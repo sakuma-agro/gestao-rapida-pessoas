@@ -20,7 +20,6 @@ const MESES = ['janeiro','fevereiro','março','abril','maio','junho',
 const estadoTela = {
   competencia: jd.competenciaAtual(),
   busca: '',
-  editandoVinculo: null,
   reabrindo: null,
 };
 
@@ -51,7 +50,6 @@ export async function abrirJornada(tela) {
   if (tela === 'jorPainel')       desenharPainel();
   if (tela === 'jorLancar')       desenharLancar();
   if (tela === 'jorBoletins')     desenharBoletins();
-  if (tela === 'jorFuncionarios') desenharFuncionarios();
   if (tela === 'jorFechamento')   desenharFechamento();
   if (tela === 'jorRelatorios')   desenharRelatorios();
   if (tela === 'jorConfig')       desenharConfigJornada();
@@ -60,7 +58,7 @@ export async function abrirJornada(tela) {
 export function limparJornada() {
   jd.limparJornadaDados();
   estadoTela.competencia = jd.competenciaAtual();
-  estadoTela.editandoVinculo = null;
+
 }
 
 function aviso(texto, ok = false) {
@@ -115,8 +113,8 @@ function desenharPainel() {
 
       ${semVinculo ? `<div class="jor-caixa alerta">
         <b>${semVinculo} funcionário(s) ainda sem vínculo de jornada.</b>
-        Enquanto não tiverem unidade, setor e função, não é possível lançar boletim para eles.
-        <button class="btn mini" id="jorIrVinculos">Abrir Funcionários</button>
+        Unidade, setor e função são preenchidos no cadastro de Funcionários — é lá que a pessoa é cadastrada uma vez só, para todos os módulos.
+        <button class="btn mini" id="jorIrVinculos">Abrir o cadastro de Funcionários</button>
       </div>` : ''}
 
       <h3 class="jor-h3">Situação por destino de DP</h3>
@@ -126,7 +124,7 @@ function desenharPainel() {
         <ul class="jor-lista">${avisos.slice(0, 12).map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
     </div>` + assinatura();
 
-  $('jorIrVinculos')?.addEventListener('click', () => irPara('jorFuncionarios'));
+  $('jorIrVinculos')?.addEventListener('click', () => irPara('funcionarios'));
 }
 
 const cartao = (valor, rotulo, tom = '') =>
@@ -155,72 +153,6 @@ function tabelaDestinos() {
         <td class="ce"><span class="tag ${sit === 'aberta' ? 'ativo' : ''}">${esc(sit)}</span></td>
       </tr>`;
     }).join('')}</tbody></table>`;
-}
-
-/* ===================================================================
-   J.4 — FUNCIONÁRIOS (vínculo de jornada)
-   =================================================================== */
-
-function desenharFuncionarios() {
-  const busca = estadoTela.busca.toLowerCase();
-  const lista = estado.funcionarios
-    .filter(f => (f.situacao || 'ATIVO') === 'ATIVO')
-    .filter(f => !busca || (f.nome || '').toLowerCase().includes(busca));
-
-  $('telaJorFuncionarios').innerHTML = cabecalho('Vínculo de jornada', 'Unidade, setor, função e jornada de cada pessoa') + `
-    <div class="jor-corpo">
-      <div class="jor-barra">
-        <input id="jorBuscaFunc" type="search" placeholder="Buscar funcionário" value="${esc(estadoTela.busca)}">
-        <span class="dc-sem">${lista.length} de ${estado.funcionarios.length}</span>
-      </div>
-      ${lista.length ? `<table class="dc-planilha"><thead><tr>
-        <th>Funcionário</th><th>Unidade</th><th>Setor</th><th>Função</th><th class="ce"></th>
-      </tr></thead><tbody>${lista.map(f => {
-        const v = jd.vinculoDe(f.id);
-        const u = jd.unidadeDe(v);
-        return `<tr>
-          <td><b>${esc(f.nome)}</b>${f.cadastro ? `<br><span class="dc-sem">nº ${esc(f.cadastro)}</span>` : ''}</td>
-          <td>${v ? esc(jd.nomeUnidade(u)) : '<span class="jor-pend">sem vínculo</span>'}</td>
-          <td>${esc(jd.dados.setores.find(s => s.id === v?.setor_id)?.nome || '—')}</td>
-          <td>${esc(jd.dados.funcoes.find(x => x.id === v?.funcao_id)?.nome || '—')}</td>
-          <td class="ce"><button class="btn mini" data-vinculo="${f.id}">${v ? 'Editar' : 'Vincular'}</button></td>
-        </tr>`;
-      }).join('')}</tbody></table>` : '<div class="vazio">Nenhum funcionário encontrado.</div>'}
-    </div>` + assinatura();
-
-  $('jorBuscaFunc').addEventListener('input', ev => {
-    estadoTela.busca = ev.target.value;
-    desenharFuncionarios();
-  });
-  document.querySelectorAll('[data-vinculo]').forEach(b =>
-    b.addEventListener('click', () => abrirVinculo(b.dataset.vinculo)));
-}
-
-function abrirVinculo(funcionarioId) {
-  const f = estado.funcionarios.find(x => x.id === funcionarioId);
-  const v = jd.vinculoDe(funcionarioId) || { funcionario_id: funcionarioId, ativo: true, insalubridade: 'nao' };
-  estadoTela.editandoVinculo = { ...v };
-
-  const opt = (lista, sel, rotulo = x => x.nome) =>
-    '<option value=""></option>' + lista.filter(x => x.ativo !== false)
-      .map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(rotulo(x))}</option>`).join('');
-
-  $('jorVinculoTitulo').textContent = f?.nome || 'Vínculo';
-  $('jorVinculoCorpo').innerHTML = `
-    <label class="campo plena">Unidade (empregador + fazenda)
-      <select id="vUnidade">${opt(jd.dados.unidades, v.unidade_id, u => jd.nomeUnidade(u))}</select></label>
-    <label class="campo">Setor <select id="vSetor">${opt(jd.dados.setores, v.setor_id)}</select></label>
-    <label class="campo">Função <select id="vFuncao">${opt(jd.dados.funcoes, v.funcao_id)}</select></label>
-    <label class="campo plena">Jornada <select id="vJornada">${opt(jd.dados.jornadas, v.jornada_id)}</select>
-      <small class="dc-sem">Em branco = usa a jornada do setor.</small></label>
-    <label class="campo">Admissão <input type="date" id="vAdmissao" value="${v.admissao || f?.admissao || ''}"></label>
-    <label class="campo">Matrícula <input type="text" id="vMatricula" value="${esc(v.matricula || f?.cadastro || '')}"></label>
-    <label class="campo jor-inline"><input type="checkbox" id="vPeric" ${v.periculosidade ? 'checked' : ''}> Periculosidade 30%</label>
-    <label class="campo">Insalubridade <select id="vInsal">
-      ${['nao','permanente','eventual'].map(o =>
-        `<option value="${o}" ${v.insalubridade === o ? 'selected' : ''}>${o === 'nao' ? 'Não' : o}</option>`).join('')}
-    </select></label>`;
-  $('dlgJorVinculo').showModal();
 }
 
 /* ===================================================================
@@ -711,32 +643,6 @@ export function ligarJornada(navegar) {
     abrirJornada(telaAtual());
   });
 
-  $('formJorVinculo')?.addEventListener('submit', async ev => {
-    ev.preventDefault();
-    const v = estadoTela.editandoVinculo;
-    if (!v) return;
-    const novo = {
-      ...v,
-      unidade_id: $('vUnidade').value || null,
-      setor_id: $('vSetor').value || null,
-      funcao_id: $('vFuncao').value || null,
-      jornada_id: $('vJornada').value || null,
-      admissao: $('vAdmissao').value || null,
-      matricula: $('vMatricula').value || null,
-      periculosidade: $('vPeric').checked,
-      insalubridade: $('vInsal').value,
-      ativo: true,
-      atualizado_em: new Date().toISOString(),
-    };
-    await jd.salvar('vinculos', novo);
-    await jd.registrar({
-      tabela: 'jor_vinculos', registro_id: novo.funcionario_id,
-      acao: 'update', antes: v, depois: novo,
-    });
-    $('dlgJorVinculo').close();
-    desenharFuncionarios();
-  });
-
   $('formJorReabrir')?.addEventListener('submit', async ev => {
     ev.preventDefault();
     const motivo = $('jorMotivoTexto').value.trim();
@@ -755,5 +661,5 @@ export function ligarJornada(navegar) {
 }
 
 const telaAtual = () =>
-  ['jorPainel','jorLancar','jorBoletins','jorFuncionarios','jorFechamento','jorRelatorios','jorConfig']
+  ['jorPainel','jorLancar','jorBoletins','jorFechamento','jorRelatorios','jorConfig']
     .find(t => !$('tela' + t.charAt(0).toUpperCase() + t.slice(1))?.hidden) || 'jorPainel';

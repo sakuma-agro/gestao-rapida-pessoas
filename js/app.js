@@ -10,6 +10,8 @@ import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
+import * as jd from './jornada-dados.js';
+import { pode } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -39,7 +41,6 @@ function abrirAba(nome) {
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
-  $('telaJorFuncionarios').hidden = nome !== 'jorFuncionarios';
   $('telaJorFechamento').hidden   = nome !== 'jorFechamento';
   $('telaJorRelatorios').hidden   = nome !== 'jorRelatorios';
   $('telaJorConfig').hidden       = nome !== 'jorConfig';
@@ -99,6 +100,14 @@ async function carregarTudo() {
   preencherControles();
   desenharSelecao();
   await carregarAcesso();
+
+  /* Os cadastros do DP (unidade, setor, função, jornada) alimentam as listas
+     do cadastro de funcionário. Carrega aqui para elas estarem prontas mesmo
+     que a pessoa vá direto para Funcionários, sem abrir o DP. */
+  if (pode('jornada')) {
+    try { await jd.carregar(); } catch { /* sem rede: usa o que está no cache */ }
+  }
+
   montarMenu(abrirAba);
 }
 
@@ -409,17 +418,44 @@ function abrirFuncionario(id) {
   $('fuCadastro').value = editandoFunc.cadastro || '';
   $('fuNascimento').value = (editandoFunc.nascimento || '').slice(0, 10);
   $('fuTelefone').value = editandoFunc.telefone || '';
-  $('fuFazenda').value = editandoFunc.fazenda || '';
   $('fuAdmissao').value = (editandoFunc.admissao || '').slice(0, 10);
-  $('fuCargo').value = editandoFunc.cargo || '';
-  $('fuEmpregador').value = editandoFunc.empregador || '';
   $('fuCpf').value = editandoFunc.cpf || '';
-  $('fuSetor').value = editandoFunc.setor || '';
+  montarListasDoCadastro(editandoFunc);
   $('fuCalcado').value = editandoFunc.tam_calcado || '';
   $('fuCamisa').value = editandoFunc.tam_camisa || '';
   $('fuSituacao').value = editandoFunc.situacao || 'ATIVO';
   $('bApagarFunc').hidden = !f;
   $('dlgFunc').showModal();
+}
+
+/* As listas de unidade, setor e função saem dos cadastros do DP — é o que
+   faz o cadastro do funcionário servir todos os módulos, sem digitar
+   empregador e fazenda na mão em cada tela. */
+function montarListasDoCadastro(f) {
+  const temDP = pode('jornada');
+  $('fuBlocoDP').hidden = !temDP;
+
+  const v = temDP ? jd.vinculoDe(f.id) : null;
+  const opcoes = (lista, sel, rotulo = x => x.nome) =>
+    '<option value=""></option>' + lista
+      .filter(x => x.ativo !== false)
+      .map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(rotulo(x))}</option>`)
+      .join('');
+
+  $('fuUnidade').innerHTML = opcoes(jd.dados.unidades, v?.unidade_id, u => jd.nomeUnidade(u));
+  $('fuSetor').innerHTML   = opcoes(jd.dados.setores, v?.setor_id);
+  $('fuCargo').innerHTML   = opcoes(jd.dados.funcoes, v?.funcao_id);
+  $('fuJornada').innerHTML = opcoes(jd.dados.jornadas, v?.jornada_id);
+
+  // Ainda sem vínculo: mostra o que estava escrito, para não parecer que sumiu.
+  const escrito = [f.empregador, f.fazenda].filter(Boolean).join(' · ');
+  $('fuUnidadeAtual').textContent = (!v?.unidade_id && escrito)
+    ? 'Hoje está escrito: ' + escrito + ' — escolha a unidade para padronizar.'
+    : '';
+
+  $('fuMatricula').value = v?.matricula || f.cadastro || '';
+  $('fuInsal').value = v?.insalubridade || 'nao';
+  $('fuPeric').checked = !!v?.periculosidade;
 }
 
 $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
@@ -434,18 +470,47 @@ $('formFunc').addEventListener('submit', async ev => {
     cadastro: $('fuCadastro').value.trim(),
     nascimento: $('fuNascimento').value || null,
     telefone: $('fuTelefone').value.trim(),
-    fazenda: $('fuFazenda').value.trim(),
     admissao: $('fuAdmissao').value || null,
-    cargo: $('fuCargo').value.trim(),
-    empregador: $('fuEmpregador').value.trim(),
     cpf: $('fuCpf').value.trim(),
-    setor: $('fuSetor').value.trim(),
     tam_calcado: $('fuCalcado').value.trim(),
     tam_camisa: $('fuCamisa').value.trim(),
     situacao: $('fuSituacao').value,
   };
   if (!f.nome) return;
+
+  /* O que foi escolhido nas listas vira também texto no cadastro, porque a
+     ficha de EPI e a lista de presença imprimem esses nomes. Sem escolha,
+     o que já estava escrito fica como estava. */
+  const temDP = pode('jornada');
+  const unidade = temDP ? jd.dados.unidades.find(u => u.id === $('fuUnidade').value) : null;
+  const setor   = temDP ? jd.dados.setores.find(s => s.id === $('fuSetor').value) : null;
+  const funcao  = temDP ? jd.dados.funcoes.find(x => x.id === $('fuCargo').value) : null;
+
+  if (unidade) {
+    f.empregador = jd.empregadorDe(unidade)?.nome || f.empregador;
+    f.fazenda = jd.fazendaDe(unidade)?.nome || f.fazenda;
+  }
+  if (setor) f.setor = setor.nome;
+  if (funcao) f.cargo = funcao.nome;
+
   await db.salvarFuncionario(f);
+
+  if (temDP) {
+    await jd.salvar('vinculos', {
+      funcionario_id: f.id,
+      unidade_id: $('fuUnidade').value || null,
+      setor_id: $('fuSetor').value || null,
+      funcao_id: $('fuCargo').value || null,
+      jornada_id: $('fuJornada').value || null,
+      admissao: f.admissao,
+      matricula: $('fuMatricula').value.trim() || f.cadastro || null,
+      periculosidade: $('fuPeric').checked,
+      insalubridade: $('fuInsal').value,
+      ativo: f.situacao === 'ATIVO',
+      atualizado_em: new Date().toISOString(),
+    });
+  }
+
   $('dlgFunc').close();
   preencherControles(); desenharFuncionarios(); desenharSelecao();
 });

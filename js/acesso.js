@@ -30,7 +30,6 @@ export const MODULOS = [
     ['jorPainel',       'Painel'],
     ['jorLancar',       'Lançar boletim'],
     ['jorBoletins',     'Boletins'],
-    ['jorFuncionarios', 'Funcionários'],
     ['jorFechamento',   'Fechamento'],
     ['jorRelatorios',   'Relatórios'],
     ['jorConfig',       'Configurações'],
