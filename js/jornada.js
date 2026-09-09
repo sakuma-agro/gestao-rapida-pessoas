@@ -71,11 +71,10 @@ function aviso(texto, ok = false) {
   el.hidden = !texto;
 }
 
-/* Cabeçalho com a marca da SAKUMA, igual em todas as telas do módulo. */
+/* Cabeçalho da tela. A marca da SAKUMA não se repete aqui: ela já está
+   na barra do app, e marca repetida na mesma página vira ruído. */
 function cabecalho(titulo, sub) {
   return `<header class="jor-cabecalho">
-    <img class="jor-cabecalho__marca" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-    <div class="jor-cabecalho__divisor"></div>
     <div>
       <div class="jor-cabecalho__titulo">${esc(titulo)}</div>
       <div class="jor-cabecalho__sub">${esc(sub || '')}</div>
@@ -86,10 +85,10 @@ function cabecalho(titulo, sub) {
   </header>`;
 }
 
-/* Assinatura da LOP, gravada a laser — só no rodapé, nunca no cabeçalho. */
-const assinatura = () => `<div class="jor-assinatura jor-assinatura--claro">
-  <img src="img/lop-assinatura-laser-claro.png"
-       alt="Desenvolvido por LOP — Inteligência para o agronegócio"></div>`;
+/* A assinatura da LOP agora é do app inteiro, no rodapé da página — não
+   de cada tela. Nos documentos impressos ela continua, porque lá o rodapé
+   do app não existe (ver jornada-relatorios.js). */
+const assinatura = () => '';
 
 /* ===================================================================
    J.1 — PAINEL
