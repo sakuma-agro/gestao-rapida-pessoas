@@ -485,14 +485,14 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .topo-divisor{width:1px;height:28px;background:var(--linha);margin:0 2px}
 .topo-marca{height:31px !important;width:auto !important;border-radius:0 !important}
 
-.rodape-lop{max-width:1180px;margin:0 auto;padding:14px 16px 22px;
-  display:flex;justify-content:flex-end;align-items:center}
-.rodape-lop img{height:29px;width:auto;opacity:.9}
+.topo-lop{height:24px !important;width:auto !important;border-radius:0 !important;
+  opacity:.85;margin-right:16px}
 
 @media (max-width:640px){
   .topo-divisor{display:none}
   .topo-marca{height:22px !important}
-  .rodape-lop{justify-content:center;padding:10px 16px 90px}
+  /* na barra estreita a assinatura sai: quem manda ali é a SAKUMA */
+  .topo-lop{display:none}
 }
 
 /* Bloco de jornada dentro do cadastro do funcionário */
