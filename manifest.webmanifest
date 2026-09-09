@@ -1,7 +1,7 @@
 {
-  "name": "Ficha de EPI · SAKUMA Agronegócios",
-  "short_name": "Ficha de EPI",
-  "description": "Cadastro de funcionários e impressão das fichas de EPI da SAKUMA Agronegócios.",
+  "name": "Gestão Rápida (Pessoas) · SAKUMA Agronegócios",
+  "short_name": "Gestão Rápida",
+  "description": "Gestão de pessoas da SAKUMA Agronegócios: cadastro, fichas de EPI, listas, aniversariantes e perfil comportamental DISC.",
   "lang": "pt-BR",
   "dir": "ltr",
   "start_url": ".",

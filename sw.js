@@ -3,14 +3,14 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'epi-v15';
+const VERSAO = 'gr-v18';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/lista.js',
   './js/planilha.js', './js/aniversarios.js', './js/seed.js',
-  './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
+  './js/acesso.js', './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
   './vendor/supabase.js', './manifest.webmanifest', './favicon.ico',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png',
+  './icons/icon-32.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png',
   './icons/maskable-192.png', './icons/maskable-512.png',
 ];
 

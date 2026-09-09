@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Ficha de EPI · SAKUMA</title>
-<meta name="description" content="Cadastro de funcionários e impressão das fichas de EPI da SAKUMA Agronegócios.">
+<title>Gestão Rápida (Pessoas) · SAKUMA</title>
+<meta name="description" content="Gestão de pessoas da SAKUMA Agronegócios: cadastro, fichas de EPI, listas, aniversariantes e perfil comportamental DISC.">
 <meta name="theme-color" content="#84BD00">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Ficha de EPI">
+<meta name="apple-mobile-web-app-title" content="Gestão Rápida">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -20,8 +20,8 @@
 <section class="centro tela" id="telaLogin" hidden>
   <div class="caixa">
     <img src="icons/icon-192.png" alt="">
-    <h1>Ficha de EPI</h1>
-    <p class="sub">SAKUMA Agronegócios</p>
+    <h1>Gestão Rápida</h1>
+    <p class="sub">Pessoas · SAKUMA Agronegócios</p>
     <div class="aviso erro" id="erroLogin" hidden></div>
     <form id="formLogin">
       <div class="grade">
@@ -42,21 +42,14 @@
   <header class="topo">
     <div class="topo-int">
       <img src="icons/icon-192.png" alt="">
-      <h1>Ficha de EPI</h1>
+      <h1>Gestão Rápida <span class="modulo">Pessoas</span></h1>
       <span class="cresce"></span>
       <span class="estado" id="estadoRede"><span class="pt"></span><span id="estadoTexto">online</span></span>
       <button class="btn mini" id="btnInstalar" hidden>Instalar app</button>
       <button class="btn mini" id="btnSair">Sair</button>
     </div>
-    <nav class="abas" role="tablist">
-      <button class="aba" role="tab" data-tela="fichas" aria-selected="true">Fichas</button>
-      <button class="aba" role="tab" data-tela="lista" aria-selected="false">Lista de presença</button>
-      <button class="aba" role="tab" data-tela="funcionarios" aria-selected="false">Funcionários</button>
-      <button class="aba" role="tab" data-tela="aniversarios" aria-selected="false">Aniversariantes</button>
-      <button class="aba" role="tab" data-tela="epis" aria-selected="false">EPIs</button>
-      <button class="aba" role="tab" data-tela="modelo" aria-selected="false">Modelo da ficha</button>
-      <button class="aba" role="tab" data-tela="disc" aria-selected="false" id="abaDisc" hidden>DISC</button>
-    </nav>
+    <nav class="abas" role="tablist" id="navModulos"></nav>
+    <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
   </header>
 
   <main>
@@ -348,15 +341,23 @@
                 <p class="dica" style="margin:2px 0 0">Os dois caminhos dão o mesmo resultado.</p>
               </div>
               <span class="dc-troca">
-                <button class="dc-op" type="button" data-origem="marcacoes" aria-selected="true">Pelas marcações</button>
+                <button class="dc-op" type="button" data-origem="notas" aria-selected="true">Notas de 1 a 4</button>
                 <button class="dc-op" type="button" data-origem="totais" aria-selected="false">Pelos totais</button>
               </span>
             </div>
 
+            <p class="dica" style="margin:14px 0 0">
+              Em cada linha, a pessoa dá <b>4</b> ao que mais combina com ela e <b>1</b> ao que menos combina,
+              usando 2 e 3 no meio — cada nota uma vez só por linha. Clique no número embaixo da caixa;
+              clicar de novo no mesmo número tira a nota, e escolher um número que outra caixa da linha
+              já usa faz as duas trocarem. Como são 10 linhas de 1+2+3+4, a soma sempre fecha 100 —
+              é por isso que o total de cada cor já é o percentual do perfil.
+            </p>
+
             <div id="dcGrade" style="margin-top:14px"></div>
 
             <div id="dcTotaisMan" hidden style="margin-top:14px">
-              <p class="dica">Digite os quatro totais somados no rodapé da folha. A soma tem de dar 100.</p>
+              <p class="dica">Quando o papel já vier somado: digite os quatro totais do rodapé da folha. A soma tem de dar 100.</p>
               <div class="grade">
                 <label class="campo">Total vermelho · D <input type="number" id="dcTD" min="0" max="100" step="0.5"></label>
                 <label class="campo">Total amarelo · I <input type="number" id="dcTI" min="0" max="100" step="0.5"></label>
@@ -376,7 +377,7 @@
             <div class="barra entre">
               <button class="btn perigo" id="dcApagar" hidden>Apagar este teste</button>
               <span>
-                <button class="btn" id="dcLimpar">Limpar marcações</button>
+                <button class="btn" id="dcLimpar">Limpar notas</button>
                 <button class="btn principal" id="dcSalvar" disabled>Salvar lançamento</button>
               </span>
             </div>
@@ -492,8 +493,53 @@
         </div>
       </div>
     </section>
+
+    <!-- ---- CONFIGURAÇÕES ---- -->
+    <section class="tela" id="telaConfig" hidden>
+      <div class="aviso erro" id="cfAviso" hidden></div>
+
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Quem acessa o quê</h2>
+            <p class="dica" style="margin:2px 0 0">Marque os módulos que cada pessoa enxerga ao entrar.</p>
+          </div>
+          <button class="btn principal" id="cfNovo">Adicionar pessoa</button>
+        </div>
+        <div id="cfTabela" style="margin-top:14px"></div>
+        <p class="dica" style="margin:14px 0 0">
+          Cada módulo reúne as telas do assunto: <b>Funcionários</b> traz o cadastro e os aniversariantes;
+          <b>EPIs</b> traz as fichas, os tipos de EPI e o modelo da ficha; <b>Certificação</b> traz a lista de
+          presença; <b>RH</b> traz o DISC. Quem estiver como <b>administrador</b> enxerga tudo, inclusive esta aba.
+          A senha de cada pessoa é criada por você no painel do Supabase, em
+          <b>Authentication → Users → Add user</b>, marcando <b>Auto Confirm User</b> — aqui só se define
+          o que ela vê depois de entrar. Os dados de <b>RH</b> também são bloqueados no banco: sem a permissão,
+          o servidor não devolve nada. Nos demais módulos o bloqueio é da tela.
+        </p>
+      </div>
+    </section>
   </main>
 </div>
+
+<!-- ============ DIÁLOGO: PESSOA ============ -->
+<dialog id="dlgUsuario">
+  <form method="dialog" id="formUsuario">
+    <h3 id="tituloUsuario">Adicionar pessoa</h3>
+    <div class="grade">
+      <label class="campo plena">E-mail do login
+        <input type="email" id="usEmail" required placeholder="nome@exemplo.com">
+      </label>
+      <label class="campo plena">Nome <input type="text" id="usNome"></label>
+    </div>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarUsuario" hidden>Tirar o acesso</button>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
 
 <!-- lista de sugestões de EPI usada dentro da ficha -->
 <datalist id="lista-epis"></datalist>
