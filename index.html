@@ -13,6 +13,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Gestão Rápida">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/jornada-marca.css">
+<link rel="stylesheet" href="css/jornada.css">
+<link rel="stylesheet" href="css/jornada-impressao.css">
 </head>
 <body>
 
@@ -518,8 +521,22 @@
         </p>
       </div>
     </section>
+
+    <!-- ============ MÓDULO JORNADA ============ -->
+    <div id="jorAviso" class="jor-aviso" hidden></div>
+    <section class="tela" id="telaJorPainel" hidden></section>
+    <section class="tela" id="telaJorLancar" hidden></section>
+    <section class="tela" id="telaJorBoletins" hidden></section>
+    <section class="tela" id="telaJorFuncionarios" hidden></section>
+    <section class="tela" id="telaJorFechamento" hidden></section>
+    <section class="tela" id="telaJorRelatorios" hidden></section>
+    <section class="tela" id="telaJorConfig" hidden></section>
   </main>
 </div>
+
+<!-- Onde o relatório da Jornada é montado. Fica fora do #app de propósito:
+     na hora de imprimir, só ele vai para o papel. -->
+<div id="jorImpressao" hidden></div>
 
 <!-- ============ DIÁLOGO: PESSOA ============ -->
 <dialog id="dlgUsuario">
@@ -607,6 +624,50 @@
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit" id="bConfirmarImportar">Gravar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGOS: JORNADA ============ -->
+<dialog id="dlgJorVinculo">
+  <form method="dialog" id="formJorVinculo">
+    <h3 id="jorVinculoTitulo">Vínculo de jornada</h3>
+    <div class="grade" id="jorVinculoCorpo"></div>
+    <div class="barra entre">
+      <span></span>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Gravar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgJorMemoria">
+  <h3>Memória de cálculo</h3>
+  <pre id="jorMemoriaTexto" class="jor-memoria"></pre>
+  <div class="barra entre">
+    <span></span>
+    <button class="btn principal" type="button" data-fechar>Fechar</button>
+  </div>
+</dialog>
+
+<dialog id="dlgJorReabrir">
+  <form method="dialog" id="formJorReabrir">
+    <h3>Reabrir competência</h3>
+    <p class="dc-sem">A reabertura fica registrada e a próxima emissão sai como
+    versão nova, marcada no cabeçalho do relatório.</p>
+    <div class="grade">
+      <label class="campo plena">Motivo
+        <textarea id="jorMotivoTexto" rows="3" required minlength="5"></textarea>
+      </label>
+    </div>
+    <div class="barra entre">
+      <span></span>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Reabrir</button>
       </span>
     </div>
   </form>
