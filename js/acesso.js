@@ -44,11 +44,26 @@ export const moduloDe = tela =>
 // fica trancado do lado de fora; RH e Configurações ficam sempre de fora.
 const PADRAO = ['pessoas', 'epis', 'certificacao'];
 
-export const acesso = { email: '', admin: false, modulos: [...PADRAO], carregado: false };
+export const acesso = { email: '', admin: false, modulos: [...PADRAO], telas: [], carregado: false };
 let usuarios = [];
 let editando = null;
 
 export const pode = m => acesso.admin || acesso.modulos.includes(m);
+
+/* Permissão por tela (submódulo). A lista guarda 'modulo:tela'.
+   Enquanto nenhuma tela de um módulo estiver na lista, a pessoa vê o módulo
+   inteiro — que é como sempre funcionou. Basta marcar uma para o resto sumir. */
+const temRestricao = m => acesso.telas.some(x => x.startsWith(m + ':'));
+
+export function podeTela(tela) {
+  if (acesso.admin) return true;
+  const m = moduloDe(tela);
+  if (!m || !pode(m)) return false;
+  return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
+}
+
+export const telasLiberadas = m =>
+  (MODULOS.find(x => x.id === m)?.telas || []).filter(([t]) => podeTela(t));
 
 export async function carregarAcesso() {
   acesso.email = (estado.sessao?.user?.email || '').toLowerCase();
@@ -60,9 +75,11 @@ export async function carregarAcesso() {
     const meu = usuarios.find(u => (u.email || '').toLowerCase() === acesso.email);
     acesso.admin = !!meu?.admin;
     acesso.modulos = meu ? (meu.modulos || []) : [...PADRAO];
+  acesso.telas = meu ? (meu.telas || []) : [];
   } catch {
     acesso.admin = false;
     acesso.modulos = [...PADRAO];
+    acesso.telas = [];
   }
   acesso.carregado = true;
   return acesso;
@@ -72,7 +89,8 @@ export async function carregarAcesso() {
 let aoTrocar = () => {};
 let moduloAberto = null;
 
-export const modulosLiberados = () => MODULOS.filter(m => pode(m.id));
+export const modulosLiberados = () =>
+  MODULOS.filter(m => pode(m.id) && telasLiberadas(m.id).length);
 
 /** Monta o menu com o que a pessoa pode ver e abre o primeiro módulo. */
 export function montarMenu(callback) {
@@ -105,11 +123,13 @@ export function abrirModulo(id, tela) {
 
   const m = MODULOS.find(x => x.id === id);
   if (!m) return;
-  const alvo = m.telas.some(([t]) => t === tela) ? tela : m.telas[0][0];
+  const permitidas = telasLiberadas(id);
+  if (!permitidas.length) return;
+  const alvo = permitidas.some(([t]) => t === tela) ? tela : permitidas[0][0];
 
   // com uma tela só, o módulo não precisa de submenu
-  $('navTelas').hidden = m.telas.length < 2;
-  $('navTelas').innerHTML = m.telas.map(([t, rot]) =>
+  $('navTelas').hidden = permitidas.length < 2;
+  $('navTelas').innerHTML = permitidas.map(([t, rot]) =>
     `<button class="aba2" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${rot}</button>`).join('');
   $('navTelas').querySelectorAll('.aba2').forEach(b =>
     b.addEventListener('click', () => {
@@ -185,7 +205,7 @@ async function trocarPermissao(cx) {
 async function gravar(u) {
   const { error } = await estado.cliente.from('app_usuarios').upsert({
     email: u.email.trim().toLowerCase(), nome: u.nome || null,
-    admin: !!u.admin, modulos: u.modulos || [],
+    admin: !!u.admin, modulos: u.modulos || [], telas: u.telas || [],
     atualizado_em: new Date().toISOString(),
   }, { onConflict: 'email' });
   if (error) {
@@ -200,13 +220,67 @@ async function gravar(u) {
 
 function abrirUsuario(email) {
   const u = email ? usuarios.find(x => x.email === email) : null;
-  editando = u ? { ...u } : { email: '', nome: '', admin: false, modulos: [...PADRAO] };
+  editando = u ? { ...u, telas: [...(u.telas || [])] } : { email: '', nome: '', admin: false, modulos: [...PADRAO], telas: [] };
   $('tituloUsuario').textContent = u ? 'Editar pessoa' : 'Adicionar pessoa';
   $('usEmail').value = editando.email || '';
   $('usEmail').disabled = !!u;
   $('usNome').value = editando.nome || '';
   $('bApagarUsuario').hidden = !u || (u.email || '').toLowerCase() === acesso.email;
+  desenharPermissoes();
   $('dlgUsuario').showModal();
+}
+
+/* O que a pessoa enxerga: o módulo e, dentro dele, as telas.
+   Deixar todas as telas desmarcadas quer dizer "o módulo inteiro" — é o
+   caso normal. Marcar uma só é o que se faz para quem vem de fora. */
+function desenharPermissoes() {
+  const e = editando;
+  if (!e) return;
+  const temModulo = m => e.admin || (e.modulos || []).includes(m);
+  const marcada = (m, t) => (e.telas || []).includes(m + ':' + t);
+  const restrito = m => (e.telas || []).some(x => x.startsWith(m + ':'));
+
+  $('usPermissoes').innerHTML = MODULOS.map(m => `
+    <div class="us-mod ${temModulo(m.id) ? '' : 'desligado'}">
+      <label class="us-mod__topo">
+        <input type="checkbox" data-mod="${m.id}" ${temModulo(m.id) ? 'checked' : ''}
+          ${e.admin ? 'disabled title="Administrador enxerga tudo"' : ''}>
+        <b>${esc(m.nome)}</b>
+        <span class="dc-sem">${restrito(m.id)
+          ? 'só as telas marcadas'
+          : 'todas as telas'}</span>
+      </label>
+      <div class="us-telas">
+        ${m.telas.map(([tid, rot]) => `
+          <label class="us-tela">
+            <input type="checkbox" data-mod="${m.id}" data-tela="${tid}"
+              ${marcada(m.id, tid) ? 'checked' : ''}
+              ${temModulo(m.id) && !e.admin ? '' : 'disabled'}>
+            ${esc(rot)}
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+
+  $('usPermissoes').querySelectorAll('input[data-mod]').forEach(cx =>
+    cx.addEventListener('change', () => {
+      const m = cx.dataset.mod;
+      if (cx.dataset.tela) {
+        const chave = m + ':' + cx.dataset.tela;
+        const lista = new Set(e.telas || []);
+        cx.checked ? lista.add(chave) : lista.delete(chave);
+        e.telas = [...lista];
+      } else {
+        const lista = new Set(e.modulos || []);
+        if (cx.checked) lista.add(m);
+        else {
+          lista.delete(m);
+          // tirou o módulo: as telas dele não fazem mais sentido
+          e.telas = (e.telas || []).filter(x => !x.startsWith(m + ':'));
+        }
+        e.modulos = [...lista];
+      }
+      desenharPermissoes();
+    }));
 }
 
 export function ligarAcesso() {
@@ -217,7 +291,8 @@ export function ligarAcesso() {
     if (!editando) return;
     const email = $('usEmail').value.trim().toLowerCase();
     if (!email) return;
-    const u = { ...editando, email, nome: $('usNome').value.trim() };
+    const u = { ...editando, email, nome: $('usNome').value.trim(),
+                 modulos: editando.modulos || [], telas: editando.telas || [] };
     if (await gravar(u)) {
       const i = usuarios.findIndex(x => x.email === email);
       if (i >= 0) usuarios[i] = u; else usuarios.push(u);
