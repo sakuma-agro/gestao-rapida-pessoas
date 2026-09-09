@@ -505,7 +505,7 @@
         <div class="barra entre" style="margin:0">
           <div>
             <h2 style="margin:0">Quem acessa o quê</h2>
-            <p class="dica" style="margin:2px 0 0">Marque os módulos que cada pessoa enxerga ao entrar.</p>
+            <p class="dica" style="margin:2px 0 0">Marque os módulos que cada pessoa enxerga. Em <b>Editar</b> dá para descer ao nível das telas e trocar a senha.</p>
           </div>
           <button class="btn principal" id="cfNovo">Adicionar pessoa</button>
         </div>
@@ -513,11 +513,17 @@
         <p class="dica" style="margin:14px 0 0">
           Cada módulo reúne as telas do assunto: <b>Funcionários</b> traz o cadastro e os aniversariantes;
           <b>EPIs</b> traz as fichas, os tipos de EPI e o modelo da ficha; <b>Certificação</b> traz a lista de
-          presença; <b>RH</b> traz o DISC. Quem estiver como <b>administrador</b> enxerga tudo, inclusive esta aba.
-          A senha de cada pessoa é criada por você no painel do Supabase, em
-          <b>Authentication → Users → Add user</b>, marcando <b>Auto Confirm User</b> — aqui só se define
-          o que ela vê depois de entrar. Os dados de <b>RH</b> também são bloqueados no banco: sem a permissão,
-          o servidor não devolve nada. Nos demais módulos o bloqueio é da tela.
+          presença; <b>RH</b> traz o DISC; <b>DP</b> traz a apuração de jornada, o fechamento e os relatórios.
+          Quem estiver como <b>administrador</b> enxerga tudo, inclusive esta aba.
+          <br><br>
+          <b>Adicionar pessoa</b> cria o login e o acesso de uma vez, e mostra a senha <b>uma única vez</b> —
+          anote na hora, porque ela não fica guardada. Em <b>Editar</b> você troca os módulos, marca telas
+          específicas dentro de cada módulo e gera uma senha nova quando alguém esquecer a dele.
+          <br><br>
+          Marcar telas é opcional: enquanto nenhuma tela de um módulo estiver marcada, a pessoa vê o módulo
+          inteiro. Os dados de <b>RH</b> são bloqueados também no banco: sem a permissão, o servidor não
+          devolve nada. Nos demais módulos o bloqueio é da tela — o que basta para a equipe de casa, mas
+          não serve para dar acesso a gente de fora.
         </p>
       </div>
     </section>
@@ -558,7 +564,10 @@
     <div id="usSenha" class="us-senha" hidden></div>
 
     <div class="barra entre">
-      <button class="btn perigo" type="button" id="bApagarUsuario" hidden>Tirar o acesso</button>
+      <span>
+        <button class="btn perigo" type="button" id="bApagarUsuario" hidden>Tirar o acesso</button>
+        <button class="btn" type="button" id="bNovaSenha" hidden>Gerar nova senha</button>
+      </span>
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit" id="bSalvarUsuario">Salvar</button>
