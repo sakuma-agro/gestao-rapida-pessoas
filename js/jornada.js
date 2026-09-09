@@ -105,7 +105,7 @@ function desenharPainel() {
   const semVinculo = estado.funcionarios.filter(f =>
     (f.situacao || 'ATIVO') === 'ATIVO' && !jd.vinculoDe(f.id)).length;
 
-  $('telaJorPainel').innerHTML = cabecalho('Gestão de Jornada', 'Apuração de horas · Campo e Administrativo') + `
+  $('telaJorPainel').innerHTML = cabecalho('Departamento Pessoal', 'Apuração de jornada · Campo e Administrativo') + `
     <div class="jor-corpo">
       <div class="jor-cartoes">
         ${cartao(bs.length, 'BOLETINS LANÇADOS')}
@@ -476,7 +476,7 @@ function desenharConfigJornada() {
 
   const par = jd.parametrosEm(hoje());
 
-  $('telaJorConfig').innerHTML = cabecalho('Configurações da Jornada', 'Cadastros estruturais e parâmetros com vigência') + `
+  $('telaJorConfig').innerHTML = cabecalho('Configurações do DP', 'Cadastros estruturais e parâmetros com vigência') + `
     <div class="jor-corpo">
       ${t('Unidades (empregador + fazenda)',
         jd.dados.unidades.map(u => `<tr>
