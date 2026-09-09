@@ -7,6 +7,7 @@ import { lerFuncionarios, comparar, aplicarEm } from './planilha.js';
 import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, linkWhatsapp,
   imagemAniversarios, nomeImagem } from './aniversarios.js';
 import { SEED_MODELO } from './seed.js';
+import { ligarDisc, verificarAcesso, abrirDisc, limparDisc } from './disc.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -33,11 +34,13 @@ function abrirAba(nome) {
   $('telaAniversarios').hidden = nome !== 'aniversarios';
   $('telaEpis').hidden = nome !== 'epis';
   $('telaModelo').hidden = nome !== 'modelo';
+  $('telaDisc').hidden = nome !== 'disc';
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'epis') desenharEpis();
   if (nome === 'modelo') preencherModelo();
+  if (nome === 'disc') abrirDisc();
 }
 
 /* =============== login =============== */
@@ -60,6 +63,7 @@ $('formLogin').addEventListener('submit', async ev => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear();
+  limparDisc();
   mostrar('login');
 });
 
@@ -85,6 +89,7 @@ async function carregarTudo() {
   preencherControles();
   desenharSelecao();
   abrirAba('fichas');
+  verificarAcesso();
 }
 
 function preencherControles() {
@@ -761,6 +766,7 @@ if ('serviceWorker' in navigator) {
 }
 
 /* arranque */
+ligarDisc();
 (async () => {
   const r = await db.iniciar();
   mostrar(r.etapa);
