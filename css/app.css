@@ -494,3 +494,9 @@ dialog h3{margin:0 0 14px;font-size:16px}
   .topo-marca{height:22px !important}
   .rodape-lop{justify-content:center;padding:10px 16px 90px}
 }
+
+/* Bloco de jornada dentro do cadastro do funcionário */
+.fu-secao{margin:16px 0 8px;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--suave)}
+label.campo.fu-inline{flex-direction:row;align-items:center;gap:8px;
+  text-transform:none;font-size:13px;letter-spacing:0;align-self:end;padding-bottom:9px}
+label.campo.fu-inline input{width:auto;margin:0;flex:none}
