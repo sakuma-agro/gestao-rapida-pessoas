@@ -44,12 +44,22 @@ body{background:var(--fundo);color:var(--texto);
 .topo-int{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .topo img{height:34px;width:34px;border-radius:7px}
 .topo h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px}
+.topo h1 .modulo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:20px;
+  background:var(--verde-fundo);color:var(--verde-esc);font-size:11px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;vertical-align:2px}
 .topo .cresce{flex:1}
 .abas{max-width:1180px;margin:0 auto;padding:0 8px;display:flex;gap:2px;overflow-x:auto}
 .aba{font:inherit;font-size:13.5px;font-weight:600;padding:10px 14px;border:0;background:transparent;
   color:var(--suave);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap}
 .aba:hover{color:var(--texto)}
 .aba[aria-selected="true"]{color:var(--verde-esc);border-bottom-color:var(--verde)}
+.aba2s{max-width:1180px;margin:0 auto;padding:8px 16px 10px;display:flex;gap:6px;overflow-x:auto;
+  border-top:1px solid var(--linha)}
+.aba2s[hidden]{display:none}
+.aba2{font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--linha);background:var(--papel);color:var(--suave);white-space:nowrap}
+.aba2:hover{color:var(--texto);border-color:var(--verde)}
+.aba2[aria-selected="true"]{background:var(--verde);border-color:var(--verde);color:#fff}
 main{max-width:1180px;margin:0 auto;padding:18px 16px 80px}
 .tela[hidden]{display:none}
 
@@ -281,12 +291,19 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .dc-tab th.dc-n,.dc-tab td.dc-n{width:30px;background:var(--fundo);color:var(--suave);
   font-size:11px;text-align:center}
 .dc-tab td{border:1px solid var(--linha);padding:3px;vertical-align:stretch}
-.dc-cx{display:block;width:100%;min-height:52px;font:inherit;font-size:11.5px;line-height:1.3;
-  padding:7px 6px;border:1.5px solid transparent;border-radius:6px;cursor:pointer;
-  background:transparent;color:var(--texto);text-align:left}
-.dc-cx:hover{background:var(--verde-fundo)}
-.dc-cx.on{background:color-mix(in srgb,var(--cor) 16%,transparent);border-color:var(--cor);font-weight:600}
-.dc-cx:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
+.dc-tab td.dc-ok{color:var(--verde-esc);font-size:14px;font-weight:700}
+.dc-tab tr.incompleta td.dc-n{background:rgba(192,57,43,.10);color:var(--erro)}
+.dc-cel{font-size:11.5px;line-height:1.3;padding:7px 7px 6px !important}
+.dc-cel.on{background:color-mix(in srgb,var(--cor) 10%,transparent)}
+.dc-cel.alta .dc-txt{font-weight:700}
+.dc-cel .dc-txt{display:block;min-height:30px}
+.dc-notas{display:flex;gap:4px;margin-top:6px}
+.dc-nt{flex:1;font:inherit;font-size:12px;font-weight:700;padding:3px 0;border-radius:5px;cursor:pointer;
+  border:1px solid var(--linha);background:var(--papel);color:var(--suave)}
+.dc-nt:hover{border-color:var(--cor);color:var(--cor)}
+.dc-nt.on{background:var(--cor);border-color:var(--cor);color:#fff}
+.dc-cel[style*="E9C46A"] .dc-nt.on{color:#3d3400}
+.dc-nt:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
 
 .dc-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:16px}
 .dc-res{border:1px solid var(--linha);border-left-width:4px;border-radius:8px;padding:9px 11px;
@@ -382,6 +399,11 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .dk-pe{margin-top:auto;padding-top:4mm;border-top:.3mm solid #dfe2d8;
   font-size:7.5pt;color:#7d8175;line-height:1.35}
 
+/* ---------- configurações ---------- */
+.cf-tab td:first-child{min-width:190px}
+.cf-tab input[type=checkbox]{width:17px;height:17px;accent-color:var(--verde);cursor:pointer}
+.cf-tab input[type=checkbox]:disabled{cursor:not-allowed;opacity:.55}
+
 /* =========================================================
    IMPRESSÃO
    ========================================================= */
@@ -393,7 +415,7 @@ dialog h3{margin:0 0 14px;font-size:16px}
 @media print{
   :root{--imp-margem:4mm;--imp-escala:1.11}
   body{background:#fff}
-  .topo,.abas,.subabas,.rodape-fixo,.naoimprimir,dialog,.aviso{display:none !important}
+  .topo,.abas,.aba2s,.subabas,.rodape-fixo,.naoimprimir,dialog,.aviso{display:none !important}
   main{padding:0;max-width:none}
   .cartao{display:none}
   .previa{margin:0;gap:0;display:block}
