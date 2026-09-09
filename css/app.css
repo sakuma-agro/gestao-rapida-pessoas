@@ -485,8 +485,8 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .topo-divisor{width:1px;height:28px;background:var(--linha);margin:0 2px}
 .topo-marca{height:31px !important;width:auto !important;border-radius:0 !important}
 
-.topo-lop{height:24px !important;width:auto !important;border-radius:0 !important;
-  opacity:.85;margin-right:16px}
+.topo-lop{height:34px !important;width:auto !important;border-radius:0 !important;
+  opacity:.9;margin-left:16px}
 
 @media (max-width:640px){
   .topo-divisor{display:none}
