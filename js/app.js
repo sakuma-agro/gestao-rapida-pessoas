@@ -7,7 +7,8 @@ import { lerFuncionarios, comparar, aplicarEm } from './planilha.js';
 import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, linkWhatsapp,
   imagemAniversarios, nomeImagem } from './aniversarios.js';
 import { SEED_MODELO } from './seed.js';
-import { ligarDisc, verificarAcesso, abrirDisc, limparDisc } from './disc.js';
+import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
+import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -26,8 +27,6 @@ function mostrar(qual) {
 }
 
 function abrirAba(nome) {
-  document.querySelectorAll('.aba').forEach(b =>
-    b.setAttribute('aria-selected', String(b.dataset.tela === nome)));
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
   $('telaFuncionarios').hidden = nome !== 'funcionarios';
@@ -35,12 +34,14 @@ function abrirAba(nome) {
   $('telaEpis').hidden = nome !== 'epis';
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
+  $('telaConfig').hidden = nome !== 'config';
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'epis') desenharEpis();
   if (nome === 'modelo') preencherModelo();
   if (nome === 'disc') abrirDisc();
+  if (nome === 'config') desenharConfig();
 }
 
 /* =============== login =============== */
@@ -63,7 +64,7 @@ $('formLogin').addEventListener('submit', async ev => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear();
-  limparDisc();
+  limparDisc(); limparAcesso();
   mostrar('login');
 });
 
@@ -88,8 +89,8 @@ async function carregarTudo() {
   }
   preencherControles();
   desenharSelecao();
-  abrirAba('fichas');
-  verificarAcesso();
+  await carregarAcesso();
+  montarMenu(abrirAba);
 }
 
 function preencherControles() {
@@ -733,8 +734,6 @@ $('bRestaurarModelo').addEventListener('click', async () => {
 });
 
 /* =============== geral =============== */
-document.querySelectorAll('.aba').forEach(b =>
-  b.addEventListener('click', () => abrirAba(b.dataset.tela)));
 document.querySelectorAll('[data-fechar]').forEach(b =>
   b.addEventListener('click', () => b.closest('dialog').close()));
 
@@ -766,7 +765,7 @@ if ('serviceWorker' in navigator) {
 }
 
 /* arranque */
-ligarDisc();
+ligarDisc(); ligarAcesso();
 (async () => {
   const r = await db.iniciar();
   mostrar(r.etapa);

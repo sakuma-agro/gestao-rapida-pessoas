@@ -1,7 +1,8 @@
 // disc.js — módulo DISC (perfil comportamental)
-// Acesso restrito: as tabelas disc_* só respondem para quem está na
-// lista disc_acesso do banco. Sem isso a aba nem aparece.
+// Acesso restrito: as tabelas disc_* só respondem para quem tem o módulo
+// "rh" em app_usuarios. Sem isso a aba nem aparece.
 import { estado } from './store.js';
+import { pode } from './acesso.js';
 import { COLUNAS, GRUPOS, PADRAO, analisar } from './disc-dados.js';
 import { montarFichaDisc } from './disc-ficha.js';
 
@@ -16,7 +17,6 @@ const dataBr = iso => {
 const hoje = () => new Date().toISOString().slice(0, 10);
 
 const D = {
-  autorizado: false,
   carregado: false,
   perfis: {},        // codigo -> linha de disc_perfis
   combinacoes: {},   // "DI" -> {titulo, texto}
@@ -24,18 +24,8 @@ const D = {
   cargos: {},        // cargo -> linha de disc_cargos_esperado
 };
 
-let lanc = null;     // { funcionario_id, id, data_teste, origem, marcas:Set('1D'), totais:{} }
+let lanc = null;     // { funcionario_id, id, data_teste, origem, notas:{'1D':4}, totais:{} }
 let subaba = 'lancar';
-
-/* =============== acesso =============== */
-export async function verificarAcesso() {
-  try {
-    const { data, error } = await estado.cliente.rpc('disc_autorizado');
-    D.autorizado = !error && data === true;
-  } catch { D.autorizado = false; }
-  $('abaDisc').hidden = !D.autorizado;
-  return D.autorizado;
-}
 
 /* =============== carga =============== */
 async function carregar() {
@@ -74,7 +64,7 @@ function leituraDe(av) {
 
 /* =============== abertura =============== */
 export async function abrirDisc() {
-  if (!D.autorizado) return;
+  if (!pode('rh')) return;
   const aviso = $('discAviso');
   if (!D.carregado) {
     aviso.textContent = 'Carregando o DISC...';
@@ -132,30 +122,55 @@ function montarGrade() {
       <thead><tr><th class="dc-n">#</th>${COLUNAS.map(c => {
         const p = D.perfis[c] || PADRAO[c];
         return `<th style="background:${p.cor};color:${c === 'I' ? '#3d3400' : '#fff'}">${c} · ${esc(p.nome)}</th>`;
-      }).join('')}</tr></thead>
-      <tbody>${GRUPOS.map((linha, i) => `<tr>
+      }).join('')}<th class="dc-n">ok</th></tr></thead>
+      <tbody>${GRUPOS.map((linha, i) => `<tr data-linha="${i + 1}">
         <td class="dc-n">${i + 1}</td>
         ${linha.map((txt, j) => {
           const ch = `${i + 1}${COLUNAS[j]}`;
-          return `<td><button type="button" class="dc-cx" data-ch="${ch}"
-            style="--cor:${(D.perfis[COLUNAS[j]] || PADRAO[COLUNAS[j]]).cor}">${esc(txt)}</button></td>`;
+          const cor = (D.perfis[COLUNAS[j]] || PADRAO[COLUNAS[j]]).cor;
+          return `<td class="dc-cel" data-ch="${ch}" style="--cor:${cor}">
+            <span class="dc-txt">${esc(txt)}</span>
+            <span class="dc-notas">${[1, 2, 3, 4].map(v =>
+              `<button type="button" class="dc-nt" data-ch="${ch}" data-v="${v}">${v}</button>`).join('')}</span>
+          </td>`;
         }).join('')}
+        <td class="dc-n dc-ok"></td>
       </tr>`).join('')}</tbody>
     </table>`;
-  $('dcGrade').querySelectorAll('.dc-cx').forEach(b =>
+  $('dcGrade').querySelectorAll('.dc-nt').forEach(b =>
     b.addEventListener('click', () => {
       if (!lanc) return;
-      const ch = b.dataset.ch;
-      lanc.marcas.has(ch) ? lanc.marcas.delete(ch) : lanc.marcas.add(ch);
+      darNota(b.dataset.ch, +b.dataset.v);
       atualizarLanc();
     }));
 }
+
+/* Uma nota por caixa; em cada linha 1, 2, 3 e 4 aparecem uma vez só.
+   Clicar na nota que já está lá tira a nota. Escolher uma nota que outra
+   caixa da linha está usando faz as duas trocarem — nada é apagado. */
+function darNota(ch, valor) {
+  const linha = ch.slice(0, -1);
+  const atual = lanc.notas[ch] || 0;
+  if (atual === valor) { delete lanc.notas[ch]; return; }
+  const irmao = COLUNAS.map(c => linha + c).find(k => k !== ch && lanc.notas[k] === valor);
+  if (irmao) { if (atual) lanc.notas[irmao] = atual; else delete lanc.notas[irmao]; }
+  lanc.notas[ch] = valor;
+}
+
+const linhaCompleta = n => {
+  const vs = COLUNAS.map(c => lanc.notas[n + c]).filter(Boolean).sort();
+  return vs.length === 4 && vs.join('') === '1234';
+};
+
+const linhasCompletas = () =>
+  lanc && lanc.origem === 'notas'
+    ? GRUPOS.map((_, i) => linhaCompleta(i + 1)).filter(Boolean).length : 0;
 
 function totaisDoLancamento() {
   if (!lanc) return { D: 0, I: 0, S: 0, C: 0 };
   if (lanc.origem === 'totais') return { ...lanc.totais };
   const t = { D: 0, I: 0, S: 0, C: 0 };
-  lanc.marcas.forEach(ch => { t[ch.slice(-1)]++; });
+  Object.entries(lanc.notas).forEach(([ch, v]) => { t[ch.slice(-1)] += v; });
   return t;
 }
 
@@ -165,13 +180,23 @@ function atualizarLanc() {
   $('dcNadaFunc').hidden = temFunc;
   if (!temFunc) return;
 
-  $('dcGrade').hidden = lanc.origem !== 'marcacoes';
+  $('dcGrade').hidden = lanc.origem === 'totais';
   $('dcTotaisMan').hidden = lanc.origem !== 'totais';
   document.querySelectorAll('[data-origem]').forEach(b =>
     b.setAttribute('aria-selected', String(b.dataset.origem === lanc.origem)));
 
-  $('dcGrade').querySelectorAll('.dc-cx').forEach(b =>
-    b.classList.toggle('on', lanc.marcas.has(b.dataset.ch)));
+  $('dcGrade').querySelectorAll('.dc-cel').forEach(td => {
+    const v = lanc.notas[td.dataset.ch] || 0;
+    td.classList.toggle('on', !!v);
+    td.classList.toggle('alta', v === 4);
+  });
+  $('dcGrade').querySelectorAll('.dc-nt').forEach(b =>
+    b.classList.toggle('on', lanc.notas[b.dataset.ch] === +b.dataset.v));
+  $('dcGrade').querySelectorAll('tr[data-linha]').forEach(tr => {
+    const ok = linhaCompleta(tr.dataset.linha);
+    tr.classList.toggle('incompleta', !ok);
+    tr.querySelector('.dc-ok').textContent = ok ? '✓' : '';
+  });
 
   const t = totaisDoLancamento();
   const soma = COLUNAS.reduce((s, c) => s + (+t[c] || 0), 0);
@@ -186,14 +211,19 @@ function atualizarLanc() {
       <span class="dc-res-p">${num(l.pct[c])}%</span>
     </div>`;
   }).join('') + `<div class="dc-res dc-res-total">
-      <span class="dc-res-n">Total marcado</span>
+      <span class="dc-res-n">Soma dos quatro</span>
       <span class="dc-res-v">${num(soma)}</span>
-      <span class="dc-res-p">100%</span>
+      <span class="dc-res-p">${soma === 100 ? 'fecha 100' : 'tem de fechar 100'}</span>
     </div>`;
 
+  const prontas = linhasCompletas();
   const av = $('dcAvisoSoma');
   if (lanc.origem === 'totais' && soma && Math.abs(soma - 100) > 0.05) {
     av.textContent = `Os quatro totais somam ${num(soma)} — no papel a soma tem de dar 100. Confira antes de salvar.`;
+    av.hidden = false;
+  } else if (lanc.origem === 'notas' && prontas < GRUPOS.length) {
+    av.textContent = `${prontas} de ${GRUPOS.length} linhas prontas. ` +
+      'Em cada linha as notas 1, 2, 3 e 4 são usadas uma vez só — as que faltam estão marcadas em vermelho.';
     av.hidden = false;
   } else av.hidden = true;
 
@@ -203,9 +233,10 @@ function atualizarLanc() {
       (l.empate ? ' — <b>empate</b>, os dois entram como principal' : '') +
       (l.intensidade ? ` · ${l.intensidade}` : '') +
       (l.parentesco ? ` · ${l.parentesco}` : '')
-    : 'Marque as caixas do papel para ver o resultado.';
+    : 'Dê as notas de 1 a 4 em cada linha para ver o resultado.';
 
-  $('dcSalvar').disabled = !soma;
+  $('dcSalvar').disabled = !soma ||
+    (lanc.origem === 'notas' && prontas < GRUPOS.length);
   $('dcApagar').hidden = !lanc.existente;
 }
 
@@ -215,8 +246,8 @@ function carregarLancamento(funcId) {
     funcionario_id: funcId,
     id: null, existente: false,
     data_teste: hoje(),
-    origem: 'marcacoes',
-    marcas: new Set(),
+    origem: 'notas',
+    notas: {},
     totais: { D: 0, I: 0, S: 0, C: 0 },
   };
   $('dcData').value = lanc.data_teste;
@@ -235,8 +266,9 @@ async function editarAvaliacao(id) {
     funcionario_id: av.funcionario_id,
     id: av.id, existente: true,
     data_teste: av.data_teste,
-    origem: av.origem,
-    marcas: new Set(error ? [] : (data || []).map(m => `${m.linha}${m.coluna}`)),
+    origem: av.origem === 'totais' ? 'totais' : 'notas',
+    notas: Object.fromEntries((error ? [] : (data || []))
+      .map(m => [`${m.linha}${m.coluna}`, m.valor || 1])),
     totais: { D: +av.total_d, I: +av.total_i, S: +av.total_s, C: +av.total_c },
   };
   $('dcFunc').value = av.funcionario_id;
@@ -256,7 +288,7 @@ function desenharHistorico() {
       <span class="tag ativo">${dataBr(a.data_teste)}</span>
       <span>
         <span class="nome">${esc(D.perfis[l.principal]?.nome || '—')}${l.secundario ? ' + ' + esc(D.perfis[l.secundario]?.nome) : ''}</span><br>
-        <span class="sub">${COLUNAS.map(c => `${c} ${num(l.pct[c])}%`).join(' · ')} · lançado por ${esc(a.origem === 'totais' ? 'totais' : 'marcações')}</span>
+        <span class="sub">${COLUNAS.map(c => `${c} ${num(l.pct[c])}%`).join(' · ')} · lançado por ${esc(a.origem === 'totais' ? 'totais' : 'notas 1 a 4')}</span>
       </span>
       <span class="acoes"><button class="btn mini" data-editar-av="${a.id}">Abrir</button></span>
     </div>`;
@@ -290,11 +322,11 @@ async function salvarLancamento() {
       .select().single();
     if (error) throw error;
 
-    // marcações: regrava do zero
+    // notas da folha: regrava do zero
     await estado.cliente.from('disc_marcacoes').delete().eq('avaliacao_id', data.id);
-    if (lanc.origem === 'marcacoes' && lanc.marcas.size) {
-      const linhas = [...lanc.marcas].map(ch => ({
-        avaliacao_id: data.id, linha: +ch.slice(0, -1), coluna: ch.slice(-1),
+    if (lanc.origem === 'notas' && Object.keys(lanc.notas).length) {
+      const linhas = Object.entries(lanc.notas).map(([ch, v]) => ({
+        avaliacao_id: data.id, linha: +ch.slice(0, -1), coluna: ch.slice(-1), valor: v,
       }));
       const r = await estado.cliente.from('disc_marcacoes').insert(linhas);
       if (r.error) throw r.error;
@@ -628,7 +660,7 @@ export function ligarDisc() {
   $('dcData').addEventListener('change', () => { if (lanc) lanc.data_teste = $('dcData').value; });
   $('dcLimpar').addEventListener('click', () => {
     if (!lanc) return;
-    lanc.marcas.clear();
+    lanc.notas = {};
     COLUNAS.forEach(c => { lanc.totais[c] = 0; $('dcT' + c).value = ''; });
     atualizarLanc();
   });
@@ -655,7 +687,6 @@ export function ligarDisc() {
 }
 
 export function limparDisc() {
-  D.carregado = false; D.autorizado = false;
+  D.carregado = false;
   D.avaliacoes = []; lanc = null;
-  $('abaDisc').hidden = true;
 }
