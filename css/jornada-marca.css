@@ -2,14 +2,18 @@
    MARCA — módulo Gestão de Jornada
    Duas marcas, dois papéis, nunca no mesmo lugar:
 
-   SAKUMA  → dona da operação. Vai no CABEÇALHO do painel e no cabeçalho
-             dos documentos impressos. Aplicada como enviada: sem recorte
-             de fundo, sem inversão, sem mudança de cor. Por isso a faixa
-             onde ela fica é sempre clara.
+   SAKUMA  → dona da operação. Na tela, fica na BARRA DO APP (ver app.css);
+             nos documentos impressos, no cabeçalho de cada página.
+             Aplicada como enviada: sem recorte de fundo, sem inversão,
+             sem mudança de cor. Por isso a faixa onde ela fica é clara.
 
    LOP     → desenvolvedora. Assina discretamente, gravada a laser, no
-             RODAPÉ da tela e no fim dos relatórios. Nunca disputa
+             RODAPÉ do app e no fim dos relatórios. Nunca disputa
              atenção com a SAKUMA.
+
+   As classes __marca e __divisor ficam aqui para quem precisar repetir a
+   marca numa peça isolada — nas telas do módulo elas não são usadas, para
+   a marca não aparecer duas vezes na mesma página.
 
    Tudo prefixado com .jor- para não colidir com o CSS do app.
    ===================================================================== */
