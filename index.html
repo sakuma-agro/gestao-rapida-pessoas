@@ -553,11 +553,15 @@
          módulo = a pessoa vê o módulo inteiro. -->
     <div id="usPermissoes" class="us-perm"></div>
 
+    <!-- Aparece uma vez, logo depois de criar o login. A senha não fica
+         guardada em lugar nenhum: ou você copia agora, ou gera outra. -->
+    <div id="usSenha" class="us-senha" hidden></div>
+
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarUsuario" hidden>Tirar o acesso</button>
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
-        <button class="btn principal" type="submit">Salvar</button>
+        <button class="btn principal" type="submit" id="bSalvarUsuario">Salvar</button>
       </span>
     </div>
   </form>
