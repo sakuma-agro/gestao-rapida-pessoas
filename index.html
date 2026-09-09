@@ -55,6 +55,7 @@
       <button class="aba" role="tab" data-tela="aniversarios" aria-selected="false">Aniversariantes</button>
       <button class="aba" role="tab" data-tela="epis" aria-selected="false">EPIs</button>
       <button class="aba" role="tab" data-tela="modelo" aria-selected="false">Modelo da ficha</button>
+      <button class="aba" role="tab" data-tela="disc" aria-selected="false" id="abaDisc" hidden>DISC</button>
     </nav>
   </header>
 
@@ -307,6 +308,189 @@
           <button class="btn" type="button" id="bRestaurarModelo">Restaurar original da planilha</button>
         </div>
       </form>
+    </section>
+
+    <!-- ---- DISC ---- -->
+    <section class="tela" id="telaDisc" hidden>
+      <div class="aviso erro" id="discAviso" hidden></div>
+
+      <nav class="subabas naoimprimir" role="tablist">
+        <button class="subaba" role="tab" data-sub="lancar" aria-selected="true">Lançar teste</button>
+        <button class="subaba" role="tab" data-sub="ficha" aria-selected="false">Ficha individual</button>
+        <button class="subaba" role="tab" data-sub="equipe" aria-selected="false">Equipe</button>
+        <button class="subaba" role="tab" data-sub="cargos" aria-selected="false">Cargos</button>
+        <button class="subaba" role="tab" data-sub="textos" aria-selected="false">Textos dos perfis</button>
+      </nav>
+
+      <!-- LANÇAR -->
+      <div id="discLancar">
+        <div class="cartao">
+          <h2>Lançar o teste</h2>
+          <p class="dica">O funcionário preenche no papel; aqui você só transporta o que ele marcou.</p>
+          <div class="grade larga">
+            <label class="campo plena">Funcionário <select id="dcFunc"></select></label>
+            <label class="campo">Data do teste <input type="date" id="dcData"></label>
+            <label class="campo" style="justify-content:flex-end">
+              <span style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;font-weight:600">
+                <input type="checkbox" id="dcSoAtivos" checked style="width:16px;height:16px;accent-color:var(--verde)">
+                Só funcionários ativos
+              </span>
+            </label>
+          </div>
+          <div class="vazio" id="dcNadaFunc">Escolha um funcionário para começar.</div>
+        </div>
+
+        <div id="dcPainel" hidden>
+          <div class="cartao">
+            <div class="barra entre" style="margin:0">
+              <div>
+                <h2 style="margin:0">Como veio o papel</h2>
+                <p class="dica" style="margin:2px 0 0">Os dois caminhos dão o mesmo resultado.</p>
+              </div>
+              <span class="dc-troca">
+                <button class="dc-op" type="button" data-origem="marcacoes" aria-selected="true">Pelas marcações</button>
+                <button class="dc-op" type="button" data-origem="totais" aria-selected="false">Pelos totais</button>
+              </span>
+            </div>
+
+            <div id="dcGrade" style="margin-top:14px"></div>
+
+            <div id="dcTotaisMan" hidden style="margin-top:14px">
+              <p class="dica">Digite os quatro totais somados no rodapé da folha. A soma tem de dar 100.</p>
+              <div class="grade">
+                <label class="campo">Total vermelho · D <input type="number" id="dcTD" min="0" max="100" step="0.5"></label>
+                <label class="campo">Total amarelo · I <input type="number" id="dcTI" min="0" max="100" step="0.5"></label>
+                <label class="campo">Total verde · S <input type="number" id="dcTS" min="0" max="100" step="0.5"></label>
+                <label class="campo">Total azul · C <input type="number" id="dcTC" min="0" max="100" step="0.5"></label>
+              </div>
+            </div>
+
+            <div class="aviso info" id="dcAvisoSoma" hidden></div>
+            <div class="dc-resumo" id="dcResumo"></div>
+            <p class="dc-leitura" id="dcLeitura"></p>
+
+            <label class="campo plena" style="margin-top:12px">Observações
+              <textarea id="dcObs" rows="2" placeholder="Opcional — contexto do teste, quem aplicou, etc."></textarea>
+            </label>
+
+            <div class="barra entre">
+              <button class="btn perigo" id="dcApagar" hidden>Apagar este teste</button>
+              <span>
+                <button class="btn" id="dcLimpar">Limpar marcações</button>
+                <button class="btn principal" id="dcSalvar" disabled>Salvar lançamento</button>
+              </span>
+            </div>
+          </div>
+
+          <div class="cartao">
+            <h2>Testes já lançados desta pessoa</h2>
+            <p class="dica">O histórico fica guardado — dá para reaplicar o teste depois e comparar.</p>
+            <div class="lista" id="dcHist"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FICHA -->
+      <div id="discFicha" hidden>
+        <div class="cartao naoimprimir">
+          <h2>Ficha individual</h2>
+          <p class="dica">Só aparecem aqui as pessoas que já têm teste lançado.</p>
+          <label class="campo plena">Funcionário <select id="dfFunc"></select></label>
+        </div>
+        <div class="previa-lista" id="dfSaida"></div>
+        <div class="rodape-fixo naoimprimir">
+          <button class="btn principal" id="dfImprimir" disabled>Imprimir / salvar em PDF</button>
+          <span class="cresce"></span>
+          <span class="zoom">Zoom
+            <input type="range" id="dfZoom" min="50" max="150" value="80" step="5">
+            <span id="dfZoomV">80%</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- EQUIPE -->
+      <div id="discEquipe" hidden>
+        <div class="cartao">
+          <div class="barra entre" style="margin:0">
+            <div>
+              <h2 style="margin:0">Visão da equipe</h2>
+              <p class="dica" style="margin:2px 0 0" id="deCobertura"></p>
+            </div>
+            <button class="btn" id="deCsv">Baixar CSV</button>
+          </div>
+          <div class="grade larga" style="margin-top:14px">
+            <label class="campo">Fazenda <select id="deFazenda"></select></label>
+            <label class="campo">Setor <select id="deSetor"></select></label>
+            <label class="campo">Cargo <select id="deCargo"></select></label>
+            <label class="campo">Situação
+              <select id="deSit">
+                <option value="ATIVO">Somente ativos</option>
+                <option value="">Todos</option>
+                <option value="INATIVO">Somente inativos</option>
+              </select>
+            </label>
+          </div>
+          <div class="dc-cards" id="deCards"></div>
+        </div>
+
+        <div class="cartao">
+          <h2>Por fazenda</h2>
+          <div id="deFazendas"></div>
+        </div>
+        <div class="cartao">
+          <h2>Por setor</h2>
+          <div id="deSetores"></div>
+        </div>
+        <div class="cartao">
+          <h2>Funcionários</h2>
+          <div id="deTabela"></div>
+        </div>
+      </div>
+
+      <!-- CARGOS -->
+      <div id="discCargos" hidden>
+        <div class="cartao">
+          <div class="barra entre" style="margin:0">
+            <div>
+              <h2 style="margin:0">Perfil esperado por cargo</h2>
+              <p class="dica" style="margin:2px 0 0">Você define o esperado; o app calcula a aderência.</p>
+            </div>
+            <span style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--suave)">
+              <input type="checkbox" id="dgTodos" style="width:16px;height:16px;accent-color:var(--verde)">
+              Incluir inativos
+            </span>
+          </div>
+          <div id="dgTabela" style="margin-top:14px"></div>
+        </div>
+
+        <div class="cartao">
+          <h2>Quem está fora do perfil esperado</h2>
+          <p class="dica">
+            Isto é informação de gestão — como comunicar, como delegar e onde a pessoa rende mais.
+            O DISC descreve estilo de comportamento: não mede competência nem desempenho e não deve
+            ser usado como critério de avaliação, promoção ou desligamento.
+          </p>
+          <div class="lista" id="dgFora"></div>
+        </div>
+      </div>
+
+      <!-- TEXTOS -->
+      <div id="discTextos" hidden>
+        <div class="cartao">
+          <h2>Textos dos perfis</h2>
+          <p class="dica">O que está aqui é o que sai na ficha individual. Editável sem mexer no app.</p>
+          <label class="campo plena">Perfil <select id="dtPerfil"></select></label>
+          <div class="grade larga" id="dtCampos" style="margin-top:14px"></div>
+        </div>
+        <div class="cartao">
+          <h2>Combinações principal + secundário</h2>
+          <p class="dica">Um parágrafo para cada uma das doze combinações.</p>
+          <div class="grade larga" id="dtCombos"></div>
+          <div class="barra fim">
+            <button class="btn principal" id="dtSalvar">Salvar textos</button>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </div>

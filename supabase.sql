@@ -135,3 +135,89 @@ end $$;
 --     funcionários e os 26 EPIs da planilha entram sozinhos na
 --     primeira vez.
 -- =====================================================================
+
+-- =====================================================================
+--  MÓDULO DISC — perfil comportamental (acesso restrito)
+--  As tabelas disc_* só respondem para quem estiver em disc_acesso.
+--  Os funcionários vêm da tabela funcionarios já existente.
+-- =====================================================================
+create table if not exists public.disc_acesso (
+  email text primary key,
+  nome text,
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.disc_perfis (
+  codigo text primary key check (codigo in ('D','I','S','C')),
+  nome text not null, cor text not null,
+  resumo text, comportamentos text, pontos_fortes text, pontos_atencao text,
+  comunicacao text, motivadores text, desmotivadores text,
+  ambiente_ideal text, como_delegar text,
+  ordem int not null default 0,
+  atualizado_em timestamptz not null default now()
+);
+
+create table if not exists public.disc_combinacoes (
+  principal text not null references public.disc_perfis(codigo) on delete cascade,
+  secundario text not null references public.disc_perfis(codigo) on delete cascade,
+  titulo text, texto text,
+  atualizado_em timestamptz not null default now(),
+  primary key (principal, secundario),
+  check (principal <> secundario)
+);
+
+create table if not exists public.disc_avaliacoes (
+  id uuid primary key default gen_random_uuid(),
+  funcionario_id uuid not null references public.funcionarios(id) on delete cascade,
+  data_teste date not null default current_date,
+  origem text not null default 'marcacoes' check (origem in ('marcacoes','totais')),
+  total_d numeric(5,1) not null default 0, total_i numeric(5,1) not null default 0,
+  total_s numeric(5,1) not null default 0, total_c numeric(5,1) not null default 0,
+  perfil_principal text references public.disc_perfis(codigo),
+  perfil_secundario text references public.disc_perfis(codigo),
+  empate boolean not null default false,
+  intensidade text, observacoes text,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now(),
+  unique (funcionario_id, data_teste)
+);
+create index if not exists disc_avaliacoes_func_idx
+  on public.disc_avaliacoes (funcionario_id, data_teste desc);
+
+create table if not exists public.disc_marcacoes (
+  avaliacao_id uuid not null references public.disc_avaliacoes(id) on delete cascade,
+  linha smallint not null check (linha between 1 and 10),
+  coluna text not null check (coluna in ('D','I','S','C')),
+  primary key (avaliacao_id, linha, coluna)
+);
+
+create table if not exists public.disc_cargos_esperado (
+  cargo text primary key,
+  perfil_esperado text references public.disc_perfis(codigo),
+  perfil_secundario_esperado text references public.disc_perfis(codigo),
+  observacao text,
+  atualizado_em timestamptz not null default now()
+);
+
+create or replace function public.disc_autorizado()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.disc_acesso
+    where lower(email) = lower(coalesce(auth.jwt() ->> 'email','')));
+$$;
+
+-- quem enxerga o módulo DISC (um e-mail por linha)
+insert into public.disc_acesso (email, nome)
+values ('escritoriosakuma@hotmail.com','Guilherme Lopes')
+on conflict (email) do nothing;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['disc_perfis','disc_combinacoes','disc_avaliacoes',
+                           'disc_marcacoes','disc_cargos_esperado','disc_acesso'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists disc_only on public.%I', t);
+    execute format('create policy disc_only on public.%I for all to authenticated
+      using (public.disc_autorizado()) with check (public.disc_autorizado())', t);
+  end loop;
+end $$;
