@@ -207,6 +207,21 @@
     </section>
 
     <!-- ---- ANIVERSARIANTES ---- -->
+    <!-- ---- CADASTRO NÍVEL 2: jornada e riscos ---- -->
+    <section class="tela" id="telaFuncionariosN2" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Cadastro · Nível 2</h2>
+            <p class="dica" style="margin:2px 0 0">Jornada, periculosidade e insalubridade. A pessoa é
+            cadastrada no Nível 1; aqui só se completa o que a apuração precisa.</p>
+          </div>
+          <input type="search" id="buscaFuncN2" placeholder="Buscar funcionário" style="max-width:280px">
+        </div>
+        <div id="listaFuncN2" style="margin-top:14px"></div>
+      </div>
+    </section>
+
     <section class="tela" id="telaAniversarios" hidden>
       <div class="cartao naoimprimir">
         <div class="barra entre" style="margin:0">
@@ -605,27 +620,6 @@
       </label>
     </div>
 
-    <!-- Só aparece para quem tem o módulo DP. É o que a apuração de jornada
-         precisa saber da pessoa — e fica aqui para não existir um segundo
-         cadastro de funcionário dentro do DP. -->
-    <div id="fuBlocoDP" hidden>
-      <h4 class="fu-secao">Jornada e apuração <span class="dc-sem">— usado pelo módulo DP</span></h4>
-      <div class="grade">
-        <label class="campo">Jornada
-          <select id="fuJornada"></select>
-          <small class="dc-sem">Em branco = usa a jornada do setor.</small>
-        </label>
-        <label class="campo">Matrícula <input type="text" id="fuMatricula"></label>
-        <label class="campo">Insalubridade
-          <select id="fuInsal">
-            <option value="nao">Não</option>
-            <option value="permanente">Permanente</option>
-            <option value="eventual">Eventual</option>
-          </select>
-        </label>
-        <label class="campo fu-inline"><input type="checkbox" id="fuPeric"> Periculosidade 30%</label>
-      </div>
-    </div>
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarFunc">Apagar</button>
       <span>
@@ -697,6 +691,36 @@
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit">Reabrir</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: NÍVEL 2 ============ -->
+<dialog id="dlgFuncN2">
+  <form method="dialog" id="formFuncN2">
+    <h3 id="tituloFuncN2">Jornada e riscos</h3>
+    <p class="dica" id="subFuncN2"></p>
+    <div class="grade">
+      <label class="campo">Jornada
+        <select id="n2Jornada"></select>
+        <small class="dc-sem">Em branco = usa a jornada do setor.</small>
+      </label>
+      <label class="campo">Matrícula <input type="text" id="n2Matricula"></label>
+      <label class="campo">Insalubridade
+        <select id="n2Insal">
+          <option value="nao">Não</option>
+          <option value="permanente">Permanente</option>
+          <option value="eventual">Eventual</option>
+        </select>
+      </label>
+      <label class="campo fu-inline"><input type="checkbox" id="n2Peric"> Periculosidade 30%</label>
+    </div>
+    <div class="barra entre">
+      <span></span>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
       </span>
     </div>
   </form>
