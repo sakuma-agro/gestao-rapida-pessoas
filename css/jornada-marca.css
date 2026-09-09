@@ -1,0 +1,151 @@
+/* =====================================================================
+   MARCA — módulo Gestão de Jornada
+   Duas marcas, dois papéis, nunca no mesmo lugar:
+
+   SAKUMA  → dona da operação. Vai no CABEÇALHO do painel e no cabeçalho
+             dos documentos impressos. Aplicada como enviada: sem recorte
+             de fundo, sem inversão, sem mudança de cor. Por isso a faixa
+             onde ela fica é sempre clara.
+
+   LOP     → desenvolvedora. Assina discretamente, gravada a laser, no
+             RODAPÉ da tela e no fim dos relatórios. Nunca disputa
+             atenção com a SAKUMA.
+
+   Tudo prefixado com .jor- para não colidir com o CSS do app.
+   ===================================================================== */
+
+:root {
+  --jor-sakuma-verde:  #84BD00;
+  --jor-sakuma-marrom: #744F28;
+  --jor-sakuma-cinza:  #51534A;
+
+  --jor-superficie:    #F3F3F1;  /* metal claro — onde a SAKUMA aparece */
+  --jor-borda:         #E1E2DE;
+  --jor-texto:         #51534A;
+  --jor-texto-fraco:   #8A8D86;
+}
+
+/* ------------------------------------------------------------------
+   CABEÇALHO DO PAINEL — a marca SAKUMA
+   ------------------------------------------------------------------ */
+
+.jor-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 20px;
+  /* Branco, e não a superfície cinza, porque o arquivo da logo SAKUMA tem
+     fundo branco e é usado sem recorte — em fundo cinza apareceria a caixa. */
+  background: #FFFFFF;
+  border-bottom: 3px solid var(--jor-sakuma-verde);
+  border-radius: 6px 6px 0 0;
+}
+
+/* A logo entra por <img>, no arquivo original. Só altura é ajustada —
+   a proporção segue o arquivo, nunca esticar. */
+.jor-cabecalho__marca {
+  height: 42px;
+  width: auto;
+  display: block;
+}
+
+.jor-cabecalho__divisor {
+  width: 1px;
+  height: 34px;
+  background: var(--jor-borda);
+}
+
+.jor-cabecalho__titulo {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--jor-texto);
+  letter-spacing: .2px;
+  line-height: 1.2;
+}
+
+.jor-cabecalho__sub {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: var(--jor-texto-fraco);
+  margin-top: 2px;
+}
+
+.jor-cabecalho__direita {
+  margin-left: auto;
+  text-align: right;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  color: var(--jor-texto-fraco);
+}
+
+.jor-cabecalho__competencia {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--jor-sakuma-marrom);
+  display: block;
+}
+
+/* ------------------------------------------------------------------
+   ASSINATURA LOP — gravada a laser
+   Duas versões do mesmo arquivo: uma para superfície clara, outra
+   para superfície escura. A escolha é do fundo, não do gosto.
+   ------------------------------------------------------------------ */
+
+.jor-assinatura {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 20px;
+}
+
+.jor-assinatura img {
+  height: 32px;
+  width: auto;
+  display: block;
+  opacity: .92;
+  /* a gravação já está no arquivo; nada de filter aqui, que descaracteriza */
+}
+
+/* Rodapé claro (dentro do painel, sobre a superfície do app) */
+.jor-assinatura--claro {
+  background: var(--jor-superficie);
+  border-top: 1px solid var(--jor-borda);
+  border-radius: 0 0 6px 6px;
+}
+
+/* Barra escura (rodapé geral do app ou lateral verde-escuro) */
+.jor-assinatura--escuro {
+  background: #0B1A12;
+}
+
+.jor-assinatura--escuro img { opacity: 1; }
+
+/* Versão mínima: só o lobo, para cantos apertados (celular, barra fina) */
+.jor-assinatura--compacta img { height: 18px; }
+
+/* ------------------------------------------------------------------
+   IMPRESSÃO
+   No papel a hierarquia é a mesma, e mais rígida: SAKUMA no alto de
+   toda página, LOP uma vez só, no fim do documento.
+   ------------------------------------------------------------------ */
+
+@media print {
+  .jor-cabecalho {
+    background: #fff;
+    border-bottom: 2px solid var(--jor-sakuma-verde);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .jor-assinatura {
+    background: #fff;
+    border-top: none;
+    padding: 6px 0 0;
+  }
+
+  .jor-assinatura img { height: 20px; opacity: .85; }
+
+  /* A assinatura da LOP não se repete página a página. */
+  .jor-assinatura--repetir { display: none; }
+}

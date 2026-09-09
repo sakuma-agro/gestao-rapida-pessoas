@@ -1,0 +1,176 @@
+/* jornada-impressao.css — os documentos emitidos pelo módulo.
+   Aqui manda a identidade da SAKUMA, não a da interface:
+   verde #84BD00, marrom #744F28, cinza #51534A, Arial, SEM PRETO. */
+
+.rel {
+  background: #fff;
+  color: #51534A;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 14mm 12mm;
+  border: 1px solid #E1E2DE;
+}
+
+/* ---- cabeçalho: a marca da SAKUMA, sem alteração ---- */
+.rel-cabecalho {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 3px solid #84BD00;
+  margin-bottom: 14px;
+}
+.rel-cabecalho img { height: 46px; width: auto; }
+.rel-titulo { flex: 1; }
+.rel-titulo h1 {
+  margin: 0;
+  font-size: 16px;
+  color: #744F28;
+  letter-spacing: .2px;
+}
+.rel-titulo p { margin: 2px 0 0; font-size: 11px; color: #8A8D86; }
+.rel-comp { text-align: right; font-size: 10px; color: #8A8D86; }
+.rel-comp strong { display: block; font-size: 13px; color: #744F28; }
+
+/* ---- tarja de versão 2 ---- */
+.rel-tarja {
+  background: #FAF6EF;
+  border-left: 4px solid #744F28;
+  padding: 7px 10px;
+  margin-bottom: 12px;
+  font-weight: 700;
+  font-size: 11px;
+  color: #744F28;
+  letter-spacing: .3px;
+}
+
+/* ---- tabelas: grade visível, cabeçalho verde, total sombreado ---- */
+.rel-unidade {
+  margin: 16px 0 6px;
+  font-size: 12px;
+  color: #744F28;
+}
+.rel-unidade small {
+  display: block;
+  font-weight: 400;
+  font-size: 10px;
+  color: #8A8D86;
+}
+
+.rel-tabela {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.rel-tabela th,
+.rel-tabela td {
+  border: 1px solid #D6D8D2;
+  padding: 4px 6px;
+  vertical-align: top;
+}
+.rel-tabela thead th {
+  background: #84BD00;
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: .3px;
+  text-align: left;
+}
+.rel-tabela tbody tr:nth-child(odd) td { background: #F4F8EA; }
+.rel-tabela tfoot td {
+  background: #E7EBDE;
+  font-weight: 700;
+}
+.rel-num { text-align: right; white-space: nowrap; }
+.rel-mini { font-size: 10px; color: #8A8D86; }
+.rel-vazio { text-align: center; color: #8A8D86; padding: 12px; }
+
+/* ---- ficha do extrato ---- */
+.rel-ficha {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 14px;
+  background: #F7F8F5;
+  border: 1px solid #E1E2DE;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.rel-ficha span { display: block; font-size: 9px; color: #8A8D86; letter-spacing: .4px; text-transform: uppercase; }
+.rel-ficha b { font-size: 11px; }
+
+.rel-memoria {
+  white-space: pre-wrap;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  background: #F7F8F5;
+  border: 1px solid #E1E2DE;
+  padding: 7px 9px;
+  margin: 0 0 7px;
+  page-break-inside: avoid;
+}
+
+/* ---- resumo e nota ---- */
+.rel-resumo {
+  background: #FBFAF6;
+  border-left: 4px solid #744F28;
+  padding: 9px 12px;
+  margin: 12px 0;
+  font-size: 11px;
+}
+.rel-nota { font-size: 10px; color: #8A8D86; margin: 8px 0 0; }
+
+/* ---- assinaturas ---- */
+.rel-assinaturas {
+  display: flex;
+  gap: 24px;
+  margin-top: 26px;
+  page-break-inside: avoid;
+}
+.rel-assina { flex: 1; text-align: center; }
+.rel-assina span {
+  display: block;
+  border-top: 1px solid #51534A;
+  margin-bottom: 4px;
+  height: 26px;
+}
+.rel-assina small { font-size: 10px; color: #8A8D86; }
+
+/* ---- rodapé: a assinatura da LOP, uma vez só ---- */
+.rel-rodape {
+  margin-top: 20px;
+  padding-top: 8px;
+  border-top: 1px solid #E1E2DE;
+  text-align: right;
+}
+.rel-rodape img { height: 22px; width: auto; opacity: .9; }
+
+/* ---- impressão de verdade ----
+   Sem regra @page aqui: o app já define @page{margin:0}, e mexer nisso
+   mudaria também a impressão da ficha de EPI. A margem do documento sai
+   do padding da própria folha. */
+@media print {
+  /* Só o documento vai para o papel. */
+  body.jor-imprimindo > *:not(#jorImpressao) { display: none !important; }
+  body.jor-imprimindo #jorImpressao { display: block !important; }
+
+  .rel {
+    border: none;
+    padding: 8mm 10mm;   /* a margem do papel vem daqui */
+    max-width: none;
+    font-size: 10px;
+  }
+  .rel-cabecalho { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rel-tabela thead th,
+  .rel-tabela tbody tr:nth-child(odd) td,
+  .rel-tabela tfoot td,
+  .rel-tarja, .rel-resumo, .rel-ficha, .rel-memoria {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Cabeçalho da tabela repete a cada página. */
+  .rel-tabela thead { display: table-header-group; }
+  .rel-tabela tfoot { display: table-footer-group; }
+  .rel-tabela tr { page-break-inside: avoid; }
+}
