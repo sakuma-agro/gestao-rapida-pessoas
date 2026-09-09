@@ -468,3 +468,12 @@ dialog h3{margin:0 0 14px;font-size:16px}
   .us-telas{margin-left:12px}
   .us-mod__topo .dc-sem{margin-left:0;width:100%}
 }
+
+/* Senha nova, mostrada uma única vez depois de criar o login */
+.us-senha{margin:12px 0 0;padding:10px 12px;border-radius:6px;
+  background:var(--verde-fundo);border:1px solid var(--verde);font-size:13px}
+.us-senha code{font-family:ui-monospace,Consolas,monospace;font-size:15px;
+  font-weight:700;letter-spacing:.5px;background:#fff;border:1px solid var(--linha);
+  border-radius:4px;padding:3px 8px;user-select:all}
+.us-senha .barra{margin-top:8px}
+.us-senha.erro{background:#FAF2EC;border-color:var(--marrom)}
