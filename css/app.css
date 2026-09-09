@@ -452,3 +452,19 @@ dialog h3{margin:0 0 14px;font-size:16px}
   .previa{align-items:flex-start;overflow-x:auto;width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+
+/* Permissões por módulo e por tela, dentro do diálogo da pessoa
+   (Configurações). Módulo desmarcado deixa as telas dele apagadas. */
+.us-perm{margin:14px 0 4px;display:grid;gap:8px}
+.us-mod{border:1px solid var(--linha);border-radius:6px;padding:8px 10px}
+.us-mod.desligado{opacity:.5}
+.us-mod__topo{display:flex;align-items:center;gap:8px;font-size:13px}
+.us-mod__topo input{width:auto;margin:0}
+.us-mod__topo .dc-sem{margin-left:auto;font-size:11px}
+.us-telas{display:flex;flex-wrap:wrap;gap:6px 14px;margin:7px 0 0 24px}
+.us-tela{display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}
+.us-tela input{width:auto;margin:0}
+@media (max-width:640px){
+  .us-telas{margin-left:12px}
+  .us-mod__topo .dc-sem{margin-left:0;width:100%}
+}
