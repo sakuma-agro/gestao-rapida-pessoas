@@ -535,7 +535,6 @@
     <section class="tela" id="telaJorPainel" hidden></section>
     <section class="tela" id="telaJorLancar" hidden></section>
     <section class="tela" id="telaJorBoletins" hidden></section>
-    <section class="tela" id="telaJorFuncionarios" hidden></section>
     <section class="tela" id="telaJorFechamento" hidden></section>
     <section class="tela" id="telaJorRelatorios" hidden></section>
     <section class="tela" id="telaJorConfig" hidden></section>
@@ -592,16 +591,40 @@
       <label class="campo">Nascimento <input type="date" id="fuNascimento"></label>
       <label class="campo">Telefone <input type="text" id="fuTelefone" inputmode="tel" placeholder="(34) 99999-0000"></label>
       <label class="campo">Admissão <input type="date" id="fuAdmissao"></label>
-      <label class="campo">Cargo <input type="text" id="fuCargo" list="lista-cargos"></label>
-      <label class="campo">Empregador <input type="text" id="fuEmpregador" list="lista-empregadores"></label>
-      <label class="campo">Fazenda <input type="text" id="fuFazenda" list="lista-fazendas"></label>
       <label class="campo">CPF <input type="text" id="fuCpf" inputmode="numeric"></label>
-      <label class="campo">Setor <input type="text" id="fuSetor"></label>
+      <label class="campo plena">Unidade (empregador + fazenda)
+        <select id="fuUnidade"></select>
+        <small class="dc-sem" id="fuUnidadeAtual"></small>
+      </label>
+      <label class="campo">Setor <select id="fuSetor"></select></label>
+      <label class="campo">Função <select id="fuCargo"></select></label>
       <label class="campo">Tam. calçado <input type="text" id="fuCalcado" inputmode="numeric"></label>
       <label class="campo">Tam. camisa <input type="text" id="fuCamisa"></label>
       <label class="campo">Situação
         <select id="fuSituacao"><option>ATIVO</option><option>INATIVO</option></select>
       </label>
+    </div>
+
+    <!-- Só aparece para quem tem o módulo DP. É o que a apuração de jornada
+         precisa saber da pessoa — e fica aqui para não existir um segundo
+         cadastro de funcionário dentro do DP. -->
+    <div id="fuBlocoDP" hidden>
+      <h4 class="fu-secao">Jornada e apuração <span class="dc-sem">— usado pelo módulo DP</span></h4>
+      <div class="grade">
+        <label class="campo">Jornada
+          <select id="fuJornada"></select>
+          <small class="dc-sem">Em branco = usa a jornada do setor.</small>
+        </label>
+        <label class="campo">Matrícula <input type="text" id="fuMatricula"></label>
+        <label class="campo">Insalubridade
+          <select id="fuInsal">
+            <option value="nao">Não</option>
+            <option value="permanente">Permanente</option>
+            <option value="eventual">Eventual</option>
+          </select>
+        </label>
+        <label class="campo fu-inline"><input type="checkbox" id="fuPeric"> Periculosidade 30%</label>
+      </div>
     </div>
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarFunc">Apagar</button>
@@ -650,20 +673,6 @@
 </dialog>
 
 <!-- ============ DIÁLOGOS: JORNADA ============ -->
-<dialog id="dlgJorVinculo">
-  <form method="dialog" id="formJorVinculo">
-    <h3 id="jorVinculoTitulo">Vínculo de jornada</h3>
-    <div class="grade" id="jorVinculoCorpo"></div>
-    <div class="barra entre">
-      <span></span>
-      <span>
-        <button class="btn" type="button" data-fechar>Cancelar</button>
-        <button class="btn principal" type="submit">Gravar</button>
-      </span>
-    </div>
-  </form>
-</dialog>
-
 <dialog id="dlgJorMemoria">
   <h3>Memória de cálculo</h3>
   <pre id="jorMemoriaTexto" class="jor-memoria"></pre>
