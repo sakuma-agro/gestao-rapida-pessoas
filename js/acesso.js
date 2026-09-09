@@ -281,6 +281,7 @@ function abrirUsuario(email) {
   $('usEmail').disabled = !!u;
   $('usNome').value = editando.nome || '';
   $('bApagarUsuario').hidden = !u || (u.email || '').toLowerCase() === acesso.email;
+  $('bNovaSenha').hidden = !u;
   desenharPermissoes();
   $('dlgUsuario').showModal();
 }
@@ -365,6 +366,36 @@ export function ligarAcesso() {
     }
     $('dlgUsuario').close();
     desenharConfig();
+  });
+
+  $('bNovaSenha').addEventListener('click', async () => {
+    if (!editando?.email) return;
+    if (!confirm(`Gerar uma senha nova para ${editando.email}?\n\n` +
+                 'A senha atual deixa de funcionar na hora, e a nova aparece uma vez só.')) return;
+    const caixa = $('usSenha');
+    caixa.hidden = false;
+    caixa.className = 'us-senha';
+    caixa.textContent = 'Gerando...';
+    try {
+      const { data, error } = await estado.cliente.functions.invoke('criar-usuario', {
+        body: { acao: 'senha', email: editando.email },
+      });
+      if (error) throw error;
+      if (data?.erro) throw new Error(data.erro);
+      caixa.innerHTML = `<b>Senha nova.</b> Anote agora — ela não fica guardada:<br><br>
+        <code>${esc(data.senha)}</code>
+        <div class="barra"><button type="button" class="btn mini" id="bCopiarSenha">Copiar</button>
+        <span class="dc-sem">A senha anterior já não funciona mais.</span></div>`;
+      $('bCopiarSenha').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(data.senha);
+          $('bCopiarSenha').textContent = 'Copiada';
+        } catch { $('bCopiarSenha').textContent = 'Selecione e copie'; }
+      });
+    } catch (e) {
+      caixa.className = 'us-senha erro';
+      caixa.innerHTML = '<b>Não consegui trocar a senha.</b><br>' + esc(e.message || String(e));
+    }
   });
 
   $('bApagarUsuario').addEventListener('click', async () => {
