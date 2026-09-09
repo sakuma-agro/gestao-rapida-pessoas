@@ -11,7 +11,7 @@ import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import * as jd from './jornada-dados.js';
-import { pode } from './acesso.js';
+import { pode, podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -33,6 +33,7 @@ function abrirAba(nome) {
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
   $('telaFuncionarios').hidden = nome !== 'funcionarios';
+  $('telaFuncionariosN2').hidden = nome !== 'funcionariosN2';
   $('telaAniversarios').hidden = nome !== 'aniversarios';
   $('telaEpis').hidden = nome !== 'epis';
   $('telaModelo').hidden = nome !== 'modelo';
@@ -47,6 +48,7 @@ function abrirAba(nome) {
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
+  if (nome === 'funcionariosN2') desenharFuncN2();
   if (nome === 'epis') desenharEpis();
   if (nome === 'modelo') preencherModelo();
   if (nome === 'disc') abrirDisc();
@@ -432,10 +434,8 @@ function abrirFuncionario(id) {
    faz o cadastro do funcionário servir todos os módulos, sem digitar
    empregador e fazenda na mão em cada tela. */
 function montarListasDoCadastro(f) {
-  const temDP = pode('jornada');
-  $('fuBlocoDP').hidden = !temDP;
-
-  const v = temDP ? jd.vinculoDe(f.id) : null;
+  const temDP = pode('jornada') || podeTela('funcionariosN2');
+  const v = jd.vinculoDe(f.id);
   const opcoes = (lista, sel, rotulo = x => x.nome) =>
     '<option value=""></option>' + lista
       .filter(x => x.ativo !== false)
@@ -445,7 +445,6 @@ function montarListasDoCadastro(f) {
   $('fuUnidade').innerHTML = opcoes(jd.dados.unidades, v?.unidade_id, u => jd.nomeUnidade(u));
   $('fuSetor').innerHTML   = opcoes(jd.dados.setores, v?.setor_id);
   $('fuCargo').innerHTML   = opcoes(jd.dados.funcoes, v?.funcao_id);
-  $('fuJornada').innerHTML = opcoes(jd.dados.jornadas, v?.jornada_id);
 
   // Ainda sem vínculo: mostra o que estava escrito, para não parecer que sumiu.
   const escrito = [f.empregador, f.fazenda].filter(Boolean).join(' · ');
@@ -453,10 +452,76 @@ function montarListasDoCadastro(f) {
     ? 'Hoje está escrito: ' + escrito + ' — escolha a unidade para padronizar.'
     : '';
 
-  $('fuMatricula').value = v?.matricula || f.cadastro || '';
-  $('fuInsal').value = v?.insalubridade || 'nao';
-  $('fuPeric').checked = !!v?.periculosidade;
 }
+
+/* =============== cadastro nível 2 =============== */
+
+let editandoN2 = null;
+
+function desenharFuncN2() {
+  const q = $('buscaFuncN2').value.trim().toLowerCase();
+  const lista = estado.funcionarios
+    .filter(f => (f.situacao || 'ATIVO') === 'ATIVO')
+    .filter(f => !q || String(f.nome || '').toLowerCase().includes(q));
+
+  $('listaFuncN2').innerHTML = lista.length ? lista.map(f => {
+    const v = jd.vinculoDe(f.id);
+    const jornada = jd.dados.jornadas.find(j => j.id === v?.jornada_id);
+    const setor = jd.dados.setores.find(s => s.id === v?.setor_id);
+    const riscos = [
+      v?.periculosidade ? 'periculosidade 30%' : null,
+      v?.insalubridade && v.insalubridade !== 'nao' ? 'insalubridade ' + v.insalubridade : null,
+    ].filter(Boolean).join(' · ');
+    return `<div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
+      <span>
+        <span class="nome">${esc(f.nome)}</span><br>
+        <span class="sub">${esc(jornada?.nome || (setor ? 'jornada do setor ' + setor.nome : 'sem jornada definida'))}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}</span>
+      </span>
+      <span class="tag ${riscos ? 'inativo' : 'ativo'}">${riscos ? 'com adicional' : 'sem adicional'}</span>
+      <span class="acoes"><button class="btn mini" data-n2="${f.id}">Editar</button></span>
+    </div>`;
+  }).join('') : '<div class="vazio">Nenhum funcionário encontrado.</div>';
+
+  $('listaFuncN2').querySelectorAll('[data-n2]').forEach(b =>
+    b.addEventListener('click', () => abrirFuncN2(b.dataset.n2)));
+}
+
+function abrirFuncN2(id) {
+  const f = estado.funcionarios.find(x => x.id === id);
+  if (!f) return;
+  const v = jd.vinculoDe(id) || {};
+  editandoN2 = { id, nome: f.nome };
+
+  const opcoes = (lista, sel) => '<option value=""></option>' + lista
+    .filter(x => x.ativo !== false)
+    .map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.nome)}</option>`).join('');
+
+  const unidade = jd.unidadeDe(v);
+  $('tituloFuncN2').textContent = f.nome;
+  $('subFuncN2').textContent = unidade
+    ? jd.nomeUnidade(unidade)
+    : 'Sem unidade no Nível 1 — a apuração precisa dela para saber o destino de DP.';
+  $('n2Jornada').innerHTML = opcoes(jd.dados.jornadas, v.jornada_id);
+  $('n2Matricula').value = v.matricula || f.cadastro || '';
+  $('n2Insal').value = v.insalubridade || 'nao';
+  $('n2Peric').checked = !!v.periculosidade;
+  $('dlgFuncN2').showModal();
+}
+
+$('buscaFuncN2').addEventListener('input', desenharFuncN2);
+
+$('formFuncN2').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  if (!editandoN2) return;
+  await jd.salvarVinculo(editandoN2.id, {
+    jornada_id: $('n2Jornada').value || null,
+    matricula: $('n2Matricula').value.trim() || null,
+    periculosidade: $('n2Peric').checked,
+    insalubridade: $('n2Insal').value,
+  });
+  $('dlgFuncN2').close();
+  desenharFuncN2();
+});
 
 $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
 ['buscaFunc', 'fSitFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
@@ -496,18 +561,13 @@ $('formFunc').addEventListener('submit', async ev => {
   await db.salvarFuncionario(f);
 
   if (temDP) {
-    await jd.salvar('vinculos', {
-      funcionario_id: f.id,
+    // Só os campos do Nível 1. Jornada e riscos ficam como estão.
+    await jd.salvarVinculo(f.id, {
       unidade_id: $('fuUnidade').value || null,
       setor_id: $('fuSetor').value || null,
       funcao_id: $('fuCargo').value || null,
-      jornada_id: $('fuJornada').value || null,
       admissao: f.admissao,
-      matricula: $('fuMatricula').value.trim() || f.cadastro || null,
-      periculosidade: $('fuPeric').checked,
-      insalubridade: $('fuInsal').value,
       ativo: f.situacao === 'ATIVO',
-      atualizado_em: new Date().toISOString(),
     });
   }
 

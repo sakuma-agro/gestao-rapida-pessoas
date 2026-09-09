@@ -12,7 +12,8 @@ const esc = s => String(s == null ? '' : s)
    de configurações e as permissões passam a enxergá-lo sozinhos. */
 export const MODULOS = [
   { id: 'pessoas', nome: 'Funcionários', telas: [
-    ['funcionarios', 'Cadastro'],
+    ['funcionarios', 'Cadastro · Nível 1'],
+    ['funcionariosN2', 'Cadastro · Nível 2'],
     ['aniversarios', 'Aniversariantes'],
   ] },
   { id: 'epis', nome: 'EPIs', telas: [

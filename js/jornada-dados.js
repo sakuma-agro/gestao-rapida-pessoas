@@ -165,6 +165,21 @@ export async function salvar(colecao, item) {
   return item;
 }
 
+/**
+ * Grava só um pedaço do vínculo, sem apagar o resto. É o que permite que o
+ * Nível 1 (unidade, setor, função) e o Nível 2 (jornada, riscos) mexam no
+ * mesmo registro sem um derrubar o outro.
+ */
+export async function salvarVinculo(funcionarioId, parcial) {
+  const atual = dados.vinculos.find(v => v.funcionario_id === funcionarioId) || {};
+  return salvar('vinculos', {
+    ...atual,
+    ...parcial,
+    funcionario_id: funcionarioId,
+    atualizado_em: new Date().toISOString(),
+  });
+}
+
 /** Nada é excluído de verdade (RN-129): inativa-se. */
 export async function inativar(colecao, id) {
   const k = chaveDe(colecao);
