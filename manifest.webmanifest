@@ -16,25 +16,25 @@
   ],
   "icons": [
     {
-      "src": "icons/gr-192.png",
+      "src": "icons/gr-192.v2.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/gr-512.png",
+      "src": "icons/gr-512.v2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/gr-maskable-192.png",
+      "src": "icons/gr-maskable-192.v2.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "icons/gr-maskable-512.png",
+      "src": "icons/gr-maskable-512.v2.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"

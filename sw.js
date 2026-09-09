@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v29';
+const VERSAO = 'gr-v30';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/lista.js',
@@ -15,9 +15,12 @@ const ARQUIVOS = [
   './img/sakuma-logo.png',
   './img/lop-assinatura-laser-claro.png', './img/lop-assinatura-laser-escuro.png',
   './vendor/supabase.js', './manifest.webmanifest',
-  './icons/favicon-gr.ico', './icons/gr-32.png', './icons/gr-180.png',
-  './icons/gr-192.png', './icons/gr-512.png',
-  './icons/gr-maskable-192.png', './icons/gr-maskable-512.png',
+  // Os ícones levam o número da versão no nome. Quando a arte mudar, suba
+  // para .v3 aqui, no manifest e no index.html — assim o navegador é obrigado
+  // a baixar o arquivo novo em vez de reaproveitar o que ficou guardado.
+  './icons/favicon-gr.v2.ico', './icons/gr-32.v2.png', './icons/gr-180.v2.png',
+  './icons/gr-192.v2.png', './icons/gr-512.v2.png',
+  './icons/gr-maskable-192.v2.png', './icons/gr-maskable-512.v2.png',
 ];
 
 self.addEventListener('install', ev => {
