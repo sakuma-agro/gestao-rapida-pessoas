@@ -3,15 +3,16 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v18';
+const VERSAO = 'gr-v19';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/lista.js',
   './js/planilha.js', './js/aniversarios.js', './js/seed.js',
   './js/acesso.js', './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
-  './vendor/supabase.js', './manifest.webmanifest', './favicon.ico',
-  './icons/icon-32.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-180.png',
-  './icons/maskable-192.png', './icons/maskable-512.png',
+  './vendor/supabase.js', './manifest.webmanifest',
+  './icons/favicon-gr.ico', './icons/gr-32.png', './icons/gr-180.png',
+  './icons/gr-192.png', './icons/gr-512.png',
+  './icons/gr-maskable-192.png', './icons/gr-maskable-512.png',
 ];
 
 self.addEventListener('install', ev => {
