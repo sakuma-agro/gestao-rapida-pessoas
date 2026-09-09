@@ -26,6 +26,15 @@ export const MODULOS = [
   { id: 'rh', nome: 'RH', telas: [
     ['disc', 'DISC'],
   ] },
+  { id: 'jornada', nome: 'Jornada', telas: [
+    ['jorPainel',       'Painel'],
+    ['jorLancar',       'Lançar boletim'],
+    ['jorBoletins',     'Boletins'],
+    ['jorFuncionarios', 'Funcionários'],
+    ['jorFechamento',   'Fechamento'],
+    ['jorRelatorios',   'Relatórios'],
+    ['jorConfig',       'Configurações'],
+  ] },
 ];
 
 export const moduloDe = tela =>

@@ -9,6 +9,7 @@ import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, link
 import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
+import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -35,6 +36,13 @@ function abrirAba(nome) {
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
+  $('telaJorPainel').hidden       = nome !== 'jorPainel';
+  $('telaJorLancar').hidden       = nome !== 'jorLancar';
+  $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
+  $('telaJorFuncionarios').hidden = nome !== 'jorFuncionarios';
+  $('telaJorFechamento').hidden   = nome !== 'jorFechamento';
+  $('telaJorRelatorios').hidden   = nome !== 'jorRelatorios';
+  $('telaJorConfig').hidden       = nome !== 'jorConfig';
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
@@ -42,6 +50,7 @@ function abrirAba(nome) {
   if (nome === 'modelo') preencherModelo();
   if (nome === 'disc') abrirDisc();
   if (nome === 'config') desenharConfig();
+  if (nome.startsWith('jor')) abrirJornada(nome);
 }
 
 /* =============== login =============== */
@@ -64,7 +73,7 @@ $('formLogin').addEventListener('submit', async ev => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear();
-  limparDisc(); limparAcesso();
+  limparDisc(); limparAcesso(); limparJornada();
   mostrar('login');
 });
 
@@ -765,7 +774,7 @@ if ('serviceWorker' in navigator) {
 }
 
 /* arranque */
-ligarDisc(); ligarAcesso();
+ligarDisc(); ligarAcesso(); ligarJornada(abrirAba);
 (async () => {
   const r = await db.iniciar();
   mostrar(r.etapa);
