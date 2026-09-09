@@ -218,9 +218,64 @@ async function gravar(u) {
   return true;
 }
 
+/* Cria o login de verdade (Supabase Auth) e o acesso, de uma vez.
+   Quem cria é a função 'criar-usuario' no servidor: ela confere se quem
+   pediu é administrador e devolve a senha uma única vez. */
+async function criarLogin(u) {
+  const aviso = $('cfAviso');
+  try {
+    const { data, error } = await estado.cliente.functions.invoke('criar-usuario', {
+      body: { email: u.email, nome: u.nome, admin: !!u.admin,
+              modulos: u.modulos || [], telas: u.telas || [] },
+    });
+    if (error) throw error;
+    if (data?.erro) throw new Error(data.erro);
+
+    const i = usuarios.findIndex(x => x.email === u.email);
+    const linha = { email: u.email, nome: u.nome, admin: !!u.admin,
+                    modulos: u.modulos || [], telas: u.telas || [] };
+    if (i >= 0) usuarios[i] = linha; else usuarios.push(linha);
+    usuarios.sort((a, b) => a.email.localeCompare(b.email));
+
+    const caixa = $('usSenha');
+    caixa.hidden = false;
+    caixa.innerHTML = data.jaExistia
+      ? `<b>Esse e-mail já tinha login.</b> A senha continua a mesma;
+         o que mudou foi o acesso aos módulos e telas.`
+      : `<b>Login criado.</b> Anote a senha agora — ela não fica guardada
+         e não dá para ver de novo:<br><br>
+         <code id="usSenhaTexto">${esc(data.senha)}</code>
+         <div class="barra"><button type="button" class="btn mini" id="bCopiarSenha">Copiar</button>
+         <span class="dc-sem">Peça para a pessoa trocar no primeiro acesso.</span></div>`;
+
+    $('bCopiarSenha')?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(data.senha);
+        $('bCopiarSenha').textContent = 'Copiada';
+      } catch { $('bCopiarSenha').textContent = 'Selecione e copie'; }
+    });
+
+    editando.novo = false;
+    $('usEmail').disabled = true;
+    aviso.hidden = true;
+    return true;
+  } catch (e) {
+    const caixa = $('usSenha');
+    caixa.hidden = false;
+    caixa.className = 'us-senha erro';
+    caixa.innerHTML = '<b>Não consegui criar o acesso.</b><br>' + esc(e.message || String(e));
+    return false;
+  }
+}
+
 function abrirUsuario(email) {
   const u = email ? usuarios.find(x => x.email === email) : null;
-  editando = u ? { ...u, telas: [...(u.telas || [])] } : { email: '', nome: '', admin: false, modulos: [...PADRAO], telas: [] };
+  editando = u ? { ...u, telas: [...(u.telas || [])], novo: false }
+                : { email: '', nome: '', admin: false, modulos: [...PADRAO], telas: [], novo: true };
+  $('usSenha').hidden = true;
+  $('usSenha').className = 'us-senha';
+  $('usSenha').innerHTML = '';
+  $('bSalvarUsuario').textContent = u ? 'Salvar' : 'Criar login e acesso';
   $('tituloUsuario').textContent = u ? 'Editar pessoa' : 'Adicionar pessoa';
   $('usEmail').value = editando.email || '';
   $('usEmail').disabled = !!u;
@@ -293,6 +348,16 @@ export function ligarAcesso() {
     if (!email) return;
     const u = { ...editando, email, nome: $('usNome').value.trim(),
                  modulos: editando.modulos || [], telas: editando.telas || [] };
+
+    if (editando.novo) {
+      // Pessoa nova: o login precisa ser criado no servidor, porque a chave
+      // que cria login não pode existir no navegador.
+      const ok = await criarLogin(u);
+      if (!ok) return;                 // erro já apareceu; o diálogo fica aberto
+      desenharConfig();
+      return;                          // fica aberto para copiar a senha
+    }
+
     if (await gravar(u)) {
       const i = usuarios.findIndex(x => x.email === email);
       if (i >= 0) usuarios[i] = u; else usuarios.push(u);
