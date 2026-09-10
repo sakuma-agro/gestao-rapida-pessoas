@@ -438,8 +438,21 @@ function desenharUltimas() {
 function gentePara() {
   const sit = $('qpSituacao').value;
   const emp = $('qpEmpregador').value;
+  const faz = $('qpFazenda').value;
   return estado.funcionarios.filter(f =>
-    (!sit || f.situacao === sit) && (!emp || so(f.empregador) === emp));
+    (!sit || f.situacao === sit) &&
+    (!emp || so(f.empregador) === emp) &&
+    (!faz || so(f.fazenda) === faz));
+}
+
+/** Como o recorte escolhido é dito no documento e no CSV. */
+function recorte() {
+  const emp = $('qpEmpregador').value;
+  const faz = $('qpFazenda').value;
+  if (emp && faz) return `${faz} · ${emp}`;
+  if (faz) return faz;
+  if (emp) return emp;
+  return 'todos os empregadores';
 }
 
 const contarPor = (gente, campo) => {
@@ -463,6 +476,18 @@ const contarFaixa = (gente, valorDe, tabela) => {
   return linhas;
 };
 
+/** Os blocos do relatório. O que o filtro já fixou não vira tabela de uma linha. */
+function blocosDe(g) {
+  const blocos = [];
+  if (!$('qpEmpregador').value) blocos.push(['Empregador', contarPor(g, 'empregador')]);
+  if (!$('qpFazenda').value) blocos.push(['Fazenda', contarPor(g, 'fazenda')]);
+  blocos.push(['Setor', contarPor(g, 'setor')]);
+  blocos.push(['Cargo', contarPor(g, 'cargo')]);
+  blocos.push(['Faixa etária', contarFaixa(g, f => anosDesde(f.nascimento), FAIXA_IDADE)]);
+  blocos.push(['Tempo de casa', contarFaixa(g, f => anosDesde(f.admissao), FAIXA_CASA)]);
+  return blocos;
+}
+
 function numeros() {
   const gente = gentePara();
   const total = gente.length;
@@ -479,8 +504,8 @@ function numeros() {
   };
 }
 
-function desenharQuadro() {
-  // empregadores do cadastro, sem repetir
+/** Enche os dois filtros. As fazendas seguem o empregador escolhido. */
+function preencherFiltros() {
   const sel = $('qpEmpregador');
   if (!sel.dataset.pronto) {
     const emps = [...new Set(estado.funcionarios.map(f => so(f.empregador)).filter(Boolean))]
@@ -489,6 +514,24 @@ function desenharQuadro() {
       emps.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
     sel.dataset.pronto = '1';
   }
+
+  // só as fazendas de quem está selecionado — nada de opção que não traz ninguém
+  const emp = sel.value;
+  const selFaz = $('qpFazenda');
+  const escolhida = selFaz.value;
+  const sit = $('qpSituacao').value;
+  const fazendas = [...new Set(estado.funcionarios
+    .filter(f => (!emp || so(f.empregador) === emp) && (!sit || f.situacao === sit))
+    .map(f => so(f.fazenda)).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  selFaz.innerHTML = '<option value="">Todas as fazendas</option>' +
+    fazendas.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  selFaz.value = fazendas.includes(escolhida) ? escolhida : '';
+}
+
+function desenharQuadro() {
+  preencherFiltros();
 
   const n = numeros();
   const um = (rotulo, valor, nota) => `
@@ -499,7 +542,7 @@ function desenharQuadro() {
     </div>`;
 
   $('rhQuadroResumo').innerHTML = [
-    um('Pessoas', String(n.total), $('qpSituacao').value ? `situação ${$('qpSituacao').value.toLowerCase()}` : 'todas as situações'),
+    um('Pessoas', String(n.total), recorte()),
     um('Homens', `${n.h}`, pct(n.h, n.total - n.semSexo)),
     um('Mulheres', `${n.mu}`, pct(n.mu, n.total - n.semSexo)),
     um('Idade média', n.idadeMedia == null ? '—' : `${n.idadeMedia.toFixed(1).replace('.', ',')} anos`,
@@ -520,14 +563,8 @@ function desenharQuadro() {
     </div>`;
 
   const g = n.gente;
-  $('rhQuadroTabelas').innerHTML = [
-    tabela('Empregador', contarPor(g, 'empregador'), n.total),
-    tabela('Fazenda', contarPor(g, 'fazenda'), n.total),
-    tabela('Setor', contarPor(g, 'setor'), n.total),
-    tabela('Cargo', contarPor(g, 'cargo'), n.total),
-    tabela('Faixa etária', contarFaixa(g, f => anosDesde(f.nascimento), FAIXA_IDADE), n.total),
-    tabela('Tempo de casa', contarFaixa(g, f => anosDesde(f.admissao), FAIXA_CASA), n.total),
-  ].join('');
+  $('rhQuadroTabelas').innerHTML = blocosDe(g).map(([titulo, linhas]) =>
+    tabela(titulo, linhas, n.total)).join('');
 
   desenharMarcacaoSexo();
 }
@@ -576,19 +613,15 @@ function documentoQuadro() {
       <div><span>Idade média</span><b>${n.idadeMedia == null ? '—' : n.idadeMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Tempo de casa</span><b>${n.casaMedia == null ? '—' : n.casaMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Situação</span><b>${esc($('qpSituacao').value || 'todas')}</b></div>
+      <div><span>Recorte</span><b>${esc(recorte())}</b></div>
     </div>
     ${n.semSexo ? `<div class="rel-resumo">${n.semSexo} pessoa(s) ainda sem sexo informado no cadastro. O percentual de homens e mulheres foi calculado sobre as ${conhecidos} já informadas.</div>` : ''}
-    ${bloco('Empregador', contarPor(g, 'empregador'))}
-    ${bloco('Fazenda', contarPor(g, 'fazenda'))}
-    ${bloco('Setor', contarPor(g, 'setor'))}
-    ${bloco('Cargo', contarPor(g, 'cargo'))}
-    ${bloco('Faixa etária', contarFaixa(g, f => anosDesde(f.nascimento), FAIXA_IDADE))}
-    ${bloco('Tempo de casa', contarFaixa(g, f => anosDesde(f.admissao), FAIXA_CASA))}`;
+    ${blocosDe(g).map(([titulo, linhas]) => bloco(titulo, linhas)).join('')}`;
 
   return documento({
     titulo: 'QUADRO DE PESSOAL',
     subtitulo: 'SAKUMA Agronegócios · composição do time',
-    canto: $('qpEmpregador').value || 'todos os empregadores',
+    canto: recorte(),
     corpo,
     assinatura: so(R.modelo?.assinatura) || 'Guilherme Lopes',
   });
@@ -599,14 +632,9 @@ function csvQuadro() {
   const linhas = [['Bloco', 'Item', 'Pessoas', 'Percentual']];
   const juntar = (titulo, dados) => dados.forEach(([k, v]) =>
     linhas.push([titulo, k, v, pct(v, n.total)]));
-  const g = n.gente;
-  juntar('Empregador', contarPor(g, 'empregador'));
-  juntar('Fazenda', contarPor(g, 'fazenda'));
-  juntar('Setor', contarPor(g, 'setor'));
-  juntar('Cargo', contarPor(g, 'cargo'));
+  linhas.push(['Recorte', recorte(), n.total, '100,0%']);
   juntar('Sexo', [['Homens', n.h], ['Mulheres', n.mu], ['Não informado', n.semSexo]]);
-  juntar('Faixa etária', contarFaixa(g, f => anosDesde(f.nascimento), FAIXA_IDADE));
-  juntar('Tempo de casa', contarFaixa(g, f => anosDesde(f.admissao), FAIXA_CASA));
+  blocosDe(n.gente).forEach(([titulo, dados]) => juntar(titulo, dados));
   return linhas;
 }
 
@@ -732,9 +760,10 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   /* --- quadro de pessoal --- */
   $('qpSituacao').addEventListener('change', desenharQuadro);
   $('qpEmpregador').addEventListener('change', desenharQuadro);
+  $('qpFazenda').addEventListener('change', desenharQuadro);
   $('bPreviaQuadro').addEventListener('click', () => verPrevia(documentoQuadro()));
   $('bCsvQuadro').addEventListener('click', () =>
-    baixarCsv(`quadro-de-pessoal-${hoje()}.csv`, csvQuadro()));
+    baixarCsv(`quadro-de-pessoal-${recorte().replace(/\W+/g, '-').toLowerCase()}-${hoje()}.csv`, csvQuadro()));
 
   $('rhListaSexo').addEventListener('click', async ev => {
     const b = ev.target.closest('[data-sexo]');
