@@ -5,6 +5,7 @@
 
 :root{
   --verde:#84BD00; --verde-esc:#6a9800; --verde-fundo:rgba(132,189,0,.10);
+  --marrom:#744F28;
   --alerta:#c98a00; --erro:#c0392b;
   --linha:#dcdfd6; --papel:#ffffff; --fundo:#eef0e9;
   --texto:#1c2118; --suave:#5e6657;
@@ -19,6 +20,7 @@
   --h21:3.393mm; --h22:5.060mm; --h23:3.890mm; --h43:7.394mm;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --marrom:#c9a06a;
   --linha:#39413a; --papel:#20241f; --fundo:#15180f; --texto:#e8ebe3; --suave:#9aa392;
   --verde-esc:#a3d626; --verde-fundo:rgba(132,189,0,.16); --alerta:#e0ac3a;
   --tagA-bg:rgba(132,189,0,.22); --tagA-tx:#a9d92e;
@@ -26,6 +28,7 @@
   --sombra:0 1px 2px rgba(0,0,0,.4);
 } }
 :root[data-theme="dark"]{
+  --marrom:#c9a06a;
   --linha:#39413a; --papel:#20241f; --fundo:#15180f; --texto:#e8ebe3; --suave:#9aa392;
   --verde-esc:#a3d626; --verde-fundo:rgba(132,189,0,.16); --alerta:#e0ac3a;
   --tagA-bg:rgba(132,189,0,.22); --tagA-tx:#a9d92e;
@@ -147,6 +150,33 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .qp-card small{display:block;font-size:11px;color:var(--suave)}
 .qp-bloco{margin-top:18px}
 .qp-bloco h3{margin:0 0 6px;font-size:13px;color:var(--marrom)}
+
+/* ---- gráficos do quadro de pessoal ----
+   Tudo em SVG: forma vetorial imprime sempre, cor de fundo não. */
+.g-rosca{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+  border:1px solid var(--linha);border-radius:10px;padding:14px 16px}
+.g-donut{width:150px;height:150px;flex:none}
+.g-centro-n{font:bold 30px Arial,Helvetica,sans-serif;fill:#744F28}
+.g-centro-r{font:13px Arial,Helvetica,sans-serif;fill:#8A8D86}
+.g-legenda{flex:1;min-width:190px}
+.g-item{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:13px;
+  border-bottom:1px solid var(--linha)}
+.g-item:last-of-type{border-bottom:none}
+.g-cor{width:12px;height:12px;flex:none}
+.g-nome{flex:1}
+.g-item b{font-size:15px;color:var(--marrom)}
+.g-item small{width:62px;text-align:right;color:var(--suave)}
+.g-nota{margin:8px 0 0;font-size:11.5px;color:var(--suave)}
+.g-vazio{border:1px dashed var(--linha);border-radius:10px;padding:16px;
+  font-size:12.5px;color:var(--suave)}
+.g-cel{width:34%;vertical-align:middle}
+.g-barra{display:block;width:100%;height:8px}
+.rel .g-rosca{border-color:#E1E2DE;padding:8px 10px;gap:16px;margin-bottom:12px}
+.rel .g-donut{width:118px;height:118px}
+.rel .g-item{font-size:11px;border-bottom-color:#E1E2DE}
+.rel .g-item b{font-size:12px}
+.rel .g-nota{font-size:9.5px}
+.rel-secao{font-size:12px;color:#744F28;margin:16px 0 6px}
 .contagem{font-size:13px;color:var(--suave)}
 .contagem b{color:var(--verde-esc)}
 
