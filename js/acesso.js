@@ -38,8 +38,17 @@ export const MODULOS = [
   { id: 'certificacao', nome: 'Certificação', telas: [
     ['lista', 'Lista de presença'],
   ] },
-  { id: 'rh', nome: 'RH', telas: [
-    ['disc', 'DISC'],
+  { id: 'rh', nome: 'RH', subs: [
+    { id: 'disc', nome: 'DISC', telas: [
+      ['disc', 'Perfil comportamental'],
+    ] },
+    { id: 'cargos', nome: 'Cargos e salários', telas: [
+      ['rhCargos', 'Plano de cargos'],
+      ['rhProposta', 'Gerar proposta'],
+    ] },
+    { id: 'relatorios', nome: 'Relatórios', telas: [
+      ['rhQuadro', 'Quadro de pessoal'],
+    ] },
   ] },
   { id: 'jornada', nome: 'DP', telas: [
     ['jorPainel',       'Painel'],

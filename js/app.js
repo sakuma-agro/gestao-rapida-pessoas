@@ -12,6 +12,7 @@ import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso }
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { ligarSst, abrirSst, limparSst } from './sst.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
+import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
 import { pode, podeTela } from './acesso.js';
 
@@ -57,7 +58,11 @@ function abrirAba(nome) {
   if (nome === 'funcionariosN2') desenharFuncN2();
   if (nome === 'epis') { desenharEpis(); conferirCa(false); }
   if (nome === 'modelo') preencherModelo();
+  $('telaRhCargos').hidden   = nome !== 'rhCargos';
+  $('telaRhProposta').hidden = nome !== 'rhProposta';
+  $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
   if (nome === 'disc') abrirDisc();
+  if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();
   if (['exVenc', 'exTipos', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome.startsWith('jor')) abrirJornada(nome);
@@ -83,7 +88,7 @@ $('formLogin').addEventListener('submit', async ev => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear();
-  limparDisc(); limparAcesso(); limparJornada(); limparSst();
+  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh();
   mostrar('login');
 });
 
@@ -434,6 +439,7 @@ function abrirFuncionario(id) {
   $('fuApelido').value = editandoFunc.apelido || '';
   $('fuCadastro').value = editandoFunc.cadastro || '';
   $('fuNascimento').value = (editandoFunc.nascimento || '').slice(0, 10);
+  $('fuSexo').value = editandoFunc.sexo || '';
   $('fuTelefone').value = editandoFunc.telefone || '';
   $('fuAdmissao').value = (editandoFunc.admissao || '').slice(0, 10);
   $('fuCpf').value = editandoFunc.cpf || '';
@@ -549,6 +555,7 @@ $('formFunc').addEventListener('submit', async ev => {
     apelido: $('fuApelido').value.trim(),
     cadastro: $('fuCadastro').value.trim(),
     nascimento: $('fuNascimento').value || null,
+    sexo: $('fuSexo').value || null,
     telefone: $('fuTelefone').value.trim(),
     admissao: $('fuAdmissao').value || null,
     cpf: $('fuCpf').value.trim(),
@@ -966,6 +973,7 @@ if ('serviceWorker' in navigator) {
 
 /* arranque */
 ligarDisc(); ligarAcesso(); ligarJornada(abrirAba); ligarSst(mostrarAviso);
+ligarRh(mostrarAviso, desenharFuncionarios);
 (async () => {
   const r = await db.iniciar();
   mostrar(r.etapa);
