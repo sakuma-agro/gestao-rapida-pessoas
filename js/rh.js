@@ -504,6 +504,83 @@ function numeros() {
   };
 }
 
+/* =============== gráficos =================================================
+   Tudo desenhado em SVG, na mão. Forma vetorial imprime sempre; se fossem
+   `div` com cor de fundo sumiriam no papel, porque o Chrome imprime sem
+   gráficos de plano de fundo. Mesma regra da lista de presença.
+   ========================================================================= */
+const CORES = {
+  homem: '#84BD00', mulher: '#744F28', semSexo: '#C9CCC2',
+  trilho: '#E7EBDE', barra: '#84BD00',
+};
+
+/** Barra horizontal proporcional, para as tabelas. */
+function barra(v, total) {
+  const larg = total > 0 ? Math.min(100, v * 100 / total) : 0;
+  return `<svg class="g-barra" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+    <rect x="0" y="1" width="100" height="6" fill="${CORES.trilho}"/>
+    <rect x="0" y="1" width="${larg.toFixed(2)}" height="6" fill="${CORES.barra}"/>
+  </svg>`;
+}
+
+/**
+ * Rosca de homens x mulheres. Cada fatia é um arco de círculo feito com
+ * tracejado (stroke-dasharray), que é o jeito mais simples de fazer rosca
+ * sem biblioteca nenhuma.
+ */
+function roscaSexo(n) {
+  const conhecidos = n.h + n.mu;
+  if (!conhecidos) {
+    return `<div class="g-vazio">Ainda não dá para desenhar: ninguém tem o sexo
+      informado neste recorte. Marque na caixa abaixo e o gráfico aparece.</div>`;
+  }
+
+  const raio = 60, grosso = 26, volta = 2 * Math.PI * raio;
+  const fatias = [
+    { rotulo: 'Homens', v: n.h, cor: CORES.homem },
+    { rotulo: 'Mulheres', v: n.mu, cor: CORES.mulher },
+  ];
+  if (n.semSexo) fatias.push({ rotulo: 'Não informado', v: n.semSexo, cor: CORES.semSexo });
+
+  const totalRosca = fatias.reduce((a, f) => a + f.v, 0);
+  let virado = 0;
+  const arcos = fatias.filter(f => f.v > 0).map(f => {
+    const trecho = volta * f.v / totalRosca;
+    const el = `<circle cx="80" cy="80" r="${raio}" fill="none" stroke="${f.cor}"
+      stroke-width="${grosso}" stroke-dasharray="${trecho.toFixed(2)} ${(volta - trecho).toFixed(2)}"
+      stroke-dashoffset="${(-virado).toFixed(2)}" transform="rotate(-90 80 80)"/>`;
+    virado += trecho;
+    return el;
+  }).join('');
+
+  // As fatias e os números da legenda saem todos sobre o mesmo total: o que
+  // está desenhado na rosca. Percentual que não bate com o desenho engana.
+  const maior = n.h >= n.mu ? fatias[0] : fatias[1];
+  const legenda = fatias.map(f => `
+    <div class="g-item">
+      <svg class="g-cor" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10" rx="2" fill="${f.cor}"/></svg>
+      <span class="g-nome">${esc(f.rotulo)}</span>
+      <b>${f.v}</b>
+      <small>${pct(f.v, totalRosca)}</small>
+    </div>`).join('');
+
+  return `
+    <div class="g-rosca">
+      <svg viewBox="0 0 160 160" class="g-donut" role="img"
+           aria-label="Homens ${pct(n.h, conhecidos)}, mulheres ${pct(n.mu, conhecidos)}">
+        ${arcos}
+        <text x="80" y="74" text-anchor="middle" class="g-centro-n">${pct(maior.v, totalRosca)}</text>
+        <text x="80" y="94" text-anchor="middle" class="g-centro-r">${esc(maior.rotulo.toLowerCase())}</text>
+      </svg>
+      <div class="g-legenda">
+        ${legenda}
+        ${n.semSexo ? `<p class="g-nota">Contando só quem já tem o sexo no cadastro
+          (${conhecidos} de ${n.total}): ${pct(n.h, conhecidos)} homens e
+          ${pct(n.mu, conhecidos)} mulheres.</p>` : ''}
+      </div>
+    </div>`;
+}
+
 /** Enche os dois filtros. As fazendas seguem o empregador escolhido. */
 function preencherFiltros() {
   const sel = $('qpEmpregador');
@@ -543,21 +620,27 @@ function desenharQuadro() {
 
   $('rhQuadroResumo').innerHTML = [
     um('Pessoas', String(n.total), recorte()),
-    um('Homens', `${n.h}`, pct(n.h, n.total - n.semSexo)),
-    um('Mulheres', `${n.mu}`, pct(n.mu, n.total - n.semSexo)),
+    // percentual sobre o total, igual ao da rosca — indicador só pode ter um valor
+    um('Homens', `${n.h}`, pct(n.h, n.total)),
+    um('Mulheres', `${n.mu}`, pct(n.mu, n.total)),
     um('Idade média', n.idadeMedia == null ? '—' : `${n.idadeMedia.toFixed(1).replace('.', ',')} anos`,
       n.semNascimento ? `${n.semNascimento} sem data de nascimento` : ''),
     um('Tempo de casa', n.casaMedia == null ? '—' : `${n.casaMedia.toFixed(1).replace('.', ',')} anos`,
       n.semAdmissao ? `${n.semAdmissao} sem admissão` : ''),
   ].join('');
 
+  $('rhGraficoSexo').innerHTML = roscaSexo(n);
+
   const tabela = (titulo, linhas, total) => `
     <div class="qp-bloco">
       <h3>${esc(titulo)}</h3>
-      <table class="dc-planilha">
-        <thead><tr><th>${esc(titulo)}</th><th class="ce">Pessoas</th><th class="ce">%</th></tr></thead>
+      <table class="dc-planilha g-tab">
+        <thead><tr>
+          <th>${esc(titulo)}</th><th class="ce">Pessoas</th><th class="ce">%</th><th></th>
+        </tr></thead>
         <tbody>${linhas.map(([k, v]) => `<tr>
           <td>${esc(k)}</td><td class="ce">${v}</td><td class="ce">${pct(v, total)}</td>
+          <td class="g-cel">${barra(v, total)}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>`;
@@ -597,25 +680,27 @@ function documentoQuadro() {
   const n = numeros();
   const g = n.gente;
   const bloco = (titulo, linhas) => `
-    <table class="rel-tabela">
-      <thead><tr><th>${esc(titulo)}</th><th class="rel-num">Pessoas</th><th class="rel-num">%</th></tr></thead>
+    <table class="rel-tabela g-tab">
+      <colgroup><col><col style="width:16mm"><col style="width:16mm"><col style="width:42mm"></colgroup>
+      <thead><tr><th>${esc(titulo)}</th><th class="rel-num">Pessoas</th><th class="rel-num">%</th><th></th></tr></thead>
       <tbody>${linhas.map(([k, v]) => `<tr><td>${esc(k)}</td>
-        <td class="rel-num">${v}</td><td class="rel-num">${pct(v, n.total)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td>Total</td><td class="rel-num">${n.total}</td><td class="rel-num">100,0%</td></tr></tfoot>
+        <td class="rel-num">${v}</td><td class="rel-num">${pct(v, n.total)}</td>
+        <td class="g-cel">${barra(v, n.total)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td class="rel-num">${n.total}</td><td class="rel-num">100,0%</td><td></td></tr></tfoot>
     </table>`;
 
-  const conhecidos = n.total - n.semSexo;
   const corpo = `
     <div class="rel-ficha">
       <div><span>Pessoas</span><b>${n.total}</b></div>
-      <div><span>Homens</span><b>${n.h} · ${pct(n.h, conhecidos)}</b></div>
-      <div><span>Mulheres</span><b>${n.mu} · ${pct(n.mu, conhecidos)}</b></div>
+      <div><span>Homens</span><b>${n.h} · ${pct(n.h, n.total)}</b></div>
+      <div><span>Mulheres</span><b>${n.mu} · ${pct(n.mu, n.total)}</b></div>
       <div><span>Idade média</span><b>${n.idadeMedia == null ? '—' : n.idadeMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Tempo de casa</span><b>${n.casaMedia == null ? '—' : n.casaMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Situação</span><b>${esc($('qpSituacao').value || 'todas')}</b></div>
       <div><span>Recorte</span><b>${esc(recorte())}</b></div>
     </div>
-    ${n.semSexo ? `<div class="rel-resumo">${n.semSexo} pessoa(s) ainda sem sexo informado no cadastro. O percentual de homens e mulheres foi calculado sobre as ${conhecidos} já informadas.</div>` : ''}
+    <h2 class="rel-secao">Homens e mulheres</h2>
+    ${roscaSexo(n)}
     ${blocosDe(g).map(([titulo, linhas]) => bloco(titulo, linhas)).join('')}`;
 
   return documento({
