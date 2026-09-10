@@ -57,6 +57,7 @@
     </div>
     <nav class="abas" role="tablist" id="navModulos"></nav>
     <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
+    <nav class="aba3s" role="tablist" id="navSub" hidden></nav>
   </header>
 
   <main>
@@ -323,6 +324,130 @@
           <button class="btn" type="button" id="bRestaurarModelo">Restaurar original da planilha</button>
         </div>
       </form>
+    </section>
+
+    <!-- ---- SST · EXAMES: vencimentos ---- -->
+    <section class="tela" id="telaExVenc" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Vencimento dos exames</h2>
+            <p class="dica" style="margin:2px 0 0">O mais recente de cada exame, por funcionário.</p>
+          </div>
+          <button class="btn principal" id="bNovoExame">Lançar exame</button>
+        </div>
+        <div class="grade larga" style="margin-top:14px">
+          <label class="campo">Buscar <input type="text" id="exBusca" placeholder="Nome do funcionário"></label>
+          <label class="campo">Exame <select id="exFiltroTipo"><option value="">Todos</option></select></label>
+          <label class="campo">Situação
+            <select id="exFiltroStatus">
+              <option value="">Todos</option>
+              <option value="vencido">Vencidos</option>
+              <option value="vencendo">Vence em até 30 dias</option>
+              <option value="emdia">Em dia</option>
+            </select>
+          </label>
+          <label class="campo">Funcionários
+            <select id="exFiltroSit">
+              <option value="ATIVO">Somente ativos</option>
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+        <div class="barra" id="exResumo"></div>
+        <label class="us-tela" style="margin-top:10px">
+          <input type="checkbox" id="exHistorico"> Mostrar todos os lançamentos, não só o último
+        </label>
+        <div id="exTabela" style="margin-top:12px"></div>
+        <div class="aviso info" id="exSemNada" hidden></div>
+      </div>
+
+      <div class="previa-lista" id="exSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirEx">Imprimir</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomEx" min="50" max="150" value="80" step="5">
+          <span id="zoomVEx">80%</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- ---- SST · EXAMES: tipos ---- -->
+    <section class="tela" id="telaExTipos" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Tipos de exame e periodicidade</h2>
+            <p class="dica" style="margin:2px 0 0">A periodicidade calcula o vencimento sozinha ao lançar o exame.</p>
+          </div>
+          <button class="btn principal" id="bNovoTipoEx">Novo tipo</button>
+        </div>
+        <div id="listaTipoEx" style="margin-top:14px"></div>
+      </div>
+    </section>
+
+    <!-- ---- SST · TREINAMENTOS: vencimentos ---- -->
+    <section class="tela" id="telaTrVenc" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Vencimento dos treinamentos</h2>
+            <p class="dica" style="margin:2px 0 0">O mais recente de cada treinamento, por funcionário.</p>
+          </div>
+          <button class="btn principal" id="bNovoTrein">Lançar treinamento</button>
+        </div>
+        <div class="grade larga" style="margin-top:14px">
+          <label class="campo">Buscar <input type="text" id="trBusca" placeholder="Nome do funcionário"></label>
+          <label class="campo">Treinamento <select id="trFiltroTipo"><option value="">Todos</option></select></label>
+          <label class="campo">Situação
+            <select id="trFiltroStatus">
+              <option value="">Todos</option>
+              <option value="vencido">Vencidos</option>
+              <option value="vencendo">Vence em até 30 dias</option>
+              <option value="emdia">Em dia</option>
+            </select>
+          </label>
+          <label class="campo">Funcionários
+            <select id="trFiltroSit">
+              <option value="ATIVO">Somente ativos</option>
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+        <div class="barra" id="trResumo"></div>
+        <label class="us-tela" style="margin-top:10px">
+          <input type="checkbox" id="trHistorico"> Mostrar todos os lançamentos, não só o último
+        </label>
+        <div id="trTabela" style="margin-top:12px"></div>
+        <div class="aviso info" id="trSemNada" hidden></div>
+      </div>
+
+      <div class="previa-lista" id="trSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirTr">Imprimir</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomTr" min="50" max="150" value="80" step="5">
+          <span id="zoomVTr">80%</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- ---- SST · TREINAMENTOS: tipos ---- -->
+    <section class="tela" id="telaTrTipos" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Tipos de treinamento e periodicidade</h2>
+            <p class="dica" style="margin:2px 0 0">A validade calcula o vencimento sozinha ao lançar o treinamento.</p>
+          </div>
+          <button class="btn principal" id="bNovoTipoTr">Novo tipo</button>
+        </div>
+        <div id="listaTipoTr" style="margin-top:14px"></div>
+      </div>
     </section>
 
     <!-- ---- DISC ---- -->
@@ -720,6 +845,132 @@
     </div>
     <div class="barra entre">
       <span></span>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: LANÇAR EXAME ============ -->
+<dialog id="dlgExame">
+  <form method="dialog" id="formExame">
+    <h3 id="tituloExame">Lançar exame</h3>
+    <div class="aviso erro" id="erroExame" hidden></div>
+    <div class="grade">
+      <label class="campo plena">Funcionário
+        <select id="exFunc" required></select>
+      </label>
+      <label class="campo plena">Exame
+        <select id="exTipo" required></select>
+      </label>
+      <label class="campo">Realizado em
+        <input type="date" id="exData" required>
+      </label>
+      <label class="campo">Vence em
+        <input type="date" id="exVence">
+      </label>
+    </div>
+    <p class="dica" id="exDicaVence" style="margin:8px 0 0"></p>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarExame">Apagar</button>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: TIPO DE EXAME ============ -->
+<dialog id="dlgTipoEx">
+  <form method="dialog" id="formTipoEx">
+    <h3 id="tituloTipoEx">Novo tipo de exame</h3>
+    <div class="aviso erro" id="erroTipoEx" hidden></div>
+    <div class="grade">
+      <label class="campo plena">Nome do exame
+        <input type="text" id="txNome" required placeholder="ASO periódico">
+      </label>
+      <label class="campo">Refazer a cada (meses)
+        <input type="number" id="txMeses" min="0" max="120" step="1" placeholder="12">
+      </label>
+      <label class="campo">Situação
+        <select id="txAtivo"><option value="1">Em uso</option><option value="0">Desativado</option></select>
+      </label>
+    </div>
+    <p class="dica" style="margin:8px 0 0">Deixe os meses em branco para exame que não vence (o demissional, por exemplo).</p>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarTipoEx">Apagar</button>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: LANÇAR TREINAMENTO ============ -->
+<dialog id="dlgTreino">
+  <form method="dialog" id="formTreino">
+    <h3 id="tituloTreino">Lançar treinamento</h3>
+    <div class="aviso erro" id="erroTreino" hidden></div>
+    <div class="grade">
+      <label class="campo plena">Funcionário
+        <select id="trFunc" required></select>
+      </label>
+      <label class="campo plena">Treinamento
+        <select id="trTipo" required></select>
+      </label>
+      <label class="campo">Realizado em
+        <input type="date" id="trData" required>
+      </label>
+      <label class="campo">Vence em
+        <input type="date" id="trVence">
+      </label>
+      <label class="campo">Carga horária
+        <input type="number" id="trCarga" min="0" max="999" step="0.5">
+      </label>
+      <label class="campo">Instrutor
+        <input type="text" id="trInstrutor">
+      </label>
+      <label class="campo plena">Observação
+        <input type="text" id="trObs">
+      </label>
+    </div>
+    <p class="dica" id="trDicaVence" style="margin:8px 0 0"></p>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarTreino">Apagar</button>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: TIPO DE TREINAMENTO ============ -->
+<dialog id="dlgTipoTr">
+  <form method="dialog" id="formTipoTr">
+    <h3 id="tituloTipoTr">Novo tipo de treinamento</h3>
+    <div class="aviso erro" id="erroTipoTr" hidden></div>
+    <div class="grade">
+      <label class="campo plena">Nome do treinamento
+        <input type="text" id="ttNome" required placeholder="NR-35 · Trabalho em altura">
+      </label>
+      <label class="campo">Reciclagem a cada (meses)
+        <input type="number" id="ttMeses" min="0" max="120" step="1" placeholder="24">
+      </label>
+      <label class="campo">Carga horária padrão
+        <input type="number" id="ttCarga" min="0" max="999" step="0.5">
+      </label>
+      <label class="campo">Situação
+        <select id="ttAtivo"><option value="1">Em uso</option><option value="0">Desativado</option></select>
+      </label>
+    </div>
+    <p class="dica" style="margin:8px 0 0">Deixe os meses em branco para treinamento que não precisa de reciclagem.</p>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarTipoTr">Apagar</button>
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit">Salvar</button>
