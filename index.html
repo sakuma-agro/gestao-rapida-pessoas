@@ -268,10 +268,14 @@
         <div class="barra entre" style="margin:0">
           <div>
             <h2 style="margin:0">Catálogo de EPIs</h2>
-            <p class="dica" style="margin:2px 0 0">Aparece como sugestão ao preencher a ficha.</p>
+            <p class="dica" style="margin:2px 0 0">Aparece como sugestão ao preencher a ficha. A validade vem do site ConsultaCA.</p>
           </div>
-          <button class="btn principal" id="bNovoEpi">Novo EPI</button>
+          <span class="acoes">
+            <button class="btn" id="bConferirCa">Conferir C.As</button>
+            <button class="btn principal" id="bNovoEpi">Novo EPI</button>
+          </span>
         </div>
+        <p class="dica" id="caRecado" style="margin:8px 0 0"></p>
         <label class="campo" style="margin-top:14px">Buscar
           <input type="text" id="buscaEpi" placeholder="Descrição ou C.A">
         </label>
