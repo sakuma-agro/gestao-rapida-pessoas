@@ -1,0 +1,485 @@
+// sst.js — submódulos Exames e Treinamentos do módulo SST.
+//
+// Os dois funcionam igual: um cadastro de tipos (com a periodicidade em meses)
+// e uma tela de vencimentos, onde cada lançamento ganha a data de vencimento
+// calculada pelo tipo. Por isso quase tudo aqui é escrito uma vez só e recebe
+// a "receita" do exame ou do treinamento em RECEITAS.
+import { estado } from './store.js';
+import { LOGO } from './seed.js';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+  .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const so = v => String(v == null ? '' : v).trim();
+const dataBr = iso => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
+};
+const hoje = () => new Date().toISOString().slice(0, 10);
+
+/** Soma meses a uma data ISO, segurando o fim de mês (31/01 + 1 mês = 28/02). */
+export function somarMeses(iso, meses) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  if (!m || !meses) return null;
+  const ano = +m[1], mes = +m[2] - 1, dia = +m[3];
+  const d = new Date(Date.UTC(ano, mes + Number(meses), 1));
+  const ultimo = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(dia, ultimo));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Em dia, vencendo (30 dias) ou vencido. */
+export function situacaoDe(vence) {
+  if (!vence) return { chave: 'semvalidade', rotulo: 'Sem validade', cor: 'neutra', dias: null };
+  const dias = Math.round((Date.parse(vence + 'T00:00:00Z') - Date.parse(hoje() + 'T00:00:00Z')) / 86400000);
+  if (dias < 0) return { chave: 'vencido', rotulo: `Vencido há ${-dias} dia${-dias > 1 ? 's' : ''}`, cor: 'perigo', dias };
+  if (dias <= 30) return { chave: 'vencendo', rotulo: dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia${dias > 1 ? 's' : ''}`, cor: 'alerta', dias };
+  return { chave: 'emdia', rotulo: 'Em dia', cor: 'ativo', dias };
+}
+
+/* =============== as duas receitas =============== */
+const RECEITAS = {
+  exame: {
+    id: 'exame',
+    titulo: 'Vencimento dos exames',
+    rotuloTipo: 'Exame',
+    tabelaTipos: 'sst_tipos_exame',
+    tabelaRegs: 'sst_exames',
+    tela: 'exVenc', telaTipos: 'exTipos',
+    completo: false,                   // exame guarda só tipo, data e vencimento
+    el: {
+      busca: 'exBusca', fTipo: 'exFiltroTipo', fStatus: 'exFiltroStatus', fSit: 'exFiltroSit',
+      resumo: 'exResumo', historico: 'exHistorico', tabela: 'exTabela', semNada: 'exSemNada',
+      saida: 'exSaida', zoom: 'zoomEx', zoomV: 'zoomVEx', imprimir: 'bImprimirEx',
+      novo: 'bNovoExame', listaTipos: 'listaTipoEx', novoTipo: 'bNovoTipoEx',
+      dlg: 'dlgExame', form: 'formExame', titulo: 'tituloExame', erro: 'erroExame',
+      func: 'exFunc', tipo: 'exTipo', data: 'exData', vence: 'exVence',
+      dica: 'exDicaVence', apagar: 'bApagarExame',
+      dlgTipo: 'dlgTipoEx', formTipo: 'formTipoEx', tituloTipo: 'tituloTipoEx', erroTipo: 'erroTipoEx',
+      tNome: 'txNome', tMeses: 'txMeses', tAtivo: 'txAtivo', tApagar: 'bApagarTipoEx', tCarga: null,
+    },
+  },
+  treinamento: {
+    id: 'treinamento',
+    titulo: 'Vencimento dos treinamentos',
+    rotuloTipo: 'Treinamento',
+    tabelaTipos: 'sst_tipos_treinamento',
+    tabelaRegs: 'sst_treinamentos',
+    tela: 'trVenc', telaTipos: 'trTipos',
+    completo: true,                    // treinamento guarda carga, instrutor e observação
+    el: {
+      busca: 'trBusca', fTipo: 'trFiltroTipo', fStatus: 'trFiltroStatus', fSit: 'trFiltroSit',
+      resumo: 'trResumo', historico: 'trHistorico', tabela: 'trTabela', semNada: 'trSemNada',
+      saida: 'trSaida', zoom: 'zoomTr', zoomV: 'zoomVTr', imprimir: 'bImprimirTr',
+      novo: 'bNovoTrein', listaTipos: 'listaTipoTr', novoTipo: 'bNovoTipoTr',
+      dlg: 'dlgTreino', form: 'formTreino', titulo: 'tituloTreino', erro: 'erroTreino',
+      func: 'trFunc', tipo: 'trTipo', data: 'trData', vence: 'trVence',
+      dica: 'trDicaVence', apagar: 'bApagarTreino',
+      carga: 'trCarga', instrutor: 'trInstrutor', obs: 'trObs',
+      dlgTipo: 'dlgTipoTr', formTipo: 'formTipoTr', tituloTipo: 'tituloTipoTr', erroTipo: 'erroTipoTr',
+      tNome: 'ttNome', tMeses: 'ttMeses', tAtivo: 'ttAtivo', tCarga: 'ttCarga', tApagar: 'bApagarTipoTr',
+    },
+  },
+};
+
+/* =============== dados =============== */
+const S = { exame: { tipos: [], regs: [] }, treinamento: { tipos: [], regs: [] }, carregado: false };
+const editando = { exame: null, treinamento: null };
+const editandoTipo = { exame: null, treinamento: null };
+
+export async function carregarSst() {
+  const c = estado.cliente;
+  const [te, ex, tt, tr] = await Promise.all([
+    c.from('sst_tipos_exame').select('*').order('ordem').order('nome'),
+    c.from('sst_exames').select('*').order('realizado', { ascending: false }),
+    c.from('sst_tipos_treinamento').select('*').order('ordem').order('nome'),
+    c.from('sst_treinamentos').select('*').order('realizado', { ascending: false }),
+  ]);
+  const erro = te.error || ex.error || tt.error || tr.error;
+  if (erro) throw erro;
+  S.exame.tipos = te.data || [];
+  S.exame.regs = ex.data || [];
+  S.treinamento.tipos = tt.data || [];
+  S.treinamento.regs = tr.data || [];
+  S.carregado = true;
+}
+
+export function limparSst() {
+  S.exame = { tipos: [], regs: [] };
+  S.treinamento = { tipos: [], regs: [] };
+  S.carregado = false;
+}
+
+const funcionario = id => estado.funcionarios.find(f => f.id === id);
+const tipoDe = (r, id) => S[r.id].tipos.find(t => t.id === id);
+
+/* =============== abrir uma tela =============== */
+export async function abrirSst(tela) {
+  const r = Object.values(RECEITAS).find(x => x.tela === tela || x.telaTipos === tela);
+  if (!r) return;
+  if (!S.carregado) {
+    try { await carregarSst(); }
+    catch (e) {
+      const alvo = tela === r.telaTipos ? $(r.el.listaTipos) : $(r.el.tabela);
+      alvo.innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`;
+      return;
+    }
+  }
+  if (tela === r.telaTipos) desenharTipos(r); else desenharVenc(r);
+}
+
+/* =============== cadastro de tipos =============== */
+function desenharTipos(r) {
+  const tipos = S[r.id].tipos;
+  $(r.el.listaTipos).innerHTML = tipos.length ? `
+    <table class="dc-planilha"><thead><tr>
+      <th>${esc(r.rotuloTipo)}</th>
+      <th class="ce">${r.id === 'exame' ? 'Refazer a cada' : 'Reciclagem'}</th>
+      ${r.completo ? '<th class="ce">Carga horária</th>' : ''}
+      <th class="ce">Lançamentos</th><th class="ce">Situação</th><th></th>
+    </tr></thead><tbody>
+    ${tipos.map(t => {
+      const usos = S[r.id].regs.filter(x => x.tipo_id === t.id).length;
+      return `<tr>
+        <td><b>${esc(t.nome)}</b></td>
+        <td class="ce">${t.meses ? t.meses + ' meses' : '<span class="dc-sem">não vence</span>'}</td>
+        ${r.completo ? `<td class="ce">${t.carga_horaria ? Number(t.carga_horaria) + ' h' : '—'}</td>` : ''}
+        <td class="ce">${usos}</td>
+        <td class="ce"><span class="tag ${t.ativo ? 'ativo' : 'inativo'}">${t.ativo ? 'EM USO' : 'DESATIVADO'}</span></td>
+        <td class="ce"><button class="btn mini" data-tipo="${t.id}">Editar</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`
+    : '<div class="vazio">Nenhum tipo cadastrado ainda.</div>';
+
+  $(r.el.listaTipos).querySelectorAll('[data-tipo]').forEach(b =>
+    b.addEventListener('click', () => abrirTipo(r, b.dataset.tipo)));
+}
+
+function abrirTipo(r, id) {
+  const t = id ? S[r.id].tipos.find(x => x.id === id) : null;
+  editandoTipo[r.id] = t ? { ...t } : { nome: '', meses: null, carga_horaria: null, ativo: true, novo: true };
+  const e = editandoTipo[r.id];
+  $(r.el.tituloTipo).textContent = t ? `Editar ${r.rotuloTipo.toLowerCase()}` : `Novo tipo de ${r.rotuloTipo.toLowerCase()}`;
+  $(r.el.erroTipo).hidden = true;
+  $(r.el.tNome).value = e.nome || '';
+  $(r.el.tMeses).value = e.meses ?? '';
+  if (r.el.tCarga) $(r.el.tCarga).value = e.carga_horaria ?? '';
+  $(r.el.tAtivo).value = e.ativo === false ? '0' : '1';
+  $(r.el.tApagar).hidden = !t;
+  $(r.el.dlgTipo).showModal();
+}
+
+/* =============== vencimentos =============== */
+function visiveis(r) {
+  const q = so($(r.el.busca).value).toLowerCase();
+  const tipo = $(r.el.fTipo).value;
+  const status = $(r.el.fStatus).value;
+  const sit = $(r.el.fSit).value;
+  const historico = $(r.el.historico).checked;
+
+  let regs = S[r.id].regs.filter(x => {
+    const f = funcionario(x.funcionario_id);
+    if (!f) return false;
+    if (sit && f.situacao !== sit) return false;
+    if (tipo && x.tipo_id !== tipo) return false;
+    if (q && !f.nome.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // sem histórico: fica só o lançamento mais novo de cada funcionário + tipo
+  if (!historico) {
+    const vistos = new Set();
+    regs = regs.filter(x => {
+      const chave = x.funcionario_id + '|' + x.tipo_id;
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
+      return true;
+    });
+  }
+
+  const comSit = regs.map(x => ({ ...x, sit: situacaoDe(x.vence) }));
+  const filtradas = status ? comSit.filter(x => x.sit.chave === status) : comSit;
+
+  // primeiro o que está mais perto de vencer
+  return filtradas.sort((a, b) => {
+    const da = a.sit.dias ?? 99999, db = b.sit.dias ?? 99999;
+    if (da !== db) return da - db;
+    return (funcionario(a.funcionario_id)?.nome || '').localeCompare(funcionario(b.funcionario_id)?.nome || '', 'pt-BR');
+  });
+}
+
+function desenharVenc(r) {
+  // filtro de tipos
+  const sel = $(r.el.fTipo);
+  const antes = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' +
+    S[r.id].tipos.map(t => `<option value="${t.id}">${esc(t.nome)}</option>`).join('');
+  sel.value = antes;
+
+  const linhas = visiveis(r);
+
+  // resumo (conta sempre o último de cada par, sem os filtros de situação)
+  const ultimos = new Map();
+  S[r.id].regs.forEach(x => {
+    const f = funcionario(x.funcionario_id);
+    if (!f || f.situacao !== 'ATIVO') return;
+    const chave = x.funcionario_id + '|' + x.tipo_id;
+    if (!ultimos.has(chave)) ultimos.set(chave, situacaoDe(x.vence).chave);
+  });
+  const conta = c => [...ultimos.values()].filter(x => x === c).length;
+  $(r.el.resumo).innerHTML = `
+    <span class="contagem"><b>${conta('emdia')}</b> em dia</span>
+    <span class="contagem"><b>${conta('vencendo')}</b> vencendo</span>
+    <span class="contagem"><b>${conta('vencido')}</b> vencido(s)</span>`;
+
+  $(r.el.tabela).innerHTML = linhas.length ? `
+    <table class="dc-planilha"><thead><tr>
+      <th>Funcionário</th><th>${esc(r.rotuloTipo)}</th>
+      <th class="ce">Realizado</th><th class="ce">Vence</th>
+      ${r.completo ? '<th class="ce">Carga</th><th>Instrutor</th>' : ''}
+      <th class="ce">Situação</th><th></th>
+    </tr></thead><tbody>
+    ${linhas.map(x => {
+      const f = funcionario(x.funcionario_id) || {};
+      const t = tipoDe(r, x.tipo_id) || {};
+      return `<tr>
+        <td><b>${esc(f.nome || '—')}</b><br><span class="dc-sem">${esc(f.cargo || '—')}</span></td>
+        <td>${esc(t.nome || '—')}</td>
+        <td class="ce">${dataBr(x.realizado)}</td>
+        <td class="ce">${dataBr(x.vence)}</td>
+        ${r.completo ? `<td class="ce">${x.carga_horaria ? Number(x.carga_horaria) + ' h' : '—'}</td>
+        <td>${esc(x.instrutor || '—')}</td>` : ''}
+        <td class="ce"><span class="tag ${x.sit.cor}">${esc(x.sit.rotulo)}</span></td>
+        <td class="ce"><button class="btn mini" data-reg="${x.id}">Editar</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`
+    : '<div class="vazio">Nada lançado com esses filtros.</div>';
+
+  $(r.el.tabela).querySelectorAll('[data-reg]').forEach(b =>
+    b.addEventListener('click', () => abrirReg(r, b.dataset.reg)));
+
+  // quem ainda não tem nenhum lançamento
+  const comAlgum = new Set(S[r.id].regs.map(x => x.funcionario_id));
+  const faltando = estado.funcionarios.filter(f => f.situacao === 'ATIVO' && !comAlgum.has(f.id));
+  const aviso = $(r.el.semNada);
+  if (faltando.length) {
+    aviso.innerHTML = `<b>${faltando.length} funcionário(s) ativo(s) sem nenhum ${r.id} lançado:</b> ` +
+      faltando.map(f => esc(f.nome)).join(' · ');
+    aviso.hidden = false;
+  } else aviso.hidden = true;
+
+  $(r.el.saida).innerHTML = montarFolhas(r, linhas);
+}
+
+/* =============== lançamento =============== */
+function abrirReg(r, id) {
+  const x = id ? S[r.id].regs.find(y => y.id === id) : null;
+  editando[r.id] = x ? { ...x } : { funcionario_id: '', tipo_id: '', realizado: hoje(), vence: null, novo: true };
+  const e = editando[r.id];
+
+  $(r.el.titulo).textContent = x ? `Editar ${r.id}` : `Lançar ${r.id}`;
+  $(r.el.erro).hidden = true;
+
+  const ativos = estado.funcionarios.filter(f => f.situacao === 'ATIVO' || f.id === e.funcionario_id);
+  $(r.el.func).innerHTML = '<option value="">Escolha...</option>' +
+    ativos.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+  $(r.el.func).value = e.funcionario_id || '';
+
+  const tipos = S[r.id].tipos.filter(t => t.ativo !== false || t.id === e.tipo_id);
+  $(r.el.tipo).innerHTML = '<option value="">Escolha...</option>' +
+    tipos.map(t => `<option value="${t.id}">${esc(t.nome)}</option>`).join('');
+  $(r.el.tipo).value = e.tipo_id || '';
+
+  $(r.el.data).value = e.realizado || hoje();
+  $(r.el.vence).value = e.vence || '';
+  if (r.completo) {
+    $(r.el.carga).value = e.carga_horaria ?? '';
+    $(r.el.instrutor).value = e.instrutor || '';
+    $(r.el.obs).value = e.observacao || '';
+  }
+  $(r.el.apagar).hidden = !x;
+  atualizarVencimento(r, !x);
+  $(r.el.dlg).showModal();
+}
+
+/** Recalcula o vencimento pela periodicidade do tipo. */
+function atualizarVencimento(r, forcar) {
+  const t = tipoDe(r, $(r.el.tipo).value);
+  const data = $(r.el.data).value;
+  const dica = $(r.el.dica);
+
+  if (!t) { dica.textContent = ''; return; }
+  if (r.completo && forcar && t.carga_horaria && !so($(r.el.carga).value)) {
+    $(r.el.carga).value = Number(t.carga_horaria);
+  }
+  if (!t.meses) {
+    dica.textContent = `${t.nome} está cadastrado como sem validade.`;
+    if (forcar) $(r.el.vence).value = '';
+    return;
+  }
+  const calculado = somarMeses(data, t.meses);
+  dica.textContent = `${t.nome} vale ${t.meses} meses` +
+    (calculado ? ` — pelo cadastro venceria em ${dataBr(calculado)}.` : '.');
+  if (forcar || !so($(r.el.vence).value)) $(r.el.vence).value = calculado || '';
+}
+
+/* =============== folha para imprimir =============== */
+const POR_FOLHA = 20;
+
+function montarFolhas(r, linhas) {
+  if (!linhas.length) return '';
+  const total = Math.ceil(linhas.length / POR_FOLHA);
+  const titulo = r.id === 'exame' ? 'EXAMES OCUPACIONAIS' : 'TREINAMENTOS';
+  const folhas = [];
+  for (let p = 0; p < total; p++) {
+    const fatia = linhas.slice(p * POR_FOLHA, (p + 1) * POR_FOLHA);
+    folhas.push(`<div class="an-folha">
+      <div class="an-topo">
+        <img src="${LOGO}" alt="">
+        <div class="an-tit">
+          <h1>${titulo}</h1>
+          <p>Controle de vencimento · ${dataBr(hoje())} · SAKUMA Agronegócios</p>
+        </div>
+      </div>
+      <table class="an-tab sst-folha-tab">
+        <colgroup><col><col style="width:48mm"><col style="width:22mm"><col style="width:22mm"><col style="width:28mm"></colgroup>
+        <thead><tr><th>FUNCIONÁRIO</th><th>${esc(r.rotuloTipo.toUpperCase())}</th>
+          <th>REALIZADO</th><th>VENCE</th><th>SITUAÇÃO</th></tr></thead>
+        <tbody>${fatia.map(x => {
+          const f = funcionario(x.funcionario_id) || {};
+          const t = tipoDe(r, x.tipo_id) || {};
+          return `<tr>
+            <td class="an-nome">${esc(f.nome || '—')}</td>
+            <td>${esc(t.nome || '—')}</td>
+            <td class="ce">${dataBr(x.realizado)}</td>
+            <td class="ce">${dataBr(x.vence)}</td>
+            <td class="ce sst-${x.sit.chave}">${esc(x.sit.chave === 'emdia' ? 'Em dia'
+              : x.sit.chave === 'vencido' ? 'Vencido'
+              : x.sit.chave === 'vencendo' ? 'A vencer' : 'Sem validade')}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+      <div class="an-pe">
+        <span>${linhas.length} lançamento(s)</span>
+        <span>${total > 1 ? `folha ${p + 1} de ${total}` : ''}</span>
+      </div>
+    </div>`);
+  }
+  return folhas.join('');
+}
+
+/* =============== ligações =============== */
+function ligarReceita(r, avisar) {
+  // filtros
+  [r.el.busca, r.el.fTipo, r.el.fStatus, r.el.fSit, r.el.historico].forEach(id =>
+    $(id).addEventListener('input', () => desenharVenc(r)));
+
+  $(r.el.novo).addEventListener('click', () => abrirReg(r, null));
+  $(r.el.novoTipo).addEventListener('click', () => abrirTipo(r, null));
+  $(r.el.imprimir).addEventListener('click', () => window.print());
+  $(r.el.zoom).addEventListener('input', () => {
+    const z = $(r.el.zoom).value;
+    $(r.el.zoomV).textContent = z + '%';
+    $(r.el.saida).style.transform = `scale(${z / 100})`;
+    $(r.el.saida).style.transformOrigin = 'top center';
+  });
+
+  $(r.el.tipo).addEventListener('change', () => atualizarVencimento(r, true));
+  $(r.el.data).addEventListener('change', () => atualizarVencimento(r, true));
+
+  /* ---- salvar lançamento ---- */
+  $(r.el.form).addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const e = editando[r.id];
+    if (!e) return;
+    const linha = {
+      funcionario_id: $(r.el.func).value,
+      tipo_id: $(r.el.tipo).value,
+      realizado: $(r.el.data).value,
+      vence: $(r.el.vence).value || null,
+    };
+    if (!linha.funcionario_id || !linha.tipo_id || !linha.realizado) {
+      return mostrarErro(r.el.erro, 'Escolha o funcionário, o tipo e a data.');
+    }
+    if (r.completo) {
+      linha.carga_horaria = so($(r.el.carga).value) ? Number($(r.el.carga).value) : null;
+      linha.instrutor = so($(r.el.instrutor).value) || null;
+      linha.observacao = so($(r.el.obs).value) || null;
+    }
+    if (!e.novo) linha.id = e.id;
+
+    const { data, error } = await estado.cliente.from(r.tabelaRegs)
+      .upsert(linha).select().single();
+    if (error) return mostrarErro(r.el.erro, error.message);
+
+    const i = S[r.id].regs.findIndex(x => x.id === data.id);
+    if (i >= 0) S[r.id].regs[i] = data; else S[r.id].regs.unshift(data);
+    S[r.id].regs.sort((a, b) => String(b.realizado).localeCompare(String(a.realizado)));
+    $(r.el.dlg).close();
+    desenharVenc(r);
+    avisar(`${r.id === 'exame' ? 'Exame' : 'Treinamento'} salvo.`);
+  });
+
+  $(r.el.apagar).addEventListener('click', async () => {
+    const e = editando[r.id];
+    if (!e?.id) return;
+    if (!confirm('Apagar este lançamento?')) return;
+    const { error } = await estado.cliente.from(r.tabelaRegs).delete().eq('id', e.id);
+    if (error) return mostrarErro(r.el.erro, error.message);
+    S[r.id].regs = S[r.id].regs.filter(x => x.id !== e.id);
+    $(r.el.dlg).close();
+    desenharVenc(r);
+  });
+
+  /* ---- salvar tipo ---- */
+  $(r.el.formTipo).addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const e = editandoTipo[r.id];
+    if (!e) return;
+    const linha = {
+      nome: so($(r.el.tNome).value),
+      meses: so($(r.el.tMeses).value) ? Number($(r.el.tMeses).value) : null,
+      ativo: $(r.el.tAtivo).value === '1',
+    };
+    if (!linha.nome) return mostrarErro(r.el.erroTipo, 'Falta o nome.');
+    if (r.el.tCarga) {
+      linha.carga_horaria = so($(r.el.tCarga).value) ? Number($(r.el.tCarga).value) : null;
+    }
+    if (!e.novo) linha.id = e.id;
+
+    const { data, error } = await estado.cliente.from(r.tabelaTipos)
+      .upsert(linha).select().single();
+    if (error) return mostrarErro(r.el.erroTipo, error.message);
+
+    const i = S[r.id].tipos.findIndex(x => x.id === data.id);
+    if (i >= 0) S[r.id].tipos[i] = data; else S[r.id].tipos.push(data);
+    $(r.el.dlgTipo).close();
+    desenharTipos(r);
+  });
+
+  $(r.el.tApagar).addEventListener('click', async () => {
+    const e = editandoTipo[r.id];
+    if (!e?.id) return;
+    const usos = S[r.id].regs.filter(x => x.tipo_id === e.id).length;
+    if (usos) {
+      return mostrarErro(r.el.erroTipo,
+        `Este tipo tem ${usos} lançamento(s). Desative em vez de apagar, senão o histórico se perde.`);
+    }
+    if (!confirm(`Apagar "${e.nome}"?`)) return;
+    const { error } = await estado.cliente.from(r.tabelaTipos).delete().eq('id', e.id);
+    if (error) return mostrarErro(r.el.erroTipo, error.message);
+    S[r.id].tipos = S[r.id].tipos.filter(x => x.id !== e.id);
+    $(r.el.dlgTipo).close();
+    desenharTipos(r);
+  });
+}
+
+function mostrarErro(id, texto) {
+  const a = $(id);
+  a.textContent = texto;
+  a.hidden = false;
+}
+
+export function ligarSst(avisar = () => {}) {
+  Object.values(RECEITAS).forEach(r => ligarReceita(r, avisar));
+}

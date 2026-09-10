@@ -10,6 +10,7 @@ import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
+import { ligarSst, abrirSst, limparSst } from './sst.js';
 import * as jd from './jornada-dados.js';
 import { pode, podeTela } from './acesso.js';
 
@@ -39,6 +40,10 @@ function abrirAba(nome) {
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
+  $('telaExVenc').hidden  = nome !== 'exVenc';
+  $('telaExTipos').hidden = nome !== 'exTipos';
+  $('telaTrVenc').hidden  = nome !== 'trVenc';
+  $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
@@ -53,6 +58,7 @@ function abrirAba(nome) {
   if (nome === 'modelo') preencherModelo();
   if (nome === 'disc') abrirDisc();
   if (nome === 'config') desenharConfig();
+  if (['exVenc', 'exTipos', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome.startsWith('jor')) abrirJornada(nome);
 }
 
@@ -76,7 +82,7 @@ $('formLogin').addEventListener('submit', async ev => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear();
-  limparDisc(); limparAcesso(); limparJornada();
+  limparDisc(); limparAcesso(); limparJornada(); limparSst();
   mostrar('login');
 });
 
@@ -899,7 +905,7 @@ if ('serviceWorker' in navigator) {
 }
 
 /* arranque */
-ligarDisc(); ligarAcesso(); ligarJornada(abrirAba);
+ligarDisc(); ligarAcesso(); ligarJornada(abrirAba); ligarSst(mostrarAviso);
 (async () => {
   const r = await db.iniciar();
   mostrar(r.etapa);

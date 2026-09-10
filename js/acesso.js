@@ -9,17 +9,31 @@ const esc = s => String(s == null ? '' : s)
 
 /* Os módulos do app. Para criar um módulo novo no futuro, basta acrescentar
    um item aqui (com as telas que já existirem no index.html) — o menu, a tela
-   de configurações e as permissões passam a enxergá-lo sozinhos. */
+   de configurações e as permissões passam a enxergá-lo sozinhos.
+
+   Um módulo pode ter as telas direto em `telas` (duas faixas de menu) ou
+   agrupá-las em `subs`, os submódulos (três faixas: módulo, submódulo, tela).
+   É o caso do SST. */
 export const MODULOS = [
   { id: 'pessoas', nome: 'Funcionários', telas: [
     ['funcionarios', 'Cadastro · Nível 1'],
     ['funcionariosN2', 'Cadastro · Nível 2'],
     ['aniversarios', 'Aniversariantes'],
   ] },
-  { id: 'epis', nome: 'EPIs', telas: [
-    ['fichas', 'Fichas'],
-    ['epis', 'Tipos de EPI'],
-    ['modelo', 'Modelo da ficha'],
+  { id: 'sst', nome: 'SST', subs: [
+    { id: 'epis', nome: "EPI's", telas: [
+      ['fichas', 'Fichas'],
+      ['epis', 'Tipos de EPI'],
+      ['modelo', 'Modelo da ficha'],
+    ] },
+    { id: 'exames', nome: 'Exames', telas: [
+      ['exVenc', 'Vencimentos'],
+      ['exTipos', 'Tipos e periodicidade'],
+    ] },
+    { id: 'treinamentos', nome: 'Treinamentos', telas: [
+      ['trVenc', 'Vencimentos'],
+      ['trTipos', 'Tipos e periodicidade'],
+    ] },
   ] },
   { id: 'certificacao', nome: 'Certificação', telas: [
     ['lista', 'Lista de presença'],
@@ -37,12 +51,17 @@ export const MODULOS = [
   ] },
 ];
 
+/* Um módulo sem submódulo se comporta como se tivesse um só, com o nome dele.
+   Assim o resto do código não precisa saber qual é qual. */
+export const subsDe = m => m.subs || [{ id: m.id, nome: m.nome, telas: m.telas || [] }];
+export const telasDe = m => subsDe(m).flatMap(s => s.telas);
+
 export const moduloDe = tela =>
-  MODULOS.find(m => m.telas.some(([t]) => t === tela))?.id || null;
+  MODULOS.find(m => telasDe(m).some(([t]) => t === tela))?.id || null;
 
 // Quem ainda não estiver na lista entra com estes módulos — assim ninguém
 // fica trancado do lado de fora; RH e Configurações ficam sempre de fora.
-const PADRAO = ['pessoas', 'epis', 'certificacao'];
+const PADRAO = ['pessoas', 'sst', 'certificacao'];
 
 export const acesso = { email: '', admin: false, modulos: [...PADRAO], telas: [], carregado: false };
 let usuarios = [];
@@ -62,8 +81,19 @@ export function podeTela(tela) {
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
 
-export const telasLiberadas = m =>
-  (MODULOS.find(x => x.id === m)?.telas || []).filter(([t]) => podeTela(t));
+export const telasLiberadas = m => {
+  const mod = MODULOS.find(x => x.id === m);
+  return mod ? telasDe(mod).filter(([t]) => podeTela(t)) : [];
+};
+
+/** Submódulos com pelo menos uma tela liberada. */
+export const subsLiberados = m => {
+  const mod = MODULOS.find(x => x.id === m);
+  if (!mod) return [];
+  return subsDe(mod)
+    .map(s => ({ ...s, telas: s.telas.filter(([t]) => podeTela(t)) }))
+    .filter(s => s.telas.length);
+};
 
 export async function carregarAcesso() {
   acesso.email = (estado.sessao?.user?.email || '').toLowerCase();
@@ -75,7 +105,9 @@ export async function carregarAcesso() {
     const meu = usuarios.find(u => (u.email || '').toLowerCase() === acesso.email);
     acesso.admin = !!meu?.admin;
     acesso.modulos = meu ? (meu.modulos || []) : [...PADRAO];
-  acesso.telas = meu ? (meu.telas || []) : [];
+    // quem tinha o módulo antigo "EPIs" enxerga o SST, que tomou o lugar dele
+    if (acesso.modulos.includes('epis') && !acesso.modulos.includes('sst')) acesso.modulos.push('sst');
+    acesso.telas = meu ? (meu.telas || []) : [];
   } catch {
     acesso.admin = false;
     acesso.modulos = [...PADRAO];
@@ -117,27 +149,44 @@ export function abrirModulo(id, tela) {
 
   if (id === 'config') {
     $('navTelas').hidden = true;
+    $('navSub').hidden = true;
     aoTrocar('config');
     return;
   }
 
-  const m = MODULOS.find(x => x.id === id);
-  if (!m) return;
-  const permitidas = telasLiberadas(id);
-  if (!permitidas.length) return;
-  const alvo = permitidas.some(([t]) => t === tela) ? tela : permitidas[0][0];
+  const subs = subsLiberados(id);
+  if (!subs.length) return;
 
-  // com uma tela só, o módulo não precisa de submenu
-  $('navTelas').hidden = permitidas.length < 2;
-  $('navTelas').innerHTML = permitidas.map(([t, rot]) =>
-    `<button class="aba2" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${rot}</button>`).join('');
+  // Módulo sem submódulo: a segunda faixa mostra as telas, como sempre foi.
+  if (subs.length === 1) {
+    $('navSub').hidden = true;
+    desenharTelas($('navTelas'), 'aba2', subs[0].telas, tela);
+    return;
+  }
+
+  // Com submódulo: segunda faixa são os submódulos, terceira são as telas.
+  const sub = subs.find(s => s.telas.some(([t]) => t === tela)) || subs[0];
+  $('navTelas').hidden = false;
+  $('navTelas').innerHTML = subs.map(s =>
+    `<button class="aba2" role="tab" data-sub="${s.id}" aria-selected="${s.id === sub.id}">${esc(s.nome)}</button>`).join('');
   $('navTelas').querySelectorAll('.aba2').forEach(b =>
+    b.addEventListener('click', () => abrirModulo(id, (subs.find(s => s.id === b.dataset.sub)?.telas[0] || [])[0])));
+
+  desenharTelas($('navSub'), 'aba3', sub.telas, tela);
+}
+
+/** Desenha uma faixa de telas e abre a escolhida (ou a primeira). */
+function desenharTelas(faixa, classe, telas, tela) {
+  const alvo = telas.some(([t]) => t === tela) ? tela : telas[0][0];
+  faixa.hidden = telas.length < 2;
+  faixa.innerHTML = telas.map(([t, rot]) =>
+    `<button class="${classe}" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${esc(rot)}</button>`).join('');
+  faixa.querySelectorAll('[data-tela]').forEach(b =>
     b.addEventListener('click', () => {
-      $('navTelas').querySelectorAll('.aba2').forEach(x =>
+      faixa.querySelectorAll('[data-tela]').forEach(x =>
         x.setAttribute('aria-selected', String(x === b)));
       aoTrocar(b.dataset.tela);
     }));
-
   aoTrocar(alvo);
 }
 
@@ -306,15 +355,17 @@ function desenharPermissoes() {
           ? 'só as telas marcadas'
           : 'todas as telas'}</span>
       </label>
-      <div class="us-telas">
-        ${m.telas.map(([tid, rot]) => `
-          <label class="us-tela">
-            <input type="checkbox" data-mod="${m.id}" data-tela="${tid}"
-              ${marcada(m.id, tid) ? 'checked' : ''}
-              ${temModulo(m.id) && !e.admin ? '' : 'disabled'}>
-            ${esc(rot)}
-          </label>`).join('')}
-      </div>
+      ${subsDe(m).map(s => `
+        ${m.subs ? `<div class="us-sub">${esc(s.nome)}</div>` : ''}
+        <div class="us-telas">
+          ${s.telas.map(([tid, rot]) => `
+            <label class="us-tela">
+              <input type="checkbox" data-mod="${m.id}" data-tela="${tid}"
+                ${marcada(m.id, tid) ? 'checked' : ''}
+                ${temModulo(m.id) && !e.admin ? '' : 'disabled'}>
+              ${esc(rot)}
+            </label>`).join('')}
+        </div>`).join('')}
     </div>`).join('');
 
   $('usPermissoes').querySelectorAll('input[data-mod]').forEach(cx =>
