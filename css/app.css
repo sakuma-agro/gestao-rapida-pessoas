@@ -60,6 +60,14 @@ body{background:var(--fundo);color:var(--texto);
   border:1px solid var(--linha);background:var(--papel);color:var(--suave);white-space:nowrap}
 .aba2:hover{color:var(--texto);border-color:var(--verde)}
 .aba2[aria-selected="true"]{background:var(--verde);border-color:var(--verde);color:#fff}
+
+/* terceira faixa: as telas de dentro do submódulo */
+.aba3s{max-width:1180px;margin:0 auto;padding:0 16px 10px;display:flex;gap:14px;overflow-x:auto}
+.aba3s[hidden]{display:none}
+.aba3{font:inherit;font-size:12.5px;font-weight:600;padding:4px 2px;border:0;background:transparent;
+  color:var(--suave);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent}
+.aba3:hover{color:var(--texto)}
+.aba3[aria-selected="true"]{color:var(--verde-esc);border-bottom-color:var(--verde)}
 main{max-width:1180px;margin:0 auto;padding:18px 16px 80px}
 .tela[hidden]{display:none}
 
@@ -117,6 +125,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .tag{font-size:10.5px;font-weight:700;letter-spacing:.5px;padding:2px 8px;border-radius:20px;white-space:nowrap}
 .tag.ativo{background:var(--tagA-bg);color:var(--tagA-tx)}
 .tag.inativo{background:var(--tagI-bg);color:var(--tagI-tx)}
+.tag.alerta{background:rgba(201,138,0,.18);color:#8a5f00}
+.tag.perigo{background:rgba(192,57,43,.16);color:#a5342a}
+.tag.neutra{background:var(--tagI-bg);color:var(--tagI-tx)}
 .vazio{padding:26px;text-align:center;color:var(--suave);font-size:13px}
 .contagem{font-size:13px;color:var(--suave)}
 .contagem b{color:var(--verde-esc)}
@@ -500,3 +511,15 @@ dialog h3{margin:0 0 14px;font-size:16px}
 label.campo.fu-inline{flex-direction:row;align-items:center;gap:8px;
   text-transform:none;font-size:13px;letter-spacing:0;align-self:end;padding-bottom:9px}
 label.campo.fu-inline input{width:auto;margin:0;flex:none}
+
+/* nome do submódulo na lista de permissões */
+.us-sub{margin:10px 0 0 24px;font-size:11px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--suave)}
+
+/* folha impressa dos vencimentos (reaproveita a folha dos aniversariantes) */
+.sst-folha-tab th:first-child{color:#fff}
+.sst-folha-tab td{font-size:9.5pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sst-folha-tab th{font-size:9pt}
+.sst-folha-tab .ce{text-align:center}
+.sst-vencido{color:#a5342a;font-weight:bold}
+.sst-vencendo{color:#8a5f00;font-weight:bold}
