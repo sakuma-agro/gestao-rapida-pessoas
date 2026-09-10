@@ -11,6 +11,7 @@ import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { ligarSst, abrirSst, limparSst } from './sst.js';
+import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import * as jd from './jornada-dados.js';
 import { pode, podeTela } from './acesso.js';
 
@@ -54,7 +55,7 @@ function abrirAba(nome) {
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'funcionariosN2') desenharFuncN2();
-  if (nome === 'epis') desenharEpis();
+  if (nome === 'epis') { desenharEpis(); conferirCa(false); }
   if (nome === 'modelo') preencherModelo();
   if (nome === 'disc') abrirDisc();
   if (nome === 'config') desenharConfig();
@@ -154,7 +155,11 @@ function preencherControles() {
     $('anAno').value = hoje.getFullYear();
   }
   $('lista-epis').innerHTML = estado.epis.filter(e => e.ativo !== false)
-    .map(e => `<option value="${esc(e.descricao)}">${esc(e.ca ? 'C.A ' + e.ca : '')}</option>`).join('');
+    .map(e => {
+      const s = estadoCa(e);
+      const alerta = ['vencido', 'irregular', 'vencendo'].includes(s.chave) ? ` — C.A ${s.rotulo}` : '';
+      return `<option value="${esc(e.descricao)}">${esc((e.ca ? 'C.A ' + e.ca : '') + alerta)}</option>`;
+    }).join('');
 }
 
 /* =============== aba FICHAS =============== */
@@ -242,6 +247,10 @@ $('saida').addEventListener('input', ev => {
         campoCa.value = epi.ca;
         r.linhas[i].ca = epi.ca;
         campoCa.closest('.cw').classList.add('preenchida');
+      }
+      // avisa, mas não impede: quem decide é você
+      if (caReprovado(epi)) {
+        mostrarAviso(`Atenção: o C.A ${epi.ca} de ${epi.descricao} está ${estadoCa(epi).rotulo} no ConsultaCA.`);
       }
     }
   }
@@ -774,22 +783,73 @@ $('bCopiarAniv').addEventListener('click', async ev => {
 });
 
 /* =============== aba EPIS =============== */
+// O número do C.A vira link para o ConsultaCA e a etiqueta ao lado mostra a
+// validade que veio de lá. Quem busca no site é a função "consulta-ca".
 function desenharEpis() {
   const q = $('buscaEpi').value.trim().toLowerCase();
   const lista = estado.epis.filter(e =>
     !q || [e.descricao, e.ca, e.atividade].some(v => String(v || '').toLowerCase().includes(q)));
-  $('listaEpi').innerHTML = lista.length ? lista.map(e => `
+
+  $('listaEpi').innerHTML = lista.length ? lista.map(e => {
+    const s = estadoCa(e);
+    const link = linkCa(e.ca);
+    const numero = e.ca
+      ? (link
+        ? `<a href="${link}" target="_blank" rel="noopener">C.A ${esc(e.ca)}</a>`
+        : `C.A ${esc(e.ca)}`)
+      : 'sem C.A';
+    return `
     <div class="item" style="grid-template-columns:1fr auto">
       <span>
-        <span class="nome">${esc(e.descricao)}</span><br>
-        <span class="sub">${e.ca ? 'C.A ' + esc(e.ca) : 'sem C.A'}${e.observacao ? ' · ' + esc(e.observacao) : ''}${e.atividade ? ' · ' + esc(e.atividade) : ''}</span>
+        <span class="nome">${esc(e.descricao)}</span>
+        ${s.rotulo ? `<span class="tag ${s.cor}">${esc(s.rotulo)}</span>` : ''}<br>
+        <span class="sub">${numero}${e.observacao ? ' · ' + esc(e.observacao) : ''}${e.atividade ? ' · ' + esc(e.atividade) : ''}</span>
       </span>
       <span class="acoes"><button class="btn mini" data-editar="${e.id}">Editar</button></span>
-    </div>`).join('')
+    </div>`;
+  }).join('')
     : '<div class="vazio">Nenhum EPI encontrado.</div>';
+
   $('listaEpi').querySelectorAll('[data-editar]').forEach(b =>
     b.addEventListener('click', () => abrirEpi(b.dataset.editar)));
+
+  desenharRecadoCa();
 }
+
+function desenharRecadoCa() {
+  const com = estado.epis.filter(e => e.ca && e.ca_conferido_em);
+  const ruins = estado.epis.filter(e => caReprovado(e)).length;
+  const perto = estado.epis.filter(e => estadoCa(e).chave === 'vencendo').length;
+  const ultima = com.map(e => e.ca_conferido_em).sort().pop();
+
+  const partes = [];
+  if (ultima) partes.push(`Conferido no ConsultaCA em ${dataBrCa(ultima.slice(0, 10))}`);
+  if (ruins) partes.push(`${ruins} C.A vencido ou irregular`);
+  if (perto) partes.push(`${perto} vencendo em até 30 dias`);
+  if (!ultima) partes.push('Os C.As ainda não foram conferidos no ConsultaCA.');
+  $('caRecado').textContent = partes.join(' · ');
+}
+
+let conferindoCa = false;
+
+async function conferirCa(forcar) {
+  if (conferindoCa) return;
+  conferindoCa = true;
+  const botao = $('bConferirCa');
+  const rotulo = botao.textContent;
+  botao.disabled = true; botao.textContent = 'Conferindo...';
+  try {
+    const r = await conferirCas(estado.cliente, estado.epis, { forcar }, db.salvarEpi);
+    desenharEpis(); preencherControles();
+    if (r.erro && forcar) mostrarAviso(`Não deu para conferir agora: ${r.erro}`);
+    else if (forcar) mostrarAviso(`C.As conferidos no ConsultaCA: ${r.conferidos}.`);
+  } finally {
+    botao.disabled = false; botao.textContent = rotulo;
+    conferindoCa = false;
+  }
+}
+
+$('bConferirCa').addEventListener('click', () => conferirCa(true));
 
 function abrirEpi(id) {
   const e = id ? estado.epis.find(x => x.id === id) : null;
