@@ -645,6 +645,133 @@
       </div>
     </section>
 
+    <!-- ---- RH · PLANO DE CARGOS E SALÁRIOS ---- -->
+    <section class="tela" id="telaRhCargos" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Plano de Cargos e Salários</h2>
+            <p class="dica" style="margin:2px 0 0">As faixas daqui alimentam a proposta. Salário só aparece para quem tem o módulo RH.</p>
+          </div>
+          <span class="acoes">
+            <button class="btn" id="bImprimirCargos">Ver tabela para imprimir</button>
+            <button class="btn principal" id="bNovoCargo">Novo cargo</button>
+          </span>
+        </div>
+        <label class="campo" style="margin-top:14px">Buscar
+          <input type="text" id="rhBuscaCargo" placeholder="Cargo ou nível">
+        </label>
+        <div class="rolagem" id="rhTabelaCargos" style="margin-top:12px"></div>
+        <div class="rh-regras" id="rhRegras" hidden></div>
+      </div>
+    </section>
+
+    <!-- ---- RH · PROPOSTA ---- -->
+    <section class="tela" id="telaRhProposta" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Gerar proposta</h2>
+            <p class="dica" style="margin:2px 0 0">Escolha o cargo e a faixa; o salário vem da tabela e pode ser mudado.</p>
+          </div>
+          <button class="btn" id="bTextosProposta">Textos fixos</button>
+        </div>
+
+        <div class="grade larga" style="margin-top:14px">
+          <label class="campo">Tipo
+            <select id="ppTipo">
+              <option value="contratacao">Contratação</option>
+              <option value="promocao">Promoção ou aumento</option>
+            </select>
+          </label>
+          <label class="campo" id="campoNome">Nome do candidato
+            <input type="text" id="ppNome" placeholder="Nome completo">
+          </label>
+          <label class="campo" id="campoPessoa" hidden>Funcionário
+            <select id="ppPessoa"></select>
+          </label>
+          <label class="campo">Cargo
+            <select id="ppCargo"></select>
+            <small class="dc-sem" id="ppNivel"></small>
+          </label>
+          <label class="campo">Faixa
+            <select id="ppFaixa"></select>
+          </label>
+          <label class="campo">Salário proposto (R$)
+            <input type="text" id="ppSalario" inputmode="decimal">
+          </label>
+          <label class="campo">Início / vigência
+            <input type="date" id="ppInicio">
+          </label>
+          <div class="campo plena" id="campoAtual" hidden>
+            <div class="grade">
+              <label class="campo">Cargo de hoje <input type="text" id="ppCargoAtual"></label>
+              <label class="campo">Salário de hoje (R$) <input type="text" id="ppSalarioAtual" inputmode="decimal"></label>
+            </div>
+          </div>
+          <p class="dica plena" id="ppDicaFaixa" style="margin:0"></p>
+          <label class="campo">Jornada <input type="text" id="ppJornada"></label>
+          <label class="campo">Local de trabalho <input type="text" id="ppLocal"></label>
+          <label class="campo plena">Período de experiência <input type="text" id="ppExperiencia"></label>
+          <label class="campo plena">Benefícios (um por linha)
+            <textarea id="ppBeneficios" rows="4"></textarea>
+          </label>
+          <label class="campo plena">Observação (sai numa caixa na proposta)
+            <textarea id="ppObs" rows="2"></textarea>
+          </label>
+        </div>
+
+        <div class="barra fim">
+          <button class="btn" id="bPreviaProposta">Ver prévia</button>
+          <button class="btn" data-imprimir-rh>Imprimir</button>
+          <button class="btn principal" id="bSalvarProposta">Salvar proposta</button>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <h2 style="margin:0 0 4px">Propostas já emitidas</h2>
+        <p class="dica" style="margin:0">Guardadas para reimprimir do jeito que saíram.</p>
+        <div class="lista rolagem" id="rhUltimas" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- ---- RH · QUADRO DE PESSOAL ---- -->
+    <section class="tela" id="telaRhQuadro" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Quadro de pessoal</h2>
+            <p class="dica" style="margin:2px 0 0">Composição do time por empregador, fazenda, setor, cargo, sexo, idade e tempo de casa.</p>
+          </div>
+          <span class="acoes">
+            <button class="btn" id="bCsvQuadro">Baixar CSV</button>
+            <button class="btn" id="bPreviaQuadro">Ver prévia</button>
+            <button class="btn principal" data-imprimir-rh>Imprimir</button>
+          </span>
+        </div>
+
+        <div class="grade" style="margin-top:14px">
+          <label class="campo">Situação
+            <select id="qpSituacao">
+              <option value="ATIVO">Só ativos</option>
+              <option value="">Todos</option>
+              <option value="INATIVO">Só inativos</option>
+            </select>
+          </label>
+          <label class="campo">Empregador <select id="qpEmpregador"></select></label>
+        </div>
+
+        <div class="qp-cards" id="rhQuadroResumo" style="margin-top:14px"></div>
+        <div id="rhQuadroTabelas" style="margin-top:6px"></div>
+      </div>
+
+      <div class="cartao" id="rhCartaoSexo" hidden>
+        <h2 style="margin:0 0 4px">Falta marcar o sexo</h2>
+        <p class="dica" id="rhFaltamSexo" style="margin:0"></p>
+        <div class="lista rolagem" id="rhListaSexo" style="margin-top:12px"></div>
+      </div>
+    </section>
+
     <!-- ---- CONFIGURAÇÕES ---- -->
     <section class="tela" id="telaConfig" hidden>
       <div class="aviso erro" id="cfAviso" hidden></div>
@@ -735,6 +862,13 @@
       <label class="campo">Apelido <input type="text" id="fuApelido"></label>
       <label class="campo">Nº de cadastro <input type="text" id="fuCadastro"></label>
       <label class="campo">Nascimento <input type="date" id="fuNascimento"></label>
+      <label class="campo">Sexo
+        <select id="fuSexo">
+          <option value="">Não informado</option>
+          <option value="M">Masculino</option>
+          <option value="F">Feminino</option>
+        </select>
+      </label>
       <label class="campo">Telefone <input type="text" id="fuTelefone" inputmode="tel" placeholder="(34) 99999-0000"></label>
       <label class="campo">Admissão <input type="date" id="fuAdmissao"></label>
       <label class="campo">CPF <input type="text" id="fuCpf" inputmode="numeric"></label>
@@ -777,6 +911,63 @@
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit">Salvar</button>
       </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: CARGO ============ -->
+<dialog id="dlgCargo">
+  <form method="dialog" id="formCargo">
+    <h3 id="tituloCargo">Novo cargo</h3>
+    <div class="aviso erro" id="erroCargo" hidden></div>
+    <div class="grade">
+      <label class="campo plena">Cargo <input type="text" id="cgNome" required></label>
+      <label class="campo">Nível
+        <select id="cgNivel">
+          <option value=""></option>
+          <option>Estratégico</option>
+          <option>Tático</option>
+          <option>Operacional</option>
+        </select>
+      </label>
+      <label class="campo">SAKUMA hoje (R$) <input type="text" id="cgAtual" inputmode="decimal"></label>
+      <label class="campo">Faixa A (R$) <input type="text" id="cgF0" inputmode="decimal"></label>
+      <label class="campo">Média (R$) <input type="text" id="cgF1" inputmode="decimal"></label>
+      <label class="campo">Faixa C (R$) <input type="text" id="cgF2" inputmode="decimal"></label>
+      <label class="campo">Faixa D (R$) <input type="text" id="cgF3" inputmode="decimal"></label>
+      <label class="campo">Faixa E (R$) <input type="text" id="cgF4" inputmode="decimal"></label>
+      <label class="campo plena">Observação <input type="text" id="cgObs"></label>
+      <label class="campo">Situação
+        <select id="cgAtivo"><option value="1">Em uso</option><option value="0">Desativado</option></select>
+      </label>
+    </div>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarCargo">Apagar</button>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: TEXTOS FIXOS DA PROPOSTA ============ -->
+<dialog id="dlgRhModelo">
+  <form method="dialog" id="formRhModelo">
+    <h3>Textos fixos da proposta</h3>
+    <p class="dica">Valem para toda proposta emitida daqui em diante.</p>
+    <div class="grade larga">
+      <label class="campo plena">Título <input type="text" id="rmTitulo"></label>
+      <label class="campo plena">Abertura <textarea id="rmAbertura" rows="3"></textarea></label>
+      <label class="campo plena">Fechamento <textarea id="rmFechamento" rows="3"></textarea></label>
+      <label class="campo plena">Regras das faixas (uma por linha)
+        <textarea id="rmRegras" rows="6"></textarea>
+      </label>
+      <label class="campo">Assinatura <input type="text" id="rmAssinatura"></label>
+    </div>
+    <div class="barra fim">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="submit">Salvar textos</button>
     </div>
   </form>
 </dialog>
