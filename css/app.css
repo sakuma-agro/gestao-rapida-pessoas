@@ -132,6 +132,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .tag.perigo{background:rgba(192,57,43,.16);color:#a5342a}
 .tag.neutra{background:var(--tagI-bg);color:var(--tagI-tx)}
 .vazio{padding:26px;text-align:center;color:var(--suave);font-size:13px}
+
+/* ---- RH: plano de cargos e quadro de pessoal ---- */
+.rh-regras{margin-top:16px;padding:12px 14px;border-left:4px solid var(--marrom);
+  background:var(--verde-fundo);border-radius:0 8px 8px 0;font-size:12.5px}
+.rh-regras strong{display:block;color:var(--marrom);margin-bottom:6px}
+.rh-regras ul{margin:0;padding-left:18px}
+.rh-regras li{margin:3px 0}
+.rh-off td{opacity:.55}
+.qp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.qp-card{border:1px solid var(--linha);border-radius:10px;padding:10px 12px;background:var(--fundo)}
+.qp-card span{display:block;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
+.qp-card strong{display:block;font-size:22px;color:var(--marrom);line-height:1.2;margin-top:2px}
+.qp-card small{display:block;font-size:11px;color:var(--suave)}
+.qp-bloco{margin-top:18px}
+.qp-bloco h3{margin:0 0 6px;font-size:13px;color:var(--marrom)}
 .contagem{font-size:13px;color:var(--suave)}
 .contagem b{color:var(--verde-esc)}
 
