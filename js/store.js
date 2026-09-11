@@ -79,6 +79,24 @@ export async function sair() {
   avisar();
 }
 
+/* Esqueci minha senha: manda o e-mail com o link de recuperação.
+   O link volta para o próprio app, com um endereço que precisa estar
+   liberado no Supabase (Authentication → URL Configuration). */
+export async function pedirRecuperacao(email) {
+  // sempre a pasta do app, nunca ".../index.html": é um endereço só para
+  // liberar na lista do Supabase (Authentication → URL Configuration)
+  const volta = location.origin + location.pathname.replace(/index\.html$/, '');
+  const { error } = await estado.cliente.auth.resetPasswordForEmail(email, { redirectTo: volta });
+  if (error) throw error;
+}
+
+/* Grava a senha nova. Só funciona com a sessão temporária que vem do link. */
+export async function trocarSenha(senha) {
+  const { data, error } = await estado.cliente.auth.updateUser({ password: senha });
+  if (error) throw error;
+  return data;
+}
+
 /* ---------------- cache ---------------- */
 function carregarCache() {
   const c = ler(CHAVE_CACHE, null);

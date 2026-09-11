@@ -29,6 +29,7 @@ let editandoEpi = null;
 /* =============== telas =============== */
 function mostrar(qual) {
   $('telaLogin').hidden = qual !== 'login';
+  $('telaNovaSenha').hidden = qual !== 'novaSenha';
   $('app').hidden = qual !== 'app';
 }
 
@@ -92,12 +93,95 @@ $('btnSair').addEventListener('click', async () => {
   mostrar('login');
 });
 
+/* =============== esqueci minha senha =============== */
+function painelEsqueci(mostrando) {
+  $('formLogin').hidden = mostrando;
+  $('formEsqueci').hidden = !mostrando;
+  $('erroLogin').hidden = true;
+  if (mostrando) {
+    $('recEmail').value = $('logEmail').value.trim();
+    $('recEmail').focus();
+  }
+}
+
+$('bEsqueci').addEventListener('click', () => painelEsqueci(true));
+$('bVoltarLogin').addEventListener('click', () => painelEsqueci(false));
+
+$('formEsqueci').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const email = $('recEmail').value.trim();
+  const erro = $('erroLogin'); erro.hidden = true;
+  if (!email) return;
+
+  const botao = $('bEnviarLink');
+  botao.disabled = true; botao.textContent = 'Enviando...';
+  try {
+    await db.pedirRecuperacao(email);
+    // De propósito não dizemos se o e-mail existe ou não: isso evita que
+    // alguém descubra quem tem acesso ao app só testando endereços.
+    $('formEsqueci').innerHTML = `
+      <p class="sub" style="text-align:left">
+        Se esse e-mail tiver login no app, a mensagem com o link já está a caminho.
+        O link vale por 1 hora. Confira também a caixa de spam.
+      </p>
+      <div class="barra fim">
+        <button class="btn principal" type="button" id="bVoltarDepois">Voltar ao login</button>
+      </div>`;
+    $('bVoltarDepois').addEventListener('click', () => location.reload());
+  } catch (e) {
+    erro.textContent = traduzirErro(e);
+    erro.hidden = false;
+    botao.disabled = false; botao.textContent = 'Enviar link';
+  }
+});
+
+/* =============== nova senha (chegou pelo link do e-mail) =============== */
+$('formNovaSenha').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const erro = $('erroNovaSenha'); erro.hidden = true;
+  const a = $('nsSenha').value, b = $('nsSenha2').value;
+
+  if (a.length < 8) {
+    erro.textContent = 'A senha precisa ter pelo menos 8 caracteres.';
+    erro.hidden = false; return;
+  }
+  if (a !== b) {
+    erro.textContent = 'As duas senhas não são iguais.';
+    erro.hidden = false; return;
+  }
+
+  const botao = $('bSalvarNovaSenha');
+  botao.disabled = true; botao.textContent = 'Salvando...';
+  try {
+    await db.trocarSenha(a);
+    history.replaceState(null, '', location.pathname);   // tira o token da barra de endereço
+    mostrar('app');
+    await carregarTudo();
+    mostrarAviso('Senha trocada. Da próxima vez entre com ela.');
+  } catch (e) {
+    erro.textContent = traduzirErro(e);
+    erro.hidden = false;
+    botao.disabled = false; botao.textContent = 'Salvar e entrar';
+  }
+});
+
 function traduzirErro(e) {
   const m = String(e?.message || e || '');
   if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
   if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado. Confirme no painel do Supabase.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o Supabase. Verifique a internet ou a URL do projeto.';
   if (/relation .* does not exist/i.test(m)) return 'As tabelas ainda não existem. Rode o SQL do arquivo supabase.sql no SQL Editor.';
+  if (/only request this after (\d+) seconds/i.test(m)) {
+    return `Espere ${/after (\d+) seconds/i.exec(m)[1]} segundos para pedir outro link.`;
+  }
+  if (/rate limit/i.test(m)) return 'Muitos pedidos seguidos. Espere alguns minutos e tente de novo.';
+  if (/should be different from the old password/i.test(m)) return 'A senha nova precisa ser diferente da anterior.';
+  if (/Auth session missing|session_not_found/i.test(m)) {
+    return 'O link de recuperação venceu. Peça outro em "Esqueci minha senha".';
+  }
+  if (/Error sending recovery email|SMTP/i.test(m)) {
+    return 'O envio de e-mail ainda não está configurado no Supabase. Fale com o administrador.';
+  }
   return m || 'Não foi possível concluir.';
 }
 
@@ -975,7 +1059,33 @@ if ('serviceWorker' in navigator) {
 ligarDisc(); ligarAcesso(); ligarJornada(abrirAba); ligarSst(mostrarAviso);
 ligarRh(mostrarAviso, desenharFuncionarios);
 (async () => {
+  /* O link do e-mail volta com #type=recovery. O Supabase consome esse
+     pedaço do endereço ao iniciar, então é preciso olhar antes. */
+  const marca = location.hash || '';
+  const recuperando = /type=recovery/.test(marca);
+  const linkRuim = /error=|error_code=/.test(marca);
+
   const r = await db.iniciar();
+
+  if (linkRuim) {
+    history.replaceState(null, '', location.pathname);
+    mostrar('login');
+    const erro = $('erroLogin');
+    erro.textContent = /expired/.test(marca)
+      ? 'Esse link de recuperação já venceu. Peça outro em "Esqueci minha senha".'
+      : 'Não deu para usar esse link de recuperação. Peça outro em "Esqueci minha senha".';
+    erro.hidden = false;
+    return;
+  }
+
+  if (recuperando) {
+    $('nsQuem').textContent = estado.sessao?.user?.email
+      ? `Login ${estado.sessao.user.email}. Escolha a senha que você vai usar daqui em diante.`
+      : 'Escolha a senha que você vai usar daqui em diante.';
+    mostrar('novaSenha');
+    return;
+  }
+
   mostrar(r.etapa);
   if (r.etapa === 'app') await carregarTudo();
 })();
