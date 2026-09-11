@@ -640,7 +640,19 @@ dialog h3{margin:0 0 14px;font-size:16px}
   background:var(--verde-fundo);color:var(--verde-esc);font-size:10.5px;font-weight:700;
   letter-spacing:1px;text-transform:uppercase;vertical-align:middle}
 .in-dica{margin:10px 0 0;color:var(--suave);font-size:13.5px}
-.in-lop{width:min(360px,76vw);height:auto;margin-top:54px}
+/* A assinatura da LOP vem numa tela de 1400 px onde a tinta ocupa só de 60 a
+   763 — sobra quase metade em transparente à direita. Centralizar o arquivo
+   deixava a marca torta para a esquerda. As margens negativas encolhem a caixa
+   até a tinta (e só a tinta fica centralizada), sem recortar o arquivo. */
+.in-lop{
+  --lop: 500px;                       /* largura do arquivo inteiro */
+  width: var(--lop);
+  height: auto;
+  margin-top: 54px;
+  margin-left: calc(var(--lop) * -0.0429);   /* 60/1400 de folga à esquerda */
+  margin-right: calc(var(--lop) * -0.455);   /* 637/1400 de folga à direita */
+}
+@media (max-width:560px){ .in-lop{ --lop: 330px } }
 /* cada assinatura no fundo certo: tinta escura no claro, clara no escuro */
 .in-lop-claro{display:none}
 @media (prefers-color-scheme:dark){
