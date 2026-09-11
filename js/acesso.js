@@ -15,16 +15,23 @@ const esc = s => String(s == null ? '' : s)
    agrupá-las em `subs`, os submódulos (três faixas: módulo, submódulo, tela).
    É o caso do SST. */
 export const MODULOS = [
-  /* "Cadastros" reúne o que todo o resto do app consome: as pessoas, as
+  /* A ordem daqui é a ordem das abas na tela, e é ela que ele pediu:
+     Cadastros, SST, RH, DP.
+
+     "Cadastros" reúne o que todo o resto do app consome: as pessoas, as
      funções e a estrutura (empregador, fazenda, unidade). Antes isso estava
      espalhado — função e setor não tinham tela nenhuma, e empregador e fazenda
-     só existiam escondidos dentro de DP → Configurações.
+     só existiam escondidos dentro de DP → Configurações. A Certificação, que
+     era módulo solto com uma tela só, virou submódulo daqui.
      `admin: true` no submódulo deixa a faixa só para administrador. */
   { id: 'pessoas', nome: 'Cadastros', subs: [
     { id: 'gente', nome: 'Funcionários', telas: [
       ['funcionarios', 'Cadastro · Nível 1'],
       ['funcionariosN2', 'Cadastro · Nível 2'],
       ['aniversarios', 'Aniversariantes'],
+    ] },
+    { id: 'certificacao', nome: 'Certificação', telas: [
+      ['lista', 'Lista de presença'],
     ] },
     { id: 'funcoes', nome: 'Funções e setores', admin: true, telas: [
       ['cadFuncoes', 'Funções e setores'],
@@ -50,9 +57,6 @@ export const MODULOS = [
       ['trVenc', 'Vencimentos'],
       ['trTipos', 'Tipos e periodicidade'],
     ] },
-  ] },
-  { id: 'certificacao', nome: 'Certificação', telas: [
-    ['lista', 'Lista de presença'],
   ] },
   { id: 'rh', nome: 'RH', subs: [
     { id: 'disc', nome: 'DISC', telas: [
@@ -86,7 +90,7 @@ export const moduloDe = tela =>
 
 // Quem ainda não estiver na lista entra com estes módulos — assim ninguém
 // fica trancado do lado de fora; RH e Configurações ficam sempre de fora.
-const PADRAO = ['pessoas', 'sst', 'certificacao'];
+const PADRAO = ['pessoas', 'sst'];
 
 export const acesso = { email: '', admin: false, modulos: [...PADRAO], telas: [], carregado: false };
 let usuarios = [];
@@ -141,6 +145,13 @@ export async function carregarAcesso() {
     // quem tinha o módulo antigo "EPIs" enxerga o SST, que tomou o lugar dele
     if (acesso.modulos.includes('epis') && !acesso.modulos.includes('sst')) acesso.modulos.push('sst');
     acesso.telas = meu ? (meu.telas || []) : [];
+    /* "Certificação" era módulo próprio e virou submódulo de Cadastros. Quem
+       tinha só ela continua entrando na lista de presença — e só nela, pelo
+       recorte por tela; quem já tinha Cadastros não muda nada. */
+    if (acesso.modulos.includes('certificacao') && !acesso.modulos.includes('pessoas')) {
+      acesso.modulos = [...acesso.modulos, 'pessoas'];
+      acesso.telas = [...acesso.telas, 'pessoas:lista'];
+    }
   } catch {
     acesso.admin = false;
     acesso.modulos = [...PADRAO];
