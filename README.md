@@ -1,4 +1,4 @@
-# Ficha de EPI · SAKUMA Agronegócios
+# Gestão Rápida (Pessoas) · SAKUMA Agronegócios
 
 Aplicativo web para cadastrar funcionários e imprimir as fichas de EPI em A4,
 reproduzindo célula por célula a aba **Ficha EPI** da planilha
@@ -41,6 +41,7 @@ O projeto já está configurado e embutido no app — ninguém precisa colar
 nada ao abrir. O que foi feito:
 
 - Projeto `ficha-epi` na organização `sakuma-agro`, região São Paulo.
+  (o nome do projeto no Supabase continua o antigo; é só um rótulo do painel)
 - Tabelas, índices e regras de acesso do [`supabase.sql`](supabase.sql).
 - **Cadastro público desligado**: ninguém cria conta sozinho.
 - Confirmação de e-mail desligada, já que só o administrador cria usuários.
