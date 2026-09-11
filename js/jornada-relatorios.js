@@ -59,8 +59,7 @@ function documento({ titulo, subtitulo, destino, competencia, versao, corpo, ass
     ${corpo}
     ${assinaturas ? blocoAssinaturas(assinaturas) : ''}
     <footer class="rel-rodape">
-      <img src="img/lop-assinatura-laser-claro.png"
-           alt="Desenvolvido por LOP — Inteligência para o agronegócio">
+      <img src="img/lop-marca.png" alt="LOP">
     </footer>
   </article>`;
 }

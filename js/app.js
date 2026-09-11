@@ -766,6 +766,15 @@ $('formFunc').addEventListener('submit', async ev => {
   if (setor) f.setor = setor.nome;
   if (funcao) f.cargo = funcao.nome;
 
+  /* Empregador, fazenda, setor e cargo saem daqui sempre em maiúsculas.
+     São texto livre gravado no funcionário, e é por eles que o quadro de
+     pessoal agrupa: uma pessoa cadastrada como "Campo" e o resto como "CAMPO"
+     abria duas linhas no relatório, cada uma com a sua fatia. O padrão é
+     maiúscula porque o nome das pessoas já é assim. */
+  ['empregador', 'fazenda', 'setor', 'cargo'].forEach(k => {
+    if (f[k]) f[k] = String(f[k]).trim().replace(/\s+/g, ' ').toUpperCase();
+  });
+
   await db.salvarFuncionario(f);
 
   if (temDP) {

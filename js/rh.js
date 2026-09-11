@@ -15,6 +15,42 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const so = v => String(v == null ? '' : v).trim();
+
+/* Empregador, fazenda, setor e cargo são texto livre no cadastro, e o mesmo
+   lugar aparece escrito de jeitos diferentes: "FABIO MASSAO SAKUMA" e "Fabio
+   Massao Sakuma", "CAMPO" e "Campo". Contadas como se fossem coisas
+   diferentes, viravam duas linhas no quadro — cada uma com a sua fatia.
+   A chave de agrupamento ignora caixa, acento e espaço sobrando; o rótulo que
+   aparece na tela é a grafia mais usada. */
+const chaveDeGrupo = v => so(v).toLowerCase()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ');
+
+/* Agrupa os valores de um campo e devolve, para cada grupo, a grafia
+   escolhida: a mais frequente e, no empate, a primeira em ordem alfabética —
+   assim o rótulo não muda a cada recarga. */
+function agrupar(gente, campo) {
+  const grupos = new Map();
+  gente.forEach(f => {
+    const bruto = so(f[campo]);
+    const k = chaveDeGrupo(bruto);
+    if (!grupos.has(k)) grupos.set(k, { total: 0, grafias: new Map() });
+    const g = grupos.get(k);
+    g.total++;
+    if (bruto) g.grafias.set(bruto, (g.grafias.get(bruto) || 0) + 1);
+  });
+  /* Desempate: mais gente escreveu assim > tem acento (COCÃO ganha de COCAO,
+     que é a mesma palavra com informação a menos) > ordem alfabética, para o
+     rótulo não mudar de uma recarga para a outra. */
+  const comAcento = t => (t.normalize('NFD').match(/[\u0300-\u036f]/g) || []).length;
+  for (const g of grupos.values()) {
+    g.rotulo = [...g.grafias.entries()]
+      .sort((a, b) => b[1] - a[1]
+        || comAcento(b[0]) - comAcento(a[0])
+        || a[0].localeCompare(b[0], 'pt-BR'))[0]?.[0] || 'Não informado';
+  }
+  return grupos;
+}
 const hoje = () => new Date().toISOString().slice(0, 10);
 const dataBr = iso => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
@@ -91,6 +127,9 @@ const naFaixa = (v, tabela) => v == null ? null
   : (tabela.find(([, a, b]) => v >= a && v <= b) || [])[0] || null;
 
 /* =============== moldura de documento (herdada do DP) =============== */
+/* `assinatura` vazia = documento sem linha de assinatura, e é esse o padrão:
+   ele pediu o nome fora dos relatórios. Quem quiser assinar de novo preenche o
+   campo "Assinatura" em RH → Modelo — não volte a cravar um nome no código. */
 function documento({ titulo, subtitulo, canto, corpo, assinatura }) {
   return `
   <article class="rel">
@@ -111,8 +150,7 @@ function documento({ titulo, subtitulo, canto, corpo, assinatura }) {
       <div class="rel-assina"><span></span><small>${esc(assinatura)}</small></div>
     </div>` : ''}
     <footer class="rel-rodape">
-      <img src="img/lop-assinatura-laser-claro.png"
-           alt="Desenvolvido por LOP — Inteligência para o agronegócio">
+      <img src="img/lop-marca.png" alt="LOP">
     </footer>
   </article>`;
 }
@@ -258,7 +296,7 @@ function documentoCargos() {
     subtitulo: 'SAKUMA Agronegócios · tabela salarial vigente',
     canto: `${lista.length} cargos`,
     corpo,
-    assinatura: so(R.modelo?.assinatura) || 'Guilherme Lopes',
+    assinatura: so(R.modelo?.assinatura),
   });
 }
 
@@ -418,7 +456,7 @@ export function documentoProposta(p) {
     subtitulo: 'Plano de Cargos e Salários · SAKUMA Agronegócios',
     canto: esc(p.cargo_nome || ''),
     corpo,
-    assinatura: so(m.assinatura) || 'Guilherme Lopes',
+    assinatura: so(m.assinatura),
   });
 }
 
@@ -451,28 +489,31 @@ function gentePara() {
   const faz = $('qpFazenda').value;
   return estado.funcionarios.filter(f =>
     (!sit || f.situacao === sit) &&
-    (!emp || so(f.empregador) === emp) &&
-    (!faz || so(f.fazenda) === faz));
+    (!emp || chaveDeGrupo(f.empregador) === emp) &&
+    (!faz || chaveDeGrupo(f.fazenda) === faz));
 }
 
 /** Como o recorte escolhido é dito no documento e no CSV. */
 function recorte() {
-  const emp = $('qpEmpregador').value;
-  const faz = $('qpFazenda').value;
+  /* O valor da opção virou a chave do grupo, que é minúscula e sem acento —
+     boa para comparar, péssima para escrever no documento. Então aqui vale o
+     que está ESCRITO na opção escolhida. */
+  const escolhido = id => {
+    const sel = $(id);
+    return sel.value ? (sel.selectedOptions[0]?.textContent || '').trim() : '';
+  };
+  const emp = escolhido('qpEmpregador');
+  const faz = escolhido('qpFazenda');
   if (emp && faz) return `${faz} · ${emp}`;
   if (faz) return faz;
   if (emp) return emp;
   return 'todos os empregadores';
 }
 
-const contarPor = (gente, campo) => {
-  const mapa = new Map();
-  gente.forEach(f => {
-    const k = so(f[campo]) || 'Não informado';
-    mapa.set(k, (mapa.get(k) || 0) + 1);
-  });
-  return [...mapa.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
-};
+const contarPor = (gente, campo) =>
+  [...agrupar(gente, campo).values()]
+    .map(g => [g.rotulo, g.total])
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
 
 const contarFaixa = (gente, valorDe, tabela) => {
   const mapa = new Map(tabela.map(([r]) => [r, 0]));
@@ -593,12 +634,18 @@ function roscaSexo(n) {
 
 /** Enche os dois filtros. As fazendas seguem o empregador escolhido. */
 function preencherFiltros() {
+  /* O valor da opção é a CHAVE do grupo, não a grafia: assim escolher
+     "FABIO MASSAO SAKUMA" também traz quem foi cadastrado como "Fabio Massao
+     Sakuma". O que aparece escrito é a grafia mais usada. */
+  const opcoes = (grupos, vazio) => `<option value="">${vazio}</option>` +
+    [...grupos.entries()]
+      .filter(([k]) => k)
+      .sort((a, b) => a[1].rotulo.localeCompare(b[1].rotulo, 'pt-BR'))
+      .map(([k, g]) => `<option value="${esc(k)}">${esc(g.rotulo)}</option>`).join('');
+
   const sel = $('qpEmpregador');
   if (!sel.dataset.pronto) {
-    const emps = [...new Set(estado.funcionarios.map(f => so(f.empregador)).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    sel.innerHTML = '<option value="">Todos os empregadores</option>' +
-      emps.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+    sel.innerHTML = opcoes(agrupar(estado.funcionarios, 'empregador'), 'Todos os empregadores');
     sel.dataset.pronto = '1';
   }
 
@@ -607,14 +654,11 @@ function preencherFiltros() {
   const selFaz = $('qpFazenda');
   const escolhida = selFaz.value;
   const sit = $('qpSituacao').value;
-  const fazendas = [...new Set(estado.funcionarios
-    .filter(f => (!emp || so(f.empregador) === emp) && (!sit || f.situacao === sit))
-    .map(f => so(f.fazenda)).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const grupos = agrupar(estado.funcionarios.filter(f =>
+    (!emp || chaveDeGrupo(f.empregador) === emp) && (!sit || f.situacao === sit)), 'fazenda');
 
-  selFaz.innerHTML = '<option value="">Todas as fazendas</option>' +
-    fazendas.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
-  selFaz.value = fazendas.includes(escolhida) ? escolhida : '';
+  selFaz.innerHTML = opcoes(grupos, 'Todas as fazendas');
+  selFaz.value = grupos.has(escolhida) ? escolhida : '';
 }
 
 function desenharQuadro() {
@@ -718,7 +762,7 @@ function documentoQuadro() {
     subtitulo: 'SAKUMA Agronegócios · composição do time',
     canto: recorte(),
     corpo,
-    assinatura: so(R.modelo?.assinatura) || 'Guilherme Lopes',
+    assinatura: so(R.modelo?.assinatura),
   });
 }
 
