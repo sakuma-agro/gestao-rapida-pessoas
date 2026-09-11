@@ -176,6 +176,14 @@ function traduzirErro(e) {
   if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
   if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado. Confirme no painel do Supabase.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o Supabase. Verifique a internet ou a URL do projeto.';
+  /* 504/502/503 e "timeout" querem dizer sempre a mesma coisa aqui: o servidor
+     do banco não respondeu. No plano gratuito isso é quase sempre o projeto
+     pausado ou sem responder — e "HTTP 504" na tela não ajuda ninguém. */
+  if (/\b(504|502|503)\b|gateway|timeout|timed out|AbortError/i.test(m)) {
+    return 'O banco de dados não respondeu. Ele costuma ficar assim quando está '
+      + 'pausado ou fora do ar. Espere um minuto e tente de novo; se insistir, '
+      + 'é preciso reiniciar o projeto no painel do Supabase.';
+  }
   if (/relation .* does not exist/i.test(m)) return 'As tabelas ainda não existem. Rode o SQL do arquivo supabase.sql no SQL Editor.';
   if (/only request this after (\d+) seconds/i.test(m)) {
     return `Espere ${/after (\d+) seconds/i.exec(m)[1]} segundos para pedir outro link.`;
