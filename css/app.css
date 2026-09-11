@@ -627,6 +627,33 @@ dialog h3{margin:0 0 14px;font-size:16px}
   .topo-lop{display:none}
 }
 
+/* ---- tela de entrada: nenhum módulo aberto ----
+   O app abre aqui, não dentro de Funcionários. Quem escolhe o que abrir é a
+   pessoa. O arquivo da marca SAKUMA vem com fundo branco e não pode ser
+   recortado nem clareado, então ele fica numa placa branca — assim o fundo do
+   arquivo vira parte do desenho em vez de um retângulo solto na tela. */
+.inicio{min-height:min(60vh,500px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:44px 20px 36px}
+.in-placa{background:#fff;border:1px solid var(--linha);border-radius:18px;
+  padding:26px 34px;box-shadow:var(--sombra);line-height:0}
+.in-placa img{width:min(200px,48vw);height:auto}
+.inicio h2{margin:26px 0 0;font-size:21px;font-weight:600;color:var(--marrom);letter-spacing:.2px}
+.inicio h2 span{display:inline-block;margin-left:8px;padding:3px 10px;border-radius:20px;
+  background:var(--verde-fundo);color:var(--verde-esc);font-size:10.5px;font-weight:700;
+  letter-spacing:1px;text-transform:uppercase;vertical-align:middle}
+.in-dica{margin:10px 0 0;color:var(--suave);font-size:13.5px}
+.in-lop{width:min(260px,58vw);height:auto;margin-top:52px}
+/* cada assinatura no fundo certo: tinta escura no claro, clara no escuro */
+.in-lop-claro{display:none}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .in-lop-escuro{display:none}
+  :root:not([data-theme="light"]) .in-lop-claro{display:block}
+}
+:root[data-theme="dark"] .in-lop-escuro{display:none}
+:root[data-theme="dark"] .in-lop-claro{display:block}
+:root[data-theme="light"] .in-lop-escuro{display:block}
+:root[data-theme="light"] .in-lop-claro{display:none}
+
 /* Bloco de jornada dentro do cadastro do funcionário */
 .fu-secao{margin:16px 0 8px;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--suave)}
 label.campo.fu-inline{flex-direction:row;align-items:center;gap:8px;
