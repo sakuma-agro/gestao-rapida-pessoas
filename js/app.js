@@ -563,8 +563,56 @@ function abrirFuncionario(id) {
   $('fuCalcado').value = editandoFunc.tam_calcado || '';
   $('fuCamisa').value = editandoFunc.tam_camisa || '';
   $('fuSituacao').value = editandoFunc.situacao || 'ATIVO';
+  preencherFichaCompleta(editandoFunc);
   $('bApagarFunc').hidden = !f;
   $('dlgFunc').showModal();
+}
+
+/* Os três blocos recolhidos da ficha: contato e emergência, endereço e
+   transporte, documentos. Um mapa só serve para preencher e para salvar —
+   acrescentar campo novo é mexer aqui e no index.html, em mais lugar nenhum. */
+const FICHA = {
+  fuTelRecado: 'telefone_recado',
+  fuEmergNome: 'emergencia_nome',
+  fuEmergParentesco: 'emergencia_parentesco',
+  fuEmergTelefone: 'emergencia_telefone',
+  fuCep: 'cep',
+  fuLogradouro: 'logradouro',
+  fuBairro: 'bairro',
+  fuMunicipio: 'municipio',
+  fuReferencia: 'referencia',
+  fuPontoEmbarque: 'ponto_embarque',
+  fuRg: 'rg',
+  fuRgOrgao: 'rg_orgao',
+  fuPis: 'pis',
+  fuCtps: 'ctps',
+  fuEstadoCivil: 'estado_civil',
+  fuEscolaridade: 'escolaridade',
+  fuNomeMae: 'nome_mae',
+  fuNaturalidade: 'naturalidade',
+};
+/* Sim/Não/não informado: no banco é true, false ou nulo. */
+const FICHA_SN = { fuAlojamento: 'alojamento', fuTransporte: 'transporte_empresa' };
+const sn = v => (v === true ? '1' : v === false ? '0' : '');
+
+function preencherFichaCompleta(f) {
+  Object.entries(FICHA).forEach(([campo, col]) => { $(campo).value = f[col] || ''; });
+  Object.entries(FICHA_SN).forEach(([campo, col]) => { $(campo).value = sn(f[col]); });
+  /* Bloco que já tem algo preenchido abre sozinho — senão a informação fica
+     escondida atrás de um triângulo e ninguém lembra de olhar. */
+  document.querySelectorAll('#formFunc .fu-bloco').forEach(b => {
+    b.open = [...b.querySelectorAll('input, select')].some(e => e.value);
+  });
+}
+
+function lerFichaCompleta() {
+  const dados = {};
+  Object.entries(FICHA).forEach(([campo, col]) => { dados[col] = $(campo).value.trim() || null; });
+  Object.entries(FICHA_SN).forEach(([campo, col]) => {
+    const v = $(campo).value;
+    dados[col] = v === '1' ? true : v === '0' ? false : null;
+  });
+  return dados;
 }
 
 /* As listas de unidade, setor e função saem dos cadastros do DP — é o que
@@ -678,6 +726,7 @@ $('formFunc').addEventListener('submit', async ev => {
     tam_calcado: $('fuCalcado').value.trim(),
     tam_camisa: $('fuCamisa').value.trim(),
     situacao: $('fuSituacao').value,
+    ...lerFichaCompleta(),
   };
   if (!f.nome) return;
 
