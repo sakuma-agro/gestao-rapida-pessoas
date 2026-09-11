@@ -46,6 +46,12 @@ body{background:var(--fundo);color:var(--texto);
 .topo{position:sticky;top:0;z-index:20;background:var(--papel);border-bottom:1px solid var(--linha)}
 .topo-int{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .topo img{height:34px;width:34px;border-radius:7px}
+/* O ícone e o nome viraram um botão só, mas continuam parecendo texto:
+   nada de moldura nem de fundo — só o cursor e um realce no passar do mouse. */
+.topo-inicio{display:flex;align-items:center;gap:12px;border:0;background:none;
+  padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;border-radius:10px}
+.topo-inicio:hover h1{color:var(--verde-esc)}
+.topo-inicio:focus-visible{outline:2px solid var(--verde);outline-offset:3px}
 .topo h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px}
 .topo h1 .modulo{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:20px;
   background:var(--verde-fundo);color:var(--verde-esc);font-size:11px;font-weight:700;
@@ -389,6 +395,10 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .an-saudacao p{margin:3mm 0 0;font-size:11.5pt;color:#51534A;line-height:1.4}
 .an-pe{margin-top:auto;padding-top:5mm;border-top:.3mm solid #dfe2d8;
   display:flex;justify-content:space-between;font-size:9pt;color:#7d8175}
+/* A assinatura da LOP: por último, pequena e discreta. É imagem, não fundo,
+   então imprime mesmo com "gráficos de plano de fundo" desligado. */
+.an-lop{margin-top:2.5mm;text-align:center;line-height:0}
+.an-lop img{height:6mm;width:auto;opacity:.75}
 
 /* prévia da importação */
 .imp-grupo{margin-bottom:14px}
