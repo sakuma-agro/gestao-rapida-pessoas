@@ -35,6 +35,7 @@ function mostrar(qual) {
 }
 
 function abrirAba(nome) {
+  $('telaInicio').hidden = nome !== 'inicio';
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
   $('telaFuncionarios').hidden = nome !== 'funcionarios';

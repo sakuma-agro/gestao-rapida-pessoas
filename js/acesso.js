@@ -150,7 +150,17 @@ export function montarMenu(callback) {
   $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
 
-  abrirModulo(libs[0]?.id || (acesso.admin ? 'config' : null));
+  // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
+  mostrarInicio();
+}
+
+/** A tela de entrada: nenhum módulo aberto, só SAKUMA e LOP. */
+export function mostrarInicio() {
+  moduloAberto = null;
+  $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
+  $('navTelas').hidden = true;
+  $('navSub').hidden = true;
+  aoTrocar('inicio');
 }
 
 export function abrirModulo(id, tela) {
