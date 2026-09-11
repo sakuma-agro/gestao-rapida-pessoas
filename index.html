@@ -35,7 +35,48 @@
           <input type="password" id="logSenha" required autocomplete="current-password">
         </label>
       </div>
-      <div class="barra"><button class="btn principal" type="submit" id="btnEntrar">Entrar</button></div>
+      <div class="barra entre">
+        <button class="btn mini" type="button" id="bEsqueci">Esqueci minha senha</button>
+        <button class="btn principal" type="submit" id="btnEntrar">Entrar</button>
+      </div>
+    </form>
+
+    <form id="formEsqueci" hidden>
+      <p class="sub" style="text-align:left;margin:0 0 12px">
+        Informe o e-mail do seu login. Você recebe uma mensagem com o link
+        para criar uma senha nova.
+      </p>
+      <label class="campo">E-mail
+        <input type="email" id="recEmail" autocomplete="username" inputmode="email">
+      </label>
+      <div class="barra entre">
+        <button class="btn mini" type="button" id="bVoltarLogin">Voltar</button>
+        <button class="btn principal" type="submit" id="bEnviarLink">Enviar link</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ============ NOVA SENHA (veio do link do e-mail) ============ -->
+<section class="centro tela" id="telaNovaSenha" hidden>
+  <div class="caixa">
+    <img src="icons/gr-192.v2.png" alt="">
+    <h1>Nova senha</h1>
+    <p class="sub" id="nsQuem">Escolha a senha que você vai usar daqui em diante.</p>
+    <div class="aviso erro" id="erroNovaSenha" hidden></div>
+    <form id="formNovaSenha">
+      <div class="grade">
+        <label class="campo">Nova senha
+          <input type="password" id="nsSenha" required autocomplete="new-password" minlength="8">
+        </label>
+        <label class="campo">Repita a senha
+          <input type="password" id="nsSenha2" required autocomplete="new-password" minlength="8">
+        </label>
+      </div>
+      <p class="sub" style="text-align:left;margin:0 0 10px">Mínimo de 8 caracteres.</p>
+      <div class="barra fim">
+        <button class="btn principal" type="submit" id="bSalvarNovaSenha">Salvar e entrar</button>
+      </div>
     </form>
   </div>
 </section>
