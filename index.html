@@ -371,6 +371,44 @@
       </form>
     </section>
 
+    <!-- ---- SST · EXAMES: painel de alerta ---- -->
+    <section class="tela" id="telaExPainel" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Painel de vencimentos · exames</h2>
+            <p class="dica" style="margin:2px 0 0">
+              O exame mais recente de cada funcionário ativo. Clique num cartão para ver a lista.
+            </p>
+          </div>
+        </div>
+        <div class="pv-cards" id="exPnCards" style="margin-top:14px"></div>
+        <div class="aviso info" id="exPnSemNada" style="margin-top:12px" hidden></div>
+
+        <div class="qp-bloco">
+          <h3>Precisa de atenção</h3>
+          <p class="dica" style="margin:0 0 8px">Tudo que já venceu ou vence nos próximos 90 dias.</p>
+          <div id="exPnAlerta"></div>
+        </div>
+
+        <div class="qp-bloco">
+          <h3>Por tipo de exame</h3>
+          <div id="exPnTipos"></div>
+        </div>
+      </div>
+
+      <div class="previa-lista" id="exPnSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirPnEx">Imprimir o painel</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomPnEx" min="50" max="150" value="80" step="5">
+          <span id="zoomVPnEx">80%</span>
+        </span>
+      </div>
+    </section>
+
     <!-- ---- SST · EXAMES: vencimentos ---- -->
     <section class="tela" id="telaExVenc" hidden>
       <div class="cartao naoimprimir">
@@ -388,8 +426,11 @@
             <select id="exFiltroStatus">
               <option value="">Todos</option>
               <option value="vencido">Vencidos</option>
-              <option value="vencendo">Vence em até 30 dias</option>
-              <option value="emdia">Em dia</option>
+              <option value="ate30">Vence em até 30 dias</option>
+              <option value="ate60">De 31 a 60 dias</option>
+              <option value="ate90">De 61 a 90 dias</option>
+              <option value="emdia">Em dia (mais de 90)</option>
+              <option value="semvalidade">Sem validade</option>
             </select>
           </label>
           <label class="campo">Funcionários
@@ -465,6 +506,44 @@
       </div>
     </section>
 
+    <!-- ---- SST · TREINAMENTOS: painel de alerta ---- -->
+    <section class="tela" id="telaTrPainel" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Painel de vencimentos · treinamentos</h2>
+            <p class="dica" style="margin:2px 0 0">
+              O treinamento mais recente de cada funcionário ativo. Clique num cartão para ver a lista.
+            </p>
+          </div>
+        </div>
+        <div class="pv-cards" id="trPnCards" style="margin-top:14px"></div>
+        <div class="aviso info" id="trPnSemNada" style="margin-top:12px" hidden></div>
+
+        <div class="qp-bloco">
+          <h3>Precisa de atenção</h3>
+          <p class="dica" style="margin:0 0 8px">Tudo que já venceu ou vence nos próximos 90 dias.</p>
+          <div id="trPnAlerta"></div>
+        </div>
+
+        <div class="qp-bloco">
+          <h3>Por tipo de treinamento</h3>
+          <div id="trPnTipos"></div>
+        </div>
+      </div>
+
+      <div class="previa-lista" id="trPnSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirPnTr">Imprimir o painel</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomPnTr" min="50" max="150" value="80" step="5">
+          <span id="zoomVPnTr">80%</span>
+        </span>
+      </div>
+    </section>
+
     <!-- ---- SST · TREINAMENTOS: vencimentos ---- -->
     <section class="tela" id="telaTrVenc" hidden>
       <div class="cartao naoimprimir">
@@ -482,8 +561,11 @@
             <select id="trFiltroStatus">
               <option value="">Todos</option>
               <option value="vencido">Vencidos</option>
-              <option value="vencendo">Vence em até 30 dias</option>
-              <option value="emdia">Em dia</option>
+              <option value="ate30">Vence em até 30 dias</option>
+              <option value="ate60">De 31 a 60 dias</option>
+              <option value="ate90">De 61 a 90 dias</option>
+              <option value="emdia">Em dia (mais de 90)</option>
+              <option value="semvalidade">Sem validade</option>
             </select>
           </label>
           <label class="campo">Funcionários
