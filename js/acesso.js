@@ -28,6 +28,7 @@ export const MODULOS = [
     ] },
     { id: 'exames', nome: 'Exames', telas: [
       ['exVenc', 'Vencimentos'],
+      ['exFuncoes', 'Exames por função'],
       ['exTipos', 'Tipos e periodicidade'],
     ] },
     { id: 'treinamentos', nome: 'Treinamentos', telas: [

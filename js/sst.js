@@ -6,6 +6,8 @@
 // a "receita" do exame ou do treinamento em RECEITAS.
 import { estado } from './store.js';
 import { LOGO } from './seed.js';
+import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
+  conferenciaDo } from './aso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -57,6 +59,7 @@ const RECEITAS = {
       dica: 'exDicaVence', apagar: 'bApagarExame',
       dlgTipo: 'dlgTipoEx', formTipo: 'formTipoEx', tituloTipo: 'tituloTipoEx', erroTipo: 'erroTipoEx',
       tNome: 'txNome', tMeses: 'txMeses', tAtivo: 'txAtivo', tApagar: 'bApagarTipoEx', tCarga: null,
+      tCategoria: 'txCategoria',
     },
   },
   treinamento: {
@@ -102,9 +105,12 @@ export async function carregarSst() {
   S.treinamento.tipos = tt.data || [];
   S.treinamento.regs = tr.data || [];
   S.carregado = true;
+  definirTipos(S.exame.tipos);
+  await carregarAso();
 }
 
 export function limparSst() {
+  limparAso();
   S.exame = { tipos: [], regs: [] };
   S.treinamento = { tipos: [], regs: [] };
   S.carregado = false;
@@ -130,6 +136,7 @@ export async function abrirSst(tela) {
 
 /* =============== cadastro de tipos =============== */
 function desenharTipos(r) {
+  if (r.id === 'exame') return desenharTiposExame();
   const tipos = S[r.id].tipos;
   $(r.el.listaTipos).innerHTML = tipos.length ? `
     <table class="dc-planilha"><thead><tr>
@@ -155,6 +162,41 @@ function desenharTipos(r) {
     b.addEventListener('click', () => abrirTipo(r, b.dataset.tipo)));
 }
 
+/* O exame tem duas naturezas e por isso duas tabelas: o ASO em si e os
+   complementares que entram na lista da função. */
+function desenharTiposExame() {
+  const r = RECEITAS.exame;
+  const bloco = (titulo, dica, lista) => `
+    <h3 class="sst-bloco">${esc(titulo)}</h3>
+    <p class="dica" style="margin:0 0 8px">${esc(dica)}</p>
+    ${lista.length ? `<table class="dc-planilha"><thead><tr>
+      <th>Exame</th><th class="ce">Refazer a cada</th>
+      <th class="ce">Lançamentos</th><th class="ce">Situação</th><th></th>
+    </tr></thead><tbody>
+    ${lista.map(t => {
+      const usos = S.exame.regs.filter(x => x.tipo_id === t.id).length;
+      return `<tr>
+        <td><b>${esc(t.nome)}</b></td>
+        <td class="ce">${t.meses ? t.meses + ' meses' : '<span class="dc-sem">segue o ASO</span>'}</td>
+        <td class="ce">${usos}</td>
+        <td class="ce"><span class="tag ${t.ativo ? 'ativo' : 'inativo'}">${t.ativo ? 'EM USO' : 'DESATIVADO'}</span></td>
+        <td class="ce"><button class="btn mini" data-tipo="${t.id}">Editar</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`
+    : '<div class="vazio">Nada cadastrado aqui ainda.</div>'}`;
+
+  const asos = S.exame.tipos.filter(t => t.categoria === 'aso');
+  const comps = S.exame.tipos.filter(t => t.categoria !== 'aso');
+
+  $(r.el.listaTipos).innerHTML =
+    bloco('ASO', 'O atestado em si. A periodicidade calcula o vencimento sozinha.', asos) +
+    bloco('Exames complementares',
+      'Entram na lista da função. Sem meses, valem enquanto o ASO valer.', comps);
+
+  $(r.el.listaTipos).querySelectorAll('[data-tipo]').forEach(b =>
+    b.addEventListener('click', () => abrirTipo(r, b.dataset.tipo)));
+}
+
 function abrirTipo(r, id) {
   const t = id ? S[r.id].tipos.find(x => x.id === id) : null;
   editandoTipo[r.id] = t ? { ...t } : { nome: '', meses: null, carga_horaria: null, ativo: true, novo: true };
@@ -164,6 +206,7 @@ function abrirTipo(r, id) {
   $(r.el.tNome).value = e.nome || '';
   $(r.el.tMeses).value = e.meses ?? '';
   if (r.el.tCarga) $(r.el.tCarga).value = e.carga_horaria ?? '';
+  if (r.el.tCategoria) $(r.el.tCategoria).value = e.categoria || 'complementar';
   $(r.el.tAtivo).value = e.ativo === false ? '0' : '1';
   $(r.el.tApagar).hidden = !t;
   $(r.el.dlgTipo).showModal();
@@ -249,7 +292,8 @@ function desenharVenc(r) {
         <td class="ce">${dataBr(x.vence)}</td>
         ${r.completo ? `<td class="ce">${x.carga_horaria ? Number(x.carga_horaria) + ' h' : '—'}</td>
         <td>${esc(x.instrutor || '—')}</td>` : ''}
-        <td class="ce"><span class="tag ${x.sit.cor}">${esc(x.sit.rotulo)}</span></td>
+        <td class="ce"><span class="tag ${x.sit.cor}">${esc(x.sit.rotulo)}</span>
+          ${etiquetaConferencia(r, x, f)}</td>
         <td class="ce"><button class="btn mini" data-reg="${x.id}">Editar</button></td>
       </tr>`;
     }).join('')}</tbody></table>`
@@ -269,6 +313,14 @@ function desenharVenc(r) {
   } else aviso.hidden = true;
 
   $(r.el.saida).innerHTML = montarFolhas(r, linhas);
+}
+
+/** "3 de 5 exames" quando o ASO ainda tem exame da função por fazer. */
+function etiquetaConferencia(r, x, f) {
+  if (r.id !== 'exame') return '';
+  const c = conferenciaDo(x, f);
+  if (!c || c.completo) return '';
+  return `<br><span class="tag alerta">faltam ${c.total - c.feitos} de ${c.total}</span>`;
 }
 
 /* =============== lançamento =============== */
@@ -299,7 +351,14 @@ function abrirReg(r, id) {
   }
   $(r.el.apagar).hidden = !x;
   atualizarVencimento(r, !x);
+  if (r.id === 'exame') mostrarItens(r);
   $(r.el.dlg).showModal();
+}
+
+/** A lista de exames da função, dentro do lançamento do ASO. */
+function mostrarItens(r) {
+  const e = editando[r.id] || {};
+  desenharItens(e.novo ? null : e.id, $(r.el.func).value, $(r.el.tipo).value);
 }
 
 /** Recalcula o vencimento pela periodicidade do tipo. */
@@ -355,7 +414,10 @@ function montarFolhas(r, linhas) {
             <td class="ce">${dataBr(x.vence)}</td>
             <td class="ce sst-${x.sit.chave}">${esc(x.sit.chave === 'emdia' ? 'Em dia'
               : x.sit.chave === 'vencido' ? 'Vencido'
-              : x.sit.chave === 'vencendo' ? 'A vencer' : 'Sem validade')}</td>
+              : x.sit.chave === 'vencendo' ? 'A vencer' : 'Sem validade')}${(() => {
+                const c = r.id === 'exame' ? conferenciaDo(x, f) : null;
+                return c && !c.completo ? `<br><span class="sst-vencendo">faltam ${c.total - c.feitos}</span>` : '';
+              })()}</td>
           </tr>`;
         }).join('')}</tbody>
       </table>
@@ -384,8 +446,12 @@ function ligarReceita(r, avisar) {
     $(r.el.saida).style.transformOrigin = 'top center';
   });
 
-  $(r.el.tipo).addEventListener('change', () => atualizarVencimento(r, true));
+  $(r.el.tipo).addEventListener('change', () => {
+    atualizarVencimento(r, true);
+    if (r.id === 'exame') mostrarItens(r);
+  });
   $(r.el.data).addEventListener('change', () => atualizarVencimento(r, true));
+  if (r.id === 'exame') $(r.el.func).addEventListener('change', () => mostrarItens(r));
 
   /* ---- salvar lançamento ---- */
   $(r.el.form).addEventListener('submit', async ev => {
@@ -415,6 +481,11 @@ function ligarReceita(r, avisar) {
     const i = S[r.id].regs.findIndex(x => x.id === data.id);
     if (i >= 0) S[r.id].regs[i] = data; else S[r.id].regs.unshift(data);
     S[r.id].regs.sort((a, b) => String(b.realizado).localeCompare(String(a.realizado)));
+
+    if (r.id === 'exame') {
+      try { await salvarItens(data.id); }
+      catch (err) { return mostrarErro(r.el.erro, 'O ASO foi salvo, mas a marcação dos exames não: ' + err.message); }
+    }
     $(r.el.dlg).close();
     desenharVenc(r);
     avisar(`${r.id === 'exame' ? 'Exame' : 'Treinamento'} salvo.`);
@@ -445,6 +516,7 @@ function ligarReceita(r, avisar) {
     if (r.el.tCarga) {
       linha.carga_horaria = so($(r.el.tCarga).value) ? Number($(r.el.tCarga).value) : null;
     }
+    if (r.el.tCategoria) linha.categoria = $(r.el.tCategoria).value;
     if (!e.novo) linha.id = e.id;
 
     const { data, error } = await estado.cliente.from(r.tabelaTipos)

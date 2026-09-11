@@ -11,6 +11,7 @@ import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { ligarSst, abrirSst, limparSst } from './sst.js';
+import { ligarAso, abrirFuncoes } from './aso.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
@@ -45,6 +46,7 @@ function abrirAba(nome) {
   $('telaConfig').hidden = nome !== 'config';
   $('telaExVenc').hidden  = nome !== 'exVenc';
   $('telaExTipos').hidden = nome !== 'exTipos';
+  $('telaExFuncoes').hidden = nome !== 'exFuncoes';
   $('telaTrVenc').hidden  = nome !== 'trVenc';
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
@@ -66,6 +68,7 @@ function abrirAba(nome) {
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();
   if (['exVenc', 'exTipos', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
+  if (nome === 'exFuncoes') abrirFuncoes();
   if (nome.startsWith('jor')) abrirJornada(nome);
 }
 
@@ -1058,6 +1061,7 @@ if ('serviceWorker' in navigator) {
 /* arranque */
 ligarDisc(); ligarAcesso(); ligarJornada(abrirAba); ligarSst(mostrarAviso);
 ligarRh(mostrarAviso, desenharFuncionarios);
+ligarAso();
 (async () => {
   /* O link do e-mail volta com #type=recovery. O Supabase consome esse
      pedaço do endereço ao iniciar, então é preciso olhar antes. */
