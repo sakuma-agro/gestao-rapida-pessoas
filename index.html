@@ -1057,6 +1057,55 @@
       </label>
     </div>
 
+    <!-- O resto da ficha fica recolhido: o dia a dia é o bloco de cima.
+         Quem precisa completar a ficha abre o bloco e preenche. -->
+    <details class="fu-bloco">
+      <summary>Contato e emergência</summary>
+      <div class="grade">
+        <label class="campo">Telefone de recado <input type="text" id="fuTelRecado" inputmode="tel"></label>
+        <label class="campo plena">Em caso de emergência, avisar
+          <input type="text" id="fuEmergNome" placeholder="Nome de quem avisar"></label>
+        <label class="campo">Parentesco <input type="text" id="fuEmergParentesco"></label>
+        <label class="campo">Telefone da emergência <input type="text" id="fuEmergTelefone" inputmode="tel"></label>
+      </div>
+    </details>
+
+    <details class="fu-bloco">
+      <summary>Endereço e transporte</summary>
+      <div class="grade">
+        <label class="campo">CEP <input type="text" id="fuCep" inputmode="numeric"></label>
+        <label class="campo plena">Logradouro e nº <input type="text" id="fuLogradouro"></label>
+        <label class="campo">Bairro / comunidade <input type="text" id="fuBairro"></label>
+        <label class="campo">Município/UF <input type="text" id="fuMunicipio"></label>
+        <label class="campo plena">Ponto de referência <input type="text" id="fuReferencia"></label>
+        <label class="campo">Mora em alojamento?
+          <select id="fuAlojamento">
+            <option value="">Não informado</option><option value="1">Sim</option><option value="0">Não</option>
+          </select>
+        </label>
+        <label class="campo">Usa transporte da empresa?
+          <select id="fuTransporte">
+            <option value="">Não informado</option><option value="1">Sim</option><option value="0">Não</option>
+          </select>
+        </label>
+        <label class="campo plena">Ponto de embarque <input type="text" id="fuPontoEmbarque"></label>
+      </div>
+    </details>
+
+    <details class="fu-bloco">
+      <summary>Documentos</summary>
+      <div class="grade">
+        <label class="campo">RG nº <input type="text" id="fuRg"></label>
+        <label class="campo">Órgão emissor / UF <input type="text" id="fuRgOrgao"></label>
+        <label class="campo">PIS/PASEP <input type="text" id="fuPis" inputmode="numeric"></label>
+        <label class="campo">CTPS nº / série <input type="text" id="fuCtps"></label>
+        <label class="campo">Estado civil <input type="text" id="fuEstadoCivil" list="lista-estado-civil"></label>
+        <label class="campo">Escolaridade <input type="text" id="fuEscolaridade" list="lista-escolaridade"></label>
+        <label class="campo plena">Nome da mãe <input type="text" id="fuNomeMae"></label>
+        <label class="campo plena">Naturalidade (cidade/UF) <input type="text" id="fuNaturalidade"></label>
+      </div>
+    </details>
+
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarFunc">Apagar</button>
       <span>
@@ -1399,6 +1448,16 @@
 </dialog>
 
 <datalist id="lista-cargos"></datalist>
+<!-- sugestões fixas, iguais às da planilha de importação do DP -->
+<datalist id="lista-estado-civil">
+  <option value="Solteiro(a)"><option value="Casado(a)"><option value="União estável">
+  <option value="Divorciado(a)"><option value="Viúvo(a)">
+</datalist>
+<datalist id="lista-escolaridade">
+  <option value="Fundamental incompleto"><option value="Fundamental completo">
+  <option value="Médio incompleto"><option value="Médio completo">
+  <option value="Superior incompleto"><option value="Superior completo">
+</datalist>
 <datalist id="lista-empregadores"></datalist>
 <datalist id="lista-fazendas"></datalist>
 
