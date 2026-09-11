@@ -151,6 +151,33 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .qp-bloco{margin-top:18px}
 .qp-bloco h3{margin:0 0 6px;font-size:13px;color:var(--marrom)}
 
+/* ---- exames por função e a conferência dentro do ASO ---- */
+.sst-bloco{margin:18px 0 2px;font-size:13px;color:var(--marrom)}
+.sst-bloco:first-child{margin-top:0}
+.aso-itens{margin-top:14px;border-top:1px solid var(--linha);padding-top:12px}
+.aso-cab{display:flex;align-items:center;gap:10px;font-size:13px;margin-bottom:8px}
+.aso-cab .dc-sem{margin-left:auto}
+.aso-item{grid-template-columns:22px 1fr auto}
+.aso-data{font:inherit;font-size:12px;padding:4px 6px;border-radius:6px;
+  border:1px solid var(--linha);background:var(--fundo);color:var(--texto);width:auto}
+.aso-data:disabled{opacity:.4}
+/* documentos da guia e do quadro */
+.aso-rot{font-size:9pt;letter-spacing:.4px;color:#5e6657;background:#f3f8e8;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+/* grade visível nos dois: é formulário, precisa de linha para escrever */
+.aso-guia th,.aso-guia td,
+.aso-quadro th,.aso-quadro td{border:1px solid #cfd4c6}
+.aso-guia td{height:7mm}
+.aso-guia th:first-child,.aso-quadro th:first-child{color:#fff}
+.aso-quadro th{font-size:8pt;vertical-align:bottom}
+.aso-quadro td{font-size:9pt}
+.aso-quadro td:first-child{white-space:nowrap}
+.aso-nota{margin-top:5mm;font-size:9pt;color:#5e6657;border-left:3px solid var(--verde);padding-left:3mm}
+.aso-assinaturas{display:flex;gap:14mm;margin-top:14mm}
+.aso-assinaturas div{flex:1;text-align:center}
+.aso-assinaturas span{display:block;border-top:1px solid #51534A;height:8mm;margin-bottom:1mm}
+.aso-assinaturas small{font-size:9pt;color:#5e6657}
+
 /* ---- gráficos do quadro de pessoal ----
    Tudo em SVG: forma vetorial imprime sempre, cor de fundo não. */
 .g-rosca{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
