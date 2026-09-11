@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v43';
+const VERSAO = 'gr-v44';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/lista.js',
@@ -12,7 +12,7 @@ const ARQUIVOS = [
   './js/jornada.js', './js/jornada-dados.js', './js/jornada-motor.js',
   './js/jornada-fechamento.js', './js/jornada-relatorios.js', './js/jornada-cadastros.js',
   './css/jornada.css', './css/jornada-marca.css', './css/jornada-impressao.css',
-  './img/sakuma-logo.png',
+  './img/sakuma-logo.png', './img/sakuma-marca-vertical.png',
   './img/lop-assinatura-laser-claro.png', './img/lop-assinatura-laser-escuro.png',
   './vendor/supabase.js', './manifest.webmanifest',
   // Os ícones levam o número da versão no nome. Quando a arte mudar, suba
