@@ -282,10 +282,20 @@ function abrirProposta() {
   if (!so($('ppJornada').value)) $('ppJornada').value = m.jornada || '';
   if (!so($('ppLocal').value)) $('ppLocal').value = m.local_trabalho || '';
   if (!so($('ppExperiencia').value)) $('ppExperiencia').value = m.experiencia || '';
-  if (!so($('ppBeneficios').value)) $('ppBeneficios').value = m.beneficios || '';
+  if (!so($('ppBeneficios').value)) montarBeneficios();
+  if (!so($('ppObs').value)) $('ppObs').value = m.observacoes || '';
   if (!so($('ppInicio').value)) $('ppInicio').value = hoje();
   trocarTipo();
   desenharUltimas();
+}
+
+/* Os benefícios saem do modelo: os de todo mundo e, se mora na fazenda,
+   mais os de morador. Marcar a caixa remonta a lista. */
+function montarBeneficios() {
+  const m = R.modelo || {};
+  const base = so(m.beneficios).split('\n').filter(Boolean);
+  const extra = $('ppMorador').checked ? so(m.beneficios_morador).split('\n').filter(Boolean) : [];
+  $('ppBeneficios').value = [...base, ...extra].join('\n');
 }
 
 function trocarTipo() {
@@ -337,6 +347,7 @@ function dadosDaProposta() {
     salario: numeroOuNulo($('ppSalario').value),
     cargo_atual: promocao ? so($('ppCargoAtual').value) : '',
     salario_atual: promocao ? numeroOuNulo($('ppSalarioAtual').value) : null,
+    morador: $('ppMorador').checked,
     data_inicio: so($('ppInicio').value) || null,
     local_trabalho: so($('ppLocal').value),
     jornada: so($('ppJornada').value),
@@ -397,7 +408,8 @@ export function documentoProposta(p) {
     ${comparativo}
     ${condicoes}
     ${beneficios}
-    ${so(p.observacao) ? `<div class="rel-resumo">${esc(p.observacao)}</div>` : ''}
+    ${so(p.observacao) ? `<div class="rel-resumo">${so(p.observacao).split('\n')
+      .filter(Boolean).map(l => `<div>${esc(l.trim())}</div>`).join('')}</div>` : ''}
     ${so(m.fechamento) ? `<p class="rel-nota">${esc(m.fechamento)}</p>` : ''}
     <p class="rel-nota">São Gotardo, ${porExtenso(hoje())}.</p>`;
 
@@ -778,6 +790,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
 
   /* --- proposta --- */
   $('ppTipo').addEventListener('change', trocarTipo);
+  $('ppMorador').addEventListener('change', montarBeneficios);
   $('ppPessoa').addEventListener('change', escolherPessoa);
   $('ppCargo').addEventListener('change', escolherCargo);
   $('ppFaixa').addEventListener('change', aplicarFaixa);
@@ -815,6 +828,12 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
     $('rmFechamento').value = m.fechamento || '';
     $('rmAssinatura').value = m.assinatura || '';
     $('rmRegras').value = m.regras || '';
+    $('rmBeneficios').value = m.beneficios || '';
+    $('rmBeneficiosMorador').value = m.beneficios_morador || '';
+    $('rmObservacoes').value = m.observacoes || '';
+    $('rmJornada').value = m.jornada || '';
+    $('rmLocal').value = m.local_trabalho || '';
+    $('rmExperiencia').value = m.experiencia || '';
     $('dlgRhModelo').showModal();
   });
 
@@ -827,15 +846,18 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
       fechamento: so($('rmFechamento').value),
       assinatura: so($('rmAssinatura').value),
       regras: $('rmRegras').value,
-      jornada: R.modelo?.jornada || null,
-      local_trabalho: R.modelo?.local_trabalho || null,
-      experiencia: R.modelo?.experiencia || null,
-      beneficios: R.modelo?.beneficios || null,
+      jornada: so($('rmJornada').value) || null,
+      local_trabalho: so($('rmLocal').value) || null,
+      experiencia: so($('rmExperiencia').value) || null,
+      beneficios: $('rmBeneficios').value,
+      beneficios_morador: $('rmBeneficiosMorador').value,
+      observacoes: $('rmObservacoes').value,
     };
     const { data, error } = await estado.cliente.from('rh_modelo').upsert(novo).select().single();
     if (error) return avisar(`Não deu para salvar: ${error.message}`);
     R.modelo = data;
     $('dlgRhModelo').close();
+    montarBeneficios();
     avisar('Textos da proposta salvos.');
   });
 
