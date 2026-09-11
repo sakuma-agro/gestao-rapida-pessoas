@@ -28,8 +28,9 @@
     <div class="aviso erro" id="erroLogin" hidden></div>
     <form id="formLogin">
       <div class="grade">
-        <label class="campo">E-mail
-          <input type="email" id="logEmail" required autocomplete="username" inputmode="email">
+        <label class="campo">Usuário
+          <input type="text" id="logEmail" required autocomplete="username"
+                 placeholder="seu nome de usuário" autocapitalize="none" spellcheck="false">
         </label>
         <label class="campo">Senha
           <input type="password" id="logSenha" required autocomplete="current-password">
@@ -43,11 +44,12 @@
 
     <form id="formEsqueci" hidden>
       <p class="sub" style="text-align:left;margin:0 0 12px">
-        Informe o e-mail do seu login. Você recebe uma mensagem com o link
-        para criar uma senha nova.
+        Informe seu usuário ou o e-mail do seu login. A mensagem com o link
+        para criar uma senha nova vai para o e-mail cadastrado.
       </p>
-      <label class="campo">E-mail
-        <input type="email" id="recEmail" autocomplete="username" inputmode="email">
+      <label class="campo">Usuário ou e-mail
+        <input type="text" id="recEmail" autocomplete="username"
+               autocapitalize="none" spellcheck="false">
       </label>
       <div class="barra entre">
         <button class="btn mini" type="button" id="bVoltarLogin">Voltar</button>
@@ -1148,11 +1150,22 @@
   <form method="dialog" id="formUsuario">
     <h3 id="tituloUsuario">Adicionar pessoa</h3>
     <div class="grade">
-      <label class="campo plena">E-mail do login
+      <label class="campo plena">E-mail
         <input type="email" id="usEmail" required placeholder="nome@exemplo.com">
       </label>
       <label class="campo plena">Nome <input type="text" id="usNome"></label>
+      <label class="campo plena">Login
+        <input type="text" id="usUsuario" placeholder="guilherme" autocapitalize="none"
+               spellcheck="false" pattern="[A-Za-z0-9._-]{3,30}">
+      </label>
     </div>
+    <p class="dc-sem" style="margin:-4px 0 10px">
+      O <b>login</b> é o que a pessoa digita para entrar. Letras, números,
+      ponto, traço ou sublinhado, de 3 a 30 — sem espaço e sem acento. O
+      <b>e-mail</b> não serve mais para entrar no dia a dia, mas continua
+      sendo para onde vai o link de recuperar a senha, então precisa estar
+      certo.
+    </p>
 
     <!-- Módulos e, dentro de cada um, as telas. Nenhuma tela marcada num
          módulo = a pessoa vê o módulo inteiro. -->
