@@ -137,14 +137,13 @@
 }
 .rel-assina small { font-size: 10px; color: #8A8D86; }
 
-/* ---- rodapé: a assinatura da LOP, uma vez só ---- */
+/* ---- rodapé: só a marca da LOP, no canto, uma vez só ---- */
 .rel-rodape {
-  margin-top: 20px;
-  padding-top: 8px;
-  border-top: 1px solid #E1E2DE;
+  margin-top: 18px;
   text-align: right;
+  line-height: 0;
 }
-.rel-rodape img { height: 22px; width: auto; opacity: .9; }
+.rel-rodape img { height: 19px; width: auto; opacity: .7; }
 
 /* ---- impressão de verdade ----
    Sem regra @page aqui: o app já define @page{margin:0}, e mexer nisso

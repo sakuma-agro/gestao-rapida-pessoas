@@ -395,10 +395,10 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .an-saudacao p{margin:3mm 0 0;font-size:11.5pt;color:#51534A;line-height:1.4}
 .an-pe{margin-top:auto;padding-top:5mm;border-top:.3mm solid #dfe2d8;
   display:flex;justify-content:space-between;font-size:9pt;color:#7d8175}
-/* A assinatura da LOP: por último, pequena e discreta. É imagem, não fundo,
-   então imprime mesmo com "gráficos de plano de fundo" desligado. */
-.an-lop{margin-top:2.5mm;text-align:center;line-height:0}
-.an-lop img{height:6mm;width:auto;opacity:.75}
+/* A marca da LOP: por último, no canto, pequena. É imagem, não fundo, então
+   imprime mesmo com "gráficos de plano de fundo" desligado. */
+.an-lop{margin-top:2mm;text-align:right;line-height:0}
+.an-lop img{height:5mm;width:auto;opacity:.7}
 
 /* =========================================================
    TERMOS (liberdade sindical, recebimento do contrato)
