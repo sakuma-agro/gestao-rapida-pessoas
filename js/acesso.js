@@ -15,10 +15,23 @@ const esc = s => String(s == null ? '' : s)
    agrupá-las em `subs`, os submódulos (três faixas: módulo, submódulo, tela).
    É o caso do SST. */
 export const MODULOS = [
-  { id: 'pessoas', nome: 'Funcionários', telas: [
-    ['funcionarios', 'Cadastro · Nível 1'],
-    ['funcionariosN2', 'Cadastro · Nível 2'],
-    ['aniversarios', 'Aniversariantes'],
+  /* "Cadastros" reúne o que todo o resto do app consome: as pessoas, as
+     funções e a estrutura (empregador, fazenda, unidade). Antes isso estava
+     espalhado — função e setor não tinham tela nenhuma, e empregador e fazenda
+     só existiam escondidos dentro de DP → Configurações.
+     `admin: true` no submódulo deixa a faixa só para administrador. */
+  { id: 'pessoas', nome: 'Cadastros', subs: [
+    { id: 'gente', nome: 'Funcionários', telas: [
+      ['funcionarios', 'Cadastro · Nível 1'],
+      ['funcionariosN2', 'Cadastro · Nível 2'],
+      ['aniversarios', 'Aniversariantes'],
+    ] },
+    { id: 'funcoes', nome: 'Funções e setores', admin: true, telas: [
+      ['cadFuncoes', 'Funções e setores'],
+    ] },
+    { id: 'estrutura', nome: 'Empregador e fazenda', admin: true, telas: [
+      ['cadEstrutura', 'Empregador e fazenda'],
+    ] },
   ] },
   { id: 'sst', nome: 'SST', subs: [
     { id: 'epis', nome: "EPI's", telas: [
@@ -86,8 +99,16 @@ export const pode = m => acesso.admin || acesso.modulos.includes(m);
    inteiro — que é como sempre funcionou. Basta marcar uma para o resto sumir. */
 const temRestricao = m => acesso.telas.some(x => x.startsWith(m + ':'));
 
+/* Telas de submódulo marcado com `admin: true`. Ficam fora para quem não é
+   administrador, mesmo que o módulo inteiro esteja liberado — é o caso de
+   empregador, fazenda e funções, que a equipe consulta mas não edita. */
+const soAdmin = new Set(
+  MODULOS.flatMap(m => subsDe(m).filter(s => s.admin).flatMap(s => s.telas.map(([t]) => t)))
+);
+
 export function podeTela(tela) {
   if (acesso.admin) return true;
+  if (soAdmin.has(tela)) return false;
   const m = moduloDe(tela);
   if (!m || !pode(m)) return false;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);

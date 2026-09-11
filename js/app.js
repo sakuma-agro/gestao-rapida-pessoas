@@ -8,6 +8,7 @@ import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, link
   imagemAniversarios, nomeImagem } from './aniversarios.js';
 import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
+import { desenharCadastros } from './jornada-cadastros.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { ligarSst, abrirSst, limparSst } from './sst.js';
@@ -41,6 +42,8 @@ function abrirAba(nome) {
   $('telaFuncionarios').hidden = nome !== 'funcionarios';
   $('telaFuncionariosN2').hidden = nome !== 'funcionariosN2';
   $('telaAniversarios').hidden = nome !== 'aniversarios';
+  $('telaCadFuncoes').hidden = nome !== 'cadFuncoes';
+  $('telaCadEstrutura').hidden = nome !== 'cadEstrutura';
   $('telaEpis').hidden = nome !== 'epis';
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
@@ -62,6 +65,12 @@ function abrirAba(nome) {
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'funcionariosN2') desenharFuncN2();
+  /* Os cadastros estruturais desenham a partir da mesma receita do DP; cada
+     tela escolhe o seu punhado. Depois de salvar, as listas do cadastro de
+     funcionário são remontadas, senão a função nova só aparece ao recarregar. */
+  if (nome === 'cadFuncoes') desenharCadastros('cadFuncoesLista', ['funcoes', 'setores'], desenharFuncionarios);
+  if (nome === 'cadEstrutura') desenharCadastros('cadEstruturaLista',
+    ['empregadores', 'fazendas', 'unidades', 'destinos'], desenharFuncionarios);
   if (nome === 'epis') { desenharEpis(); conferirCa(false); }
   if (nome === 'modelo') preencherModelo();
   $('telaRhCargos').hidden   = nome !== 'rhCargos';

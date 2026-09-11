@@ -6,7 +6,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
-import { desenharCadastros, ligarCadastros } from './jornada-cadastros.js';
+import { ligarCadastros } from './jornada-cadastros.js';
 import { apurarDia, minParaHHMM, minParaDecimal } from './jornada-motor.js';
 import * as fech from './jornada-fechamento.js';
 import * as rel from './jornada-relatorios.js';
@@ -411,9 +411,11 @@ function desenharConfigJornada() {
 
   const par = jd.parametrosEm(hoje());
 
-  $('telaJorConfig').innerHTML = cabecalho('Configurações do DP', 'Cadastros estruturais e parâmetros com vigência') + `
+  $('telaJorConfig').innerHTML = cabecalho('Configurações do DP', 'Parâmetros e tabelas com vigência') + `
     <div class="jor-corpo">
-      <div id="jorCadastros"></div>
+      <p class="dc-sem jor-nota" style="margin:0 0 14px">Empregador, fazenda, unidade, destino,
+      função e setor saíram daqui em 11/09/2026 — agora ficam no módulo <b>Cadastros</b>,
+      porque o app inteiro usa essa informação, não só o DP.</p>
 
       ${t('Jornadas',
         jd.dados.jornadas.map(j => `<tr>
@@ -443,7 +445,6 @@ function desenharConfigJornada() {
         ['Data', 'Feriado', 'Abrangência'])}
     </div>` + assinatura();
 
-  desenharCadastros('jorCadastros', () => abrirJornada('jorConfig'));
 }
 
 function resumoJornada(j) {

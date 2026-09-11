@@ -79,6 +79,39 @@ const CADASTROS = {
     ],
   },
 
+  funcoes: {
+    titulo: 'Funções',
+    dica: 'O que a pessoa faz. É por ela que os exames se organizam e é ela que sai impressa na ficha de EPI.',
+    singular: 'função',
+    novo: 'Nova função',
+    colunas: ['Função', 'Pessoas'],
+    linha: f => [
+      `<b>${esc(f.nome)}</b>`,
+      String(jd.dados.vinculos.filter(v => v.funcao_id === f.id).length),
+    ],
+    campos: [
+      { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
+    ],
+  },
+
+  setores: {
+    titulo: 'Setores',
+    dica: 'Onde a pessoa trabalha. O setor traz a jornada padrão de quem entra nele.',
+    singular: 'setor',
+    novo: 'Novo setor',
+    colunas: ['Setor', 'Jornada padrão', 'Pessoas'],
+    linha: s => [
+      `<b>${esc(s.nome)}</b>`,
+      esc(jd.dados.jornadas.find(j => j.id === s.jornada_id)?.nome || '—'),
+      String(jd.dados.vinculos.filter(v => v.setor_id === s.id).length),
+    ],
+    campos: [
+      { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
+      { k: 'jornada_id', rotulo: 'Jornada padrão', t: 's',
+        opcoes: () => ativos(jd.dados.jornadas).sort(porNome).map(j => [j.id, j.nome]) },
+    ],
+  },
+
   destinos: {
     titulo: 'Destinos do DP',
     dica: 'Cada escritório de contabilidade que recebe os relatórios.',
@@ -110,14 +143,23 @@ const cpfBr = c => {
 /* =============== desenho =============== */
 let editando = null;      // { chave, item }
 let aoSalvar = () => {};
+let ultimoAlvo = { alvoId: 'jorCadastros', quais: null };
+const redesenhar = () => desenharCadastros(ultimoAlvo.alvoId, ultimoAlvo.quais);
 
-export function desenharCadastros(alvoId, callback) {
+/* `quais` escolhe quais cadastros a tela desenha. É o que deixa o mesmo
+   mecanismo servir duas telas diferentes — Funções e setores numa, empregador
+   e fazenda noutra — sem duplicar nada. Sem `quais`, desenha todos. */
+export function desenharCadastros(alvoId, quais, callback) {
+  if (typeof quais === 'function') { callback = quais; quais = null; }
   if (callback) aoSalvar = callback;
   const alvo = $(alvoId);
   if (!alvo) return;
+  ultimoAlvo = { alvoId, quais };
 
-  alvo.innerHTML = Object.entries(CADASTROS).map(([chave, c]) => {
-    const lista = [...jd.dados[chave]].sort(porNome);
+  const lista = (quais || Object.keys(CADASTROS)).filter(k => CADASTROS[k]);
+  alvo.innerHTML = lista.map(chave => {
+    const c = CADASTROS[chave];
+    const itens = [...jd.dados[chave]].sort(porNome);
     return `
     <div class="jor-cad">
       <div class="barra entre" style="margin:0">
@@ -127,9 +169,9 @@ export function desenharCadastros(alvoId, callback) {
         </div>
         <button class="btn mini" data-novo="${chave}">${esc(c.novo)}</button>
       </div>
-      ${lista.length ? `<table class="dc-planilha" style="margin-top:10px"><thead><tr>
+      ${itens.length ? `<table class="dc-planilha" style="margin-top:10px"><thead><tr>
         ${c.colunas.map(x => `<th>${esc(x)}</th>`).join('')}<th class="ce">Situação</th><th></th>
-      </tr></thead><tbody>${lista.map(x => `<tr${x.ativo === false ? ' class="rh-off"' : ''}>
+      </tr></thead><tbody>${itens.map(x => `<tr${x.ativo === false ? ' class="rh-off"' : ''}>
         ${c.linha(x).map(v => `<td>${v}</td>`).join('')}
         <td class="ce"><span class="tag ${x.ativo === false ? 'inativo' : 'ativo'}">${x.ativo === false ? 'INATIVO' : 'ATIVO'}</span></td>
         <td class="ce"><button class="btn mini" data-editar="${chave}" data-id="${x.id}">Editar</button></td>
@@ -212,7 +254,7 @@ export function ligarCadastros() {
     try {
       await jd.salvar(chave, linha);
       $('dlgCadastro').close();
-      desenharCadastros('jorCadastros');
+      redesenhar();
       aoSalvar();
     } catch (e) {
       erro(e.message || String(e));
@@ -227,7 +269,7 @@ export function ligarCadastros() {
     try {
       await jd.inativar(editando.chave, editando.item.id);
       $('dlgCadastro').close();
-      desenharCadastros('jorCadastros');
+      redesenhar();
       aoSalvar();
     } catch (e) { erro(e.message || String(e)); }
   });
