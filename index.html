@@ -433,6 +433,38 @@
       </div>
     </section>
 
+    <!-- ---- SST · EXAMES: exames por função ---- -->
+    <section class="tela" id="telaExFuncoes" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Exames por função</h2>
+            <p class="dica" style="margin:2px 0 0">
+              O que o PCMSO pede em cada função. Essa lista aparece dentro do ASO e sai na guia da clínica.
+            </p>
+          </div>
+          <span class="acoes">
+            <button class="btn" id="bQuadroFuncoes">Quadro geral</button>
+            <button class="btn principal" id="bGuiaFuncao">Gerar guia</button>
+          </span>
+        </div>
+
+        <div class="grade" style="margin-top:14px">
+          <label class="campo">Função <select id="efFuncao"></select></label>
+        </div>
+        <p class="dica" id="efResumo" style="margin:10px 0 0"></p>
+        <div id="efLista" style="margin-top:12px"></div>
+      </div>
+
+      <div class="previa-lista" id="efSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirEf">Imprimir</button>
+        <span class="cresce"></span>
+        <span class="dc-sem">Gere a guia ou o quadro para aparecer aqui.</span>
+      </div>
+    </section>
+
     <!-- ---- SST · TREINAMENTOS: vencimentos ---- -->
     <section class="tela" id="telaTrVenc" hidden>
       <div class="cartao naoimprimir">
@@ -958,6 +990,24 @@
   </form>
 </dialog>
 
+<!-- ============ DIÁLOGO: GUIA DE EXAMES ============ -->
+<dialog id="dlgGuia">
+  <form method="dialog" id="formGuia">
+    <h3>Gerar guia de exames</h3>
+    <p class="dica">Função: <b id="gfFuncao"></b></p>
+    <div class="grade">
+      <label class="campo plena">Nome de quem vai fazer
+        <input type="text" id="gfNome" placeholder="Deixe em branco para preencher à mão">
+      </label>
+      <label class="campo plena">Tipo de ASO <select id="gfTipo"></select></label>
+    </div>
+    <div class="barra fim">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="submit">Gerar</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- ============ DIÁLOGO: CARGO ============ -->
 <dialog id="dlgCargo">
   <form method="dialog" id="formCargo">
@@ -1111,6 +1161,7 @@
       </label>
     </div>
     <p class="dica" id="exDicaVence" style="margin:8px 0 0"></p>
+    <div class="aso-itens" id="exItens" hidden></div>
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarExame">Apagar</button>
       <span>
@@ -1129,6 +1180,12 @@
     <div class="grade">
       <label class="campo plena">Nome do exame
         <input type="text" id="txNome" required placeholder="ASO periódico">
+      </label>
+      <label class="campo">Natureza
+        <select id="txCategoria">
+          <option value="aso">ASO (o atestado em si)</option>
+          <option value="complementar">Exame complementar</option>
+        </select>
       </label>
       <label class="campo">Refazer a cada (meses)
         <input type="number" id="txMeses" min="0" max="120" step="1" placeholder="12">
