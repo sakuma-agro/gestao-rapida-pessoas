@@ -42,18 +42,21 @@ const CADASTROS = {
 
   fazendas: {
     titulo: 'Fazendas',
-    dica: 'O município manda no feriado municipal da apuração.',
+    dica: 'O município manda no feriado municipal da apuração. O endereço completo é o que sai no termo de liberdade sindical.',
     singular: 'fazenda',
     novo: 'Nova fazenda',
-    colunas: ['Fazenda', 'Município', 'UF', 'Unidades'],
+    colunas: ['Fazenda', 'Município', 'UF', 'Endereço', 'Unidades'],
     linha: f => [
       `<b>${esc(f.nome)}</b>`, esc(f.municipio || '—'), esc(f.uf || '—'),
+      esc(f.endereco || '—'),
       String(jd.dados.unidades.filter(u => u.fazenda_id === f.id).length),
     ],
     campos: [
       { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
       { k: 'municipio', rotulo: 'Município', t: 't' },
       { k: 'uf', rotulo: 'UF', t: 't' },
+      // é o "estabelecida na ..." do termo de liberdade sindical
+      { k: 'endereco', rotulo: 'Endereço completo', t: 't', plena: true },
     ],
   },
 

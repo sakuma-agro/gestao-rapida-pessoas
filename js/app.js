@@ -14,6 +14,7 @@ import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { ligarSst, abrirSst, limparSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
+import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
@@ -40,6 +41,8 @@ function abrirAba(nome) {
   $('telaInicio').hidden = nome !== 'inicio';
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
+  $('telaTermoSindical').hidden = nome !== 'termoSindical';
+  $('telaTermoContrato').hidden = nome !== 'termoContrato';
   $('telaFuncionarios').hidden = nome !== 'funcionarios';
   $('telaFuncionariosN2').hidden = nome !== 'funcionariosN2';
   $('telaAniversarios').hidden = nome !== 'aniversarios';
@@ -63,6 +66,7 @@ function abrirAba(nome) {
   $('telaJorRelatorios').hidden   = nome !== 'jorRelatorios';
   $('telaJorConfig').hidden       = nome !== 'jorConfig';
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
+  if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'funcionariosN2') desenharFuncN2();
@@ -1175,6 +1179,7 @@ ligar('DP', () => ligarJornada(abrirAba));
 ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
+ligar('termos', () => ligarTermos(mostrarAviso));
 
 /** Nunca deixe a tela vazia: se nem o login der para montar, escreva o motivo. */
 function telaDeSocorro(texto) {

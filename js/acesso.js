@@ -32,6 +32,8 @@ export const MODULOS = [
     ] },
     { id: 'certificacao', nome: 'Certificação', telas: [
       ['lista', 'Lista de presença'],
+      ['termoSindical', 'Termo de liberdade sindical'],
+      ['termoContrato', 'Recebimento do contrato'],
     ] },
     { id: 'funcoes', nome: 'Funções e setores', admin: true, telas: [
       ['cadFuncoes', 'Funções e setores'],
