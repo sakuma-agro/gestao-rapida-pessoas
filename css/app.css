@@ -152,6 +152,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .qp-bloco h3{margin:0 0 6px;font-size:13px;color:var(--marrom)}
 
 /* ---- exames por função e a conferência dentro do ASO ---- */
+.jor-cad{margin:0 0 22px}
+.jor-cad:last-child{margin-bottom:0}
 .sst-bloco{margin:18px 0 2px;font-size:13px;color:var(--marrom)}
 .sst-bloco:first-child{margin-top:0}
 .aso-itens{margin-top:14px;border-top:1px solid var(--linha);padding-top:12px}
