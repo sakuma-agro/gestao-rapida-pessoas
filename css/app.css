@@ -666,6 +666,18 @@ dialog h3{margin:0 0 14px;font-size:16px}
 
 /* Bloco de jornada dentro do cadastro do funcionário */
 .fu-secao{margin:16px 0 8px;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--suave)}
+
+/* Os blocos recolhidos da ficha completa. O essencial fica sempre à vista;
+   contato, endereço e documentos abrem quando se precisa deles — ou sozinhos,
+   quando já têm algo preenchido. */
+.fu-bloco{margin-top:12px;border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+.fu-bloco > summary{cursor:pointer;padding:10px 14px;font-size:12.5px;font-weight:600;
+  color:var(--marrom);background:var(--fundo);list-style:none;user-select:none}
+.fu-bloco > summary::-webkit-details-marker{display:none}
+.fu-bloco > summary::before{content:"▸";display:inline-block;width:14px;color:var(--suave)}
+.fu-bloco[open] > summary::before{content:"▾"}
+.fu-bloco > summary:hover{color:var(--verde-esc)}
+.fu-bloco > .grade{padding:12px 14px 14px}
 label.campo.fu-inline{flex-direction:row;align-items:center;gap:8px;
   text-transform:none;font-size:13px;letter-spacing:0;align-self:end;padding-bottom:9px}
 label.campo.fu-inline input{width:auto;margin:0;flex:none}
