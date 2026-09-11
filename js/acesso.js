@@ -259,7 +259,7 @@ export function desenharConfig() {
 
   $('cfTabela').innerHTML = usuarios.length ? `
     <table class="dc-planilha cf-tab"><thead><tr>
-      <th>Pessoa</th><th class="ce">Admin</th>
+      <th>Pessoa</th><th>Login</th><th class="ce">Admin</th>
       ${MODULOS.map(m => `<th class="ce">${esc(m.nome)}</th>`).join('')}
       <th></th>
     </tr></thead><tbody>${usuarios.map(u => {
@@ -269,6 +269,9 @@ export function desenharConfig() {
           <b>${esc(u.nome || u.email)}</b>${eu ? ' <span class="tag ativo">você</span>' : ''}
           <br><span class="dc-sem">${esc(u.email)}</span>
         </td>
+        <td>${u.usuario
+          ? `<code>${esc(u.usuario)}</code>`
+          : '<span class="dc-sem">entra pelo e-mail</span>'}</td>
         <td class="ce"><input type="checkbox" class="cf-cx" data-email="${esc(u.email)}"
           data-campo="admin" ${u.admin ? 'checked' : ''} ${eu ? 'disabled title="Você não pode tirar o próprio acesso de administrador"' : ''}></td>
         ${MODULOS.map(m => `<td class="ce"><input type="checkbox" class="cf-cx"
@@ -310,17 +313,32 @@ async function trocarPermissao(cx) {
 async function gravar(u) {
   const { error } = await estado.cliente.from('app_usuarios').upsert({
     email: u.email.trim().toLowerCase(), nome: u.nome || null,
+    usuario: u.usuario || null,
     admin: !!u.admin, modulos: u.modulos || [], telas: u.telas || [],
     atualizado_em: new Date().toISOString(),
   }, { onConflict: 'email' });
   if (error) {
     const a = $('cfAviso');
-    a.textContent = 'Não consegui salvar: ' + error.message;
+    a.textContent = erroDeLogin(error) || ('Não consegui salvar: ' + error.message);
     a.hidden = false;
     return false;
   }
   $('cfAviso').hidden = true;
   return true;
+}
+
+/* O banco é quem garante que não existem dois logins iguais e que o formato
+   está certo. Aqui só traduzimos o que ele reclama. */
+function erroDeLogin(error) {
+  const m = String(error?.message || '');
+  if (/app_usuarios_usuario_unico|duplicate key/i.test(m)) {
+    return 'Esse login já é de outra pessoa. Escolha outro.';
+  }
+  if (/app_usuarios_usuario_formato|violates check constraint/i.test(m)) {
+    return 'Login inválido: use de 3 a 30 caracteres, só letras, números, '
+      + 'ponto, traço ou sublinhado — sem espaço e sem acento.';
+  }
+  return null;
 }
 
 /* Cria o login de verdade (Supabase Auth) e o acesso, de uma vez.
@@ -337,7 +355,8 @@ async function criarLogin(u) {
     if (data?.erro) throw new Error(data.erro);
 
     const i = usuarios.findIndex(x => x.email === u.email);
-    const linha = { email: u.email, nome: u.nome, admin: !!u.admin,
+    const linha = { email: u.email, nome: u.nome, usuario: u.usuario || null,
+                    admin: !!u.admin,
                     modulos: u.modulos || [], telas: u.telas || [] };
     if (i >= 0) usuarios[i] = linha; else usuarios.push(linha);
     usuarios.sort((a, b) => a.email.localeCompare(b.email));
@@ -376,7 +395,8 @@ async function criarLogin(u) {
 function abrirUsuario(email) {
   const u = email ? usuarios.find(x => x.email === email) : null;
   editando = u ? { ...u, telas: [...(u.telas || [])], novo: false }
-                : { email: '', nome: '', admin: false, modulos: [...PADRAO], telas: [], novo: true };
+                : { email: '', nome: '', usuario: '', admin: false,
+                    modulos: [...PADRAO], telas: [], novo: true };
   $('usSenha').hidden = true;
   $('usSenha').className = 'us-senha';
   $('usSenha').innerHTML = '';
@@ -385,6 +405,7 @@ function abrirUsuario(email) {
   $('usEmail').value = editando.email || '';
   $('usEmail').disabled = !!u;
   $('usNome').value = editando.nome || '';
+  $('usUsuario').value = editando.usuario || '';
   $('bApagarUsuario').hidden = !u || (u.email || '').toLowerCase() === acesso.email;
   $('bNovaSenha').hidden = !u;
   desenharPermissoes();
@@ -454,7 +475,25 @@ export function ligarAcesso() {
     if (!editando) return;
     const email = $('usEmail').value.trim().toLowerCase();
     if (!email) return;
+
+    const usuario = $('usUsuario').value.trim().toLowerCase();
+    if (usuario && !/^[a-z0-9._-]{3,30}$/.test(usuario)) {
+      const a = $('cfAviso');
+      a.textContent = 'Login inválido: use de 3 a 30 caracteres, só letras, '
+        + 'números, ponto, traço ou sublinhado — sem espaço e sem acento.';
+      a.hidden = false;
+      return;
+    }
+    // conferência amigável antes de bater no banco; a garantia de verdade é o índice único
+    if (usuario && usuarios.some(x => (x.usuario || '') === usuario && x.email !== email)) {
+      const a = $('cfAviso');
+      a.textContent = 'Esse login já é de outra pessoa. Escolha outro.';
+      a.hidden = false;
+      return;
+    }
+
     const u = { ...editando, email, nome: $('usNome').value.trim(),
+                 usuario: usuario || null,
                  modulos: editando.modulos || [], telas: editando.telas || [] };
 
     if (editando.novo) {

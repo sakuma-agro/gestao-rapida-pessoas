@@ -135,20 +135,21 @@ $('bVoltarLogin').addEventListener('click', () => painelEsqueci(false));
 
 $('formEsqueci').addEventListener('submit', async ev => {
   ev.preventDefault();
-  const email = $('recEmail').value.trim();
+  const quem = $('recEmail').value.trim();
   const erro = $('erroLogin'); erro.hidden = true;
-  if (!email) return;
+  if (!quem) return;
 
   const botao = $('bEnviarLink');
   botao.disabled = true; botao.textContent = 'Enviando...';
   try {
-    await db.pedirRecuperacao(email);
-    // De propósito não dizemos se o e-mail existe ou não: isso evita que
-    // alguém descubra quem tem acesso ao app só testando endereços.
+    await db.pedirRecuperacao(quem);
+    // De propósito não dizemos se existe ou não: isso evita que alguém
+    // descubra quem tem acesso ao app só testando nomes e endereços.
     $('formEsqueci').innerHTML = `
       <p class="sub" style="text-align:left">
-        Se esse e-mail tiver login no app, a mensagem com o link já está a caminho.
-        O link vale por 1 hora. Confira também a caixa de spam.
+        Se esse login existir no app, a mensagem com o link já está a caminho
+        do e-mail cadastrado. O link vale por 1 hora. Confira também a caixa
+        de spam.
       </p>
       <div class="barra fim">
         <button class="btn principal" type="button" id="bVoltarDepois">Voltar ao login</button>
@@ -193,7 +194,7 @@ $('formNovaSenha').addEventListener('submit', async ev => {
 
 function traduzirErro(e) {
   const m = String(e?.message || e || '');
-  if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha incorretos.';
+  if (/Invalid login credentials/i.test(m)) return 'Usuário ou senha incorretos.';
   if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado. Confirme no painel do Supabase.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o Supabase. Verifique a internet ou a URL do projeto.';
   /* 504/502/503 e "timeout" querem dizer sempre a mesma coisa aqui: o servidor

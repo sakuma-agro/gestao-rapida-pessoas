@@ -46,10 +46,38 @@ const gravar = (chave, valor) => {
 };
 
 /* ---------------- conexão ---------------- */
+/* A sessão fica em `sessionStorage`, não em `localStorage`: ela morre quando
+   a janela do app fecha. Foi pedido — computador desligado tem de voltar
+   pedindo senha. O preço é entrar de novo toda vez que fechar o navegador;
+   o cache dos dados continua em localStorage, então a abertura é rápida.
+   Onde sessionStorage não existir (modo estranho de navegador), o login
+   simplesmente não é guardado, que é o lado seguro do erro. */
+const guardaDaSessao = () => {
+  try {
+    sessionStorage.setItem('gr.teste', '1');
+    sessionStorage.removeItem('gr.teste');
+    return sessionStorage;
+  } catch { return undefined; }
+};
+
+/* A sessão morava em localStorage sob 'epi.auth'. Mudou de lugar, mas a
+   antiga ficaria lá para sempre — um token de acesso esquecido no navegador é
+   exatamente o que esta mudança quis eliminar. Então some com ela na primeira
+   abertura. */
+function limparSessaoAntiga() {
+  try { localStorage.removeItem('epi.auth'); } catch {}
+}
+
 function criarCliente() {
   if (!window.supabase) return null;
+  limparSessaoAntiga();
   estado.cliente = window.supabase.createClient(CONEXAO.url, CONEXAO.chave, {
-    auth: { persistSession: true, autoRefreshToken: true, storageKey: 'epi.auth' },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      storageKey: 'gr.auth',
+      storage: guardaDaSessao(),
+    },
   });
   return estado.cliente;
 }
@@ -66,11 +94,37 @@ export async function iniciar() {
   return estado.sessao ? { etapa: 'app' } : { etapa: 'login' };
 }
 
-export async function entrar(email, senha) {
-  const { data, error } = await estado.cliente.auth.signInWithPassword({ email, password: senha });
-  if (error) throw error;
-  estado.sessao = data.session;
-  return data;
+const pareceEmail = v => /@/.test(String(v || ''));
+
+/* Entra pelo nome de login ou pelo e-mail — os dois servem.
+   Com e-mail, é o caminho direto do Supabase. Com nome, quem traduz é a
+   função 'entrar' no servidor: a tabela que liga nome e e-mail só é legível
+   para quem já está logado, e o e-mail de ninguém pode vazar para quem chuta
+   nomes. Por isso ela devolve a sessão pronta, não o e-mail. */
+export async function entrar(login, senha) {
+  const quem = String(login || '').trim();
+
+  if (pareceEmail(quem)) {
+    const { data, error } = await estado.cliente.auth
+      .signInWithPassword({ email: quem.toLowerCase(), password: senha });
+    if (error) throw error;
+    estado.sessao = data.session;
+    return data;
+  }
+
+  const { data, error } = await estado.cliente.functions.invoke('entrar', {
+    body: { usuario: quem.toLowerCase(), senha },
+  });
+  if (error && !data?.erro) throw new Error('Não consegui falar com o servidor de login.');
+  if (data?.erro) throw new Error(data.erro);
+
+  const { data: sessao, error: erroSessao } = await estado.cliente.auth.setSession({
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+  });
+  if (erroSessao) throw erroSessao;
+  estado.sessao = sessao.session;
+  return sessao;
 }
 
 export async function sair() {
@@ -82,12 +136,26 @@ export async function sair() {
 /* Esqueci minha senha: manda o e-mail com o link de recuperação.
    O link volta para o próprio app, com um endereço que precisa estar
    liberado no Supabase (Authentication → URL Configuration). */
-export async function pedirRecuperacao(email) {
+export async function pedirRecuperacao(login) {
   // sempre a pasta do app, nunca ".../index.html": é um endereço só para
   // liberar na lista do Supabase (Authentication → URL Configuration)
   const volta = location.origin + location.pathname.replace(/index\.html$/, '');
-  const { error } = await estado.cliente.auth.resetPasswordForEmail(email, { redirectTo: volta });
-  if (error) throw error;
+  const quem = String(login || '').trim();
+
+  if (pareceEmail(quem)) {
+    const { error } = await estado.cliente.auth
+      .resetPasswordForEmail(quem.toLowerCase(), { redirectTo: volta });
+    if (error) throw error;
+    return;
+  }
+
+  /* Pelo nome, quem sabe o e-mail é o servidor. Ele responde "ok" ache ou
+     não ache — a tela já diz "se existir, a mensagem está a caminho", e
+     assim ninguém descobre quais logins existem. */
+  const { data, error } = await estado.cliente.functions.invoke('entrar', {
+    body: { acao: 'recuperar', usuario: quem.toLowerCase(), volta },
+  });
+  if (error && !data?.ok) throw new Error('Não consegui falar com o servidor de login.');
 }
 
 /* Grava a senha nova. Só funciona com a sessão temporária que vem do link. */
