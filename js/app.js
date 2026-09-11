@@ -192,18 +192,25 @@ function traduzirErro(e) {
 }
 
 /* =============== carga =============== */
+/* A ordem aqui importa: o menu sobe ANTES das telas.
+   Ele é o esqueleto do app — se uma tela tropeça no meio do caminho, a pessoa
+   ainda tem por onde andar, e o tropeço aparece no aviso do topo. Antes, um
+   erro em qualquer preparação deixava a pessoa presa na tela de entrada, sem
+   menu e sem explicação, porque a tela de entrada é a visível por padrão. */
 async function carregarTudo() {
-  const aviso = $('avisoGlobal');
+  const recado = [];
+
   try {
     await db.sincronizar();
-    aviso.hidden = true;
   } catch (e) {
-    aviso.textContent = 'Usando os dados salvos neste aparelho. ' + traduzirErro(e);
-    aviso.hidden = false;
+    recado.push('Usando os dados salvos neste aparelho. ' + traduzirErro(e));
   }
-  preencherControles();
-  desenharSelecao();
-  await carregarAcesso();
+
+  try {
+    await carregarAcesso();
+  } catch (e) {
+    recado.push('Não consegui ler suas permissões: ' + (e.message || e));
+  }
 
   /* Os cadastros do DP (unidade, setor, função, jornada) alimentam as listas
      do cadastro de funcionário. Carrega aqui para elas estarem prontas mesmo
@@ -213,6 +220,17 @@ async function carregarTudo() {
   }
 
   montarMenu(abrirAba);
+
+  try {
+    preencherControles();
+    desenharSelecao();
+  } catch (e) {
+    recado.push('A tela de fichas não montou por inteiro: ' + (e.message || e));
+  }
+
+  const aviso = $('avisoGlobal');
+  aviso.innerHTML = recado.map(esc).join('<br>');
+  aviso.hidden = !recado.length;
 }
 
 function preencherControles() {
