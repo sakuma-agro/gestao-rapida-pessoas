@@ -786,8 +786,13 @@
           <label class="campo">Jornada <input type="text" id="ppJornada"></label>
           <label class="campo">Local de trabalho <input type="text" id="ppLocal"></label>
           <label class="campo plena">Período de experiência <input type="text" id="ppExperiencia"></label>
+          <label class="campo plena" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:13px">
+            <span><input type="checkbox" id="ppMorador" style="width:auto;margin-right:6px">
+            Mora na fazenda — acrescenta moradia, internet e a folga de compras</span>
+          </label>
           <label class="campo plena">Benefícios (um por linha)
-            <textarea id="ppBeneficios" rows="4"></textarea>
+            <textarea id="ppBeneficios" rows="5"></textarea>
+            <small class="dc-sem">Marcar ou desmarcar "mora na fazenda" remonta esta lista pelo padrão.</small>
           </label>
           <label class="campo plena">Observação (sai numa caixa na proposta)
             <textarea id="ppObs" rows="2"></textarea>
@@ -1051,6 +1056,18 @@
     <div class="grade larga">
       <label class="campo plena">Título <input type="text" id="rmTitulo"></label>
       <label class="campo plena">Abertura <textarea id="rmAbertura" rows="3"></textarea></label>
+      <label class="campo plena">Benefícios de todo mundo (um por linha)
+        <textarea id="rmBeneficios" rows="4"></textarea>
+      </label>
+      <label class="campo plena">Benefícios de quem mora na fazenda (um por linha)
+        <textarea id="rmBeneficiosMorador" rows="4"></textarea>
+      </label>
+      <label class="campo plena">Observações da proposta (uma por linha)
+        <textarea id="rmObservacoes" rows="3"></textarea>
+      </label>
+      <label class="campo">Jornada <input type="text" id="rmJornada"></label>
+      <label class="campo">Local de trabalho <input type="text" id="rmLocal"></label>
+      <label class="campo plena">Período de experiência <input type="text" id="rmExperiencia"></label>
       <label class="campo plena">Fechamento <textarea id="rmFechamento" rows="3"></textarea></label>
       <label class="campo plena">Regras das faixas (uma por linha)
         <textarea id="rmRegras" rows="6"></textarea>
