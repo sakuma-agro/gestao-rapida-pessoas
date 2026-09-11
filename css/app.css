@@ -195,9 +195,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .aso-quadro th,.aso-quadro td{border:1px solid #cfd4c6}
 .aso-guia td{height:7mm}
 .aso-guia th:first-child,.aso-quadro th:first-child{color:#fff}
-.aso-quadro th{font-size:8pt;vertical-align:bottom}
-.aso-quadro td{font-size:9pt}
-.aso-quadro td:first-child{white-space:nowrap}
+/* o quadro é a única tabela que NÃO tem largura fixa: são N colunas de exame,
+   e é a largura do nome de cada um que manda. Em fixo eles se atropelavam.
+   Precisa dos dois nomes: `.an-tab{table-layout:fixed}` vem depois no arquivo
+   e ganharia de `.aso-quadro` sozinho. */
+.an-tab.aso-quadro{table-layout:auto}
+/* quebra no espaço, nunca no meio da palavra — "Colineste/rase" não se lê */
+.aso-quadro th{font-size:7.5pt;vertical-align:bottom;line-height:1.2;
+  padding:2.5mm 1.5mm;white-space:normal;word-break:normal;overflow-wrap:normal}
+.aso-quadro th:first-child,.aso-quadro th:last-child{white-space:nowrap}
+.aso-quadro td{font-size:9pt;padding:2mm 1.5mm}
+/* o nome da função não pode ser cortado com "..." como nas outras folhas:
+   aqui ele é a chave da linha. `overflow:visible` desliga a reticência que
+   vem de .an-tab td. */
+.aso-quadro td:first-child{white-space:nowrap;width:1%;overflow:visible;text-overflow:clip}
 .aso-nota{margin-top:5mm;font-size:9pt;color:#5e6657;border-left:3px solid var(--verde);padding-left:3mm}
 .aso-assinaturas{display:flex;gap:14mm;margin-top:14mm}
 .aso-assinaturas div{flex:1;text-align:center}
@@ -342,6 +353,9 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .previa-lista{margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:22px}
 .previa-lista:empty::after{content:"Marque quem vai assinar para ver a lista aqui.";
   color:var(--suave);font-size:13px}
+/* folha deitada é mais larga que a tela em monitor pequeno: rola em vez de
+   ser cortada pela esquerda (o que `align-items:center` faria) */
+.previa-lista{overflow-x:auto;align-items:safe center}
 
 /* =========================================================
    ANIVERSARIANTES — folha A4 no padrão SAKUMA
@@ -349,6 +363,10 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .an-folha{position:relative;width:210mm;height:296.8mm;overflow:hidden;background:#fff;color:#51534A;
   box-shadow:0 4px 20px rgba(0,0,0,.16);padding:14mm 10mm 12mm;
   font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column}
+/* A4 deitado, para a folha que tem coluna demais (o quadro de exames por
+   função). O `page:` nomeado é o que faz o Chrome virar só esta folha; o resto
+   do documento continua em pé. */
+.an-folha.deitada{width:296.8mm;height:210mm;page:paisagem}
 .an-topo{display:flex;align-items:center;gap:8mm;border-bottom:1.2mm solid #84BD00;padding-bottom:5mm}
 .an-topo img{height:24mm;width:auto;display:block}
 .an-tit h1{margin:0;font-size:17pt;font-weight:bold;color:#744F28;letter-spacing:.4pt}
@@ -524,6 +542,8 @@ dialog h3{margin:0 0 14px;font-size:16px}
    margem da propria ficha (--imp-margem), e a ficha e ampliada
    (--imp-escala) para ocupar a largura util do A4. */
 @page{size:A4 portrait;margin:0}
+/* A folha marcada com `.deitada` sai em paisagem; o resto continua em pé. */
+@page paisagem{size:A4 landscape;margin:0}
 @media print{
   :root{--imp-margem:4mm;--imp-escala:1.11}
   body{background:#fff}
