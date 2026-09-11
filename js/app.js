@@ -1079,10 +1079,41 @@ if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
-/* arranque */
-ligarDisc(); ligarAcesso(); ligarJornada(abrirAba); ligarSst(mostrarAviso);
-ligarRh(mostrarAviso, desenharFuncionarios);
-ligarAso();
+/* arranque
+   Cada ligação vai isolada. Se uma tela tiver um botão faltando — acontece
+   quando o navegador serve um index.html velho junto com um js novo — o resto
+   do app ainda sobe. Antes, um erro em qualquer uma delas derrubava o arranque
+   inteiro e a pessoa via uma página em branco, sem uma palavra escrita. */
+const falhasAoLigar = [];
+function ligar(nome, fn) {
+  try { fn(); }
+  catch (e) {
+    falhasAoLigar.push(`${nome}: ${e.message || e}`);
+    console.error('[Gestão Rápida] falhou ao ligar', nome, e);
+  }
+}
+
+ligar('DISC', ligarDisc);
+ligar('acesso', ligarAcesso);
+ligar('DP', () => ligarJornada(abrirAba));
+ligar('SST', () => ligarSst(mostrarAviso));
+ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
+ligar('exames por função', ligarAso);
+
+/** Nunca deixe a tela vazia: se nem o login der para montar, escreva o motivo. */
+function telaDeSocorro(texto) {
+  document.body.innerHTML =
+    `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;
+       font-family:Arial,Helvetica,sans-serif;color:#51534A;padding:24px">
+      <div style="max-width:420px;text-align:center">
+        <h1 style="font-size:19px;color:#744F28;margin:0 0 10px">O app não conseguiu abrir</h1>
+        <p style="font-size:14px;line-height:1.6;margin:0 0 18px">${esc(texto)}</p>
+        <p style="font-size:13px;color:#7d8175;line-height:1.6">
+          Tente recarregar a página. Se continuar, avise o Guilherme com este recado.</p>
+      </div>
+    </div>`;
+}
+
 (async () => {
   /* O link do e-mail volta com #type=recovery. O Supabase consome esse
      pedaço do endereço ao iniciar, então é preciso olhar antes. */
@@ -1090,7 +1121,17 @@ ligarAso();
   const recuperando = /type=recovery/.test(marca);
   const linkRuim = /error=|error_code=/.test(marca);
 
-  const r = await db.iniciar();
+  /* Com o token vencido, o supabase-js tenta renovar antes de responder — e se
+     o servidor estiver lento ou pausado essa chamada fica pendurada. Como nada
+     é mostrado antes dela, a pessoa fica olhando uma página vazia. Então: 12
+     segundos e cai no login com o recado. Se o banco acordar depois, o app
+     entra sozinho. */
+  let demorou = false;
+  const arranque = db.iniciar();
+  const r = await Promise.race([
+    arranque,
+    new Promise(ok => setTimeout(() => { demorou = true; ok({ etapa: 'login' }); }, 12000)),
+  ]);
 
   if (linkRuim) {
     history.replaceState(null, '', location.pathname);
@@ -1112,5 +1153,24 @@ ligarAso();
   }
 
   mostrar(r.etapa);
+
+  if (demorou) {
+    const erro = $('erroLogin');
+    erro.textContent = 'O servidor está demorando para responder. Pode ser o banco pausado — '
+      + 'espere um minuto e recarregue.';
+    erro.hidden = false;
+    arranque.then(x => { if (x?.etapa === 'app') { mostrar('app'); carregarTudo(); } }).catch(() => {});
+    return;
+  }
+
   if (r.etapa === 'app') await carregarTudo();
-})();
+
+  if (falhasAoLigar.length) {
+    const aviso = $('avisoGlobal');
+    aviso.innerHTML = 'Uma parte do app não carregou:<br>' + falhasAoLigar.map(esc).join('<br>');
+    aviso.hidden = false;
+  }
+})().catch(e => {
+  console.error('[Gestão Rápida] o arranque parou', e);
+  telaDeSocorro(e.message || String(e));
+});
