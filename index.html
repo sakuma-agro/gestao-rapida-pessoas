@@ -230,6 +230,132 @@
       </div>
     </section>
 
+    <!-- ---- TERMO DE LIBERDADE SINDICAL ---- -->
+    <section class="tela" id="telaTermoSindical" hidden>
+      <div class="cartao naoimprimir">
+        <h2>Termo de liberdade sindical</h2>
+        <p class="dica">Escolha a pessoa: nome, CPF, função, empregador e endereço da fazenda
+          vêm do cadastro. Uma folha por funcionário, para assinar à mão.</p>
+        <div class="grade larga">
+          <label class="campo plena">Funcionário
+            <select id="tmSinFunc"></select>
+          </label>
+        </div>
+        <div class="aviso info" id="tmSinAviso" hidden></div>
+      </div>
+
+      <details class="cartao naoimprimir fu-bloco">
+        <summary>Texto do termo</summary>
+        <form id="formTmSindical">
+          <p class="dica">Fica salvo no banco e vale para os dois usuários.
+            Entre chaves: <code>{NOME}</code>, <code>{CPF}</code>, <code>{FUNCAO}</code>,
+            <code>{EMPREGADOR}</code>, <code>{FAZENDA}</code>, <code>{ENDERECO}</code>,
+            <code>{SINDICATO}</code> — cada um é trocado pelo dado da pessoa na hora de imprimir.</p>
+          <div class="grade larga">
+            <label class="campo plena">Título
+              <input type="text" id="tmSinTitulo">
+            </label>
+            <label class="campo plena">Abertura
+              <textarea id="tmSinAbertura" rows="3"></textarea>
+            </label>
+            <label class="campo plena">Cláusulas <span class="dc-sem">(uma por linha; comece com "- " para recuar)</span>
+              <textarea id="tmSinItens" rows="14"></textarea>
+            </label>
+            <label class="campo plena">Fecho
+              <textarea id="tmSinFecho" rows="2"></textarea>
+            </label>
+            <label class="campo plena">Sindicato
+              <input type="text" id="tmSinSindicato">
+            </label>
+            <label class="campo">Telefone do sindicato
+              <input type="text" id="tmSinTelefone">
+            </label>
+            <label class="campo">E-mail do sindicato
+              <input type="text" id="tmSinEmail">
+            </label>
+            <label class="campo plena">Título da ciência
+              <input type="text" id="tmSinCienciaTitulo">
+            </label>
+            <label class="campo plena">Texto da ciência
+              <textarea id="tmSinCiencia" rows="2"></textarea>
+            </label>
+          </div>
+          <div class="barra">
+            <button class="btn principal" type="submit">Salvar texto</button>
+            <button class="btn" type="button" id="bRestaurarTmSindical">Restaurar original</button>
+          </div>
+        </form>
+      </details>
+
+      <div class="previa" id="tmSinSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirTmSindical">Imprimir termo</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomTmSin" min="50" max="150" value="80" step="5">
+          <span id="zoomTmSinV">80%</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- ---- TERMO DE RECEBIMENTO DO CONTRATO ---- -->
+    <section class="tela" id="telaTermoContrato" hidden>
+      <div class="cartao naoimprimir">
+        <h2>Recebimento da segunda via do contrato</h2>
+        <p class="dica">Sem data preenchida, a folha sai com a linha em branco para escrever à mão.</p>
+        <div class="grade larga">
+          <label class="campo plena">Funcionário
+            <select id="tmConFunc"></select>
+          </label>
+          <label class="campo">Data da entrega <span class="dc-sem">(opcional)</span>
+            <input type="date" id="tmConData">
+          </label>
+        </div>
+        <div class="aviso info" id="tmConAviso" hidden></div>
+      </div>
+
+      <details class="cartao naoimprimir fu-bloco">
+        <summary>Texto do termo</summary>
+        <form id="formTmContrato">
+          <p class="dica">Entre chaves: <code>{NOME}</code>, <code>{CPF}</code>,
+            <code>{EMPREGADOR}</code>, <code>{FAZENDA}</code> — trocados pelo dado da pessoa.</p>
+          <div class="grade larga">
+            <label class="campo plena">Título
+              <input type="text" id="tmConTitulo">
+            </label>
+            <label class="campo plena">Corpo
+              <textarea id="tmConCorpo" rows="4"></textarea>
+            </label>
+            <label class="campo plena">Ciência
+              <textarea id="tmConCiencia" rows="2"></textarea>
+            </label>
+            <label class="campo plena">Fecho
+              <textarea id="tmConFecho" rows="2"></textarea>
+            </label>
+            <label class="campo">Local
+              <input type="text" id="tmConLocal">
+            </label>
+          </div>
+          <div class="barra">
+            <button class="btn principal" type="submit">Salvar texto</button>
+            <button class="btn" type="button" id="bRestaurarTmContrato">Restaurar original</button>
+          </div>
+        </form>
+      </details>
+
+      <div class="previa" id="tmConSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirTmContrato">Imprimir termo</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomTmCon" min="50" max="150" value="80" step="5">
+          <span id="zoomTmConV">80%</span>
+        </span>
+      </div>
+    </section>
+
     <!-- ---- FUNCIONÁRIOS ---- -->
     <section class="tela" id="telaFuncionarios" hidden>
       <div class="cartao">
