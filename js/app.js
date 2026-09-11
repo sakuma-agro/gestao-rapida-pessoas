@@ -5,11 +5,12 @@ import { montarFicha, linhaVazia, MESES, TRACO } from './ficha.js';
 import { montarLista, listaAtual, LISTA_PADRAO } from './lista.js';
 import { lerFuncionarios, comparar, aplicarEm } from './planilha.js';
 import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, linkWhatsapp,
-  imagemAniversarios, nomeImagem } from './aniversarios.js';
+  imagemAniversarios, nomeImagem, marcaDe } from './aniversarios.js';
 import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { desenharCadastros } from './jornada-cadastros.js';
-import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso } from './acesso.js';
+import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
+  mostrarInicio } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { ligarSst, abrirSst, limparSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
@@ -99,6 +100,12 @@ $('formLogin').addEventListener('submit', async ev => {
   } finally {
     botao.disabled = false; botao.textContent = 'Entrar';
   }
+});
+
+/* O nome do app no alto volta para a tela de marca e desmarca o módulo —
+   é o mesmo gesto de clicar no logotipo de um site. */
+$('bInicio').addEventListener('click', () => {
+  if (!$('app').hidden) mostrarInicio();
 });
 
 $('btnSair').addEventListener('click', async () => {
@@ -874,25 +881,28 @@ function mostrarAviso(texto) {
 function listaAniversarios() {
   const mes = +$('anMes').value;
   const soAtivos = $('anSit').value === 'ativos';
-  return { mes, ano: +$('anAno').value || new Date().getFullYear(), soAtivos,
-    gente: aniversariantes(estado.funcionarios, mes, soAtivos) };
+  // os empregadores entram na mesma folha quando têm data de nascimento
+  const patroes = jd.dados.empregadores || [];
+  return { mes, ano: +$('anAno').value || new Date().getFullYear(), soAtivos, patroes,
+    gente: aniversariantes(estado.funcionarios, mes, soAtivos, patroes) };
 }
 
 function atualizarAniversarios() {
-  const { mes, ano, soAtivos, gente } = listaAniversarios();
+  const { mes, ano, soAtivos, gente, patroes } = listaAniversarios();
 
   $('anLista').innerHTML = gente.length ? gente.map(a => `
     <div class="item" style="grid-template-columns:auto 1fr">
       <span class="tag ativo">dia ${String(a.dia).padStart(2, '0')}</span>
-      <span class="nome">${esc(a.nome)}${a.apelido ? ' (' + esc(a.apelido) + ')' : ''}</span>
+      <span class="nome">${esc(a.nome)}${marcaDe(a) ? ' (' + esc(marcaDe(a)) + ')' : ''}</span>
     </div>`).join('')
     : '<div class="vazio">Ninguém faz aniversário neste mês.</div>';
 
-  const faltando = semNascimento(estado.funcionarios, soAtivos);
+  const faltando = semNascimento(estado.funcionarios, soAtivos, patroes);
   const aviso = $('anAviso');
   if (faltando) {
-    aviso.textContent = `${faltando} pessoa(s) ainda estão sem data de nascimento no cadastro — ` +
-      'importe a planilha ou preencha na aba Funcionários para aparecerem aqui.';
+    aviso.textContent = `${faltando} pessoa(s) ainda estão sem data de nascimento no cadastro — `
+      + 'preencha em Cadastros › Funcionários (ou em Empregador e fazenda, no caso dos '
+      + 'empregadores) para aparecerem aqui.';
     aviso.hidden = false;
   } else aviso.hidden = true;
 

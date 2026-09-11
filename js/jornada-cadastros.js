@@ -22,18 +22,21 @@ const porNome = (a, b) => String(a.nome || '').localeCompare(String(b.nome || ''
 const CADASTROS = {
   empregadores: {
     titulo: 'Empregadores',
-    dica: 'Quem assina a carteira. O CPF é o do empregador rural.',
+    dica: 'Quem assina a carteira. O CPF é o do empregador rural. '
+      + 'Com a data de nascimento, ele também sai na folha de aniversariantes.',
     singular: 'empregador',
     novo: 'Novo empregador',
-    colunas: ['Empregador', 'CPF', 'Unidades'],
+    colunas: ['Empregador', 'CPF', 'Nascimento', 'Unidades'],
     linha: e => [
       `<b>${esc(e.nome)}</b>`,
       esc(cpfBr(e.cpf)),
+      esc(dataBr(e.nascimento)),
       String(jd.dados.unidades.filter(u => u.empregador_id === e.id).length),
     ],
     campos: [
       { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
       { k: 'cpf', rotulo: 'CPF', t: 't' },
+      { k: 'nascimento', rotulo: 'Data de nascimento', t: 'd' },
     ],
   },
 
@@ -140,6 +143,11 @@ const cpfBr = c => {
   return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : (c || '—');
 };
 
+const dataBr = iso => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
+};
+
 /* =============== desenho =============== */
 let editando = null;      // { chave, item }
 let aoSalvar = () => {};
@@ -206,7 +214,7 @@ function abrir(chave, id) {
         </select></label>`;
     }
     return `<label class="campo${f.plena ? ' plena' : ''}">${esc(f.rotulo)}
-      <input type="text" data-campo="${f.k}" value="${esc(v)}"></label>`;
+      <input type="${f.t === 'd' ? 'date' : 'text'}" data-campo="${f.k}" value="${esc(v)}"></label>`;
   }).join('') + `
     <label class="campo">Situação
       <select data-campo="ativo">

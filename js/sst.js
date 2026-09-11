@@ -5,7 +5,7 @@
 // calculada pelo tipo. Por isso quase tudo aqui é escrito uma vez só e recebe
 // a "receita" do exame ou do treinamento em RECEITAS.
 import { estado } from './store.js';
-import { LOGO } from './seed.js';
+import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
   conferenciaDo } from './aso.js';
 import { abrirModulo } from './acesso.js';
@@ -537,7 +537,7 @@ function atualizarVencimento(r, forcar) {
 }
 
 /* =============== folha para imprimir =============== */
-const POR_FOLHA = 20;
+const POR_FOLHA = 13;
 
 function montarFolhas(r, linhas) {
   if (!linhas.length) return '';
@@ -579,6 +579,7 @@ function montarFolhas(r, linhas) {
         <span>${linhas.length} lançamento(s)</span>
         <span>${total > 1 ? `folha ${p + 1} de ${total}` : ''}</span>
       </div>
+      ${PE_LOP}
     </div>`);
   }
   return folhas.join('');
@@ -630,6 +631,7 @@ function folhaPainel(r, urgentes, faltando) {
         <span>${urgentes.length} lançamento(s) a vencer</span>
         <span>${total > 1 ? `folha ${p + 1} de ${total}` : ''}</span>
       </div>
+      ${PE_LOP}
     </div>`);
   }
   return folhas.join('');

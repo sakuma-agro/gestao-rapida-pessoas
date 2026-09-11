@@ -1,6 +1,6 @@
 // aniversarios.js — folha de aniversariantes do mês, em A4 retrato, no padrão
 // visual da SAKUMA (verde #84BD00, marrom #744F28, cinza #51534A, Arial).
-import { LOGO } from './seed.js';
+import { LOGO, PE_LOP } from './seed.js';
 import { MESES } from './ficha.js';
 
 // 15 cabem na folha junto com o recado de parabéns (que sai na última).
@@ -19,14 +19,26 @@ const partes = iso => {
   return m ? { ano: +m[1], mes: +m[2] - 1, dia: +m[3] } : null;
 };
 
+/* O empregador não é funcionário — vem de outra tabela e usa `ativo` em vez de
+   `situacao`. Aqui ele é traduzido para o mesmo formato, com o papel marcado
+   para sair identificado na folha e no WhatsApp. */
+const comoPessoa = e => ({
+  id: e.id,
+  nome: e.nome,
+  nascimento: e.nascimento,
+  situacao: e.ativo === false ? 'INATIVO' : 'ATIVO',
+  papel: 'Empregador',
+});
+
 /**
  * Aniversariantes de um mês, em ordem de dia.
  * @param {Array} funcionarios  lista do cadastro
  * @param {number} mes          0 a 11
  * @param {boolean} soAtivos
+ * @param {Array} empregadores  entram na mesma folha, marcados como empregador
  */
-export function aniversariantes(funcionarios, mes, soAtivos = true) {
-  return funcionarios
+export function aniversariantes(funcionarios, mes, soAtivos = true, empregadores = []) {
+  return [...funcionarios, ...empregadores.map(comoPessoa)]
     .filter(f => (!soAtivos || f.situacao === 'ATIVO'))
     .map(f => ({ f, p: partes(f.nascimento) }))
     .filter(x => x.p && x.p.mes === mes)
@@ -35,8 +47,12 @@ export function aniversariantes(funcionarios, mes, soAtivos = true) {
 }
 
 /** Quantos do cadastro ainda estão sem data de nascimento. */
-export const semNascimento = (funcionarios, soAtivos = true) =>
-  funcionarios.filter(f => (!soAtivos || f.situacao === 'ATIVO') && !partes(f.nascimento)).length;
+export const semNascimento = (funcionarios, soAtivos = true, empregadores = []) =>
+  [...funcionarios, ...empregadores.map(comoPessoa)]
+    .filter(f => (!soAtivos || f.situacao === 'ATIVO') && !partes(f.nascimento)).length;
+
+/** O que vem entre parênteses depois do nome: apelido ou papel. */
+export const marcaDe = a => a.apelido || a.papel || '';
 
 /* ---------------- folha impressa ---------------- */
 export function montarAniversarios(lista, mes, ano) {
@@ -49,7 +65,7 @@ export function montarAniversarios(lista, mes, ano) {
     const linhas = fatia.length
       ? fatia.map(a => `<tr>
           <td class="an-dia">${String(a.dia).padStart(2, '0')}</td>
-          <td class="an-nome">${esc(a.nome)}${a.apelido ? ` <span class="an-apelido">(${esc(a.apelido)})</span>` : ''}</td>
+          <td class="an-nome">${esc(a.nome)}${marcaDe(a) ? ` <span class="an-apelido">(${esc(marcaDe(a))})</span>` : ''}</td>
         </tr>`).join('')
       : `<tr><td colspan="2" class="an-vazio">Nenhum aniversariante neste mês.</td></tr>`;
 
@@ -74,6 +90,7 @@ export function montarAniversarios(lista, mes, ano) {
         <span>${lista.length} aniversariante(s) em ${MESES[mes]}</span>
         <span>${total > 1 ? `folha ${p + 1} de ${total}` : ''}</span>
       </div>
+      ${PE_LOP}
     </div>`);
   }
   return folhas.join('');
@@ -86,7 +103,7 @@ export function textoWhatsapp(lista, mes, ano) {
   if (!lista.length) return `${cabeca}\n\nNinguém faz aniversário neste mês.`;
   const linhas = lista.map(a =>
     `${String(a.dia).padStart(2, '0')}/${String(mes + 1).padStart(2, '0')} - ` +
-    (a.apelido ? `${a.nome} (${a.apelido})` : a.nome));
+    (marcaDe(a) ? `${a.nome} (${marcaDe(a)})` : a.nome));
   return `${cabeca}\n\n${linhas.join('\n')}\n\n` +
     `*Feliz aniversário!* ${SAUDACAO}\n\nSAKUMA Agronegócios`;
 }
@@ -184,11 +201,11 @@ function desenhar(marca, lista, mes, ano) {
     g.fillStyle = CORES.cinza;
     g.font = 'bold 30px Arial, Helvetica, sans-serif';
     g.fillText(a.nome, m + 150, y + 48);
-    if (a.apelido) {
+    if (marcaDe(a)) {
       const larg = g.measureText(a.nome).width;
       g.fillStyle = CORES.suave;
       g.font = '30px Arial, Helvetica, sans-serif';
-      g.fillText(` (${a.apelido})`, m + 150 + larg, y + 48);
+      g.fillText(` (${marcaDe(a)})`, m + 150 + larg, y + 48);
     }
     y += hLin;
   });

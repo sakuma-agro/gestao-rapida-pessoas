@@ -8,7 +8,7 @@
 // A mesma lista alimenta dois papéis: a guia que o candidato leva na clínica e
 // o quadro geral de todas as funções, para conferir com o técnico.
 import { estado } from './store.js';
-import { LOGO } from './seed.js';
+import { LOGO, PE_LOP } from './seed.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -261,6 +261,7 @@ const folha = (titulo, subtitulo, corpo, pe, deitada) => `
     </div>
     ${corpo}
     <div class="an-pe"><span>${esc(pe || '')}</span><span>SAKUMA Agronegócios</span></div>
+    ${PE_LOP}
   </div>`;
 
 /** A guia que o candidato leva na clínica. */
