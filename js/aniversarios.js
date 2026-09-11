@@ -20,14 +20,14 @@ const partes = iso => {
 };
 
 /* O empregador não é funcionário — vem de outra tabela e usa `ativo` em vez de
-   `situacao`. Aqui ele é traduzido para o mesmo formato, com o papel marcado
-   para sair identificado na folha e no WhatsApp. */
+   `situacao`. Aqui ele é traduzido para o mesmo formato. O nome sai em
+   maiúsculas para ficar igual aos do cadastro de funcionários, e nada marca
+   que ele é empregador: na folha todo mundo é aniversariante do mês. */
 const comoPessoa = e => ({
   id: e.id,
-  nome: e.nome,
+  nome: String(e.nome || '').toUpperCase(),
   nascimento: e.nascimento,
   situacao: e.ativo === false ? 'INATIVO' : 'ATIVO',
-  papel: 'Empregador',
 });
 
 /**
@@ -35,7 +35,7 @@ const comoPessoa = e => ({
  * @param {Array} funcionarios  lista do cadastro
  * @param {number} mes          0 a 11
  * @param {boolean} soAtivos
- * @param {Array} empregadores  entram na mesma folha, marcados como empregador
+ * @param {Array} empregadores  entram na mesma folha, como todo mundo
  */
 export function aniversariantes(funcionarios, mes, soAtivos = true, empregadores = []) {
   return [...funcionarios, ...empregadores.map(comoPessoa)]
@@ -51,9 +51,6 @@ export const semNascimento = (funcionarios, soAtivos = true, empregadores = []) 
   [...funcionarios, ...empregadores.map(comoPessoa)]
     .filter(f => (!soAtivos || f.situacao === 'ATIVO') && !partes(f.nascimento)).length;
 
-/** O que vem entre parênteses depois do nome: apelido ou papel. */
-export const marcaDe = a => a.apelido || a.papel || '';
-
 /* ---------------- folha impressa ---------------- */
 export function montarAniversarios(lista, mes, ano) {
   const titulo = `ANIVERSARIANTES DE ${MESES[mes].toUpperCase()}`;
@@ -65,7 +62,7 @@ export function montarAniversarios(lista, mes, ano) {
     const linhas = fatia.length
       ? fatia.map(a => `<tr>
           <td class="an-dia">${String(a.dia).padStart(2, '0')}</td>
-          <td class="an-nome">${esc(a.nome)}${marcaDe(a) ? ` <span class="an-apelido">(${esc(marcaDe(a))})</span>` : ''}</td>
+          <td class="an-nome">${esc(a.nome)}${a.apelido ? ` <span class="an-apelido">(${esc(a.apelido)})</span>` : ''}</td>
         </tr>`).join('')
       : `<tr><td colspan="2" class="an-vazio">Nenhum aniversariante neste mês.</td></tr>`;
 
@@ -103,7 +100,7 @@ export function textoWhatsapp(lista, mes, ano) {
   if (!lista.length) return `${cabeca}\n\nNinguém faz aniversário neste mês.`;
   const linhas = lista.map(a =>
     `${String(a.dia).padStart(2, '0')}/${String(mes + 1).padStart(2, '0')} - ` +
-    (marcaDe(a) ? `${a.nome} (${marcaDe(a)})` : a.nome));
+    (a.apelido ? `${a.nome} (${a.apelido})` : a.nome));
   return `${cabeca}\n\n${linhas.join('\n')}\n\n` +
     `*Feliz aniversário!* ${SAUDACAO}\n\nSAKUMA Agronegócios`;
 }
@@ -201,11 +198,11 @@ function desenhar(marca, lista, mes, ano) {
     g.fillStyle = CORES.cinza;
     g.font = 'bold 30px Arial, Helvetica, sans-serif';
     g.fillText(a.nome, m + 150, y + 48);
-    if (marcaDe(a)) {
+    if (a.apelido) {
       const larg = g.measureText(a.nome).width;
       g.fillStyle = CORES.suave;
       g.font = '30px Arial, Helvetica, sans-serif';
-      g.fillText(` (${marcaDe(a)})`, m + 150 + larg, y + 48);
+      g.fillText(` (${a.apelido})`, m + 150 + larg, y + 48);
     }
     y += hLin;
   });

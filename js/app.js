@@ -5,7 +5,7 @@ import { montarFicha, linhaVazia, MESES, TRACO } from './ficha.js';
 import { montarLista, listaAtual, LISTA_PADRAO } from './lista.js';
 import { lerFuncionarios, comparar, aplicarEm } from './planilha.js';
 import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, linkWhatsapp,
-  imagemAniversarios, nomeImagem, marcaDe } from './aniversarios.js';
+  imagemAniversarios, nomeImagem } from './aniversarios.js';
 import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { desenharCadastros } from './jornada-cadastros.js';
@@ -893,7 +893,7 @@ function atualizarAniversarios() {
   $('anLista').innerHTML = gente.length ? gente.map(a => `
     <div class="item" style="grid-template-columns:auto 1fr">
       <span class="tag ativo">dia ${String(a.dia).padStart(2, '0')}</span>
-      <span class="nome">${esc(a.nome)}${marcaDe(a) ? ' (' + esc(marcaDe(a)) + ')' : ''}</span>
+      <span class="nome">${esc(a.nome)}${a.apelido ? ' (' + esc(a.apelido) + ')' : ''}</span>
     </div>`).join('')
     : '<div class="vazio">Ninguém faz aniversário neste mês.</div>';
 
