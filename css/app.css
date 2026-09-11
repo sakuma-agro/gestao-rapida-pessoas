@@ -151,6 +151,30 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .qp-bloco{margin-top:18px}
 .qp-bloco h3{margin:0 0 6px;font-size:13px;color:var(--marrom)}
 
+/* ---- painel de vencimentos do SST ----
+   Cada cartão é um botão: leva para a lista já filtrada naquela faixa.
+   A urgência entra pela faixa colorida da esquerda e pela cor do número. */
+.pv-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px}
+.pv-card{display:block;width:100%;text-align:left;font:inherit;cursor:pointer;
+  border:1px solid var(--linha);border-left:4px solid var(--linha);border-radius:10px;
+  padding:10px 12px;background:var(--fundo);color:inherit;transition:transform .08s}
+.pv-card:hover{transform:translateY(-1px);border-color:var(--verde)}
+.pv-card:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.pv-card span{display:block;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
+.pv-card strong{display:block;font-size:24px;line-height:1.2;margin-top:2px}
+.pv-card small{display:block;font-size:11px;color:var(--suave)}
+.pv-perigo{border-left-color:#c0392b} .pv-perigo strong{color:#a5342a}
+.pv-alerta{border-left-color:var(--alerta)} .pv-alerta strong{color:#8a5f00}
+.pv-atencao{border-left-color:var(--marrom)} .pv-atencao strong{color:var(--marrom)}
+.pv-calma{border-left-color:var(--verde)} .pv-calma strong{color:var(--verde-esc)}
+.pv-ok{border-left-color:var(--linha)} .pv-ok strong{color:var(--suave)}
+.pv-zero{opacity:.6}
+.pv-zero strong{color:var(--suave)}
+.pv-num-perigo{color:#a5342a;font-weight:700}
+.pv-num-alerta{color:#8a5f00;font-weight:700}
+.pv-num-atencao{color:var(--marrom);font-weight:700}
+.pv-num-calma{color:var(--verde-esc);font-weight:700}
+
 /* ---- exames por função e a conferência dentro do ASO ---- */
 .jor-cad{margin:0 0 22px}
 .jor-cad:last-child{margin-bottom:0}
@@ -600,3 +624,18 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
 .sst-folha-tab .ce{text-align:center}
 .sst-vencido{color:#a5342a;font-weight:bold}
 .sst-vencendo{color:#8a5f00;font-weight:bold}
+
+/* folha do painel de alerta. O Chrome imprime sem fundo colorido, então aqui
+   quem marca a faixa é a borda e a cor da letra — nunca background. */
+.pn-resumo{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-top:6mm}
+.pn-cx{border:.3mm solid #dfe2d8;border-left:1mm solid #51534A;border-radius:1.5mm;
+  padding:2.5mm 3mm;text-align:left}
+.pn-cx b{display:block;font-size:17pt;line-height:1.1}
+.pn-cx span{display:block;font-size:7pt;letter-spacing:.3pt;color:#51534A;margin-top:.6mm}
+.pn-perigo{border-left-color:#a5342a} .pn-perigo b,td.pn-perigo{color:#a5342a;font-weight:bold}
+.pn-alerta{border-left-color:#8a5f00} .pn-alerta b,td.pn-alerta{color:#8a5f00;font-weight:bold}
+.pn-atencao{border-left-color:#744F28} .pn-atencao b,td.pn-atencao{color:#744F28;font-weight:bold}
+.pn-calma{border-left-color:#84BD00} .pn-calma b,td.pn-calma{color:#51534A}
+.pn-obs{margin-top:5mm;font-size:9pt;line-height:1.5;color:#51534A;
+  border-top:.3mm solid #dfe2d8;padding-top:3mm}
+.pn-nada{margin-top:10mm;font-size:11pt;color:#51534A;text-align:center}
