@@ -27,11 +27,13 @@ export const MODULOS = [
       ['modelo', 'Modelo da ficha'],
     ] },
     { id: 'exames', nome: 'Exames', telas: [
+      ['exPainel', 'Painel'],
       ['exVenc', 'Vencimentos'],
       ['exFuncoes', 'Exames por função'],
       ['exTipos', 'Tipos e periodicidade'],
     ] },
     { id: 'treinamentos', nome: 'Treinamentos', telas: [
+      ['trPainel', 'Painel'],
       ['trVenc', 'Vencimentos'],
       ['trTipos', 'Tipos e periodicidade'],
     ] },

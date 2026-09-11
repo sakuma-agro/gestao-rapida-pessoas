@@ -44,6 +44,8 @@ function abrirAba(nome) {
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
+  $('telaExPainel').hidden = nome !== 'exPainel';
+  $('telaTrPainel').hidden = nome !== 'trPainel';
   $('telaExVenc').hidden  = nome !== 'exVenc';
   $('telaExTipos').hidden = nome !== 'exTipos';
   $('telaExFuncoes').hidden = nome !== 'exFuncoes';
@@ -67,7 +69,7 @@ function abrirAba(nome) {
   if (nome === 'disc') abrirDisc();
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();
-  if (['exVenc', 'exTipos', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
+  if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
   if (nome.startsWith('jor')) abrirJornada(nome);
 }

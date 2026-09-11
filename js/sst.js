@@ -8,6 +8,7 @@ import { estado } from './store.js';
 import { LOGO } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
   conferenciaDo } from './aso.js';
+import { abrirModulo } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -30,13 +31,32 @@ export function somarMeses(iso, meses) {
   return d.toISOString().slice(0, 10);
 }
 
-/** Em dia, vencendo (30 dias) ou vencido. */
+/* As gavetas do painel de alerta. São exclusivas de propósito: quem está em
+   "31 a 60" não aparece também em "até 30", senão a soma dos cartões não bate
+   com o total e ninguém confia no número. */
+export const FAIXAS = [
+  { chave: 'vencido', rotulo: 'Vencidos', curto: 'Vencidos', dica: 'Refazer agora', cor: 'perigo' },
+  { chave: 'ate30', rotulo: 'Vence em até 30 dias', curto: 'Até 30 dias', dica: 'Agendar esta semana', cor: 'alerta' },
+  { chave: 'ate60', rotulo: 'De 31 a 60 dias', curto: '31 a 60 dias', dica: 'Já dá para marcar', cor: 'atencao' },
+  { chave: 'ate90', rotulo: 'De 61 a 90 dias', curto: '61 a 90 dias', dica: 'Entra no radar', cor: 'calma' },
+];
+const faixaDe = dias => {
+  if (dias == null) return 'semvalidade';
+  if (dias < 0) return 'vencido';
+  if (dias <= 30) return 'ate30';
+  if (dias <= 60) return 'ate60';
+  if (dias <= 90) return 'ate90';
+  return 'emdia';
+};
+
+/** Em dia, vencendo (30 dias) ou vencido — mais a faixa de 60/90 do painel. */
 export function situacaoDe(vence) {
-  if (!vence) return { chave: 'semvalidade', rotulo: 'Sem validade', cor: 'neutra', dias: null };
+  if (!vence) return { chave: 'semvalidade', rotulo: 'Sem validade', cor: 'neutra', dias: null, faixa: 'semvalidade' };
   const dias = Math.round((Date.parse(vence + 'T00:00:00Z') - Date.parse(hoje() + 'T00:00:00Z')) / 86400000);
-  if (dias < 0) return { chave: 'vencido', rotulo: `Vencido há ${-dias} dia${-dias > 1 ? 's' : ''}`, cor: 'perigo', dias };
-  if (dias <= 30) return { chave: 'vencendo', rotulo: dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia${dias > 1 ? 's' : ''}`, cor: 'alerta', dias };
-  return { chave: 'emdia', rotulo: 'Em dia', cor: 'ativo', dias };
+  const faixa = faixaDe(dias);
+  if (dias < 0) return { chave: 'vencido', rotulo: `Vencido há ${-dias} dia${-dias > 1 ? 's' : ''}`, cor: 'perigo', dias, faixa };
+  if (dias <= 30) return { chave: 'vencendo', rotulo: dias === 0 ? 'Vence hoje' : `Vence em ${dias} dia${dias > 1 ? 's' : ''}`, cor: 'alerta', dias, faixa };
+  return { chave: 'emdia', rotulo: 'Em dia', cor: 'ativo', dias, faixa };
 }
 
 /* =============== as duas receitas =============== */
@@ -47,9 +67,13 @@ const RECEITAS = {
     rotuloTipo: 'Exame',
     tabelaTipos: 'sst_tipos_exame',
     tabelaRegs: 'sst_exames',
-    tela: 'exVenc', telaTipos: 'exTipos',
+    tela: 'exVenc', telaTipos: 'exTipos', telaPainel: 'exPainel',
+    semNenhum: 'sem nenhum exame lançado',
+    tituloFolha: 'PAINEL DE ALERTA · EXAMES OCUPACIONAIS',
     completo: false,                   // exame guarda só tipo, data e vencimento
     el: {
+      pCards: 'exPnCards', pAlerta: 'exPnAlerta', pTipos: 'exPnTipos', pSemNada: 'exPnSemNada',
+      pSaida: 'exPnSaida', pImprimir: 'bImprimirPnEx', pZoom: 'zoomPnEx', pZoomV: 'zoomVPnEx',
       busca: 'exBusca', fTipo: 'exFiltroTipo', fStatus: 'exFiltroStatus', fSit: 'exFiltroSit',
       resumo: 'exResumo', historico: 'exHistorico', tabela: 'exTabela', semNada: 'exSemNada',
       saida: 'exSaida', zoom: 'zoomEx', zoomV: 'zoomVEx', imprimir: 'bImprimirEx',
@@ -68,9 +92,13 @@ const RECEITAS = {
     rotuloTipo: 'Treinamento',
     tabelaTipos: 'sst_tipos_treinamento',
     tabelaRegs: 'sst_treinamentos',
-    tela: 'trVenc', telaTipos: 'trTipos',
+    tela: 'trVenc', telaTipos: 'trTipos', telaPainel: 'trPainel',
+    semNenhum: 'sem nenhum treinamento lançado',
+    tituloFolha: 'PAINEL DE ALERTA · TREINAMENTOS',
     completo: true,                    // treinamento guarda carga, instrutor e observação
     el: {
+      pCards: 'trPnCards', pAlerta: 'trPnAlerta', pTipos: 'trPnTipos', pSemNada: 'trPnSemNada',
+      pSaida: 'trPnSaida', pImprimir: 'bImprimirPnTr', pZoom: 'zoomPnTr', pZoomV: 'zoomVPnTr',
       busca: 'trBusca', fTipo: 'trFiltroTipo', fStatus: 'trFiltroStatus', fSit: 'trFiltroSit',
       resumo: 'trResumo', historico: 'trHistorico', tabela: 'trTabela', semNada: 'trSemNada',
       saida: 'trSaida', zoom: 'zoomTr', zoomV: 'zoomVTr', imprimir: 'bImprimirTr',
@@ -121,17 +149,21 @@ const tipoDe = (r, id) => S[r.id].tipos.find(t => t.id === id);
 
 /* =============== abrir uma tela =============== */
 export async function abrirSst(tela) {
-  const r = Object.values(RECEITAS).find(x => x.tela === tela || x.telaTipos === tela);
+  const r = Object.values(RECEITAS).find(x =>
+    x.tela === tela || x.telaTipos === tela || x.telaPainel === tela);
   if (!r) return;
   if (!S.carregado) {
     try { await carregarSst(); }
     catch (e) {
-      const alvo = tela === r.telaTipos ? $(r.el.listaTipos) : $(r.el.tabela);
+      const alvo = tela === r.telaTipos ? $(r.el.listaTipos)
+        : tela === r.telaPainel ? $(r.el.pCards) : $(r.el.tabela);
       alvo.innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`;
       return;
     }
   }
-  if (tela === r.telaTipos) desenharTipos(r); else desenharVenc(r);
+  if (tela === r.telaTipos) desenharTipos(r);
+  else if (tela === r.telaPainel) desenharPainel(r);
+  else desenharVenc(r);
 }
 
 /* =============== cadastro de tipos =============== */
@@ -241,7 +273,7 @@ function visiveis(r) {
   }
 
   const comSit = regs.map(x => ({ ...x, sit: situacaoDe(x.vence) }));
-  const filtradas = status ? comSit.filter(x => x.sit.chave === status) : comSit;
+  const filtradas = status ? comSit.filter(x => x.sit.faixa === status) : comSit;
 
   // primeiro o que está mais perto de vencer
   return filtradas.sort((a, b) => {
@@ -249,6 +281,135 @@ function visiveis(r) {
     if (da !== db) return da - db;
     return (funcionario(a.funcionario_id)?.nome || '').localeCompare(funcionario(b.funcionario_id)?.nome || '', 'pt-BR');
   });
+}
+
+/* O retrato de hoje: o lançamento mais novo de cada funcionário ativo em cada
+   tipo. É a base do resumo da tela de vencimentos e do painel inteiro — se as
+   duas contas saíssem de lugares diferentes, uma hora dariam números diferentes.
+   Os regs já chegam do banco do mais novo para o mais velho. */
+function atuais(r) {
+  const vistos = new Set();
+  const fora = [];
+  S[r.id].regs.forEach(x => {
+    const f = funcionario(x.funcionario_id);
+    if (!f || f.situacao !== 'ATIVO') return;
+    const chave = x.funcionario_id + '|' + x.tipo_id;
+    if (vistos.has(chave)) return;
+    vistos.add(chave);
+    fora.push({ ...x, f, sit: situacaoDe(x.vence) });
+  });
+  return fora.sort((a, b) => {
+    const da = a.sit.dias ?? 99999, db = b.sit.dias ?? 99999;
+    if (da !== db) return da - db;
+    return a.f.nome.localeCompare(b.f.nome, 'pt-BR');
+  });
+}
+
+/** Quem está ativo e não tem nenhum lançamento — o buraco que o painel não vê. */
+function semNenhum(r) {
+  const comAlgum = new Set(S[r.id].regs.map(x => x.funcionario_id));
+  return estado.funcionarios
+    .filter(f => f.situacao === 'ATIVO' && !comAlgum.has(f.id))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+/* Dentro do painel, "Em dia" não ajuda: a lista inteira já é do que precisa de
+   atenção. Quem está a 45 dias merece ler "Vence em 45 dias". */
+function avisoDe(sit) {
+  if (sit.faixa === 'vencido' || sit.faixa === 'ate30') return { cor: sit.cor, texto: sit.rotulo };
+  return { cor: 'neutra', texto: `Vence em ${sit.dias} dias` };
+}
+
+/* =============== painel de alerta =============== */
+function desenharPainel(r) {
+  const linhas = atuais(r);
+  const conta = ch => linhas.filter(x => x.sit.faixa === ch).length;
+  const emDia = conta('emdia');
+  const semVal = conta('semvalidade');
+
+  /* ---- cartões, um por faixa ---- */
+  $(r.el.pCards).innerHTML = FAIXAS.map(fx => {
+    const n = conta(fx.chave);
+    return `<button type="button" class="pv-card pv-${fx.cor}${n ? '' : ' pv-zero'}" data-faixa="${fx.chave}">
+      <span>${esc(fx.rotulo)}</span>
+      <strong>${n}</strong>
+      <small>${n ? esc(fx.dica) : 'nada aqui'}</small>
+    </button>`;
+  }).join('') + `
+    <button type="button" class="pv-card pv-ok" data-faixa="emdia">
+      <span>Em dia</span><strong>${emDia}</strong>
+      <small>${semVal ? `+ ${semVal} sem validade` : 'mais de 90 dias'}</small>
+    </button>`;
+
+  $(r.el.pCards).querySelectorAll('[data-faixa]').forEach(b =>
+    b.addEventListener('click', () => irParaVencimentos(r, b.dataset.faixa)));
+
+  /* ---- a lista que precisa de ação: vencido + 90 dias ---- */
+  const urgentes = linhas.filter(x => ['vencido', 'ate30', 'ate60', 'ate90'].includes(x.sit.faixa));
+  $(r.el.pAlerta).innerHTML = urgentes.length ? `
+    <table class="dc-planilha"><thead><tr>
+      <th>Funcionário</th><th>${esc(r.rotuloTipo)}</th>
+      <th class="ce">Vence</th><th class="ce">Situação</th><th></th>
+    </tr></thead><tbody>
+    ${urgentes.map(x => {
+      const t = tipoDe(r, x.tipo_id) || {};
+      const a = avisoDe(x.sit);
+      return `<tr>
+        <td><b>${esc(x.f.nome)}</b><br><span class="dc-sem">${esc(x.f.cargo || '—')}</span></td>
+        <td>${esc(t.nome || '—')}</td>
+        <td class="ce">${dataBr(x.vence)}</td>
+        <td class="ce"><span class="tag ${a.cor}">${esc(a.texto)}</span></td>
+        <td class="ce"><button class="btn mini" data-reg="${x.id}">Editar</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`
+    : '<div class="vazio">Nada vence nos próximos 90 dias. Tudo em ordem.</div>';
+
+  $(r.el.pAlerta).querySelectorAll('[data-reg]').forEach(b =>
+    b.addEventListener('click', () => abrirReg(r, b.dataset.reg)));
+
+  /* ---- o mesmo recorte, agora por tipo ---- */
+  const usados = S[r.id].tipos.filter(t => linhas.some(x => x.tipo_id === t.id));
+  $(r.el.pTipos).innerHTML = usados.length ? `
+    <table class="dc-planilha"><thead><tr>
+      <th>${esc(r.rotuloTipo)}</th>
+      ${FAIXAS.map(fx => `<th class="ce">${esc(fx.curto)}</th>`).join('')}
+      <th class="ce">Em dia</th><th class="ce">Total</th>
+    </tr></thead><tbody>
+    ${usados.map(t => {
+      const dele = linhas.filter(x => x.tipo_id === t.id);
+      const c = ch => dele.filter(x => x.sit.faixa === ch).length;
+      return `<tr>
+        <td><b>${esc(t.nome)}</b></td>
+        ${FAIXAS.map(fx => {
+          const n = c(fx.chave);
+          return `<td class="ce${n ? ' pv-num-' + fx.cor : ' dc-sem'}">${n || '—'}</td>`;
+        }).join('')}
+        <td class="ce">${c('emdia') + c('semvalidade') || '—'}</td>
+        <td class="ce"><b>${dele.length}</b></td>
+      </tr>`;
+    }).join('')}</tbody></table>`
+    : '<div class="vazio">Nenhum lançamento ainda.</div>';
+
+  /* ---- e quem nem começou ---- */
+  const faltando = semNenhum(r);
+  const aviso = $(r.el.pSemNada);
+  if (faltando.length) {
+    aviso.innerHTML = `<b>${faltando.length} funcionário(s) ativo(s) ${esc(r.semNenhum)}:</b> ` +
+      faltando.map(f => esc(f.nome)).join(' · ');
+    aviso.hidden = false;
+  } else aviso.hidden = true;
+
+  $(r.el.pSaida).innerHTML = folhaPainel(r, urgentes, faltando);
+}
+
+/** Clicar no cartão leva para a lista já filtrada — o painel aponta, a outra tela resolve. */
+function irParaVencimentos(r, faixa) {
+  $(r.el.fStatus).value = faixa;
+  $(r.el.fSit).value = 'ATIVO';
+  $(r.el.busca).value = '';
+  $(r.el.fTipo).value = '';
+  $(r.el.historico).checked = false;
+  abrirModulo('sst', r.tela);
 }
 
 function desenharVenc(r) {
@@ -262,14 +423,8 @@ function desenharVenc(r) {
   const linhas = visiveis(r);
 
   // resumo (conta sempre o último de cada par, sem os filtros de situação)
-  const ultimos = new Map();
-  S[r.id].regs.forEach(x => {
-    const f = funcionario(x.funcionario_id);
-    if (!f || f.situacao !== 'ATIVO') return;
-    const chave = x.funcionario_id + '|' + x.tipo_id;
-    if (!ultimos.has(chave)) ultimos.set(chave, situacaoDe(x.vence).chave);
-  });
-  const conta = c => [...ultimos.values()].filter(x => x === c).length;
+  const retrato = atuais(r);
+  const conta = c => retrato.filter(x => x.sit.chave === c).length;
   $(r.el.resumo).innerHTML = `
     <span class="contagem"><b>${conta('emdia')}</b> em dia</span>
     <span class="contagem"><b>${conta('vencendo')}</b> vencendo</span>
@@ -303,8 +458,7 @@ function desenharVenc(r) {
     b.addEventListener('click', () => abrirReg(r, b.dataset.reg)));
 
   // quem ainda não tem nenhum lançamento
-  const comAlgum = new Set(S[r.id].regs.map(x => x.funcionario_id));
-  const faltando = estado.funcionarios.filter(f => f.situacao === 'ATIVO' && !comAlgum.has(f.id));
+  const faltando = semNenhum(r);
   const aviso = $(r.el.semNada);
   if (faltando.length) {
     aviso.innerHTML = `<b>${faltando.length} funcionário(s) ativo(s) sem nenhum ${r.id} lançado:</b> ` +
@@ -430,11 +584,71 @@ function montarFolhas(r, linhas) {
   return folhas.join('');
 }
 
+/* A folha do painel. Sem fundo colorido em lugar nenhum: o Chrome imprime
+   sem "gráficos de plano de fundo" e a cor viraria papel em branco. Quem
+   marca a urgência é a borda e a cor da letra. */
+function folhaPainel(r, urgentes, faltando) {
+  const conta = ch => urgentes.filter(x => x.sit.faixa === ch).length;
+  const caixas = FAIXAS.map(fx => `
+    <div class="pn-cx pn-${fx.cor}">
+      <b>${conta(fx.chave)}</b>
+      <span>${esc(fx.curto.toUpperCase())}</span>
+    </div>`).join('');
+
+  const total = Math.max(1, Math.ceil(urgentes.length / POR_FOLHA));
+  const folhas = [];
+  for (let p = 0; p < total; p++) {
+    const fatia = urgentes.slice(p * POR_FOLHA, (p + 1) * POR_FOLHA);
+    folhas.push(`<div class="an-folha">
+      <div class="an-topo">
+        <img src="${LOGO}" alt="">
+        <div class="an-tit">
+          <h1>${esc(r.tituloFolha)}</h1>
+          <p>O que vence nos próximos 90 dias · ${dataBr(hoje())} · SAKUMA Agronegócios</p>
+        </div>
+      </div>
+      ${p === 0 ? `<div class="pn-resumo">${caixas}</div>` : ''}
+      ${fatia.length ? `<table class="an-tab sst-folha-tab">
+        <colgroup><col><col style="width:46mm"><col style="width:24mm"><col style="width:22mm"><col style="width:26mm"></colgroup>
+        <thead><tr><th>FUNCIONÁRIO</th><th>${esc(r.rotuloTipo.toUpperCase())}</th>
+          <th>VENCE</th><th>DIAS</th><th>SITUAÇÃO</th></tr></thead>
+        <tbody>${fatia.map(x => {
+          const t = tipoDe(r, x.tipo_id) || {};
+          const fx = FAIXAS.find(y => y.chave === x.sit.faixa);
+          return `<tr>
+            <td class="an-nome">${esc(x.f.nome)}</td>
+            <td>${esc(t.nome || '—')}</td>
+            <td class="ce">${dataBr(x.vence)}</td>
+            <td class="ce">${x.sit.dias < 0 ? `há ${-x.sit.dias}` : x.sit.dias}</td>
+            <td class="ce pn-${fx ? fx.cor : 'calma'}">${esc(fx ? fx.curto : '—')}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>` : '<p class="pn-nada">Nada vence nos próximos 90 dias.</p>'}
+      ${p === total - 1 && faltando.length ? `<p class="pn-obs"><b>Sem nenhum lançamento
+        (${faltando.length}):</b> ${faltando.map(f => esc(f.nome)).join(' · ')}</p>` : ''}
+      <div class="an-pe">
+        <span>${urgentes.length} lançamento(s) a vencer</span>
+        <span>${total > 1 ? `folha ${p + 1} de ${total}` : ''}</span>
+      </div>
+    </div>`);
+  }
+  return folhas.join('');
+}
+
 /* =============== ligações =============== */
 function ligarReceita(r, avisar) {
   // filtros
   [r.el.busca, r.el.fTipo, r.el.fStatus, r.el.fSit, r.el.historico].forEach(id =>
     $(id).addEventListener('input', () => desenharVenc(r)));
+
+  // painel
+  $(r.el.pImprimir).addEventListener('click', () => window.print());
+  $(r.el.pZoom).addEventListener('input', () => {
+    const z = $(r.el.pZoom).value;
+    $(r.el.pZoomV).textContent = z + '%';
+    $(r.el.pSaida).style.transform = `scale(${z / 100})`;
+    $(r.el.pSaida).style.transformOrigin = 'top center';
+  });
 
   $(r.el.novo).addEventListener('click', () => abrirReg(r, null));
   $(r.el.novoTipo).addEventListener('click', () => abrirTipo(r, null));
@@ -488,6 +702,7 @@ function ligarReceita(r, avisar) {
     }
     $(r.el.dlg).close();
     desenharVenc(r);
+    desenharPainel(r);
     avisar(`${r.id === 'exame' ? 'Exame' : 'Treinamento'} salvo.`);
   });
 
@@ -500,6 +715,7 @@ function ligarReceita(r, avisar) {
     S[r.id].regs = S[r.id].regs.filter(x => x.id !== e.id);
     $(r.el.dlg).close();
     desenharVenc(r);
+    desenharPainel(r);
   });
 
   /* ---- salvar tipo ---- */
