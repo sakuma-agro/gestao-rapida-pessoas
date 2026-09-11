@@ -33,9 +33,11 @@ export const dinheiro = v => (v == null || v === '' || isNaN(v))
 
 const pct = (parte, total) => (total ? `${(parte * 100 / total).toFixed(1).replace('.', ',')}%` : '—');
 
-/** As cinco faixas da tabela salarial, na ordem em que ele usa. */
+/* As cinco faixas da tabela salarial: A, B, C, D e E. A B é a "média", o
+   salário ideal conforme o mercado — a coluna do banco ainda se chama
+   faixa_media por isso, mas na tela e no papel ela é a B. */
 export const FAIXAS = [
-  ['faixa_a', 'A'], ['faixa_media', 'Média'], ['faixa_c', 'C'], ['faixa_d', 'D'], ['faixa_e', 'E'],
+  ['faixa_a', 'A'], ['faixa_media', 'B'], ['faixa_c', 'C'], ['faixa_d', 'D'], ['faixa_e', 'E'],
 ];
 
 /* =============== dados =============== */
@@ -177,14 +179,13 @@ function desenharCargos() {
       <thead><tr>
         <th>Cargo</th><th>Nível</th>
         ${FAIXAS.map(([, r]) => `<th class="ce">${r}</th>`).join('')}
-        <th class="ce">SAKUMA hoje</th><th></th>
+        <th></th>
       </tr></thead>
       <tbody>${lista.map(c => `
         <tr${c.ativo === false ? ' class="rh-off"' : ''}>
           <td><strong>${esc(c.nome)}</strong>${c.ativo === false ? ' <span class="tag inativo">inativo</span>' : ''}</td>
           <td>${esc(c.nivel || '—')}</td>
           ${FAIXAS.map(([campo]) => `<td class="ce">${dinheiro(c[campo])}</td>`).join('')}
-          <td class="ce">${dinheiro(c.sakuma_atual)}</td>
           <td class="ce"><button class="btn mini" data-cargo="${c.id}">Editar</button></td>
         </tr>`).join('')}
       </tbody>
@@ -208,7 +209,6 @@ function abrirCargo(id) {
   $('cgNome').value = c?.nome || '';
   $('cgNivel').value = c?.nivel || '';
   FAIXAS.forEach(([campo], i) => { $(`cgF${i}`).value = emCampo(c?.[campo]); });
-  $('cgAtual').value = emCampo(c?.sakuma_atual);
   $('cgObs').value = c?.observacao || '';
   $('cgAtivo').value = (c && c.ativo === false) ? '0' : '1';
   $('erroCargo').hidden = true;
@@ -300,11 +300,9 @@ function escolherPessoa() {
   const f = estado.funcionarios.find(x => x.id === $('ppPessoa').value);
   if (!f) return;
   $('ppCargoAtual').value = f.cargo || '';
+  // o salário de hoje é da pessoa, não do cargo — quem digita é ele
   const c = cargoPorNome(f.cargo);
-  if (c) {
-    if (c.sakuma_atual != null) $('ppSalarioAtual').value = emCampo(c.sakuma_atual);
-    if (!$('ppCargo').value) { $('ppCargo').value = c.id; escolherCargo(); }
-  }
+  if (c && !$('ppCargo').value) { $('ppCargo').value = c.id; escolherCargo(); }
 }
 
 /** Cargo + faixa mandam o salário; ele pode mudar em cima. */
@@ -740,7 +738,6 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
       ...editandoCargo,
       nome,
       nivel: so($('cgNivel').value) || null,
-      sakuma_atual: numeroOuNulo($('cgAtual').value),
       observacao: so($('cgObs').value) || null,
       ativo: $('cgAtivo').value === '1',
     };
