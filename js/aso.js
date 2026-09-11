@@ -247,8 +247,11 @@ async function trocarExame(funcao, tipoId, ligar, caixa) {
 /* ==================================================================
    OS DOIS DOCUMENTOS
    ================================================================== */
-const folha = (titulo, subtitulo, corpo, pe) => `
-  <div class="an-folha">
+/* `deitada` vira A4 em paisagem — o quadro geral tem uma coluna por exame e
+   em pé os nomes dos exames se atropelam. Quem faz a virada é a classe
+   `.deitada` + a `@page paisagem` no css/app.css. */
+const folha = (titulo, subtitulo, corpo, pe, deitada) => `
+  <div class="an-folha${deitada ? ' deitada' : ''}">
     <div class="an-topo">
       <img src="${LOGO}" alt="">
       <div class="an-tit">
@@ -334,7 +337,7 @@ export function documentoQuadro() {
     </div>`;
 
   return folha('EXAMES POR FUNÇÃO',
-    `Quadro geral · ${dataBr(hoje())}`, corpo, `${lista.length} função(ões)`);
+    `Quadro geral · ${dataBr(hoje())}`, corpo, `${lista.length} função(ões)`, true);
 }
 
 /* =============== ligações =============== */
