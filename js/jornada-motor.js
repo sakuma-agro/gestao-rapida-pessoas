@@ -1,6 +1,6 @@
 // =====================================================================
 // MOTOR DE APURAÇÃO — Módulo Gestão de Jornada
-// Para o app "Gestão Rápida" (sakuma-agro/ficha-epi) · JavaScript puro
+// Para o app "Gestão Rápida" (sakuma-agro/gestao-rapida-pessoas) · JavaScript puro
 //
 // Função PURA: não acessa banco, não guarda estado, não tem efeito
 // colateral. Entra um dia, sai um resultado. É o que permite testar
