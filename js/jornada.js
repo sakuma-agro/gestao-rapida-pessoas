@@ -6,6 +6,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
+import { desenharCadastros, ligarCadastros } from './jornada-cadastros.js';
 import { apurarDia, minParaHHMM, minParaDecimal } from './jornada-motor.js';
 import * as fech from './jornada-fechamento.js';
 import * as rel from './jornada-relatorios.js';
@@ -400,6 +401,9 @@ function desenharBoletins() {
    =================================================================== */
 
 function desenharConfigJornada() {
+  // os quatro cadastros são desenhados depois, porque o innerHTML abaixo
+  // recria a tela inteira e levaria os ouvintes junto
+
   const t = (titulo, linhas, colunas) => `
     <h3 class="jor-h3">${esc(titulo)}</h3>
     ${linhas.length ? `<table class="dc-planilha"><thead><tr>${colunas.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
@@ -409,13 +413,7 @@ function desenharConfigJornada() {
 
   $('telaJorConfig').innerHTML = cabecalho('Configurações do DP', 'Cadastros estruturais e parâmetros com vigência') + `
     <div class="jor-corpo">
-      ${t('Unidades (empregador + fazenda)',
-        jd.dados.unidades.map(u => `<tr>
-          <td>${esc(jd.nomeUnidade(u))}</td>
-          <td>${esc(jd.fazendaDe(u)?.municipio || '')}</td>
-          <td>${esc(u.caepf || '')}</td>
-          <td>${esc(jd.destinoDe(u)?.nome || '')}</td></tr>`),
-        ['Unidade', 'Município', 'CAEPF', 'Destino DP'])}
+      <div id="jorCadastros"></div>
 
       ${t('Jornadas',
         jd.dados.jornadas.map(j => `<tr>
@@ -444,6 +442,8 @@ function desenharConfigJornada() {
           <td>${dataBR(f.data)}</td><td>${esc(f.nome)}</td><td>${esc(f.abrangencia)}</td></tr>`),
         ['Data', 'Feriado', 'Abrangência'])}
     </div>` + assinatura();
+
+  desenharCadastros('jorCadastros', () => abrirJornada('jorConfig'));
 }
 
 function resumoJornada(j) {
@@ -636,6 +636,7 @@ let irPara = () => {};
 
 export function ligarJornada(navegar) {
   if (navegar) irPara = navegar;
+  ligarCadastros();
 
   $('jorCompetencia')?.addEventListener('change', async ev => {
     estadoTela.competencia = ev.target.value + '-01';
