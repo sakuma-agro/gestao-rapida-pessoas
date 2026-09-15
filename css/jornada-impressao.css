@@ -161,6 +161,11 @@
 }
 .rel-rodape img { height: 19px; width: auto; opacity: .7; }
 
+/* A segunda folha de um documento (hoje: a fase seguinte ao contrato de
+   experiência na proposta). Na tela fica separada por um espaço; no papel
+   começa numa página nova. */
+.rel.folha2 { margin-top: 18px; }
+
 /* ---- impressão de verdade ----
    Sem regra @page aqui: o app já define @page{margin:0}, e mexer nisso
    mudaria também a impressão da ficha de EPI. A margem do documento sai
@@ -189,6 +194,7 @@
   .rel-ficha { gap: 4px 14px; padding: 8px 12px; margin-bottom: 9px; }
   .rel-secao { margin: 11px 0 5px; }
   .rel-rodape { margin-top: 8px; break-before: avoid; page-break-before: avoid; }
+  .rel.folha2 { margin-top: 0; break-before: page; page-break-before: always; }
   .rel-cabecalho { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rel-tabela thead th,
   .rel-tabela tbody tr:nth-child(odd) td,
