@@ -10,7 +10,7 @@
 // cabeçalho da lista de presença mora em `modelo.lista` — quem muda o telefone
 // do sindicato ou uma cláusula é ele, pelo próprio app.
 import { estado, modeloAtual, salvarModelo } from './store.js';
-import { LOGO, PE_LOP } from './seed.js';
+import { LOGO, PE_LOP_SIMBOLO as PE_LOP } from './seed.js';
 import * as jd from './jornada-dados.js';
 
 const $ = id => document.getElementById(id);

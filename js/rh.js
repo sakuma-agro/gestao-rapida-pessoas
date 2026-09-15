@@ -151,6 +151,7 @@ function documento({ titulo, subtitulo, canto, corpo, assinatura }) {
     </div>` : ''}
     <footer class="rel-rodape">
       <img src="img/lop-marca.png" alt="LOP">
+      <span class="rel-lop">Inteligência para o agronegócio</span>
     </footer>
   </article>`;
 }

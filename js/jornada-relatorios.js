@@ -60,6 +60,7 @@ function documento({ titulo, subtitulo, destino, competencia, versao, corpo, ass
     ${assinaturas ? blocoAssinaturas(assinaturas) : ''}
     <footer class="rel-rodape">
       <img src="img/lop-marca.png" alt="LOP">
+      <span class="rel-lop">Inteligência para o agronegócio</span>
     </footer>
   </article>`;
 }
