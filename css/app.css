@@ -740,3 +740,23 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
 .pn-obs{margin-top:5mm;font-size:9pt;line-height:1.5;color:#51534A;
   border-top:.3mm solid #dfe2d8;padding-top:3mm}
 .pn-nada{margin-top:10mm;font-size:11pt;color:#51534A;text-align:center}
+
+/* ---------- filtro de unidades (empregador + fazenda) ----------
+   Caixa que abre com uma marcação por unidade: dá para juntar duas ou três
+   num filtro só. Fechada, mostra o que está valendo. */
+.uni{border:1px solid var(--linha);border-radius:10px;background:var(--papel);overflow:hidden}
+.uni>summary{list-style:none;cursor:pointer;padding:7px 10px;display:flex;
+  align-items:baseline;justify-content:space-between;gap:10px}
+.uni>summary::-webkit-details-marker{display:none}
+.uni>summary::after{content:'▾';color:var(--suave);font-size:11px}
+.uni[open]>summary::after{content:'▴'}
+.uni-rot{font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.4px}
+.uni>summary b{font-size:13px;text-align:right;flex:1}
+.uni-painel{max-height:270px;overflow:auto;border-top:1px solid var(--linha);padding:6px 10px 10px}
+.uni-acoes{display:flex;align-items:center;gap:8px;margin:4px 0 2px}
+.uni-grupo h4{margin:10px 0 2px;font-size:11px;color:var(--marrom);
+  text-transform:uppercase;letter-spacing:.3px}
+.uni-item{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:13px;cursor:pointer}
+.uni-item input{width:auto;margin:0}
+.uni-item small{margin-left:auto;color:var(--suave)}
+
