@@ -1038,6 +1038,10 @@
             <span><input type="checkbox" id="ppMorador" style="width:auto;margin-right:6px">
             Mora na fazenda — acrescenta moradia, internet e a folga de compras</span>
           </label>
+          <label class="campo plena">
+            <span><input type="checkbox" id="ppPeric" style="width:auto;margin-right:6px">
+            Salário com periculosidade de 30% embutida — a proposta abre a conta (base + adicional = total)</span>
+          </label>
           <label class="campo plena">Benefícios (um por linha)
             <textarea id="ppBeneficios" rows="5"></textarea>
             <small class="dc-sem">Marcar ou desmarcar "mora na fazenda" remonta esta lista pelo padrão.</small>
@@ -1127,6 +1131,24 @@
           inteiro. Os dados de <b>RH</b> são bloqueados também no banco: sem a permissão, o servidor não
           devolve nada. Nos demais módulos o bloqueio é da tela — o que basta para a equipe de casa, mas
           não serve para dar acesso a gente de fora.
+        </p>
+      </div>
+
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Backup dos dados</h2>
+            <p class="dica" style="margin:2px 0 0">Baixa tudo o que está no banco: funcionários, EPIs e fichas,
+              exames, treinamentos, DISC, cargos e propostas, estrutura, DP e os acessos.</p>
+          </div>
+          <button class="btn principal" id="cfBackup">Gerar backup</button>
+        </div>
+        <p class="dica" id="cfBackupStatus" style="margin:10px 0 0"></p>
+        <p class="dica" style="margin:10px 0 0">
+          Saem <b>dois arquivos</b>: a planilha <b>.xlsx</b>, com uma aba por tabela, para ler e arquivar; e o
+          <b>.json</b>, que é a cópia fiel do banco — é ele que serve para repor os dados se algo se perder.
+          Guarde os dois juntos, fora do computador. O arquivo traz nome, CPF e data de nascimento das
+          pessoas: trate como documento de RH, não deixe em pasta compartilhada.
         </p>
       </div>
     </section>
