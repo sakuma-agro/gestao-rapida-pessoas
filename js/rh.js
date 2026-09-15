@@ -69,6 +69,9 @@ export const dinheiro = v => (v == null || v === '' || isNaN(v))
 
 const pct = (parte, total) => (total ? `${(parte * 100 / total).toFixed(1).replace('.', ',')}%` : '—');
 
+/* O adicional de periculosidade da NR-16: 30% sobre o salário base. */
+export const PERICULOSIDADE = 0.30;
+
 /* As cinco faixas da tabela salarial: A, B, C, D e E. A B é a "média", o
    salário ideal conforme o mercado — a coluna do banco ainda se chama
    faixa_media por isso, mas na tela e no papel ela é a B. */
@@ -387,6 +390,7 @@ function dadosDaProposta() {
     cargo_atual: promocao ? so($('ppCargoAtual').value) : '',
     salario_atual: promocao ? numeroOuNulo($('ppSalarioAtual').value) : null,
     morador: $('ppMorador').checked,
+    periculosidade: $('ppPeric').checked,
     data_inicio: so($('ppInicio').value) || null,
     local_trabalho: so($('ppLocal').value),
     jornada: so($('ppJornada').value),
@@ -402,13 +406,33 @@ export function documentoProposta(p) {
   const dif = (promocao && p.salario != null && p.salario_atual)
     ? ((p.salario - p.salario_atual) * 100 / p.salario_atual) : null;
 
+  /* O valor da tabela salarial já vem COM a periculosidade dentro — foi o que
+     ele confirmou. Então a conta é para trás: base = total / 1,30, e o
+     adicional é o que sobra. Escrever "30% de 3.105,96" seria errado. */
+  const comPeric = !!p.periculosidade && p.salario != null;
+  const base = comPeric ? p.salario / (1 + PERICULOSIDADE) : null;
+  const adicional = comPeric ? p.salario - base : null;
+
+  const composicao = comPeric ? `
+    <table class="rel-tabela">
+      <thead><tr><th colspan="2">Como o salário é composto</th></tr></thead>
+      <tbody>
+        <tr><td style="width:60%">Salário base</td><td class="rel-num">${dinheiro(base)}</td></tr>
+        <tr><td>Adicional de periculosidade (${(PERICULOSIDADE * 100).toFixed(0)}%)</td>
+            <td class="rel-num">${dinheiro(adicional)}</td></tr>
+      </tbody>
+      <tfoot><tr><td>Total mensal</td><td class="rel-num">${dinheiro(p.salario)}</td></tr></tfoot>
+    </table>
+    <p class="rel-nota">O adicional de periculosidade é pago enquanto durar a atividade que lhe dá
+      direito; cessada a condição, cessa o pagamento.</p>` : '';
+
   const ficha = `
     <div class="rel-ficha">
       <div><span>Nome</span><b>${esc(p.nome || '—')}</b></div>
       <div><span>Cargo</span><b>${esc(p.cargo_nome || '—')}</b></div>
       <div><span>Nível</span><b>${esc(p.nivel || '—')}</b></div>
       <div><span>Faixa salarial</span><b>${esc(p.faixa || '—')}</b></div>
-      <div><span>Salário mensal</span><b>${dinheiro(p.salario)}</b></div>
+      <div><span>Salário mensal</span><b>${dinheiro(p.salario)}${comPeric ? ' <small style="font-weight:400">(com periculosidade)</small>' : ''}</b></div>
       <div><span>${promocao ? 'Vigência a partir de' : 'Início previsto'}</span><b>${dataBr(p.data_inicio)}</b></div>
     </div>`;
 
@@ -444,6 +468,7 @@ export function documentoProposta(p) {
   const corpo = `
     <p>${esc(m.abertura || '')}</p>
     ${ficha}
+    ${composicao}
     ${comparativo}
     ${condicoes}
     ${beneficios}

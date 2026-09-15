@@ -19,6 +19,7 @@ import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from '
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
 import { pode, podeTela } from './acesso.js';
+import { ligarBackup } from './backup.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -1259,6 +1260,7 @@ ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
 ligar('termos', () => ligarTermos(mostrarAviso));
+ligar('backup', () => ligarBackup(mostrarAviso));
 
 /** Nunca deixe a tela vazia: se nem o login der para montar, escreva o motivo. */
 function telaDeSocorro(texto) {
