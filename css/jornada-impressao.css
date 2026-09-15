@@ -156,10 +156,23 @@
 
   .rel {
     border: none;
-    padding: 8mm 10mm;   /* a margem do papel vem daqui */
+    padding: 6mm 10mm;   /* a margem do papel vem daqui */
     max-width: none;
     font-size: 10px;
   }
+
+  /* ---- aperto de impressão (15/09/2026) ----
+     O Quadro de Pessoal fechava a folha no limite e empurrava só a marca da
+     LOP para uma segunda página em branco — o pior jeito de estourar, porque
+     rende uma folha inteira para 5 mm de tinta. Estas medidas valem só no
+     papel: na tela o documento continua arejado. Se for mexer, refaça a conta
+     do estouro (scrollHeight do .rel contra 297 mm) antes de publicar. */
+  .rel-tabela { margin-bottom: 6px; }
+  .rel-tabela th,
+  .rel-tabela td { padding: 2.5px 6px; }
+  .rel-ficha { gap: 4px 14px; padding: 8px 12px; margin-bottom: 9px; }
+  .rel-secao { margin: 11px 0 5px; }
+  .rel-rodape { margin-top: 8px; break-before: avoid; page-break-before: avoid; }
   .rel-cabecalho { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rel-tabela thead th,
   .rel-tabela tbody tr:nth-child(odd) td,
