@@ -279,14 +279,12 @@ function preencherControles() {
   if (!$('selLinhas').value) $('selLinhas').value = m.linhas_padrao || 20;
 
   const emps = [...new Set(estado.funcionarios.map(f => f.empregador).filter(Boolean))].sort();
-  /* Remontar as opções zera a escolha da caixa; guarde e devolva, senão
-     cadastrar alguém no meio de um filtro joga a pessoa de volta para "Todos". */
-  const opcoes = opcoesEmpregador();
-  ['fEmp', 'fEmpLista', 'fEmpFunc'].forEach(id => {
-    const antes = $(id).value;
-    $(id).innerHTML = opcoes;
-    if (antes && [...$(id).options].some(o => o.value === antes)) $(id).value = antes;
-  });
+  /* As três caixas de unidade. O que está marcado vive no mapa `selecoes`, não
+     no HTML, então remontar aqui (depois de salvar alguém, por exemplo) não
+     joga o filtro de volta para "Todas". */
+  desenharFiltroUnidades('uniFichas', desenharSelecao);
+  desenharFiltroUnidades('uniLista', desenharSelecaoLista);
+  desenharFiltroUnidades('uniFunc', desenharFuncionarios);
   $('lista-empregadores').innerHTML =
     [...new Set([...(m.empregadores || []), ...emps])].map(e => `<option value="${esc(e)}">`).join('');
   const cargos = [...new Set([...(m.cargos || []), ...estado.funcionarios.map(f => f.cargo).filter(Boolean)])].sort();
@@ -311,74 +309,138 @@ function preencherControles() {
     }).join('');
 }
 
-/* O mesmo empregador assina em mais de uma fazenda, e quase sempre a ficha
-   sai por fazenda, não pelo empregador inteiro. Então o filtro lista o par:
-   o empregador é o título do grupo e cada fazenda dele é uma linha, com uma
-   primeira opção para pegar todas.
+/* ---- filtro de unidades: empregador + fazenda, com várias marcadas ----
+   O mesmo empregador assina em mais de uma fazenda, e o recorte quase sempre é
+   por fazenda. Antes era uma caixa de escolher uma; agora são caixinhas, e dá
+   para juntar duas ou três unidades num filtro só — foi o pedido dele.
 
-   O valor guarda os dois separados por \u0001 — caractere de controle, que
-   não aparece em nome de fazenda nenhum. Fazenda vazia quer dizer "todas";
-   para dizer "as pessoas SEM fazenda no cadastro" existe o \u0002, senão elas
-   sumiriam do filtro sem ninguém notar. */
-const SEP = '\u0001';
-const SEM_FAZENDA = '\u0002';
+   As opções saem de DOIS lugares, de propósito: o cadastro de unidades
+   (Cadastros › Empregador e fazenda), que manda na grafia, e o texto gravado em
+   cada funcionário, que garante que ninguém suma enquanto a unidade não estiver
+   escolhida para todo mundo. A comparação é por uma chave que ignora acento,
+   caixa e espaço sobrando — senão "Quebra Cocão" e "Quebra Cocao" viravam duas
+   linhas, cada uma com um pedaço da gente.
 
-function opcoesEmpregador() {
-  const pares = new Map();     // empregador -> { fazendas:Set, soltos:number }
-  estado.funcionarios.forEach(f => {
-    const e = so(f.empregador);
-    if (!e) return;
-    if (!pares.has(e)) pares.set(e, { fazendas: new Set(), soltos: 0 });
-    const g = pares.get(e);
-    const z = so(f.fazenda);
-    if (z) g.fazendas.add(z); else g.soltos++;
-  });
+   Nada marcado = todas, que é o padrão e o que a caixa mostra. */
+const SEP = ' || ';
+const SEM_FAZENDA = '(SEM FAZENDA)';
 
-  const grupos = [...pares.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
-    .map(([e, g]) => {
-      const lista = [...g.fazendas].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+const chaveUni = v => String(v == null ? '' : v)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .trim().replace(/\s+/g, ' ').toUpperCase();
+const chaveDoPar = (emp, faz) =>
+  chaveUni(emp) + SEP + (so(faz) ? chaveUni(faz) : SEM_FAZENDA);
 
-      /* Uma fazenda só e ninguém solto: o grupo viraria cabeçalho de uma linha.
-         Aí vira uma linha só, "EMPREGADOR · FAZENDA" — e o rótulo continua
-         verdadeiro, porque não há mais ninguém desse empregador em outro lugar. */
-      if (lista.length <= 1 && !g.soltos) {
-        const z = lista[0] || '';
-        return `<option value="${esc(e + SEP)}">${esc(z ? `${e} · ${z}` : e)}</option>`;
-      }
-
-      return `<optgroup label="${esc(e)}">`
-        + `<option value="${esc(e + SEP)}">Todas as fazendas</option>`
-        + lista.map(z => `<option value="${esc(e + SEP + z)}">${esc(z)}</option>`).join('')
-        + (g.soltos
-            ? `<option value="${esc(e + SEP + SEM_FAZENDA)}">Sem fazenda no cadastro (${g.soltos})</option>`
-            : '')
-        + '</optgroup>';
-    });
-
-  return '<option value="">Todos</option>' + grupos.join('');
-}
-
-/** O par escolhido no filtro: { emp, faz }. Fazenda vazia = todas. */
-function parDoFiltro(id) {
-  const [emp = '', faz = ''] = String($(id).value || '').split(SEP);
-  return { emp, faz };
-}
-
-const casaCom = (f, { emp, faz }) => {
-  if (emp && so(f.empregador) !== emp) return false;
-  if (faz === SEM_FAZENDA) return !so(f.fazenda);
-  return !faz || so(f.fazenda) === faz;
+const selecoes = new Map();          // id da caixa -> Set de chaves marcadas
+const selDe = id => {
+  if (!selecoes.has(id)) selecoes.set(id, new Set());
+  return selecoes.get(id);
 };
+/** Sem nada marcado, passa todo mundo. */
+const casaUnidade = (f, sel) => !sel.size || sel.has(chaveDoPar(f.empregador, f.fazenda));
+
+function unidadesDoFiltro() {
+  const mapa = new Map();
+  const por = (emp, faz) => {
+    const k = chaveDoPar(emp, faz);
+    if (!mapa.has(k)) mapa.set(k, { chave: k, emp: so(emp), faz: so(faz), qtd: 0, cadastro: false });
+    return mapa.get(k);
+  };
+  (jd.dados.unidades || []).filter(u => u.ativo !== false).forEach(u => {
+    const it = por(jd.empregadorDe(u)?.nome || '', jd.fazendaDe(u)?.nome || '');
+    it.cadastro = true;
+    if (jd.empregadorDe(u)?.nome) it.emp = jd.empregadorDe(u).nome;
+    if (jd.fazendaDe(u)?.nome) it.faz = jd.fazendaDe(u).nome;
+  });
+  estado.funcionarios.forEach(f => { por(f.empregador, f.fazenda).qtd++; });
+
+  const grupos = new Map();
+  [...mapa.values()].forEach(it => {
+    const g = chaveUni(it.emp);
+    if (!grupos.has(g)) grupos.set(g, { rotulo: it.emp || 'Sem empregador no cadastro', itens: [] });
+    if (it.cadastro && it.emp) grupos.get(g).rotulo = it.emp;   // a grafia do cadastro manda
+    grupos.get(g).itens.push(it);
+  });
+  return [...grupos.values()]
+    .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'))
+    .map(g => {
+      g.itens.sort((a, b) => (a.faz ? 0 : 1) - (b.faz ? 0 : 1) || a.faz.localeCompare(b.faz, 'pt-BR'));
+      return g;
+    });
+}
+
+function resumoDaSelecao(sel, grupos) {
+  if (!sel.size) return 'Todas';
+  const itens = grupos.flatMap(g => g.itens).filter(i => sel.has(i.chave));
+  if (itens.length === 1) {
+    const i = itens[0];
+    return i.faz ? `${i.emp} · ${i.faz}` : `${i.emp} · sem fazenda`;
+  }
+  return `${itens.length} unidades`;
+}
+
+/** Desenha a caixa de unidades no container `id` e avisa quem precisa redesenhar. */
+function desenharFiltroUnidades(id, aoMudar) {
+  const caixa = $(id);
+  if (!caixa) return;
+  const sel = selDe(id);
+  const grupos = unidadesDoFiltro();
+
+  // Unidade que sumiu do cadastro não pode ficar marcada e filtrando escondido.
+  const validas = new Set(grupos.flatMap(g => g.itens.map(i => i.chave)));
+  [...sel].forEach(k => { if (!validas.has(k)) sel.delete(k); });
+
+  const aberta = caixa.querySelector('details')?.open || false;
+  caixa.innerHTML = `
+    <details class="uni" ${aberta ? 'open' : ''}>
+      <summary>
+        <span class="uni-rot">Empregador e fazenda</span>
+        <b data-uni-resumo>${esc(resumoDaSelecao(sel, grupos))}</b>
+      </summary>
+      <div class="uni-painel">
+        <div class="uni-acoes">
+          <button type="button" class="btn mini" data-uni-todas>Todas</button>
+          <span class="dica" style="margin:0">marque quantas quiser</span>
+        </div>
+        ${grupos.map(g => `<div class="uni-grupo">
+          <h4>${esc(g.rotulo)}</h4>
+          ${g.itens.map(i => `<label class="uni-item">
+            <input type="checkbox" value="${esc(i.chave)}" ${sel.has(i.chave) ? 'checked' : ''}>
+            <span>${esc(i.faz || 'Sem fazenda no cadastro')}</span>
+            <small>${i.qtd}</small>
+          </label>`).join('')}
+        </div>`).join('')}
+      </div>
+    </details>`;
+
+  /* Marcar uma caixinha NÃO redesenha o painel: redesenhar fecharia o
+     <details> na cara de quem está marcando a segunda unidade. Só o resumo
+     do topo é reescrito. */
+  const resumo = caixa.querySelector('[data-uni-resumo]');
+  const atualizar = () => {
+    resumo.textContent = resumoDaSelecao(sel, grupos);
+    aoMudar();
+  };
+  caixa.querySelectorAll('input[type=checkbox]').forEach(c =>
+    c.addEventListener('change', () => {
+      if (c.checked) sel.add(c.value); else sel.delete(c.value);
+      atualizar();
+    }));
+  caixa.querySelector('[data-uni-todas]').addEventListener('click', () => {
+    sel.clear();
+    caixa.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
+    atualizar();
+  });
+}
 
 /* =============== aba FICHAS =============== */
 function visiveis() {
   const q = $('busca').value.trim().toLowerCase();
-  const s = $('fSit').value, par = parDoFiltro('fEmp');
+  const s = $('fSit').value, sel = selDe('uniFichas');
   return estado.funcionarios.filter(f =>
     (!q || f.nome.toLowerCase().includes(q)) &&
     (!s || f.situacao === s) &&
-    casaCom(f, par));
+    casaUnidade(f, sel));
 }
 
 function desenharSelecao() {
@@ -493,7 +555,7 @@ $('bLimparFichas').addEventListener('click', () => {
   atualizarFichas();
 });
 
-['busca', 'fSit', 'fEmp'].forEach(id => $(id).addEventListener('input', desenharSelecao));
+['busca', 'fSit'].forEach(id => $(id).addEventListener('input', desenharSelecao));
 ['selMes', 'selAno', 'selLinhas'].forEach(id => $(id).addEventListener('input', atualizarFichas));
 $('bTodos').addEventListener('click', () => { visiveis().forEach(f => marcados.add(f.id)); desenharSelecao(); });
 $('bNenhum').addEventListener('click', () => { marcados.clear(); desenharSelecao(); });
@@ -518,11 +580,11 @@ function preencherLista() {
 
 function visiveisLista() {
   const q = $('buscaLista').value.trim().toLowerCase();
-  const s = $('fSitLista').value, par = parDoFiltro('fEmpLista');
+  const s = $('fSitLista').value, sel = selDe('uniLista');
   return estado.funcionarios.filter(f =>
     (!q || f.nome.toLowerCase().includes(q)) &&
     (!s || f.situacao === s) &&
-    casaCom(f, par));
+    casaUnidade(f, sel));
 }
 
 function desenharSelecaoLista() {
@@ -567,7 +629,7 @@ function atualizarLista() {
 ['lpTitulo', 'lpCodigo', 'lpData', 'lpRevisao', 'lpElaboracao', 'lpAprovacao']
   .forEach(id => $(id).addEventListener('input', atualizarLista));
 
-['buscaLista', 'fSitLista', 'fEmpLista'].forEach(id =>
+['buscaLista', 'fSitLista'].forEach(id =>
   $(id).addEventListener('input', desenharSelecaoLista));
 $('bTodosLista').addEventListener('click', ev => {
   ev.preventDefault();
@@ -611,11 +673,11 @@ $('bRestaurarLista').addEventListener('click', async () => {
 function desenharFuncionarios() {
   const q = $('buscaFunc').value.trim().toLowerCase();
   const s = $('fSitFunc').value;
-  const par = parDoFiltro('fEmpFunc');
+  const sel = selDe('uniFunc');
   const lista = estado.funcionarios.filter(f =>
     (!q || [f.nome, f.cargo, f.cadastro, f.empregador, f.fazenda].some(v => String(v || '').toLowerCase().includes(q))) &&
     (!s || f.situacao === s) &&
-    casaCom(f, par));
+    casaUnidade(f, sel));
   const total = estado.funcionarios.length;
   $('cntFunc').textContent = lista.length === total ? total : `${lista.length} de ${total}`;
   $('listaFunc').innerHTML = lista.length ? lista.map(f => `
@@ -800,7 +862,7 @@ $('formFuncN2').addEventListener('submit', async ev => {
 });
 
 $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
-['buscaFunc', 'fSitFunc', 'fEmpFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
+['buscaFunc', 'fSitFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
 
 $('formFunc').addEventListener('submit', async ev => {
   ev.preventDefault();
