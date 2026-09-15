@@ -23,6 +23,7 @@ import { pode, podeTela } from './acesso.js';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const so = v => String(v == null ? '' : v).trim();
 
 const marcados = new Set();     // ids de funcionários selecionados (fichas)
 const naLista = new Set();      // ids de funcionários na lista de presença
@@ -277,7 +278,7 @@ function preencherControles() {
   if (!$('selLinhas').value) $('selLinhas').value = m.linhas_padrao || 20;
 
   const emps = [...new Set(estado.funcionarios.map(f => f.empregador).filter(Boolean))].sort();
-  const opcoes = '<option value="">Todos</option>' + emps.map(e => `<option>${esc(e)}</option>`).join('');
+  const opcoes = opcoesEmpregador();
   $('fEmp').innerHTML = opcoes;
   $('fEmpLista').innerHTML = opcoes;
   $('lista-empregadores').innerHTML =
@@ -304,14 +305,74 @@ function preencherControles() {
     }).join('');
 }
 
+/* O mesmo empregador assina em mais de uma fazenda, e quase sempre a ficha
+   sai por fazenda, não pelo empregador inteiro. Então o filtro lista o par:
+   o empregador é o título do grupo e cada fazenda dele é uma linha, com uma
+   primeira opção para pegar todas.
+
+   O valor guarda os dois separados por \u0001 — caractere de controle, que
+   não aparece em nome de fazenda nenhum. Fazenda vazia quer dizer "todas";
+   para dizer "as pessoas SEM fazenda no cadastro" existe o \u0002, senão elas
+   sumiriam do filtro sem ninguém notar. */
+const SEP = '\u0001';
+const SEM_FAZENDA = '\u0002';
+
+function opcoesEmpregador() {
+  const pares = new Map();     // empregador -> { fazendas:Set, soltos:number }
+  estado.funcionarios.forEach(f => {
+    const e = so(f.empregador);
+    if (!e) return;
+    if (!pares.has(e)) pares.set(e, { fazendas: new Set(), soltos: 0 });
+    const g = pares.get(e);
+    const z = so(f.fazenda);
+    if (z) g.fazendas.add(z); else g.soltos++;
+  });
+
+  const grupos = [...pares.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+    .map(([e, g]) => {
+      const lista = [...g.fazendas].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+      /* Uma fazenda só e ninguém solto: o grupo viraria cabeçalho de uma linha.
+         Aí vira uma linha só, "EMPREGADOR · FAZENDA" — e o rótulo continua
+         verdadeiro, porque não há mais ninguém desse empregador em outro lugar. */
+      if (lista.length <= 1 && !g.soltos) {
+        const z = lista[0] || '';
+        return `<option value="${esc(e + SEP)}">${esc(z ? `${e} · ${z}` : e)}</option>`;
+      }
+
+      return `<optgroup label="${esc(e)}">`
+        + `<option value="${esc(e + SEP)}">Todas as fazendas</option>`
+        + lista.map(z => `<option value="${esc(e + SEP + z)}">${esc(z)}</option>`).join('')
+        + (g.soltos
+            ? `<option value="${esc(e + SEP + SEM_FAZENDA)}">Sem fazenda no cadastro (${g.soltos})</option>`
+            : '')
+        + '</optgroup>';
+    });
+
+  return '<option value="">Todos</option>' + grupos.join('');
+}
+
+/** O par escolhido no filtro: { emp, faz }. Fazenda vazia = todas. */
+function parDoFiltro(id) {
+  const [emp = '', faz = ''] = String($(id).value || '').split(SEP);
+  return { emp, faz };
+}
+
+const casaCom = (f, { emp, faz }) => {
+  if (emp && so(f.empregador) !== emp) return false;
+  if (faz === SEM_FAZENDA) return !so(f.fazenda);
+  return !faz || so(f.fazenda) === faz;
+};
+
 /* =============== aba FICHAS =============== */
 function visiveis() {
   const q = $('busca').value.trim().toLowerCase();
-  const s = $('fSit').value, e = $('fEmp').value;
+  const s = $('fSit').value, par = parDoFiltro('fEmp');
   return estado.funcionarios.filter(f =>
     (!q || f.nome.toLowerCase().includes(q)) &&
     (!s || f.situacao === s) &&
-    (!e || f.empregador === e));
+    casaCom(f, par));
 }
 
 function desenharSelecao() {
@@ -321,7 +382,7 @@ function desenharSelecao() {
       <input type="checkbox" id="s_${f.id}" data-id="${f.id}" ${marcados.has(f.id) ? 'checked' : ''}>
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}</span>
+        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}</span>
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
     </label>`).join('')
@@ -451,11 +512,11 @@ function preencherLista() {
 
 function visiveisLista() {
   const q = $('buscaLista').value.trim().toLowerCase();
-  const s = $('fSitLista').value, e = $('fEmpLista').value;
+  const s = $('fSitLista').value, par = parDoFiltro('fEmpLista');
   return estado.funcionarios.filter(f =>
     (!q || f.nome.toLowerCase().includes(q)) &&
     (!s || f.situacao === s) &&
-    (!e || f.empregador === e));
+    casaCom(f, par));
 }
 
 function desenharSelecaoLista() {
@@ -465,7 +526,7 @@ function desenharSelecaoLista() {
       <input type="checkbox" id="l_${f.id}" data-id="${f.id}" ${naLista.has(f.id) ? 'checked' : ''}>
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}</span>
+        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}</span>
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
     </label>`).join('')
