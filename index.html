@@ -1050,6 +1050,24 @@
             <textarea id="ppBeneficios" rows="5"></textarea>
             <small class="dc-sem">Marcar ou desmarcar "mora na fazenda" remonta esta lista pelo padrão.</small>
           </label>
+          <label class="campo plena">
+            <span><input type="checkbox" id="ppPos" style="width:auto;margin-right:6px">
+            Prevê mudança depois do contrato de experiência — sai numa segunda folha</span>
+          </label>
+          <div class="campo plena" id="campoPos" hidden>
+            <div class="grade">
+              <label class="campo">Função depois da experiência
+                <select id="ppPosCargo"></select>
+                <small class="dc-sem" id="ppPosNivel"></small>
+              </label>
+              <label class="campo">Faixa
+                <select id="ppPosFaixa"></select>
+              </label>
+              <label class="campo">Salário (R$)
+                <input type="text" id="ppPosSalario" inputmode="decimal">
+              </label>
+            </div>
+          </div>
           <label class="campo plena">Observação (sai numa caixa na proposta)
             <textarea id="ppObs" rows="2"></textarea>
             <small class="dc-sem"><label style="cursor:pointer">
