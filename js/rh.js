@@ -391,6 +391,7 @@ function dadosDaProposta() {
     salario_atual: promocao ? numeroOuNulo($('ppSalarioAtual').value) : null,
     morador: $('ppMorador').checked,
     periculosidade: $('ppPeric').checked,
+    ticket_alimentacao: numeroOuNulo($('ppTicket').value),
     data_inicio: so($('ppInicio').value) || null,
     local_trabalho: so($('ppLocal').value),
     jornada: so($('ppJornada').value),
@@ -413,18 +414,36 @@ export function documentoProposta(p) {
   const base = comPeric ? p.salario / (1 + PERICULOSIDADE) : null;
   const adicional = comPeric ? p.salario - base : null;
 
-  const composicao = comPeric ? `
+  /* O ticket alimentação não passa pelo holerite. Por isso a tabela fecha em
+     dois totais: o "Total mensal holerite", que é o que a folha paga, e o
+     "Total de tudo", que é o que a pessoa recebe no mês. Somar o ticket dentro
+     do salário seria prometer no holerite o que não vai estar nele. */
+  const ticket = p.ticket_alimentacao != null && p.ticket_alimentacao !== '' && !isNaN(p.ticket_alimentacao)
+    ? Number(p.ticket_alimentacao) : null;
+  const mostrarComposicao = (comPeric || ticket != null) && p.salario != null;
+
+  const composicao = mostrarComposicao ? `
     <table class="rel-tabela">
       <thead><tr><th colspan="2">Como o salário é composto</th></tr></thead>
       <tbody>
+        ${comPeric ? `
         <tr><td style="width:60%">Salário base</td><td class="rel-num">${dinheiro(base)}</td></tr>
         <tr><td>Adicional de periculosidade (${(PERICULOSIDADE * 100).toFixed(0)}%)</td>
             <td class="rel-num">${dinheiro(adicional)}</td></tr>
+        <tr><td><strong>Total mensal holerite</strong></td>
+            <td class="rel-num"><strong>${dinheiro(p.salario)}</strong></td></tr>`
+        : `<tr><td style="width:60%"><strong>Total mensal holerite</strong></td>
+            <td class="rel-num"><strong>${dinheiro(p.salario)}</strong></td></tr>`}
+        ${ticket != null ? `<tr><td>Ticket alimentação</td>
+            <td class="rel-num">${dinheiro(ticket)}</td></tr>` : ''}
       </tbody>
-      <tfoot><tr><td>Total mensal</td><td class="rel-num">${dinheiro(p.salario)}</td></tr></tfoot>
+      <tfoot><tr><td>${ticket != null ? 'Total de tudo' : 'Total mensal'}</td>
+        <td class="rel-num">${dinheiro(p.salario + (ticket || 0))}</td></tr></tfoot>
     </table>
-    <p class="rel-nota">O adicional de periculosidade é pago enquanto durar a atividade que lhe dá
-      direito; cessada a condição, cessa o pagamento.</p>` : '';
+    ${comPeric ? `<p class="rel-nota">O adicional de periculosidade é pago enquanto durar a atividade
+      que lhe dá direito; cessada a condição, cessa o pagamento.</p>` : ''}
+    <p class="rel-nota">As horas extras trabalhadas são pagas à parte, conforme a jornada combinada e
+      a legislação — não estão nos valores acima.</p>` : '';
 
   const ficha = `
     <div class="rel-ficha">
@@ -433,6 +452,7 @@ export function documentoProposta(p) {
       <div><span>Nível</span><b>${esc(p.nivel || '—')}</b></div>
       <div><span>Faixa salarial</span><b>${esc(p.faixa || '—')}</b></div>
       <div><span>Salário mensal</span><b>${dinheiro(p.salario)}${comPeric ? ' <small style="font-weight:400">(com periculosidade)</small>' : ''}</b></div>
+      ${ticket != null ? `<div><span>Ticket alimentação</span><b>${dinheiro(ticket)}</b></div>` : ''}
       <div><span>${promocao ? 'Vigência a partir de' : 'Início previsto'}</span><b>${dataBr(p.data_inicio)}</b></div>
     </div>`;
 
