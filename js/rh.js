@@ -83,6 +83,7 @@ export const FAIXAS = [
 const R = { cargos: [], modelo: null, propostas: [], carregado: false };
 let editandoCargo = null;
 let documentoAtual = '';   // o que está na prévia, para imprimir
+let editandoProposta = null;   // id da proposta emitida que está sendo corrigida
 
 export async function carregarRh() {
   const c = estado.cliente;
@@ -595,7 +596,11 @@ function desenharUltimas() {
         <span class="tag ${p.tipo === 'promocao' ? 'alerta' : 'ativo'}">${p.tipo === 'promocao' ? 'promoção' : 'contratação'}</span><br>
         <span class="sub">${esc(p.cargo_nome || '')} · faixa ${esc(p.faixa || '—')} · ${dinheiro(p.salario)} · ${dataBr(String(p.criado_em).slice(0, 10))}</span>
       </span>
-      <span class="acoes"><button class="btn mini" data-prop="${p.id}">Ver de novo</button></span>
+      <span class="acoes">
+        <button class="btn mini" data-prop="${p.id}">Ver de novo</button>
+        <button class="btn mini" data-prop-ed="${p.id}">Editar</button>
+        <button class="btn mini" data-prop-del="${p.id}">Excluir</button>
+      </span>
     </div>`).join('')
     : '<div class="vazio">Nenhuma proposta emitida ainda.</div>';
 
@@ -603,6 +608,75 @@ function desenharUltimas() {
     const p = R.propostas.find(x => x.id === b.dataset.prop);
     if (p) verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
   }));
+  alvo.querySelectorAll('[data-prop-ed]').forEach(b => b.addEventListener('click', () => {
+    const p = R.propostas.find(x => x.id === b.dataset.propEd);
+    if (p) carregarNaProposta(p);
+  }));
+  alvo.querySelectorAll('[data-prop-del]').forEach(b => b.addEventListener('click', () => {
+    const p = R.propostas.find(x => x.id === b.dataset.propDel);
+    if (p) excluirProposta(p);
+  }));
+}
+
+/* Corrigir uma proposta já emitida: o formulário volta exatamente como ela foi
+   salva e o botão passa a gravar por cima, em vez de criar outra. Sem isso, a
+   única saída para um erro de digitação era emitir uma segunda proposta e
+   conviver com as duas na lista. */
+function carregarNaProposta(p) {
+  editandoProposta = p.id;
+  $('ppTipo').value = p.tipo === 'promocao' ? 'promocao' : 'contratacao';
+  trocarTipo();
+  $('ppPessoa').value = p.funcionario_id || '';
+  $('ppNome').value = p.nome || '';
+  $('ppCargo').value = p.cargo_id || '';
+  escolherCargo();
+  $('ppFaixa').value = (FAIXAS.find(([, r]) => r === p.faixa) || ['faixa_media'])[0];
+  $('ppSalario').value = p.salario != null ? emCampo(p.salario) : '';
+  $('ppTicket').value = p.ticket_alimentacao != null ? emCampo(p.ticket_alimentacao) : '';
+  $('ppPeric').checked = !!p.periculosidade;
+  $('ppMorador').checked = !!p.morador;
+  $('ppCargoAtual').value = p.cargo_atual || '';
+  $('ppSalarioAtual').value = p.salario_atual != null ? emCampo(p.salario_atual) : '';
+  $('ppInicio').value = (p.data_inicio || '').slice(0, 10);
+  $('ppJornada').value = p.jornada || '';
+  $('ppLocal').value = p.local_trabalho || '';
+  $('ppExperiencia').value = p.experiencia || '';
+  $('ppBeneficios').value = p.beneficios || '';
+  $('ppObs').value = p.observacao || '';
+  $('ppObsMostrar').checked = !!so(p.observacao);
+  $('ppPos').checked = !!p.pos_experiencia;
+  trocarPos();
+  $('ppPosCargo').value = p.pos_cargo_id || '';
+  escolherCargoPos();
+  $('ppPosFaixa').value = (FAIXAS.find(([, r]) => r === p.pos_faixa) || ['faixa_media'])[0];
+  $('ppPosSalario').value = p.pos_salario != null ? emCampo(p.pos_salario) : '';
+  modoEdicao();
+  verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
+  $('ppNome').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function modoEdicao() {
+  const editando = !!editandoProposta;
+  $('bSalvarProposta').textContent = editando ? 'Salvar alterações' : 'Salvar proposta';
+  $('bCancelarEdProposta').hidden = !editando;
+}
+
+function sairDaEdicao() {
+  editandoProposta = null;
+  modoEdicao();
+}
+
+async function excluirProposta(p) {
+  if (!confirm(`Excluir a proposta de ${p.nome}? Ela some da lista e não dá para voltar atrás.`)) return;
+  try {
+    const { error } = await estado.cliente.from('rh_propostas').delete().eq('id', p.id);
+    if (error) throw error;
+    R.propostas = R.propostas.filter(x => x.id !== p.id);
+    if (editandoProposta === p.id) sairDaEdicao();
+    desenharUltimas();
+  } catch (e) {
+    alert(`Não deu para excluir: ${e.message || e}`);
+  }
 }
 
 /* ==================================================================
@@ -966,6 +1040,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   $('ppCargo').addEventListener('change', escolherCargo);
   $('ppFaixa').addEventListener('change', aplicarFaixa);
   $('ppPos').addEventListener('change', trocarPos);
+  $('bCancelarEdProposta').addEventListener('click', sairDaEdicao);
   $('ppPosCargo').addEventListener('change', escolherCargoPos);
   $('ppPosFaixa').addEventListener('change', aplicarFaixaPos);
 
@@ -982,10 +1057,18 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
     const botao = ev.currentTarget;
     botao.disabled = true;
     try {
-      const { data, error } = await estado.cliente.from('rh_propostas')
-        .insert({ ...p, emitida_por: estado.sessao?.user?.email || null }).select().single();
+      const corpo = { ...p, emitida_por: estado.sessao?.user?.email || null };
+      const { data, error } = editandoProposta
+        ? await estado.cliente.from('rh_propostas').update(corpo).eq('id', editandoProposta).select().single()
+        : await estado.cliente.from('rh_propostas').insert(corpo).select().single();
       if (error) throw error;
-      R.propostas.unshift(data);
+      if (editandoProposta) {
+        const i = R.propostas.findIndex(x => x.id === editandoProposta);
+        if (i >= 0) R.propostas[i] = data; else R.propostas.unshift(data);
+        sairDaEdicao();
+      } else {
+        R.propostas.unshift(data);
+      }
       desenharUltimas();
       verPrevia(documentoProposta(data), `Proposta salarial - ${data.nome || ''}`);
       avisar('Proposta salva. A prévia está aí embaixo, pronta para imprimir.');
