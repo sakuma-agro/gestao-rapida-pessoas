@@ -143,7 +143,7 @@
               <option value="INATIVO">Somente inativos</option>
             </select>
           </label>
-          <label class="campo">Empregador e fazenda <select id="fEmp"><option value="">Todos</option></select></label>
+          <div class="campo" id="uniFichas"></div>
         </div>
         <div class="barra">
           <button class="btn" id="bTodos">Marcar todos</button>
@@ -210,7 +210,7 @@
               <option value="INATIVO">Somente inativos</option>
             </select>
           </label>
-          <label class="campo">Empregador e fazenda <select id="fEmpLista"><option value="">Todos</option></select></label>
+          <div class="campo" id="uniLista"></div>
         </div>
         <div class="barra">
           <button class="btn" id="bTodosLista">Marcar todos</button>
@@ -386,7 +386,7 @@
               <option value="INATIVO">Inativos</option>
             </select>
           </label>
-          <label class="campo">Empregador e fazenda <select id="fEmpFunc"><option value="">Todos</option></select></label>
+          <div class="campo" id="uniFunc"></div>
         </div>
         <div class="lista rolagem" id="listaFunc" style="margin-top:12px"></div>
       </div>
@@ -1021,6 +1021,10 @@
           <label class="campo">Salário proposto (R$)
             <input type="text" id="ppSalario" inputmode="decimal">
           </label>
+          <label class="campo">Ticket alimentação (R$)
+            <input type="text" id="ppTicket" inputmode="decimal" placeholder="em branco = não entra">
+            <small class="dc-sem">Sai fora do holerite: entra depois do total e soma no "Total de tudo".</small>
+          </label>
           <label class="campo">Início / vigência
             <input type="date" id="ppInicio">
           </label>
@@ -1048,6 +1052,9 @@
           </label>
           <label class="campo plena">Observação (sai numa caixa na proposta)
             <textarea id="ppObs" rows="2"></textarea>
+            <small class="dc-sem"><label style="cursor:pointer">
+              <input type="checkbox" id="ppObsMostrar" checked style="width:auto;margin-right:6px">
+              Mostrar esta caixa na proposta</label></small>
           </label>
         </div>
 
