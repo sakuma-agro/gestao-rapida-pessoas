@@ -133,9 +133,9 @@ const naFaixa = (v, tabela) => v == null ? null
 /* `assinatura` vazia = documento sem linha de assinatura, e é esse o padrão:
    ele pediu o nome fora dos relatórios. Quem quiser assinar de novo preenche o
    campo "Assinatura" em RH → Modelo — não volte a cravar um nome no código. */
-function documento({ titulo, subtitulo, canto, corpo, assinatura }) {
+function documento({ titulo, subtitulo, canto, corpo, assinatura, classe }) {
   return `
-  <article class="rel">
+  <article class="rel ${classe || ''}">
     <header class="rel-cabecalho">
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-titulo">
@@ -319,6 +319,8 @@ function abrirProposta() {
     $('ppPessoa').innerHTML = '<option value="">Escolha a pessoa</option>' + estado.funcionarios
       .filter(f => f.situacao === 'ATIVO')
       .map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+    $('ppPosCargo').innerHTML = sel.innerHTML;
+    $('ppPosFaixa').innerHTML = $('ppFaixa').innerHTML;
     sel.dataset.pronto = '1';
   }
   if (!so($('ppJornada').value)) $('ppJornada').value = m.jornada || '';
@@ -338,6 +340,24 @@ function montarBeneficios() {
   const base = so(m.beneficios).split('\n').filter(Boolean);
   const extra = $('ppMorador').checked ? so(m.beneficios_morador).split('\n').filter(Boolean) : [];
   $('ppBeneficios').value = [...base, ...extra].join('\n');
+}
+
+/* A segunda fase (depois do contrato de experiência) é opcional: enquanto a
+   caixa estiver desmarcada, os campos ficam escondidos e nada sai no papel. */
+function trocarPos() {
+  $('campoPos').hidden = !$('ppPos').checked;
+}
+
+function escolherCargoPos() {
+  const c = cargoPorId($('ppPosCargo').value);
+  $('ppPosNivel').textContent = c?.nivel ? `Nível ${c.nivel}` : '';
+  aplicarFaixaPos();
+}
+
+function aplicarFaixaPos() {
+  const c = cargoPorId($('ppPosCargo').value);
+  const campo = $('ppPosFaixa').value;
+  if (c && c[campo] != null) $('ppPosSalario').value = emCampo(c[campo]);
 }
 
 function trocarTipo() {
@@ -397,8 +417,87 @@ function dadosDaProposta() {
     jornada: so($('ppJornada').value),
     experiencia: so($('ppExperiencia').value),
     beneficios: so($('ppBeneficios').value),
-    observacao: so($('ppObs').value),
+    /* A caixa de observação é opcional: desmarcada, a proposta sai sem ela — e
+       sem o texto guardado junto, que volta do modelo na próxima. */
+    observacao: $('ppObsMostrar').checked ? so($('ppObs').value) : '',
+    pos_experiencia: $('ppPos').checked,
+    pos_cargo_id: ($('ppPos').checked && $('ppPosCargo').value) || null,
+    pos_cargo_nome: $('ppPos').checked ? (cargoPorId($('ppPosCargo').value)?.nome || '') : '',
+    pos_nivel: $('ppPos').checked ? (cargoPorId($('ppPosCargo').value)?.nivel || '') : '',
+    pos_faixa: $('ppPos').checked
+      ? ((FAIXAS.find(([k]) => k === $('ppPosFaixa').value) || [])[1] || '') : '',
+    pos_salario: $('ppPos').checked ? numeroOuNulo($('ppPosSalario').value) : null,
   };
+}
+
+/* O ticket alimentação não passa pelo holerite. Por isso a tabela fecha em
+   dois totais: o "Total mensal holerite", que é o que a folha paga, e o
+   "Total de tudo", que é o que a pessoa recebe no mês. Somar o ticket dentro
+   do salário seria prometer no holerite o que não vai estar nele.
+
+   O valor da tabela salarial já vem COM a periculosidade dentro — foi o que
+   ele confirmou. Então a conta é para trás: base = total / 1,30, e o adicional
+   é o que sobra. Escrever "30% de 3.105,96" seria errado.
+
+   A mesma função serve a folha da proposta e a da fase seguinte ao contrato de
+   experiência: as duas fecham a conta do mesmo jeito. */
+const valorOuNulo = v => (v == null || v === '' || isNaN(v)) ? null : Number(v);
+
+function composicaoDoSalario(salario, comPeric, ticket) {
+  if (salario == null || (!comPeric && ticket == null)) return '';
+  const base = comPeric ? salario / (1 + PERICULOSIDADE) : null;
+  const adicional = comPeric ? salario - base : null;
+  return `
+    <table class="rel-tabela">
+      <thead><tr><th colspan="2">Como o salário é composto</th></tr></thead>
+      <tbody>
+        ${comPeric ? `
+        <tr><td style="width:60%">Salário base</td><td class="rel-num">${dinheiro(base)}</td></tr>
+        <tr><td>Adicional de periculosidade (${(PERICULOSIDADE * 100).toFixed(0)}%)</td>
+            <td class="rel-num">${dinheiro(adicional)}</td></tr>
+        <tr><td><strong>Total mensal holerite</strong></td>
+            <td class="rel-num"><strong>${dinheiro(salario)}</strong></td></tr>`
+        : `<tr><td style="width:60%"><strong>Total mensal holerite</strong></td>
+            <td class="rel-num"><strong>${dinheiro(salario)}</strong></td></tr>`}
+        ${ticket != null ? `<tr><td>Ticket alimentação</td>
+            <td class="rel-num">${dinheiro(ticket)}</td></tr>` : ''}
+      </tbody>
+      <tfoot><tr><td>${ticket != null ? 'Total de tudo' : 'Total mensal'}</td>
+        <td class="rel-num">${dinheiro(salario + (ticket || 0))}</td></tr></tfoot>
+    </table>
+    ${comPeric ? `<p class="rel-nota">O adicional de periculosidade é pago enquanto durar a atividade
+      que lhe dá direito; cessada a condição, cessa o pagamento.</p>` : ''}
+    <p class="rel-nota">As horas extras trabalhadas são pagas à parte, conforme a jornada combinada e
+      a legislação — não estão nos valores acima.</p>`;
+}
+
+/* A segunda folha: a condição que passa a valer quando acabar o contrato de
+   experiência. Sai só se ele marcar e preencher — e mostra a fase nova por
+   inteiro, sem repetir os valores da primeira, que foi o que ele pediu. */
+function folhaPosExperiencia(p, comPeric, ticket) {
+  if (!p.pos_experiencia || p.pos_salario == null) return '';
+  const corpo = `
+    <p>Encerrado o período de experiência e confirmada a efetivação, passam a valer as condições
+       abaixo. O restante da proposta — jornada, local de trabalho, benefícios e observações —
+       continua como está na primeira folha.</p>
+    <div class="rel-ficha">
+      <div><span>Nome</span><b>${esc(p.nome || '—')}</b></div>
+      <div><span>Função</span><b>${esc(p.pos_cargo_nome || '—')}</b></div>
+      <div><span>Nível</span><b>${esc(p.pos_nivel || '—')}</b></div>
+      <div><span>Faixa salarial</span><b>${esc(p.pos_faixa || '—')}</b></div>
+      <div><span>Salário mensal</span><b>${dinheiro(p.pos_salario)}${comPeric ? ' <small style="font-weight:400">(com periculosidade)</small>' : ''}</b></div>
+      <div><span>A partir de</span><b>o fim do contrato de experiência</b></div>
+    </div>
+    ${composicaoDoSalario(p.pos_salario, comPeric, ticket)}
+    <p class="rel-nota">São Gotardo, ${porExtenso(hoje())}.</p>`;
+  return documento({
+    titulo: 'DEPOIS DO CONTRATO DE EXPERIÊNCIA',
+    subtitulo: 'Plano de Cargos e Salários · SAKUMA Agronegócios',
+    canto: esc(p.pos_cargo_nome || ''),
+    corpo,
+    assinatura: so((R.modelo || {}).assinatura),
+    classe: 'folha2',
+  });
 }
 
 export function documentoProposta(p) {
@@ -411,39 +510,8 @@ export function documentoProposta(p) {
      ele confirmou. Então a conta é para trás: base = total / 1,30, e o
      adicional é o que sobra. Escrever "30% de 3.105,96" seria errado. */
   const comPeric = !!p.periculosidade && p.salario != null;
-  const base = comPeric ? p.salario / (1 + PERICULOSIDADE) : null;
-  const adicional = comPeric ? p.salario - base : null;
-
-  /* O ticket alimentação não passa pelo holerite. Por isso a tabela fecha em
-     dois totais: o "Total mensal holerite", que é o que a folha paga, e o
-     "Total de tudo", que é o que a pessoa recebe no mês. Somar o ticket dentro
-     do salário seria prometer no holerite o que não vai estar nele. */
-  const ticket = p.ticket_alimentacao != null && p.ticket_alimentacao !== '' && !isNaN(p.ticket_alimentacao)
-    ? Number(p.ticket_alimentacao) : null;
-  const mostrarComposicao = (comPeric || ticket != null) && p.salario != null;
-
-  const composicao = mostrarComposicao ? `
-    <table class="rel-tabela">
-      <thead><tr><th colspan="2">Como o salário é composto</th></tr></thead>
-      <tbody>
-        ${comPeric ? `
-        <tr><td style="width:60%">Salário base</td><td class="rel-num">${dinheiro(base)}</td></tr>
-        <tr><td>Adicional de periculosidade (${(PERICULOSIDADE * 100).toFixed(0)}%)</td>
-            <td class="rel-num">${dinheiro(adicional)}</td></tr>
-        <tr><td><strong>Total mensal holerite</strong></td>
-            <td class="rel-num"><strong>${dinheiro(p.salario)}</strong></td></tr>`
-        : `<tr><td style="width:60%"><strong>Total mensal holerite</strong></td>
-            <td class="rel-num"><strong>${dinheiro(p.salario)}</strong></td></tr>`}
-        ${ticket != null ? `<tr><td>Ticket alimentação</td>
-            <td class="rel-num">${dinheiro(ticket)}</td></tr>` : ''}
-      </tbody>
-      <tfoot><tr><td>${ticket != null ? 'Total de tudo' : 'Total mensal'}</td>
-        <td class="rel-num">${dinheiro(p.salario + (ticket || 0))}</td></tr></tfoot>
-    </table>
-    ${comPeric ? `<p class="rel-nota">O adicional de periculosidade é pago enquanto durar a atividade
-      que lhe dá direito; cessada a condição, cessa o pagamento.</p>` : ''}
-    <p class="rel-nota">As horas extras trabalhadas são pagas à parte, conforme a jornada combinada e
-      a legislação — não estão nos valores acima.</p>` : '';
+  const ticket = valorOuNulo(p.ticket_alimentacao);
+  const composicao = composicaoDoSalario(p.salario, comPeric, ticket);
 
   const ficha = `
     <div class="rel-ficha">
@@ -503,7 +571,7 @@ export function documentoProposta(p) {
     canto: esc(p.cargo_nome || ''),
     corpo,
     assinatura: so(m.assinatura),
-  });
+  }) + folhaPosExperiencia(p, comPeric, ticket);
 }
 
 function desenharUltimas() {
@@ -692,6 +760,8 @@ function preencherFiltros() {
   const sel = $('qpEmpregador');
   if (!sel.dataset.pronto) {
     sel.innerHTML = opcoes(agrupar(estado.funcionarios, 'empregador'), 'Todos os empregadores');
+    $('ppPosCargo').innerHTML = sel.innerHTML;
+    $('ppPosFaixa').innerHTML = $('ppFaixa').innerHTML;
     sel.dataset.pronto = '1';
   }
 
@@ -884,6 +954,9 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   $('ppPessoa').addEventListener('change', escolherPessoa);
   $('ppCargo').addEventListener('change', escolherCargo);
   $('ppFaixa').addEventListener('change', aplicarFaixa);
+  $('ppPos').addEventListener('change', trocarPos);
+  $('ppPosCargo').addEventListener('change', escolherCargoPos);
+  $('ppPosFaixa').addEventListener('change', aplicarFaixaPos);
 
   $('bPreviaProposta').addEventListener('click', () => {
     const p = dadosDaProposta();
