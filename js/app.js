@@ -278,9 +278,14 @@ function preencherControles() {
   if (!$('selLinhas').value) $('selLinhas').value = m.linhas_padrao || 20;
 
   const emps = [...new Set(estado.funcionarios.map(f => f.empregador).filter(Boolean))].sort();
+  /* Remontar as opções zera a escolha da caixa; guarde e devolva, senão
+     cadastrar alguém no meio de um filtro joga a pessoa de volta para "Todos". */
   const opcoes = opcoesEmpregador();
-  $('fEmp').innerHTML = opcoes;
-  $('fEmpLista').innerHTML = opcoes;
+  ['fEmp', 'fEmpLista', 'fEmpFunc'].forEach(id => {
+    const antes = $(id).value;
+    $(id).innerHTML = opcoes;
+    if (antes && [...$(id).options].some(o => o.value === antes)) $(id).value = antes;
+  });
   $('lista-empregadores').innerHTML =
     [...new Set([...(m.empregadores || []), ...emps])].map(e => `<option value="${esc(e)}">`).join('');
   const cargos = [...new Set([...(m.cargos || []), ...estado.funcionarios.map(f => f.cargo).filter(Boolean)])].sort();
@@ -605,15 +610,18 @@ $('bRestaurarLista').addEventListener('click', async () => {
 function desenharFuncionarios() {
   const q = $('buscaFunc').value.trim().toLowerCase();
   const s = $('fSitFunc').value;
+  const par = parDoFiltro('fEmpFunc');
   const lista = estado.funcionarios.filter(f =>
-    (!q || [f.nome, f.cargo, f.cadastro, f.empregador].some(v => String(v || '').toLowerCase().includes(q))) &&
-    (!s || f.situacao === s));
-  $('cntFunc').textContent = estado.funcionarios.length;
+    (!q || [f.nome, f.cargo, f.cadastro, f.empregador, f.fazenda].some(v => String(v || '').toLowerCase().includes(q))) &&
+    (!s || f.situacao === s) &&
+    casaCom(f, par));
+  const total = estado.funcionarios.length;
+  $('cntFunc').textContent = lista.length === total ? total : `${lista.length} de ${total}`;
   $('listaFunc').innerHTML = lista.length ? lista.map(f => `
     <div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>
+        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
       <span class="acoes"><button class="btn mini" data-editar="${f.id}">Editar</button></span>
@@ -791,7 +799,7 @@ $('formFuncN2').addEventListener('submit', async ev => {
 });
 
 $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
-['buscaFunc', 'fSitFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
+['buscaFunc', 'fSitFunc', 'fEmpFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
 
 $('formFunc').addEventListener('submit', async ev => {
   ev.preventDefault();
