@@ -137,11 +137,27 @@
 }
 .rel-assina small { font-size: 10px; color: #8A8D86; }
 
-/* ---- rodapé: só a marca da LOP, no canto, uma vez só ---- */
+/* ---- rodapé: a marca da LOP, no canto, uma vez só ---- */
 .rel-rodape {
   margin-top: 18px;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
   line-height: 0;
+}
+/* A assinatura de desenvolvedor: a frase é "Inteligência para o agronegócio"
+   (a do Instagram, "para o dia a dia", é outra coisa). Fica do tamanho de nota
+   de rodapé e na mesma linha do símbolo — não custa altura na folha. */
+.rel-lop {
+  font-size: 8px;
+  line-height: 1;
+  color: #8A8D86;
+  letter-spacing: .2px;
+  /* O arquivo da marca tem a cabeça do lobo em cima e o wordmark embaixo, então
+     o meio da caixa fica acima do meio das letras. Centrar pelo flex deixava a
+     frase flutuando alto; estes 5 px descem a linha até o meio do "LOP". */
+  transform: translateY(4px);
 }
 .rel-rodape img { height: 19px; width: auto; opacity: .7; }
 

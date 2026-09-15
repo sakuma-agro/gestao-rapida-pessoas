@@ -397,8 +397,12 @@ dialog h3{margin:0 0 14px;font-size:16px}
   display:flex;justify-content:space-between;font-size:9pt;color:#7d8175}
 /* A marca da LOP: por último, no canto, pequena. É imagem, não fundo, então
    imprime mesmo com "gráficos de plano de fundo" desligado. */
-.an-lop{margin-top:2mm;text-align:right;line-height:0}
+.an-lop{margin-top:2mm;display:flex;align-items:center;justify-content:flex-end;gap:7px;line-height:0}
 .an-lop img{height:5mm;width:auto;opacity:.7}
+/* O arquivo da marca tem a cabeça do lobo em cima e o wordmark embaixo: o meio
+   da caixa fica acima do meio das letras, e centrar pelo flex deixava a frase
+   flutuando alto. Os 4 px descem a linha até o meio do "LOP". */
+.an-lop span{font-size:8px;line-height:1;color:#8A8D86;letter-spacing:.2px;transform:translateY(4px)}
 
 /* =========================================================
    TERMOS (liberdade sindical, recebimento do contrato)
