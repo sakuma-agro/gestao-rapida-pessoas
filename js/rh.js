@@ -159,8 +159,16 @@ function documento({ titulo, subtitulo, canto, corpo, assinatura, classe }) {
   </article>`;
 }
 
+/* O nome do arquivo que o Chrome sugere ao "Salvar como PDF" é o
+   document.title. Então cada documento diz como quer se chamar, e o título
+   volta ao normal assim que a impressão termina. Sem isso todo PDF saía como
+   "Gestão Rápida (Pessoas) · SAKUMA". */
+let tituloAtual = '';
+const limparNome = t => String(t || '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+
 /** Põe o documento na prévia. Nada vai para o papel sem passar por aqui. */
-function verPrevia(html) {
+function verPrevia(html, titulo = '') {
+  tituloAtual = limparNome(titulo);
   documentoAtual = html;
   const alvo = $('jorImpressao');
   if (!alvo) return;
@@ -171,9 +179,12 @@ function verPrevia(html) {
 
 function imprimirPrevia() {
   if (!documentoAtual) return;
+  const tituloDaAba = document.title;
+  if (tituloAtual) document.title = tituloAtual;
   document.body.classList.add('jor-imprimindo');
   const soltar = () => {
     document.body.classList.remove('jor-imprimindo');
+    document.title = tituloDaAba;
     removeEventListener('afterprint', soltar);
   };
   addEventListener('afterprint', soltar);
@@ -590,7 +601,7 @@ function desenharUltimas() {
 
   alvo.querySelectorAll('[data-prop]').forEach(b => b.addEventListener('click', () => {
     const p = R.propostas.find(x => x.id === b.dataset.prop);
-    if (p) verPrevia(documentoProposta(p));
+    if (p) verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
   }));
 }
 
@@ -900,7 +911,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   /* --- cargos --- */
   $('rhBuscaCargo').addEventListener('input', desenharCargos);
   $('bNovoCargo').addEventListener('click', () => abrirCargo(null));
-  $('bImprimirCargos').addEventListener('click', () => verPrevia(documentoCargos()));
+  $('bImprimirCargos').addEventListener('click', () => verPrevia(documentoCargos(), 'Plano de cargos e salarios'));
 
   $('formCargo').addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -962,7 +973,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
     const p = dadosDaProposta();
     if (!p.nome) return avisar('Falta o nome da pessoa.');
     if (!p.cargo_id) return avisar('Escolha o cargo.');
-    verPrevia(documentoProposta(p));
+    verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
   });
 
   $('bSalvarProposta').addEventListener('click', async ev => {
@@ -976,7 +987,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
       if (error) throw error;
       R.propostas.unshift(data);
       desenharUltimas();
-      verPrevia(documentoProposta(data));
+      verPrevia(documentoProposta(data), `Proposta salarial - ${data.nome || ''}`);
       avisar('Proposta salva. A prévia está aí embaixo, pronta para imprimir.');
     } catch (e) {
       avisar(`Não deu para salvar: ${e.message || e}`);
@@ -1028,7 +1039,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   $('qpSituacao').addEventListener('change', desenharQuadro);
   $('qpEmpregador').addEventListener('change', desenharQuadro);
   $('qpFazenda').addEventListener('change', desenharQuadro);
-  $('bPreviaQuadro').addEventListener('click', () => verPrevia(documentoQuadro()));
+  $('bPreviaQuadro').addEventListener('click', () => verPrevia(documentoQuadro(), `Quadro de pessoal - ${recorte()}`));
   $('bCsvQuadro').addEventListener('click', () =>
     baixarCsv(`quadro-de-pessoal-${recorte().replace(/\W+/g, '-').toLowerCase()}-${hoje()}.csv`, csvQuadro()));
 
