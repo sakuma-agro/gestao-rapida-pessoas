@@ -149,6 +149,12 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .rh-regras ul{margin:0;padding-left:18px}
 .rh-regras li{margin:3px 0}
 .rh-off td{opacity:.55}
+/* O olho do salário: a tabela abre escondida, como o saldo no app do banco. */
+.btn.olho{display:inline-flex;align-items:center;gap:6px}
+.btn.olho svg{flex:none}
+.btn.olho[aria-pressed="true"]{border-color:var(--verde);color:var(--verde-esc)}
+.rh-oculto{display:inline-block;color:var(--suave);letter-spacing:.16em;
+  font-size:13px;line-height:1;user-select:none}
 .qp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .qp-card{border:1px solid var(--linha);border-radius:10px;padding:10px 12px;background:var(--fundo)}
 .qp-card span{display:block;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
