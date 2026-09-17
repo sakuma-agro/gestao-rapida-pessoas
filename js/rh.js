@@ -135,6 +135,7 @@ const R = { cargos: [], modelo: null, propostas: [], carregado: false };
 let editandoCargo = null;
 let documentoAtual = '';   // o que está na prévia, para imprimir
 let editandoProposta = null;   // id da proposta emitida que está sendo corrigida
+let propostaOriginal = null;   // como ela estava quando foi aberta, para comparar
 
 export async function carregarRh() {
   const c = estado.cliente;
@@ -681,6 +682,7 @@ function desenharUltimas() {
    conviver com as duas na lista. */
 function carregarNaProposta(p) {
   editandoProposta = p.id;
+  propostaOriginal = { ...p };
   $('ppTipo').value = p.tipo === 'promocao' ? 'promocao' : 'contratacao';
   trocarTipo();
   $('ppPessoa').value = p.funcionario_id || '';
@@ -716,11 +718,76 @@ function modoEdicao() {
   const editando = !!editandoProposta;
   $('bSalvarProposta').textContent = editando ? 'Salvar alterações' : 'Salvar proposta';
   $('bCancelarEdProposta').hidden = !editando;
+  /* A faixa de aviso é a correção do acidente de 17/09/2026: ele abriu uma
+     proposta no Editar, digitou os dados de outra pessoa e o Salvar gravou por
+     cima — o único sinal de que o formulário estava preso numa proposta antiga
+     era a palavra "alterações" no botão, no fim da tela. */
+  const faixa = $('ppAvisoEdicao');
+  if (!faixa) return;                       /* index.html velho no cache */
+  faixa.hidden = !editando;
+  if (editando) {
+    const o = propostaOriginal || {};
+    const quando = dataBr(String(o.criado_em || '').slice(0, 10));
+    $('ppAvisoTexto').textContent =
+      `Corrigindo a proposta de ${o.nome || 'alguém'}${quando !== '—' ? ` (${quando})` : ''}`
+      + ' — salvar aqui grava por cima dela.';
+  }
 }
 
 function sairDaEdicao() {
   editandoProposta = null;
+  propostaOriginal = null;
   modoEdicao();
+}
+
+/* "Guardar como proposta nova": mantém tudo que está digitado e só solta o
+   vínculo com a proposta aberta, para o Salvar criar outra em vez de gravar
+   por cima. É o caminho de quem começou a escrever por cima sem perceber. */
+function virarNovaProposta(avisar = () => {}) {
+  if (!editandoProposta) return;
+  const antiga = propostaOriginal?.nome || 'a anterior';
+  sairDaEdicao();
+  avisar(`Agora é uma proposta nova — salvar não mexe mais na de ${antiga}.`);
+}
+
+/* Formulário em branco para uma proposta nova: some o que era da pessoa e os
+   textos fixos voltam do modelo. */
+function limparProposta(avisar = () => {}) {
+  sairDaEdicao();
+  const m = R.modelo || {};
+  $('ppTipo').value = 'contratacao';
+  trocarTipo();
+  $('ppPessoa').value = '';
+  $('ppNome').value = '';
+  $('ppCargo').value = '';
+  $('ppFaixa').value = 'faixa_media';
+  escolherCargo();
+  $('ppSalario').value = '';
+  $('ppTicket').value = '';
+  $('ppPeric').checked = false;
+  $('ppMorador').checked = false;
+  $('ppCargoAtual').value = '';
+  $('ppSalarioAtual').value = '';
+  $('ppInicio').value = hoje();
+  $('ppJornada').value = m.jornada || '';
+  $('ppLocal').value = m.local_trabalho || '';
+  $('ppExperiencia').value = m.experiencia || '';
+  montarBeneficios();
+  $('ppObs').value = m.observacoes || '';
+  $('ppObsMostrar').checked = true;
+  $('ppPos').checked = false;
+  trocarPos();
+  $('ppPosCargo').value = '';
+  $('ppPosFaixa').value = 'faixa_media';
+  $('ppPosSalario').value = '';
+  $('ppPosNivel').textContent = '';
+  /* A prévia era da proposta anterior: deixá-la aí embaixo, ao lado de um
+     formulário vazio, é convite para imprimir a folha errada. */
+  documentoAtual = '';
+  if ($('jorImpressao')) { $('jorImpressao').innerHTML = ''; $('jorImpressao').hidden = true; }
+  avisar('Formulário limpo — esta será uma proposta nova.');
+  $('ppNome').focus();
+  $('ppTipo').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 async function excluirProposta(p) {
@@ -1129,6 +1196,13 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   $('ppFaixa').addEventListener('change', aplicarFaixa);
   $('ppPos').addEventListener('change', trocarPos);
   $('bCancelarEdProposta').addEventListener('click', sairDaEdicao);
+  $('bCancelarEdProposta2').addEventListener('click', sairDaEdicao);
+  $('bVirarNovaProposta').addEventListener('click', () => virarNovaProposta(avisar));
+  $('bNovaProposta').addEventListener('click', () => {
+    const sujo = so($('ppNome').value) || $('ppPessoa').value || $('ppCargo').value;
+    if (sujo && !confirm('Limpar o formulário para começar uma proposta nova?\n\nO que está digitado aqui se perde. As propostas já salvas não são tocadas.')) return;
+    limparProposta(avisar);
+  });
   $('ppPosCargo').addEventListener('change', escolherCargoPos);
   $('ppPosFaixa').addEventListener('change', aplicarFaixaPos);
 
@@ -1142,6 +1216,22 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   $('bSalvarProposta').addEventListener('click', async ev => {
     const p = dadosDaProposta();
     if (!p.nome || !p.cargo_id) return avisar('Preencha o nome e o cargo antes de salvar.');
+
+    /* Trava: se o formulário está preso numa proposta e o nome mudou, quem
+       está aí é outra pessoa. Gravar por cima apagaria a proposta da primeira
+       sem aviso nenhum — foi exatamente o que aconteceu em 17/09/2026. */
+    if (editandoProposta && propostaOriginal
+        && so(p.nome).toLowerCase() !== so(propostaOriginal.nome).toLowerCase()) {
+      const criarNova = confirm(
+        `Esta tela está corrigindo a proposta de "${propostaOriginal.nome}", `
+        + `mas o nome agora é "${p.nome}".\n\n`
+        + `OK  →  guarda uma proposta NOVA para ${p.nome} e deixa a de `
+        + `${propostaOriginal.nome} como está.\n`
+        + `Cancelar  →  não salva nada agora.`);
+      if (!criarNova) return;
+      sairDaEdicao();
+    }
+
     const botao = ev.currentTarget;
     botao.disabled = true;
     try {
