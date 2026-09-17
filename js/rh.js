@@ -79,6 +79,57 @@ export const FAIXAS = [
   ['faixa_a', 'A'], ['faixa_media', 'B'], ['faixa_c', 'C'], ['faixa_d', 'D'], ['faixa_e', 'E'],
 ];
 
+/* =============== o olho dos salários ===============
+   Pedido dele (17/09/2026): o plano de cargos abre com os valores escondidos,
+   como o saldo no aplicativo do banco, e só aparece depois da senha.
+   O que isso é e o que não é: é uma cortina contra quem olha por cima do
+   ombro numa sala compartilhada. NÃO é segurança — a senha está aqui, no
+   código, que é público no GitHub, e quem abre o F12 lê. A trava de verdade
+   continua sendo o módulo RH conferido no banco (app_pode('rh')).
+   Escolhas dele: vale só no Plano de cargos, e o olho fecha sozinho ao sair
+   da tela — quem voltar digita de novo. */
+const SENHA_SALARIO = 'sk123';
+const OCULTO = '<span class="rh-oculto">••••••</span>';
+let salarioVisivel = false;
+let aposDestravar = null;
+
+const svgOlho = corpo => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+  aria-hidden="true">${corpo}</svg>`;
+const OLHO_ABERTO = svgOlho(
+  '<path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/>'
+  + '<circle cx="12" cy="12" r="3.2"/>');
+const OLHO_FECHADO = svgOlho(
+  '<path d="M3 3l18 18"/>'
+  + '<path d="M10.2 6.1A10.6 10.6 0 0 1 12 6c7 0 10.5 6 10.5 6a18 18 0 0 1-3.8 4.3"/>'
+  + '<path d="M6.5 7.7A17.7 17.7 0 0 0 1.5 12S5 18 12 18c1.5 0 2.9-.3 4.1-.7"/>'
+  + '<path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>');
+
+function atualizarOlho() {
+  const b = $('bOlhoCargos');
+  if (!b) return;
+  b.innerHTML = (salarioVisivel ? OLHO_ABERTO : OLHO_FECHADO)
+    + `<span>${salarioVisivel ? 'Esconder valores' : 'Mostrar valores'}</span>`;
+  b.title = salarioVisivel
+    ? 'Esconder os salários'
+    : 'Mostrar os salários (pede senha)';
+  b.setAttribute('aria-pressed', salarioVisivel ? 'true' : 'false');
+}
+
+/** Abre o diálogo da senha. `depois` é o que fazer assim que destravar. */
+function pedirSenhaSalario(depois = null) {
+  aposDestravar = depois;
+  const campo = $('senhaSalario');
+  if (!campo) { salarioVisivel = true; return; }   /* tela antiga em cache */
+  campo.value = '';
+  $('erroSenhaSalario').hidden = true;
+  $('dlgSenhaSalario').showModal();
+  campo.focus();
+}
+
+/** Faz agora se o olho estiver aberto; senão pede a senha e faz depois. */
+const comSalarioAberto = fn => salarioVisivel ? fn() : pedirSenhaSalario(fn);
+
 /* =============== dados =============== */
 const R = { cargos: [], modelo: null, propostas: [], carregado: false };
 let editandoCargo = null;
@@ -102,6 +153,7 @@ export async function carregarRh() {
 export function limparRh() {
   R.cargos = []; R.modelo = null; R.propostas = []; R.carregado = false;
   documentoAtual = '';
+  salarioVisivel = false;
 }
 
 const cargoPorId = id => R.cargos.find(c => c.id === id);
@@ -215,7 +267,8 @@ export async function abrirRh(tela) {
       return;
     }
   }
-  if (tela === 'rhCargos') desenharCargos();
+  /* Sair da tela fecha o olho: quem voltar ao plano de cargos digita de novo. */
+  if (tela === 'rhCargos') { salarioVisivel = false; desenharCargos(); }
   if (tela === 'rhProposta') abrirProposta();
   if (tela === 'rhQuadro') desenharQuadro();
 }
@@ -239,14 +292,18 @@ function desenharCargos() {
         <tr${c.ativo === false ? ' class="rh-off"' : ''}>
           <td><strong>${esc(c.nome)}</strong>${c.ativo === false ? ' <span class="tag inativo">inativo</span>' : ''}</td>
           <td>${esc(c.nivel || '—')}</td>
-          ${FAIXAS.map(([campo]) => `<td class="ce">${dinheiro(c[campo])}</td>`).join('')}
+          ${FAIXAS.map(([campo]) => `<td class="ce">${salarioVisivel ? dinheiro(c[campo]) : OCULTO}</td>`).join('')}
           <td class="ce"><button class="btn mini" data-cargo="${c.id}">Editar</button></td>
         </tr>`).join('')}
       </tbody>
     </table>` : '<div class="vazio">Nenhum cargo encontrado.</div>';
 
+  atualizarOlho();
+
+  /* O diálogo de editar mostra as cinco faixas: com o olho fechado, pede a
+     senha antes de abrir — senão o Editar seria o caminho de volta. */
   $('rhTabelaCargos').querySelectorAll('[data-cargo]').forEach(b =>
-    b.addEventListener('click', () => abrirCargo(b.dataset.cargo)));
+    b.addEventListener('click', () => comSalarioAberto(() => abrirCargo(b.dataset.cargo))));
 
   const regras = so(R.modelo?.regras);
   $('rhRegras').innerHTML = regras
@@ -985,7 +1042,38 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   /* --- cargos --- */
   $('rhBuscaCargo').addEventListener('input', desenharCargos);
   $('bNovoCargo').addEventListener('click', () => abrirCargo(null));
-  $('bImprimirCargos').addEventListener('click', () => verPrevia(documentoCargos(), 'Plano de cargos e salarios'));
+  /* A tabela para imprimir traz os valores; com o olho fechado, senha antes. */
+  $('bImprimirCargos').addEventListener('click', () => comSalarioAberto(
+    () => verPrevia(documentoCargos(), 'Plano de cargos e salarios')));
+
+  /* --- o olho dos salários --- */
+  $('bOlhoCargos').addEventListener('click', () => {
+    if (salarioVisivel) { salarioVisivel = false; desenharCargos(); return; }
+    pedirSenhaSalario();
+  });
+
+  $('formSenhaSalario').addEventListener('submit', ev => {
+    ev.preventDefault();
+    if (so($('senhaSalario').value) !== SENHA_SALARIO) {
+      $('erroSenhaSalario').textContent = 'Senha incorreta.';
+      $('erroSenhaSalario').hidden = false;
+      $('senhaSalario').select();
+      return;
+    }
+    const depois = aposDestravar;
+    aposDestravar = null;
+    salarioVisivel = true;
+    $('senhaSalario').value = '';
+    $('dlgSenhaSalario').close();
+    desenharCargos();
+    if (depois) depois();
+  });
+
+  /* Fechar no Cancelar ou no Esc não pode deixar a ação pendurada. */
+  $('dlgSenhaSalario').addEventListener('close', () => {
+    aposDestravar = null;
+    $('senhaSalario').value = '';
+  });
 
   $('formCargo').addEventListener('submit', async ev => {
     ev.preventDefault();
