@@ -149,6 +149,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .rh-regras ul{margin:0;padding-left:18px}
 .rh-regras li{margin:3px 0}
 .rh-off td{opacity:.55}
+/* A faixa que avisa, em voz alta, que o formulário está corrigindo uma
+   proposta já emitida — salvar aqui grava por cima dela. */
+.pp-editando{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:10px;margin-top:14px;padding:10px 12px;border:1px solid var(--marrom);
+  border-left-width:4px;border-radius:0 8px 8px 0;background:rgba(116,79,40,.07);
+  font-size:12.5px;color:var(--marrom);font-weight:600}
+.pp-editando .acoes{flex:none}
 /* O olho do salário: a tabela abre escondida, como o saldo no app do banco. */
 .btn.olho{display:inline-flex;align-items:center;gap:6px}
 .btn.olho svg{flex:none}
