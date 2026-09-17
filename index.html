@@ -975,6 +975,7 @@
             <p class="dica" style="margin:2px 0 0">As faixas daqui alimentam a proposta. Salário só aparece para quem tem o módulo RH.</p>
           </div>
           <span class="acoes">
+            <button class="btn olho" type="button" id="bOlhoCargos" aria-pressed="false">Mostrar valores</button>
             <button class="btn" id="bImprimirCargos">Ver tabela para imprimir</button>
             <button class="btn principal" id="bNovoCargo">Novo cargo</button>
           </span>
@@ -1381,6 +1382,22 @@
     <div class="barra fim">
       <button class="btn" type="button" data-fechar>Cancelar</button>
       <button class="btn principal" type="submit">Gerar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: SENHA DOS SALÁRIOS ============ -->
+<dialog id="dlgSenhaSalario">
+  <form method="dialog" id="formSenhaSalario">
+    <h3>Mostrar os salários</h3>
+    <p class="dica">Os valores do plano de cargos ficam escondidos. Digite a senha para abrir.</p>
+    <div class="aviso erro" id="erroSenhaSalario" hidden></div>
+    <label class="campo plena">Senha
+      <input type="password" id="senhaSalario" autocomplete="off" inputmode="text">
+    </label>
+    <div class="barra fim">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="submit">Mostrar</button>
     </div>
   </form>
 </dialog>
