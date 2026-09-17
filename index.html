@@ -996,7 +996,18 @@
             <h2 style="margin:0">Gerar proposta</h2>
             <p class="dica" style="margin:2px 0 0">Escolha o cargo e a faixa; o salário vem da tabela e pode ser mudado.</p>
           </div>
-          <button class="btn" id="bTextosProposta">Textos fixos</button>
+          <span class="acoes">
+            <button class="btn principal" id="bNovaProposta">Nova proposta</button>
+            <button class="btn" id="bTextosProposta">Textos fixos</button>
+          </span>
+        </div>
+
+        <div class="pp-editando" id="ppAvisoEdicao" hidden>
+          <span id="ppAvisoTexto"></span>
+          <span class="acoes">
+            <button class="btn mini" type="button" id="bVirarNovaProposta">Guardar como proposta nova</button>
+            <button class="btn mini" type="button" id="bCancelarEdProposta2">Cancelar edição</button>
+          </span>
         </div>
 
         <div class="grade larga" style="margin-top:14px">
