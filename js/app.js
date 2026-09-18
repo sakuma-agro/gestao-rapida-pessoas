@@ -12,7 +12,7 @@ import { desenharCadastros } from './jornada-cadastros.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
   mostrarInicio } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
-import { ligarSst, abrirSst, limparSst } from './sst.js';
+import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
@@ -40,7 +40,21 @@ function mostrar(qual) {
   $('app').hidden = qual !== 'app';
 }
 
+/* A prévia dos documentos vive toda no #jorImpressao, que fica fora do #app e
+   é de todos os módulos: Ficha do Funcionário, relatório do SST, documentos do
+   DP e do RH. Ela só nasce depois que a tela já está aberta, então trocar de
+   tela sempre pode apagá-la — e precisa: senão ela fica pendurada embaixo da
+   tela nova, com a barra de impressão de outro módulo, e ainda sai no papel na
+   impressão seguinte. */
+function limparPrevias() {
+  fecharFichaCadastral();   // esconde a barra do Cadastro · Nível 1
+  limparPreviaSst();        // esconde as barras do SST e devolve a da lista
+  const alvo = $('jorImpressao');
+  if (alvo) { alvo.innerHTML = ''; alvo.hidden = true; }
+}
+
 function abrirAba(nome) {
+  limparPrevias();
   $('telaInicio').hidden = nome !== 'inicio';
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
@@ -71,10 +85,6 @@ function abrirAba(nome) {
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
-  /* Sair da tela fecha a prévia da Ficha do Funcionário: o #jorImpressao é
-     compartilhado com os documentos do DP e do RH, e prévia esquecida ali
-     acaba indo para o papel na impressão seguinte. */
-  if (nome !== 'funcionarios') fecharFichaCadastral();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'funcionariosN2') desenharFuncN2();
   /* Os cadastros estruturais desenham a partir da mesma receita do DP; cada

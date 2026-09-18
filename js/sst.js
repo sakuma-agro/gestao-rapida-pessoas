@@ -145,7 +145,7 @@ export async function carregarSst() {
 
 export function limparSst() {
   limparAso();
-  fecharFicha();
+  limparPreviaSst();
   S.exame = { tipos: [], regs: [] };
   S.treinamento = { tipos: [], regs: [] };
   S.carregado = false;
@@ -176,7 +176,7 @@ export async function abrirSst(tela) {
   if (!r) return;
   // o #jorImpressao é compartilhado: prévia esquecida aqui sairia na impressão
   // de outra tela
-  fecharFicha();
+  limparPreviaSst();
   if (!S.carregado) {
     try { await carregarSst(); }
     catch (e) {
@@ -681,7 +681,7 @@ function folhaPainel(r, urgentes, faltando) {
 /* Enquanto a folha de uma pessoa está na prévia, a barra da lista sai do ar:
    as duas juntas empilhariam dois rodapés, e o "Imprimir" de lá mandaria a
    lista inteira e a folha da pessoa na mesma impressão. */
-function fecharFicha() {
+export function limparPreviaSst() {
   fecharFichaSst();
   Object.values(RECEITAS).forEach(x => {
     const b = $(x.el.barraLista);
@@ -802,7 +802,7 @@ function ligarReceita(r, avisar) {
   // relatório de uma pessoa só
   $(r.el.ficha).addEventListener('click', () => abrirEscolhaFicha(r));
   $(r.el.fichaImprimir).addEventListener('click', imprimirFichaSst);
-  $(r.el.fichaFechar).addEventListener('click', fecharFicha);
+  $(r.el.fichaFechar).addEventListener('click', limparPreviaSst);
   $(r.el.imprimir).addEventListener('click', () => window.print());
   $(r.el.zoom).addEventListener('input', () => {
     const z = $(r.el.zoom).value;
