@@ -3,11 +3,11 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v70';
+const VERSAO = 'gr-v71';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
-  './js/planilha.js', './js/aniversarios.js', './js/seed.js', './js/sst.js', './js/ca.js', './js/rh.js', './js/aso.js',
+  './js/planilha.js', './js/aniversarios.js', './js/seed.js', './js/sst.js', './js/sst-ficha.js', './js/ca.js', './js/rh.js', './js/aso.js',
   './js/acesso.js', './js/termos.js', './js/backup.js', './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
   './js/jornada.js', './js/jornada-dados.js', './js/jornada-motor.js',
   './js/jornada-fechamento.js', './js/jornada-relatorios.js', './js/jornada-cadastros.js',

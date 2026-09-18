@@ -592,7 +592,10 @@
             <h2 style="margin:0">Vencimento dos exames</h2>
             <p class="dica" style="margin:2px 0 0">O mais recente de cada exame, por funcionário.</p>
           </div>
-          <button class="btn principal" id="bNovoExame">Lançar exame</button>
+          <span class="barra">
+            <button class="btn" id="bFichaEx">Relatório do funcionário</button>
+            <button class="btn principal" id="bNovoExame">Lançar exame</button>
+          </span>
         </div>
         <div class="grade larga" style="margin-top:14px">
           <label class="campo">Buscar <input type="text" id="exBusca" placeholder="Nome do funcionário"></label>
@@ -625,13 +628,22 @@
 
       <div class="previa-lista" id="exSaida"></div>
 
-      <div class="rodape-fixo naoimprimir">
+      <div class="rodape-fixo naoimprimir" id="rodapeEx">
         <button class="btn principal" id="bImprimirEx">Imprimir</button>
         <span class="cresce"></span>
         <span class="zoom">Zoom
           <input type="range" id="zoomEx" min="50" max="150" value="80" step="5">
           <span id="zoomVEx">80%</span>
         </span>
+      </div>
+
+      <!-- Acende quando alguém pede o relatório de uma pessoa. A prévia em si
+           é montada no #jorImpressao, lá embaixo, fora do #app. -->
+      <div class="rodape-fixo naoimprimir" id="barraFichaEx" hidden>
+        <button class="btn principal" id="bImprimirFichaEx">Imprimir o relatório</button>
+        <button class="btn" id="bFecharFichaEx">Fechar prévia</button>
+        <span class="cresce"></span>
+        <span class="dica">A folha traz o exame mais recente de cada tipo e o que a função exige.</span>
       </div>
     </section>
 
@@ -727,7 +739,10 @@
             <h2 style="margin:0">Vencimento dos treinamentos</h2>
             <p class="dica" style="margin:2px 0 0">O mais recente de cada treinamento, por funcionário.</p>
           </div>
-          <button class="btn principal" id="bNovoTrein">Lançar treinamento</button>
+          <span class="barra">
+            <button class="btn" id="bFichaTr">Relatório do funcionário</button>
+            <button class="btn principal" id="bNovoTrein">Lançar treinamento</button>
+          </span>
         </div>
         <div class="grade larga" style="margin-top:14px">
           <label class="campo">Buscar <input type="text" id="trBusca" placeholder="Nome do funcionário"></label>
@@ -760,13 +775,21 @@
 
       <div class="previa-lista" id="trSaida"></div>
 
-      <div class="rodape-fixo naoimprimir">
+      <div class="rodape-fixo naoimprimir" id="rodapeTr">
         <button class="btn principal" id="bImprimirTr">Imprimir</button>
         <span class="cresce"></span>
         <span class="zoom">Zoom
           <input type="range" id="zoomTr" min="50" max="150" value="80" step="5">
           <span id="zoomVTr">80%</span>
         </span>
+      </div>
+
+      <!-- Idem à tela de exames: a barra da prévia do relatório por pessoa. -->
+      <div class="rodape-fixo naoimprimir" id="barraFichaTr" hidden>
+        <button class="btn principal" id="bImprimirFichaTr">Imprimir o relatório</button>
+        <button class="btn" id="bFecharFichaTr">Fechar prévia</button>
+        <span class="cresce"></span>
+        <span class="dica">A folha traz o treinamento mais recente de cada tipo, com carga e instrutor.</span>
       </div>
     </section>
 
@@ -1402,6 +1425,22 @@
     <div class="barra fim">
       <button class="btn" type="button" data-fechar>Cancelar</button>
       <button class="btn principal" type="submit">Gerar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: RELATÓRIO DE UMA PESSOA (SST) ============ -->
+<!-- Serve as duas telas de Vencimentos; o texto muda conforme quem abriu. -->
+<dialog id="dlgFichaSst">
+  <form method="dialog" id="formFichaSst">
+    <h3 id="fsTitulo">Relatório do funcionário</h3>
+    <p class="dica" id="fsDica"></p>
+    <div class="grade">
+      <label class="campo plena">Funcionário <select id="fsFunc"></select></label>
+    </div>
+    <div class="barra fim">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="submit">Gerar relatório</button>
     </div>
   </form>
 </dialog>
