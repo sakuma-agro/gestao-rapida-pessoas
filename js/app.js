@@ -20,6 +20,7 @@ import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
+import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -70,6 +71,10 @@ function abrirAba(nome) {
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
+  /* Sair da tela fecha a prévia da Ficha do Funcionário: o #jorImpressao é
+     compartilhado com os documentos do DP e do RH, e prévia esquecida ali
+     acaba indo para o papel na impressão seguinte. */
+  if (nome !== 'funcionarios') fecharFichaCadastral();
   if (nome === 'funcionarios') desenharFuncionarios();
   if (nome === 'funcionariosN2') desenharFuncN2();
   /* Os cadastros estruturais desenham a partir da mesma receita do DP; cada
@@ -687,12 +692,19 @@ function desenharFuncionarios() {
         <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
-      <span class="acoes"><button class="btn mini" data-editar="${f.id}">Editar</button></span>
+      <span class="acoes">
+        <button class="btn mini" data-ficha="${f.id}">Ficha</button>
+        <button class="btn mini" data-editar="${f.id}">Editar</button>
+      </span>
     </div>`).join('')
     : '<div class="vazio">Nenhum funcionário encontrado.</div>';
 
   $('listaFunc').querySelectorAll('[data-editar]').forEach(b =>
     b.addEventListener('click', () => abrirFuncionario(b.dataset.editar)));
+  /* Ficha do Funcionário: prévia na tela primeiro, imprimir é escolha dele. */
+  $('listaFunc').querySelectorAll('[data-ficha]').forEach(b =>
+    b.addEventListener('click', () =>
+      verFichaCadastral(estado.funcionarios.find(x => x.id === b.dataset.ficha))));
 }
 
 const dataBr = iso => {
@@ -862,6 +874,8 @@ $('formFuncN2').addEventListener('submit', async ev => {
 });
 
 $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
+$('bImprimirFichaCad').addEventListener('click', imprimirFichaCadastral);
+$('bFecharFichaCad').addEventListener('click', fecharFichaCadastral);
 ['buscaFunc', 'fSitFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
 
 $('formFunc').addEventListener('submit', async ev => {
