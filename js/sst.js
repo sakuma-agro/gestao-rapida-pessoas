@@ -7,7 +7,8 @@
 import { estado } from './store.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
-  conferenciaDo } from './aso.js';
+  conferenciaDo, pendenciasDe } from './aso.js';
+import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
 import { abrirModulo } from './acesso.js';
 
 const $ = id => document.getElementById(id);
@@ -78,6 +79,8 @@ const RECEITAS = {
       resumo: 'exResumo', historico: 'exHistorico', tabela: 'exTabela', semNada: 'exSemNada',
       saida: 'exSaida', zoom: 'zoomEx', zoomV: 'zoomVEx', imprimir: 'bImprimirEx',
       novo: 'bNovoExame', listaTipos: 'listaTipoEx', novoTipo: 'bNovoTipoEx',
+      ficha: 'bFichaEx', barraFicha: 'barraFichaEx', barraLista: 'rodapeEx',
+      fichaImprimir: 'bImprimirFichaEx', fichaFechar: 'bFecharFichaEx',
       dlg: 'dlgExame', form: 'formExame', titulo: 'tituloExame', erro: 'erroExame',
       func: 'exFunc', tipo: 'exTipo', data: 'exData', vence: 'exVence',
       dica: 'exDicaVence', apagar: 'bApagarExame',
@@ -103,6 +106,8 @@ const RECEITAS = {
       resumo: 'trResumo', historico: 'trHistorico', tabela: 'trTabela', semNada: 'trSemNada',
       saida: 'trSaida', zoom: 'zoomTr', zoomV: 'zoomVTr', imprimir: 'bImprimirTr',
       novo: 'bNovoTrein', listaTipos: 'listaTipoTr', novoTipo: 'bNovoTipoTr',
+      ficha: 'bFichaTr', barraFicha: 'barraFichaTr', barraLista: 'rodapeTr',
+      fichaImprimir: 'bImprimirFichaTr', fichaFechar: 'bFecharFichaTr',
       dlg: 'dlgTreino', form: 'formTreino', titulo: 'tituloTreino', erro: 'erroTreino',
       func: 'trFunc', tipo: 'trTipo', data: 'trData', vence: 'trVence',
       dica: 'trDicaVence', apagar: 'bApagarTreino',
@@ -140,6 +145,7 @@ export async function carregarSst() {
 
 export function limparSst() {
   limparAso();
+  fecharFicha();
   S.exame = { tipos: [], regs: [] };
   S.treinamento = { tipos: [], regs: [] };
   S.carregado = false;
@@ -168,6 +174,9 @@ export async function abrirSst(tela) {
   const r = Object.values(RECEITAS).find(x =>
     x.tela === tela || x.telaTipos === tela || x.telaPainel === tela);
   if (!r) return;
+  // o #jorImpressao é compartilhado: prévia esquecida aqui sairia na impressão
+  // de outra tela
+  fecharFicha();
   if (!S.carregado) {
     try { await carregarSst(); }
     catch (e) {
@@ -663,6 +672,115 @@ function folhaPainel(r, urgentes, faltando) {
   return folhas.join('');
 }
 
+/* =============== relatório de uma pessoa só ===============
+   As telas de Vencimentos olham a empresa inteira. Este documento vira o
+   retrato de uma pessoa: o que vale hoje em cada tipo e, nos exames, o que a
+   função exige e ela nunca fez. A folha em si está no sst-ficha.js — aqui só
+   se monta o que ela precisa saber. */
+
+/* Enquanto a folha de uma pessoa está na prévia, a barra da lista sai do ar:
+   as duas juntas empilhariam dois rodapés, e o "Imprimir" de lá mandaria a
+   lista inteira e a folha da pessoa na mesma impressão. */
+function fecharFicha() {
+  fecharFichaSst();
+  Object.values(RECEITAS).forEach(x => {
+    const b = $(x.el.barraLista);
+    if (b) b.hidden = false;
+  });
+}
+
+/** O vigente de cada tipo para uma pessoa, do mais urgente para o menos. */
+function vigentesDa(r, funcionarioId) {
+  // os regs já chegam do banco do mais novo para o mais velho
+  const dela = S[r.id].regs.filter(x => x.funcionario_id === funcionarioId);
+  const vistos = new Set();
+  const vigentes = [];
+  dela.forEach(x => {
+    const chave = grupoDe(r, x.tipo_id);
+    if (vistos.has(chave)) return;
+    vistos.add(chave);
+    vigentes.push(x);
+  });
+  return { todos: dela, vigentes };
+}
+
+/** Monta a folha de uma pessoa e joga na prévia. */
+function gerarFicha(r, funcionarioId) {
+  const f = funcionario(funcionarioId);
+  if (!f) return;
+  const { todos, vigentes } = vigentesDa(r, funcionarioId);
+
+  const linhas = vigentes
+    .map(x => ({ ...x, sit: situacaoDe(x.vence) }))
+    .sort((a, b) => {
+      const da = a.sit.dias ?? 99999, db = b.sit.dias ?? 99999;
+      if (da !== db) return da - db;
+      const ta = tipoDe(r, a.tipo_id)?.nome || '', tb = tipoDe(r, b.tipo_id)?.nome || '';
+      return ta.localeCompare(tb, 'pt-BR');
+    })
+    .map(x => ({
+      nome: tipoDe(r, x.tipo_id)?.nome || '—',
+      realizado: x.realizado,
+      vence: x.vence,
+      sit: x.sit,
+      carga: x.carga_horaria,
+      instrutor: x.instrutor,
+      observacao: x.observacao,
+      conferencia: r.id === 'exame' ? conferenciaDo(x, f) : null,
+    }));
+
+  // pendência é coisa de exame: treinamento não tem lista por função no app
+  const pend = r.id === 'exame' ? pendenciasDe(f, todos) : { lista: [], semLista: false };
+
+  const html = documentoFichaSst({
+    tipo: r.id,
+    funcionario: f,
+    linhas,
+    pendencias: pend.lista.map(t => ({ nome: t.nome })),
+    funcaoSemLista: pend.semLista,
+  });
+
+  verFichaSst(html, `Ficha de ${r.id === 'exame' ? 'exames' : 'treinamentos'} - ${f.nome || ''}`,
+    r.el.barraFicha);
+  const barraLista = $(r.el.barraLista);
+  if (barraLista) barraLista.hidden = true;
+}
+
+/** O diálogo de escolher a pessoa. É um só, servindo as duas telas. */
+let receitaDaFicha = null;
+
+function abrirEscolhaFicha(r) {
+  receitaDaFicha = r;
+  const sel = $('fsFunc');
+  const ativos = estado.funcionarios.filter(f => f.situacao === 'ATIVO')
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const outros = estado.funcionarios.filter(f => f.situacao !== 'ATIVO')
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  // quem está na busca da tela já vem escolhido — o caminho mais comum é
+  // procurar a pessoa na lista e querer a folha dela
+  const busca = so($(r.el.busca).value).toLowerCase();
+  const achado = busca
+    ? [...ativos, ...outros].find(f => f.nome.toLowerCase().includes(busca))
+    : null;
+
+  const grupo = (rotulo, lista) => lista.length
+    ? `<optgroup label="${esc(rotulo)}">${lista.map(f =>
+        `<option value="${f.id}">${esc(f.nome)}${f.cargo ? ` — ${esc(f.cargo)}` : ''}</option>`)
+        .join('')}</optgroup>`
+    : '';
+
+  sel.innerHTML = grupo('Ativos', ativos) + grupo('Inativos', outros);
+  sel.value = achado ? achado.id : (ativos[0]?.id || outros[0]?.id || '');
+
+  $('fsTitulo').textContent = r.id === 'exame'
+    ? 'Relatório de exames do funcionário' : 'Relatório de treinamentos do funcionário';
+  $('fsDica').textContent = r.id === 'exame'
+    ? 'Sai uma folha A4 com o exame mais recente de cada tipo, a situação de cada um e os exames que a função exige e nunca foram lançados.'
+    : 'Sai uma folha A4 com o treinamento mais recente de cada tipo, com carga horária, instrutor e a situação de cada um.';
+  $('dlgFichaSst').showModal();
+}
+
 /* =============== ligações =============== */
 function ligarReceita(r, avisar) {
   // filtros
@@ -680,6 +798,11 @@ function ligarReceita(r, avisar) {
 
   $(r.el.novo).addEventListener('click', () => abrirReg(r, null));
   $(r.el.novoTipo).addEventListener('click', () => abrirTipo(r, null));
+
+  // relatório de uma pessoa só
+  $(r.el.ficha).addEventListener('click', () => abrirEscolhaFicha(r));
+  $(r.el.fichaImprimir).addEventListener('click', imprimirFichaSst);
+  $(r.el.fichaFechar).addEventListener('click', fecharFicha);
   $(r.el.imprimir).addEventListener('click', () => window.print());
   $(r.el.zoom).addEventListener('input', () => {
     const z = $(r.el.zoom).value;
@@ -799,4 +922,14 @@ function mostrarErro(id, texto) {
 
 export function ligarSst(avisar = () => {}) {
   Object.values(RECEITAS).forEach(r => ligarReceita(r, avisar));
+
+  // o diálogo de escolher a pessoa é um só para as duas telas
+  $('formFichaSst').addEventListener('submit', ev => {
+    ev.preventDefault();
+    const r = receitaDaFicha;
+    const id = $('fsFunc').value;
+    if (!r || !id) return;
+    $('dlgFichaSst').close();
+    gerarFicha(r, id);
+  });
 }

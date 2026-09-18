@@ -85,6 +85,29 @@ export function conferenciaDo(exame, funcionario) {
   return { feitos, total: exigidos.length, completo: feitos === exigidos.length };
 }
 
+/**
+ * O que a função exige e nunca apareceu no histórico da pessoa.
+ *
+ * Duas portas contam como "feito": um lançamento próprio daquele exame
+ * complementar, ou a marcação dentro de um ASO. Exame que já foi feito e
+ * venceu NÃO entra aqui — esse aparece na tabela do vigente, como vencido.
+ * Aqui é só o que nunca foi realizado, que é o buraco que nenhuma tela mostra.
+ *
+ * @param {object} funcionario  a pessoa, como está no cadastro
+ * @param {Array}  regs         os lançamentos de exame dela (todos)
+ * @returns {{ lista: Array, semLista: boolean }}
+ */
+export function pendenciasDe(funcionario, regs) {
+  const exigidos = exigidosDe(funcionario?.cargo);
+  if (!exigidos.length) return { lista: [], semLista: true };
+
+  const feitos = new Set((regs || []).map(x => x.tipo_id));
+  (regs || []).forEach(x => (A.itens.get(x.id) || [])
+    .filter(m => m.feito).forEach(m => feitos.add(m.tipo_id)));
+
+  return { lista: exigidos.filter(t => !feitos.has(t.id)), semLista: false };
+}
+
 /* =============== a lista dentro do lançamento ===============
    Enquanto o diálogo está aberto, a marcação vive aqui. Só vai para o banco
    depois que o ASO for salvo — um ASO novo ainda não tem id. */
