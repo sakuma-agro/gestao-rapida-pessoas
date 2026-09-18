@@ -109,6 +109,7 @@ const RECEITAS = {
       carga: 'trCarga', instrutor: 'trInstrutor', obs: 'trObs',
       dlgTipo: 'dlgTipoTr', formTipo: 'formTipoTr', tituloTipo: 'tituloTipoTr', erroTipo: 'erroTipoTr',
       tNome: 'ttNome', tMeses: 'ttMeses', tAtivo: 'ttAtivo', tCarga: 'ttCarga', tApagar: 'bApagarTipoTr',
+      tRecicla: 'ttRecicla',
     },
   },
 };
@@ -147,6 +148,21 @@ export function limparSst() {
 const funcionario = id => estado.funcionarios.find(f => f.id === id);
 const tipoDe = (r, id) => S[r.id].tipos.find(t => t.id === id);
 
+/* O "grupo" de um tipo: ele mesmo, ou o treinamento que ele recicla. A
+   reciclagem NR-31 renova o curso inicial de mecanização, então os dois contam
+   como o mesmo assunto — senão o inicial de 2005 fica cobrando para sempre,
+   mesmo com a reciclagem feita. A volta é limitada para o caso de alguém
+   cadastrar A recicla B e B recicla A. */
+function grupoDe(r, tipoId) {
+  let id = tipoId;
+  for (let volta = 0; volta < 10; volta++) {
+    const t = S[r.id].tipos.find(x => x.id === id);
+    if (!t || !t.recicla_tipo_id) return id;
+    id = t.recicla_tipo_id;
+  }
+  return id;
+}
+
 /* =============== abrir uma tela =============== */
 export async function abrirSst(tela) {
   const r = Object.values(RECEITAS).find(x =>
@@ -179,8 +195,10 @@ function desenharTipos(r) {
     </tr></thead><tbody>
     ${tipos.map(t => {
       const usos = S[r.id].regs.filter(x => x.tipo_id === t.id).length;
+      const recicla = t.recicla_tipo_id ? tipoDe(r, t.recicla_tipo_id) : null;
       return `<tr>
-        <td><b>${esc(t.nome)}</b></td>
+        <td><b>${esc(t.nome)}</b>${recicla
+          ? `<br><span class="dc-sem">recicla: ${esc(recicla.nome)}</span>` : ''}</td>
         <td class="ce">${t.meses ? t.meses + ' meses' : '<span class="dc-sem">não vence</span>'}</td>
         ${r.completo ? `<td class="ce">${t.carga_horaria ? Number(t.carga_horaria) + ' h' : '—'}</td>` : ''}
         <td class="ce">${usos}</td>
@@ -238,6 +256,14 @@ function abrirTipo(r, id) {
   $(r.el.tNome).value = e.nome || '';
   $(r.el.tMeses).value = e.meses ?? '';
   if (r.el.tCarga) $(r.el.tCarga).value = e.carga_horaria ?? '';
+  if (r.el.tRecicla) {
+    // não deixo escolher ele mesmo nem quem já aponta para ele: viraria laço
+    const opcoes = S[r.id].tipos.filter(o =>
+      o.id !== e.id && grupoDe(r, o.id) !== e.id);
+    $(r.el.tRecicla).innerHTML = '<option value="">Nenhum — é um treinamento por si só</option>' +
+      opcoes.map(o => `<option value="${o.id}">${esc(o.nome)}</option>`).join('');
+    $(r.el.tRecicla).value = e.recicla_tipo_id || '';
+  }
   if (r.el.tCategoria) $(r.el.tCategoria).value = e.categoria || 'complementar';
   $(r.el.tAtivo).value = e.ativo === false ? '0' : '1';
   $(r.el.tApagar).hidden = !t;
@@ -256,16 +282,16 @@ function visiveis(r) {
     const f = funcionario(x.funcionario_id);
     if (!f) return false;
     if (sit && f.situacao !== sit) return false;
-    if (tipo && x.tipo_id !== tipo) return false;
+    if (tipo && grupoDe(r, x.tipo_id) !== grupoDe(r, tipo)) return false;
     if (q && !f.nome.toLowerCase().includes(q)) return false;
     return true;
   });
 
-  // sem histórico: fica só o lançamento mais novo de cada funcionário + tipo
+  // sem histórico: fica só o lançamento mais novo de cada funcionário + grupo
   if (!historico) {
     const vistos = new Set();
     regs = regs.filter(x => {
-      const chave = x.funcionario_id + '|' + x.tipo_id;
+      const chave = x.funcionario_id + '|' + grupoDe(r, x.tipo_id);
       if (vistos.has(chave)) return false;
       vistos.add(chave);
       return true;
@@ -293,7 +319,7 @@ function atuais(r) {
   S[r.id].regs.forEach(x => {
     const f = funcionario(x.funcionario_id);
     if (!f || f.situacao !== 'ATIVO') return;
-    const chave = x.funcionario_id + '|' + x.tipo_id;
+    const chave = x.funcionario_id + '|' + grupoDe(r, x.tipo_id);
     if (vistos.has(chave)) return;
     vistos.add(chave);
     fora.push({ ...x, f, sit: situacaoDe(x.vence) });
@@ -368,7 +394,7 @@ function desenharPainel(r) {
     b.addEventListener('click', () => abrirReg(r, b.dataset.reg)));
 
   /* ---- o mesmo recorte, agora por tipo ---- */
-  const usados = S[r.id].tipos.filter(t => linhas.some(x => x.tipo_id === t.id));
+  const usados = S[r.id].tipos.filter(t => linhas.some(x => grupoDe(r, x.tipo_id) === t.id));
   $(r.el.pTipos).innerHTML = usados.length ? `
     <table class="dc-planilha"><thead><tr>
       <th>${esc(r.rotuloTipo)}</th>
@@ -376,7 +402,7 @@ function desenharPainel(r) {
       <th class="ce">Em dia</th><th class="ce">Total</th>
     </tr></thead><tbody>
     ${usados.map(t => {
-      const dele = linhas.filter(x => x.tipo_id === t.id);
+      const dele = linhas.filter(x => grupoDe(r, x.tipo_id) === t.id);
       const c = ch => dele.filter(x => x.sit.faixa === ch).length;
       return `<tr>
         <td><b>${esc(t.nome)}</b></td>
@@ -735,6 +761,7 @@ function ligarReceita(r, avisar) {
       linha.carga_horaria = so($(r.el.tCarga).value) ? Number($(r.el.tCarga).value) : null;
     }
     if (r.el.tCategoria) linha.categoria = $(r.el.tCategoria).value;
+    if (r.el.tRecicla) linha.recicla_tipo_id = $(r.el.tRecicla).value || null;
     if (!e.novo) linha.id = e.id;
 
     const { data, error } = await estado.cliente.from(r.tabelaTipos)
