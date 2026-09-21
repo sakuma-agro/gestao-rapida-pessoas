@@ -72,13 +72,31 @@ export const MODULOS = [
       ['rhQuadro', 'Quadro de pessoal'],
     ] },
   ] },
-  { id: 'jornada', nome: 'DP', telas: [
-    ['jorPainel',       'Painel'],
-    ['jorLancar',       'Lançar boletim'],
-    ['jorBoletins',     'Boletins'],
-    ['jorFechamento',   'Fechamento'],
-    ['jorRelatorios',   'Relatórios'],
-    ['jorConfig',       'Configurações'],
+  /* DP em submódulos (21/09/2026). O Painel é a tela de abertura, fora dos
+     submódulos — submódulo de uma tela só esconde a terceira faixa. As chaves
+     das telas antigas (jorLancar, jorBoletins…) não mudaram: a permissão por
+     tela que já estiver gravada em app_usuarios continua valendo. */
+  { id: 'jornada', nome: 'DP', subs: [
+    { id: 'dpPainel', nome: 'Painel', telas: [
+      ['jorPainel',       'Painel'],
+    ] },
+    { id: 'gestaoJornada', nome: 'Gestão de jornada', telas: [
+      ['jorLancar',       'Lançar jornada'],
+      ['jorBoletins',     'Lançados'],
+      ['jorFechamento',   'Fechamento'],
+    ] },
+    { id: 'emprestimo', nome: 'Empréstimo Funcionário', telas: [
+      ['empEmissao',      'Emissão recibo'],
+      ['empRecibos',      'Recibos emitidos'],
+      ['empHistorico',    'Histórico'],
+    ] },
+    { id: 'dpRelatorios', nome: 'Relatórios', telas: [
+      ['jorRelatorios',   'Relatórios'],
+    ] },
+    { id: 'dpConfig', nome: 'Configurações', telas: [
+      ['jorConfig',       'Jornada'],
+      ['empSalarios',     'Salário base'],
+    ] },
   ] },
 ];
 

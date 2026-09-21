@@ -12,6 +12,7 @@ import { desenharCadastros } from './jornada-cadastros.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
   mostrarInicio } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
+import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
@@ -49,6 +50,7 @@ function mostrar(qual) {
 function limparPrevias() {
   fecharFichaCadastral();   // esconde a barra do Cadastro · Nível 1
   limparPreviaSst();        // esconde as barras do SST e devolve a da lista
+  fecharDocEmprestimo();    // esconde a barra do recibo / extrato do empréstimo
   const alvo = $('jorImpressao');
   if (alvo) { alvo.innerHTML = ''; alvo.hidden = true; }
 }
@@ -82,6 +84,10 @@ function abrirAba(nome) {
   $('telaJorFechamento').hidden   = nome !== 'jorFechamento';
   $('telaJorRelatorios').hidden   = nome !== 'jorRelatorios';
   $('telaJorConfig').hidden       = nome !== 'jorConfig';
+  $('telaEmpEmissao').hidden      = nome !== 'empEmissao';
+  $('telaEmpRecibos').hidden      = nome !== 'empRecibos';
+  $('telaEmpHistorico').hidden    = nome !== 'empHistorico';
+  $('telaEmpSalarios').hidden     = nome !== 'empSalarios';
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
@@ -104,6 +110,7 @@ function abrirAba(nome) {
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
   if (nome.startsWith('jor')) abrirJornada(nome);
+  if (nome.startsWith('emp')) abrirEmprestimo(nome);
 }
 
 /* =============== login =============== */

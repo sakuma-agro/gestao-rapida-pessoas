@@ -10,6 +10,7 @@ import { ligarCadastros } from './jornada-cadastros.js';
 import { apurarDia, minParaHHMM, minParaDecimal } from './jornada-motor.js';
 import * as fech from './jornada-fechamento.js';
 import * as rel from './jornada-relatorios.js';
+import * as emp from './jornada-emprestimos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -58,6 +59,7 @@ export async function abrirJornada(tela) {
 
 export function limparJornada() {
   jd.limparJornadaDados();
+  emp.limparEmprestimos();
   estadoTela.competencia = jd.competenciaAtual();
 
 }
@@ -112,6 +114,8 @@ function desenharPainel() {
         ${cartao(avisos.length, 'AVISOS', avisos.length ? 'alerta' : '')}
       </div>
 
+      ${painelEmprestimos()}
+
       ${semVinculo ? `<div class="jor-caixa alerta">
         <b>${semVinculo} funcionário(s) ainda sem vínculo de jornada.</b>
         Unidade, setor e função são preenchidos no cadastro de Funcionários — é lá que a pessoa é cadastrada uma vez só, para todos os módulos.
@@ -126,6 +130,22 @@ function desenharPainel() {
     </div>` + assinatura();
 
   $('jorIrVinculos')?.addEventListener('click', () => irPara('funcionarios'));
+  $('jorIrEmprestimos')?.addEventListener('click', () => irPara('empRecibos'));
+}
+
+/* Empréstimo Funcionário no painel: só para quem enxerga o submódulo. */
+function painelEmprestimos() {
+  const r = emp.resumoPainel();
+  if (!r) return '';
+  return `<h3 class="jor-h3">Empréstimo Funcionário</h3>
+    <div class="jor-cartoes">
+      ${cartao(r.brl(r.saldo), 'SALDO EM ABERTO')}
+      ${cartao(r.desconto, 'EM DESCONTO')}
+      ${cartao(r.fila, 'NA FILA')}
+      ${cartao(r.aguardando, 'AGUARDANDO LIBERAÇÃO', r.aguardando ? 'alerta' : '')}
+    </div>
+    ${r.aguardando ? `<div class="jor-caixa alerta"><b>${r.aguardando} empréstimo(s) acima do teto</b> esperando o administrador.
+      <button class="btn mini" id="jorIrEmprestimos">Abrir Recibos emitidos</button></div>` : ''}`;
 }
 
 const cartao = (valor, rotulo, tom = '') =>
@@ -164,7 +184,7 @@ function desenharLancar() {
   const ativos = estado.funcionarios
     .filter(f => (f.situacao || 'ATIVO') === 'ATIVO' && jd.vinculoDe(f.id));
 
-  $('telaJorLancar').innerHTML = cabecalho('Lançar boletim', 'O número vem do talão; o cálculo é do sistema') + `
+  $('telaJorLancar').innerHTML = cabecalho('Lançar jornada', 'O número vem do talão; o cálculo é do sistema') + `
     <div class="jor-corpo jor-duas">
       <form id="jorFormBoletim" class="jor-form">
         <label>Funcionário
@@ -353,7 +373,7 @@ function desenharBoletins() {
 
   const soma = c => linhas.reduce((s, l) => s + (l.a?.[c] || 0), 0);
 
-  $('telaJorBoletins').innerHTML = cabecalho('Boletins da competência', 'Conferência e correção') + `
+  $('telaJorBoletins').innerHTML = cabecalho('Jornadas lançadas', 'Conferência e correção da competência') + `
     <div class="jor-corpo">
       <div class="jor-barra">
         <input id="jorBuscaBol" type="search" placeholder="Buscar por funcionário ou nº do boletim" value="${esc(estadoTela.busca)}">
@@ -526,6 +546,8 @@ async function desenharFechamento() {
           <td class="ce">${c.totais.atestados}</td>
         </tr></tfoot></table>
 
+        ${emp.blocoFechamento(estadoTela.competencia, d, sit)}
+
         <div class="jor-acoes">
           ${sit === 'aberta' || sit === 'reaberta'
             ? `<button class="btn principal" data-enviar="${d.id}" ${check.pode ? '' : 'disabled'}>Enviar ao ${esc(d.nome)}</button>`
@@ -541,11 +563,21 @@ async function desenharFechamento() {
   $('telaJorFechamento').innerHTML = cabecalho('Fechamento da competência', 'Um envio por destino de DP — nunca misturados') + `
     <div class="jor-corpo">${blocos.join('')}</div>` + assinatura();
 
+  emp.ligarBlocoFechamento();
+
   document.querySelectorAll('[data-enviar]').forEach(b => b.addEventListener('click', async () => {
     const c = fech.consolidar(estadoTela.competencia, b.dataset.enviar);
     if (!confirm(`Enviar a competência de ${rotuloCompetencia(estadoTela.competencia)} ao ${c.destino.nome}?\n\n` +
                  `${c.totais.pessoas} pessoa(s) · ${fech.formatarHoras(c.totais.extraTotal, c.destino.formato_horas)} de horas extras.`)) return;
-    try { await fech.enviar(c); aviso('Competência enviada. Falta aprovar para travar.', true); desenharFechamento(); }
+    // Empréstimo: confere antes, grava a baixa só depois que o envio deu certo.
+    const prep = emp.prepararAbatimentos(estadoTela.competencia, b.dataset.enviar);
+    if (prep.erro) { aviso(prep.erro); return; }
+    try {
+      await fech.enviar(c);
+      await emp.lancarAbatimentos(estadoTela.competencia, b.dataset.enviar, prep);
+      aviso('Competência enviada. Falta aprovar para travar.', true);
+      desenharFechamento();
+    }
     catch (e) { aviso(e.message); }
   }));
 
@@ -605,6 +637,12 @@ function desenharRelatorios() {
         <button class="btn" id="relExtrato">Extrato individual</button>
       </div>
 
+      ${emp.podeVerEmprestimo() ? `<h3 class="jor-h3">Empréstimo Funcionário</h3>
+      <div class="jor-barra">
+        <button class="btn" id="relEmpDev">Quem deve quanto</button>
+        <button class="btn mini" id="relEmpCsv">Baixar dados (Excel)</button>
+      </div>` : ''}
+
       <div class="jor-acoes" id="relAcoes" hidden>
         <button class="btn principal" id="relImprimir">Imprimir / salvar em PDF</button>
         <button class="btn mini" id="relFechar">Fechar prévia</button>
@@ -621,6 +659,8 @@ function desenharRelatorios() {
     preview(rel.extratoIndividual(estadoTela.competencia, $('relPessoa').value)));
   $('relCsv').addEventListener('click', () =>
     rel.baixar(rel.planilhaDP(estadoTela.competencia, $('relDestino').value)));
+  $('relEmpDev')?.addEventListener('click', () => preview(emp.devedoresHTML()));
+  $('relEmpCsv')?.addEventListener('click', () => emp.baixarCSV(emp.devedoresCSV()));
   $('relImprimir').addEventListener('click', () => rel.imprimir());
   $('relFechar').addEventListener('click', () => {
     $('jorImpressao').hidden = true;
@@ -638,6 +678,7 @@ let irPara = () => {};
 export function ligarJornada(navegar) {
   if (navegar) irPara = navegar;
   ligarCadastros();
+  emp.ligarEmprestimos(irPara, aviso);
 
   $('jorCompetencia')?.addEventListener('change', async ev => {
     estadoTela.competencia = ev.target.value + '-01';
@@ -650,6 +691,7 @@ export function ligarJornada(navegar) {
     const motivo = $('jorMotivoTexto').value.trim();
     try {
       await fech.reabrir(estadoTela.competencia, estadoTela.reabrindo, motivo);
+      await emp.estornarAbatimentos(estadoTela.competencia, estadoTela.reabrindo, 'Reabertura: ' + motivo);
       $('dlgJorReabrir').close();
       aviso('Competência reaberta. A próxima emissão sai como versão nova, marcada no cabeçalho.', true);
       desenharFechamento();

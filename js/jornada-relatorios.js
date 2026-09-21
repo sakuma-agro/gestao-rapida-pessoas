@@ -15,6 +15,7 @@ import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
 import { consolidar, formatarHoras } from './jornada-fechamento.js';
 import { minParaHHMM } from './jornada-motor.js';
+import { valorParaFolha } from './jornada-emprestimos.js';
 
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -285,12 +286,14 @@ export function planilhaDP(competencia, destinoId) {
 
   const colunas = ['Codigo da empresa', 'Matricula', 'CPF', 'Nome', 'Unidade', 'CAEPF',
                    'Horas extras', 'Deficit', 'Intervalo suprimido (min)',
-                   'Faltas (dias)', 'Atestado (dias)'];
+                   'Faltas (dias)', 'Atestado (dias)', 'Emprestimo a descontar'];
 
   const linhas = c.linhas.map(l => [
     l.codigoEmpresa, l.matricula, cpfBR(l.cpf), l.nome, l.unidadeNome, l.caepf,
     h(l.minExtraTotal), h(l.minDeficitAvulso), l.minIntervaloSuprimido,
     l.faltasInformadas, l.diasAtestado,
+    // Parcela do empréstimo: a lançada no envio, ou a prevista enquanto aberta.
+    valorParaFolha(l.vinculo.funcionario_id, competencia).toFixed(2).replace('.', ','),
   ]);
 
   const limpar = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;

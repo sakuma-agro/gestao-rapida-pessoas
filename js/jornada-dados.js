@@ -29,6 +29,11 @@ export const TABELAS = {
   ocorrencias:  'jor_ocorrencias',
   competencias: 'jor_competencias',
   auditoria:    'jor_auditoria',
+  // Empréstimo Funcionário (21/09/2026). Salário só volta para quem tem a
+  // tela Salário base — para os outros o banco devolve lista vazia.
+  emprestimos:  'jor_emprestimos',
+  abatimentos:  'jor_emprestimo_abatimentos',
+  salarios:     'jor_salarios',
 };
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
@@ -103,6 +108,14 @@ export async function carregar(competencia = competenciaAtual()) {
   } else {
     dados.apuracoes = [];
   }
+
+  // Empréstimos: pequenos, vêm inteiros — o saldo depende de todo o histórico.
+  // Tabela que ainda não existe (ou sem permissão) não derruba o DP.
+  const extras = await Promise.all(['emprestimos', 'abatimentos', 'salarios']
+    .map(k => c.from(TABELAS[k]).select('*')));
+  ['emprestimos', 'abatimentos', 'salarios'].forEach((k, i) => {
+    dados[k] = extras[i].error ? (dados[k] || []) : (extras[i].data || []);
+  });
 
   dados.carregado = true;
   salvarCache();
