@@ -68,7 +68,11 @@ export const podeVerEmprestimo = () =>
    =================================================================== */
 
 const emprestimos = () => jd.dados.emprestimos || [];
-const abatimentos = () => (jd.dados.abatimentos || []).filter(a => a.situacao !== 'estornado');
+/* Só o abatimento "lancado" baixa o saldo. "ajustado" é o valor combinado para
+   um mês que ainda não foi enviado (ex.: parcela de 500 que vai descontar 200). */
+const abatimentos = () => (jd.dados.abatimentos || []).filter(a => a.situacao === 'lancado');
+export const ajusteDe = (emprestimoId, competencia) => (jd.dados.abatimentos || [])
+  .find(a => a.emprestimo_id === emprestimoId && a.competencia === competencia && a.situacao === 'ajustado') || null;
 
 export const abatidoDe = (e, antesDe = null) => num(abatimentos()
   .filter(a => a.emprestimo_id === e.id && (!antesDe || a.competencia < antesDe))
@@ -107,7 +111,10 @@ export function previstoEm(fid, competencia) {
     const antes = saldoBruto(e, competencia);
     if (antes <= 0.004) continue;
     if (e.primeira_comp > competencia) return null;
-    return { emprestimo: e, saldoAntes: antes, valor: parcelaDe(e, antes) };
+    const padrao = parcelaDe(e, antes);
+    const ajuste = ajusteDe(e.id, competencia);
+    return { emprestimo: e, saldoAntes: antes, padrao, ajuste,
+      valor: ajuste ? Math.min(num(ajuste.valor), antes) : padrao };
   }
   return null;
 }
@@ -125,8 +132,9 @@ export function projecaoDa(fid) {
     const e = lista.find(x => resto.get(x.id) > 0.004);
     if (!e) break;
     if (e.primeira_comp > c) c = e.primeira_comp;
-    const v = parcelaDe(e, resto.get(e.id));
-    saida.push({ emprestimo_id: e.id, competencia: c, valor: v });
+    const aj = ajusteDe(e.id, c);
+    const v = aj ? Math.min(num(aj.valor), resto.get(e.id)) : parcelaDe(e, resto.get(e.id));
+    saida.push({ emprestimo_id: e.id, competencia: c, valor: v, ajuste: aj });
     resto.set(e.id, num(resto.get(e.id) - v));
     c = proxComp(c);
   }
@@ -156,148 +164,188 @@ const destinoDaPessoa = fid => jd.unidadeDe(jd.vinculoDe(fid))?.destino_id || nu
    FECHAMENTO — a parcela do mês, por destino de DP
    =================================================================== */
 
-const edicao = new Map();   // `${destino}|${funcionario}` → valor digitado
+/* Competência aberta para a pessoa: a atual, ou a seguinte se o DP dela já enviou. */
+function competenciaAberta(fid) {
+  let c = jd.competenciaAtual();
+  const d = destinoDaPessoa(fid);
+  for (let i = 0; i < 3 && d && jd.travada(c, d); i++) c = proxComp(c);
+  return c;
+}
 
 export function linhasFechamento(competencia, destinoId) {
   const pessoas = [...new Set(emprestimos().map(e => e.funcionario_id))]
     .filter(fid => destinoDaPessoa(fid) === destinoId);
   return pessoas.map(fid => {
-    const lancados = (jd.dados.abatimentos || []).filter(a =>
-      a.funcionario_id === fid && a.competencia === competencia && a.situacao !== 'estornado');
+    const lancados = abatimentos().filter(a => a.funcionario_id === fid && a.competencia === competencia);
     const p = previstoEm(fid, competencia);
     if (!p && !lancados.length) return null;
-    return { fid, nome: nomeDe(fid), previsto: p, lancados };
+    return { fid, nome: nomeDe(fid), previsto: lancados.length ? null : p, lancados };
   }).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
-/** Valor que vai no arquivo do escritório: o lançado, ou o previsto se aberto. */
+/** O que vai para o escritório: o lançado, ou o previsto (com ajuste) se aberta. */
 export function valorParaFolha(fid, competencia) {
   const lanc = abatimentos().filter(a => a.funcionario_id === fid && a.competencia === competencia);
   if (lanc.length) return num(lanc.reduce((s, a) => s + Number(a.valor), 0));
-  const d = destinoDaPessoa(fid);
-  const k = `${d}|${fid}`;
-  if (edicao.has(k)) return num(edicao.get(k));
   return previstoEm(fid, competencia)?.valor || 0;
 }
 
 const efeito = (v, prev, saldoAntes) =>
-  v > saldoAntes + 0.004 ? `<span class="jor-pend">Maior que o saldo (${brl(saldoAntes)}). Não é aceito.</span>`
-  : v <= 0.004 ? 'Sem desconto neste mês: a parcela vai para o fim.'
-  : v < prev - 0.004 ? `Parcial: ${brl(prev - v)} vão para o fim.`
+  v > saldoAntes + 0.004 ? `<span class="jor-pend">Maior que o saldo (${brl(saldoAntes)}).</span>`
+  : v <= 0.004 ? `Sem desconto neste mês: ${brl(prev)} vão para o fim.`
+  : v < prev - 0.004 ? `Desconta ${brl(v)}; os ${brl(prev - v)} que faltam vão para o fim.`
   : v > prev + 0.004 ? 'Acima da parcela: antecipa a quitação.'
   : 'Desconta a parcela inteira.';
 
-export function blocoFechamento(competencia, destino, situacao) {
-  const linhas = linhasFechamento(competencia, destino.id);
-  if (!linhas.length) return '';
-  const aberta = situacao === 'aberta' || situacao === 'reaberta';
-  let total = 0;
-  const corpo = linhas.map(l => {
-    const k = `${destino.id}|${l.fid}`;
-    if (l.lancados.length && !aberta) {
-      const v = num(l.lancados.reduce((s, a) => s + Number(a.valor), 0));
-      total += v;
-      const e = emprestimos().find(x => x.id === l.lancados[0].emprestimo_id);
-      return `<tr><td>${esc(l.nome)}</td><td>${e ? numeroTxt(e) : '—'}</td>
-        <td class="ce">${brl(l.lancados[0].previsto)}</td><td class="ce"><b>${brl(v)}</b></td>
-        <td class="dc-sem">${l.lancados[0].justificativa ? esc(l.lancados[0].justificativa) : 'abatido no envio'}</td></tr>`;
+/** As linhas do mês de um destino, já no formato dos documentos. */
+export function descontosDoMes(competencia, destinoId) {
+  return linhasFechamento(competencia, destinoId).map(l => {
+    if (l.lancados.length) {
+      const a = l.lancados[0];
+      const e = emprestimos().find(x => x.id === a.emprestimo_id);
+      const v = num(l.lancados.reduce((s, x) => s + Number(x.valor), 0));
+      return { fid: l.fid, nome: l.nome, emprestimo: e, previsto: num(a.previsto ?? v), valor: v,
+        saldoAntes: e ? saldoBruto(e, competencia) : v, obs: a.justificativa || '', lancado: true };
     }
     const p = l.previsto;
-    if (!p) return '';
-    const v = edicao.has(k) ? edicao.get(k) : p.valor;
-    total += Number(v) || 0;
-    return `<tr><td>${esc(l.nome)}</td>
-      <td>${numeroTxt(p.emprestimo)} <span class="dc-sem">saldo ${brl(p.saldoAntes)}</span></td>
-      <td class="ce">${brl(p.valor)}</td>
-      <td class="ce">${aberta
-        ? `<input type="number" class="dc-mini" style="max-width:110px;text-align:right" step="0.01" min="0"
-             data-abater="${k}" data-prev="${p.valor}" data-saldo="${p.saldoAntes}" value="${Number(v).toFixed(2)}">`
-        : `<b>${brl(v)}</b>`}</td>
-      <td class="dc-sem" data-efeito="${k}">${efeito(Number(v), p.valor, p.saldoAntes)}</td></tr>`;
-  }).join('');
-  if (!corpo) return '';
-  const difere = linhas.some(l => {
-    const k = `${destino.id}|${l.fid}`;
-    return l.previsto && edicao.has(k) && Math.abs(edicao.get(k) - l.previsto.valor) > 0.004;
+    return { fid: l.fid, nome: l.nome, emprestimo: p.emprestimo, previsto: p.padrao, valor: p.valor,
+      saldoAntes: p.saldoAntes, obs: p.ajuste?.justificativa || '', ajustado: !!p.ajuste, lancado: false };
   });
+}
+
+export function blocoFechamento(competencia, destino, situacao) {
+  const linhas = descontosDoMes(competencia, destino.id);
+  if (!linhas.length) return '';
+  const aberta = situacao === 'aberta' || situacao === 'reaberta';
+  const total = num(linhas.reduce((s, l) => s + l.valor, 0));
   return `
-    <h3 class="jor-h3">Empréstimo a abater · ${esc(compLonga(competencia))}</h3>
+    <h3 class="jor-h3">Empréstimo a descontar · ${esc(compLonga(competencia))}</h3>
     <table class="dc-planilha"><thead><tr>
       <th>Funcionário</th><th>Empréstimo</th><th class="ce">Parcela prevista</th>
-      <th class="ce">Abater</th><th>O que acontece</th></tr></thead>
-      <tbody>${corpo}</tbody>
-      <tfoot><tr class="jor-total"><td colspan="3">Total a abater</td>
-        <td class="ce" data-total-abater="${destino.id}">${brl(total)}</td><td></td></tr></tfoot></table>
-    ${aberta ? `<div data-just-abater="${destino.id}" ${difere ? '' : 'hidden'} style="margin-top:8px">
-        <label class="campo plena">Justificativa da mudança na parcela (obrigatória)
-        <input type="text" class="dc-mini" id="empJust_${destino.id}" maxlength="200"></label></div>
-      <p class="dc-sem jor-nota">O valor baixa do saldo quando a competência é enviada, e sai na coluna
-      <b>Empréstimo a descontar</b> do arquivo "Dados para a folha". Reabrir a competência devolve o valor ao saldo.</p>` : ''}`;
+      <th class="ce">A descontar</th><th>O que acontece</th>${aberta ? '<th></th>' : ''}</tr></thead>
+      <tbody>${linhas.map(l => `<tr>
+        <td>${esc(l.nome)}</td>
+        <td>${l.emprestimo ? numeroTxt(l.emprestimo) : '—'} <span class="dc-sem">saldo ${brl(l.saldoAntes)}</span></td>
+        <td class="ce">${brl(l.previsto)}</td>
+        <td class="ce"><b>${brl(l.valor)}</b>${l.ajustado ? ' <span class="tag alerta">ajustado</span>' : ''}</td>
+        <td class="dc-sem">${l.lancado ? 'baixado no envio' : efeito(l.valor, l.previsto, l.saldoAntes)}${l.obs ? `<br>${esc(l.obs)}` : ''}</td>
+        ${aberta ? `<td class="ce">${l.lancado ? '' : `<button class="btn mini" type="button" data-ajustar="${l.fid}" data-comp="${competencia}">Ajustar</button>`}</td>` : ''}
+      </tr>`).join('')}</tbody>
+      <tfoot><tr class="jor-total"><td colspan="3">Total a descontar</td>
+        <td class="ce">${brl(total)}</td><td colspan="${aberta ? 2 : 1}"></td></tr></tfoot></table>
+    ${aberta ? `<p class="dc-sem jor-nota">Imprevisto? Use <b>Ajustar</b> para descontar menos (ou nada) neste mês — o que faltar vai
+      para o fim. O saldo baixa quando a competência é enviada, e o valor sai no Relatório DP e na coluna
+      <b>Empréstimo a descontar</b> do arquivo "Dados para a folha".</p>` : ''}`;
 }
 
-export function ligarBlocoFechamento() {
-  document.querySelectorAll('[data-abater]').forEach(inp => inp.addEventListener('input', () => {
-    const k = inp.dataset.abater, [destino] = k.split('|');
-    const v = Number(inp.value) || 0;
-    edicao.set(k, v);
-    const alvo = document.querySelector(`[data-efeito="${k}"]`);
-    if (alvo) alvo.innerHTML = efeito(v, +inp.dataset.prev, +inp.dataset.saldo);
-    let t = 0, difere = false;
-    document.querySelectorAll(`[data-abater^="${destino}|"]`).forEach(i => {
-      t += Number(i.value) || 0;
-      if (Math.abs((Number(i.value) || 0) - Number(i.dataset.prev)) > 0.004) difere = true;
-    });
-    const tot = document.querySelector(`[data-total-abater="${destino}"]`);
-    if (tot) tot.textContent = brl(t);
-    const j = document.querySelector(`[data-just-abater="${destino}"]`);
-    if (j) j.hidden = !difere;
-  }));
+let redesenharFechamento = () => {};
+export function ligarBlocoFechamento(aoMudar) {
+  if (aoMudar) redesenharFechamento = aoMudar;
+  document.querySelectorAll('[data-ajustar]').forEach(b =>
+    b.addEventListener('click', () => dlgAjuste(b.dataset.ajustar, b.dataset.comp, redesenharFechamento)));
 }
 
-/** Confere antes do envio. Devolve erro em texto, ou os abatimentos a gravar. */
+/** Confere antes do envio e devolve o que vai ser baixado. */
 export function prepararAbatimentos(competencia, destinoId) {
-  const linhas = linhasFechamento(competencia, destinoId).filter(l => l.previsto && !l.lancados.length);
   const itens = [];
-  let difere = false;
-  for (const l of linhas) {
-    const k = `${destinoId}|${l.fid}`;
-    const v = num(edicao.has(k) ? edicao.get(k) : l.previsto.valor);
-    if (v < 0 || v > l.previsto.saldoAntes + 0.004)
-      return { erro: `O valor a abater de ${l.nome} passa do saldo (${brl(l.previsto.saldoAntes)}).` };
-    if (Math.abs(v - l.previsto.valor) > 0.004) difere = true;
-    itens.push({ l, v });
+  for (const l of linhasFechamento(competencia, destinoId).filter(x => x.previsto)) {
+    if (l.previsto.valor > l.previsto.saldoAntes + 0.004)
+      return { erro: `O desconto de ${l.nome} passa do saldo (${brl(l.previsto.saldoAntes)}). Ajuste antes de enviar.` };
+    itens.push({ l, v: num(l.previsto.valor) });
   }
-  const just = ($('empJust_' + destinoId)?.value || '').trim();
-  if (difere && just.length < 5)
-    return { erro: 'Escreva a justificativa da mudança na parcela do empréstimo antes de enviar.' };
-  return { itens, justificativa: difere ? just : null };
+  return { itens };
 }
 
 export async function lancarAbatimentos(competencia, destinoId, prep) {
   for (const { l, v } of prep?.itens || []) {
-    const a = {
-      emprestimo_id: l.previsto.emprestimo.id, funcionario_id: l.fid,
-      competencia, destino_id: destinoId, valor: v, previsto: l.previsto.valor,
-      justificativa: Math.abs(v - l.previsto.valor) > 0.004 ? prep.justificativa : null,
-      situacao: 'lancado', criado_por: usuario(), criado_em: agora(),
+    const p = l.previsto;
+    const base = p.ajuste || {
+      emprestimo_id: p.emprestimo.id, funcionario_id: l.fid, competencia,
+      previsto: p.padrao, justificativa: null, criado_por: usuario(), criado_em: agora(),
     };
+    const a = { ...base, destino_id: destinoId, valor: v, situacao: 'lancado', criado_em: agora() };
     const g = await jd.salvar('abatimentos', a);
-    await jd.registrar({ tabela: 'jor_emprestimo_abatimentos', registro_id: g.id, acao: 'insert', depois: g,
-      justificativa: a.justificativa });
-    edicao.delete(`${destinoId}|${l.fid}`);
+    await jd.registrar({ tabela: 'jor_emprestimo_abatimentos', registro_id: g.id,
+      acao: p.ajuste ? 'update' : 'insert', antes: p.ajuste || null, depois: g, justificativa: a.justificativa });
   }
 }
 
-/** Reabrir a competência devolve ao saldo o que tinha sido abatido nela. */
+/* Reabrir a competência devolve ao saldo o que tinha sido baixado nela. Se o
+   valor era um ajuste combinado, o ajuste volta a valer — ninguém precisa
+   digitar de novo o "desconta só 200". */
 export async function estornarAbatimentos(competencia, destinoId, motivo) {
-  const lista = (jd.dados.abatimentos || []).filter(a =>
-    a.competencia === competencia && a.destino_id === destinoId && a.situacao !== 'estornado');
+  const lista = abatimentos().filter(a => a.competencia === competencia && a.destino_id === destinoId);
   for (const a of lista) {
     const novo = { ...a, situacao: 'estornado', estornado_por: usuario(), estornado_em: agora(), estorno_motivo: motivo };
     await jd.salvar('abatimentos', novo);
     await jd.registrar({ tabela: 'jor_emprestimo_abatimentos', registro_id: a.id, acao: 'update',
       antes: a, depois: novo, justificativa: motivo });
+    if (a.justificativa) {
+      const { id, estornado_por, estornado_em, estorno_motivo, ...resto } = a;
+      await jd.salvar('abatimentos', { ...resto, situacao: 'ajustado', criado_por: usuario(), criado_em: agora() });
+    }
   }
+}
+
+/* Baixa manual: o valor combinado para um mês (menos que a parcela, ou nada).
+   Fica gravado como "ajustado" e só baixa o saldo no envio da competência. */
+function dlgAjuste(fid, competencia, depois) {
+  const c = competencia || competenciaAberta(fid);
+  const d = destinoDaPessoa(fid);
+  if (d && jd.travada(c, d)) { avisar(`A competência de ${compLonga(c)} já foi enviada. Reabra no Fechamento para mudar o desconto.`); return; }
+  const p = previstoEm(fid, c);
+  if (!p) { avisar(`${nomeDe(fid)} não tem parcela prevista em ${compLonga(c)}.`); return; }
+  dialogo(`<h3>Ajustar o desconto — ${esc(nomeDe(fid))}</h3>
+    <p class="dc-sem">${numeroTxt(p.emprestimo)} · saldo ${brl(p.saldoAntes)} · parcela prevista de ${compLonga(c)}: <b>${brl(p.padrao)}</b>.
+    O que não for descontado agora vai para o fim, como parcela a mais.</p>
+    <div class="grade">
+      <label class="campo">Descontar em ${esc(compLonga(c))}<input type="number" id="empAjValor" step="0.01" min="0" max="${p.saldoAntes}" value="${p.valor.toFixed(2)}"></label>
+    </div>
+    <p class="dc-sem" id="empAjEfeito">${efeito(p.valor, p.padrao, p.saldoAntes)}</p>
+    ${campoJust('Motivo (obrigatório)')}
+    ${rodapeDlg(`${p.ajuste ? '<button class="btn" type="button" id="empAjVoltar">Voltar ao previsto</button> ' : ''}<button class="btn principal" type="button" id="empOkDlg">Gravar ajuste</button>`)}`, () => {
+    if (p.ajuste) $('empDlgJust').value = p.ajuste.justificativa || '';
+    $('empAjValor').addEventListener('input', () => {
+      $('empAjEfeito').innerHTML = efeito(Number($('empAjValor').value) || 0, p.padrao, p.saldoAntes);
+    });
+    $('empAjVoltar')?.addEventListener('click', async () => {
+      const novo = { ...p.ajuste, situacao: 'descartado' };
+      await jd.salvar('abatimentos', novo);
+      await jd.registrar({ tabela: 'jor_emprestimo_abatimentos', registro_id: novo.id, acao: 'descartar', antes: p.ajuste, depois: novo });
+      $('dlgEmp').close(); avisar('Ajuste desfeito: volta a valer a parcela prevista.', true); depois?.();
+    });
+    $('empOkDlg').addEventListener('click', async () => {
+      const v = num($('empAjValor').value);
+      if (v < 0 || v > p.saldoAntes + 0.004) { $('empDlgErro').textContent = `O valor vai de R$ 0,00 até o saldo (${brl(p.saldoAntes)}).`; return; }
+      const j = exigeJust(); if (!j) return;
+      const a = {
+        ...(p.ajuste || { emprestimo_id: p.emprestimo.id, funcionario_id: fid, competencia: c }),
+        destino_id: d, valor: v, previsto: p.padrao, justificativa: j, situacao: 'ajustado',
+        criado_por: usuario(), criado_em: agora(),
+      };
+      const g = await jd.salvar('abatimentos', a);
+      await jd.registrar({ tabela: 'jor_emprestimo_abatimentos', registro_id: g.id, acao: p.ajuste ? 'update' : 'ajuste',
+        antes: p.ajuste || null, depois: g, justificativa: j });
+      $('dlgEmp').close();
+      avisar(`${nomeDe(fid)}: desconto de ${compLonga(c)} ajustado para ${brl(v)}. Vai assim para o Fechamento e o Relatório DP.`, true);
+      depois?.();
+    });
+  });
+}
+
+/** Seção do Relatório DP: o desconto de empréstimo de cada pessoa no mês. */
+export function secaoRelatorioDP(competencia, destinoId) {
+  const linhas = descontosDoMes(competencia, destinoId).filter(l => l.valor > 0.004 || l.previsto > 0.004);
+  if (!linhas.length) return '';
+  const tot = num(linhas.reduce((s, l) => s + l.valor, 0));
+  return `<h2 class="rel-unidade">Empréstimo a descontar<small>parcelas do mês, sem juros — autorizadas no recibo assinado (art. 462 da CLT)</small></h2>
+    <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Empréstimo</th><th class="rel-num">Parcela prevista</th>
+      <th class="rel-num">A descontar</th><th class="rel-num">Saldo depois</th><th>Observação</th></tr></thead>
+    <tbody>${linhas.map(l => `<tr><td>${esc(l.nome)}</td><td>${l.emprestimo ? numeroTxt(l.emprestimo) : '—'}</td>
+      <td class="rel-num">${brl(l.previsto)}</td><td class="rel-num">${brl(l.valor)}</td>
+      <td class="rel-num">${brl(Math.max(0, l.saldoAntes - l.valor))}</td>
+      <td class="rel-mini">${esc(l.obs || (l.valor < l.previsto - 0.004 ? 'restante vai para o fim' : ''))}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">Total a descontar — ${linhas.length} pessoa(s)</td><td class="rel-num">${brl(tot)}</td><td colspan="2"></td></tr></tfoot></table>`;
 }
 
 /* ===================================================================
@@ -404,7 +452,7 @@ export function movimentosDa(fid) {
     const n = numeroTxt(e);
     movs.push({ quando: e.data, ordem: 0, emp: e, debito: Number(e.valor), credito: 0,
       historico: `${n} · ${e.origem === 'importado' ? 'saldo trazido da planilha' : `empréstimo em ${e.parcelas}×`}${e.motivo && e.origem !== 'importado' ? ` — ${e.motivo}` : ''}` });
-    (jd.dados.abatimentos || []).filter(a => a.emprestimo_id === e.id).forEach(a => {
+    (jd.dados.abatimentos || []).filter(a => a.emprestimo_id === e.id && ['lancado', 'estornado'].includes(a.situacao)).forEach(a => {
       const lancado = (a.criado_em || a.competencia).slice(0, 10);
       movs.push({ quando: lancado, ordem: 1, emp: e, debito: 0, credito: Number(a.valor),
         historico: `${n} · ${Number(a.valor) ? 'parcela abatida' : 'mês sem desconto'} de ${compCurta(a.competencia)}${a.justificativa ? ` — ${a.justificativa}` : ''}` });
@@ -475,43 +523,56 @@ function devedores() {
 }
 const saldoLinha = e => e.situacao === 'rescisao' ? Math.max(0, saldoBruto(e)) : saldo(e);
 
+/* Extrato geral: uma linha por pessoa que deve, agrupada por fazenda. */
+export function linhasDevedores() {
+  const ids = [...new Set(devedores().flatMap(([, ps]) => Object.keys(ps)))];
+  return ids.map(fid => {
+    const f = pessoa(fid) || {};
+    const r = resumoDa(fid), proj = projecaoDa(fid);
+    const es = emprestimos().filter(e => e.funcionario_id === fid && (['desconto', 'fila'].includes(situacaoDe(e)) || e.situacao === 'rescisao'));
+    return { fid, nome: f.nome || '—', cpf: f.cpf, fazenda: f.fazenda || 'Sem fazenda no cadastro',
+      emprestimos: es, emprestado: r.emprestado, abatido: r.abatido, saldo: num(r.aberto + r.rescisao),
+      rescisao: r.rescisao, proxima: proj[0] || null, restantes: proj.length };
+  }).sort((a, b) => a.fazenda.localeCompare(b.fazenda, 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 export function devedoresHTML() {
-  const g = devedores();
-  const tot = num(g.flatMap(([, ps]) => Object.values(ps).flat()).reduce((s, e) => s + saldoLinha(e), 0));
-  const pessoas = g.reduce((s, [, ps]) => s + Object.keys(ps).length, 0);
+  const l = linhasDevedores();
+  const tot = num(l.reduce((s, x) => s + x.saldo, 0));
+  const fazendas = [...new Set(l.map(x => x.fazenda))];
+  const prox = num(l.reduce((s, x) => s + (x.proxima?.valor || 0), 0));
   return `<article class="rel">
-    ${cabecalhoDoc('Empréstimos em aberto', 'Quem deve quanto, por fazenda', `posição em<strong>${dataBR(hoje())}</strong>`)}
+    ${cabecalhoDoc('Extrato geral de empréstimos', 'Todos os funcionários que devem, por fazenda', `posição em<strong>${dataBR(hoje())}</strong>`)}
     <div class="rel-ficha">
       <div><span>Saldo em aberto</span><b>${brl(tot)}</b></div>
-      <div><span>Pessoas</span><b>${pessoas}</b></div>
-      <div><span>Aguardando liberação</span><b>${emprestimos().filter(e => e.situacao === 'aguardando').length}</b></div>
+      <div><span>Funcionários devendo</span><b>${l.length}</b></div>
+      <div><span>Próximas parcelas</span><b>${brl(prox)}</b></div>
     </div>
-    ${g.map(([faz, ps]) => {
-      const itens = Object.values(ps).flat().sort((a, b) => nomeDe(a.funcionario_id).localeCompare(nomeDe(b.funcionario_id), 'pt-BR'));
-      const st = num(itens.reduce((s, e) => s + saldoLinha(e), 0));
+    ${fazendas.map(faz => {
+      const g = l.filter(x => x.fazenda === faz);
       return `<div class="rel-secao">${esc(faz)}</div>
-      <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Empréstimo</th><th>Concedido em</th>
-        <th class="rel-num">Valor</th><th>Situação</th><th class="rel-num">Saldo</th></tr></thead>
-      <tbody>${itens.map(e => `<tr><td>${esc(nomeDe(e.funcionario_id))}</td><td>${numeroTxt(e)}</td><td>${dataBR(e.data)}</td>
-        <td class="rel-num">${brl(e.valor)}</td><td class="rel-pend">${(SIT[situacaoDe(e)] || [e.situacao])[0]}</td>
-        <td class="rel-num">${brl(saldoLinha(e))}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="5">Subtotal ${esc(faz)}</td><td class="rel-num">${brl(st)}</td></tr></tfoot></table>`;
-    }).join('') || '<p class="rel-vazio">Nenhum saldo em aberto.</p>'}
+      <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Empréstimos</th><th class="rel-num">Emprestado</th>
+        <th class="rel-num">Abatido</th><th class="rel-num">Saldo</th><th>Próxima parcela</th><th class="rel-num">Faltam</th></tr></thead>
+      <tbody>${g.map(x => `<tr><td>${esc(x.nome)}</td><td>${x.emprestimos.map(numeroTxt).join(', ')}</td>
+        <td class="rel-num">${brl(x.emprestado)}</td><td class="rel-num">${brl(x.abatido)}</td><td class="rel-num">${brl(x.saldo)}</td>
+        <td>${x.proxima ? `${brl(x.proxima.valor)} · ${compCurta(x.proxima.competencia)}${x.proxima.ajuste ? ' (ajustado)' : ''}`
+          : x.rescisao ? 'descontar na rescisão' : '—'}</td>
+        <td class="rel-num">${x.restantes || '—'}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="4">Subtotal ${esc(faz)}</td><td class="rel-num">${brl(g.reduce((s, x) => s + x.saldo, 0))}</td><td colspan="2"></td></tr></tfoot></table>`;
+    }).join('') || '<p class="rel-vazio">Ninguém deve nada hoje.</p>'}
     <table class="rel-tabela"><tfoot><tr><td>Total geral em aberto</td><td class="rel-num">${brl(tot)}</td></tr></tfoot></table>
-    <p class="rel-nota">Sem juros e sem correção. "Descontar na rescisão" é saldo de pessoa desligada, a acertar pelo escritório.</p>
+    <p class="rel-nota">Sem juros e sem correção. "Faltam" é o número de parcelas previstas; mês sem desconto ou desconto parcial empurra para o fim.</p>
     <p class="rel-nota">Emitido por Guilherme Lopes · Gerente Administrativo</p>
     ${rodapeLop()}</article>`;
 }
 
 export function devedoresCSV() {
-  const cols = ['Fazenda', 'Funcionario', 'CPF', 'Emprestimo', 'Concedido em', 'Valor', 'Parcelas', 'Situacao', 'Saldo'];
-  const linhas = devedores().flatMap(([faz, ps]) => Object.values(ps).flat().map(e => {
-    const f = pessoa(e.funcionario_id) || {};
-    return [faz, f.nome, cpfBR(f.cpf), numeroTxt(e), dataBR(e.data), Number(e.valor).toFixed(2).replace('.', ','),
-      e.parcelas, (SIT[situacaoDe(e)] || [e.situacao])[0], saldoLinha(e).toFixed(2).replace('.', ',')];
-  }));
-  const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-  return { nome: `Emprestimos_em_aberto_${hoje()}.csv`,
+  const cols = ['Fazenda', 'Funcionario', 'CPF', 'Emprestimos', 'Emprestado', 'Abatido', 'Saldo', 'Proxima parcela', 'Competencia', 'Parcelas restantes'];
+  const v = x => Number(x || 0).toFixed(2).replace('.', ',');
+  const linhas = linhasDevedores().map(x => [x.fazenda, x.nome, cpfBR(x.cpf), x.emprestimos.map(numeroTxt).join(' '),
+    v(x.emprestado), v(x.abatido), v(x.saldo), x.proxima ? v(x.proxima.valor) : '', x.proxima ? compCurta(x.proxima.competencia) : '', x.restantes]);
+  const q = c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`;
+  return { nome: `Emprestimos_extrato_geral_${hoje()}.csv`,
     conteudo: '﻿' + [cols, ...linhas].map(l => l.map(q).join(';')).join('\r\n') };
 }
 
@@ -565,7 +626,7 @@ function ligarBarraDoc(raiz) {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { busca: '', buscaSal: '', filtro: 'aberto', pessoa: '', importar: false };
+const est = { busca: '', buscaSal: '', filtro: 'aberto', pessoa: '*', importar: false };
 const focarNoFim = el => { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} };
 
 function cabecalho(titulo, sub) {
@@ -822,9 +883,9 @@ function detalhe(id) {
   const e = emprestimos().find(x => x.id === id);
   if (!e) return;
   const s = situacaoDe(e);
-  const abats = (jd.dados.abatimentos || []).filter(a => a.emprestimo_id === e.id)
+  const abats = (jd.dados.abatimentos || []).filter(a => a.emprestimo_id === e.id && ['lancado', 'estornado'].includes(a.situacao))
     .sort((a, b) => a.competencia.localeCompare(b.competencia));
-  const temAbat = abats.some(a => a.situacao !== 'estornado');
+  const temAbat = abats.some(a => a.situacao === 'lancado');
   const proj = projecaoDa(e.funcionario_id).filter(p => p.emprestimo_id === e.id);
   dialogo(`<h3>${numeroTxt(e)} · ${esc(nomeDe(e.funcionario_id))}</h3>
     <p class="dc-sem">${e.origem === 'importado' ? 'Saldo trazido da planilha em' : 'Concedido em'} ${dataBR(e.data)} por ${esc(e.criado_por || '—')}
@@ -946,7 +1007,32 @@ function desenharHistorico() {
     (f.situacao || 'ATIVO') !== 'ATIVO' ? ' (desligado)' : ''}</option>`).join('');
 
   let corpo = '<div class="vazio">Escolha o funcionário para ver a conta corrente dele.</div>';
-  if (fid) {
+  if (fid === '*') {
+    const l = linhasDevedores();
+    const tot = num(l.reduce((s2, x) => s2 + x.saldo, 0));
+    corpo = `
+      <div class="jor-cartoes" style="grid-template-columns:repeat(3,1fr)">
+        <div class="jor-cartao alerta"><b>${brl(tot)}</b><span>SALDO EM ABERTO</span></div>
+        <div class="jor-cartao"><b>${l.length}</b><span>FUNCIONÁRIOS DEVENDO</span></div>
+        <div class="jor-cartao"><b>${brl(l.reduce((s2, x) => s2 + (x.proxima?.valor || 0), 0))}</b><span>PRÓXIMAS PARCELAS</span></div>
+      </div>
+      <h3 class="jor-h3">Todos que devem</h3>
+      ${l.length ? `<table class="dc-planilha"><thead><tr><th>Funcionário</th><th>Fazenda</th><th class="ce">Emprestado</th>
+        <th class="ce">Abatido</th><th class="ce">Saldo</th><th>Próxima parcela</th><th class="ce">Faltam</th></tr></thead><tbody>
+        ${l.map(x => `<tr><td><button class="btn mini" type="button" data-conta="${x.fid}">${esc(x.nome)}</button>
+            <br><span class="dc-sem">${x.emprestimos.map(numeroTxt).join(', ')}</span></td>
+          <td>${esc(x.fazenda)}</td><td class="ce">${brl(x.emprestado)}</td><td class="ce">${brl(x.abatido)}</td>
+          <td class="ce"><b>${brl(x.saldo)}</b></td>
+          <td>${x.proxima ? `${brl(x.proxima.valor)} · ${compCurta(x.proxima.competencia)}${x.proxima.ajuste ? ' <span class="tag alerta">ajustado</span>' : ''}`
+            : x.rescisao ? '<span class="tag alerta">descontar na rescisão</span>' : '—'}</td>
+          <td class="ce">${x.restantes || '—'}</td></tr>`).join('')}
+      </tbody><tfoot><tr class="jor-total"><td colspan="4">Total em aberto</td><td class="ce">${brl(tot)}</td><td colspan="2"></td></tr></tfoot></table>`
+        : '<div class="vazio">Ninguém deve nada hoje.</div>'}
+      <div class="jor-acoes">
+        <button class="btn principal" type="button" id="empImpGeral">Imprimir extrato geral</button>
+        <button class="btn mini" type="button" id="empCsvGeral">Baixar dados (Excel)</button>
+      </div>`;
+  } else if (fid) {
     const movs = movimentosDa(fid), r = resumoDa(fid), proj = projecaoDa(fid);
     const numDe = id => numeroTxt(emprestimos().find(e => e.id === id) || {});
     const saldoFinal = movs.length ? movs[movs.length - 1].saldo : 0;
@@ -972,12 +1058,14 @@ function desenharHistorico() {
 
       ${proj.length ? `<h3 class="jor-h3">Parcelas a vencer</h3>
       <table class="dc-planilha"><thead><tr><th>Competência</th><th>Empréstimo</th><th class="ce">Valor</th></tr></thead><tbody>
-        ${proj.map(p => `<tr><td>${compLonga(p.competencia)}</td><td>${numDe(p.emprestimo_id)}</td><td class="ce">${brl(p.valor)}</td></tr>`).join('')}
+        ${proj.map(p => `<tr><td>${compLonga(p.competencia)}</td><td>${numDe(p.emprestimo_id)}</td>
+          <td class="ce">${brl(p.valor)}${p.ajuste ? ` <span class="tag alerta">ajustado</span><br><span class="dc-sem">${esc(p.ajuste.justificativa || '')}</span>` : ''}</td></tr>`).join('')}
       </tbody><tfoot><tr class="jor-total"><td colspan="2">Total a vencer</td><td class="ce">${brl(proj.reduce((s, p) => s + p.valor, 0))}</td></tr></tfoot></table>
       <p class="dc-sem jor-nota">Previsão. Mês sem desconto ou desconto parcial no fechamento empurra o que faltou para o fim.</p>` : ''}
 
       <div class="jor-acoes">
         ${movs.length ? '<button class="btn principal" type="button" id="empImpExtrato">Imprimir extrato</button>' : ''}
+        ${proj.length ? `<button class="btn" type="button" id="empAjustar">Ajustar desconto de ${compCurta(competenciaAberta(fid))}</button>` : ''}
         ${ativosDa(fid).some(e => saldo(e) > 0.004) ? '<button class="btn mini" type="button" id="empDesligH">Registrar desligamento</button>' : ''}
       </div>`;
   }
@@ -985,8 +1073,9 @@ function desenharHistorico() {
   $('telaEmpHistorico').innerHTML = cabecalho('Conta corrente', 'Escolha o funcionário e veja o extrato completo') + `
     <div class="jor-corpo">
       <div class="jor-barra">
-        <select id="empPessoa" class="dc-mini" style="max-width:360px"><option value="">Escolha o funcionário…</option>
-          ${opc(pessoas.filter(f => comEmp.has(f.id)))}
+        <select id="empPessoa" class="dc-mini" style="max-width:360px">
+          <option value="*" ${fid === '*' ? 'selected' : ''}>Todos que devem (extrato geral)</option>
+          <optgroup label="Com empréstimo">${opc(pessoas.filter(f => comEmp.has(f.id)))}</optgroup>
           ${pessoas.some(f => !comEmp.has(f.id)) ? `<optgroup label="Sem empréstimo">${opc(pessoas.filter(f => !comEmp.has(f.id)))}</optgroup>` : ''}
         </select>
       </div>
@@ -996,6 +1085,12 @@ function desenharHistorico() {
 
   $('empPessoa').addEventListener('change', ev => { est.pessoa = ev.target.value; fecharPrevia(); desenharHistorico(); });
   $('empImpExtrato')?.addEventListener('click', () => mostrarDoc(extratoHTML(fid), 'empBarraHist'));
+  $('empAjustar')?.addEventListener('click', () => dlgAjuste(fid, null, desenharHistorico));
+  $('empImpGeral')?.addEventListener('click', () => mostrarDoc(devedoresHTML(), 'empBarraHist'));
+  $('empCsvGeral')?.addEventListener('click', () => baixarCSV(devedoresCSV()));
+  document.querySelectorAll('[data-conta]').forEach(b => b.addEventListener('click', () => {
+    est.pessoa = b.dataset.conta; fecharPrevia(); desenharHistorico();
+  }));
   $('empDesligH')?.addEventListener('click', () => desligamento(fid));
   ligarBarraDoc($('telaEmpHistorico'));
 }
@@ -1068,6 +1163,6 @@ export function ligarEmprestimos(navegar, aviso) {
 }
 
 export function limparEmprestimos() {
-  edicao.clear(); tetoCache.clear();
-  est.busca = ''; est.buscaSal = ''; est.pessoa = ''; est.filtro = 'aberto'; est.importar = false;
+  tetoCache.clear();
+  est.busca = ''; est.buscaSal = ''; est.pessoa = '*'; est.filtro = 'aberto'; est.importar = false;
 }

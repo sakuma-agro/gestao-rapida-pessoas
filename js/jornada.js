@@ -563,7 +563,7 @@ async function desenharFechamento() {
   $('telaJorFechamento').innerHTML = cabecalho('Fechamento da competência', 'Um envio por destino de DP — nunca misturados') + `
     <div class="jor-corpo">${blocos.join('')}</div>` + assinatura();
 
-  emp.ligarBlocoFechamento();
+  emp.ligarBlocoFechamento(() => desenharFechamento());
 
   document.querySelectorAll('[data-enviar]').forEach(b => b.addEventListener('click', async () => {
     const c = fech.consolidar(estadoTela.competencia, b.dataset.enviar);
@@ -639,7 +639,7 @@ function desenharRelatorios() {
 
       ${emp.podeVerEmprestimo() ? `<h3 class="jor-h3">Empréstimo Funcionário</h3>
       <div class="jor-barra">
-        <button class="btn" id="relEmpDev">Quem deve quanto</button>
+        <button class="btn" id="relEmpDev">Extrato geral — todos que devem</button>
         <button class="btn mini" id="relEmpCsv">Baixar dados (Excel)</button>
       </div>` : ''}
 

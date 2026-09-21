@@ -15,7 +15,7 @@ import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
 import { consolidar, formatarHoras } from './jornada-fechamento.js';
 import { minParaHHMM } from './jornada-motor.js';
-import { valorParaFolha } from './jornada-emprestimos.js';
+import { valorParaFolha, secaoRelatorioDP } from './jornada-emprestimos.js';
 
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -115,6 +115,7 @@ export function relatorioDP(competencia, destinoId) {
 
   const corpo = `
     ${porUnidade || '<p class="rel-vazio">Nenhum lançamento nesta competência.</p>'}
+    ${secaoRelatorioDP(competencia, destinoId)}
     <div class="rel-resumo">
       <b>Total do destino:</b> ${c.totais.pessoas} pessoa(s) ·
       ${h(c.totais.extraTotal)} de horas extras ·
@@ -171,6 +172,7 @@ export function relatorioDetalhado(competencia, destinoId) {
         <td class="rel-num">${c.totais.faltasInformadas}</td>
       </tr></tfoot>
     </table>
+    ${secaoRelatorioDP(competencia, destinoId)}
     <div class="rel-resumo">
       <b>Como ler esta abertura.</b>
       O <b>intervalo suprimido</b> não está somado às horas extras: é o período efetivamente
