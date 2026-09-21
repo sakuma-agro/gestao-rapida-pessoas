@@ -166,6 +166,18 @@
    começa numa página nova. */
 .rel.folha2 { margin-top: 18px; }
 
+/* ---- recibo de empréstimo: duas vias na mesma folha A4 ----
+   Cada via ocupa meia folha; a linha tracejada é o corte. */
+.rel-duasvias { max-width: 210mm; margin: 0 auto; background: #fff; }
+.rel.rel-via { padding: 9mm 12mm 7mm; font-size: 10.5px; }
+.rel-via .rel-cabecalho { margin-bottom: 9px; padding-bottom: 7px; }
+.rel-via .rel-cabecalho img { height: 36px; }
+.rel-via .rel-ficha { margin-bottom: 8px; padding: 7px 10px; }
+.rel-via p { margin: 6px 0; }
+.rel-via .rel-assinaturas { margin-top: 20px; }
+.rel-via .rel-rodape { margin-top: 8px; }
+.rel-corte { border: 0; border-top: 1px dashed #8A8D86; margin: 0; }
+
 /* ---- impressão de verdade ----
    Sem regra @page aqui: o app já define @page{margin:0}, e mexer nisso
    mudaria também a impressão da ficha de EPI. A margem do documento sai
@@ -195,6 +207,9 @@
   .rel-secao { margin: 11px 0 5px; }
   .rel-rodape { margin-top: 8px; break-before: avoid; page-break-before: avoid; }
   .rel.folha2 { margin-top: 0; break-before: page; page-break-before: always; }
+  /* Duas vias: cada uma com meia folha (148 mm), corte no meio. */
+  .rel.rel-via { height: 147mm; overflow: hidden; padding: 8mm 12mm 6mm; font-size: 10px; }
+  .rel-duasvias { max-width: none; }
   .rel-cabecalho { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rel-tabela thead th,
   .rel-tabela tbody tr:nth-child(odd) td,
