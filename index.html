@@ -1231,6 +1231,11 @@
     <section class="tela" id="telaJorFechamento" hidden></section>
     <section class="tela" id="telaJorRelatorios" hidden></section>
     <section class="tela" id="telaJorConfig" hidden></section>
+    <!-- DP → Empréstimo Funcionário (21/09/2026); Salário base fica em DP → Configurações -->
+    <section class="tela" id="telaEmpEmissao" hidden></section>
+    <section class="tela" id="telaEmpRecibos" hidden></section>
+    <section class="tela" id="telaEmpHistorico" hidden></section>
+    <section class="tela" id="telaEmpSalarios" hidden></section>
   </main>
 </div>
 
@@ -1554,6 +1559,10 @@
     <button class="btn principal" type="button" data-fechar>Fechar</button>
   </div>
 </dialog>
+
+<!-- Empréstimo Funcionário: um diálogo só, o conteúdo muda conforme a ação
+     (detalhe, cancelar, liberar, recusar, desligamento, salário). -->
+<dialog id="dlgEmp"><div id="dlgEmpCorpo"></div></dialog>
 
 <dialog id="dlgJorReabrir">
   <form method="dialog" id="formJorReabrir">
