@@ -88,7 +88,7 @@ export const MODULOS = [
     { id: 'emprestimo', nome: 'Empréstimo Funcionário', telas: [
       ['empEmissao',      'Emissão recibo'],
       ['empRecibos',      'Recibos emitidos'],
-      ['empHistorico',    'Histórico'],
+      ['empHistorico',    'Conta corrente'],
     ] },
     { id: 'dpRelatorios', nome: 'Relatórios', telas: [
       ['jorRelatorios',   'Relatórios'],

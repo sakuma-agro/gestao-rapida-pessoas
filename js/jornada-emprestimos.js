@@ -393,40 +393,73 @@ export function reciboHTML(e, reimpressao = false) {
   return `<div class="rel-duasvias">${via('via da empresa')}<hr class="rel-corte">${via('via do funcionário')}</div>`;
 }
 
+/* Conta corrente da pessoa: todos os movimentos de todos os empréstimos numa
+   linha do tempo só, com o saldo acumulado — como o extrato do banco.
+   Empréstimo entra como débito (a pessoa passa a dever); abatimento, baixa e
+   cancelamento entram como crédito. Estorno devolve o que tinha sido abatido. */
+export function movimentosDa(fid) {
+  const movs = [];
+  const lista = emprestimos().filter(e => e.funcionario_id === fid && e.situacao !== 'aguardando');
+  for (const e of lista) {
+    const n = numeroTxt(e);
+    movs.push({ quando: e.data, ordem: 0, emp: e, debito: Number(e.valor), credito: 0,
+      historico: `${n} · ${e.origem === 'importado' ? 'saldo trazido da planilha' : `empréstimo em ${e.parcelas}×`}${e.motivo && e.origem !== 'importado' ? ` — ${e.motivo}` : ''}` });
+    (jd.dados.abatimentos || []).filter(a => a.emprestimo_id === e.id).forEach(a => {
+      const lancado = (a.criado_em || a.competencia).slice(0, 10);
+      movs.push({ quando: lancado, ordem: 1, emp: e, debito: 0, credito: Number(a.valor),
+        historico: `${n} · ${Number(a.valor) ? 'parcela abatida' : 'mês sem desconto'} de ${compCurta(a.competencia)}${a.justificativa ? ` — ${a.justificativa}` : ''}` });
+      if (a.situacao === 'estornado') movs.push({ quando: (a.estornado_em || lancado).slice(0, 10), ordem: 2, emp: e,
+        debito: Number(a.valor), credito: 0, historico: `${n} · estorno da parcela de ${compCurta(a.competencia)} — ${a.estorno_motivo || 'reabertura'}` });
+    });
+    const quando = (e.encerrado_em || e.data).slice(0, 10);
+    if (e.situacao === 'cancelado') movs.push({ quando, ordem: 3, emp: e, debito: 0, credito: Number(e.valor),
+      historico: `${n} · ${e.encerramento_motivo || 'cancelado'}` });
+    if (e.situacao === 'baixado') movs.push({ quando, ordem: 3, emp: e, debito: 0, credito: Math.max(0, saldoBruto(e)),
+      historico: `${n} · baixado como perda no desligamento` });
+    if (e.situacao === 'rescisao') movs.push({ quando, ordem: 3, emp: e, debito: 0, credito: 0,
+      historico: `${n} · desligado — ${brl(Math.max(0, saldoBruto(e)))} a descontar na rescisão` });
+  }
+  movs.sort((a, b) => a.quando.localeCompare(b.quando) || a.ordem - b.ordem || ordem(a.emp, b.emp));
+  let acum = 0;
+  movs.forEach(m => { acum = num(acum + m.debito - m.credito); m.saldo = acum; });
+  return movs;
+}
+
+export function resumoDa(fid) {
+  const lista = emprestimos().filter(e => e.funcionario_id === fid && !['aguardando', 'cancelado'].includes(e.situacao));
+  const emprestado = num(lista.reduce((s, e) => s + Number(e.valor), 0));
+  const abatido = num(lista.reduce((s, e) => s + abatidoDe(e), 0));
+  const rescisao = num(lista.filter(e => e.situacao === 'rescisao').reduce((s, e) => s + Math.max(0, saldoBruto(e)), 0));
+  return { emprestado, abatido, aberto: abertoDe(fid), rescisao, proxima: projecaoDa(fid)[0] || null,
+    aguardando: emprestimos().filter(e => e.funcionario_id === fid && e.situacao === 'aguardando') };
+}
+
 function extratoHTML(fid) {
   const f = pessoa(fid) || {};
-  const lista = emprestimos().filter(e => e.funcionario_id === fid && e.situacao !== 'aguardando').sort(ordem);
-  const proj = projecaoDa(fid);
-  const blocos = lista.map(e => {
-    let s = Number(e.valor);
-    const movs = [[dataBR(e.data), e.origem === 'importado' ? 'Saldo trazido da planilha' : 'Empréstimo concedido', brl(e.valor), brl(s)]];
-    (jd.dados.abatimentos || []).filter(a => a.emprestimo_id === e.id)
-      .sort((a, b) => a.competencia.localeCompare(b.competencia) || (a.criado_em || '').localeCompare(b.criado_em || ''))
-      .forEach(a => {
-        if (a.situacao === 'estornado') {
-          movs.push([compCurta(a.competencia), `Abatimento estornado (${esc(a.estorno_motivo || 'reabertura')})`, '—', brl(s)]);
-          return;
-        }
-        s = num(s - Number(a.valor));
-        movs.push([compCurta(a.competencia), Number(a.valor) ? 'Abatido no fechamento' : 'Mês sem desconto', brl(-a.valor), brl(s)]);
-      });
-    const futuras = proj.filter(p => p.emprestimo_id === e.id);
-    return `<div class="rel-secao">${numeroTxt(e)} · ${esc((SIT[situacaoDe(e)] || [e.situacao])[0])}</div>
-      <table class="rel-tabela"><thead><tr><th>Quando</th><th>Movimento</th><th class="rel-num">Valor</th><th class="rel-num">Saldo</th></tr></thead>
-      <tbody>${movs.map(m => `<tr><td>${m[0]}</td><td>${m[1]}</td><td class="rel-num">${m[2]}</td><td class="rel-num">${m[3]}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="3">Saldo atual</td><td class="rel-num">${brl(saldo(e))}</td></tr></tfoot></table>
-      ${futuras.length ? `<p class="rel-nota">Previsto: ${futuras.map(p => `${compCurta(p.competencia)} ${brl(p.valor)}`).join(' · ')}</p>` : ''}
-      ${e.encerramento_motivo ? `<p class="rel-nota">${esc(e.encerramento_motivo)}</p>` : ''}`;
-  }).join('');
+  const movs = movimentosDa(fid), r = resumoDa(fid), proj = projecaoDa(fid);
+  const numDe = id => numeroTxt(emprestimos().find(e => e.id === id) || {});
   return `<article class="rel">
-    ${cabecalhoDoc('Extrato de empréstimos', f.nome || '—', `posição em<strong>${dataBR(hoje())}</strong>`)}
+    ${cabecalhoDoc('Extrato da conta corrente', f.nome || '—', `posição em<strong>${dataBR(hoje())}</strong>`)}
     <div class="rel-ficha">
       <div><span>Funcionário</span><b>${esc(f.nome || '—')}</b></div>
+      <div><span>CPF</span><b>${esc(cpfBR(f.cpf))}</b></div>
       <div><span>Fazenda</span><b>${esc(f.fazenda || '—')}</b></div>
-      <div><span>Saldo em aberto</span><b>${brl(abertoDe(fid))}</b></div>
+      <div><span>Total emprestado</span><b>${brl(r.emprestado)}</b></div>
+      <div><span>Já abatido</span><b>${brl(r.abatido)}</b></div>
+      <div><span>Saldo em aberto</span><b>${brl(r.aberto + r.rescisao)}</b></div>
     </div>
-    ${blocos || '<p class="rel-vazio">Nenhum empréstimo.</p>'}
-    <p class="rel-nota">Sem juros e sem correção. Saldo calculado dos abatimentos lançados no fechamento.</p>
+    <div class="rel-secao">Movimentos</div>
+    <table class="rel-tabela"><thead><tr><th>Data</th><th>Histórico</th><th class="rel-num">Débito</th>
+      <th class="rel-num">Crédito</th><th class="rel-num">Saldo</th></tr></thead>
+    <tbody>${movs.map(m => `<tr><td>${dataBR(m.quando)}</td><td>${esc(m.historico)}</td>
+      <td class="rel-num">${m.debito ? brl(m.debito) : ''}</td><td class="rel-num">${m.credito ? brl(m.credito) : ''}</td>
+      <td class="rel-num">${brl(m.saldo)}</td></tr>`).join('') || '<tr><td colspan="5" class="rel-vazio">Nenhum movimento.</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="4">Saldo atual</td><td class="rel-num">${brl(movs.length ? movs[movs.length - 1].saldo : 0)}</td></tr></tfoot></table>
+    ${proj.length ? `<div class="rel-secao">Parcelas a vencer</div>
+    <table class="rel-tabela"><thead><tr><th>Competência</th><th>Empréstimo</th><th class="rel-num">Valor</th></tr></thead>
+    <tbody>${proj.map(p => `<tr><td>${compLonga(p.competencia)}</td><td>${numDe(p.emprestimo_id)}</td><td class="rel-num">${brl(p.valor)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="2">Total a vencer</td><td class="rel-num">${brl(proj.reduce((s, p) => s + p.valor, 0))}</td></tr></tfoot></table>` : ''}
+    <p class="rel-nota">Sem juros e sem correção. As parcelas a vencer são previsão: mês sem desconto ou desconto parcial empurra o que faltou para o fim.</p>
     ${rodapeLop()}</article>`;
 }
 
@@ -900,57 +933,70 @@ function desligamento(fid) {
     }));
 }
 
-/* ---------------- Histórico ---------------- */
+/* ---------------- Conta corrente ---------------- */
 
 function desenharHistorico() {
-  const g = devedores();
-  const tot = num(g.flatMap(([, ps]) => Object.values(ps).flat()).reduce((s, e) => s + saldoLinha(e), 0));
-  const comEmprestimo = [...new Set(emprestimos().filter(e => e.situacao !== 'aguardando').map(e => e.funcionario_id))]
-    .map(pessoa).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  const comEmp = new Set(emprestimos().map(e => e.funcionario_id));
+  // Quem tem ou já teve empréstimo vem primeiro; desligado só aparece se tiver.
+  const pessoas = estado.funcionarios
+    .filter(f => comEmp.has(f.id) || (f.situacao || 'ATIVO') === 'ATIVO')
+    .sort((a, b) => (comEmp.has(b.id) - comEmp.has(a.id)) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const fid = est.pessoa;
+  const opc = lista => lista.map(f => `<option value="${f.id}" ${fid === f.id ? 'selected' : ''}>${esc(f.nome)}${
+    (f.situacao || 'ATIVO') !== 'ATIVO' ? ' (desligado)' : ''}</option>`).join('');
 
-  $('telaEmpHistorico').innerHTML = cabecalho('Histórico', 'Quem deve quanto e o extrato de cada pessoa') + `
-    <div class="jor-corpo">
-      <div class="jor-cartoes" style="grid-template-columns:repeat(3,1fr)">
-        <div class="jor-cartao alerta"><b>${brl(tot)}</b><span>SALDO EM ABERTO</span></div>
-        <div class="jor-cartao"><b>${emprestimos().filter(e => situacaoDe(e) === 'desconto').length}</b><span>EM DESCONTO</span></div>
-        <div class="jor-cartao"><b>${emprestimos().filter(e => situacaoDe(e) === 'fila').length}</b><span>NA FILA</span></div>
+  let corpo = '<div class="vazio">Escolha o funcionário para ver a conta corrente dele.</div>';
+  if (fid) {
+    const movs = movimentosDa(fid), r = resumoDa(fid), proj = projecaoDa(fid);
+    const numDe = id => numeroTxt(emprestimos().find(e => e.id === id) || {});
+    const saldoFinal = movs.length ? movs[movs.length - 1].saldo : 0;
+    corpo = `
+      <div class="jor-cartoes">
+        <div class="jor-cartao"><b>${brl(r.emprestado)}</b><span>TOTAL EMPRESTADO</span></div>
+        <div class="jor-cartao"><b>${brl(r.abatido)}</b><span>JÁ ABATIDO</span></div>
+        <div class="jor-cartao alerta"><b>${brl(r.aberto + r.rescisao)}</b><span>SALDO EM ABERTO</span></div>
+        <div class="jor-cartao"><b>${r.proxima ? brl(r.proxima.valor) : '—'}</b><span>${r.proxima ? 'PRÓXIMA · ' + compCurta(r.proxima.competencia).toUpperCase() : 'SEM PARCELA A VENCER'}</span></div>
       </div>
+      ${r.rescisao ? `<div class="jor-caixa alerta">${brl(r.rescisao)} a descontar na rescisão — acerto com o escritório.</div>` : ''}
+      ${r.aguardando.length ? `<div class="jor-caixa alerta">${r.aguardando.length} empréstimo(s) aguardando a liberação do administrador (${
+        r.aguardando.map(e => `${numeroTxt(e)} · ${brl(e.valor)}`).join(', ')}). Só entram na conta depois de liberados.</div>` : ''}
 
-      <h3 class="jor-h3">Quem deve quanto</h3>
-      ${g.length ? `<table class="dc-planilha"><thead><tr><th>Funcionário</th><th>Empréstimos</th><th>Próxima parcela</th><th class="ce">Saldo</th></tr></thead><tbody>
-        ${g.map(([faz, ps]) => `<tr><td colspan="4"><b>${esc(faz)}</b></td></tr>` + Object.entries(ps)
-          .sort((a, b) => nomeDe(a[0]).localeCompare(nomeDe(b[0]), 'pt-BR')).map(([fid, es]) => {
-            const px = projecaoDa(fid)[0];
-            return `<tr><td><button class="btn mini" data-extrato="${fid}">${esc(nomeDe(fid))}</button></td>
-              <td>${es.map(e => `${numeroTxt(e)} ${tagSit(e)}`).join('<br>')}</td>
-              <td>${px ? `${brl(px.valor)} · ${compCurta(px.competencia)}` : '—'}</td>
-              <td class="ce">${brl(es.reduce((s, e) => s + saldoLinha(e), 0))}</td></tr>`;
-          }).join('')).join('')}
-      </tbody><tfoot><tr class="jor-total"><td colspan="3">Total em aberto</td><td class="ce">${brl(tot)}</td></tr></tfoot></table>`
-        : '<div class="vazio">Nenhum saldo em aberto.</div>'}
+      <h3 class="jor-h3">Movimentos</h3>
+      ${movs.length ? `<table class="dc-planilha"><thead><tr><th>Data</th><th>Histórico</th>
+        <th class="ce">Débito</th><th class="ce">Crédito</th><th class="ce">Saldo</th></tr></thead><tbody>
+        ${movs.map(m => `<tr><td>${dataBR(m.quando)}</td><td>${esc(m.historico)}</td>
+          <td class="ce">${m.debito ? brl(m.debito) : ''}</td><td class="ce">${m.credito ? brl(m.credito) : ''}</td>
+          <td class="ce"><b>${brl(m.saldo)}</b></td></tr>`).join('')}
+      </tbody><tfoot><tr class="jor-total"><td colspan="4">Saldo atual</td><td class="ce">${brl(saldoFinal)}</td></tr></tfoot></table>`
+        : '<div class="vazio">Nenhum empréstimo lançado para esta pessoa.</div>'}
+
+      ${proj.length ? `<h3 class="jor-h3">Parcelas a vencer</h3>
+      <table class="dc-planilha"><thead><tr><th>Competência</th><th>Empréstimo</th><th class="ce">Valor</th></tr></thead><tbody>
+        ${proj.map(p => `<tr><td>${compLonga(p.competencia)}</td><td>${numDe(p.emprestimo_id)}</td><td class="ce">${brl(p.valor)}</td></tr>`).join('')}
+      </tbody><tfoot><tr class="jor-total"><td colspan="2">Total a vencer</td><td class="ce">${brl(proj.reduce((s, p) => s + p.valor, 0))}</td></tr></tfoot></table>
+      <p class="dc-sem jor-nota">Previsão. Mês sem desconto ou desconto parcial no fechamento empurra o que faltou para o fim.</p>` : ''}
+
       <div class="jor-acoes">
-        <button class="btn" type="button" id="empRelDev">Emitir "Quem deve quanto"</button>
-        <button class="btn mini" type="button" id="empCsvDev">Baixar dados (Excel)</button>
-      </div>
+        ${movs.length ? '<button class="btn principal" type="button" id="empImpExtrato">Imprimir extrato</button>' : ''}
+        ${ativosDa(fid).some(e => saldo(e) > 0.004) ? '<button class="btn mini" type="button" id="empDesligH">Registrar desligamento</button>' : ''}
+      </div>`;
+  }
 
-      <h3 class="jor-h3">Extrato de uma pessoa</h3>
+  $('telaEmpHistorico').innerHTML = cabecalho('Conta corrente', 'Escolha o funcionário e veja o extrato completo') + `
+    <div class="jor-corpo">
       <div class="jor-barra">
-        <select id="empPessoa" class="dc-mini" style="max-width:320px"><option value="">Escolha…</option>
-          ${comEmprestimo.map(f => `<option value="${f.id}" ${est.pessoa === f.id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}</select>
-        <button class="btn" type="button" id="empExtrato" ${est.pessoa ? '' : 'disabled'}>Ver extrato</button>
-        ${est.pessoa && ativosDa(est.pessoa).some(e => saldo(e) > 0.004)
-          ? '<button class="btn mini" type="button" id="empDesligH">Registrar desligamento</button>' : ''}
+        <select id="empPessoa" class="dc-mini" style="max-width:360px"><option value="">Escolha o funcionário…</option>
+          ${opc(pessoas.filter(f => comEmp.has(f.id)))}
+          ${pessoas.some(f => !comEmp.has(f.id)) ? `<optgroup label="Sem empréstimo">${opc(pessoas.filter(f => !comEmp.has(f.id)))}</optgroup>` : ''}
+        </select>
       </div>
+      ${corpo}
       ${barraDoc('empBarraHist')}
     </div>`;
 
-  const ver = fid => { est.pessoa = fid; desenharHistorico(); mostrarDoc(extratoHTML(fid), 'empBarraHist'); };
-  document.querySelectorAll('[data-extrato]').forEach(b => b.addEventListener('click', () => ver(b.dataset.extrato)));
-  $('empPessoa').addEventListener('change', ev => { est.pessoa = ev.target.value; desenharHistorico(); });
-  $('empExtrato').addEventListener('click', () => est.pessoa && ver(est.pessoa));
-  $('empDesligH')?.addEventListener('click', () => desligamento(est.pessoa));
-  $('empRelDev').addEventListener('click', () => mostrarDoc(devedoresHTML(), 'empBarraHist'));
-  $('empCsvDev').addEventListener('click', () => baixarCSV(devedoresCSV()));
+  $('empPessoa').addEventListener('change', ev => { est.pessoa = ev.target.value; fecharPrevia(); desenharHistorico(); });
+  $('empImpExtrato')?.addEventListener('click', () => mostrarDoc(extratoHTML(fid), 'empBarraHist'));
+  $('empDesligH')?.addEventListener('click', () => desligamento(fid));
   ligarBarraDoc($('telaEmpHistorico'));
 }
 
