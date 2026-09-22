@@ -10,7 +10,7 @@ import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
 import { desenharCadastros } from './jornada-cadastros.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
-  mostrarInicio } from './acesso.js';
+  mostrarInicio, abrirModulo, moduloDe } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
@@ -55,9 +55,45 @@ function limparPrevias() {
   if (alvo) { alvo.innerHTML = ''; alvo.hidden = true; }
 }
 
+/* Acesso rápido na lateral da tela inicial: ícone grande e nome embaixo.
+   Só aparece o que a pessoa tem permissão de abrir. */
+const ICONES_ATALHO = {
+  pessoa: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  bolo: '<path d="M4 21h16v-7H4z"/><path d="M4 14c2 1.5 4 1.5 6 0s4-1.5 6 0 3 1.5 4 0"/><path d="M12 10V7M12 4.5v.01"/>',
+  escudo: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  exame: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M12 8v6"/>',
+  treino: '<path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/>',
+  painel: '<path d="M5 20V10M11 20V4M17 20v-7"/>',
+  relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  disc: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>',
+};
+const ATALHOS_INICIO = [
+  ['funcionarios', 'pessoa', 'Funcionários', 'prim'],
+  ['aniversarios', 'bolo', 'Aniversariantes'],
+  ['fichas', 'escudo', 'Fichas de EPI'],
+  ['exVenc', 'exame', 'Exames a vencer'],
+  ['trVenc', 'treino', 'Treinamentos a vencer'],
+  ['jorPainel', 'painel', 'Painel DP'],
+  ['jorLancar', 'relogio', 'Lançar jornada'],
+  ['disc', 'disc', 'Perfil DISC'],
+];
+function desenharAtalhos() {
+  const nav = $('atalhosInicio');
+  if (!nav) return;
+  const lista = ATALHOS_INICIO.filter(([t]) => podeTela(t));
+  nav.hidden = !lista.length;
+  nav.innerHTML = lista.map(([t, ic, rot, cl]) => `
+    <button type="button" class="ql-item ${cl || ''}" data-atalho="${t}" title="${rot}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES_ATALHO[ic]}</svg>
+      <span>${rot}</span></button>`).join('');
+  nav.querySelectorAll('[data-atalho]').forEach(b => b.addEventListener('click', () =>
+    abrirModulo(moduloDe(b.dataset.atalho), b.dataset.atalho)));
+}
+
 function abrirAba(nome) {
   limparPrevias();
   $('telaInicio').hidden = nome !== 'inicio';
+  if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
   $('telaTermoSindical').hidden = nome !== 'termoSindical';
@@ -1163,7 +1199,8 @@ $('bWhatsapp').addEventListener('click', async ev => {
     if (e && e.name === 'AbortError') return;          // ele fechou o compartilhamento
     window.open(linkWhatsapp(texto), '_blank', 'noopener');
   } finally {
-    botao.disabled = false; botao.textContent = 'Enviar no WhatsApp';
+    botao.disabled = false;
+    botao.innerHTML = '<img class="ic-zap" src="img/whatsapp.png" alt="">Enviar no WhatsApp';
   }
 });
 
