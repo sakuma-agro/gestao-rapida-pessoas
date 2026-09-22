@@ -113,12 +113,20 @@
 
     <!-- ---- ENTRADA: nenhum módulo aberto, só as duas marcas ---- -->
     <section class="tela inicio" id="telaInicio">
-      <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
-      <h2>Gestão Rápida <span>Pessoas</span></h2>
-      <p class="in-dica">Escolha um módulo no menu acima para começar.</p>
-      <img class="in-lop in-lop-escuro" src="img/lop-assinatura-laser-escuro.png"
-           alt="Desenvolvido por LOP — Inteligência para o agronegócio">
-      <img class="in-lop in-lop-claro" src="img/lop-assinatura-laser-claro.png" alt="">
+      <div class="ini-lateral">
+        <!-- acesso rápido na lateral (mesmo modelo do Programação Campo) -->
+        <nav class="ql" id="atalhosInicio" aria-label="Acesso rápido"></nav>
+        <div class="ini-centro">
+          <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
+          <h2>Gestão Rápida <span>Pessoas</span></h2>
+          <p class="in-dica">Escolha um atalho ao lado ou um módulo no menu acima.</p>
+          <div class="lop-ass in-lop-escuro" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
+            <img src="img/lop-marca.png" alt=""><span class="lop-div"></span>
+            <span class="lop-txt"><b>DESENVOLVIDO POR LOP</b><span>INTELIGÊNCIA PARA O AGRONEGÓCIO</span></span>
+          </div>
+          <img class="in-lop in-lop-claro" src="img/lop-assinatura-laser-claro.png" alt="">
+        </div>
+      </div>
     </section>
 
     <!-- ---- FICHAS ---- -->
@@ -450,7 +458,7 @@
             <h2 style="margin:0">Aniversariantes do mês</h2>
             <p class="dica" style="margin:2px 0 0">Pela data de nascimento do cadastro.</p>
           </div>
-          <button class="btn principal" id="bWhatsapp">Enviar no WhatsApp</button>
+          <button class="btn btn-zap" id="bWhatsapp"><img class="ic-zap" src="img/whatsapp.png" alt="">Enviar no WhatsApp</button>
         </div>
         <div class="grade larga" style="margin-top:14px">
           <label class="campo">Mês <select id="anMes"></select></label>
@@ -470,7 +478,7 @@
 
       <div class="rodape-fixo naoimprimir">
         <button class="btn principal" id="bImprimirAniv">Imprimir</button>
-        <button class="btn" id="bBaixarAniv">Baixar imagem</button>
+        <button class="btn btn-cinza" id="bBaixarAniv">Baixar imagem</button>
         <button class="btn" id="bCopiarAniv">Copiar texto</button>
         <span class="cresce"></span>
         <span class="zoom">Zoom
