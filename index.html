@@ -59,7 +59,7 @@
   </div>
 </section>
 
-<!-- ============ NOVA SENHA (veio do link do e-mail) ============ -->
+<!-- ============ NOVA SENHA (veio do link do e-mail, ou "Trocar senha" no topo) ============ -->
 <section class="centro tela" id="telaNovaSenha" hidden>
   <div class="caixa">
     <img src="icons/gr-192.v2.png" alt="">
@@ -77,6 +77,7 @@
       </div>
       <p class="sub" style="text-align:left;margin:0 0 10px">Mínimo de 8 caracteres.</p>
       <div class="barra fim">
+        <button class="btn" type="button" id="bCancelarNovaSenha" hidden>Cancelar</button>
         <button class="btn principal" type="submit" id="bSalvarNovaSenha">Salvar e entrar</button>
       </div>
     </form>
@@ -97,6 +98,7 @@
       <span class="cresce"></span>
       <span class="estado" id="estadoRede"><span class="pt"></span><span id="estadoTexto">online</span></span>
       <button class="btn mini" id="btnInstalar" hidden>Instalar app</button>
+      <button class="btn mini" id="btnTrocarSenha" title="Escolher uma senha nova">Trocar senha</button>
       <button class="btn mini" id="btnSair">Sair</button>
       <img class="topo-lop" src="img/lop-assinatura-laser-claro.png"
            alt="Desenvolvido por LOP — Inteligência para o agronegócio">
