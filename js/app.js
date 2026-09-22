@@ -301,7 +301,9 @@ async function carregarTudo() {
   /* Os cadastros do DP (unidade, setor, função, jornada) alimentam as listas
      do cadastro de funcionário. Carrega aqui para elas estarem prontas mesmo
      que a pessoa vá direto para Funcionários, sem abrir o DP. */
-  if (pode('jornada')) {
+  /* Quem tem só Cadastros também precisa delas: sem isso as listas de
+     unidade, setor e função do cadastro de funcionário abrem vazias. */
+  if (pode('jornada') || pode('pessoas')) {
     try { await jd.carregar(); } catch { /* sem rede: usa o que está no cache */ }
   }
 
@@ -950,7 +952,8 @@ $('formFunc').addEventListener('submit', async ev => {
   /* O que foi escolhido nas listas vira também texto no cadastro, porque a
      ficha de EPI e a lista de presença imprimem esses nomes. Sem escolha,
      o que já estava escrito fica como estava. */
-  const temDP = pode('jornada');
+  // Unidade, setor e função são do módulo Cadastros: quem tem Cadastros grava.
+  const temDP = pode('jornada') || pode('pessoas');
   const unidade = temDP ? jd.dados.unidades.find(u => u.id === $('fuUnidade').value) : null;
   const setor   = temDP ? jd.dados.setores.find(s => s.id === $('fuSetor').value) : null;
   const funcao  = temDP ? jd.dados.funcoes.find(x => x.id === $('fuCargo').value) : null;
