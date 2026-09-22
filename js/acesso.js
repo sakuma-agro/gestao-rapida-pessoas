@@ -398,7 +398,7 @@ async function criarLogin(u) {
     });
 
     editando.novo = false;
-    $('usEmail').disabled = true;
+    editando.emailOriginal = u.email;
     aviso.hidden = true;
     return true;
   } catch (e) {
@@ -410,9 +410,38 @@ async function criarLogin(u) {
   }
 }
 
+function mostrarErroNoDialogo(titulo, texto) {
+  const caixa = $('usSenha');
+  caixa.hidden = false;
+  caixa.className = 'us-senha erro';
+  caixa.innerHTML = '<b>' + esc(titulo) + '</b><br>' + esc(texto);
+}
+
+/* Troca o e-mail de quem já tem login. Quem faz é a função 'criar-usuario'
+   (acao 'email'), porque mexer na conta exige a chave de serviço. A senha e o
+   login (nome de usuário) continuam os mesmos. */
+async function trocarEmail(antigo, novo) {
+  try {
+    const { data, error } = await estado.cliente.functions.invoke('criar-usuario', {
+      body: { acao: 'email', email: antigo, novo },
+    });
+    if (error) {
+      // a função devolve o motivo no corpo mesmo quando o status é de erro
+      let motivo = '';
+      try { motivo = (await error.context?.json())?.erro || ''; } catch {}
+      throw new Error(motivo || error.message);
+    }
+    if (data?.erro) throw new Error(data.erro);
+    return true;
+  } catch (e) {
+    mostrarErroNoDialogo('Não troquei o e-mail.', e.message || String(e));
+    return false;
+  }
+}
+
 function abrirUsuario(email) {
   const u = email ? usuarios.find(x => x.email === email) : null;
-  editando = u ? { ...u, telas: [...(u.telas || [])], novo: false }
+  editando = u ? { ...u, telas: [...(u.telas || [])], novo: false, emailOriginal: u.email }
                 : { email: '', nome: '', usuario: '', admin: false,
                     modulos: [...PADRAO], telas: [], novo: true };
   $('usSenha').hidden = true;
@@ -421,7 +450,7 @@ function abrirUsuario(email) {
   $('bSalvarUsuario').textContent = u ? 'Salvar' : 'Criar login e acesso';
   $('tituloUsuario').textContent = u ? 'Editar pessoa' : 'Adicionar pessoa';
   $('usEmail').value = editando.email || '';
-  $('usEmail').disabled = !!u;
+  $('usEmail').disabled = false;
   $('usNome').value = editando.nome || '';
   $('usUsuario').value = editando.usuario || '';
   $('bApagarUsuario').hidden = !u || (u.email || '').toLowerCase() === acesso.email;
@@ -523,10 +552,41 @@ export function ligarAcesso() {
       return;                          // fica aberto para copiar a senha
     }
 
+    // Trocou o e-mail de quem já tem login: a conta de login e as tabelas
+    // que usam o e-mail como chave mudam juntas, no servidor.
+    const antigo = (editando.emailOriginal || '').toLowerCase();
+    const trocouEmail = antigo && email !== antigo;
+    if (trocouEmail) {
+      if (usuarios.some(x => (x.email || '').toLowerCase() === email)) {
+        mostrarErroNoDialogo('Não troquei o e-mail.', 'Esse e-mail já é de outra pessoa no app.');
+        return;
+      }
+      const ok = await trocarEmail(antigo, email);
+      if (!ok) return;                 // erro já apareceu; o diálogo fica aberto
+      usuarios = usuarios.filter(x => (x.email || '').toLowerCase() !== antigo);
+      editando.email = email;
+      editando.emailOriginal = email;
+      // Foi o próprio e-mail: o token atual ainda carrega o endereço velho, e
+      // é por ele que o banco reconhece o administrador. Renova já, antes de
+      // gravar o resto — senão o banco recusa por não achar o admin.
+      if (antigo === acesso.email) {
+        try {
+          const { data } = await estado.cliente.auth.refreshSession();
+          if (data?.session) estado.sessao = data.session;
+        } catch {}
+      }
+    }
+
     if (await gravar(u)) {
       const i = usuarios.findIndex(x => x.email === email);
       if (i >= 0) usuarios[i] = u; else usuarios.push(u);
       usuarios.sort((a, b) => a.email.localeCompare(b.email));
+    }
+
+    if (trocouEmail && antigo === acesso.email) {
+      await carregarAcesso();
+      montarMenu();
+      abrirModulo('config');
     }
     $('dlgUsuario').close();
     desenharConfig();
