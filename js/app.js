@@ -136,6 +136,30 @@ $('bInicio').addEventListener('click', () => {
   if (!$('app').hidden) mostrarInicio();
 });
 
+/* Trocar a própria senha já logado. Usa a mesma tela do link do e-mail —
+   é o caminho que não depende do e-mail de recuperação chegar certo. */
+let trocandoLogado = false;
+$('btnTrocarSenha').addEventListener('click', () => {
+  trocandoLogado = true;
+  $('nsSenha').value = ''; $('nsSenha2').value = '';
+  $('erroNovaSenha').hidden = true;
+  const email = estado.sessao?.user?.email;
+  $('nsQuem').textContent = email
+    ? `Login ${email}. Escolha a senha que você vai usar daqui em diante.`
+    : 'Escolha a senha que você vai usar daqui em diante.';
+  $('bSalvarNovaSenha').textContent = 'Salvar';
+  $('bSalvarNovaSenha').disabled = false;
+  $('bCancelarNovaSenha').hidden = false;
+  mostrar('novaSenha');
+  $('nsSenha').focus();
+});
+$('bCancelarNovaSenha').addEventListener('click', () => {
+  trocandoLogado = false;
+  $('bCancelarNovaSenha').hidden = true;
+  $('bSalvarNovaSenha').textContent = 'Salvar e entrar';
+  mostrar('app');
+});
+
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear();
@@ -205,6 +229,15 @@ $('formNovaSenha').addEventListener('submit', async ev => {
   botao.disabled = true; botao.textContent = 'Salvando...';
   try {
     await db.trocarSenha(a);
+    if (trocandoLogado) {
+      // já estava dentro: só volta para onde estava, sem recarregar nada
+      trocandoLogado = false;
+      $('bCancelarNovaSenha').hidden = true;
+      botao.disabled = false; botao.textContent = 'Salvar e entrar';
+      mostrar('app');
+      mostrarAviso('Senha trocada. Da próxima vez entre com ela.');
+      return;
+    }
     history.replaceState(null, '', location.pathname);   // tira o token da barra de endereço
     mostrar('app');
     await carregarTudo();
@@ -212,7 +245,7 @@ $('formNovaSenha').addEventListener('submit', async ev => {
   } catch (e) {
     erro.textContent = traduzirErro(e);
     erro.hidden = false;
-    botao.disabled = false; botao.textContent = 'Salvar e entrar';
+    botao.disabled = false; botao.textContent = trocandoLogado ? 'Salvar' : 'Salvar e entrar';
   }
 });
 
