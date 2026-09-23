@@ -34,14 +34,25 @@ export const TABELAS = {
   emprestimos:  'jor_emprestimos',
   abatimentos:  'jor_emprestimo_abatimentos',
   salarios:     'jor_salarios',
+  // Férias e afastamentos (23/09/2026). O app controla direito e prazo —
+  // nenhum valor em dinheiro mora aqui.
+  afastamentos:  'jor_afastamentos',
+  feriasInicial: 'jor_ferias_inicial',
+  feriasGozos:   'jor_ferias_gozos',
+  feriasPerdas:  'jor_ferias_perdas',
 };
+
+/* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
+   (para a contagem do período aquisitivo) e os boletins que caem dentro de
+   férias lançadas (o pessoal tira férias "no papel" e continua trabalhando). */
+const APOIO = ['faltas', 'bolFerias'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id' };
 const chaveDe = c => CHAVE[c] || 'id';
 
-export const dados = Object.fromEntries(Object.keys(TABELAS).map(k => [k, []]));
+export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
 dados.carregado = false;
 
 const ouvintes = new Set();
@@ -58,12 +69,12 @@ export const pendentes = () => ler(CHAVE_FILA, []).length;
 function carregarCache() {
   const c = ler(CHAVE_CACHE, null);
   if (!c) return;
-  for (const k of Object.keys(TABELAS)) dados[k] = c[k] || [];
+  for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = c[k] || [];
 }
 
 function salvarCache() {
   const c = {};
-  for (const k of Object.keys(TABELAS)) c[k] = dados[k];
+  for (const k of [...Object.keys(TABELAS), ...APOIO]) c[k] = dados[k];
   gravar(CHAVE_CACHE, c);
 }
 
@@ -117,10 +128,69 @@ export async function carregar(competencia = competenciaAtual()) {
     dados[k] = extras[i].error ? (dados[k] || []) : (extras[i].data || []);
   });
 
+  // Férias e afastamentos: pequenos, vêm inteiros, pelo mesmo motivo.
+  const FER = ['afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas'];
+  const fer = await Promise.all(FER.map(k => c.from(TABELAS[k]).select('*')));
+  FER.forEach((k, i) => { dados[k] = fer[i].error ? (dados[k] || []) : (fer[i].data || []); });
+  try { await carregarApoioFerias(); } catch { /* sem rede: fica o que estava no cache */ }
+
   dados.carregado = true;
   salvarCache();
   avisar();
   return dados;
+}
+
+/* Faltas de todo o histórico (boletim e ocorrência com o tipo FALTA) e os
+   boletins lançados dentro de férias. Só datas — nada de horas. */
+export async function carregarApoioFerias() {
+  const c = estado.cliente;
+  if (!c || !estado.sessao) return;
+  const falta = dados.tipos.filter(t => t.codigo === 'FALTA').map(t => t.id);
+  const lista = [];
+  if (falta.length) {
+    const [b, o] = await Promise.all([
+      todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao').in('tipo_id', falta).order('data_fato')),
+      todas(() => c.from(TABELAS.ocorrencias).select('funcionario_id,data_ini,data_fim').in('tipo_id', falta).order('data_ini')),
+    ]);
+    b.filter(x => x.situacao !== 'cancelado')
+      .forEach(x => lista.push({ funcionario_id: x.funcionario_id, data: x.data_fato }));
+    o.forEach(x => {
+      for (let d = x.data_ini; d && d <= x.data_fim; d = somarDia(d)) lista.push({ funcionario_id: x.funcionario_id, data: d });
+    });
+  }
+  dados.faltas = lista;
+
+  const gozos = (dados.feriasGozos || []).filter(g => g.situacao === 'lancado');
+  if (!gozos.length) { dados.bolFerias = []; salvarCache(); return; }
+  // Uma consulta por férias lançada: cada uma traz no máximo ~30 boletins, e
+  // assim nenhuma resposta bate no limite de 1.000 linhas do Supabase.
+  const rs = await Promise.all(gozos.map(g => c.from(TABELAS.boletins)
+    .select('id,funcionario_id,data_fato,competencia,situacao')
+    .eq('funcionario_id', g.funcionario_id).gte('data_fato', g.data_ini).lte('data_fato', g.data_fim)));
+  const erro = rs.find(r => r.error)?.error;
+  if (erro) throw erro;
+  const vistos = new Set();
+  dados.bolFerias = rs.flatMap(r => r.data || [])
+    .filter(b => b.situacao !== 'cancelado' && !vistos.has(b.id) && vistos.add(b.id));
+  salvarCache();
+}
+
+/* Lê a consulta inteira em páginas de 1.000 — o teto de uma resposta. */
+async function todas(consulta) {
+  const saida = [];
+  for (let de = 0; de < 100000; de += 1000) {
+    const { data, error } = await consulta().range(de, de + 999);
+    if (error) throw error;
+    saida.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return saida;
+}
+
+function somarDia(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const t = new Date(Date.UTC(a, m - 1, d + 1));
+  return t.toISOString().slice(0, 10);
 }
 
 /* ---------------- escrita ---------------- */
@@ -300,7 +370,7 @@ export function travada(competencia, destinoId) {
 }
 
 export function limparJornadaDados() {
-  for (const k of Object.keys(TABELAS)) dados[k] = [];
+  for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = [];
   dados.carregado = false;
   try { localStorage.removeItem(CHAVE_CACHE); } catch {}
 }

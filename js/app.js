@@ -13,6 +13,7 @@ import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
   mostrarInicio, abrirModulo, moduloDe } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
+import { abrirFerias, etiquetaFicha } from './jornada-ferias.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
@@ -124,6 +125,8 @@ function abrirAba(nome) {
   $('telaEmpRecibos').hidden      = nome !== 'empRecibos';
   $('telaEmpHistorico').hidden    = nome !== 'empHistorico';
   $('telaEmpSalarios').hidden     = nome !== 'empSalarios';
+  ['ferPainel', 'ferPrev', 'ferLanc', 'ferAfast', 'ferRisco', 'ferIni'].forEach(t =>
+    { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
@@ -147,6 +150,7 @@ function abrirAba(nome) {
   if (nome === 'exFuncoes') abrirFuncoes();
   if (nome.startsWith('jor')) abrirJornada(nome);
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
+  if (nome.startsWith('fer')) abrirFerias(nome);
 }
 
 /* =============== login =============== */
@@ -777,7 +781,8 @@ function desenharFuncionarios() {
     <div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>
+        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>${
+          f.situacao === 'ATIVO' && etiquetaFicha(f.id) ? `<br><span class="fer-etiquetas">${etiquetaFicha(f.id)}</span>` : ''}
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
       <span class="acoes">

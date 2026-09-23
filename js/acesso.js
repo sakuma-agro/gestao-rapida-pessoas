@@ -90,6 +90,17 @@ export const MODULOS = [
       ['empRecibos',      'Recibos emitidos'],
       ['empHistorico',    'Conta corrente'],
     ] },
+    /* Férias (23/09/2026): direito e prazo, sem valores. Afastamento mora aqui
+       porque é ele que decide a perda do período aquisitivo — e o bloqueio da
+       parcela do empréstimo lê o mesmo lançamento. */
+    { id: 'ferias', nome: 'Férias', telas: [
+      ['ferPainel',       'Painel'],
+      ['ferPrev',         'Previsão'],
+      ['ferLanc',         'Lançamentos'],
+      ['ferAfast',        'Afastamentos'],
+      ['ferRisco',        'Períodos em risco'],
+      ['ferIni',          'Situação inicial'],
+    ] },
     { id: 'dpRelatorios', nome: 'Relatórios', telas: [
       ['jorRelatorios',   'Relatórios'],
     ] },

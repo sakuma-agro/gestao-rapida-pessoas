@@ -11,6 +11,7 @@ import { apurarDia, minParaHHMM, minParaDecimal } from './jornada-motor.js';
 import * as fech from './jornada-fechamento.js';
 import * as rel from './jornada-relatorios.js';
 import * as emp from './jornada-emprestimos.js';
+import * as fer from './jornada-ferias.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -60,6 +61,7 @@ export async function abrirJornada(tela) {
 export function limparJornada() {
   jd.limparJornadaDados();
   emp.limparEmprestimos();
+  fer.limparFerias();
   estadoTela.competencia = jd.competenciaAtual();
 
 }
@@ -115,6 +117,7 @@ function desenharPainel() {
       </div>
 
       ${painelEmprestimos()}
+      ${painelFerias()}
 
       ${semVinculo ? `<div class="jor-caixa alerta">
         <b>${semVinculo} funcionário(s) ainda sem vínculo de jornada.</b>
@@ -131,6 +134,30 @@ function desenharPainel() {
 
   $('jorIrVinculos')?.addEventListener('click', () => irPara('funcionarios'));
   $('jorIrEmprestimos')?.addEventListener('click', () => irPara('empRecibos'));
+  document.querySelectorAll('#telaJorPainel [data-ir-fer]').forEach(b =>
+    b.addEventListener('click', () => irPara(b.dataset.irFer)));
+}
+
+/* Férias no painel: só para quem enxerga o submódulo. As faixas são as do
+   painel de Férias — 90/60/30 dias até o limite de gozo. */
+function painelFerias() {
+  const r = fer.resumoPainel();
+  if (!r) return '';
+  return `<h3 class="jor-h3">Férias</h3>
+    <div class="jor-cartoes">
+      ${cartao(r.vencida, 'LIMITE VENCIDO', r.vencida ? 'alerta' : '')}
+      ${cartao(r.f30, 'LIMITE EM ATÉ 30 DIAS', r.f30 ? 'alerta' : '')}
+      ${cartao(r.f60 + r.f90, 'LIMITE EM 31 A 90 DIAS')}
+      ${cartao(r.afastados, 'AFASTADOS HOJE')}
+    </div>
+    ${r.vencida || r.f30 || r.risco || r.semini ? `<div class="jor-caixa alerta">
+      ${r.vencida ? `<b>${r.vencida} pessoa(s) passaram do limite de gozo</b> — férias em dobro (art. 137), a conta é do escritório. ` : ''}
+      ${r.f30 ? `${r.f30} com limite nos próximos 30 dias. ` : ''}
+      ${r.risco ? `${r.risco} período(s) aquisitivo(s) em risco por afastamento. ` : ''}
+      ${r.semini ? `${r.semini} pessoa(s) sem situação inicial. ` : ''}
+      <button class="btn mini" data-ir-fer="ferPainel">Abrir Férias</button></div>` : ''}
+    ${r.bolFerias ? `<div class="jor-caixa">${r.bolFerias} boletim(ns) lançado(s) dentro de férias — informativo.
+      <button class="btn mini" data-ir-fer="ferLanc">Ver lançamentos</button></div>` : ''}`;
 }
 
 /* Empréstimo Funcionário no painel: só para quem enxerga o submódulo. */
@@ -525,13 +552,17 @@ async function desenharFechamento() {
           <ul class="jor-lista">${check.informativos.map(b => `<li>${esc(b)}</li>`).join('')}</ul>
         </div>` : ''}
 
+        ${fer.avisosFechamento(estadoTela.competencia, c.linhas)}
+
         <table class="dc-planilha"><thead><tr>
           <th>Funcionário</th><th>Unidade</th>
           <th class="ce">Extras</th><th class="ce">Déficit</th>
           <th class="ce">Faltas</th><th class="ce">Atestado</th>
         </tr></thead><tbody>
           ${c.linhas.map(l => `<tr>
-            <td>${esc(l.nome)}${l.boletins === 0 ? ' <span class="jor-pend">sem lançamento</span>' : ''}</td>
+            <td>${esc(l.nome)}${fer.afastadoNaComp(l.vinculo.funcionario_id, estadoTela.competencia)
+              ? ' <span class="tag neutra">afastado</span>'
+              : l.boletins === 0 ? ' <span class="jor-pend">sem lançamento</span>' : ''}</td>
             <td class="dc-sem">${esc(l.unidadeNome)}</td>
             <td class="ce">${h(l.minExtraTotal)}</td>
             <td class="ce">${l.minDeficitAvulso ? h(l.minDeficitAvulso) : '—'}</td>
@@ -643,6 +674,28 @@ function desenharRelatorios() {
         <button class="btn mini" id="relEmpCsv">Baixar dados (Excel)</button>
       </div>` : ''}
 
+      ${fer.podeVerFerias() ? `<h3 class="jor-h3">Férias</h3>
+      <div class="jor-barra fer-barra-rel">
+        <label>Relatório
+          <select id="relFerTipo">
+            <option value="venc">Venceram no mês</option>
+            <option value="prev">Previsão dos próximos 12 meses</option>
+            <option value="sit">Situação da equipe</option>
+          </select>
+        </label>
+        <label id="relFerMesRot">Mês <input type="month" id="relFerMes" value="${mesAnterior()}"></label>
+        <label>Destino
+          <select id="relFerDest">
+            <option value="">Todos</option>
+            ${destinos.map(d => `<option value="${d.id}">${esc(d.nome)}</option>`).join('')}
+            <option value="-">Sem destino</option>
+          </select>
+        </label>
+        <button class="btn" id="relFerVer">Ver relatório</button>
+        <button class="btn mini" id="relFerCsv">Baixar dados (Excel)</button>
+      </div>
+      <p class="dc-sem jor-nota">No início de cada mês, emita "Venceram no mês" do mês anterior.</p>` : ''}
+
       <div class="jor-acoes" id="relAcoes" hidden>
         <button class="btn principal" id="relImprimir">Imprimir / salvar em PDF</button>
         <button class="btn mini" id="relFechar">Fechar prévia</button>
@@ -661,6 +714,15 @@ function desenharRelatorios() {
     rel.baixar(rel.planilhaDP(estadoTela.competencia, $('relDestino').value)));
   $('relEmpDev')?.addEventListener('click', () => preview(emp.devedoresHTML()));
   $('relEmpCsv')?.addEventListener('click', () => emp.baixarCSV(emp.devedoresCSV()));
+  const ferHtml = () => {
+    const t = $('relFerTipo').value, d = $('relFerDest').value;
+    return t === 'venc' ? fer.relVencidos($('relFerMes').value || mesAnterior(), d)
+      : t === 'prev' ? fer.relPrevisao(d) : fer.relSituacao(d);
+  };
+  $('relFerTipo')?.addEventListener('change', () => { $('relFerMesRot').hidden = $('relFerTipo').value !== 'venc'; });
+  $('relFerVer')?.addEventListener('click', () => preview(ferHtml()));
+  $('relFerCsv')?.addEventListener('click', () =>
+    rel.baixar(fer.csvFerias($('relFerTipo').value, $('relFerMes').value || mesAnterior(), $('relFerDest').value)));
   $('relImprimir').addEventListener('click', () => rel.imprimir());
   $('relFechar').addEventListener('click', () => {
     $('jorImpressao').hidden = true;
@@ -668,6 +730,12 @@ function desenharRelatorios() {
     $('relAcoes').hidden = true;
   });
 }
+
+const mesAnterior = () => {
+  const d = new Date();
+  d.setDate(1); d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 /* ===================================================================
    LIGAÇÃO — chamada uma vez, na abertura do app
@@ -679,6 +747,7 @@ export function ligarJornada(navegar) {
   if (navegar) irPara = navegar;
   ligarCadastros();
   emp.ligarEmprestimos(irPara, aviso);
+  fer.ligarFerias(irPara, aviso);
 
   $('jorCompetencia')?.addEventListener('change', async ev => {
     estadoTela.competencia = ev.target.value + '-01';

@@ -21,6 +21,7 @@
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
 import { acesso, podeTela } from './acesso.js';
+import { bloqueioInss } from './jornada-ferias.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -112,6 +113,10 @@ export function previstoEm(fid, competencia) {
     if (antes <= 0.004) continue;
     if (e.primeira_comp > competencia) return null;
     const padrao = parcelaDe(e, antes);
+    /* RN-80: recebendo do INSS (16º dia de afastamento em diante), a parcela
+       do mês não é descontada — vai para o fim, como mês sem desconto. */
+    const bloq = bloqueioInss(fid, competencia);
+    if (bloq) return { emprestimo: e, saldoAntes: antes, padrao, ajuste: ajusteDe(e.id, competencia), valor: 0, bloqueado: bloq };
     const ajuste = ajusteDe(e.id, competencia);
     return { emprestimo: e, saldoAntes: antes, padrao, ajuste,
       valor: ajuste ? Math.min(num(ajuste.valor), antes) : padrao };
@@ -132,6 +137,7 @@ export function projecaoDa(fid) {
     const e = lista.find(x => resto.get(x.id) > 0.004);
     if (!e) break;
     if (e.primeira_comp > c) c = e.primeira_comp;
+    if (bloqueioInss(fid, c)) { c = proxComp(c); continue; }   // RN-80: pula o mês
     const aj = ajusteDe(e.id, c);
     const v = aj ? Math.min(num(aj.valor), resto.get(e.id)) : parcelaDe(e, resto.get(e.id));
     saida.push({ emprestimo_id: e.id, competencia: c, valor: v, ajuste: aj });
@@ -157,6 +163,8 @@ const SIT = {
   rescisao:   ['Descontar na rescisão', 'alerta'],
 };
 const tagSit = e => { const s = SIT[situacaoDe(e)] || [e.situacao, 'neutra']; return `<span class="tag ${s[1]}">${s[0]}</span>`; };
+
+const MOTIVO_RN80 = 'Bloqueado: afastamento INSS a partir do 16º dia (RN-80) — a parcela vai para o fim';
 
 const destinoDaPessoa = fid => jd.unidadeDe(jd.vinculoDe(fid))?.destino_id || null;
 
@@ -209,7 +217,8 @@ export function descontosDoMes(competencia, destinoId) {
     }
     const p = l.previsto;
     return { fid: l.fid, nome: l.nome, emprestimo: p.emprestimo, previsto: p.padrao, valor: p.valor,
-      saldoAntes: p.saldoAntes, obs: p.ajuste?.justificativa || '', ajustado: !!p.ajuste, lancado: false };
+      saldoAntes: p.saldoAntes, obs: p.bloqueado ? MOTIVO_RN80 : (p.ajuste?.justificativa || ''),
+      ajustado: !!p.ajuste, bloqueado: !!p.bloqueado, lancado: false };
   });
 }
 
@@ -227,9 +236,9 @@ export function blocoFechamento(competencia, destino, situacao) {
         <td>${esc(l.nome)}</td>
         <td>${l.emprestimo ? numeroTxt(l.emprestimo) : '—'} <span class="dc-sem">saldo ${brl(l.saldoAntes)}</span></td>
         <td class="ce">${brl(l.previsto)}</td>
-        <td class="ce"><b>${brl(l.valor)}</b>${l.ajustado ? ' <span class="tag alerta">ajustado</span>' : ''}</td>
-        <td class="dc-sem">${l.lancado ? 'baixado no envio' : efeito(l.valor, l.previsto, l.saldoAntes)}${l.obs ? `<br>${esc(l.obs)}` : ''}</td>
-        ${aberta ? `<td class="ce">${l.lancado ? '' : `<button class="btn mini" type="button" data-ajustar="${l.fid}" data-comp="${competencia}">Ajustar</button>`}</td>` : ''}
+        <td class="ce"><b>${brl(l.valor)}</b>${l.bloqueado ? ' <span class="tag neutra">afastado</span>' : l.ajustado ? ' <span class="tag alerta">ajustado</span>' : ''}</td>
+        <td class="dc-sem">${l.lancado ? 'baixado no envio' : l.bloqueado ? '' : efeito(l.valor, l.previsto, l.saldoAntes)}${l.obs ? `${l.bloqueado ? '' : '<br>'}${esc(l.obs)}` : ''}</td>
+        ${aberta ? `<td class="ce">${l.lancado || l.bloqueado ? '' : `<button class="btn mini" type="button" data-ajustar="${l.fid}" data-comp="${competencia}">Ajustar</button>`}</td>` : ''}
       </tr>`).join('')}</tbody>
       <tfoot><tr class="jor-total"><td colspan="3">Total a descontar</td>
         <td class="ce">${brl(total)}</td><td colspan="${aberta ? 2 : 1}"></td></tr></tfoot></table>
@@ -261,7 +270,7 @@ export async function lancarAbatimentos(competencia, destinoId, prep) {
     const p = l.previsto;
     const base = p.ajuste || {
       emprestimo_id: p.emprestimo.id, funcionario_id: l.fid, competencia,
-      previsto: p.padrao, justificativa: null, criado_por: usuario(), criado_em: agora(),
+      previsto: p.padrao, justificativa: p.bloqueado ? MOTIVO_RN80 : null, criado_por: usuario(), criado_em: agora(),
     };
     const a = { ...base, destino_id: destinoId, valor: v, situacao: 'lancado', criado_em: agora() };
     const g = await jd.salvar('abatimentos', a);
@@ -280,7 +289,7 @@ export async function estornarAbatimentos(competencia, destinoId, motivo) {
     await jd.salvar('abatimentos', novo);
     await jd.registrar({ tabela: 'jor_emprestimo_abatimentos', registro_id: a.id, acao: 'update',
       antes: a, depois: novo, justificativa: motivo });
-    if (a.justificativa) {
+    if (a.justificativa && a.justificativa !== MOTIVO_RN80) {
       const { id, estornado_por, estornado_em, estorno_motivo, ...resto } = a;
       await jd.salvar('abatimentos', { ...resto, situacao: 'ajustado', criado_por: usuario(), criado_em: agora() });
     }
@@ -295,6 +304,7 @@ function dlgAjuste(fid, competencia, depois) {
   if (d && jd.travada(c, d)) { avisar(`A competência de ${compLonga(c)} já foi enviada. Reabra no Fechamento para mudar o desconto.`); return; }
   const p = previstoEm(fid, c);
   if (!p) { avisar(`${nomeDe(fid)} não tem parcela prevista em ${compLonga(c)}.`); return; }
+  if (p.bloqueado) { avisar(`${nomeDe(fid)} está afastado pelo INSS em ${compLonga(c)}: a parcela já não é descontada (RN-80) e vai para o fim.`); return; }
   dialogo(`<h3>Ajustar o desconto — ${esc(nomeDe(fid))}</h3>
     <p class="dc-sem">${numeroTxt(p.emprestimo)} · saldo ${brl(p.saldoAntes)} · parcela prevista de ${compLonga(c)}: <b>${brl(p.padrao)}</b>.
     O que não for descontado agora vai para o fim, como parcela a mais.</p>
