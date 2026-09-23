@@ -223,3 +223,8 @@
   .rel-tabela tfoot { display: table-footer-group; }
   .rel-tabela tr { page-break-inside: avoid; }
 }
+
+/* Situação na tabela dos relatórios de Férias: verde quando em dia, marrom
+   quando pede atenção — sem preto, como o resto da identidade. */
+.rel-ok { color: #5f8a00; font-weight: 700; }
+.rel-pend { color: #744F28; font-weight: 700; }

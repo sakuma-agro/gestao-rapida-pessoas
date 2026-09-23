@@ -150,3 +150,40 @@
   .jor-barra, .jor-acoes, .jor-caixa .btn { display: none; }
   .jor-apurado { border: none; background: none; }
 }
+
+/* ---- DP → Férias (23/09/2026) ---- */
+.fer-filtro { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #51534A; }
+.fer-filtro select { width: auto; max-width: 220px; }
+.fer-tabela tr.fer-clica { cursor: pointer; }
+.fer-tabela tr.fer-clica:hover td, .fer-tabela tr.fer-clica:focus td { background: #F2F7E6; }
+.fer-tabela tr.fer-clica:focus { outline: 2px solid #84BD00; outline-offset: -2px; }
+.fer-apagado td { opacity: .55; }
+.fer-mudou td { background: #FAF6EF !important; }
+.fer-rola { overflow-x: auto; }
+.fer-etiquetas { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.fer-barra-rel { flex-wrap: wrap; }
+.fer-barra-rel label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.fer-barra-rel label[hidden] { display: none; }
+.fer-barra-rel select, .fer-barra-rel input { width: auto; }
+
+/* previsão: uma barra por mês */
+.fer-prev {
+  display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; align-items: end;
+  height: 150px; padding: 8px 4px 0; border-bottom: 1px solid #E1E2DE;
+}
+.fer-prev button {
+  font: inherit; border: 0; background: none; cursor: pointer; display: flex; flex-direction: column;
+  justify-content: flex-end; align-items: center; height: 100%; gap: 3px; padding: 0; color: #51534A;
+}
+.fer-prev .fer-barra { width: 70%; background: #84BD00; border-radius: 4px 4px 0 0; min-height: 2px; }
+.fer-prev button[aria-pressed="true"] .fer-barra { background: #744F28; }
+.fer-prev button:focus-visible { outline: 2px solid #84BD00; outline-offset: 2px; }
+.fer-prev b { font-size: 12px; }
+.fer-prev-rot { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; font-size: 11px; color: #8A8D86; text-align: center; padding-top: 4px; }
+@media (max-width: 560px) {
+  .fer-prev { gap: 2px; }
+  .fer-prev-rot { gap: 2px; font-size: 9px; }
+  .fer-prev b { font-size: 10px; }
+  .fer-filtro { flex-wrap: wrap; }
+}
+@media (max-width: 760px) { .fer-rola .fer-tabela { min-width: 720px; } }
