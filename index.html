@@ -398,6 +398,7 @@
           </label>
           <div class="campo" id="uniFunc"></div>
         </div>
+        <details class="aviso info" id="avisoPlano" hidden style="margin-top:12px"></details>
         <div class="lista rolagem" id="listaFunc" style="margin-top:12px"></div>
       </div>
 
@@ -1331,7 +1332,18 @@
         <small class="dc-sem" id="fuUnidadeAtual"></small>
       </label>
       <label class="campo">Setor <select id="fuSetor"></select></label>
-      <label class="campo">Função <select id="fuCargo"></select></label>
+      <label class="campo">Função (plano de cargos)
+        <select id="fuCargo"></select>
+        <small class="dc-sem" id="fuNivel"></small>
+      </label>
+      <label class="campo">Faixa do plano
+        <select id="fuFaixa">
+          <option value="">—</option>
+          <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+          <option value="D">D</option><option value="E">E</option>
+        </select>
+        <small class="dc-sem">A é começo de contrato; B é a média de mercado.</small>
+      </label>
       <label class="campo">Tam. calçado <input type="text" id="fuCalcado" inputmode="numeric"></label>
       <label class="campo">Tam. camisa <input type="text" id="fuCamisa"></label>
       <label class="campo">Situação
