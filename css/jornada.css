@@ -272,3 +272,16 @@
   .bd-barra .bd-sel { flex: 1 1 auto; max-width: none; }
   .bd-dica { display: none; }
 }
+
+/* menu da célula na grade do mês (24/09/2026) */
+.bd-menu { position: fixed; z-index: 50; min-width: 190px; background: var(--papel); border: 1px solid var(--linha);
+  border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.2); padding: 6px; }
+.bd-menu-tit { font-size: 11px; color: var(--suave); padding: 4px 8px 6px; border-bottom: 1px solid var(--linha); margin-bottom: 4px; }
+.bd-menu-tit b { display: block; font-size: 12.5px; color: var(--texto); }
+.bd-menu button { display: flex; align-items: center; gap: 9px; width: 100%; font: inherit; font-size: 13px; text-align: left;
+  border: 0; background: none; color: var(--texto); padding: 7px 8px; border-radius: 6px; cursor: pointer; }
+.bd-menu button:hover, .bd-menu button:focus-visible { background: var(--verde-fundo); outline: none; }
+.bd-menu button.bd-atual { font-weight: 700; background: rgba(81,83,74,.08); }
+.bd-menu button small { font-weight: 400; color: var(--suave); }
+.bd-menu .bd-menu-apaga { color: var(--suave); border-top: 1px solid var(--linha); border-radius: 0 0 6px 6px; margin-top: 4px; }
+.bd-menu .bd-cel { flex: none; }
