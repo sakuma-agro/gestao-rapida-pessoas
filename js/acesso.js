@@ -85,6 +85,14 @@ export const MODULOS = [
       ['jorBoletins',     'Lançados'],
       ['jorFechamento',   'Fechamento'],
     ] },
+    /* Boletins diários (24/09/2026): quem entregou o boletim de serviço do dia
+       e o relatório individual do que falta. Substitui a planilha
+       Controle_Entrega_Boletim.xlsx. */
+    { id: 'boletinsDiarios', nome: 'Boletins diários', telas: [
+      ['bdDia',           'Marcar o dia'],
+      ['bdMes',           'Mês'],
+      ['bdPend',          'Pendências'],
+    ] },
     { id: 'emprestimo', nome: 'Empréstimo Funcionário', telas: [
       ['empEmissao',      'Emissão recibo'],
       ['empRecibos',      'Recibos emitidos'],

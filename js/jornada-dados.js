@@ -40,16 +40,19 @@ export const TABELAS = {
   feriasInicial: 'jor_ferias_inicial',
   feriasGozos:   'jor_ferias_gozos',
   feriasPerdas:  'jor_ferias_perdas',
+  // Boletins diários (24/09/2026): entrega do boletim de serviço, uma linha
+  // por pessoa por dia. Chave = funcionario_id|AAAA-MM-DD.
+  bolEntregas:   'jor_bol_entregas',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
    (para a contagem do período aquisitivo) e os boletins que caem dentro de
    férias lançadas (o pessoal tira férias "no papel" e continua trabalhando). */
-const APOIO = ['faltas', 'bolFerias'];
+const APOIO = ['faltas', 'bolFerias', 'bolJornada'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave' };
 const chaveDe = c => CHAVE[c] || 'id';
 
 export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
@@ -134,6 +137,12 @@ export async function carregar(competencia = competenciaAtual()) {
   FER.forEach((k, i) => { dados[k] = fer[i].error ? (dados[k] || []) : (fer[i].data || []); });
   try { await carregarApoioFerias(); } catch { /* sem rede: fica o que estava no cache */ }
 
+  // Boletins diários: o mês da competência e as pendências em aberto (painel).
+  try {
+    const [a, m] = competencia.split('-').map(Number);
+    await carregarEntregas(competencia, new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10));
+  } catch { /* tabela sem permissão ou sem rede: o DP abre mesmo assim */ }
+
   dados.carregado = true;
   salvarCache();
   avisar();
@@ -191,6 +200,34 @@ function somarDia(iso) {
   const [a, m, d] = iso.split('-').map(Number);
   const t = new Date(Date.UTC(a, m - 1, d + 1));
   return t.toISOString().slice(0, 10);
+}
+
+/* Boletins diários: as marcações de um intervalo de datas, mais TODOS os
+   "não entregou" em aberto (são poucos e alimentam as pendências). Também
+   traz os boletins lançados na Gestão de jornada no intervalo — boletim
+   lançado lá conta como entregue. Junta com o que já está no cache. */
+export async function carregarEntregas(ini, fim) {
+  const c = estado.cliente;
+  if (!c || !estado.sessao) return;
+  await enviarFila();
+  const [marc, pend, bol] = await Promise.all([
+    todas(() => c.from(TABELAS.bolEntregas).select('*').gte('data', ini).lte('data', fim).order('data')),
+    todas(() => c.from(TABELAS.bolEntregas).select('*').eq('situacao', 'nao_entregou').order('data')),
+    todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao')
+      .gte('data_fato', ini).lte('data_fato', fim).order('data_fato')),
+  ]);
+  const fila = new Set(ler(CHAVE_FILA, []).filter(p => p.colecao === 'bolEntregas').map(p => p.item.chave));
+  const mapa = new Map();
+  // Fica do cache o que está fora do intervalo e não é pendência, e o que
+  // ainda está na fila (a nuvem não sabe dele).
+  for (const x of dados.bolEntregas) {
+    if (fila.has(x.chave) || ((x.data < ini || x.data > fim) && x.situacao !== 'nao_entregou')) mapa.set(x.chave, x);
+  }
+  for (const x of [...pend, ...marc]) if (!fila.has(x.chave)) mapa.set(x.chave, x);
+  dados.bolEntregas = [...mapa.values()];
+  const outros = (dados.bolJornada || []).filter(b => b.data_fato < ini || b.data_fato > fim);
+  dados.bolJornada = [...outros, ...bol.filter(b => b.situacao !== 'cancelado')];
+  salvarCache();
 }
 
 /* ---------------- escrita ---------------- */
@@ -261,6 +298,16 @@ export async function salvarVinculo(funcionarioId, parcial) {
     funcionario_id: funcionarioId,
     atualizado_em: new Date().toISOString(),
   });
+}
+
+/** Apaga de verdade — só para a marcação de boletim (desmarcar o dia). */
+export async function apagar(colecao, chave) {
+  const k = chaveDe(colecao);
+  const item = dados[colecao].find(x => x[k] === chave);
+  if (!item) return;
+  dados[colecao] = dados[colecao].filter(x => x[k] !== chave);
+  salvarCache(); avisar();
+  await enviar(colecao, 'apagar', item);
 }
 
 /** Nada é excluído de verdade (RN-129): inativa-se. */

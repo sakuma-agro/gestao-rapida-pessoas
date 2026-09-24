@@ -14,6 +14,7 @@ import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
 import { abrirFerias, etiquetaFicha } from './jornada-ferias.js';
+import { abrirBoletins, fecharDocBoletins } from './jornada-boletins.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
@@ -52,6 +53,7 @@ function limparPrevias() {
   fecharFichaCadastral();   // esconde a barra do Cadastro · Nível 1
   limparPreviaSst();        // esconde as barras do SST e devolve a da lista
   fecharDocEmprestimo();    // esconde a barra do recibo / extrato do empréstimo
+  fecharDocBoletins();      // esconde a barra do relatório de boletins
   const alvo = $('jorImpressao');
   if (alvo) { alvo.innerHTML = ''; alvo.hidden = true; }
 }
@@ -127,6 +129,8 @@ function abrirAba(nome) {
   $('telaEmpSalarios').hidden     = nome !== 'empSalarios';
   ['ferPainel', 'ferPrev', 'ferLanc', 'ferAfast', 'ferRisco', 'ferIni'].forEach(t =>
     { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
+  ['bdDia', 'bdMes', 'bdPend'].forEach(t =>
+    { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
@@ -151,6 +155,7 @@ function abrirAba(nome) {
   if (nome.startsWith('jor')) abrirJornada(nome);
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
   if (nome.startsWith('fer')) abrirFerias(nome);
+  if (nome.startsWith('bd')) abrirBoletins(nome);
 }
 
 /* =============== login =============== */

@@ -12,6 +12,8 @@ import * as fech from './jornada-fechamento.js';
 import * as rel from './jornada-relatorios.js';
 import * as emp from './jornada-emprestimos.js';
 import * as fer from './jornada-ferias.js';
+import * as bol from './jornada-boletins.js';
+import { podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -62,6 +64,7 @@ export function limparJornada() {
   jd.limparJornadaDados();
   emp.limparEmprestimos();
   fer.limparFerias();
+  bol.limparBoletins();
   estadoTela.competencia = jd.competenciaAtual();
 
 }
@@ -118,6 +121,7 @@ function desenharPainel() {
 
       ${painelEmprestimos()}
       ${painelFerias()}
+      ${painelBoletins()}
 
       ${semVinculo ? `<div class="jor-caixa alerta">
         <b>${semVinculo} funcionário(s) ainda sem vínculo de jornada.</b>
@@ -136,6 +140,15 @@ function desenharPainel() {
   $('jorIrEmprestimos')?.addEventListener('click', () => irPara('empRecibos'));
   document.querySelectorAll('#telaJorPainel [data-ir-fer]').forEach(b =>
     b.addEventListener('click', () => irPara(b.dataset.irFer)));
+}
+
+/* Boletins diários no painel: só para quem enxerga a tela de pendências. */
+function painelBoletins() {
+  if (!podeTela('bdPend')) return '';
+  const r = bol.resumoPainel();
+  if (!r.pendentes) return '';
+  return `<div class="jor-caixa alerta"><b>${r.pendentes} boletim(ns) de serviço não entregue(s)</b>, de ${r.pessoas} pessoa(s).
+    <button class="btn mini" data-ir-fer="bdPend">Ver pendências</button></div>`;
 }
 
 /* Férias no painel: só para quem enxerga o submódulo. As faixas são as do
@@ -748,6 +761,7 @@ export function ligarJornada(navegar) {
   ligarCadastros();
   emp.ligarEmprestimos(irPara, aviso);
   fer.ligarFerias(irPara, aviso);
+  bol.ligarBoletins(irPara, aviso);
 
   $('jorCompetencia')?.addEventListener('change', async ev => {
     estadoTela.competencia = ev.target.value + '-01';
