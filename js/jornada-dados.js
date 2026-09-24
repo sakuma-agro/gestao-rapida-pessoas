@@ -213,7 +213,7 @@ export async function carregarEntregas(ini, fim) {
   const [marc, pend, bol] = await Promise.all([
     todas(() => c.from(TABELAS.bolEntregas).select('*').gte('data', ini).lte('data', fim).order('data')),
     todas(() => c.from(TABELAS.bolEntregas).select('*').in('situacao', ['nao_entregou', 'correcao']).order('data')),
-    todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao')
+    todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao,numero')
       .gte('data_fato', ini).lte('data_fato', fim).order('data_fato')),
   ]);
   const fila = new Set(ler(CHAVE_FILA, []).filter(p => p.colecao === 'bolEntregas').map(p => p.item.chave));

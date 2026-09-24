@@ -62,6 +62,7 @@ export const SIT = {
   nao_entregou: { rot: 'Não entregou', curto: '✗',  cls: 'bd-nao' },
   correcao:     { rot: 'Em correção',  curto: 'EC', cls: 'bd-corr' },
   faltou:       { rot: 'Faltou',       curto: 'FT', cls: 'bd-falta' },
+  atestado:     { rot: 'Atestado',     curto: 'AT', cls: 'bd-atest' },
   ferias:       { rot: 'Férias',       curto: 'FE', cls: 'bd-neutro' },
   afastado:     { rot: 'Afastado',     curto: 'AF', cls: 'bd-neutro' },
   folga:        { rot: 'Folga',        curto: 'FG', cls: 'bd-neutro' },
@@ -102,13 +103,22 @@ const fimAfast = a => a.fim_real || a.fim_previsto || '9999-12-31';
 export function situacaoDia(fid, d) {
   const m = marcacao(fid, d);
   if (m) return { sit: m.situacao, origem: 'marcado', reg: m };
-  if ((jd.dados.bolJornada || []).some(b => b.funcionario_id === fid && b.data_fato === d))
-    return { sit: 'entregou', origem: 'jornada' };
+  const bj = (jd.dados.bolJornada || []).find(b => b.funcionario_id === fid && b.data_fato === d);
+  if (bj) return { sit: 'entregou', origem: 'jornada', bol: bj };
   if ((jd.dados.afastamentos || []).some(a => a.funcionario_id === fid && a.situacao !== 'cancelado' &&
       a.data_ini <= d && fimAfast(a) >= d)) return { sit: 'afastado', origem: 'dp' };
   if ((jd.dados.feriasGozos || []).some(g => g.funcionario_id === fid && g.situacao === 'lancado' &&
       g.data_ini <= d && g.data_fim >= d)) return { sit: 'ferias', origem: 'dp' };
   return { sit: null, origem: null };
+}
+/** O que o app preencheria sozinho naquele dia, ignorando a marcação manual. */
+function situacaoAuto(fid, d) {
+  if ((jd.dados.bolJornada || []).some(b => b.funcionario_id === fid && b.data_fato === d)) return 'entregou';
+  if ((jd.dados.afastamentos || []).some(a => a.funcionario_id === fid && a.situacao !== 'cancelado' &&
+      a.data_ini <= d && fimAfast(a) >= d)) return 'afastado';
+  if ((jd.dados.feriasGozos || []).some(g => g.funcionario_id === fid && g.situacao === 'lancado' &&
+      g.data_ini <= d && g.data_fim >= d)) return 'ferias';
+  return null;
 }
 const ORIGEM_TXT = { jornada: 'boletim lançado na Gestão de jornada', dp: 'lançado em Férias e afastamentos' };
 
@@ -198,6 +208,7 @@ const COR_CAL = {
   nao_entregou: { fundo: '#744F28', letra: '#fff' },
   correcao:     { fundo: '#F2C500', letra: '#51534A' },
   faltou:       { fundo: '#C0392B', letra: '#fff' },
+  atestado:     { fundo: '#9DD3F0', letra: '#1f4f6b' },
 };
 
 /**
@@ -212,11 +223,11 @@ export function relIndividual(fid, ini = '', fim = '', tipo = '') {
   const quem = [f?.cargo, f?.fazenda].filter(Boolean).map(esc).join(' · ');
   const meses = [...new Set(p.map(x => x.data.slice(0, 7)))].sort();
   const marca = new Map(p.map(x => [x.data, x.situacao]));
-  const faltas = (jd.dados.bolEntregas || []).filter(x => x.funcionario_id === fid && x.situacao === 'faltou' &&
+  const info = (jd.dados.bolEntregas || []).filter(x => x.funcionario_id === fid && ['faltou', 'atestado'].includes(x.situacao) &&
     meses.includes(x.data.slice(0, 7)));
-  faltas.forEach(x => { if (!marca.has(x.data)) marca.set(x.data, 'faltou'); });
+  info.forEach(x => { if (!marca.has(x.data)) marca.set(x.data, x.situacao); });
   const n = k => [...marca.values()].filter(v => v === k).length;
-  const nNao = n('nao_entregou'), nCor = n('correcao'), nFal = n('faltou');
+  const nNao = n('nao_entregou'), nCor = n('correcao'), nFal = n('faltou'), nAte = n('atestado');
 
   const quad = (k, extra = '') => `<span style="display:inline-block;width:16px;height:16px;border-radius:3px;vertical-align:-3px;${
     k ? `background:${COR_CAL[k].fundo}` : 'border:1px solid #D5D7D0'};${extra}"></span>`;
@@ -243,6 +254,7 @@ export function relIndividual(fid, ini = '', fim = '', tipo = '') {
     ${tipo !== 'correcao' ? linhaLeg('nao_entregou', 'Não entregou', nNao, 'Entregar o boletim no DP') : ''}
     ${tipo !== 'nao_entregou' ? linhaLeg('correcao', 'Em correção', nCor, 'Boletim devolvido: corrigir e devolver ao DP') : ''}
     ${nFal ? linhaLeg('faltou', 'Falta', nFal, 'Dia de falta — só informação') : ''}
+    ${nAte ? linhaLeg('atestado', 'Atestado', nAte, 'Dia com atestado — só informação') : ''}
     ${linhaLeg('', 'Dia normal', null, 'Nada a fazer')}
   </div>`;
   const partes = [nNao && tipo !== 'correcao' ? `${nNao} não ${nNao === 1 ? 'entregue' : 'entregues'}` : '',
@@ -439,7 +451,7 @@ function desenharDia() {
       <div class="pv-cards bd-cards">
         <div class="pv-card pv-calma"><span>Entregou</span><strong>${cont.entregou}</strong><small>de ${todos.length} no Campo</small></div>
         <div class="pv-card ${cont.nao_entregou + cont.correcao ? 'pv-atencao' : 'pv-ok'}"><span>Não entregou · em correção</span><strong>${cont.nao_entregou + cont.correcao}</strong><small>${cont.nao_entregou} não entregou · ${cont.correcao} em correção</small></div>
-        <div class="pv-card pv-ok"><span>Faltou · férias · afast. · folga</span><strong>${cont.outros}</strong><small>não cobra boletim</small></div>
+        <div class="pv-card pv-ok"><span>Falta · atestado · férias · afast. · folga</span><strong>${cont.outros}</strong><small>não cobra boletim</small></div>
         <div class="pv-card ${cont.vazio ? 'pv-alerta' : 'pv-ok'}"><span>Sem marcação</span><strong>${cont.vazio}</strong><small>${cont.vazio ? 'falta marcar' : 'dia completo'}</small></div>
       </div>
       <div class="jor-acoes">
@@ -581,7 +593,13 @@ function menuCelula(cel) {
   m.innerHTML = `<div class="bd-menu-tit"><b>${esc((f?.apelido || f?.nome || '').split(' ').slice(0, 2).join(' '))}</b>${brCurto(d)} · ${SEM_CURTA[dow(d)]}</div>
     ${ORDEM.map(k => `<button type="button" role="menuitem" data-sit="${k}" class="${s.sit === k ? 'bd-atual' : ''}">
       <i class="bd-cel ${SIT[k].cls}">${SIT[k].curto}</i>${SIT[k].rot}${s.sit === k && s.origem !== 'marcado' ? ' <small>(automático)</small>' : ''}</button>`).join('')}
-    ${s.origem === 'marcado' ? '<button type="button" role="menuitem" data-sit="" class="bd-menu-apaga"><i class="bd-cel"></i>Apagar marcação</button>' : ''}`;
+    ${s.origem === 'marcado' ? `<button type="button" role="menuitem" data-sit="" class="bd-menu-apaga"><i class="bd-cel"></i>Apagar marcação${
+      situacaoAuto(fid, d) ? ' <small>(volta ao automático)</small>' : ''}</button>` : ''}
+    ${s.origem === 'jornada' ? `<div class="bd-menu-nota">Este ✓ vem do <b>boletim nº ${esc(s.bol?.numero || '—')}</b> lançado na Gestão de jornada.
+        Para tirar, cancele o boletim lá — ou escolha outra situação acima, que vale mais.</div>
+      <button type="button" role="menuitem" class="bd-menu-apaga" data-ir="jorBoletins"><i class="bd-cel">↗</i>Abrir boletins lançados</button>`
+      : s.origem === 'dp' ? `<div class="bd-menu-nota">Vem de <b>DP › Férias › ${s.sit === 'ferias' ? 'Lançamentos' : 'Afastamentos'}</b>.
+        Para tirar, corrija lá — ou escolha outra situação acima, que vale mais.</div>` : ''}`;
   document.body.appendChild(m);
   // Posição: embaixo da célula; se não couber, em cima. Nunca sai da tela.
   const r = cel.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
@@ -589,7 +607,8 @@ function menuCelula(cel) {
   const top = r.bottom + h + 8 <= innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4);
   m.style.left = left + 'px'; m.style.top = top + 'px';
   (m.querySelector('.bd-atual') || m.querySelector('button')).focus();
-  m.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
+  m.querySelector('[data-ir]')?.addEventListener('click', () => { fecharMenu(); irPara('jorBoletins'); });
+  m.querySelectorAll('button[data-sit]').forEach(b => b.addEventListener('click', async () => {
     fecharMenu();
     await marcar(fid, d, b.dataset.sit || null);
     const x = document.querySelector('#telaBdMes .bd-rola')?.scrollLeft || 0;
