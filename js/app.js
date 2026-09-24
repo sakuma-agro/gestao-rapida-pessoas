@@ -1296,6 +1296,15 @@ $('bCopiarAniv').addEventListener('click', async ev => {
 /* =============== aba EPIS =============== */
 // O número do C.A vira link para o ConsultaCA e a etiqueta ao lado mostra a
 // validade que veio de lá. Quem busca no site é a função "consulta-ca".
+// Periodicidade de troca do EPI: número + unidade. Em branco = conforme desgaste.
+function textoTroca(e) {
+  const n = Number(e.troca_qtd);
+  if (!n) return '';
+  const u = e.troca_unidade || 'meses';
+  const sing = { dias: 'dia', semanas: 'semana', meses: 'mês' }[u] || u;
+  return `troca a cada ${n} ${n === 1 ? sing : u}`;
+}
+
 function desenharEpis() {
   const q = $('buscaEpi').value.trim().toLowerCase();
   const lista = estado.epis.filter(e =>
@@ -1314,7 +1323,7 @@ function desenharEpis() {
       <span>
         <span class="nome">${esc(e.descricao)}</span>
         ${s.rotulo ? `<span class="tag ${s.cor}">${esc(s.rotulo)}</span>` : ''}<br>
-        <span class="sub">${numero}${e.observacao ? ' · ' + esc(e.observacao) : ''}${e.atividade ? ' · ' + esc(e.atividade) : ''}</span>
+        <span class="sub">${numero}${e.observacao ? ' · ' + esc(e.observacao) : ''}${e.atividade ? ' · ' + esc(e.atividade) : ''} · ${textoTroca(e) ? '<b>' + esc(textoTroca(e)) + '</b>' : 'troca conforme desgaste'}</span>
       </span>
       <span class="acoes"><button class="btn mini" data-editar="${e.id}">Editar</button></span>
     </div>`;
@@ -1370,6 +1379,8 @@ function abrirEpi(id) {
   $('epCa').value = editandoEpi.ca || '';
   $('epObs').value = editandoEpi.observacao || '';
   $('epAtividade').value = editandoEpi.atividade || '';
+  $('epTrocaQtd').value = editandoEpi.troca_qtd || '';
+  $('epTrocaUnidade').value = editandoEpi.troca_unidade || 'meses';
   $('bApagarEpi').hidden = !e;
   $('dlgEpi').showModal();
 }
@@ -1386,6 +1397,9 @@ $('formEpi').addEventListener('submit', async ev => {
     observacao: $('epObs').value.trim(),
     atividade: $('epAtividade').value.trim(),
   };
+  const qtd = parseInt($('epTrocaQtd').value, 10);
+  e.troca_qtd = qtd > 0 ? qtd : null;
+  e.troca_unidade = e.troca_qtd ? $('epTrocaUnidade').value : null;
   if (!e.descricao) return;
   await db.salvarEpi(e);
   $('dlgEpi').close();
