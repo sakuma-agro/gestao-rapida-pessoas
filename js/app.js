@@ -14,7 +14,7 @@ import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
 import { abrirFerias, etiquetaFicha } from './jornada-ferias.js';
-import { abrirBoletins, fecharDocBoletins } from './jornada-boletins.js';
+import { abrirBoletins, fecharDocBoletins, fecharMenuBoletins } from './jornada-boletins.js';
 import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from './atalhos.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
@@ -55,6 +55,7 @@ function limparPrevias() {
   limparPreviaSst();        // esconde as barras do SST e devolve a da lista
   fecharDocEmprestimo();    // esconde a barra do recibo / extrato do empréstimo
   fecharDocBoletins();      // esconde a barra do relatório de boletins
+  fecharMenuBoletins();     // fecha o menu da célula da grade do mês
   const alvo = $('jorImpressao');
   if (alvo) { alvo.innerHTML = ''; alvo.hidden = true; }
 }

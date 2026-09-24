@@ -535,7 +535,7 @@ function desenharMes() {
         ${dias.map(d => { const n = lista.filter(f => ehPend(situacaoDia(f.id, d).sit)).length; return `<td>${n || ''}</td>`; }).join('')}
         <td class="bd-tot">${pendMes || ''}</td></tr></tfoot></table></div>
       ${barraDoc('bdBarraMes')}
-      <p class="dc-sem jor-nota">Clique na célula para trocar a situação, na ordem da legenda (a última volta a vazio).
+      <p class="dc-sem jor-nota">Clique na célula e escolha a situação no menu (Esc fecha).
         Clique no nome para ver as pendências da pessoa e emitir o relatório. Célula com ponto marrom: boletim que chegou atrasado.</p>
     </div>`;
 
@@ -543,18 +543,68 @@ function desenharMes() {
   ligarFiltros('bdBuscaMes', 'bdFazMes', desenharMes);
   $('bdCsvMes').addEventListener('click', () => baixarCSV(csvMes(ym, lista)));
   ligarBarraDoc($('telaBdMes'));
-  document.querySelectorAll('#telaBdMes td button[data-d]').forEach(b => b.addEventListener('click', async () => {
-    const fid = b.dataset.fid, d = b.dataset.d;
-    const s = situacaoDia(fid, d);
-    const i = s.origem === 'marcado' ? ORDEM.indexOf(s.sit) : -1;
-    await marcar(fid, d, ORDEM[i + 1] || null);
-    const rola = document.querySelector('#telaBdMes .bd-rola');
-    const x = rola?.scrollLeft || 0;
-    desenharMes();
-    const r2 = document.querySelector('#telaBdMes .bd-rola'); if (r2) r2.scrollLeft = x;
+  document.querySelectorAll('#telaBdMes td button[data-d]').forEach(b => b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    menuCelula(b);
   }));
   document.querySelectorAll('#telaBdMes [data-pessoa]').forEach(b => b.addEventListener('click', () => dlgPessoa(b.dataset.pessoa)));
 }
+
+/* Menu ao clicar na célula (pedido dele em 24/09/2026 — ficar clicando até
+   chegar na situação certa dava trabalho). Um clique abre, outro escolhe. */
+function fecharMenu() {
+  const m = $('bdMenu');
+  if (m) m.remove();
+  document.removeEventListener('pointerdown', foraDoMenu, true);
+  document.removeEventListener('keydown', teclaMenu, true);
+  window.removeEventListener('resize', fecharMenu);
+  document.querySelector('#telaBdMes .bd-rola')?.removeEventListener('scroll', fecharMenu);
+}
+function foraDoMenu(ev) { if (!ev.target.closest('#bdMenu')) fecharMenu(); }
+function teclaMenu(ev) {
+  if (ev.key === 'Escape') { ev.preventDefault(); fecharMenu(); return; }
+  if (!['ArrowDown', 'ArrowUp'].includes(ev.key)) return;
+  const bs = [...document.querySelectorAll('#bdMenu button')];
+  const i = bs.indexOf(document.activeElement);
+  ev.preventDefault();
+  bs[(i + (ev.key === 'ArrowDown' ? 1 : bs.length - 1)) % bs.length]?.focus();
+}
+function menuCelula(cel) {
+  fecharMenu();
+  const fid = cel.dataset.fid, d = cel.dataset.d;
+  const s = situacaoDia(fid, d);
+  const f = pessoa(fid);
+  const m = document.createElement('div');
+  m.id = 'bdMenu';
+  m.className = 'bd-menu';
+  m.setAttribute('role', 'menu');
+  m.innerHTML = `<div class="bd-menu-tit"><b>${esc((f?.apelido || f?.nome || '').split(' ').slice(0, 2).join(' '))}</b>${brCurto(d)} · ${SEM_CURTA[dow(d)]}</div>
+    ${ORDEM.map(k => `<button type="button" role="menuitem" data-sit="${k}" class="${s.sit === k ? 'bd-atual' : ''}">
+      <i class="bd-cel ${SIT[k].cls}">${SIT[k].curto}</i>${SIT[k].rot}${s.sit === k && s.origem !== 'marcado' ? ' <small>(automático)</small>' : ''}</button>`).join('')}
+    ${s.origem === 'marcado' ? '<button type="button" role="menuitem" data-sit="" class="bd-menu-apaga"><i class="bd-cel"></i>Apagar marcação</button>' : ''}`;
+  document.body.appendChild(m);
+  // Posição: embaixo da célula; se não couber, em cima. Nunca sai da tela.
+  const r = cel.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8));
+  const top = r.bottom + h + 8 <= innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4);
+  m.style.left = left + 'px'; m.style.top = top + 'px';
+  (m.querySelector('.bd-atual') || m.querySelector('button')).focus();
+  m.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
+    fecharMenu();
+    await marcar(fid, d, b.dataset.sit || null);
+    const x = document.querySelector('#telaBdMes .bd-rola')?.scrollLeft || 0;
+    desenharMes();
+    const r2 = document.querySelector('#telaBdMes .bd-rola'); if (r2) r2.scrollLeft = x;
+    document.querySelector(`#telaBdMes button[data-fid="${fid}"][data-d="${d}"]`)?.focus();
+  }));
+  setTimeout(() => {
+    document.addEventListener('pointerdown', foraDoMenu, true);
+    document.addEventListener('keydown', teclaMenu, true);
+    window.addEventListener('resize', fecharMenu);
+    document.querySelector('#telaBdMes .bd-rola')?.addEventListener('scroll', fecharMenu);
+  });
+}
+export const fecharMenuBoletins = fecharMenu;
 
 /* ---------------- Pendências ---------------- */
 
