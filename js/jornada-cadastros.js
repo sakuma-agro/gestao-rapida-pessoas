@@ -85,18 +85,32 @@ const CADASTROS = {
     ],
   },
 
+  /* As funções seguem o plano de cargos do RH (24/09/2026). Nome, nível e
+     situação de uma função do plano vêm de rh_cargos, por um gatilho no banco
+     (rh_cargo_para_funcao): mexeu no plano, a função acompanha. Por isso ela
+     não se edita aqui. Aqui só nasce função FORA do plano (o Vaqueiro). */
   funcoes: {
     titulo: 'Funções',
-    dica: 'O que a pessoa faz. É por ela que os exames se organizam e é ela que sai impressa na ficha de EPI.',
+    dica: 'Seguem o plano de cargos: nome e nível de uma função do plano se mudam em RH › Cargos e salários › Plano de cargos. '
+      + 'Aqui entra só a função que está fora do plano.',
     singular: 'função',
-    novo: 'Nova função',
-    colunas: ['Função', 'Pessoas'],
+    novo: 'Nova função fora do plano',
+    ordenar: (a, b) => (a.ativo === false) - (b.ativo === false)
+      || (a.ordem ?? 9999) - (b.ordem ?? 9999) || porNome(a, b),
+    travado: f => f.rh_cargo_id
+      ? 'Esta função vem do plano de cargos. Para mudar o nome, o nível ou desativar, vá em RH › Cargos e salários › Plano de cargos — a função acompanha sozinha.'
+      : '',
+    colunas: ['Função', 'Nível', 'Plano de cargos', 'Pessoas'],
     linha: f => [
       `<b>${esc(f.nome)}</b>`,
-      String(jd.dados.vinculos.filter(v => v.funcao_id === f.id).length),
+      esc(f.nivel || '—'),
+      f.rh_cargo_id ? 'no plano' : '<span class="dc-sem">fora do plano</span>',
+      String(jd.dados.vinculos.filter(v => v.funcao_id === f.id && v.ativo !== false).length),
     ],
     campos: [
       { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
+      { k: 'nivel', rotulo: 'Nível', t: 's',
+        opcoes: () => NIVEIS.map(n => [n, n]) },
     ],
   },
 
@@ -141,6 +155,8 @@ const CADASTROS = {
   },
 };
 
+export const NIVEIS = ['Estratégico', 'Tático', 'Operacional'];
+
 const cpfBr = c => {
   const d = String(c || '').replace(/\D/g, '');
   return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : (c || '—');
@@ -170,7 +186,7 @@ export function desenharCadastros(alvoId, quais, callback) {
   const lista = (quais || Object.keys(CADASTROS)).filter(k => CADASTROS[k]);
   alvo.innerHTML = lista.map(chave => {
     const c = CADASTROS[chave];
-    const itens = [...jd.dados[chave]].sort(porNome);
+    const itens = [...jd.dados[chave]].sort(c.ordenar || porNome);
     return `
     <div class="jor-cad">
       <div class="barra entre" style="margin:0">
@@ -205,6 +221,17 @@ function abrir(chave, id) {
 
   $('cadTitulo').textContent = item ? `Editar ${c.singular}` : c.novo;
   $('cadErro').hidden = true;
+
+  // Registro que é de outro cadastro (função do plano de cargos): só se lê.
+  const trava = item && c.travado ? c.travado(item) : '';
+  $('formCadastro').querySelector('[type=submit]').hidden = !!trava;
+  if (trava) {
+    $('cadCampos').innerHTML = `<p style="grid-column:1/-1;margin:0"><b>${esc(item.nome)}</b>`
+      + `${item.nivel ? ' · nível ' + esc(item.nivel) : ''}</p><p class="dc-sem" style="grid-column:1/-1;margin:0">${esc(trava)}</p>`;
+    $('bDesativarCad').hidden = true;
+    $('dlgCadastro').showModal();
+    return;
+  }
 
   $('cadCampos').innerHTML = c.campos.map(f => {
     const v = editando.item[f.k] ?? '';

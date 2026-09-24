@@ -8,7 +8,7 @@ import { aniversariantes, semNascimento, montarAniversarios, textoWhatsapp, link
   imagemAniversarios, nomeImagem } from './aniversarios.js';
 import { SEED_MODELO } from './seed.js';
 import { ligarDisc, abrirDisc, limparDisc } from './disc.js';
-import { desenharCadastros } from './jornada-cadastros.js';
+import { desenharCadastros, NIVEIS } from './jornada-cadastros.js';
 import { carregarAcesso, montarMenu, desenharConfig, ligarAcesso, limparAcesso,
   mostrarInicio, abrirModulo, moduloDe } from './acesso.js';
 import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
@@ -781,7 +781,7 @@ function desenharFuncionarios() {
     <div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(f.cargo || '—')} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>${
+        <span class="sub">${esc(f.cargo || '—')}${faixaDe(f.id) ? ' · faixa ' + faixaDe(f.id) : ''} · ${esc(f.empregador || '—')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}${f.admissao ? ' · desde ' + esc(dataBr(f.admissao)) : ''}</span>${
           f.situacao === 'ATIVO' && etiquetaFicha(f.id) ? `<br><span class="fer-etiquetas">${etiquetaFicha(f.id)}</span>` : ''}
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
@@ -794,6 +794,7 @@ function desenharFuncionarios() {
 
   $('listaFunc').querySelectorAll('[data-editar]').forEach(b =>
     b.addEventListener('click', () => abrirFuncionario(b.dataset.editar)));
+  desenharPendentesPlano();
   /* Ficha do Funcionário: prévia na tela primeiro, imprimir é escolha dele. */
   $('listaFunc').querySelectorAll('[data-ficha]').forEach(b =>
     b.addEventListener('click', () =>
@@ -804,6 +805,66 @@ const dataBr = iso => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
   return m ? `${m[3]}/${m[2]}/${m[1]}` : (iso || '');
 };
+
+/* =============== plano de cargos no cadastro (24/09/2026) ===============
+   A função do funcionário segue o plano de cargos do RH: o nível
+   (Estratégico, Tático, Operacional) vem da função, a faixa (A a E) é da
+   pessoa e fica no vínculo. Só a letra — o valor em dinheiro continua só
+   no RH, onde a RLS de rh_* segura quem vê salário. */
+const faixaDe = id => jd.vinculoDe(id)?.faixa || '';
+const funcaoDe = id => jd.dados.funcoes.find(x => x.id === jd.vinculoDe(id)?.funcao_id);
+
+/* Quem está ativo e ainda não tem função do plano (sem função, ou numa
+   função que saiu de uso, como o "Tratorista" sem nível). Decisão dele:
+   ninguém é chutado para um nível — fica pendente até alguém escolher. */
+function desenharPendentesPlano() {
+  const caixa = $('avisoPlano');
+  if (!caixa) return;
+  const ativos = estado.funcionarios.filter(f => (f.situacao || 'ATIVO') === 'ATIVO');
+  const semFuncao = ativos.filter(f => { const fn = funcaoDe(f.id); return !fn || fn.ativo === false; })
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  const semFaixa = ativos.filter(f => { const fn = funcaoDe(f.id); return fn?.rh_cargo_id && fn.ativo !== false && !faixaDe(f.id); })
+    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  if (!semFuncao.length && !semFaixa.length) { caixa.hidden = true; caixa.innerHTML = ''; return; }
+  const aberto = caixa.open;
+  const pedaco = (lista, titulo) => lista.length ? `<p style="margin:8px 0 4px"><b>${titulo}</b></p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${lista.map(f =>
+      `<button type="button" class="btn mini" data-pend="${f.id}" title="${esc(f.cargo || 'sem função')}">${esc(f.nome)}</button>`).join('')}</div>` : '';
+  caixa.innerHTML = `<summary style="cursor:pointer">Plano de cargos: <b>${semFuncao.length}</b> ativo(s) sem função do plano`
+    + ` · <b>${semFaixa.length}</b> sem faixa — clique para ver</summary>`
+    + pedaco(semFuncao, 'Sem função do plano — escolha a função com o nível certo (ex.: Tratorista I a IV):')
+    + pedaco(semFaixa, 'Com função do plano, sem faixa:');
+  caixa.open = aberto;
+  caixa.hidden = false;
+  caixa.querySelectorAll('[data-pend]').forEach(b =>
+    b.addEventListener('click', () => abrirFuncionario(b.dataset.pend)));
+}
+
+function mostrarNivel() {
+  const fn = jd.dados.funcoes.find(x => x.id === $('fuCargo').value);
+  $('fuNivel').textContent = !fn ? ''
+    : fn.ativo === false ? 'Função fora de uso — escolha a do plano de cargos.'
+    : fn.rh_cargo_id ? `Nível ${fn.nivel || '—'}`
+    : `Fora do plano de cargos${fn.nivel ? ' · nível ' + fn.nivel : ''}`;
+}
+
+/* Funções agrupadas pelo nível, na ordem do plano de cargos. A função atual
+   que saiu de uso continua aparecendo, marcada, para não sumir calada. */
+function opcoesFuncao(sel) {
+  const todas = jd.dados.funcoes;
+  const uso = todas.filter(x => x.ativo !== false)
+    .sort((a, b) => (a.ordem ?? 9999) - (b.ordem ?? 9999) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  const opt = x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.nome)}</option>`;
+  const grupos = [...NIVEIS.map(n => [n, uso.filter(x => x.rh_cargo_id && x.nivel === n)]),
+    ['', uso.filter(x => !x.rh_cargo_id || !NIVEIS.includes(x.nivel))]]
+    .filter(([, itens]) => itens.length)
+    .map(([n, itens]) => `<optgroup label="${esc(n ? 'Nível ' + n : 'Fora do plano de cargos')}">${itens.map(opt).join('')}</optgroup>`)
+    .join('');
+  const atual = todas.find(x => x.id === sel && x.ativo === false);
+  return '<option value=""></option>'
+    + (atual ? `<option value="${atual.id}" selected>${esc(atual.nome)} (fora de uso — escolha o nível)</option>` : '')
+    + grupos;
+}
 
 function abrirFuncionario(id) {
   const f = id ? estado.funcionarios.find(x => x.id === id) : null;
@@ -887,7 +948,9 @@ function montarListasDoCadastro(f) {
 
   $('fuUnidade').innerHTML = opcoes(jd.dados.unidades, v?.unidade_id, u => jd.nomeUnidade(u));
   $('fuSetor').innerHTML   = opcoes(jd.dados.setores, v?.setor_id);
-  $('fuCargo').innerHTML   = opcoes(jd.dados.funcoes, v?.funcao_id);
+  $('fuCargo').innerHTML   = opcoesFuncao(v?.funcao_id);
+  $('fuFaixa').value = v?.faixa || '';
+  mostrarNivel();
 
   // Ainda sem vínculo: mostra o que estava escrito, para não parecer que sumiu.
   const escrito = [f.empregador, f.fazenda].filter(Boolean).join(' · ');
@@ -970,6 +1033,7 @@ $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
 $('bImprimirFichaCad').addEventListener('click', imprimirFichaCadastral);
 $('bFecharFichaCad').addEventListener('click', fecharFichaCadastral);
 ['buscaFunc', 'fSitFunc'].forEach(id => $(id).addEventListener('input', desenharFuncionarios));
+$('fuCargo').addEventListener('change', mostrarNivel);
 
 $('formFunc').addEventListener('submit', async ev => {
   ev.preventDefault();
@@ -1023,6 +1087,7 @@ $('formFunc').addEventListener('submit', async ev => {
       unidade_id: $('fuUnidade').value || null,
       setor_id: $('fuSetor').value || null,
       funcao_id: $('fuCargo').value || null,
+      faixa: $('fuFaixa').value || null,
       admissao: f.admissao,
       ativo: f.situacao === 'ATIVO',
     });
