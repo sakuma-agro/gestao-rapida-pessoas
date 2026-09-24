@@ -1419,6 +1419,14 @@
       <label class="campo">C.A <input type="text" id="epCa"></label>
       <label class="campo">Observação <input type="text" id="epObs"></label>
       <label class="campo plena">Atividade <input type="text" id="epAtividade"></label>
+      <label class="campo">Trocar a cada <input type="number" id="epTrocaQtd" min="1" step="1" inputmode="numeric" placeholder="em branco = conforme desgaste"></label>
+      <label class="campo">Unidade
+        <select id="epTrocaUnidade">
+          <option value="dias">dias</option>
+          <option value="semanas">semanas</option>
+          <option value="meses" selected>meses</option>
+        </select>
+      </label>
     </div>
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarEpi">Apagar</button>
