@@ -147,7 +147,7 @@ function painelBoletins() {
   if (!podeTela('bdPend')) return '';
   const r = bol.resumoPainel();
   if (!r.pendentes) return '';
-  return `<div class="jor-caixa alerta"><b>${r.pendentes} boletim(ns) de serviço não entregue(s)</b>, de ${r.pessoas} pessoa(s).
+  return `<div class="jor-caixa alerta"><b>${r.pendentes} boletim(ns) de serviço pendente(s)</b> — ${r.naoEntregou} não entregue(s), ${r.correcao} em correção — de ${r.pessoas} pessoa(s).
     <button class="btn mini" data-ir-fer="bdPend">Ver pendências</button></div>`;
 }
 

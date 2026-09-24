@@ -203,7 +203,7 @@ function somarDia(iso) {
 }
 
 /* Boletins diários: as marcações de um intervalo de datas, mais TODOS os
-   "não entregou" em aberto (são poucos e alimentam as pendências). Também
+   "não entregou" e "em correção" em aberto (são poucos e alimentam as pendências). Também
    traz os boletins lançados na Gestão de jornada no intervalo — boletim
    lançado lá conta como entregue. Junta com o que já está no cache. */
 export async function carregarEntregas(ini, fim) {
@@ -212,7 +212,7 @@ export async function carregarEntregas(ini, fim) {
   await enviarFila();
   const [marc, pend, bol] = await Promise.all([
     todas(() => c.from(TABELAS.bolEntregas).select('*').gte('data', ini).lte('data', fim).order('data')),
-    todas(() => c.from(TABELAS.bolEntregas).select('*').eq('situacao', 'nao_entregou').order('data')),
+    todas(() => c.from(TABELAS.bolEntregas).select('*').in('situacao', ['nao_entregou', 'correcao']).order('data')),
     todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao')
       .gte('data_fato', ini).lte('data_fato', fim).order('data_fato')),
   ]);
@@ -221,7 +221,7 @@ export async function carregarEntregas(ini, fim) {
   // Fica do cache o que está fora do intervalo e não é pendência, e o que
   // ainda está na fila (a nuvem não sabe dele).
   for (const x of dados.bolEntregas) {
-    if (fila.has(x.chave) || ((x.data < ini || x.data > fim) && x.situacao !== 'nao_entregou')) mapa.set(x.chave, x);
+    if (fila.has(x.chave) || ((x.data < ini || x.data > fim) && !['nao_entregou', 'correcao'].includes(x.situacao))) mapa.set(x.chave, x);
   }
   for (const x of [...pend, ...marc]) if (!fila.has(x.chave)) mapa.set(x.chave, x);
   dados.bolEntregas = [...mapa.values()];
