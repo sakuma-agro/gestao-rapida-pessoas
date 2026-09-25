@@ -241,12 +241,16 @@ function desenharLancar() {
           <label>Nº do boletim <input type="text" id="bNumero" inputmode="numeric"></label>
           <label>Data do fato <input type="date" id="bData" value="${hoje()}" required></label>
         </div>
+        <div class="jor-dia-auto" id="bDiaAuto"></div>
         <label>Tipo do dia
           <select id="bTipo">
-            ${jd.dados.tipos.filter(t => t.ativo !== false)
+            ${jd.dados.tipos.filter(t => t.ativo !== false && !PELA_DATA.includes(t.codigo))
               .sort((a, b) => a.ordem - b.ordem)
               .map(t => `<option value="${t.id}" ${t.codigo === 'NORMAL' ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}
           </select>
+        </label>
+        <label id="bMotivoRot" hidden>Motivo
+          <input type="text" id="bMotivo" maxlength="200" placeholder="Ex.: consulta médica, doença na família, não justificou…">
         </label>
         <div class="jor-linha">
           <label>Entrada <input type="time" id="bIni"></label>
@@ -278,6 +282,7 @@ function desenharLancar() {
   // Funcionário, data ou tipo do dia mudou → a jornada padrão entra de novo.
   ['bFunc','bData','bTipo'].forEach(id => $(id).addEventListener('change', () => {
     if (id === 'bFunc') cadastroDoSelecionado();
+    mostrarDiaAuto(); mostrarMotivo();
     preencherJornadaPadrao(); mostrarApurado();
   }));
   $('bCadastro').addEventListener('input', () => {
@@ -285,10 +290,43 @@ function desenharLancar() {
   });
   $('bLimpar').addEventListener('click', () => {
     $('jorFormBoletim').reset(); $('bCadAviso').innerHTML = ''; $('bJorPadrao').textContent = '';
-    mostrarApurado();
+    mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
-  mostrarApurado();
+  mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
+}
+
+/* ---------- Sábado, domingo e feriado vêm da data (25/09/2026) ----------
+   O motor já decide o percentual pela data (feriado > domingo > sábado), então
+   esses três saíram da lista do Tipo do dia e aparecem sozinhos aqui. */
+const PELA_DATA = ['SABADO', 'DOMINGO', 'FERIADO'];
+const SEMANA = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+
+function mostrarDiaAuto() {
+  const alvo = $('bDiaAuto');
+  const data = $('bData').value;
+  if (!data) { alvo.innerHTML = ''; return; }
+  const [a, m, d] = data.split('-').map(Number);
+  const dow = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+  const v = jd.vinculoDe($('bFunc').value);
+  const fer = jd.feriadoEm(data, jd.fazendaDe(jd.unidadeDe(v))?.municipio);
+  const p = jd.parametrosEm(data);
+  const perc = (k, pad) => p[k] != null ? Number(p[k]) : pad;
+  let cls = '', txt;
+  if (fer) { cls = 'forte'; txt = `<b>Feriado</b> — ${esc(fer.nome)} · todas as horas são extra a ${perc('perc_extra_feriado', 100)}%`; }
+  else if (dow === 0) { cls = 'forte'; txt = `<b>Domingo</b> · todas as horas são extra a ${perc('perc_extra_domingo', 100)}%`; }
+  else if (dow === 6) { cls = 'medio'; txt = `<b>Sábado</b> · extra a ${perc('perc_extra_sabado', 50)}% além da jornada do sábado`; }
+  else txt = `${SEMANA[dow].charAt(0).toUpperCase() + SEMANA[dow].slice(1)} · dia útil`;
+  alvo.className = 'jor-dia-auto ' + cls;
+  alvo.innerHTML = txt;
+}
+
+/* Falta, falta justificada e atestado (tipos que não apuram horas) pedem o motivo. */
+function mostrarMotivo() {
+  const tipo = jd.dados.tipos.find(t => t.id === $('bTipo').value);
+  const pede = !!tipo && tipo.apura === false;
+  $('bMotivoRot').hidden = !pede;
+  if (!pede) $('bMotivo').value = '';
 }
 
 /* ---------- Nº do cadastro → funcionário (25/09/2026) ----------
@@ -337,6 +375,14 @@ function preencherJornadaPadrao() {
   }
   if (!j) {
     dica.innerHTML = '<span class="jor-pend">Funcionário sem jornada no cadastro (Nível 2) — preencha os horários à mão.</span>';
+    return;
+  }
+  // Feriado não tem jornada prevista: deixar 07–16 preenchido viraria 8h de
+  // extra a 100% para quem só esqueceu de apagar.
+  const fer = jd.feriadoEm(data, jd.fazendaDe(jd.unidadeDe(v))?.municipio);
+  if (fer) {
+    $('bIni').value = ''; $('bFim').value = '';
+    dica.textContent = 'Feriado: sem jornada prevista — se trabalhou, preencha os horários.';
     return;
   }
   if (!dia) {
@@ -447,6 +493,7 @@ async function gravarBoletim(ev) {
     he_especial_tipo_id: $('bEspecial').value || null,
     insalubridade_dia: $('bInsal').checked,
     observacao: $('bObs').value || null,
+    motivo: $('bMotivoRot').hidden ? null : ($('bMotivo').value.trim() || null),
     situacao: 'lancado',
     criado_por: estado.sessao?.user?.email || null,
     criado_em: new Date().toISOString(),
@@ -476,7 +523,7 @@ async function gravarBoletim(ev) {
   await jd.registrar({ tabela: 'jor_boletins', registro_id: gravado.id, acao: 'insert', depois: b });
 
   $('bNumero').value = '';
-  $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = '';
+  $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
   preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
   aviso(`Boletim de ${dataBR(entrada.data)} lançado.` + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
   mostrarApurado();
@@ -516,7 +563,8 @@ function desenharBoletins() {
           <td>${dataBR(b.data_fato)}</td>
           <td>${esc(b.numero || '—')}</td>
           <td>${esc(f?.nome || '—')}</td>
-          <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}` : '—'}</td>
+          <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
+            : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}</td>
           <td class="ce">${horas(a?.min_extra_50)}</td>
           <td class="ce">${horas(a?.min_extra_100)}</td>
           <td class="ce">${horas(a?.min_deficit)}</td>
