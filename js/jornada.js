@@ -6,7 +6,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
-import { ligarCadastros } from './jornada-cadastros.js';
+import { ligarCadastros, desenharCadastros } from './jornada-cadastros.js';
 import { apurarDia, minParaHHMM, minParaDecimal } from './jornada-motor.js';
 import * as fech from './jornada-fechamento.js';
 import * as rel from './jornada-relatorios.js';
@@ -227,13 +227,16 @@ function desenharLancar() {
   $('telaJorLancar').innerHTML = cabecalho('Lançar jornada', 'O número vem do talão; o cálculo é do sistema') + `
     <div class="jor-corpo jor-duas">
       <form id="jorFormBoletim" class="jor-form">
-        <label>Funcionário
-          <select id="bFunc" required>
-            <option value=""></option>
-            ${ativos.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')}
-          </select>
-          ${ativos.length ? '' : '<small class="jor-pend">Ninguém tem vínculo de jornada ainda.</small>'}
-        </label>
+        <div class="jor-linha jor-linha-cad">
+          <label>Nº do cadastro <input type="text" id="bCadastro" inputmode="numeric" autocomplete="off"></label>
+          <label>Funcionário
+            <select id="bFunc" required>
+              <option value=""></option>
+              ${ativos.map(f => `<option value="${f.id}">${esc(f.nome)}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <small class="jor-dica" id="bCadAviso">${ativos.length ? '' : '<span class="jor-pend">Ninguém tem vínculo de jornada ainda.</span>'}</small>
         <div class="jor-linha">
           <label>Nº do boletim <input type="text" id="bNumero" inputmode="numeric"></label>
           <label>Data do fato <input type="date" id="bData" value="${hoje()}" required></label>
@@ -250,8 +253,14 @@ function desenharLancar() {
           <label>Saída <input type="time" id="bFim"></label>
           <label>Intervalo (min) <input type="number" id="bInterv" min="0" step="5" value="60"></label>
         </div>
+        <small class="jor-dica" id="bJorPadrao"></small>
         <div class="jor-linha">
-          <label>Hora extra especial (min) <input type="number" id="bEspecial" min="0" step="30" value="0"></label>
+          <label>Hora extra especial
+            <select id="bEspecial">
+              <option value="">Nenhuma</option>
+              ${tiposHeAtivos().map(t => `<option value="${t.id}">${esc(t.nome)} (${minParaHHMM(t.minutos)})</option>`).join('')}
+            </select>
+          </label>
           <label class="jor-inline"><input type="checkbox" id="bInsal"> Insalubridade no dia</label>
         </div>
         <label>Observação <input type="text" id="bObs" maxlength="200"></label>
@@ -266,10 +275,87 @@ function desenharLancar() {
 
   ['bFunc','bData','bTipo','bIni','bFim','bInterv','bEspecial'].forEach(id =>
     $(id).addEventListener('input', mostrarApurado));
-  $('bLimpar').addEventListener('click', () => { $('jorFormBoletim').reset(); mostrarApurado(); });
+  // Funcionário, data ou tipo do dia mudou → a jornada padrão entra de novo.
+  ['bFunc','bData','bTipo'].forEach(id => $(id).addEventListener('change', () => {
+    if (id === 'bFunc') cadastroDoSelecionado();
+    preencherJornadaPadrao(); mostrarApurado();
+  }));
+  $('bCadastro').addEventListener('input', () => {
+    buscarPorCadastro(); preencherJornadaPadrao(); mostrarApurado();
+  });
+  $('bLimpar').addEventListener('click', () => {
+    $('jorFormBoletim').reset(); $('bCadAviso').innerHTML = ''; $('bJorPadrao').textContent = '';
+    mostrarApurado();
+  });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
   mostrarApurado();
 }
+
+/* ---------- Nº do cadastro → funcionário (25/09/2026) ----------
+   Compara só os dígitos e sem zero à esquerda: "007" e "7" são o mesmo. */
+const numCad = v => String(v == null ? '' : v).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+
+function buscarPorCadastro() {
+  const n = numCad($('bCadastro').value);
+  const aviso = $('bCadAviso');
+  if (!n) { aviso.innerHTML = ''; return; }
+  const achados = estado.funcionarios.filter(f => numCad(f.cadastro) === n);
+  const bom = achados.find(f => (f.situacao || 'ATIVO') === 'ATIVO' && jd.vinculoDe(f.id));
+  if (bom) {
+    $('bFunc').value = bom.id;
+    aviso.innerHTML = '';
+    return;
+  }
+  $('bFunc').value = '';
+  aviso.innerHTML = achados.length
+    ? `<span class="jor-pend">Nº ${esc(n)} é de ${esc(achados[0].nome)}, que está inativo ou sem vínculo de jornada.</span>`
+    : `<span class="jor-pend">Nenhum funcionário com o nº de cadastro ${esc(n)}.</span>`;
+}
+
+function cadastroDoSelecionado() {
+  const f = estado.funcionarios.find(x => x.id === $('bFunc').value);
+  $('bCadastro').value = f?.cadastro || '';
+  $('bCadAviso').innerHTML = '';
+}
+
+/* ---------- Jornada padrão nos horários (25/09/2026) ----------
+   Entrada, saída e intervalo vêm da jornada do funcionário para aquele dia
+   da semana. Continuam editáveis: é sugestão, não trava. Tipo do dia que não
+   apura horas (falta, atestado) ou dia sem jornada (domingo) limpa os campos. */
+function preencherJornadaPadrao() {
+  const dica = $('bJorPadrao');
+  const fid = $('bFunc').value, data = $('bData').value;
+  if (!fid || !data) { dica.textContent = ''; return; }
+  const v = jd.vinculoDe(fid);
+  const tipo = jd.dados.tipos.find(t => t.id === $('bTipo').value);
+  const j = jd.jornadaDe(v);
+  const dia = jd.jornadaDoDia(v, data);
+  if (tipo && tipo.apura === false) {
+    $('bIni').value = ''; $('bFim').value = '';
+    dica.textContent = `${tipo.nome}: sem horários.`;
+    return;
+  }
+  if (!j) {
+    dica.innerHTML = '<span class="jor-pend">Funcionário sem jornada no cadastro (Nível 2) — preencha os horários à mão.</span>';
+    return;
+  }
+  if (!dia) {
+    $('bIni').value = ''; $('bFim').value = '';
+    dica.textContent = `Jornada ${j.nome}: sem expediente neste dia — se trabalhou, preencha os horários.`;
+    return;
+  }
+  $('bIni').value = dia.ini || '';
+  $('bFim').value = dia.fim || '';
+  $('bInterv').value = dia.int ?? 0;
+  dica.textContent = `Jornada padrão (${j.nome}) preenchida — altere se o boletim trouxer outro horário.`;
+}
+
+const tiposHeAtivos = () => (jd.dados.tiposHe || [])
+  .filter(t => t.ativo !== false)
+  .sort((a, b) => (a.ordem - b.ordem) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+
+const minutosHe = () =>
+  Number((jd.dados.tiposHe || []).find(t => t.id === $('bEspecial').value)?.minutos || 0);
 
 /** Monta a entrada do motor a partir do formulário. Um lugar só. */
 function entradaDoFormulario() {
@@ -291,7 +377,7 @@ function entradaDoFormulario() {
       ini: $('bIni').value,
       fim: $('bFim').value,
       intervalo: Number($('bInterv').value || 0),
-      heEspecial: Number($('bEspecial').value || 0),
+      heEspecial: minutosHe(),
     }] : [],
     jornadaDia: jd.jornadaDoDia(v, data),
     tipo: tipo ? {
@@ -357,7 +443,8 @@ async function gravarBoletim(ev) {
     hora_fim: $('bFim').value || null,
     intervalo_min: Number($('bInterv').value || 0),
     intervalo_suprimido_min: r.minIntervaloSuprimido,
-    he_especial_min: Number($('bEspecial').value || 0),
+    he_especial_min: minutosHe(),
+    he_especial_tipo_id: $('bEspecial').value || null,
     insalubridade_dia: $('bInsal').checked,
     observacao: $('bObs').value || null,
     situacao: 'lancado',
@@ -389,7 +476,8 @@ async function gravarBoletim(ev) {
   await jd.registrar({ tabela: 'jor_boletins', registro_id: gravado.id, acao: 'insert', depois: b });
 
   $('bNumero').value = '';
-  $('bIni').value = ''; $('bFim').value = ''; $('bObs').value = '';
+  $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = '';
+  preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
   aviso(`Boletim de ${dataBR(entrada.data)} lançado.` + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
   mostrarApurado();
 }
@@ -477,20 +565,7 @@ function desenharConfigJornada() {
       função e setor saíram daqui em 11/09/2026 — agora ficam no módulo <b>Cadastros</b>,
       porque o app inteiro usa essa informação, não só o DP.</p>
 
-      ${t('Jornadas',
-        jd.dados.jornadas.map(j => `<tr>
-          <td><b>${esc(j.nome)}</b></td>
-          <td>${esc(resumoJornada(j))}</td>
-          <td class="ce">${minParaHHMM(j.carga_semanal_min)}${j.carga_semanal_min !== 2640 ? ' <span class="jor-pend">≠ 44h</span>' : ''}</td></tr>`),
-        ['Jornada', 'Dias', 'Carga semanal'])}
-
-      ${t('Tipos de ocorrência',
-        [...jd.dados.tipos].sort((a, b) => a.ordem - b.ordem).map(x => `<tr>
-          <td><b>${esc(x.nome)}</b> <span class="dc-sem">${esc(x.codigo)}</span></td>
-          <td>${x.apura ? 'apura horas' : 'não apura'}</td>
-          <td>${x.deducao === 'nenhuma' ? '—' : esc(x.deducao)}</td>
-          <td class="ce">${x.percentual_forcado ? x.percentual_forcado + '%' : '—'}</td></tr>`),
-        ['Tipo', 'Cálculo', 'Dedução', 'Percentual'])}
+      <div id="jorCfgCad"></div>
 
       ${t('Parâmetros vigentes hoje',
         Object.entries(par).sort().map(([k, v]) => `<tr><td>${esc(k)}</td><td class="ce"><b>${esc(v)}</b></td></tr>`),
@@ -505,6 +580,9 @@ function desenharConfigJornada() {
         ['Data', 'Feriado', 'Abrangência'])}
     </div>` + assinatura();
 
+  // Jornadas, tipos do dia e tipos de hora extra especial: cadastráveis aqui
+  // (25/09/2026). O que mudar vale para os próximos lançamentos.
+  desenharCadastros('jorCfgCad', ['jornadas', 'tipos', 'tiposHe'], () => {});
 }
 
 function resumoJornada(j) {

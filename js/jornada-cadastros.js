@@ -155,6 +155,119 @@ const CADASTROS = {
   },
 };
 
+/* =============== cadastros do DP (25/09/2026) ===============
+   Jornadas, tipos do dia e tipos de hora extra especial. Moram em
+   DP › Configurações, não em Cadastros: só o DP usa. */
+const DIAS_SEMANA = [['1','Segunda'],['2','Terça'],['3','Quarta'],['4','Quinta'],['5','Sexta'],['6','Sábado'],['0','Domingo']];
+const hm = min => `${String(Math.floor((min || 0) / 60)).padStart(2, '0')}:${String((min || 0) % 60).padStart(2, '0')}`;
+const paraMin = t => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+const DIAS_ABREV = ['dom','seg','ter','qua','qui','sex','sáb'];
+
+/** Minutos trabalhados na semana pela grade da jornada (fim − início − intervalo). */
+export function cargaSemanal(dias) {
+  return Object.values(dias || {}).reduce((s, d) => {
+    if (!d) return s;
+    const a = paraMin(d.ini), b = paraMin(d.fim);
+    if (a == null || b == null) return s;
+    return s + Math.max(0, (b > a ? b - a : b + 1440 - a) - (Number(d.int) || 0));
+  }, 0);
+}
+
+const semAcento = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+const codigoDe = nome => semAcento(nome).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 20) || 'TIPO';
+
+const DEDUCOES = [
+  ['nenhuma', 'Não desconta'],
+  ['fixa_8h', 'Desconta 8h fixas (Campo)'],
+  ['jornada_dia', 'Desconta a jornada do dia'],
+];
+
+Object.assign(CADASTROS, {
+  jornadas: {
+    titulo: 'Jornadas',
+    dica: 'Horário padrão de cada dia da semana. É o que vem preenchido em "Lançar jornada" — e o que o cálculo usa como previsto.',
+    singular: 'jornada',
+    novo: 'Nova jornada',
+    colunas: ['Jornada', 'Dias', 'Carga semanal', 'Quem usa'],
+    linha: j => [
+      `<b>${esc(j.nome)}</b>`,
+      `<span class="dc-sem">${esc(Object.entries(j.dias || {}).filter(([, v]) => v)
+        .sort(([a], [b]) => ((+a || 7) - (+b || 7)))
+        .map(([k, v]) => `${DIAS_ABREV[k]} ${v.ini}–${v.fim}${v.int ? ` (${v.int}min)` : ''}`).join(' · '))}</span>`,
+      `${hm(j.carga_semanal_min)}${j.carga_semanal_min > 2640 ? ' <span class="jor-pend">acima de 44h</span>' : ''}`,
+      (() => {
+        const setores = jd.dados.setores.filter(x => x.jornada_id === j.id).map(x => x.nome);
+        const proprios = jd.dados.vinculos.filter(v => v.jornada_id === j.id).length;
+        return [setores.length ? 'setor ' + esc(setores.join(', ')) : '', proprios ? `${proprios} com jornada própria` : '']
+          .filter(Boolean).join(' · ') || '—';
+      })(),
+    ],
+    campos: [
+      { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
+      { k: 'dias', rotulo: 'Horário por dia', t: 'dias', plena: true },
+    ],
+    preparar: j => {
+      j.carga_semanal_min = cargaSemanal(j.dias);
+      if (!Object.values(j.dias || {}).some(Boolean)) return 'Marque pelo menos um dia de trabalho.';
+    },
+  },
+
+  tipos: {
+    titulo: 'Tipos do dia',
+    dica: 'As opções de "Tipo do dia" no lançamento. Cada tipo diz se o dia conta horas, se desconta e se força um percentual de extra.',
+    singular: 'tipo do dia',
+    novo: 'Novo tipo do dia',
+    ordenar: (a, b) => (a.ativo === false) - (b.ativo === false) || (a.ordem - b.ordem),
+    colunas: ['Tipo', 'Horas', 'Desconto', 'Conta dia', 'Percentual'],
+    linha: x => [
+      `<b>${esc(x.nome)}</b>`,
+      x.apura ? 'apura horas' : 'sem horários',
+      esc((DEDUCOES.find(d => d[0] === x.deducao) || [, x.deducao])[1]),
+      x.conta_dias ? 'sim' : '—',
+      x.percentual_forcado ? x.percentual_forcado + '%' : '<span class="dc-sem">pelo dia</span>',
+    ],
+    campos: [
+      { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
+      { k: 'apura', rotulo: 'Conta horas trabalhadas?', t: 'b', padrao: true },
+      { k: 'deducao', rotulo: 'Desconto', t: 's', padrao: 'nenhuma', opcoes: () => DEDUCOES },
+      { k: 'conta_dias', rotulo: 'Conta como dia (falta, atestado…)?', t: 'b', padrao: false },
+      { k: 'percentual_forcado', rotulo: 'Percentual de extra fixo (%)', t: 'n',
+        dica: 'Em branco = segue o dia (50% normal/sábado, 100% domingo/feriado).' },
+      { k: 'ordem', rotulo: 'Ordem na lista', t: 'n' },
+    ],
+    preparar: (x, lista) => {
+      if (!x.codigo) {
+        let c = codigoDe(x.nome), n = 2;
+        while (lista.some(o => o.codigo === c && o.id !== x.id)) c = codigoDe(x.nome).slice(0, 17) + '_' + n++;
+        x.codigo = c;
+      }
+      if (x.ordem == null) x.ordem = Math.max(0, ...lista.map(o => o.ordem || 0)) + 1;
+      if (!x.deducao) x.deducao = 'nenhuma';
+      if (x.percentual_forcado != null && (x.percentual_forcado < 0 || x.percentual_forcado > 300))
+        return 'Percentual fora do razoável (0 a 300).';
+    },
+  },
+
+  tiposHe: {
+    titulo: 'Tipos de hora extra especial',
+    dica: 'Horas fixas que entram por escolha no lançamento (ex.: Irrigação 1 = 1h). Somam na hora extra, no percentual do dia, sem tolerância.',
+    singular: 'tipo de hora extra especial',
+    novo: 'Novo tipo',
+    ordenar: (a, b) => (a.ativo === false) - (b.ativo === false) || (a.ordem - b.ordem),
+    colunas: ['Tipo', 'Horas'],
+    linha: x => [`<b>${esc(x.nome)}</b>`, hm(x.minutos)],
+    campos: [
+      { k: 'nome', rotulo: 'Nome', t: 't', req: true },
+      { k: 'minutos', rotulo: 'Horas (hh:mm)', t: 'hm', req: true },
+      { k: 'ordem', rotulo: 'Ordem na lista', t: 'n' },
+    ],
+    preparar: (x, lista) => {
+      if (!(x.minutos > 0)) return 'Informe quantas horas o tipo vale (ex.: 01:00).';
+      if (x.ordem == null) x.ordem = Math.max(0, ...lista.map(o => o.ordem || 0)) + 1;
+    },
+  },
+});
+
 export const NIVEIS = ['Estratégico', 'Tático', 'Operacional'];
 
 const cpfBr = c => {
@@ -234,7 +347,31 @@ function abrir(chave, id) {
   }
 
   $('cadCampos').innerHTML = c.campos.map(f => {
-    const v = editando.item[f.k] ?? '';
+    const v = editando.item[f.k] ?? (item ? '' : (f.padrao ?? ''));
+    if (f.t === 'dias') {
+      const dias = editando.item.dias || {};
+      return `<div class="jor-dias-bloco"><span>${esc(f.rotulo)}</span><div class="jor-dias-rolo">
+        <table class="dc-planilha jor-dias-cad"><thead><tr><th>Dia</th><th class="ce">Trabalha</th><th>Entrada</th><th>Saída</th><th>Intervalo (min)</th></tr></thead><tbody>
+        ${DIAS_SEMANA.map(([k, rot]) => { const d = dias[k]; return `<tr data-dia="${k}">
+          <td>${rot}</td>
+          <td class="ce"><input type="checkbox" data-trab${d ? ' checked' : ''}></td>
+          <td><input type="time" data-ini value="${esc(d?.ini || '')}"></td>
+          <td><input type="time" data-fim value="${esc(d?.fim || '')}"></td>
+          <td><input type="number" data-int min="0" step="5" value="${esc(d ? (d.int ?? 0) : '')}"></td></tr>`; }).join('')}
+        </tbody></table></div>
+        <small class="dc-sem" id="cadCarga"></small></div>`;
+    }
+    if (f.t === 'b') {
+      const sim = v === true || v === 'true';
+      return `<label class="campo${f.plena ? ' plena' : ''}">${esc(f.rotulo)}
+        <select data-campo="${f.k}" data-tipo="b"><option value="1"${sim ? ' selected' : ''}>Sim</option><option value="0"${sim ? '' : ' selected'}>Não</option></select></label>`;
+    }
+    if (f.t === 'n' || f.t === 'hm') {
+      const val = f.t === 'hm' ? (v === '' ? '' : hm(v)) : v;
+      return `<label class="campo${f.plena ? ' plena' : ''}">${esc(f.rotulo)}
+        <input type="${f.t === 'hm' ? 'time' : 'number'}" data-campo="${f.k}" data-tipo="${f.t}" value="${esc(val)}">
+        ${f.dica ? `<small class="dc-sem">${esc(f.dica)}</small>` : ''}</label>`;
+    }
     if (f.t === 's') {
       const ops = f.opcoes();
       return `<label class="campo${f.plena ? ' plena' : ''}">${esc(f.rotulo)}
@@ -254,7 +391,43 @@ function abrir(chave, id) {
     </label>`;
 
   $('bDesativarCad').hidden = !item || item.ativo === false;
+  ligarGradeDias();
   $('dlgCadastro').showModal();
+}
+
+/* Grade de dias da jornada: marcar "Trabalha" sugere o horário da linha de
+   cima; a carga semanal aparece embaixo, recalculada a cada tecla. */
+function lerDias() {
+  const dias = {};
+  $('cadCampos').querySelectorAll('tr[data-dia]').forEach(tr => {
+    const q = s => tr.querySelector(s);
+    dias[tr.dataset.dia] = q('[data-trab]').checked && q('[data-ini]').value && q('[data-fim]').value
+      ? { ini: q('[data-ini]').value, fim: q('[data-fim]').value, int: Number(q('[data-int]').value || 0) }
+      : null;
+  });
+  return dias;
+}
+
+function ligarGradeDias() {
+  const linhas = [...$('cadCampos').querySelectorAll('tr[data-dia]')];
+  if (!linhas.length) return;
+  const carga = () => {
+    const m = cargaSemanal(lerDias());
+    $('cadCarga').innerHTML = `Carga semanal: <b>${hm(m)}</b>${m > 2640 ? ' <span class="jor-pend">acima de 44h</span>' : ''}`;
+  };
+  linhas.forEach((tr, i) => {
+    tr.querySelector('[data-trab]').addEventListener('change', ev => {
+      if (ev.target.checked && !tr.querySelector('[data-ini]').value) {
+        const ant = linhas.slice(0, i).reverse().find(x => x.querySelector('[data-trab]').checked);
+        tr.querySelector('[data-ini]').value = ant?.querySelector('[data-ini]').value || '07:00';
+        tr.querySelector('[data-fim]').value = ant?.querySelector('[data-fim]').value || '16:00';
+        tr.querySelector('[data-int]').value = ant?.querySelector('[data-int]').value || 60;
+      }
+      carga();
+    });
+    tr.querySelectorAll('input').forEach(el => el.addEventListener('input', carga));
+  });
+  carga();
 }
 
 function erro(texto) {
@@ -273,8 +446,17 @@ export function ligarCadastros() {
     const linha = { ...editando.item };
     $('cadCampos').querySelectorAll('[data-campo]').forEach(el => {
       const k = el.dataset.campo;
-      linha[k] = k === 'ativo' ? el.value === '1' : (so(el.value) || null);
+      const t = el.dataset.tipo;
+      linha[k] = k === 'ativo' || t === 'b' ? el.value === '1'
+        : t === 'n' ? (so(el.value) === '' ? null : Number(el.value))
+        : t === 'hm' ? paraMin(el.value)
+        : (so(el.value) || null);
     });
+    if (c.campos.some(f => f.t === 'dias')) linha.dias = lerDias();
+    if (c.preparar) {
+      const problema = c.preparar(linha, jd.dados[chave]);
+      if (problema) return erro(problema);
+    }
 
     for (const f of c.campos) {
       if (f.req && !linha[f.k]) return erro(`Falta preencher: ${f.rotulo}.`);

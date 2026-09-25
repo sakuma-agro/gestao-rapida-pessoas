@@ -21,6 +21,8 @@ export const TABELAS = {
   setores:      'jor_setores',
   funcoes:      'jor_funcoes',
   tipos:        'jor_tipos_ocorrencia',
+  // Tipos de hora extra especial (25/09/2026): Irrigação 1 = 1h, Irrigação 2 = 2h…
+  tiposHe:      'jor_tipos_he_especial',
   feriados:     'jor_feriados',
   parametros:   'jor_parametros',
   vinculos:     'jor_vinculos',
@@ -122,6 +124,11 @@ export async function carregar(competencia = competenciaAtual()) {
   } else {
     dados.apuracoes = [];
   }
+
+  // Tipos de hora extra especial: tabela nova (25/09/2026). Se falhar,
+  // o DP abre do mesmo jeito — só o seletor fica vazio.
+  const he = await c.from(TABELAS.tiposHe).select('*');
+  dados.tiposHe = he.error ? (dados.tiposHe || []) : (he.data || []);
 
   // Empréstimos: pequenos, vêm inteiros — o saldo depende de todo o histórico.
   // Tabela que ainda não existe (ou sem permissão) não derruba o DP.
