@@ -178,6 +178,22 @@
 .rel-via .rel-rodape { margin-top: 8px; }
 .rel-corte { border: 0; border-top: 1px dashed #8A8D86; margin: 0; }
 
+
+/* ---- moldura do protótipo 12.7 (25/09/2026): Horas Extras, Faltas,
+   Faltas Totais e Atestados. Título no centro, destino e versão à direita. */
+.rel-cab-dp .rel-titulo { text-align: center; }
+.rel-cab-dp .rel-titulo h1 { font-size: 15px; letter-spacing: .4px; }
+.rel-cab-dp .rel-titulo p { color: #51534A; font-size: 11.5px; }
+.rel-cab-dp .rel-comp { width: 118px; line-height: 1.4; color: #51534A; }
+.rel-cab-dp img { width: 118px; height: auto; }
+.rel-emp { font-size: 11px; font-weight: 700; color: #744F28; margin: 12px 0 4px; }
+.rel-c { text-align: center; }
+.rel-tabela-dp thead th.rel-c { text-align: center; }
+.rel-tabela-dp thead th.rel-num { text-align: right; }
+.rel-tarja--interna { background: #FDF3F2; border-left-color: #C0392B; color: #A93226; }
+.rel-rodape-dp { justify-content: flex-start; border-top: 1px solid #E1E2DE; padding-top: 7px; }
+.rel-rodape-dp .rel-pe { flex: 1; font-size: 8.5px; line-height: 1.2; color: #8A8D86; }
+
 /* ---- impressão de verdade ----
    Sem regra @page aqui: o app já define @page{margin:0}, e mexer nisso
    mudaria também a impressão da ficha de EPI. A margem do documento sai
