@@ -1,6 +1,11 @@
 // jornada-relatorios.js — J5 · os relatórios da competência
 //
-// REL-DP      Relatório DP — formato de hoje, total único de horas extras
+// REL-DP      Relatório Horas Extras — formato do protótipo 12.7 (25/09/2026):
+//             por empregador, com insalubridade, periculosidade, faltas e
+//             a parcela do empréstimo na mesma linha
+// REL-FAL     Relatório de Faltas — só as informadas ao DP, com as datas
+// REL-FAL-TOT Relatório Faltas Totais — todas, compensadas marcadas (uso interno)
+// REL-ATE     Relatório de Atestados — períodos e dias, sem motivo
 // REL-DP-DET  Detalhado DP — abertura por percentual, intervalo e déficit
 // REL-EXT     Extrato individual — dia a dia, com a memória de cálculo
 //
@@ -72,64 +77,189 @@ const blocoAssinaturas = nomes => `
   </div>`;
 
 /* ------------------------------------------------------------------
-   REL-DP — o que o escritório recebe hoje
+   Moldura do protótipo 12.7 (25/09/2026) — Relatório Horas Extras,
+   Faltas, Faltas Totais e Atestados. É o formato que o escritório lê
+   "de sempre": título no centro, mês por extenso, destino e versão à
+   direita, um bloco por empregador + fazenda.
+   ------------------------------------------------------------------ */
+
+const MAIUSC = s => String(s || '').toLocaleUpperCase('pt-BR');
+const mesRef = c => { const [a, m] = c.split('-').map(Number); return `REFERENTE AO MÊS DE ${MAIUSC(MESES[m - 1])} ${a}`; };
+const compCurta = c => { const [a, m] = c.split('-').map(Number); return `${MESES[m - 1]}/${a}`; };
+
+function documentoDP({ titulo, competencia, destino, versao, corpo, assinaturas, interno }) {
+  const tarjaInterna = interno
+    ? '<div class="rel-tarja rel-tarja--interna">USO INTERNO — não enviar ao escritório</div>' : '';
+  const tarjaVersao = versao > 1
+    ? `<div class="rel-tarja">VERSÃO ${versao} — substitui a versão anterior desta competência</div>` : '';
+  return `
+  <article class="rel rel-dp">
+    <header class="rel-cabecalho rel-cab-dp">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-titulo">
+        <h1>${esc(titulo)}</h1>
+        <p>${esc(mesRef(competencia))}</p>
+      </div>
+      <div class="rel-comp">${esc(destino?.nome || '')}<br>${interno ? 'uso interno' : `versão ${versao || 1}`}</div>
+    </header>
+    ${tarjaInterna}${tarjaVersao}
+    ${corpo}
+    ${assinaturas ? blocoAssinaturas(assinaturas) : ''}
+    <footer class="rel-rodape rel-rodape-dp">
+      <span class="rel-pe">${esc(titulo.charAt(0) + titulo.slice(1).toLocaleLowerCase('pt-BR'))} · ${esc(compCurta(competencia))} · ${esc(destino?.nome || '')} · ${interno ? 'uso interno' : `versão ${versao || 1}`}</span>
+      <img src="img/lop-marca.png" alt="LOP">
+      <span class="rel-lop">Inteligência para o agronegócio</span>
+    </footer>
+  </article>`;
+}
+
+/** Linhas do consolidado agrupadas por unidade (empregador + fazenda), em ordem alfabética. */
+function porEmpregador(c, filtro = () => true) {
+  return c.unidades.map(u => {
+    const linhas = c.linhas.filter(l => l.unidade?.id === u.id && filtro(l))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const emp = jd.empregadorDe(u)?.nome || '';
+    const faz = jd.fazendaDe(u)?.nome || '';
+    const rotulo = 'EMPREGADOR: ' + MAIUSC([emp, faz].filter(Boolean).join(' — ') || jd.nomeUnidade(u));
+    return { u, rotulo, linhas };
+  }).filter(g => g.linhas.length)
+    .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
+}
+const blocoEmp = t => `<p class="rel-emp">${esc(t)}</p>`;
+const assinaturasDP = ['Gerente de Campo', 'Gerente Administrativo', 'Analista Administrativo'];
+const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/* ------------------------------------------------------------------
+   REL-DP — Relatório Horas Extras (protótipo 12.7, decisão de 25/09/2026)
+   Colunas: Funcionário · Horas extras · Insalubridade · Periculosidade 30%
+   · Faltas justif. · Faltas não justif. · Saldo devedor (parcela do mês).
    ------------------------------------------------------------------ */
 
 export function relatorioDP(competencia, destinoId) {
   const c = consolidar(competencia, destinoId);
   const fmt = c.destino?.formato_horas || 'decimal';
   const comp = jd.competenciaDoDestino(competencia, destinoId);
-  const h = m => formatarHoras(m, fmt);
+  const h = m => m ? formatarHoras(m, fmt) : '';
 
-  const porUnidade = c.unidades.map(u => {
-    const linhas = c.linhas.filter(l => l.unidade?.id === u.id);
-    if (!linhas.length) return '';
-    const soma = campo => linhas.reduce((s, l) => s + (l[campo] || 0), 0);
-    return `
-      <h2 class="rel-unidade">${esc(jd.nomeUnidade(u))}
-        <small>${esc(jd.fazendaDe(u)?.municipio || '')} · CAEPF ${esc(u.caepf || '—')}${u.codigo_empresa ? ` · empresa ${esc(u.codigo_empresa)}` : ''}</small>
-      </h2>
-      <table class="rel-tabela">
+  const grupos = porEmpregador(c);
+  const corpo = grupos.map(g => `
+      ${blocoEmp(g.rotulo)}
+      <table class="rel-tabela rel-tabela-dp">
         <thead><tr>
-          <th class="rel-num">Matr.</th><th>Funcionário</th>
-          <th class="rel-num">Horas extras</th><th class="rel-num">Déficit</th>
-          <th class="rel-num">Faltas</th><th class="rel-num">Atestado</th>
+          <th>Funcionário</th><th class="rel-num">Horas extras</th>
+          <th class="rel-c">Insalubridade</th><th class="rel-c">Periculosidade 30%</th>
+          <th class="rel-c">Faltas justif.</th><th class="rel-c">Faltas não justif.</th>
+          <th class="rel-num">Saldo devedor</th>
         </tr></thead>
-        <tbody>${linhas.map(l => `<tr>
-          <td class="rel-num">${esc(l.matricula)}</td>
+        <tbody>${g.linhas.map(l => {
+          const parcela = valorParaFolha(l.vinculo.funcionario_id, competencia);
+          return `<tr>
           <td>${esc(l.nome)}</td>
-          <td class="rel-num">${h(l.minExtraTotal)}</td>
-          <td class="rel-num">${l.minDeficitAvulso ? h(l.minDeficitAvulso) : '—'}</td>
-          <td class="rel-num">${l.faltasInformadas || '—'}</td>
-          <td class="rel-num">${l.diasAtestado || '—'}</td>
-        </tr>`).join('')}</tbody>
-        <tfoot><tr>
-          <td colspan="2">Total da unidade — ${linhas.length} pessoa(s)</td>
-          <td class="rel-num">${h(soma('minExtraTotal'))}</td>
-          <td class="rel-num">${h(soma('minDeficitAvulso'))}</td>
-          <td class="rel-num">${soma('faltasInformadas')}</td>
-          <td class="rel-num">${soma('diasAtestado')}</td>
-        </tr></tfoot>
-      </table>`;
-  }).join('');
+          <td class="rel-num"><b>${h(l.minExtraTotal)}</b></td>
+          <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
+          <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
+          <td class="rel-c">${l.faltasJ.length || ''}</td>
+          <td class="rel-c">${l.faltasInformadas || ''}</td>
+          <td class="rel-num">${parcela > 0.004 ? brl(parcela) : ''}</td>
+        </tr>`; }).join('')}</tbody>
+      </table>`).join('') || '<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>';
 
-  const corpo = `
-    ${porUnidade || '<p class="rel-vazio">Nenhum lançamento nesta competência.</p>'}
-    ${secaoRelatorioDP(competencia, destinoId)}
-    <div class="rel-resumo">
-      <b>Total do destino:</b> ${c.totais.pessoas} pessoa(s) ·
-      ${h(c.totais.extraTotal)} de horas extras ·
-      ${c.totais.faltasInformadas} falta(s) · ${c.totais.atestados} dia(s) de atestado.
-      ${c.totais.intervaloSuprimido ? `<br><b>Intervalo suprimido:</b> ${minParaHHMM(c.totais.intervaloSuprimido)} — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras.` : ''}
-    </div>
-    <p class="rel-nota">Horas em ${fmt === 'hm' ? 'horas e minutos' : 'decimal, duas casas'}.
-    Apuração em minutos exatos, tolerância de 5 min por marcação e 10 min no dia (art. 58 §1º).</p>`;
+  const nota = `
+    ${c.totais.intervaloSuprimido ? `<div class="rel-resumo"><b>Intervalo suprimido:</b> ${minParaHHMM(c.totais.intervaloSuprimido)} no destino — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras (ver Relatório Detalhado).</div>` : ''}
+    <p class="rel-nota">Horas extras em ${fmt === 'hm' ? 'horas e minutos' : 'decimal, duas casas'}. Faltas não justificadas: só as que as horas extras do mês não cobriram.
+    Saldo devedor: parcela do empréstimo a descontar neste mês.</p>`;
 
-  return documento({
-    titulo: 'Relatório de Horas — DP',
-    subtitulo: 'Apuração de jornada para processamento da folha',
-    destino: c.destino, competencia, versao: comp?.versao || 1, corpo,
-    assinaturas: ['Gerente de Campo', 'Gerente Administrativo', 'Analista Administrativo'],
+  return documentoDP({
+    titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino,
+    versao: comp?.versao || 1, corpo: corpo + nota, assinaturas: assinaturasDP,
+  });
+}
+
+/* ------------------------------------------------------------------
+   Faltas (vai ao DP) e FALTAS TOTAIS (uso interno) — 25/09/2026
+   Faltas: só as informadas ao DP. Faltas Totais: todas, com a
+   compensada marcada. Fonte: Gestão de jornada.
+   ------------------------------------------------------------------ */
+
+export function relatorioFaltas(competencia, destinoId, { totais = false } = {}) {
+  const c = consolidar(competencia, destinoId);
+  const comp = jd.competenciaDoDestino(competencia, destinoId);
+
+  const nj = l => l.faltasNJ.filter(f => totais || !f.absorvida);
+  const temFalta = l => l.faltasJ.length + nj(l).length > 0;
+  const datas = l => nj(l).map(f => dataBR(f.data) + (f.absorvida ? ' <span class="rel-mini">(compensada)</span>' : ''));
+
+  const grupos = porEmpregador(c, temFalta);
+  let qJ = 0, qNJ = 0, qComp = 0;
+  const corpo = grupos.map(g => `
+      ${blocoEmp(g.rotulo)}
+      <table class="rel-tabela rel-tabela-dp">
+        <thead><tr>
+          <th>Funcionário</th><th class="rel-c">Faltas justificadas</th>
+          <th class="rel-c">Faltas não justificadas</th><th class="rel-num">Total</th>
+        </tr></thead>
+        <tbody>${g.linhas.map(l => {
+          const n = nj(l);
+          qJ += l.faltasJ.length; qNJ += n.length; qComp += n.filter(f => f.absorvida).length;
+          return `<tr>
+          <td>${esc(l.nome)}</td>
+          <td class="rel-c">${l.faltasJ.map(dataBR).join(', ') || '—'}</td>
+          <td class="rel-c">${datas(l).join(', ') || '—'}</td>
+          <td class="rel-num"><b>${l.faltasJ.length + n.length}</b></td>
+        </tr>`; }).join('')}</tbody>
+      </table>`).join('')
+    || `<p class="rel-vazio">Nenhuma falta ${totais ? 'lançada' : 'informada ao DP'} nesta competência.</p>`;
+
+  const resumo = totais
+    ? `<div class="rel-resumo"><b>Resumo:</b> ${qJ + qNJ} falta(s) no mês — ${qJ} justificada(s) e ${qNJ} não justificada(s).
+       Das não justificadas, ${qComp} foram compensadas por horas extras e ${qNJ - qComp} foram informadas ao DP.</div>`
+    : `<p class="rel-nota">Constam só as faltas informadas ao DP. A falta não justificada que as horas extras do mês cobriram não aparece aqui.</p>`;
+
+  return documentoDP({
+    titulo: totais ? 'RELATÓRIO FALTAS TOTAIS' : 'RELATÓRIO DE FALTAS',
+    competencia, destino: c.destino, versao: comp?.versao || 1, interno: totais,
+    corpo: corpo + resumo, assinaturas: totais ? null : assinaturasDP,
+  });
+}
+
+/* ------------------------------------------------------------------
+   Atestados — 25/09/2026. Dias seguidos viram um período. Sem motivo
+   e sem CID: o documento só informa os dias.
+   ------------------------------------------------------------------ */
+
+function periodos(datas) {
+  const dia = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+  const r = [];
+  for (const d of [...new Set(datas)].sort()) {
+    const u = r[r.length - 1];
+    if (u && dia(d) - dia(u.fim) === 86400000) u.fim = d;
+    else r.push({ ini: d, fim: d });
+  }
+  return r;
+}
+
+export function relatorioAtestados(competencia, destinoId) {
+  const c = consolidar(competencia, destinoId);
+  const comp = jd.competenciaDoDestino(competencia, destinoId);
+  const grupos = porEmpregador(c, l => l.atestadoDatas.length > 0);
+  let total = 0;
+  const corpo = grupos.map(g => `
+      ${blocoEmp(g.rotulo)}
+      <table class="rel-tabela rel-tabela-dp">
+        <thead><tr><th>Funcionário</th><th class="rel-c">Período do atestado</th><th class="rel-num">Dias</th></tr></thead>
+        <tbody>${g.linhas.map(l => {
+          total += l.atestadoDatas.length;
+          return `<tr>
+          <td>${esc(l.nome)}</td>
+          <td class="rel-c">${periodos(l.atestadoDatas).map(p => p.ini === p.fim ? dataBR(p.ini) : `${dataBR(p.ini)} a ${dataBR(p.fim)}`).join('<br>')}</td>
+          <td class="rel-num"><b>${l.atestadoDatas.length}</b></td>
+        </tr>`; }).join('')}</tbody>
+      </table>`).join('') || '<p class="rel-vazio">Nenhum atestado nesta competência.</p>';
+
+  const nota = `<p class="rel-nota">${total ? `${total} dia(s) de atestado no destino. ` : ''}Atestado não desconta horas: o relatório só informa os dias.</p>`;
+  return documentoDP({
+    titulo: 'RELATÓRIO DE ATESTADOS', competencia, destino: c.destino,
+    versao: comp?.versao || 1, corpo: corpo + nota, assinaturas: assinaturasDP,
   });
 }
 

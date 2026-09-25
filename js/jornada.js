@@ -725,7 +725,7 @@ async function desenharFechamento() {
           ${sit === 'enviada' ? `<button class="btn principal" data-aprovar="${d.id}">Aprovar e travar</button>` : ''}
           ${['enviada','aprovada','travada'].includes(sit)
             ? `<button class="btn mini" data-reabrir="${d.id}">Reabrir com motivo</button>` : ''}
-          <button class="btn mini" data-verdp="${d.id}">Ver Relatório DP</button>
+          <button class="btn mini" data-verdp="${d.id}">Ver Relatório Horas Extras</button>
         </div>
       </section>`;
   }));
@@ -792,9 +792,15 @@ function desenharRelatorios() {
             ${destinos.map(d => `<option value="${d.id}">${esc(d.nome)}</option>`).join('')}
           </select>
         </label>
-        <button class="btn principal" id="relDP">Relatório DP</button>
+        <button class="btn principal" id="relDP">Relatório Horas Extras</button>
+        <button class="btn" id="relFaltas">Faltas</button>
+        <button class="btn" id="relAtest">Atestados</button>
         <button class="btn" id="relDet">Detalhado DP</button>
         <button class="btn mini" id="relCsv">Baixar dados (Excel)</button>
+      </div>
+      <div class="jor-barra">
+        <button class="btn" id="relFaltasTot">Faltas totais · uso interno</button>
+        <span class="dc-sem">Todas as faltas do mês, inclusive as compensadas por horas extras. Não vai ao escritório.</span>
       </div>
 
       <h3 class="jor-h3">De uma pessoa</h3>
@@ -845,6 +851,12 @@ function desenharRelatorios() {
 
   $('relDP').addEventListener('click', () =>
     preview(rel.relatorioDP(estadoTela.competencia, $('relDestino').value)));
+  $('relFaltas').addEventListener('click', () =>
+    preview(rel.relatorioFaltas(estadoTela.competencia, $('relDestino').value)));
+  $('relFaltasTot').addEventListener('click', () =>
+    preview(rel.relatorioFaltas(estadoTela.competencia, $('relDestino').value, { totais: true })));
+  $('relAtest').addEventListener('click', () =>
+    preview(rel.relatorioAtestados(estadoTela.competencia, $('relDestino').value)));
   $('relDet').addEventListener('click', () =>
     preview(rel.relatorioDetalhado(estadoTela.competencia, $('relDestino').value)));
   $('relExtrato').addEventListener('click', () =>

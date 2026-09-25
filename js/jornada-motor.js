@@ -305,6 +305,9 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
 
   const passos = [];
   let faltasInformadas = 0, faltasAbsorvidas = 0;
+  // Data a data, para os relatórios de faltas (25/09/2026): qual foi
+  // compensada por extras e qual foi informada ao DP.
+  const faltasDatas = [];
 
   for (const f of faltas) {
     const disponivel = extra50 + extra100;
@@ -314,9 +317,11 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
       const tira50 = Math.min(extra50, resto); extra50 -= tira50; resto -= tira50;
       extra100 -= resto;
       faltasAbsorvidas += 1;
+      faltasDatas.push({ data: f.data, absorvida: true });
       passos.push(`Falta de ${f.data}: absorvida por ${minParaHHMM(f.minDeficit)} de extras (Leitura A).`);
     } else {
       faltasInformadas += 1;
+      faltasDatas.push({ data: f.data, absorvida: false });
       passos.push(`Falta de ${f.data}: extras insuficientes (${minParaHHMM(disponivel)}) — paga as extras integralmente e informa a falta ao DP.`);
     }
   }
@@ -333,6 +338,7 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
     minDeficitAvulso: deficitAvulso,
     faltasAbsorvidas,
     faltasInformadas,
+    faltasDatas,
     diasAtestado,
     avisos: dias.flatMap(d => d.avisos || []),
     memoria: passos.join('\n'),

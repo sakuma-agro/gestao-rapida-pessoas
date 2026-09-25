@@ -45,6 +45,13 @@ export function consolidar(competencia, destinoId) {
     const r = apurarCompetencia({ dias, parametros: jd.parametrosEm(competencia) });
     const unidade = jd.unidadeDe(v);
 
+    /* Para os relatórios de faltas, atestados e o de horas no formato 12.7
+       (25/09/2026). A fonte é a Gestão de jornada, a mesma do cálculo acima:
+       o tipo do dia de cada boletim. */
+    const codigo = b => jd.dados.tipos.find(t => t.id === b.tipo_id)?.codigo || '';
+    const datasDe = cod => boletins.filter(b => codigo(b) === cod).map(b => b.data_fato).sort();
+    const insal = v.insalubridade || 'nao';
+
     return {
       vinculo: v,
       funcionario: f,
@@ -57,6 +64,18 @@ export function consolidar(competencia, destinoId) {
       unidadeNome: unidade ? jd.nomeUnidade(unidade) : '—',
       boletins: boletins.length,
       ...r,
+      faltasNJ: r.faltasDatas || [],            // [{ data, absorvida }]
+      faltasJ: datasDe('FALTAJ'),               // falta justificada não desconta
+      atestadoDatas: datasDe('ATESTADO'),
+      /* Correção (25/09/2026): o motor contava atestado como "dia sem
+         dedução com contaDias", mas o fechamento só marca contaDias quando
+         há déficit — o atestado saía sempre 0 no Detalhado e no Excel.
+         O número de dias vem agora direto dos boletins do tipo Atestado. */
+      diasAtestado: datasDe('ATESTADO').length,
+      // RN-27/RN-28: permanente paga sempre; sem permanente, paga se algum
+      // boletim do mês marcou a exposição no dia.
+      insalubridadePagar: insal === 'permanente' || boletins.some(b => b.insalubridade_dia),
+      periculosidade: !!v.periculosidade,
     };
   });
 
