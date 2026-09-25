@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v88';
+const VERSAO = 'gr-v90';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
