@@ -391,3 +391,7 @@
 .fp-ajuste summary { cursor: pointer; }
 .fp-num input { width: 70px; }
 @media (max-width: 800px) { .fp-passos { grid-template-columns: 1fr; } }
+.fp-campos { border-collapse: collapse; margin: 4px 0 10px; }
+.fp-campos th, .fp-campos td { text-align: left; padding: 4px 10px 4px 0; font-size: 13px; }
+.fp-campos th { color: #8A8D86; font-weight: 600; }
+.fp-campos input { width: 80px; }
