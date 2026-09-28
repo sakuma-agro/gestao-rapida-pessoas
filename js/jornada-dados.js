@@ -219,12 +219,29 @@ function somarDia(iso) {
  *  do painel. Sem rede, usa o que já está carregado. */
 export async function boletinsDoPeriodo(ini, fim) {
   const c = estado.cliente;
-  const campos = 'id,funcionario_id,unidade_id,data_fato,numero,hora_ini,hora_fim,qualidade,marcado,situacao,observacao,motivo_alteracao';
+  const campos = 'id,funcionario_id,unidade_id,data_fato,numero,hora_ini,hora_fim,intervalo_min,qualidade,marcado,situacao,observacao,origem_alteracao,motivo_alteracao';
   const local = () => dados.boletins.filter(b => b.data_fato >= ini && b.data_fato <= fim);
   if (!c || !estado.sessao) return local();
   try {
     return await todas(() => c.from(TABELAS.boletins).select(campos)
       .gte('data_fato', ini).lte('data_fato', fim).order('data_fato'));
+  } catch { return local(); }
+}
+
+/** Apurações de uma lista de boletins (Marcado × Conferido por período). */
+export async function apuracoesDe(ids) {
+  const c = estado.cliente;
+  const local = () => dados.apuracoes.filter(a => ids.includes(a.boletim_id));
+  if (!ids.length) return [];
+  if (!c || !estado.sessao) return local();
+  try {
+    const out = [];
+    for (let i = 0; i < ids.length; i += 150) {
+      const r = await c.from(TABELAS.apuracoes).select('boletim_id,min_extra_50,min_extra_100,min_deficit').in('boletim_id', ids.slice(i, i + 150));
+      if (r.error) throw r.error;
+      out.push(...(r.data || []));
+    }
+    return out;
   } catch { return local(); }
 }
 

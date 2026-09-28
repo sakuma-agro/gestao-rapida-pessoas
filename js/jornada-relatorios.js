@@ -329,19 +329,21 @@ const ORIGEM_REL = { gerente: 'Gerente de campo', digitacao: 'Erro de digitaçã
 const faixa = (ini, fim, intv) => ini || fim
   ? `${String(ini || '').slice(0, 5)}–${String(fim || '').slice(0, 5)}${intv ? `<br><small>interv. ${intv} min</small>` : ''}` : '—';
 
-export function relatorioConferencia(competencia, destinoId) {
+/* Por funcionário e por período (28/09/2026, pedido dele): um funcionário,
+   ou todos do destino; boletins e apurações vêm do banco para o período. */
+export function relatorioConferencia({ boletins, apuracoes, de, ate, funcionarioId, destinoId }) {
   const destino = jd.dados.destinos.find(d => d.id === destinoId) || null;
+  const pessoa = funcionarioId ? estado.funcionarios.find(f => f.id === funcionarioId) : null;
   const fmt = destino?.formato_horas || 'decimal';
   const h = m => m ? formatarHoras(m, fmt) : '—';
   const hs = m => !m ? '—' : (m < 0 ? '−' : '+') + formatarHoras(Math.abs(m), fmt);
-  const comp = jd.competenciaDoDestino(competencia, destinoId);
   const nomeDe = id => estado.funcionarios.find(f => f.id === id)?.nome || '—';
 
-  const linhas = jd.dados.boletins.filter(b => b.competencia === competencia && b.marcado
-      && jd.dados.unidades.find(u => u.id === b.unidade_id)?.destino_id === destinoId)
+  const linhas = boletins.filter(b => b.marcado && (pessoa ? b.funcionario_id === pessoa.id
+      : jd.dados.unidades.find(u => u.id === b.unidade_id)?.destino_id === destinoId))
     .map(b => {
       const m = b.marcado;
-      const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      const a = apuracoes.find(x => x.boletim_id === b.id) || {};
       const excluido = b.situacao === 'cancelado';
       const heM = (m.min_extra_50 || 0) + (m.min_extra_100 || 0);
       const heC = excluido ? 0 : (a.min_extra_50 || 0) + (a.min_extra_100 || 0);
@@ -353,12 +355,12 @@ export function relatorioConferencia(competencia, destinoId) {
   const soma = k => linhas.reduce((s, l) => s + l[k], 0);
   const tabela = linhas.length ? `
       <table class="rel-tabela rel-tabela-dp rel-he">
-        <thead><tr><th>Funcionário</th><th class="rel-c">Dia</th>
+        <thead><tr>${pessoa ? '' : '<th>Funcionário</th>'}<th class="rel-c">Dia</th>
           <th class="rel-c">Marcado</th><th class="rel-c">Extras marcadas</th>
           <th class="rel-c">Conferido</th><th class="rel-c">Extras conferidas</th>
           <th class="rel-c">Diferença</th><th class="rel-c">Por quê</th><th>Motivo</th></tr></thead>
         <tbody>${linhas.map(l => `<tr>
-          <td>${esc(l.nome)}</td>
+          ${pessoa ? '' : `<td>${esc(l.nome)}</td>`}
           <td class="rel-c">${dataBR(l.b.data_fato)}</td>
           <td class="rel-c">${faixa(l.m.hora_ini, l.m.hora_fim, l.m.intervalo_min)}</td>
           <td class="rel-c">${h(l.heM)}${l.defM ? `<br><small>déficit ${h(l.defM)}</small>` : ''}</td>
@@ -368,11 +370,11 @@ export function relatorioConferencia(competencia, destinoId) {
           <td class="rel-c">${esc(ORIGEM_REL[l.b.origem_alteracao] || '—')}</td>
           <td>${esc(l.b.motivo_alteracao || '')}</td>
         </tr>`).join('')}</tbody>
-        <tfoot><tr><td colspan="3">Total (${linhas.length} lançamento${linhas.length > 1 ? 's' : ''})</td>
+        <tfoot><tr><td colspan="${pessoa ? 2 : 3}">Total (${linhas.length} lançamento${linhas.length > 1 ? 's' : ''})</td>
           <td class="rel-c">${h(soma('heM'))}</td><td></td>
           <td class="rel-c">${h(soma('heC'))}</td>
           <td class="rel-c">${hs(soma('dif'))}</td><td colspan="2"></td></tr></tfoot>
-      </table>` : '<p class="rel-vazio">Nenhum lançamento com marcado diferente do conferido nesta competência.</p>';
+      </table>` : '<p class="rel-vazio">Nenhum lançamento com marcado diferente do conferido no período.</p>';
 
   // Resumo por funcionário: quantas vezes o marcado não bateu com o conferido pelo gerente.
   const porPessoa = {};
@@ -380,7 +382,7 @@ export function relatorioConferencia(competencia, destinoId) {
     const p = porPessoa[l.nome] ||= { n: 0, dif: 0 };
     p.n++; p.dif += l.dif;
   });
-  const resumo = Object.keys(porPessoa).length ? `
+  const resumo = !pessoa && Object.keys(porPessoa).length ? `
       <p class="rel-emp">CONFERIDOS COM O GERENTE DE CAMPO — POR FUNCIONÁRIO</p>
       <table class="rel-tabela rel-tabela-dp rel-he">
         <thead><tr><th>Funcionário</th><th class="rel-c">Lançamentos divergentes</th><th class="rel-c">Diferença em extras</th></tr></thead>
@@ -389,12 +391,15 @@ export function relatorioConferencia(competencia, destinoId) {
       </table>` : '';
 
   const nota = `<p class="rel-nota">Marcado = o que o funcionário marcou no boletim, informado em Lançar jornada ou Editar ("O funcionário marcou diferente do correto"). Conferido = o que ficou valendo e foi para a folha.</p>`;
+  const quem = pessoa
+    ? `<div class="rel-qpessoa"><b>${esc(pessoa.nome)}</b>${pessoa.cadastro ? ` · cadastro nº ${esc(pessoa.cadastro)}` : ''} · período ${esc(rotPeriodo(de, ate))}</div>`
+    : `<div class="rel-qpessoa">Todos do destino · período ${esc(rotPeriodo(de, ate))}</div>`;
   return documentoDP({
-    titulo: 'MARCADO × CONFERIDO', competencia, destino, interno: true,
-    versao: comp?.versao || 1, corpo: tabela + resumo + nota,
+    titulo: 'MARCADO × CONFERIDO', competencia: ate + '-01', destino: pessoa ? null : destino, interno: true,
+    corpo: quem + tabela + resumo + nota,
     assinaturas: ['Gerente de Campo', 'Gerente Administrativo'],
     classe: 'rel-paisagem',
-  });
+  }).replace(/REFERENTE AO MÊS DE [^<]*/, 'PERÍODO: ' + MAIUSC(rotPeriodo(de, ate)));
 }
 
 /* ------------------------------------------------------------------

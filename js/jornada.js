@@ -1294,13 +1294,19 @@ function desenharRelatorios() {
   const comp = () => estadoTela.competencia;
   const dest = () => relTela.destino;
   const semPessoa = () => { aviso('Escolha um funcionário para o extrato.'); return null; };
-  const qualidade = async () => {
+  const doPeriodo = async () => {
     const { de, ate } = relTela;
     if (!de || !ate || de > ate) { aviso('Escolha o período: "De" antes de "Até".'); return null; }
     const [a, m] = ate.split('-').map(Number);
     const fim = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
-    const boletins = await jd.boletinsDoPeriodo(de + '-01', fim);
-    return rel.relatorioQualidade({ boletins, de, ate, funcionarioId: relTela.pessoa || null, destinoId: dest() });
+    return { de, ate, boletins: await jd.boletinsDoPeriodo(de + '-01', fim),
+             funcionarioId: relTela.pessoa || null, destinoId: dest() };
+  };
+  const qualidade = async () => { const p = await doPeriodo(); return p && rel.relatorioQualidade(p); };
+  const marcadoConf = async () => {
+    const p = await doPeriodo(); if (!p) return null;
+    const ids = p.boletins.filter(b => b.marcado).map(b => b.id);
+    return rel.relatorioConferencia({ ...p, apuracoes: await jd.apuracoesDe(ids) });
   };
   const ferRel = t => t === 'venc' ? fer.relVencidos(relTela.ferMes || mesAnterior(), relTela.ferDest)
     : t === 'conc' ? fer.relConcessao(relTela.ferDest)
@@ -1318,13 +1324,13 @@ function desenharRelatorios() {
     ],
     conf: [
       { k: 'mes', nome: 'Horas extras por mês', desc: 'Uma coluna por mês do fato — mostra o boletim atrasado no mês em que aconteceu', html: () => rel.relatorioPorMes(comp(), dest()) },
-      { k: 'mxc', nome: 'Marcado × Conferido', desc: 'O que o funcionário marcou × o que ficou valendo', html: () => rel.relatorioConferencia(comp(), dest()) },
       { k: 'ftot', nome: 'Faltas totais', desc: 'Todas as faltas do mês, inclusive as compensadas por horas extras', html: () => rel.relatorioFaltas(comp(), dest(), { totais: true }) },
       { k: 'det', nome: 'Detalhado DP', desc: 'Abertura por percentual, intervalo e déficit', html: () => rel.relatorioDetalhado(comp(), dest()) },
     ],
     pessoa: [
       { k: 'ext', nome: 'Extrato individual', desc: 'Dia a dia da competência, com a memória de cálculo — precisa de um funcionário',
         html: () => relTela.pessoa ? rel.extratoIndividual(comp(), relTela.pessoa) : semPessoa() },
+      { k: 'mxc', nome: 'Marcado × Conferido', desc: 'O que o funcionário marcou × o que ficou valendo, no período — de um funcionário ou de todos do destino', html: marcadoConf },
       { k: 'qual', nome: 'Qualidade dos boletins', desc: 'Nível do boletim (Ruim, Bom, Ótimo) no período — de um funcionário ou de todos do destino', html: qualidade },
     ],
     emp: [
@@ -1343,7 +1349,7 @@ function desenharRelatorios() {
   const filtros = {
     esc: selDestino, conf: selDestino,
     pessoa: `<label>Funcionário <select data-rel-f="pessoa">
-        <option value="">Todos do destino (só Qualidade)</option>
+        <option value="">Todos do destino</option>
         ${pessoas.map(f => `<option value="${f.id}"${f.id === relTela.pessoa ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       ${selDestino}
       <label>De <input type="month" data-rel-f="de" value="${relTela.de}"></label>
@@ -1356,7 +1362,7 @@ function desenharRelatorios() {
   const dicas = {
     esc: 'O que vai ao escritório no fechamento. Competência: troque no alto, à direita. Todo relatório sai de <b>um destino de DP só</b>.',
     conf: 'Uso interno — para conferir antes de enviar. Não vai ao escritório.',
-    pessoa: 'Uso interno. O Extrato usa a competência do alto; a Qualidade usa De/Até.',
+    pessoa: 'Uso interno. O Extrato usa a competência do alto e precisa de um funcionário; Marcado × Conferido e Qualidade usam De/Até.',
     emp: 'Não depende da competência.',
     fer: 'O Mês vale só para "Venceram no mês".',
   };
