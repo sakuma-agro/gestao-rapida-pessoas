@@ -444,6 +444,35 @@ export function competenciaDePagamento(dataISO, destinoId) {
 /** Boletim cujo fato é de um mês anterior ao da competência em que ele é pago. */
 export const deCompetenciaAnterior = b => !!b && competenciaDe(b.data_fato) < b.competencia;
 
+/**
+ * Boletins já lançados para a pessoa naquele dia, de qualquer competência
+ * (28/09/2026). O dia 30/09 pode estar num mês já fechado e fora do que a
+ * tela carregou — por isso vai ao banco. Sem rede, fica com o cache.
+ */
+export async function boletinsDoDia(fid, data) {
+  const vivo = b => b.funcionario_id === fid && b.data_fato === data && b.situacao !== 'cancelado';
+  let boletins = dados.boletins.filter(vivo);
+  let apuracoes = dados.apuracoes.filter(a => boletins.some(b => b.id === a.boletim_id));
+  if (!estado.cliente || !estado.sessao) return { boletins, apuracoes };
+  try {
+    const c = estado.cliente;
+    const r = await c.from(TABELAS.boletins).select('*').eq('funcionario_id', fid).eq('data_fato', data);
+    if (r.error) throw r.error;
+    const mapa = new Map((r.data || []).filter(vivo).map(b => [b.id, b]));
+    boletins.forEach(b => mapa.set(b.id, b));             // o local (recém-gravado) vale mais
+    boletins = [...mapa.values()].filter(vivo);
+    const ids = boletins.map(b => b.id);
+    if (ids.length) {
+      const a = await c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids);
+      if (a.error) throw a.error;
+      const am = new Map((a.data || []).map(x => [x.boletim_id, x]));
+      apuracoes.forEach(x => am.set(x.boletim_id, x));
+      apuracoes = [...am.values()].filter(x => ids.includes(x.boletim_id));
+    }
+  } catch { /* sem rede: fica com o que já estava na memória */ }
+  return { boletins, apuracoes };
+}
+
 export function limparJornadaDados() {
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = [];
   dados.carregado = false;

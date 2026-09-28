@@ -299,6 +299,7 @@ function desenharLancar() {
           <label>Data do fato <input type="date" id="bData" value="${hoje()}" required></label>
         </div>
         <div class="jor-dia-auto" id="bDiaAuto"></div>
+        <div class="jor-dia-ja" id="bDiaJa" hidden></div>
         <label>Tipo do dia
           <select id="bTipo">
             ${jd.dados.tipos.filter(t => t.ativo !== false && !PELA_DATA.includes(t.codigo))
@@ -341,9 +342,10 @@ function desenharLancar() {
     if (id === 'bFunc') cadastroDoSelecionado();
     mostrarDiaAuto(); mostrarMotivo();
     preencherJornadaPadrao(); mostrarApurado();
+    carregarDia();
   }));
   $('bCadastro').addEventListener('input', () => {
-    buscarPorCadastro(); preencherJornadaPadrao(); mostrarApurado();
+    buscarPorCadastro(); preencherJornadaPadrao(); mostrarApurado(); carregarDia();
   });
   $('bLimpar').addEventListener('click', () => {
     $('jorFormBoletim').reset(); $('bCadAviso').innerHTML = ''; $('bJorPadrao').textContent = '';
@@ -352,6 +354,79 @@ function desenharLancar() {
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
   prepararEdicao();
   mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
+  carregarDia();
+}
+
+/* ---------- Complemento do dia (28/09/2026) ----------
+   Se a pessoa já tem boletim com horário naquele dia (mesmo num mês já
+   fechado), o novo lançamento é calculado JUNTO com o que existe — o dia tem
+   fechamento único (A-01) — e grava só a diferença. Ex.: 30/09 lançado
+   07–16 e fechado; em 10/10 aparece a hora extra 16–19: o app apura o dia
+   07–19, desconta o que já foi pago e grava 3h, pagas em outubro. */
+const dia = { chave: '', boletins: [], apuracoes: [] };
+
+const outrosDoDia = (fid, data) => (fid + '|' + data) !== dia.chave ? []
+  : dia.boletins.filter(b => b.id !== estadoTela.editando && b.situacao !== 'cancelado' && b.hora_ini && b.hora_fim);
+
+async function carregarDia() {
+  const fid = $('bFunc')?.value, data = $('bData')?.value;
+  const chave = fid && data ? fid + '|' + data : '';
+  if (!chave) { dia.chave = ''; dia.boletins = []; dia.apuracoes = []; mostrarDiaJa(); return; }
+  if (chave === dia.chave) { mostrarDiaJa(); return; }
+  const r = await jd.boletinsDoDia(fid, data);
+  if ((($('bFunc')?.value || '') + '|' + ($('bData')?.value || '')) !== chave) return;   // trocou no meio
+  Object.assign(dia, { chave, boletins: r.boletins, apuracoes: r.apuracoes });
+  if (!estadoTela.editando) preencherJornadaPadrao();
+  mostrarDiaJa(); mostrarApurado();
+}
+
+function mostrarDiaJa() {
+  const box = $('bDiaJa');
+  if (!box) return;
+  const fid = $('bFunc').value, data = $('bData').value;
+  const outros = outrosDoDia(fid, data);
+  const todos = (fid + '|' + data) === dia.chave ? dia.boletins.filter(b => b.id !== estadoTela.editando) : [];
+  if (!todos.length) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = `<b>Já existe lançamento neste dia:</b> ${todos.map(b => {
+    const s = situacaoBoletim(b);
+    const tipo = jd.dados.tipos.find(t => t.id === b.tipo_id);
+    return `${b.hora_ini ? `${b.hora_ini.slice(0, 5)}–${(b.hora_fim || '').slice(0, 5)}` : esc(tipo?.nome || '—')}${b.numero ? ` (nº ${esc(b.numero)})` : ''}
+      · ${s.fechado ? `fechado, pago em ${esc(fech.mesCurto(s.pagoEm))}` : `em aberto, a pagar em ${esc(fech.mesCurto(s.pagoEm))}`}`;
+  }).join('; ')}.
+  ${outros.length ? `<br>Este lançamento entra como <b>complemento</b>: o app junta com o que já existe e grava só a diferença.
+    Para corrigir o lançamento em aberto, use <b>Editar</b> em Lançados.` : ''}`;
+}
+
+/** Apura o dia inteiro e, se já havia boletim com horário, devolve só a diferença. */
+function apurarComplemento(entrada) {
+  const r = apurarDia(entrada);
+  const outros = outrosDoDia(entrada._contexto.funcionarioId, entrada.data);
+  if (!outros.length || entrada.tipo?.apura === false) return r;
+  const aps = outros.map(b => dia.apuracoes.find(a => a.boletim_id === b.id) || {});
+  const ja = k => aps.reduce((s, a) => s + (a[k] || 0), 0);
+  const menos = (v, k) => Math.max(0, v - ja(k));
+  const extraDia = r.minExtra50 + r.minExtra100;
+  const out = {
+    ...r,
+    minPrevistos: menos(r.minPrevistos, 'min_previstos'),
+    minTrabalhados: menos(r.minTrabalhados, 'min_trabalhados'),
+    minExtra50: menos(r.minExtra50, 'min_extra_50'),
+    minExtra100: menos(r.minExtra100, 'min_extra_100'),
+    minDeficit: menos(r.minDeficit, 'min_deficit'),
+    minNoturnos: menos(r.minNoturnos, 'min_noturnos'),
+    minIntervaloSuprimido: menos(r.minIntervaloSuprimido, 'min_intervalo_suprimido'),
+    avisos: [...r.avisos],
+    complemento: { trabalhadoDia: r.minTrabalhados, extraDia, extraJa: ja('min_extra_50') + ja('min_extra_100') },
+  };
+  if (r.minDeficit < ja('min_deficit'))
+    out.avisos.push(`O dia agora tem menos déficit do que o já lançado (${horas(ja('min_deficit'))}). O desconto já feito não volta sozinho — acerte com o escritório.`);
+  out.memoria = `COMPLEMENTO DO DIA — ${outros.length} lançamento(s) anterior(es) neste dia.\n`
+    + `Dia inteiro: ${minParaHHMM(r.minTrabalhados)} trabalhadas, extras ${minParaHHMM(extraDia)}, déficit ${minParaHHMM(r.minDeficit)}.\n`
+    + `Já lançado: extras ${minParaHHMM(ja('min_extra_50') + ja('min_extra_100'))}, déficit ${minParaHHMM(ja('min_deficit'))}.\n`
+    + `Este lançamento grava só a diferença: extras ${minParaHHMM(out.minExtra50 + out.minExtra100)}, déficit ${minParaHHMM(out.minDeficit)}.\n\n`
+    + r.memoria;
+  return out;
 }
 
 /* Editar lançamento em aberto (28/09/2026): a tela Lançados manda o id em
@@ -462,6 +537,12 @@ function preencherJornadaPadrao() {
   const dica = $('bJorPadrao');
   const fid = $('bFunc').value, data = $('bData').value;
   if (!fid || !data) { dica.textContent = ''; return; }
+  // Já tem horário lançado neste dia: a jornada padrão viraria dia em dobro.
+  if (!estadoTela.editando && outrosDoDia(fid, data).length) {
+    $('bIni').value = ''; $('bFim').value = ''; $('bInterv').value = 0;
+    dica.textContent = 'Já há horário lançado neste dia — informe só o horário a mais (ex.: 16:00 a 19:00).';
+    return;
+  }
   const v = jd.vinculoDe(fid);
   const tipo = jd.dados.tipos.find(t => t.id === $('bTipo').value);
   const j = jd.jornadaDe(v);
@@ -514,15 +595,19 @@ function entradaDoFormulario() {
   const tipo = jd.dados.tipos.find(t => t.id === $('bTipo').value);
   const funcao = jd.dados.funcoes.find(f => f.id === v?.funcao_id);
 
+  const doDia = outrosDoDia(funcionarioId, data).map(b => ({
+    numero: b.numero, ini: b.hora_ini.slice(0, 5), fim: b.hora_fim.slice(0, 5),
+    intervalo: Number(b.intervalo_min || 0), heEspecial: Number(b.he_especial_min || 0),
+  }));
   return {
     data,
-    boletins: ($('bIni').value && $('bFim').value) ? [{
+    boletins: [...doDia, ...(($('bIni').value && $('bFim').value) ? [{
       numero: $('bNumero').value,
       ini: $('bIni').value,
       fim: $('bFim').value,
       intervalo: Number($('bInterv').value || 0),
       heEspecial: minutosHe(),
-    }] : [],
+    }] : [])],
     jornadaDia: jd.jornadaDoDia(v, data),
     tipo: tipo ? {
       codigo: tipo.codigo, nome: tipo.nome, apura: tipo.apura,
@@ -544,9 +629,11 @@ function mostrarApurado() {
   const alvo = $('jorApurado');
   if (!entrada) { alvo.innerHTML = '<div class="vazio">Escolha o funcionário e a data.</div>'; return; }
 
-  const r = apurarDia(entrada);
+  const r = apurarComplemento(entrada);
   alvo.innerHTML = `
-    <h4>Apurado</h4>
+    <h4>Apurado${r.complemento ? ' <span class="dc-sem">— só a diferença</span>' : ''}</h4>
+    ${r.complemento ? `<p class="dc-sem" style="margin:0 0 6px">Dia inteiro com os lançamentos anteriores: ${minParaHHMM(r.complemento.trabalhadoDia)} trabalhadas,
+      extras ${horas(r.complemento.extraDia)}. Já lançado antes: extras ${horas(r.complemento.extraJa)}.</p>` : ''}
     <dl class="jor-apurado__grade">
       <dt>Situação</dt><dd>${esc(r.situacao)}</dd>
       <dt>Previsto</dt><dd>${minParaHHMM(r.minPrevistos)}</dd>
@@ -579,8 +666,9 @@ async function gravarBoletim(ev) {
     if (motivoAlt.length < 5) { aviso('Escreva o motivo da alteração (pelo menos 5 letras).'); $('bMotivoAlt').focus(); return; }
   }
 
-  // O motor roda ANTES da gravação: boletim e apuração nascem juntos.
-  const r = apurarDia(entrada);
+  // O motor roda ANTES da gravação: boletim e apuração nascem juntos. Com
+  // outro boletim no mesmo dia, grava só a diferença (complemento do dia).
+  const r = apurarComplemento(entrada);
   const b = {
     numero: $('bNumero').value || null,
     data_fato: entrada.data,
@@ -635,7 +723,9 @@ async function gravarBoletim(ev) {
 
   $('bNumero').value = '';
   $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
+  dia.chave = '';
   preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
+  carregarDia();
   aviso(`Boletim de ${dataBR(entrada.data)} lançado`
     + (atrasado ? ` — entra no pagamento de ${rotuloCompetencia(competencia)} como competência anterior.` : '.')
     + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
