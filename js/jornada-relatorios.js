@@ -8,6 +8,8 @@
 // REL-ATE     Relatório de Atestados — períodos e dias, sem motivo
 // REL-MES     Horas extras por mês — conferência: uma coluna por mês do fato
 //             (o boletim atrasado aparece no mês em que aconteceu), 28/09/2026
+// REL-CONF    Marcado × Conferido — o que o funcionário marcou × o que ficou
+//             depois da conferência (uso interno), 28/09/2026
 // REL-DP-DET  Detalhado DP — abertura por percentual, intervalo e déficit
 // REL-EXT     Extrato individual — dia a dia, com a memória de cálculo
 //
@@ -314,6 +316,83 @@ function periodos(datas) {
     else r.push({ ini: d, fim: d });
   }
   return r;
+}
+
+/* ------------------------------------------------------------------
+   REL-CONF — Marcado × Conferido (28/09/2026), uso interno
+   O que o funcionário marcou (foto guardada no boletim na primeira
+   alteração ou exclusão) contra o que ficou depois da conferência.
+   ------------------------------------------------------------------ */
+const ORIGEM_REL = { gerente: 'Gerente de campo', digitacao: 'Erro de digitação', outro: 'Outro' };
+const faixa = (ini, fim, intv) => ini || fim
+  ? `${String(ini || '').slice(0, 5)}–${String(fim || '').slice(0, 5)}${intv ? `<br><small>interv. ${intv} min</small>` : ''}` : '—';
+
+export function relatorioConferencia(competencia, destinoId) {
+  const destino = jd.dados.destinos.find(d => d.id === destinoId) || null;
+  const fmt = destino?.formato_horas || 'decimal';
+  const h = m => m ? formatarHoras(m, fmt) : '—';
+  const hs = m => !m ? '—' : (m < 0 ? '−' : '+') + formatarHoras(Math.abs(m), fmt);
+  const comp = jd.competenciaDoDestino(competencia, destinoId);
+  const nomeDe = id => estado.funcionarios.find(f => f.id === id)?.nome || '—';
+
+  const linhas = jd.dados.boletins.filter(b => b.competencia === competencia && b.marcado
+      && jd.dados.unidades.find(u => u.id === b.unidade_id)?.destino_id === destinoId)
+    .map(b => {
+      const m = b.marcado;
+      const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      const excluido = b.situacao === 'cancelado';
+      const heM = (m.min_extra_50 || 0) + (m.min_extra_100 || 0);
+      const heC = excluido ? 0 : (a.min_extra_50 || 0) + (a.min_extra_100 || 0);
+      return { b, m, excluido, nome: nomeDe(b.funcionario_id), heM, heC, dif: heC - heM,
+               defM: m.min_deficit || 0, defC: excluido ? 0 : (a.min_deficit || 0) };
+    })
+    .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR') || String(x.b.data_fato).localeCompare(String(y.b.data_fato)));
+
+  const soma = k => linhas.reduce((s, l) => s + l[k], 0);
+  const tabela = linhas.length ? `
+      <table class="rel-tabela rel-tabela-dp rel-he">
+        <thead><tr><th>Funcionário</th><th class="rel-c">Dia</th>
+          <th class="rel-c">Marcado</th><th class="rel-c">Extras marcadas</th>
+          <th class="rel-c">Conferido</th><th class="rel-c">Extras conferidas</th>
+          <th class="rel-c">Diferença</th><th class="rel-c">Por quê</th><th>Motivo</th></tr></thead>
+        <tbody>${linhas.map(l => `<tr>
+          <td>${esc(l.nome)}</td>
+          <td class="rel-c">${dataBR(l.b.data_fato)}</td>
+          <td class="rel-c">${faixa(l.m.hora_ini, l.m.hora_fim, l.m.intervalo_min)}</td>
+          <td class="rel-c">${h(l.heM)}${l.defM ? `<br><small>déficit ${h(l.defM)}</small>` : ''}</td>
+          <td class="rel-c">${l.excluido ? '<b>Excluído</b>' : faixa(l.b.hora_ini, l.b.hora_fim, l.b.intervalo_min)}</td>
+          <td class="rel-c">${h(l.heC)}${l.defC ? `<br><small>déficit ${h(l.defC)}</small>` : ''}</td>
+          <td class="rel-c"><b>${hs(l.dif)}</b></td>
+          <td class="rel-c">${esc(ORIGEM_REL[l.b.origem_alteracao] || '—')}</td>
+          <td>${esc(l.b.motivo_alteracao || '')}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="3">Total (${linhas.length} lançamento${linhas.length > 1 ? 's' : ''})</td>
+          <td class="rel-c">${h(soma('heM'))}</td><td></td>
+          <td class="rel-c">${h(soma('heC'))}</td>
+          <td class="rel-c">${hs(soma('dif'))}</td><td colspan="2"></td></tr></tfoot>
+      </table>` : '<p class="rel-vazio">Nenhum lançamento alterado ou excluído nesta competência.</p>';
+
+  // Resumo por funcionário: quantas vezes o marcado não bateu com o conferido pelo gerente.
+  const porPessoa = {};
+  linhas.filter(l => l.b.origem_alteracao === 'gerente').forEach(l => {
+    const p = porPessoa[l.nome] ||= { n: 0, dif: 0 };
+    p.n++; p.dif += l.dif;
+  });
+  const resumo = Object.keys(porPessoa).length ? `
+      <p class="rel-emp">CONFERIDOS COM O GERENTE DE CAMPO — POR FUNCIONÁRIO</p>
+      <table class="rel-tabela rel-tabela-dp rel-he">
+        <thead><tr><th>Funcionário</th><th class="rel-c">Lançamentos divergentes</th><th class="rel-c">Diferença em extras</th></tr></thead>
+        <tbody>${Object.entries(porPessoa).sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], 'pt-BR'))
+          .map(([n, p]) => `<tr><td>${esc(n)}</td><td class="rel-c">${p.n}</td><td class="rel-c"><b>${hs(p.dif)}</b></td></tr>`).join('')}</tbody>
+      </table>` : '';
+
+  const nota = `<p class="rel-nota">Marcado = como o boletim foi lançado pela primeira vez (o que o funcionário marcou no talão). Conferido = como ficou depois da alteração.</p>`;
+  return documentoDP({
+    titulo: 'MARCADO × CONFERIDO', competencia, destino, interno: true,
+    versao: comp?.versao || 1, corpo: tabela + resumo + nota,
+    assinaturas: ['Gerente de Campo', 'Gerente Administrativo'],
+    classe: 'rel-paisagem',
+  });
 }
 
 export function relatorioAtestados(competencia, destinoId) {

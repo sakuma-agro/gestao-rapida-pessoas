@@ -432,6 +432,29 @@ function apurarComplemento(entrada) {
 /* Editar lançamento em aberto (28/09/2026): a tela Lançados manda o id em
    estadoTela.editando; o formulário abre preenchido, pede o motivo da
    alteração e grava por cima do mesmo boletim (situação "corrigido"). */
+const ORIGENS = {
+  gerente:   'Conferido com o gerente de campo — o funcionário marcou diferente',
+  digitacao: 'Erro de digitação no lançamento',
+  outro:     'Outro',
+};
+const selOrigem = id => `<select id="${id}" required><option value="">— escolha —</option>
+  ${Object.entries(ORIGENS).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>`;
+
+/* Marcado × Conferido (28/09/2026): na primeira alteração ou exclusão, o
+   boletim guarda uma foto do que foi lançado do talão (o que o funcionário
+   marcou). Alterações seguintes não mexem na foto. */
+function fotoMarcado(b) {
+  if (b.marcado) return b.marcado;
+  const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+  return {
+    hora_ini: b.hora_ini, hora_fim: b.hora_fim, intervalo_min: b.intervalo_min,
+    tipo_id: b.tipo_id, he_especial_min: b.he_especial_min || 0,
+    min_extra_50: a.min_extra_50 || 0, min_extra_100: a.min_extra_100 || 0,
+    min_deficit: a.min_deficit || 0, min_trabalhados: a.min_trabalhados || 0,
+    lancado_por: b.criado_por || null, lancado_em: b.criado_em || null,
+  };
+}
+
 function prepararEdicao() {
   const b = estadoTela.editando && jd.dados.boletins.find(x => x.id === estadoTela.editando);
   if (!b || b.situacao === 'cancelado' || situacaoBoletim(b).fechado) { estadoTela.editando = null; return; }
@@ -441,7 +464,8 @@ function prepararEdicao() {
     <b>Editando</b> o lançamento de ${esc(f?.nome || '—')} de ${dataBR(b.data_fato)}${b.numero ? ` (boletim nº ${esc(b.numero)})` : ''}.
     <button class="btn mini" type="button" id="bCancelarEdicao">Cancelar edição</button></div>`);
   $('bObs').closest('label').insertAdjacentHTML('afterend',
-    `<label>Motivo da alteração (obrigatório) <input type="text" id="bMotivoAlt" maxlength="200" required></label>`);
+    `<label>Por que mudou? (obrigatório) ${selOrigem('bOrigemAlt')}</label>
+     <label>Motivo da alteração (obrigatório) <input type="text" id="bMotivoAlt" maxlength="200" required></label>`);
   if (![...$('bFunc').options].some(o => o.value === b.funcionario_id))
     $('bFunc').insertAdjacentHTML('beforeend', `<option value="${b.funcionario_id}">${esc(f?.nome || '—')}</option>`);
   $('bFunc').value = b.funcionario_id; cadastroDoSelecionado();
@@ -663,6 +687,7 @@ async function gravarBoletim(ev) {
   const motivoAlt = $('bMotivoAlt')?.value.trim() || '';
   if (original) {
     if (situacaoBoletim(original).fechado) { aviso('Este lançamento já está fechado — para corrigir, reabra a competência no Fechamento.'); return; }
+    if (!$('bOrigemAlt').value) { aviso('Escolha por que o lançamento mudou.'); $('bOrigemAlt').focus(); return; }
     if (motivoAlt.length < 5) { aviso('Escreva o motivo da alteração (pelo menos 5 letras).'); $('bMotivoAlt').focus(); return; }
   }
 
@@ -690,7 +715,12 @@ async function gravarBoletim(ev) {
     criado_em: original ? original.criado_em : new Date().toISOString(),
     atualizado_em: new Date().toISOString(),
   };
-  if (original) { b.id = original.id; b.compensacao = original.compensacao ?? null; }
+  if (original) {
+    b.id = original.id; b.compensacao = original.compensacao ?? null;
+    b.marcado = fotoMarcado(original);
+    b.origem_alteracao = $('bOrigemAlt').value;
+    b.motivo_alteracao = motivoAlt;
+  }
 
   // Nº repetido gera alerta, nunca bloqueio (RN-04).
   if (b.numero && jd.dados.boletins.some(x => x.numero === b.numero && x.id !== b.id && x.situacao !== 'cancelado')) {
@@ -787,7 +817,8 @@ function desenharBoletins() {
           <td>${esc(b.numero || '—')}</td>
           <td>${esc(f?.nome || '—')}</td>
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
-            : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}</td>
+            : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
+              ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · alterado</span>` : ''}</td>
           <td class="ce">${horas(a?.min_extra_50)}</td>
           <td class="ce">${horas(a?.min_extra_100)}</td>
           <td class="ce">${horas(a?.min_deficit)}</td>
@@ -811,6 +842,7 @@ function desenharBoletins() {
     <dialog id="dlgJorExcluir"><form method="dialog" id="formJorExcluir">
       <h3>Excluir lançamento</h3>
       <p class="dc-sem" id="jorExcluirQual"></p>
+      <label class="campo plena">Por que excluir? (obrigatório) ${selOrigem('jorExcluirOrigem')}</label>
       <label class="campo plena">Motivo (obrigatório)<textarea id="jorExcluirMotivo" rows="3" maxlength="300"></textarea></label>
       <p class="jor-pend" id="jorExcluirErro"></p>
       <div class="barra entre"><button class="btn" type="button" data-fechar-exc>Cancelar</button>
@@ -829,18 +861,21 @@ function desenharBoletins() {
     const f = estado.funcionarios.find(x => x.id === excluindo.funcionario_id);
     $('jorExcluirQual').textContent = `${f?.nome || '—'} · ${dataBR(excluindo.data_fato)}${excluindo.numero ? ` · boletim nº ${excluindo.numero}` : ''}. `
       + 'O lançamento sai das contas do mês; fica guardado no histórico com o motivo.';
-    $('jorExcluirMotivo').value = ''; $('jorExcluirErro').textContent = '';
+    $('jorExcluirMotivo').value = ''; $('jorExcluirOrigem').value = ''; $('jorExcluirErro').textContent = '';
     $('dlgJorExcluir').showModal();
   }));
   $('dlgJorExcluir').querySelector('[data-fechar-exc]').addEventListener('click', () => $('dlgJorExcluir').close());
   $('formJorExcluir').addEventListener('submit', async ev => {
     ev.preventDefault();
     const motivo = $('jorExcluirMotivo').value.trim();
+    const origem = $('jorExcluirOrigem').value;
+    if (!origem) { $('jorExcluirErro').textContent = 'Escolha por que está excluindo.'; return; }
     if (motivo.length < 5) { $('jorExcluirErro').textContent = 'Escreva o motivo (pelo menos 5 letras).'; return; }
     const b = excluindo;
     if (!b || situacaoBoletim(b).fechado) { $('jorExcluirErro').textContent = 'Este lançamento já está fechado.'; return; }
     try {
-      const depois = { ...b, situacao: 'cancelado', atualizado_em: new Date().toISOString() };
+      const depois = { ...b, situacao: 'cancelado', marcado: fotoMarcado(b), origem_alteracao: origem,
+        motivo_alteracao: motivo, atualizado_em: new Date().toISOString() };
       await jd.salvar('boletins', depois);
       await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'cancelar', antes: b, depois, justificativa: motivo });
       $('dlgJorExcluir').close();
@@ -1163,6 +1198,7 @@ function desenharRelatorios() {
         <button class="btn" id="relFaltas">Faltas</button>
         <button class="btn" id="relAtest">Atestados</button>
         <button class="btn" id="relMes">Horas extras por mês</button>
+        <button class="btn" id="relConf">Marcado × Conferido</button>
         <button class="btn" id="relDet">Detalhado DP</button>
         <button class="btn mini" id="relCsv">Baixar dados (Excel)</button>
       </div>
@@ -1226,6 +1262,8 @@ function desenharRelatorios() {
     preview(rel.relatorioFaltas(estadoTela.competencia, $('relDestino').value, { totais: true })));
   $('relAtest').addEventListener('click', () =>
     preview(rel.relatorioAtestados(estadoTela.competencia, $('relDestino').value)));
+  $('relConf').addEventListener('click', () =>
+    preview(rel.relatorioConferencia(estadoTela.competencia, $('relDestino').value)));
   $('relMes').addEventListener('click', () =>
     preview(rel.relatorioPorMes(estadoTela.competencia, $('relDestino').value)));
   $('relDet').addEventListener('click', () =>
