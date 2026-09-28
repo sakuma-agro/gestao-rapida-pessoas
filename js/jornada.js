@@ -25,6 +25,8 @@ const MESES = ['janeiro','fevereiro','março','abril','maio','junho',
 const estadoTela = {
   competencia: jd.competenciaAtual(),
   busca: '',
+  filtroSit: '',        // Lançados: '' todos · 'aberto' · 'fechado'
+  editando: null,       // id do boletim em edição na tela Lançar jornada
   reabrindo: null,
 };
 
@@ -97,6 +99,7 @@ export function limparJornada() {
   bol.limparBoletins();
   estadoTela.competencia = jd.competenciaAtual();
   competenciaDecidida = false;
+  estadoTela.editando = null;
 }
 
 function aviso(texto, ok = false) {
@@ -347,7 +350,40 @@ function desenharLancar() {
     mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
+  prepararEdicao();
   mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
+}
+
+/* Editar lançamento em aberto (28/09/2026): a tela Lançados manda o id em
+   estadoTela.editando; o formulário abre preenchido, pede o motivo da
+   alteração e grava por cima do mesmo boletim (situação "corrigido"). */
+function prepararEdicao() {
+  const b = estadoTela.editando && jd.dados.boletins.find(x => x.id === estadoTela.editando);
+  if (!b || b.situacao === 'cancelado' || situacaoBoletim(b).fechado) { estadoTela.editando = null; return; }
+  const f = estado.funcionarios.find(x => x.id === b.funcionario_id);
+  const form = $('jorFormBoletim');
+  form.insertAdjacentHTML('afterbegin', `<div class="jor-caixa alerta" id="bEditando">
+    <b>Editando</b> o lançamento de ${esc(f?.nome || '—')} de ${dataBR(b.data_fato)}${b.numero ? ` (boletim nº ${esc(b.numero)})` : ''}.
+    <button class="btn mini" type="button" id="bCancelarEdicao">Cancelar edição</button></div>`);
+  $('bObs').closest('label').insertAdjacentHTML('afterend',
+    `<label>Motivo da alteração (obrigatório) <input type="text" id="bMotivoAlt" maxlength="200" required></label>`);
+  if (![...$('bFunc').options].some(o => o.value === b.funcionario_id))
+    $('bFunc').insertAdjacentHTML('beforeend', `<option value="${b.funcionario_id}">${esc(f?.nome || '—')}</option>`);
+  $('bFunc').value = b.funcionario_id; cadastroDoSelecionado();
+  $('bNumero').value = b.numero || '';
+  $('bData').value = b.data_fato;
+  if (b.tipo_id) $('bTipo').value = b.tipo_id;
+  $('bIni').value = (b.hora_ini || '').slice(0, 5);
+  $('bFim').value = (b.hora_fim || '').slice(0, 5);
+  $('bInterv').value = b.intervalo_min ?? 0;
+  $('bEspecial').value = b.he_especial_tipo_id || '';
+  $('bInsal').checked = !!b.insalubridade_dia;
+  $('bObs').value = b.observacao || '';
+  mostrarMotivo();
+  $('bMotivo').value = b.motivo || '';
+  form.querySelector('[type=submit]').textContent = 'Salvar alteração';
+  $('bJorPadrao').textContent = '';
+  $('bCancelarEdicao').addEventListener('click', () => { estadoTela.editando = null; irPara('jorBoletins'); });
 }
 
 /* ---------- Sábado, domingo e feriado vêm da data (25/09/2026) ----------
@@ -536,6 +572,13 @@ async function gravarBoletim(ev) {
   const competencia = jd.competenciaDePagamento(entrada.data, unidade?.destino_id);
   const atrasado = competencia !== jd.competenciaDe(entrada.data);
 
+  const original = estadoTela.editando ? jd.dados.boletins.find(x => x.id === estadoTela.editando) : null;
+  const motivoAlt = $('bMotivoAlt')?.value.trim() || '';
+  if (original) {
+    if (situacaoBoletim(original).fechado) { aviso('Este lançamento já está fechado — para corrigir, reabra a competência no Fechamento.'); return; }
+    if (motivoAlt.length < 5) { aviso('Escreva o motivo da alteração (pelo menos 5 letras).'); $('bMotivoAlt').focus(); return; }
+  }
+
   // O motor roda ANTES da gravação: boletim e apuração nascem juntos.
   const r = apurarDia(entrada);
   const b = {
@@ -554,14 +597,15 @@ async function gravarBoletim(ev) {
     insalubridade_dia: $('bInsal').checked,
     observacao: $('bObs').value || null,
     motivo: $('bMotivoRot').hidden ? null : ($('bMotivo').value.trim() || null),
-    situacao: 'lancado',
-    criado_por: estado.sessao?.user?.email || null,
-    criado_em: new Date().toISOString(),
+    situacao: original ? 'corrigido' : 'lancado',
+    criado_por: original ? original.criado_por : (estado.sessao?.user?.email || null),
+    criado_em: original ? original.criado_em : new Date().toISOString(),
     atualizado_em: new Date().toISOString(),
   };
+  if (original) { b.id = original.id; b.compensacao = original.compensacao ?? null; }
 
   // Nº repetido gera alerta, nunca bloqueio (RN-04).
-  if (b.numero && jd.dados.boletins.some(x => x.numero === b.numero)) {
+  if (b.numero && jd.dados.boletins.some(x => x.numero === b.numero && x.id !== b.id && x.situacao !== 'cancelado')) {
     aviso(`Atenção: o boletim nº ${b.numero} já foi lançado antes. Lançado assim mesmo — confira o talão.`);
   }
 
@@ -580,7 +624,14 @@ async function gravarBoletim(ev) {
     parametros: entrada.parametros,
     calculado_em: new Date().toISOString(),
   });
-  await jd.registrar({ tabela: 'jor_boletins', registro_id: gravado.id, acao: 'insert', depois: b });
+  await jd.registrar({ tabela: 'jor_boletins', registro_id: gravado.id, acao: original ? 'update' : 'insert',
+    antes: original || null, depois: b, justificativa: original ? motivoAlt : null });
+  if (original) {
+    estadoTela.editando = null;
+    aviso(`Lançamento de ${dataBR(entrada.data)} alterado.`, true);
+    irPara('jorBoletins');
+    return;
+  }
 
   $('bNumero').value = '';
   $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
@@ -595,18 +646,33 @@ async function gravarBoletim(ev) {
    J.3 — BOLETINS DA COMPETÊNCIA
    =================================================================== */
 
+/* Situação do boletim (28/09/2026): Fechado quando a competência em que ele é
+   pago já foi enviada ao DP daquele destino; senão Em aberto (a pagar). Só o
+   boletim em aberto pode ser editado ou excluído. */
+function situacaoBoletim(b) {
+  const u = jd.dados.unidades.find(x => x.id === b.unidade_id);
+  const comp = u ? jd.competenciaDoDestino(b.competencia, u.destino_id) : null;
+  const fechado = !!comp && ['enviada', 'aprovada', 'travada'].includes(comp.situacao);
+  return { fechado, pagoEm: b.competencia, fechadoEm: fechado ? (comp.enviada_em || comp.aprovada_em || '').slice(0, 10) : null };
+}
+
 function desenharBoletins() {
   const busca = estadoTela.busca.toLowerCase();
-  const linhas = jd.dados.boletins
+  const todas = jd.dados.boletins
+    .filter(b => b.competencia === estadoTela.competencia && b.situacao !== 'cancelado')
     .map(b => ({
       b,
       f: estado.funcionarios.find(x => x.id === b.funcionario_id),
       a: jd.dados.apuracoes.find(x => x.boletim_id === b.id),
-    }))
+      s: situacaoBoletim(b),
+    }));
+  const linhas = todas
     .filter(l => !busca ||
       (l.f?.nome || '').toLowerCase().includes(busca) ||
       (l.b.numero || '').includes(busca))
+    .filter(l => !estadoTela.filtroSit || (estadoTela.filtroSit === 'fechado') === l.s.fechado)
     .sort((x, y) => y.b.data_fato.localeCompare(x.b.data_fato));
+  const nAberto = todas.filter(l => !l.s.fechado).length;
 
   const soma = c => linhas.reduce((s, l) => s + (l.a?.[c] || 0), 0);
 
@@ -614,14 +680,19 @@ function desenharBoletins() {
     <div class="jor-corpo">
       <div class="jor-barra">
         <input id="jorBuscaBol" type="search" placeholder="Buscar por funcionário ou nº do boletim" value="${esc(estadoTela.busca)}">
+        <select id="jorFiltroSit" aria-label="Situação">
+          <option value="">Todas as situações</option>
+          <option value="aberto" ${estadoTela.filtroSit === 'aberto' ? 'selected' : ''}>Em aberto (a pagar) · ${nAberto}</option>
+          <option value="fechado" ${estadoTela.filtroSit === 'fechado' ? 'selected' : ''}>Fechado (já pago) · ${todas.length - nAberto}</option>
+        </select>
         <span class="dc-sem">${linhas.length} boletim(ns)</span>
       </div>
       ${linhas.length ? `<table class="dc-planilha"><thead><tr>
         <th>Data</th><th>Nº</th><th>Funcionário</th><th>Horário</th>
         <th class="ce">Extra 50%</th><th class="ce">Extra 100%</th>
-        <th class="ce">Déficit</th><th class="ce">Interv.</th><th class="ce"></th>
+        <th class="ce">Déficit</th><th class="ce">Interv.</th><th>Situação</th><th class="ce"></th>
       </tr></thead><tbody>
-        ${linhas.map(({ b, f, a }) => `<tr>
+        ${linhas.map(({ b, f, a, s }) => `<tr>
           <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? `<br><span class="jor-pend">pago em ${esc(rotuloCompetencia(b.competencia))}</span>` : ''}</td>
           <td>${esc(b.numero || '—')}</td>
           <td>${esc(f?.nome || '—')}</td>
@@ -631,16 +702,62 @@ function desenharBoletins() {
           <td class="ce">${horas(a?.min_extra_100)}</td>
           <td class="ce">${horas(a?.min_deficit)}</td>
           <td class="ce">${a?.min_intervalo_suprimido || 0}</td>
-          <td class="ce"><button class="btn mini" data-memoria="${b.id}">Memória</button></td>
+          <td>${s.fechado
+            ? `<span class="tag ativo">Fechado</span><br><span class="dc-sem">pago em ${esc(fech.mesCurto(s.pagoEm))}${s.fechadoEm ? ` · fechado em ${dataBR(s.fechadoEm)}` : ''}</span>`
+            : `<span class="tag alerta">Em aberto</span><br><span class="dc-sem">a pagar em ${esc(fech.mesCurto(s.pagoEm))}</span>`}</td>
+          <td class="ce jor-bol-acoes"><button class="btn mini" data-memoria="${b.id}">Memória</button>${s.fechado ? ''
+            : `<button class="btn mini" data-editar-bol="${b.id}">Editar</button><button class="btn mini perigo" data-excluir-bol="${b.id}">Excluir</button>`}</td>
         </tr>`).join('')}
       </tbody><tfoot><tr class="jor-total">
         <td colspan="4">Total da competência</td>
         <td class="ce">${horas(soma('min_extra_50'))}</td>
         <td class="ce">${horas(soma('min_extra_100'))}</td>
         <td class="ce">${horas(soma('min_deficit'))}</td>
-        <td class="ce">${soma('min_intervalo_suprimido')}</td><td></td>
-      </tr></tfoot></table>` : '<div class="vazio">Nenhum boletim lançado nesta competência.</div>'}
-    </div>` + assinatura();
+        <td class="ce">${soma('min_intervalo_suprimido')}</td><td></td><td></td>
+      </tr></tfoot></table>` : '<div class="vazio">Nenhum boletim nesta competência com esse filtro.</div>'}
+      <p class="dc-sem jor-nota"><b>Fechado</b>: a competência em que o boletim é pago já foi enviada ao DP — para corrigir, reabra no Fechamento.
+      <b>Em aberto</b>: ainda vai ser pago; dá para editar ou excluir (com motivo, fica registrado).</p>
+    </div>
+    <dialog id="dlgJorExcluir"><form method="dialog" id="formJorExcluir">
+      <h3>Excluir lançamento</h3>
+      <p class="dc-sem" id="jorExcluirQual"></p>
+      <label class="campo plena">Motivo (obrigatório)<textarea id="jorExcluirMotivo" rows="3" maxlength="300"></textarea></label>
+      <p class="jor-pend" id="jorExcluirErro"></p>
+      <div class="barra entre"><button class="btn" type="button" data-fechar-exc>Cancelar</button>
+        <button class="btn perigo" type="submit">Excluir</button></div>
+    </form></dialog>` + assinatura();
+
+  $('jorFiltroSit').addEventListener('change', ev => { estadoTela.filtroSit = ev.target.value; desenharBoletins(); });
+  document.querySelectorAll('#telaJorBoletins [data-editar-bol]').forEach(btn => btn.addEventListener('click', () => {
+    estadoTela.editando = btn.dataset.editarBol;
+    irPara('jorLancar');
+  }));
+  let excluindo = null;
+  document.querySelectorAll('#telaJorBoletins [data-excluir-bol]').forEach(btn => btn.addEventListener('click', () => {
+    excluindo = jd.dados.boletins.find(x => x.id === btn.dataset.excluirBol);
+    if (!excluindo) return;
+    const f = estado.funcionarios.find(x => x.id === excluindo.funcionario_id);
+    $('jorExcluirQual').textContent = `${f?.nome || '—'} · ${dataBR(excluindo.data_fato)}${excluindo.numero ? ` · boletim nº ${excluindo.numero}` : ''}. `
+      + 'O lançamento sai das contas do mês; fica guardado no histórico com o motivo.';
+    $('jorExcluirMotivo').value = ''; $('jorExcluirErro').textContent = '';
+    $('dlgJorExcluir').showModal();
+  }));
+  $('dlgJorExcluir').querySelector('[data-fechar-exc]').addEventListener('click', () => $('dlgJorExcluir').close());
+  $('formJorExcluir').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const motivo = $('jorExcluirMotivo').value.trim();
+    if (motivo.length < 5) { $('jorExcluirErro').textContent = 'Escreva o motivo (pelo menos 5 letras).'; return; }
+    const b = excluindo;
+    if (!b || situacaoBoletim(b).fechado) { $('jorExcluirErro').textContent = 'Este lançamento já está fechado.'; return; }
+    try {
+      const depois = { ...b, situacao: 'cancelado', atualizado_em: new Date().toISOString() };
+      await jd.salvar('boletins', depois);
+      await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'cancelar', antes: b, depois, justificativa: motivo });
+      $('dlgJorExcluir').close();
+      aviso(`Lançamento de ${dataBR(b.data_fato)} excluído.`, true);
+      desenharBoletins();
+    } catch (e) { $('jorExcluirErro').textContent = e.message; }
+  });
 
   $('jorBuscaBol').addEventListener('input', ev => {
     estadoTela.busca = ev.target.value;
