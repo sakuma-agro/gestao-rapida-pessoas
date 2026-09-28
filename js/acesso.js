@@ -83,6 +83,7 @@ export const MODULOS = [
     { id: 'gestaoJornada', nome: 'Gestão de jornada', telas: [
       ['jorLancar',       'Lançar jornada'],
       ['jorBoletins',     'Lançados'],
+      ['jorAbatimento',   'Abatimento de horas'],
       ['jorFechamento',   'Fechamento'],
     ] },
     /* Boletins diários (24/09/2026): quem entregou o boletim de serviço do dia

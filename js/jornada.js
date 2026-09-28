@@ -56,6 +56,7 @@ export async function abrirJornada(tela) {
   if (tela === 'jorLancar')       desenharLancar();
   if (tela === 'jorBoletins')     desenharBoletins();
   if (tela === 'jorFechamento')   desenharFechamento();
+  if (tela === 'jorAbatimento')   desenharAbatimento();
   if (tela === 'jorRelatorios')   desenharRelatorios();
   if (tela === 'jorConfig')       desenharConfigJornada();
 }
@@ -674,6 +675,87 @@ function resumoJornada(j) {
 }
 
 /* ===================================================================
+   ABATIMENTO DE HORAS (28/09/2026) — decisão falta a falta
+   A regra automática (RN-23.1, Leitura A) vem marcada; o analista troca
+   para "compensar com horas extras" ou "descontar no salário". Grava em
+   jor_boletins.compensacao (null = automático). Competência enviada trava.
+   =================================================================== */
+
+function desenharAbatimento() {
+  const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
+  let nFaltas = 0, nComp = 0, minAbatido = 0;
+
+  const blocos = destinos.map(d => {
+    const c = fech.consolidar(estadoTela.competencia, d.id);
+    const comp = jd.competenciaDoDestino(estadoTela.competencia, d.id);
+    const sit = comp?.situacao || 'aberta';
+    const pode = sit === 'aberta' || sit === 'reaberta';
+    const h = m => fech.formatarHoras(m, d.formato_horas);
+    const pessoas = c.linhas.filter(l => (l.faltasNJ || []).length);
+    if (!pessoas.length) return '';
+
+    return `<section class="jor-destino">
+      <div class="jor-destino__topo"><div><h3>${esc(d.nome)}</h3>
+        <span class="dc-sem">${pessoas.length} pessoa(s) com falta não justificada</span></div>
+        <span class="tag ${pode ? 'ativo' : ''}">${esc(sit)}</span></div>
+      ${pode ? '' : `<div class="jor-caixa">Competência ${esc(sit)} — as decisões estão travadas. Para mudar, reabra com motivo no Fechamento.</div>`}
+      ${pessoas.map(l => {
+        const abatido = l.faltasNJ.filter(f => f.absorvida).reduce((s, f) => s + (f.minDeficit || 0), 0);
+        const antes = l.minExtraTotal + abatido;
+        nFaltas += l.faltasNJ.length; nComp += l.faltasNJ.filter(f => f.absorvida).length; minAbatido += abatido;
+        return `<div class="jor-abat">
+          <div class="jor-abat__topo"><b>${esc(l.nome)}</b>
+            <span class="dc-sem">horas extras do mês <b>${h(antes)}</b> → abatido <b>${h(abatido)}</b> → vão para a folha <b>${h(l.minExtraTotal)}</b>${l.minExtraAnterior ? ` + ${h(l.minExtraAnterior)} de comp. anterior` : ''}</span></div>
+          <table class="dc-planilha"><thead><tr><th>Data</th><th>Motivo</th><th class="ce">Desconto</th><th>Decisão</th><th>Resultado</th></tr></thead><tbody>
+          ${l.faltasNJ.map(f => {
+            const b = jd.dados.boletins.find(x => x.id === f.boletimId);
+            const res = f.atrasada ? '<span class="jor-pend">mês anterior — vai ao DP</span>'
+              : f.absorvida ? `compensada — sai ${h(f.minDeficit)} das extras`
+              : f.semSaldo ? `<span class="jor-pend">extras insuficientes (${h(antes - abatido)}) — vai ao DP</span>`
+              : '<span class="jor-pend">vai ao DP — desconto em folha</span>';
+            const sel = f.atrasada || !b ? '<span class="dc-sem">—</span>'
+              : `<select data-abat="${b.id}" ${pode ? '' : 'disabled'}>
+                  <option value="" ${!f.decisao ? 'selected' : ''}>Automático${!f.decisao ? ` (${f.sugerida === 'compensar' ? 'compensar' : 'descontar'})` : ''}</option>
+                  <option value="compensar" ${f.decisao === 'compensar' ? 'selected' : ''}>Compensar com horas extras</option>
+                  <option value="descontar" ${f.decisao === 'descontar' ? 'selected' : ''}>Descontar no salário</option>
+                </select>`;
+            return `<tr><td>${dataBR(f.data)}</td><td>${esc(b?.motivo || '—')}</td>
+              <td class="ce">${f.minDeficit ? h(f.minDeficit) : '—'}</td><td>${sel}</td><td>${res}</td></tr>`;
+          }).join('')}</tbody></table></div>`;
+      }).join('')}
+    </section>`;
+  }).join('');
+
+  $('telaJorAbatimento').innerHTML = cabecalho('Abatimento de horas', 'Falta não justificada: compensar com horas extras ou descontar no salário') + `
+    <div class="jor-corpo">
+      <div class="jor-cartoes">
+        ${cartao(nFaltas, 'FALTAS NÃO JUSTIFICADAS')}
+        ${cartao(nComp, 'COMPENSADAS')}
+        ${cartao(nFaltas - nComp, 'VÃO AO DP', nFaltas - nComp ? 'alerta' : '')}
+        ${cartao(horas(minAbatido), 'HORAS ABATIDAS')}
+      </div>
+      <p class="dc-sem jor-nota" style="margin:0 0 12px">A sugestão automática compensa quando as horas extras do mês cobrem a falta inteira,
+      da mais antiga para a mais recente. Escolher <b>Descontar no salário</b> preserva as horas extras para a folha.
+      Falta justificada e atestado nunca descontam e não aparecem aqui.</p>
+      ${blocos || '<div class="vazio">Nenhuma falta não justificada nesta competência.</div>'}
+    </div>` + assinatura();
+
+  document.querySelectorAll('#telaJorAbatimento [data-abat]').forEach(s => s.addEventListener('change', async () => {
+    const b = jd.dados.boletins.find(x => x.id === s.dataset.abat);
+    if (!b) return;
+    const antes = b.compensacao || null;
+    const depois = s.value || null;
+    try {
+      await jd.salvar('boletins', { ...b, compensacao: depois, atualizado_em: new Date().toISOString() });
+      await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'update',
+        antes: { compensacao: antes }, depois: { compensacao: depois },
+        justificativa: 'Abatimento de horas: ' + (depois || 'automático') });
+    } catch (e) { aviso(e.message); }
+    desenharAbatimento();
+  }));
+}
+
+/* ===================================================================
    J.5 — FECHAMENTO DA COMPETÊNCIA, por destino de DP
    =================================================================== */
 
@@ -969,5 +1051,5 @@ export function ligarJornada(navegar) {
 }
 
 const telaAtual = () =>
-  ['jorPainel','jorLancar','jorBoletins','jorFechamento','jorRelatorios','jorConfig']
+  ['jorPainel','jorLancar','jorBoletins','jorAbatimento','jorFechamento','jorRelatorios','jorConfig']
     .find(t => !$('tela' + t.charAt(0).toUpperCase() + t.slice(1))?.hidden) || 'jorPainel';

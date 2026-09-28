@@ -38,6 +38,8 @@ export function consolidar(competencia, destinoId) {
         minIntervaloSuprimido: a.min_intervalo_suprimido || 0,
         minNoturnos: a.min_noturnos || 0,
         contaDias: (a.min_deficit || 0) > 0 && !b.hora_ini ? 1 : 0,
+        boletimId: b.id,
+        decisao: b.compensacao || null,
         avisos: a.avisos || [],
       };
     });
@@ -177,9 +179,11 @@ export function podeEnviar(consolidado) {
     informativos.push(`${semLancamento.length} pessoa(s) sem nenhum lançamento no mês: ${semLancamento.slice(0, 5).map(l => l.nome).join(', ')}${semLancamento.length > 5 ? '…' : ''}`);
   }
 
-  const comFalta = linhas.filter(l => l.faltasInformadas > 0);
-  if (comFalta.length) {
-    informativos.push(`${comFalta.length} pessoa(s) com falta informada ao DP (extras não cobriram a dedução).`);
+  const faltas = linhas.flatMap(l => l.faltasNJ || []);
+  if (faltas.length) {
+    const comp = faltas.filter(f => f.absorvida).length;
+    informativos.push(`${faltas.length} falta(s) não justificada(s): ${comp} compensada(s) com horas extras, ${faltas.length - comp} vão ao DP para desconto. `
+      + `Para mudar, use Gestão de jornada › Abatimento de horas.`);
   }
 
   const comArt59 = linhas.filter(l => (l.avisos || []).some(a => a.includes('art. 59')));

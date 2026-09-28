@@ -309,19 +309,31 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
   // compensada por extras e qual foi informada ao DP.
   const faltasDatas = [];
 
+  /* Decisão por falta (28/09/2026): o analista escolhe no fechamento.
+     decisao null  → regra automática acima (Leitura A).
+     'descontar'   → vai ao DP e NÃO consome horas extras.
+     'compensar'   → abate das extras, se elas cobrirem a falta inteira;
+                     se não cobrirem, vai ao DP e fica marcada como impossível. */
   for (const f of faltas) {
     const disponivel = extra50 + extra100;
+    const base = { data: f.data, boletimId: f.boletimId || null, decisao: f.decisao || null, minDeficit: f.minDeficit };
+    if (f.decisao === 'descontar') {
+      faltasInformadas += 1;
+      faltasDatas.push({ ...base, absorvida: false, sugerida: disponivel >= f.minDeficit ? 'compensar' : 'descontar' });
+      passos.push(`Falta de ${f.data}: descontar no salário por decisão do analista — extras preservadas.`);
+      continue;
+    }
     if (disponivel >= f.minDeficit) {
       // abate primeiro das de 50%, que é o que o DP recebe como base
       let resto = f.minDeficit;
       const tira50 = Math.min(extra50, resto); extra50 -= tira50; resto -= tira50;
       extra100 -= resto;
       faltasAbsorvidas += 1;
-      faltasDatas.push({ data: f.data, absorvida: true });
+      faltasDatas.push({ ...base, absorvida: true, sugerida: 'compensar' });
       passos.push(`Falta de ${f.data}: absorvida por ${minParaHHMM(f.minDeficit)} de extras (Leitura A).`);
     } else {
       faltasInformadas += 1;
-      faltasDatas.push({ data: f.data, absorvida: false });
+      faltasDatas.push({ ...base, absorvida: false, sugerida: 'descontar', semSaldo: f.decisao === 'compensar' });
       passos.push(`Falta de ${f.data}: extras insuficientes (${minParaHHMM(disponivel)}) — paga as extras integralmente e informa a falta ao DP.`);
     }
   }
