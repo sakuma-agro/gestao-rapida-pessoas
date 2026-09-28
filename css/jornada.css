@@ -329,3 +329,7 @@
 .jor-bol-acoes .btn + .btn { margin-left: 4px; }
 #bEditando { margin-bottom: 12px; }
 #jorFiltroSit { width: auto; flex: 0 0 auto; max-width: 100%; }
+
+/* Lançar jornada: já existe lançamento no dia — complemento (28/09/2026) */
+.jor-dia-ja { margin: -4px 0 12px; padding: 8px 10px; border-left: 3px solid #744F28; background: #F7F1EA; color: #51534A; font-size: 12.5px; line-height: 1.5; border-radius: 0; }
+.jor-dia-ja[hidden] { display: none; }
