@@ -30,6 +30,11 @@ export const MODULOS = [
       ['funcionariosN2', 'Cadastro · Nível 2'],
       ['aniversarios', 'Aniversariantes'],
     ] },
+    /* Folha de ponto (28/09/2026): imprime empregador, nome, mês e ano na
+       folha de ponto que vem da gráfica. Ele pediu aqui em Cadastros. */
+    { id: 'folhaPonto', nome: 'Folha de ponto', telas: [
+      ['folhaPonto', 'Folha de ponto'],
+    ] },
     { id: 'certificacao', nome: 'Certificação', telas: [
       ['lista', 'Lista de presença'],
       ['termoSindical', 'Termo de liberdade sindical'],

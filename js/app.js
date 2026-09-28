@@ -22,6 +22,7 @@ import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
+import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
@@ -76,6 +77,8 @@ function abrirAba(nome) {
   $('telaAniversarios').hidden = nome !== 'aniversarios';
   $('telaCadFuncoes').hidden = nome !== 'cadFuncoes';
   $('telaCadEstrutura').hidden = nome !== 'cadEstrutura';
+  $('telaFolhaPonto').hidden = nome !== 'folhaPonto';
+  if (nome === 'folhaPonto') folhaPonto.desenhar($('folhaPontoAlvo'), { aviso: () => {} });
   $('telaEpis').hidden = nome !== 'epis';
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';

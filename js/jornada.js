@@ -14,7 +14,6 @@ import * as emp from './jornada-emprestimos.js';
 import * as fer from './jornada-ferias.js';
 import * as bol from './jornada-boletins.js';
 import { podeTela } from './acesso.js';
-import * as fp from './jornada-folhaponto.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -1289,7 +1288,6 @@ function desenharRelatorios() {
     ['esc', 'Escritório (DP)'], ['conf', 'Conferência interna'], ['pessoa', 'Por funcionário'],
     ...(emp.podeVerEmprestimo() ? [['emp', 'Empréstimo']] : []),
     ...(fer.podeVerFerias() ? [['fer', 'Férias']] : []),
-    ['fp', 'Folha de ponto'],
   ];
   if (!abas.some(a => a[0] === relTela.aba)) relTela.aba = 'esc';
 
@@ -1382,14 +1380,13 @@ function desenharRelatorios() {
       <div class="rel-abas" role="tablist">
         ${abas.map(([k, t]) => `<button type="button" role="tab" class="rel-aba${k === relTela.aba ? ' ativa' : ''}" data-rel-aba="${k}">${t}</button>`).join('')}
       </div>
-      <div class="rel-abacorpo">${relTela.aba === 'fp' ? '<div id="fpAlvo"></div>' : `
+      <div class="rel-abacorpo">
         ${filtros[relTela.aba] ? `<div class="jor-barra rel-filtros">${filtros[relTela.aba]}</div>` : ''}
         <p class="dc-sem jor-nota rel-dica">${dicas[relTela.aba]}</p>
-        ${RELS[relTela.aba].map(linha).join('')}`}
+        ${RELS[relTela.aba].map(linha).join('')}
       </div>
     </div>` + assinatura();
 
-  if (relTela.aba === 'fp') fp.desenhar($('fpAlvo'), { aviso });
   const achar = k => (RELS[relTela.aba] || []).find(r => r.k === k);
   const gerar = async (k, imprimir) => {
     const html = await achar(k)?.html();

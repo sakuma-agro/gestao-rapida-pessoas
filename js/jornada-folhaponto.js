@@ -6,8 +6,10 @@
 // nome do empregado, mês e os dois últimos dígitos do ano ("20" já vem).
 //
 // Impressora dele: Epson L4260. Tamanho personalizado não tem frente e verso
-// automático e entra pela bandeja traseira, pelo lado menor — por isso:
-//   1. imprime o lote de frentes; 2. vira o maço; 3. imprime o lote de versos.
+// automático e entra pela bandeja traseira, pelo lado menor. Ele imprime uma
+// folha por vez (28/09): botão Imprimir por funcionário, que marca "impresso"
+// no mês; o verso é só virar a folha e clicar de novo (mesmo cabeçalho).
+// Posição que deu certo na L4260: em pé, cabeçalho à direita (270°).
 // Posições medidas no PDF da gráfica (mm, a partir do canto de cima à
 // esquerda). O ajuste fino por impressora fica guardado no navegador.
 
@@ -45,7 +47,18 @@ function lerAjuste() {
 }
 function gravarAjuste(a) { try { localStorage.setItem(CHAVE, JSON.stringify(a)); } catch { /* sem armazenamento: vale só agora */ } }
 
-const tela = { unidade: '', mes: '', marcados: null };
+const tela = { mes: '', busca: '', filtro: '' };
+
+/* Controle de "já impresso" por mês (28/09/2026, pedido dele): ele imprime
+   uma folha por vez; cada funcionário tem a caixinha marcada sozinha quando
+   clica em Imprimir, e pode marcar/desmarcar à mão. Fica neste computador. */
+const CHAVE_IMP = 'gr-folha-ponto-impressos';
+function lerImpressos() { try { return JSON.parse(localStorage.getItem(CHAVE_IMP)) || {}; } catch { return {}; } }
+function marcarImpresso(mes, fid, sim) {
+  const t = lerImpressos(); t[mes] = t[mes] || {};
+  if (sim) t[mes][fid] = new Date().toISOString(); else delete t[mes][fid];
+  try { localStorage.setItem(CHAVE_IMP, JSON.stringify(t)); } catch { /* sem armazenamento */ }
+}
 
 function mesPadrao() {
   // Até o dia 20 imprime o mês corrente; depois, já o seguinte.
@@ -53,6 +66,7 @@ function mesPadrao() {
   if (d.getDate() > 20) d.setMonth(d.getMonth() + 1, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+const rotMes = ym => { const [a, m] = ym.split('-').map(Number); return `${MESES[m - 1].toLocaleLowerCase('pt-BR')}/${a}`; };
 
 const unidadesComGente = () => jd.dados.unidades
   .filter(u => u.ativo !== false)
@@ -77,18 +91,27 @@ function textoEmpregador(u, linha) {
 export function desenhar(alvo, { aviso }) {
   const aj = lerAjuste();
   const grupos = unidadesComGente();
-  if (!grupos.some(g => g.u.id === tela.unidade)) { tela.unidade = grupos[0]?.u.id || ''; tela.marcados = null; }
   if (!tela.mes) tela.mes = mesPadrao();
-  const pessoas = grupos.find(g => g.u.id === tela.unidade)?.pessoas || [];
-  if (!tela.marcados) tela.marcados = new Set(pessoas.map(p => p.id));
+  const imp = lerImpressos()[tela.mes] || {};
+  const todos = grupos.flatMap(g => g.pessoas);
+  const feitos = todos.filter(p => imp[p.id]).length;
+  const busca = tela.busca.trim().toLocaleLowerCase('pt-BR');
+  const passa = p => (!busca || p.nome.toLocaleLowerCase('pt-BR').includes(busca) || String(p.cadastro || '').includes(busca))
+    && (tela.filtro !== 'falta' || !imp[p.id]) && (tela.filtro !== 'feito' || imp[p.id]);
+  const dataBR = iso => { const d = new Date(iso); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
   const num = (id, v, rot) => `<label class="fp-num">${rot} <input type="number" id="${id}" step="0.5" value="${v}"> mm</label>`;
   alvo.innerHTML = `
     <div class="jor-barra rel-filtros">
-      <label>Empregador / fazenda
-        <select id="fpUnidade">${grupos.map(g => `<option value="${g.u.id}"${g.u.id === tela.unidade ? ' selected' : ''}>${esc(jd.nomeUnidade(g.u))} (${g.pessoas.length})</option>`).join('')}</select>
-      </label>
       <label>Mês <input type="month" id="fpMes" value="${tela.mes}"></label>
+      <label>Buscar <input type="search" id="fpBusca" placeholder="nome ou nº" value="${esc(tela.busca)}"></label>
+      <label>Mostrar
+        <select id="fpFiltro">
+          <option value=""${!tela.filtro ? ' selected' : ''}>Todos</option>
+          <option value="falta"${tela.filtro === 'falta' ? ' selected' : ''}>Falta imprimir</option>
+          <option value="feito"${tela.filtro === 'feito' ? ' selected' : ''}>Já impressos</option>
+        </select>
+      </label>
       <label>Na linha pontilhada
         <select id="fpLinha">
           <option value="ambos"${aj.linha === 'ambos' ? ' selected' : ''}>Empregador — fazenda</option>
@@ -98,41 +121,34 @@ export function desenhar(alvo, { aviso }) {
       </label>
       <label class="jor-inline"><input type="checkbox" id="fpCadastro"${aj.cadastro ? ' checked' : ''}> Nº do cadastro junto do nome</label>
     </div>
-    <p class="dc-sem jor-nota rel-dica">Imprime <b>só</b> empregador, nome, mês e ano na folha de ponto que já vem da gráfica (26 × 16,5 cm).
-      Na Epson L4260: bandeja traseira, folha deitada entrando pelo <b>lado menor</b>, impressão em <b>100% / tamanho real</b>.</p>
+    <p class="dc-sem jor-nota rel-dica">Uma folha por vez: coloque a folha de ponto na bandeja e clique em <b>Imprimir</b> na linha do funcionário.
+      Para o outro lado, vire a folha e clique de novo. Sai <b>só</b> empregador, nome, mês e ano.
+      Na janela de impressão: <b>Margens: Nenhuma</b> e <b>sem "Cabeçalhos e rodapés"</b> (em "Mais configurações").</p>
 
-    <div class="fp-pessoas">
-      <div class="fp-pessoas__topo"><b>Funcionários</b> <span class="dc-sem" id="fpConta"></span>
-        <button type="button" class="btn mini" id="fpTodos">Marcar todos</button>
-        <button type="button" class="btn mini" id="fpNenhum">Desmarcar todos</button></div>
-      <div class="fp-pessoas__lista">
-        ${pessoas.map(p => `<label class="jor-inline"><input type="checkbox" data-fp-p="${p.id}"${tela.marcados.has(p.id) ? ' checked' : ''}>
-          ${esc(p.nome)}${p.cadastro ? ` <span class="dc-sem">nº ${esc(p.cadastro)}</span>` : ''}</label>`).join('') || '<span class="dc-sem">Ninguém com vínculo nesta unidade.</span>'}
-      </div>
+    <div class="fp-lista">
+      <div class="fp-lista__topo"><b>${feitos} de ${todos.length}</b> impressos em ${esc(rotMes(tela.mes))}
+        <span class="fp-barra"><i style="width:${todos.length ? Math.round(feitos * 100 / todos.length) : 0}%"></i></span></div>
+      ${grupos.map(g => {
+        const ps = g.pessoas.filter(passa);
+        if (!ps.length) return '';
+        return `<div class="fp-grupo"><div class="fp-grupo__nome">${esc(jd.nomeUnidade(g.u))}</div>
+          ${ps.map(p => `<div class="fp-linha-f${imp[p.id] ? ' feito' : ''}">
+            <label class="jor-inline" title="Marque se já imprimiu"><input type="checkbox" data-fp-imp="${p.id}"${imp[p.id] ? ' checked' : ''}> Impresso</label>
+            <span class="fp-linha-f__nome">${esc(p.nome)}${p.cadastro ? ` <span class="dc-sem">nº ${esc(p.cadastro)}</span>` : ''}</span>
+            <span class="dc-sem">${imp[p.id] ? 'em ' + dataBR(imp[p.id]) : ''}</span>
+            <button class="btn${imp[p.id] ? '' : ' principal'}" type="button" data-fp-imprimir="${p.id}" data-fp-u="${g.u.id}">Imprimir</button>
+          </div>`).join('')}</div>`;
+      }).join('') || '<p class="dc-sem">Ninguém encontrado.</p>'}
     </div>
 
-    <div class="fp-passos">
-      <div class="fp-passo"><span>1</span><div><b>Frentes</b> (dias 01 a 15)<br>
-        <button class="btn principal" type="button" id="fpFrente">Imprimir frentes</button>
-        <button class="btn" type="button" id="fpVerFrente">Ver na tela</button></div></div>
-      <div class="fp-passo"><span>2</span><div><b>Vire o maço</b> e coloque de volta na bandeja, com o verso (dias 16 a 31) para cima.</div></div>
-      <div class="fp-passo"><span>3</span><div><b>Versos</b> (dias 16 a 31)<br>
-        <button class="btn principal" type="button" id="fpVerso">Imprimir versos</button>
-        <button class="btn" type="button" id="fpVerVerso">Ver na tela</button>
-        <label class="jor-inline"><input type="checkbox" id="fpInvertida"${aj.invertida ? ' checked' : ''}> Versos em ordem invertida</label></div></div>
-    </div>
-
-    <details class="fp-ajuste" open>
-      <summary><b>Acertar a posição na impressora</b> — faça uma vez; fica guardado neste computador</summary>
+    <details class="fp-ajuste">
+      <summary><b>Acertar a posição na impressora</b> — já acertado; fica guardado neste computador</summary>
       <ol class="dc-sem">
-        <li>Clique em <b>Folha de teste</b> e imprima em <b>papel comum</b>, cortado ou dobrado no tamanho da folha de ponto (26 × 16,5 cm), do mesmo jeito que vai colocar a folha de ponto.</li>
+        <li>Clique em <b>Folha de teste</b> e imprima em <b>papel comum</b> no tamanho da folha de ponto (26 × 16,5 cm), do mesmo jeito que vai colocar a folha de ponto.</li>
         <li>Ponha o teste sobre uma folha de ponto contra a luz: as <b>linhas cinzas</b> têm de cair em cima das linhas do quadro "Empregado / Mês / Ano".</li>
-        <li>Se ficou deslocado, meça com a régua e ajuste abaixo (número positivo = para a direita / para baixo). Imprima o teste de novo até bater.</li>
+        <li>Se ficou deslocado, meça com a régua e ajuste abaixo (número positivo = para a direita / para baixo).</li>
       </ol>
-      <div class="jor-barra">
-        ${num('fpDx', aj.dx, 'Frente: direita')} ${num('fpDy', aj.dy, 'baixo')}
-        ${num('fpDxV', aj.dxV, 'Verso: direita')} ${num('fpDyV', aj.dyV, 'baixo')}
-      </div>
+      <div class="jor-barra">${num('fpDx', aj.dx, 'Tudo: direita')} ${num('fpDy', aj.dy, 'baixo')}</div>
       <p class="dc-sem" style="margin:10px 0 4px"><b>Cada campo</b> — soma ao ajuste acima. Positivo = para a direita / para baixo, olhando a folha deitada, como se lê.</p>
       <table class="fp-campos">
         <thead><tr><th>Campo</th><th>Direita (mm)</th><th>Baixo (mm)</th><th>Tamanho da letra (pt)</th></tr></thead>
@@ -149,24 +165,20 @@ export function desenhar(alvo, { aviso }) {
             <option value="dir"${aj.girar === 'dir' ? ' selected' : ''}>Em pé, cabeçalho à direita (girar 270°)</option>
           </select>
         </label>
-        <label class="jor-inline"><input type="checkbox" id="fpVerso180"${aj.verso180 ? ' checked' : ''}> Verso de cabeça para baixo (girar 180°)</label>
       </div>
       <div class="jor-barra">
-        <button class="btn" type="button" id="fpTesteF">Folha de teste — frente</button>
-        <button class="btn" type="button" id="fpTesteV">Folha de teste — verso</button>
+        <button class="btn" type="button" id="fpTeste">Folha de teste</button>
         <button class="btn mini" type="button" id="fpZerar">Zerar ajuste</button>
       </div>
     </details>`;
 
   const $ = id => alvo.querySelector('#' + id);
-  const conta = () => { $('fpConta').textContent = `${tela.marcados.size} de ${pessoas.length} marcados`; };
-  conta();
+  const redesenhar = () => desenhar(alvo, { aviso });
 
   const salvarAjuste = () => {
     const n = id => Number(String($(id).value).replace(',', '.')) || 0;
-    Object.assign(aj, { dx: n('fpDx'), dy: n('fpDy'), dxV: n('fpDxV'), dyV: n('fpDyV'),
-      girar: $('fpGirar').value || false, verso180: $('fpVerso180').checked,
-      invertida: $('fpInvertida').checked, cadastro: $('fpCadastro').checked, linha: $('fpLinha').value });
+    Object.assign(aj, { dx: n('fpDx'), dy: n('fpDy'), girar: $('fpGirar').value || false,
+      cadastro: $('fpCadastro').checked, linha: $('fpLinha').value });
     aj.campos = {};
     alvo.querySelectorAll('[data-fpc]').forEach(el => {
       const k = el.dataset.fpc; aj.campos[k] = aj.campos[k] || {};
@@ -175,31 +187,27 @@ export function desenhar(alvo, { aviso }) {
     });
     gravarAjuste(aj);
   };
-  alvo.querySelectorAll('.fp-ajuste input, .fp-ajuste select, #fpInvertida, #fpCadastro, #fpLinha').forEach(el => el.addEventListener('change', salvarAjuste));
-  $('fpUnidade').addEventListener('change', () => { tela.unidade = $('fpUnidade').value; tela.marcados = null; desenhar(alvo, { aviso }); });
-  $('fpMes').addEventListener('change', () => { tela.mes = $('fpMes').value; });
-  alvo.querySelectorAll('[data-fp-p]').forEach(c => c.addEventListener('change', () => {
-    c.checked ? tela.marcados.add(c.dataset.fpP) : tela.marcados.delete(c.dataset.fpP); conta();
+  alvo.querySelectorAll('.fp-ajuste input, .fp-ajuste select, #fpCadastro, #fpLinha').forEach(el => el.addEventListener('change', salvarAjuste));
+  $('fpMes').addEventListener('change', () => { tela.mes = $('fpMes').value || mesPadrao(); redesenhar(); });
+  $('fpFiltro').addEventListener('change', () => { tela.filtro = $('fpFiltro').value; redesenhar(); });
+  $('fpBusca').addEventListener('input', () => {
+    tela.busca = $('fpBusca').value; const pos = $('fpBusca').selectionStart;
+    redesenhar(); $('fpBusca').focus(); $('fpBusca').setSelectionRange(pos, pos);
+  });
+  alvo.querySelectorAll('[data-fp-imp]').forEach(c => c.addEventListener('change', () => {
+    marcarImpresso(tela.mes, c.dataset.fpImp, c.checked); redesenhar();
   }));
-  $('fpTodos').addEventListener('click', () => { tela.marcados = new Set(pessoas.map(p => p.id)); desenhar(alvo, { aviso }); });
-  $('fpNenhum').addEventListener('click', () => { tela.marcados = new Set(); desenhar(alvo, { aviso }); });
-  $('fpZerar').addEventListener('click', () => { gravarAjuste({ ...PADRAO, invertida: aj.invertida, cadastro: aj.cadastro, linha: aj.linha }); desenhar(alvo, { aviso }); });
-
-  const lote = (lado, imprimir) => {
+  alvo.querySelectorAll('[data-fp-imprimir]').forEach(b => b.addEventListener('click', () => {
     salvarAjuste();
-    if (!tela.mes) { aviso('Escolha o mês.'); return; }
-    const lista = pessoas.filter(p => tela.marcados.has(p.id));
-    if (!lista.length) { aviso('Marque pelo menos um funcionário.'); return; }
-    const u = jd.dados.unidades.find(x => x.id === tela.unidade);
-    const ordem = lado === 'verso' && aj.invertida ? [...lista].reverse() : lista;
-    mostrar(ordem.map(p => folha(p, u, lado, aj)).join(''), imprimir, lado, ordem.length);
-  };
-  $('fpFrente').addEventListener('click', () => lote('frente', true));
-  $('fpVerso').addEventListener('click', () => lote('verso', true));
-  $('fpVerFrente').addEventListener('click', () => lote('frente', false));
-  $('fpVerVerso').addEventListener('click', () => lote('verso', false));
-  $('fpTesteF').addEventListener('click', () => { salvarAjuste(); mostrar(folhaTeste('frente', aj), true, 'teste', 1); });
-  $('fpTesteV').addEventListener('click', () => { salvarAjuste(); mostrar(folhaTeste('verso', aj), true, 'teste', 1); });
+    const p = estado.funcionarios.find(f => f.id === b.dataset.fpImprimir);
+    const u = jd.dados.unidades.find(x => x.id === b.dataset.fpU);
+    if (!p || !u) return;
+    marcarImpresso(tela.mes, p.id, true);
+    mostrar(folha(p, u, aj), true, p.nome);
+    redesenhar();
+  }));
+  $('fpZerar').addEventListener('click', () => { gravarAjuste({ ...PADRAO, cadastro: aj.cadastro, linha: aj.linha }); redesenhar(); });
+  $('fpTeste').addEventListener('click', () => { salvarAjuste(); mostrar(folhaTeste(aj), true, 'teste'); });
 }
 
 /* ---------------- folhas ---------------- */
@@ -214,9 +222,8 @@ function campo(k, texto, aj) {
     style="left:${c.x}mm;top:${topo.toFixed(2)}mm;font-size:${c.pt}pt">${esc(texto)}</span>`;
 }
 
-function envelope(lado, aj, miolo, teste = false) {
-  const dx = lado === 'verso' ? aj.dxV : aj.dx, dy = lado === 'verso' ? aj.dyV : aj.dy;
-  const gira180 = lado === 'verso' && aj.verso180;
+function envelope(aj, miolo, teste = false) {
+  const dx = aj.dx, dy = aj.dy;
   // A folha da gráfica fica parada ao fundo (só na tela); o texto é que se move com o ajuste.
   // Em pé: "esq" = cabeçalho à esquerda na bandeja (90°); "dir" = à direita (270°).
   // Com o cabeçalho à direita, o ano fica na borda que entra primeiro e não
@@ -224,13 +231,13 @@ function envelope(lado, aj, miolo, teste = false) {
   const giro = aj.girar === true ? 'esq' : (aj.girar || '');
   return `<div class="fp-folha${giro ? ' fp-girada fp-girada-' + giro : ''}${teste ? ' fp-teste' : ''}"><div class="fp-rot">
     <img class="fp-fundo" src="img/folha-ponto.png" alt="">
-    <div class="fp-area" style="transform:translate(${dx}mm,${dy}mm)${gira180 ? ' rotate(180deg)' : ''}">${miolo}</div></div></div>`;
+    <div class="fp-area" style="transform:translate(${dx}mm,${dy}mm)">${miolo}</div></div></div>`;
 }
 
-function folha(p, u, lado, aj) {
+function folha(p, u, aj) {
   const [a, m] = tela.mes.split('-').map(Number);
   const nome = MAIUSC(p.nome) + (aj.cadastro && p.cadastro ? `  · nº ${p.cadastro}` : '');
-  return envelope(lado, aj, campo('empregador', textoEmpregador(u, aj.linha), aj)
+  return envelope(aj, campo('empregador', textoEmpregador(u, aj.linha), aj)
     + campo('empregado', nome, aj)
     + campo('mes', MESES[m - 1], aj)
     + campo('ano', String(a).slice(2), aj));
@@ -238,26 +245,38 @@ function folha(p, u, lado, aj) {
 
 /* Folha de teste: as linhas do quadro "Empregado / Mês / Ano" e a linha
    pontilhada, em cinza, mais os textos de exemplo no lugar certo. */
-function folhaTeste(lado, aj) {
+function folhaTeste(aj) {
   const L = (x, y, w, h) => `<i class="fp-linha" style="left:${x}mm;top:${y}mm;width:${w}mm;height:${h}mm"></i>`;
   const miolo = L(5.9, 17.15, 248, 0.25) + L(5.9, 25.3, 248, 0.25)
     + L(5.9, 17.15, 0.25, 8.4) + L(156.3, 17.15, 0.25, 8.4) + L(229.3, 17.15, 0.25, 8.4) + L(253.8, 17.15, 0.25, 8.4)
     + L(92, 14.8, 93.5, 0.25)
-    + `<span class="fp-legenda" style="left:8mm;top:40mm">FOLHA DE TESTE — ${lado === 'verso' ? 'VERSO' : 'FRENTE'} · as linhas cinzas devem cair sobre as linhas do quadro da folha de ponto</span>`
+    + `<span class="fp-legenda" style="left:8mm;top:40mm">FOLHA DE TESTE · as linhas cinzas devem cair sobre as linhas do quadro da folha de ponto</span>`
     + campo('empregador', 'EMPREGADOR — FAZENDA', aj)
     + campo('empregado', 'NOME DO FUNCIONÁRIO', aj)
     + campo('mes', 'MÊS', aj)
     + campo('ano', '26', aj);
-  return envelope(lado, aj, miolo, true);
+  return envelope(aj, miolo, true);
 }
 
-function mostrar(html, imprimir, lado, n) {
-  const topo = `<p class="fp-aviso-tela">${lado === 'teste' ? 'Folha de teste' : `${n} folha(s) — ${lado === 'verso' ? 'versos' : 'frentes'}`}.
+function mostrar(html, imprimir, quem) {
+  const topo = `<p class="fp-aviso-tela">${quem === 'teste' ? 'Folha de teste' : esc(quem)}.
     Na tela aparece a folha da gráfica ao fundo só para conferir; no papel sai <b>só o texto</b>.
-    Na janela de impressão: tamanho <b>26 × 16,5 cm</b> (personalizado), <b>100% / tamanho real</b>, sem margens.</p>`;
+    Na janela de impressão: tamanho <b>16,5 × 26 cm</b>, <b>100% / tamanho real</b>, <b>Margens: Nenhuma</b> e sem "Cabeçalhos e rodapés".</p>`;
   rel.mostrar(`<div class="fp-lote">${topo}${html}</div>`, { barra: true });
   ajustarLargura();
-  if (imprimir) setTimeout(() => rel.imprimir(), 400);
+  if (imprimir) setTimeout(() => imprimirSemTitulo(), 400);
+}
+
+/* O Chrome escreve o título da página e a hora na borda se "Cabeçalhos e
+   rodapés" estiver ligado. O título sai vazio durante a impressão; a hora só
+   some desligando a opção na janela de impressão (o Chrome lembra depois). */
+function imprimirSemTitulo() {
+  const titulo = document.title;
+  document.title = ' ';
+  const volta = () => { document.title = titulo; removeEventListener('afterprint', volta); };
+  addEventListener('afterprint', volta);
+  rel.imprimir();
+  setTimeout(volta, 3000);
 }
 
 /* Nome comprido: diminui a letra até caber no espaço do campo. */
