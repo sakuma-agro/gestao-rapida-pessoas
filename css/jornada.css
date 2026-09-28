@@ -318,3 +318,8 @@
   border: 1px solid #D9DCD2; border-radius: 6px; padding: 3px 6px; background: #fff; }
 .jor-cabecalho__direita .jor-cabecalho__competencia { display: none; }
 @media (max-width: 560px) { .jor-comp-sel { margin-left: 0; } }
+
+/* Abatimento de horas (28/09/2026) */
+.jor-abat { margin: 0 0 14px; }
+.jor-abat__topo { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin: 0 0 6px; }
+.jor-abat select { min-width: 190px; max-width: 100%; }
