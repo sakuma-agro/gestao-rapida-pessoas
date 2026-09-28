@@ -316,7 +316,7 @@
 /* Seletor de competência no cabeçalho do DP (28/09/2026) */
 .jor-comp-sel { display: block; margin: 3px 0 2px auto; font: 700 14px Arial, Helvetica, sans-serif; color: #744F28;
   border: 1px solid #D9DCD2; border-radius: 6px; padding: 3px 6px; background: #fff; }
-.jor-cabecalho__direita .jor-cabecalho__competencia { display: none; }
+.jor-cabecalho__direita .jor-comp-sel + .jor-cabecalho__competencia { display: none; }   /* só onde há o seletor — Férias e outros mostram a data */
 @media (max-width: 560px) { .jor-comp-sel { margin-left: 0; } }
 
 /* Abatimento de horas (28/09/2026) */
