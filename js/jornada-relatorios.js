@@ -6,6 +6,8 @@
 // REL-FAL     Relatório de Faltas — só as informadas ao DP, com as datas
 // REL-FAL-TOT Relatório Faltas Totais — todas, compensadas marcadas (uso interno)
 // REL-ATE     Relatório de Atestados — períodos e dias, sem motivo
+// REL-MES     Horas extras por mês — conferência: uma coluna por mês do fato
+//             (o boletim atrasado aparece no mês em que aconteceu), 28/09/2026
 // REL-DP-DET  Detalhado DP — abertura por percentual, intervalo e déficit
 // REL-EXT     Extrato individual — dia a dia, com a memória de cálculo
 //
@@ -18,7 +20,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
-import { consolidar, formatarHoras } from './jornada-fechamento.js';
+import { consolidar, formatarHoras, mesCurto } from './jornada-fechamento.js';
 import { minParaHHMM } from './jornada-motor.js';
 import { valorParaFolha, secaoRelatorioDP } from './jornada-emprestimos.js';
 
@@ -155,7 +157,7 @@ export function relatorioDP(competencia, destinoId) {
           const parcela = valorParaFolha(l.vinculo.funcionario_id, competencia);
           return `<tr>
           <td>${esc(l.nome)}</td>
-          <td class="rel-num"><b>${h(l.minExtraTotal)}</b></td>
+          <td class="rel-num"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}</td>
@@ -164,7 +166,14 @@ export function relatorioDP(competencia, destinoId) {
         </tr>`; }).join('')}</tbody>
       </table>`).join('') || '<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>';
 
-  const nota = `
+  // Boletim atrasado (RN-18): soma nas horas extras, e a nota diz de onde veio.
+  const atrasadas = c.linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
+    .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
+  const notaAtrasadas = atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas de competência anterior</b>, lançadas depois do envio
+      daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
+      Total de ${h(c.totais.extraAnterior)}. Abertura por mês no Relatório Horas Extras por Mês.</div>` : '';
+
+  const nota = `${notaAtrasadas}
     ${c.totais.intervaloSuprimido ? `<div class="rel-resumo"><b>Intervalo suprimido:</b> ${minParaHHMM(c.totais.intervaloSuprimido)} no destino — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras (ver Relatório Detalhado).</div>` : ''}
     <p class="rel-nota">Horas extras em ${fmt === 'hm' ? 'horas e minutos' : 'decimal, duas casas'}. Faltas não justificadas: só as que as horas extras do mês não cobriram.
     Saldo devedor: parcela do empréstimo a descontar neste mês.</p>`;
@@ -172,6 +181,52 @@ export function relatorioDP(competencia, destinoId) {
   return documentoDP({
     titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino,
     versao: comp?.versao || 1, corpo: corpo + nota, assinaturas: assinaturasDP,
+  });
+}
+
+/* ------------------------------------------------------------------
+   REL-MES — Horas extras por mês (28/09/2026). Conferência do boletim
+   atrasado: uma coluna por mês do fato, o total é o que o Relatório
+   Horas Extras manda pagar nesta competência.
+   ------------------------------------------------------------------ */
+
+export function relatorioPorMes(competencia, destinoId) {
+  const c = consolidar(competencia, destinoId);
+  const fmt = c.destino?.formato_horas || 'decimal';
+  const comp = jd.competenciaDoDestino(competencia, destinoId);
+  const h = m => m ? formatarHoras(m, fmt) : '—';
+
+  const meses = [...new Set(c.linhas.flatMap(l => Object.keys(l.porMes)))].sort();
+  if (!meses.includes(competencia)) meses.push(competencia);
+  const grupos = porEmpregador(c);
+  const soma = (ls, k) => ls.reduce((s, l) => s + (l.porMes[k] || 0), 0);
+
+  const corpo = grupos.map(g => `
+      ${blocoEmp(g.rotulo)}
+      <table class="rel-tabela rel-tabela-dp">
+        <thead><tr><th>Funcionário</th>
+          ${meses.map(m => `<th class="rel-num">${esc(mesCurto(m))}${m < competencia ? '<br><span style="font-weight:400">anterior</span>' : ''}</th>`).join('')}
+          <th class="rel-num">Total a pagar</th></tr></thead>
+        <tbody>${g.linhas.map(l => `<tr><td>${esc(l.nome)}</td>
+          ${meses.map(m => `<td class="rel-num">${h(l.porMes[m])}</td>`).join('')}
+          <td class="rel-num"><b>${h(l.minExtraPagar)}</b></td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Total</td>
+          ${meses.map(m => `<td class="rel-num">${h(soma(g.linhas, m))}</td>`).join('')}
+          <td class="rel-num">${h(g.linhas.reduce((s, l) => s + l.minExtraPagar, 0))}</td></tr></tfoot>
+      </table>`).join('') || '<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>';
+
+  const detalhe = c.linhas.flatMap(l => l.atrasados.map(x => ({ l, x })));
+  const nota = detalhe.length
+    ? `<div class="rel-resumo"><b>Boletins de competência anterior pagos neste mês:</b>
+        ${detalhe.sort((a, b) => a.x.data.localeCompare(b.x.data)).map(({ l, x }) =>
+          `${esc(l.nome)} — ${dataBR(x.data)}${x.falta ? ' (falta, informada ao DP)' : `, ${h(x.extra)}`}`).join(' · ')}.</div>`
+    : `<p class="rel-nota">Nenhum boletim de competência anterior neste mês: todas as horas são de ${esc(compCurta(competencia))}.</p>`;
+
+  return documentoDP({
+    titulo: 'RELATÓRIO HORAS EXTRAS POR MÊS', competencia, destino: c.destino,
+    versao: comp?.versao || 1,
+    corpo: corpo + nota + `<p class="rel-nota">Cada coluna é o mês em que o trabalho aconteceu. O total a pagar é o mesmo do Relatório Horas Extras.</p>`,
+    assinaturas: null,
   });
 }
 
@@ -187,7 +242,8 @@ export function relatorioFaltas(competencia, destinoId, { totais = false } = {})
 
   const nj = l => l.faltasNJ.filter(f => totais || !f.absorvida);
   const temFalta = l => l.faltasJ.length + nj(l).length > 0;
-  const datas = l => nj(l).map(f => dataBR(f.data) + (f.absorvida ? ' <span class="rel-mini">(compensada)</span>' : ''));
+  const datas = l => nj(l).map(f => dataBR(f.data) + (f.absorvida ? ' <span class="rel-mini">(compensada)</span>'
+    : f.atrasada ? ' <span class="rel-mini">(mês anterior)</span>' : ''));
 
   const grupos = porEmpregador(c, temFalta);
   let qJ = 0, qNJ = 0, qComp = 0;
@@ -278,6 +334,7 @@ export function relatorioDetalhado(competencia, destinoId) {
       <thead><tr>
         <th class="rel-num">Matr.</th><th>Funcionário</th><th>Unidade</th>
         <th class="rel-num">50%</th><th class="rel-num">100%</th>
+        ${c.totais.atrasados ? '<th class="rel-num">Comp. ant.</th>' : ''}
         <th class="rel-num">Interv. supr.</th><th class="rel-num">Déficit</th>
         <th class="rel-num">Noturnas</th><th class="rel-num">Faltas</th>
       </tr></thead>
@@ -287,6 +344,7 @@ export function relatorioDetalhado(competencia, destinoId) {
         <td class="rel-mini">${esc(l.unidadeNome)}</td>
         <td class="rel-num">${h(l.minExtra50)}</td>
         <td class="rel-num">${h(l.minExtra100)}</td>
+        ${c.totais.atrasados ? `<td class="rel-num">${l.minExtraAnterior ? h(l.minExtraAnterior) : '—'}</td>` : ''}
         <td class="rel-num">${l.minIntervaloSuprimido ? minParaHHMM(l.minIntervaloSuprimido) : '—'}</td>
         <td class="rel-num">${l.minDeficitAvulso ? h(l.minDeficitAvulso) : '—'}</td>
         <td class="rel-num">${l.minNoturnas ? minParaHHMM(l.minNoturnas) : '—'}</td>
@@ -296,6 +354,7 @@ export function relatorioDetalhado(competencia, destinoId) {
         <td colspan="3">Total — ${c.totais.pessoas} pessoa(s)</td>
         <td class="rel-num">${h(c.totais.extra50)}</td>
         <td class="rel-num">${h(c.totais.extra100)}</td>
+        ${c.totais.atrasados ? `<td class="rel-num">${h(c.totais.extraAnterior)}</td>` : ''}
         <td class="rel-num">${minParaHHMM(c.totais.intervaloSuprimido)}</td>
         <td class="rel-num">${h(c.totais.deficit)}</td>
         <td class="rel-num">${minParaHHMM(c.totais.noturnas)}</td>
@@ -310,6 +369,7 @@ export function relatorioDetalhado(competencia, destinoId) {
       da Lei 13.467/2017). As <b>noturnas</b> são registradas para conferência; o adicional
       noturno está desligado por parâmetro. Faltas já consideram a compensação por horas
       extras: só é informada a falta que as extras do próprio mês não cobriram.
+      ${c.totais.atrasados ? `<br><b>Comp. ant.</b> são horas de um mês já enviado, lançadas depois e pagas neste; não entram nos 50% e 100% do mês nem abatem falta dele.` : ''}
       ${c.totais.faltasAbsorvidas ? `<br>Neste mês, ${c.totais.faltasAbsorvidas} falta(s) foram absorvidas por horas extras e não vão ao DP.` : ''}
     </div>`;
 
@@ -356,7 +416,7 @@ export function extratoIndividual(competencia, funcionarioId) {
       <tbody>${boletins.map(b => {
         const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
         return `<tr>
-          <td>${dataBR(b.data_fato)}</td>
+          <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? ' <span class="rel-mini">(mês anterior)</span>' : ''}</td>
           <td class="rel-num">${esc(b.numero || '—')}</td>
           <td>${b.hora_ini ? `${String(b.hora_ini).slice(0,5)}–${String(b.hora_fim || '').slice(0,5)}` : '—'}</td>
           <td class="rel-num">${minParaHHMM(a.min_previstos || 0)}</td>
@@ -417,12 +477,12 @@ export function planilhaDP(competencia, destinoId) {
   const h = m => formatarHoras(m, fmt);
 
   const colunas = ['Codigo da empresa', 'Matricula', 'CPF', 'Nome', 'Unidade', 'CAEPF',
-                   'Horas extras', 'Deficit', 'Intervalo suprimido (min)',
+                   'Horas extras', 'Horas extras de competencia anterior (ja somadas)', 'Deficit', 'Intervalo suprimido (min)',
                    'Faltas (dias)', 'Atestado (dias)', 'Emprestimo a descontar'];
 
   const linhas = c.linhas.map(l => [
     l.codigoEmpresa, l.matricula, cpfBR(l.cpf), l.nome, l.unidadeNome, l.caepf,
-    h(l.minExtraTotal), h(l.minDeficitAvulso), l.minIntervaloSuprimido,
+    h(l.minExtraPagar), h(l.minExtraAnterior || 0), h(l.minDeficitAvulso), l.minIntervaloSuprimido,
     l.faltasInformadas, l.diasAtestado,
     // Parcela do empréstimo: a lançada no envio, ou a prevista enquanto aberta.
     valorParaFolha(l.vinculo.funcionario_id, competencia).toFixed(2).replace('.', ','),

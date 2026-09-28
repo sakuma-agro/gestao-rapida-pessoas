@@ -103,7 +103,9 @@ export async function carregar(competencia = competenciaAtual()) {
   const respostas = await Promise.all([
     ...cadastros.map(k => c.from(TABELAS[k]).select('*')),
     c.from(TABELAS.boletins).select('*').eq('competencia', competencia),
-    c.from(TABELAS.competencias).select('*').eq('competencia', competencia),
+    // Todas as competências (tabela pequena: destino × mês). O boletim atrasado
+    // precisa saber se o mês DO FATO já foi enviado, não só o mês aberto na tela.
+    c.from(TABELAS.competencias).select('*'),
     c.from(TABELAS.ocorrencias).select('*').gte('data_fim', competencia),
   ]);
 
@@ -422,6 +424,25 @@ export function travada(competencia, destinoId) {
   const c = competenciaDoDestino(competencia, destinoId);
   return !!c && ['enviada', 'aprovada', 'travada'].includes(c.situacao);
 }
+
+/**
+ * Competência de PAGAMENTO de um boletim (RN-18, 28/09/2026). É o mês do fato,
+ * a não ser que esse mês já tenha sido enviado ao DP daquele destino: aí o
+ * boletim atrasado vai para o primeiro mês seguinte ainda aberto, e o mês do
+ * fato continua fechado e intacto.
+ */
+export function competenciaDePagamento(dataISO, destinoId) {
+  let c = competenciaDe(dataISO);
+  if (!destinoId) return c;
+  for (let i = 0; i < 24 && travada(c, destinoId); i++) {
+    const [a, m] = c.split('-').map(Number);
+    c = m === 12 ? `${a + 1}-01-01` : `${a}-${String(m + 1).padStart(2, '0')}-01`;
+  }
+  return c;
+}
+
+/** Boletim cujo fato é de um mês anterior ao da competência em que ele é pago. */
+export const deCompetenciaAnterior = b => !!b && competenciaDe(b.data_fato) < b.competencia;
 
 export function limparJornadaDados() {
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = [];

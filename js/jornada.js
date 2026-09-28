@@ -85,9 +85,11 @@ function cabecalho(titulo, sub) {
       <div class="jor-cabecalho__titulo">${esc(titulo)}</div>
       <div class="jor-cabecalho__sub">${esc(sub || '')}</div>
     </div>
-    <div class="jor-cabecalho__direita">competência
+    <label class="jor-cabecalho__direita">competência
+      <input type="month" class="jor-comp-sel" value="${estadoTela.competencia.slice(0, 7)}"
+        title="Escolha o mês — no início do mês, volte ao anterior para fechar">
       <strong class="jor-cabecalho__competencia">${rotuloCompetencia(estadoTela.competencia)}</strong>
-    </div>
+    </label>
   </header>`;
 }
 
@@ -122,6 +124,7 @@ function desenharPainel() {
       ${painelEmprestimos()}
       ${painelFerias()}
       ${painelBoletins()}
+      ${painelAtrasados()}
 
       ${semVinculo ? `<div class="jor-caixa alerta">
         <b>${semVinculo} funcionário(s) ainda sem vínculo de jornada.</b>
@@ -140,6 +143,27 @@ function desenharPainel() {
   $('jorIrEmprestimos')?.addEventListener('click', () => irPara('empRecibos'));
   document.querySelectorAll('#telaJorPainel [data-ir-fer]').forEach(b =>
     b.addEventListener('click', () => irPara(b.dataset.irFer)));
+}
+
+/* Pendências de competência anterior (RN-18, 28/09/2026): boletim de um mês já
+   enviado, lançado depois e pago nesta competência. */
+function painelAtrasados() {
+  const lista = jd.dados.boletins
+    .filter(b => b.situacao !== 'cancelado' && b.competencia === estadoTela.competencia && jd.deCompetenciaAnterior(b))
+    .sort((a, b) => a.data_fato.localeCompare(b.data_fato));
+  if (!lista.length) return '';
+  return `<h3 class="jor-h3">Pendências de competência anterior</h3>
+    <p class="dc-sem jor-nota" style="margin:0 0 8px">Boletins de um mês já enviado ao DP, lançados depois. Entram no pagamento de
+    ${rotuloCompetencia(estadoTela.competencia)}, somados às horas extras, sem reabrir o mês do fato.</p>
+    <table class="dc-planilha"><thead><tr><th>Funcionário</th><th>Data do fato</th><th>Lançado em</th><th class="ce">Horas extras</th><th>Destino</th></tr></thead>
+    <tbody>${lista.map(b => {
+      const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      const u = jd.dados.unidades.find(x => x.id === b.unidade_id);
+      return `<tr><td>${esc(estado.funcionarios.find(f => f.id === b.funcionario_id)?.nome || '—')}</td>
+        <td>${dataBR(b.data_fato)}</td><td>${dataBR(String(b.criado_em || '').slice(0, 10))}</td>
+        <td class="ce">${horas((a.min_extra_50 || 0) + (a.min_extra_100 || 0))}</td>
+        <td>${esc(jd.destinoDe(u)?.nome || '—')}</td></tr>`;
+    }).join('')}</tbody></table>`;
 }
 
 /* Boletins diários no painel: só para quem enxerga a tela de pendências. */
@@ -317,6 +341,14 @@ function mostrarDiaAuto() {
   else if (dow === 0) { cls = 'forte'; txt = `<b>Domingo</b> · todas as horas são extra a ${perc('perc_extra_domingo', 100)}%`; }
   else if (dow === 6) { cls = 'medio'; txt = `<b>Sábado</b> · extra a ${perc('perc_extra_sabado', 50)}% além da jornada do sábado`; }
   else txt = `${SEMANA[dow].charAt(0).toUpperCase() + SEMANA[dow].slice(1)} · dia útil`;
+  // Boletim atrasado (RN-18): o mês do fato já foi enviado → paga no próximo aberto.
+  const dest = jd.unidadeDe(v)?.destino_id;
+  const pag = jd.competenciaDePagamento(data, dest);
+  if (dest && pag !== jd.competenciaDe(data)) {
+    cls = 'forte';
+    txt += `<br><b>${rotuloCompetencia(jd.competenciaDe(data))} já foi enviado ao ${esc(jd.destinoDe(jd.unidadeDe(v))?.nome || 'DP')}.</b>
+      Este boletim entra no pagamento de <b>${rotuloCompetencia(pag)}</b>, marcado como competência anterior. O mês do fato não é reaberto.`;
+  }
   alvo.className = 'jor-dia-auto ' + cls;
   alvo.innerHTML = txt;
 }
@@ -469,12 +501,10 @@ async function gravarBoletim(ev) {
   if (!entrada) return;
 
   const { v, unidade, funcionarioId } = entrada._contexto;
-  const competencia = jd.competenciaDe(entrada.data);
-
-  if (unidade && jd.travada(competencia, unidade.destino_id)) {
-    aviso('Competência já enviada ao DP. Para corrigir, é preciso reabrir com motivo (RN-130).');
-    return;
-  }
+  // RN-18 (28/09/2026): mês do fato já enviado → o boletim é pago no primeiro
+  // mês aberto seguinte, com a data do fato preservada. Nada é reaberto.
+  const competencia = jd.competenciaDePagamento(entrada.data, unidade?.destino_id);
+  const atrasado = competencia !== jd.competenciaDe(entrada.data);
 
   // O motor roda ANTES da gravação: boletim e apuração nascem juntos.
   const r = apurarDia(entrada);
@@ -525,7 +555,9 @@ async function gravarBoletim(ev) {
   $('bNumero').value = '';
   $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
   preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
-  aviso(`Boletim de ${dataBR(entrada.data)} lançado.` + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
+  aviso(`Boletim de ${dataBR(entrada.data)} lançado`
+    + (atrasado ? ` — entra no pagamento de ${rotuloCompetencia(competencia)} como competência anterior.` : '.')
+    + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
   mostrarApurado();
 }
 
@@ -560,7 +592,7 @@ function desenharBoletins() {
         <th class="ce">Déficit</th><th class="ce">Interv.</th><th class="ce"></th>
       </tr></thead><tbody>
         ${linhas.map(({ b, f, a }) => `<tr>
-          <td>${dataBR(b.data_fato)}</td>
+          <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? `<br><span class="jor-pend">pago em ${esc(rotuloCompetencia(b.competencia))}</span>` : ''}</td>
           <td>${esc(b.numero || '—')}</td>
           <td>${esc(f?.nome || '—')}</td>
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
@@ -659,7 +691,7 @@ async function desenharFechamento() {
     const variacao = ant
       ? (() => {
           const antes = ant.totais.extraTotal || 0;
-          const agora = c.totais.extraTotal || 0;
+          const agora = c.totais.extraTotal || 0;   // só o mês — o atrasado distorceria a comparação
           if (!antes) return '';
           const p = Math.round(((agora - antes) / antes) * 100);
           return `<span class="dc-sem">mês anterior ${h(antes)} · ${p >= 0 ? '+' : ''}${p}%</span>`;
@@ -674,7 +706,7 @@ async function desenharFechamento() {
             <span class="dc-sem">${c.unidades.length} unidade(s) · ${c.totais.pessoas} pessoa(s) · ${c.totais.boletins} boletim(ns)</span>
           </div>
           <div class="jor-destino__num">
-            <b>${h(c.totais.extraTotal)}</b>
+            <b>${h(c.totais.extraPagar)}</b>
             <span>horas extras</span>
             ${variacao}
           </div>
@@ -695,7 +727,7 @@ async function desenharFechamento() {
 
         <table class="dc-planilha"><thead><tr>
           <th>Funcionário</th><th>Unidade</th>
-          <th class="ce">Extras</th><th class="ce">Déficit</th>
+          <th class="ce">Extras</th>${c.totais.atrasados ? '<th class="ce">Comp. anterior</th>' : ''}<th class="ce">Déficit</th>
           <th class="ce">Faltas</th><th class="ce">Atestado</th>
         </tr></thead><tbody>
           ${c.linhas.map(l => `<tr>
@@ -704,13 +736,17 @@ async function desenharFechamento() {
               : l.boletins === 0 ? ' <span class="jor-pend">sem lançamento</span>' : ''}</td>
             <td class="dc-sem">${esc(l.unidadeNome)}</td>
             <td class="ce">${h(l.minExtraTotal)}</td>
+            ${c.totais.atrasados ? `<td class="ce">${l.atrasados.length
+              ? `${l.minExtraAnterior ? `<b class="jor-pend">${h(l.minExtraAnterior)}</b><br>` : ''}<span class="dc-sem">${l.atrasados.map(x => (x.falta ? 'falta ' : '') + dataBR(x.data).slice(0, 5)).join(', ')}</span>`
+              : '—'}</td>` : ''}
             <td class="ce">${l.minDeficitAvulso ? h(l.minDeficitAvulso) : '—'}</td>
             <td class="ce">${l.faltasInformadas || '—'}</td>
             <td class="ce">${l.diasAtestado || '—'}</td>
-          </tr>`).join('') || '<tr><td colspan="6" class="vazio">Nenhum vínculo neste destino.</td></tr>'}
+          </tr>`).join('') || `<tr><td colspan="${c.totais.atrasados ? 7 : 6}" class="vazio">Nenhum vínculo neste destino.</td></tr>`}
         </tbody><tfoot><tr class="jor-total">
           <td colspan="2">Total</td>
           <td class="ce">${h(c.totais.extraTotal)}</td>
+          ${c.totais.atrasados ? `<td class="ce">${h(c.totais.extraAnterior)}</td>` : ''}
           <td class="ce">${h(c.totais.deficit)}</td>
           <td class="ce">${c.totais.faltasInformadas}</td>
           <td class="ce">${c.totais.atestados}</td>
@@ -738,7 +774,8 @@ async function desenharFechamento() {
   document.querySelectorAll('[data-enviar]').forEach(b => b.addEventListener('click', async () => {
     const c = fech.consolidar(estadoTela.competencia, b.dataset.enviar);
     if (!confirm(`Enviar a competência de ${rotuloCompetencia(estadoTela.competencia)} ao ${c.destino.nome}?\n\n` +
-                 `${c.totais.pessoas} pessoa(s) · ${fech.formatarHoras(c.totais.extraTotal, c.destino.formato_horas)} de horas extras.`)) return;
+                 `${c.totais.pessoas} pessoa(s) · ${fech.formatarHoras(c.totais.extraPagar, c.destino.formato_horas)} de horas extras`
+                 + (c.totais.atrasados ? ` (${fech.formatarHoras(c.totais.extraAnterior, c.destino.formato_horas)} de competência anterior).` : '.'))) return;
     // Empréstimo: confere antes, grava a baixa só depois que o envio deu certo.
     const prep = emp.prepararAbatimentos(estadoTela.competencia, b.dataset.enviar);
     if (prep.erro) { aviso(prep.erro); return; }
@@ -795,6 +832,7 @@ function desenharRelatorios() {
         <button class="btn principal" id="relDP">Relatório Horas Extras</button>
         <button class="btn" id="relFaltas">Faltas</button>
         <button class="btn" id="relAtest">Atestados</button>
+        <button class="btn" id="relMes">Horas extras por mês</button>
         <button class="btn" id="relDet">Detalhado DP</button>
         <button class="btn mini" id="relCsv">Baixar dados (Excel)</button>
       </div>
@@ -857,6 +895,8 @@ function desenharRelatorios() {
     preview(rel.relatorioFaltas(estadoTela.competencia, $('relDestino').value, { totais: true })));
   $('relAtest').addEventListener('click', () =>
     preview(rel.relatorioAtestados(estadoTela.competencia, $('relDestino').value)));
+  $('relMes').addEventListener('click', () =>
+    preview(rel.relatorioPorMes(estadoTela.competencia, $('relDestino').value)));
   $('relDet').addEventListener('click', () =>
     preview(rel.relatorioDetalhado(estadoTela.competencia, $('relDestino').value)));
   $('relExtrato').addEventListener('click', () =>
@@ -901,7 +941,10 @@ export function ligarJornada(navegar) {
   fer.ligarFerias(irPara, aviso);
   bol.ligarBoletins(irPara, aviso);
 
-  $('jorCompetencia')?.addEventListener('change', async ev => {
+  /* Seletor de competência no cabeçalho de toda tela do DP (28/09/2026). O
+     cabeçalho é redesenhado a cada tela, então o ouvinte fica no documento. */
+  document.addEventListener('change', async ev => {
+    if (!ev.target.matches?.('.jor-comp-sel') || !/^\d{4}-\d{2}$/.test(ev.target.value)) return;
     estadoTela.competencia = ev.target.value + '-01';
     try { await jd.carregar(estadoTela.competencia); } catch (e) { aviso(e.message); }
     abrirJornada(telaAtual());

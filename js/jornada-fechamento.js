@@ -28,7 +28,7 @@ export function consolidar(competencia, destinoId) {
       b.situacao !== 'cancelado');
 
     // Um "dia" por boletim apurado, do jeito que o motor da competência espera.
-    const dias = boletins.map(b => {
+    const dias = boletins.filter(b => !jd.deCompetenciaAnterior(b)).map(b => {
       const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
       return {
         data: b.data_fato,
@@ -42,7 +42,28 @@ export function consolidar(competencia, destinoId) {
       };
     });
 
-    const r = apurarCompetencia({ dias, parametros: jd.parametrosEm(competencia) });
+    /* Boletim atrasado (RN-18, 28/09/2026): fato de um mês já enviado, pago
+       neste. As horas entram à parte e NÃO absorvem falta deste mês (A-03).
+       Falta atrasada vai direto como informada — o mês dela já fechou. */
+    const atrasados = boletins.filter(b => jd.deCompetenciaAnterior(b)).map(b => {
+      const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      const extra = (a.min_extra_50 || 0) + (a.min_extra_100 || 0);
+      const falta = (a.min_deficit || 0) > 0 && !b.hora_ini;
+      return { b, data: b.data_fato, origem: jd.competenciaDe(b.data_fato),
+               extra, falta, deficit: falta ? 0 : (a.min_deficit || 0),
+               supr: a.min_intervalo_suprimido || 0 };
+    });
+    const minExtraAnterior = atrasados.reduce((s, x) => s + x.extra, 0);
+
+    const r = apurarCompetencia({ dias, parametros: jd.parametrosEm(competencia), minExtraAnterior });
+    const faltasAtrasadas = atrasados.filter(x => x.falta).map(x => ({ data: x.data, absorvida: false, atrasada: true }));
+    r.faltasInformadas += faltasAtrasadas.length;
+    r.faltasDatas = [...(r.faltasDatas || []), ...faltasAtrasadas];
+    r.minDeficitAvulso += atrasados.reduce((s, x) => s + x.deficit, 0);
+    r.minIntervaloSuprimido += atrasados.reduce((s, x) => s + x.supr, 0);
+    // Horas extras por mês do fato — o relatório de conferência abre por aqui.
+    const porMes = { [competencia]: r.minExtraTotal };
+    for (const x of atrasados) porMes[x.origem] = (porMes[x.origem] || 0) + x.extra;
     const unidade = jd.unidadeDe(v);
 
     /* Para os relatórios de faltas, atestados e o de horas no formato 12.7
@@ -64,6 +85,10 @@ export function consolidar(competencia, destinoId) {
       unidadeNome: unidade ? jd.nomeUnidade(unidade) : '—',
       boletins: boletins.length,
       ...r,
+      atrasados,
+      porMes,
+      // O que vai para a folha: as extras do mês + as de competência anterior.
+      minExtraPagar: r.minExtraTotal + minExtraAnterior,
       faltasNJ: r.faltasDatas || [],            // [{ data, absorvida }]
       faltasJ: datasDe('FALTAJ'),               // falta justificada não desconta
       atestadoDatas: datasDe('ATESTADO'),
@@ -94,6 +119,9 @@ export function consolidar(competencia, destinoId) {
       extra50: total('minExtra50'),
       extra100: total('minExtra100'),
       extraTotal: total('minExtraTotal'),
+      extraAnterior: total('minExtraAnterior'),
+      extraPagar: total('minExtraPagar'),
+      atrasados: linhas.reduce((s, l) => s + l.atrasados.length, 0),
       deficit: total('minDeficitAvulso'),
       intervaloSuprimido: total('minIntervaloSuprimido'),
       noturnas: total('minNoturnas'),
@@ -132,6 +160,13 @@ export function podeEnviar(consolidado) {
     bloqueios.push(`${semApuracao.length} boletim(ns) sem cálculo gravado. Reabra e grave de novo antes de enviar.`);
   }
 
+  const atrasados = linhas.flatMap(l => l.atrasados.map(x => ({ l, x })));
+  if (atrasados.length) {
+    const meses = [...new Set(atrasados.map(a => a.x.origem))].sort().map(mesCurto).join(', ');
+    informativos.push(`${atrasados.length} boletim(ns) de competência anterior (${meses}) lançado(s) depois do envio — `
+      + `entram neste pagamento, somados às horas extras, e não abatem falta deste mês.`);
+  }
+
   const semCodigo = unidades.filter(u => !u.codigo_empresa);
   if (semCodigo.length) {
     informativos.push(`${semCodigo.length} unidade(s) sem código da empresa — o Excel sai identificando por CPF e matrícula.`);
@@ -159,6 +194,9 @@ export function podeEnviar(consolidado) {
 
   return { bloqueios, informativos, pode: bloqueios.length === 0 };
 }
+
+const MESES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+export const mesCurto = c => { const [a, m] = c.split('-').map(Number); return `${MESES_ABREV[m - 1]}/${a}`; };
 
 /** Comparativo com o mês anterior, para o número estranho saltar aos olhos. */
 export async function comparativo(competencia, destinoId) {
