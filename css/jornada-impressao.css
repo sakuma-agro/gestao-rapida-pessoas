@@ -240,6 +240,8 @@
   .rel.rel-paisagem { page: paisagem; width: 297mm; box-sizing: border-box; padding: 7mm 12mm; }
   .rel.rel-paisagem + .rel.rel-paisagem { margin-top: 0; }
   .rel.rel-paisagem.folha2 { break-before: page; page-break-before: always; }
+  /* Em paisagem o Chrome jogava o total (tfoot repetido) para uma folha nova: aqui ele é linha comum. */
+  .rel.rel-paisagem .rel-tabela tfoot { display: table-row-group; }
 }
 
 /* Relatório Horas Extras (28/09/2026): números centralizados; Insalubridade e
