@@ -1029,7 +1029,8 @@ function desenharRelatorios() {
   const pedido = fer.tomarPedidoRelatorio();
   if (pedido && $('relFerTipo')) {
     $('relFerTipo').value = pedido.tipo; $('relFerDest').value = pedido.destino || '';
-    $('relFerMesRot').hidden = true;
+    if (pedido.mes) $('relFerMes').value = pedido.mes;
+    $('relFerMesRot').hidden = pedido.tipo !== 'venc';
     preview(ferHtml());
   }
   $('relFerVer')?.addEventListener('click', () => preview(ferHtml()));

@@ -331,18 +331,20 @@ export function relVencidos(ym, filtro = '') {
   const grupos = {};
   l.forEach(x => (grupos[x.f.fazenda || 'Sem fazenda no cadastro'] ||= []).push(x));
   const mes = `${MESES_L[+ym.slice(5) - 1]} de ${ym.slice(0, 4)}`;
+  const futuro = ym > hoje().slice(0, 7);
   return `<article class="rel">
-    ${cabecalhoDoc('Férias que venceram no mês', `Quem ganhou o direito às férias em ${mes}`,
+    ${cabecalhoDoc(futuro ? 'Férias que vencem no mês' : 'Férias que venceram no mês',
+      futuro ? `Quem ganha o direito às férias em ${mes}` : `Quem ganhou o direito às férias em ${mes}`,
       `competência<strong>${MESES[+ym.slice(5) - 1]}/${ym.slice(0, 4)}</strong>${esc(rotDestino(filtro))}`)}
     ${Object.entries(grupos).sort((a, b) => a[0].localeCompare(b[0], 'pt-BR')).map(([faz, g]) => `
       <div class="rel-secao">${esc(faz)}</div>
       <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Admissão</th><th>Período aquisitivo</th>
-        <th>Venceu em</th><th>Limite de gozo</th><th class="rel-num">Faltas no aquisitivo</th></tr></thead>
+        <th>${futuro ? 'Vence em' : 'Venceu em'}</th><th>Limite de gozo</th><th class="rel-num">Faltas no aquisitivo</th></tr></thead>
       <tbody>${g.map(x => `<tr><td>${esc(x.f.nome)}</td><td>${br(admissao(x.f))}</td>
         <td>${x.per.k}º · ${br(x.per.iniAq)} a ${br(x.per.fimAq)}</td><td>${br(x.per.vence)}</td>
         <td>${br(x.per.limite)}</td><td class="rel-num">${faltasEm(x.f.id, x.per)}</td></tr>`).join('')}</tbody></table>`).join('')
-      || '<p class="rel-vazio">Ninguém venceu neste mês.</p>'}
-    <div class="rel-resumo"><b>${l.length} ${l.length === 1 ? 'pessoa venceu' : 'pessoas venceram'}</b> em ${esc(mes)}.
+      || `<p class="rel-vazio">Ninguém ${futuro ? 'vence' : 'venceu'} neste mês.</p>`}
+    <div class="rel-resumo"><b>${l.length} ${futuro ? (l.length === 1 ? 'pessoa vence' : 'pessoas vencem') : (l.length === 1 ? 'pessoa venceu' : 'pessoas venceram')}</b> em ${esc(mes)}.
       Cada uma tem até o limite de gozo para tirar as férias sem pagamento em dobro (art. 137 da CLT).</div>
     <p class="rel-nota">Faltas: todas as lançadas no período aquisitivo, compensadas ou não — apenas informativo; o app não reduz os dias.</p>
     ${assinaNota()}${rodapeLop()}</article>`;
@@ -642,11 +644,17 @@ function desenharPrevisao() {
           <td>${x.per.k}º · ${br(x.per.iniAq)} a ${br(x.per.fimAq)}</td><td>${br(x.per.limite)}</td></tr>`).join('')
           || '<tr><td colspan="5" class="vazio">Ninguém vence neste mês.</td></tr>'}
       </tbody></table>
-      <div class="jor-acoes"><button class="btn" type="button" data-ir="jorRelatorios">Emitir relatório (DP › Relatórios)</button></div>
+      <div class="jor-acoes">
+        <button class="btn principal" type="button" id="ferPrevTabela">Emitir esta tabela (${MESES[+sel.slice(5) - 1]}/${sel.slice(0, 4)})</button>
+        <button class="btn" type="button" data-ir="jorRelatorios">Emitir relatório (DP › Relatórios)</button></div>
     </div>`;
   ligarFiltro(desenharPrevisao);
   document.querySelectorAll('#telaFerPrev [data-mes]').forEach(b => b.addEventListener('click', () => { est.mes = b.dataset.mes; desenharPrevisao(); }));
   document.querySelectorAll('#telaFerPrev [data-ir]').forEach(b => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  // 28/09/2026: emite a tabela do mês escolhido no gráfico, já na prévia de impressão.
+  $('ferPrevTabela')?.addEventListener('click', () => {
+    pedirRelatorio({ tipo: 'venc', mes: sel, destino: est.destino }); irPara('jorRelatorios');
+  });
 }
 
 /* ---------------- Lançamentos ---------------- */
