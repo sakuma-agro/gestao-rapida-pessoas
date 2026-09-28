@@ -370,6 +370,68 @@ export function relPrevisao(filtro = '') {
     ${assinaNota()}${rodapeLop()}</article>`;
 }
 
+/* ------------------------------------------------------------------
+   Período de concessão (28/09/2026) — relatório simplificado: quem já
+   ganhou o direito e está no período de conceder, separado entre
+   EM ABERTO (ainda tem dias a tirar) e CONCEDIDAS (30 dias resolvidos).
+   Concedidas só do período concessivo que ainda corre — o histórico
+   antigo não entra, senão a lista cresce todo ano.
+   ------------------------------------------------------------------ */
+export function concessao(filtro = '') {
+  const abertas = [], concedidas = [], semInicial = [];
+  for (const f of doFiltro(filtro)) {
+    if (!admissao(f)) continue;
+    if (precisaInicial(f.id)) { semInicial.push(f); continue; }
+    for (const p of periodosDe(f.id, hoje())) {
+      if (p.vence > hoje() || p.quitadoInicial || p.perdido) continue;
+      if (p.saldo > 0) abertas.push({ f, p, prazo: dias(hoje(), p.limite) });
+      else if (p.limite >= hoje()) concedidas.push({ f, p });
+    }
+  }
+  abertas.sort((a, b) => a.p.limite.localeCompare(b.p.limite) || a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
+  concedidas.sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
+  return { abertas, concedidas, semInicial };
+}
+
+const periodosLanc = p => p.lanc.map(g => `${br(g.data_ini)} a ${br(g.data_fim)}${g.data_ini > hoje() ? ' (programada)' : ''}`)
+  .concat(p.vend ? [`${p.vend} vendido(s)`] : []).join('<br>');
+
+export function relConcessao(filtro = '') {
+  const { abertas, concedidas, semInicial } = concessao(filtro);
+  const prazo = n => n < 0 ? `<span class="rel-pend">vencido há ${-n} dia(s)</span>`
+    : n <= 60 ? `<span class="rel-pend">faltam ${n} dia(s)</span>` : `faltam ${n} dia(s)`;
+  return `<article class="rel">
+    ${cabecalhoDoc('Férias — período de concessão', 'Quem já tem direito: em aberto e concedidas',
+      `posição em<strong>${br(hoje())}</strong>${esc(rotDestino(filtro))}`)}
+    <div class="rel-resumo"><b>${abertas.length} em aberto</b> · <b>${concedidas.length} concedida(s)</b> no período concessivo atual.</div>
+
+    <div class="rel-secao">Em aberto — férias a conceder</div>
+    <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th>
+      <th>Pode tirar desde</th><th>Limite de gozo</th><th class="rel-num">Dias a tirar</th><th>Prazo</th></tr></thead>
+    <tbody>${abertas.map(({ f, p, prazo: n }) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.fazenda || '—')}</td>
+      <td>${p.k}º · ${br(p.iniAq)} a ${br(p.fimAq)}</td><td>${br(p.vence)}</td><td>${br(p.limite)}</td>
+      <td class="rel-num"><b>${p.saldo}</b>${p.goz || p.vend ? `<br><span class="rel-mini">já tirou ${p.goz}${p.vend ? ` · vendeu ${p.vend}` : ''}</span>` : ''}</td>
+      <td>${prazo(n)}</td></tr>`).join('') || '<tr><td colspan="7" class="rel-vazio">Ninguém com férias em aberto.</td></tr>'}</tbody></table>
+
+    <div class="rel-secao">Concedidas — período concessivo em curso</div>
+    <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Férias</th><th class="rel-num">Dias</th></tr></thead>
+    <tbody>${concedidas.map(({ f, p }) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.fazenda || '—')}</td>
+      <td>${p.k}º · ${br(p.iniAq)} a ${br(p.fimAq)}</td><td>${periodosLanc(p)}</td>
+      <td class="rel-num"><span class="rel-ok">${p.goz + p.vend}</span></td></tr>`).join('')
+      || '<tr><td colspan="5" class="rel-vazio">Nenhuma concedida no período concessivo em curso.</td></tr>'}</tbody></table>
+
+    ${semInicial.length ? `<p class="rel-nota"><b>Fora do relatório por falta de situação inicial:</b> ${semInicial.map(f => esc(f.nome)).join(', ')}.
+      Informe em DP › Férias › Situação inicial.</p>` : ''}
+    <p class="rel-nota">Em aberto: período vencido com dias a tirar, do limite mais próximo para o mais distante. Passado o limite de gozo,
+      as férias são devidas em dobro (art. 137 da CLT). Férias "programadas" já foram lançadas com data futura.</p>
+    ${assinaNota()}${rodapeLop()}</article>`;
+}
+
+/* O Painel de Férias pede este relatório à tela de Relatórios (sem import cruzado). */
+let pedidoRelatorio = null;
+export const pedirRelatorio = tipo => { pedidoRelatorio = tipo; };
+export const tomarPedidoRelatorio = () => { const t = pedidoRelatorio; pedidoRelatorio = null; return t; };
+
 const ORDEM_FX = ['vencida', 'f30', 'f60', 'f90', 'emdia', 'semini', 'sem'];
 export function relSituacao(filtro = '') {
   const l = doFiltro(filtro).slice().sort((a, b) =>
@@ -401,6 +463,12 @@ export function csvFerias(tipo, ym, filtro = '') {
     linhas = vencimentosNoMes(ym, doFiltro(filtro)).map(x => [x.f.fazenda || '', x.f.nome, br(admissao(x.f)), x.per.k,
       br(x.per.iniAq), br(x.per.fimAq), br(x.per.vence), br(x.per.limite), faltasEm(x.f.id, x.per)]);
     nome = `Ferias_venceram_${ym}.csv`;
+  } else if (tipo === 'conc') {
+    cols = ['Situacao', 'Funcionario', 'Fazenda', 'Destino', 'Periodo', 'Inicio aquisitivo', 'Fim aquisitivo', 'Pode tirar desde', 'Limite de gozo', 'Dias a tirar', 'Dias tirados', 'Dias vendidos'];
+    const c = concessao(filtro);
+    linhas = [...c.abertas.map(x => ['Em aberto', x]), ...c.concedidas.map(x => ['Concedida', x])].map(([s, { f, p }]) =>
+      [s, f.nome, f.fazenda || '', nomeDestino(f.id), p.k, br(p.iniAq), br(p.fimAq), br(p.vence), br(p.limite), p.saldo, p.goz, p.vend]);
+    nome = `Ferias_concessao_${hoje()}.csv`;
   } else if (tipo === 'prev') {
     cols = ['Mes', 'Funcionario', 'Fazenda', 'Vence em', 'Limite de gozo'];
     const lista = doFiltro(filtro);
@@ -467,7 +535,8 @@ function desenharPainel() {
 
   $('telaFerPainel').innerHTML = cabecalho('Férias da equipe', 'Quem venceu, até quando pode tirar e quanto falta') + `
     <div class="jor-corpo">
-      <div class="jor-barra">${filtroDestino()}<span class="dc-sem">${lista.length} pessoa(s) ativa(s)</span></div>
+      <div class="jor-barra">${filtroDestino()}<span class="dc-sem">${lista.length} pessoa(s) ativa(s)</span>
+        <button class="btn mini" type="button" id="ferRelConc">Relatório: período de concessão</button></div>
       <div class="pv-cards">
         ${mostrar.map(k => `<button type="button" class="pv-card ${FAIXAS[k].cls} ${cont[k] ? '' : 'pv-zero'}" aria-pressed="${est.faixa === k}" data-fx="${k}">
           <span>${FAIXAS[k].rot}</span><strong>${cont[k]}</strong><small>${FAIXAS[k].txt}</small></button>`).join('')}
@@ -509,6 +578,7 @@ function desenharPainel() {
     est.faixa = est.faixa === b.dataset.fx ? null : b.dataset.fx; desenharPainel();
   }));
   document.querySelectorAll('#telaFerPainel [data-ir]').forEach(b => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  $('ferRelConc')?.addEventListener('click', () => { pedirRelatorio({ tipo: 'conc', destino: est.destino }); irPara('jorRelatorios'); });
   document.querySelectorAll('#telaFerPainel tr[data-pessoa]').forEach(r => {
     r.addEventListener('click', () => fichaFerias(r.dataset.pessoa));
     r.addEventListener('keydown', ev => { if (ev.key === 'Enter') fichaFerias(r.dataset.pessoa); });

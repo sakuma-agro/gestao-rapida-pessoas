@@ -972,6 +972,7 @@ function desenharRelatorios() {
       <div class="jor-barra fer-barra-rel">
         <label>Relatório
           <select id="relFerTipo">
+            <option value="conc">Período de concessão — em aberto e concedidas</option>
             <option value="venc">Venceram no mês</option>
             <option value="prev">Previsão dos próximos 12 meses</option>
             <option value="sit">Situação da equipe</option>
@@ -1019,9 +1020,18 @@ function desenharRelatorios() {
   const ferHtml = () => {
     const t = $('relFerTipo').value, d = $('relFerDest').value;
     return t === 'venc' ? fer.relVencidos($('relFerMes').value || mesAnterior(), d)
+      : t === 'conc' ? fer.relConcessao(d)
       : t === 'prev' ? fer.relPrevisao(d) : fer.relSituacao(d);
   };
   $('relFerTipo')?.addEventListener('change', () => { $('relFerMesRot').hidden = $('relFerTipo').value !== 'venc'; });
+  if ($('relFerTipo')) $('relFerMesRot').hidden = $('relFerTipo').value !== 'venc';
+  // Atalho do Painel de Férias: já abre com o relatório de concessão na prévia.
+  const pedido = fer.tomarPedidoRelatorio();
+  if (pedido && $('relFerTipo')) {
+    $('relFerTipo').value = pedido.tipo; $('relFerDest').value = pedido.destino || '';
+    $('relFerMesRot').hidden = true;
+    preview(ferHtml());
+  }
   $('relFerVer')?.addEventListener('click', () => preview(ferHtml()));
   $('relFerCsv')?.addEventListener('click', () =>
     rel.baixar(fer.csvFerias($('relFerTipo').value, $('relFerMes').value || mesAnterior(), $('relFerDest').value)));
