@@ -31,9 +31,17 @@ const CAMPOS = {
 const FOLHA = { w: 260, h: 165 };
 
 const CHAVE = 'gr-folha-ponto';
-const PADRAO = { dx: 0, dy: 0, dxV: 0, dyV: 0, girar: false, verso180: false, invertida: false, cadastro: false, linha: 'ambos' };
+const PADRAO = { dx: 0, dy: 0, dxV: 0, dyV: 0, girar: false, verso180: false, invertida: false, cadastro: false, linha: 'ambos', campos: {} };
+/* Ajuste de cada campo (28/09/2026, pedido dele): direita/baixo em mm e
+   tamanho da letra, somados ao ajuste geral da frente ou do verso. */
+const ROTULOS = { empregador: 'Empregador (linha pontilhada)', empregado: 'Empregado (nome)', mes: 'Mês', ano: 'Ano' };
+const campoAj = (aj, k) => ({ dx: 0, dy: 0, pt: CAMPOS[k].pt, ...((aj.campos || {})[k] || {}) });
 function lerAjuste() {
-  try { return { ...PADRAO, ...(JSON.parse(localStorage.getItem(CHAVE)) || {}) }; } catch { return { ...PADRAO }; }
+  try {
+    const a = { ...PADRAO, ...(JSON.parse(localStorage.getItem(CHAVE)) || {}) };
+    a.campos = a.campos || {};
+    return a;
+  } catch { return { ...PADRAO, campos: {} }; }
 }
 function gravarAjuste(a) { try { localStorage.setItem(CHAVE, JSON.stringify(a)); } catch { /* sem armazenamento: vale só agora */ } }
 
@@ -114,7 +122,7 @@ export function desenhar(alvo, { aviso }) {
         <label class="jor-inline"><input type="checkbox" id="fpInvertida"${aj.invertida ? ' checked' : ''}> Versos em ordem invertida</label></div></div>
     </div>
 
-    <details class="fp-ajuste"${aj.dx || aj.dy || aj.dxV || aj.dyV || aj.girar || aj.verso180 ? '' : ' open'}>
+    <details class="fp-ajuste" open>
       <summary><b>Acertar a posição na impressora</b> — faça uma vez; fica guardado neste computador</summary>
       <ol class="dc-sem">
         <li>Clique em <b>Folha de teste</b> e imprima em <b>papel comum</b>, cortado ou dobrado no tamanho da folha de ponto (26 × 16,5 cm), do mesmo jeito que vai colocar a folha de ponto.</li>
@@ -125,6 +133,14 @@ export function desenhar(alvo, { aviso }) {
         ${num('fpDx', aj.dx, 'Frente: direita')} ${num('fpDy', aj.dy, 'baixo')}
         ${num('fpDxV', aj.dxV, 'Verso: direita')} ${num('fpDyV', aj.dyV, 'baixo')}
       </div>
+      <p class="dc-sem" style="margin:10px 0 4px"><b>Cada campo</b> — soma ao ajuste acima. Positivo = para a direita / para baixo, olhando a folha deitada, como se lê.</p>
+      <table class="fp-campos">
+        <thead><tr><th>Campo</th><th>Direita (mm)</th><th>Baixo (mm)</th><th>Tamanho da letra (pt)</th></tr></thead>
+        <tbody>${Object.keys(CAMPOS).map(k => { const c = campoAj(aj, k); return `<tr><td>${ROTULOS[k]}</td>
+          <td><input type="number" step="0.5" data-fpc="${k}" data-fpk="dx" value="${c.dx}"></td>
+          <td><input type="number" step="0.5" data-fpc="${k}" data-fpk="dy" value="${c.dy}"></td>
+          <td><input type="number" step="0.5" min="6" max="16" data-fpc="${k}" data-fpk="pt" value="${c.pt}"></td></tr>`; }).join('')}</tbody>
+      </table>
       <div class="jor-barra">
         <label class="jor-inline"><input type="checkbox" id="fpGirar"${aj.girar ? ' checked' : ''}> Girar 90° (se o teste sair de lado)</label>
         <label class="jor-inline"><input type="checkbox" id="fpVerso180"${aj.verso180 ? ' checked' : ''}> Verso de cabeça para baixo (girar 180°)</label>
@@ -145,9 +161,15 @@ export function desenhar(alvo, { aviso }) {
     Object.assign(aj, { dx: n('fpDx'), dy: n('fpDy'), dxV: n('fpDxV'), dyV: n('fpDyV'),
       girar: $('fpGirar').checked, verso180: $('fpVerso180').checked,
       invertida: $('fpInvertida').checked, cadastro: $('fpCadastro').checked, linha: $('fpLinha').value });
+    aj.campos = {};
+    alvo.querySelectorAll('[data-fpc]').forEach(el => {
+      const k = el.dataset.fpc; aj.campos[k] = aj.campos[k] || {};
+      const v = Number(String(el.value).replace(',', '.'));
+      aj.campos[k][el.dataset.fpk] = Number.isFinite(v) && el.value !== '' ? v : (el.dataset.fpk === 'pt' ? CAMPOS[k].pt : 0);
+    });
     gravarAjuste(aj);
   };
-  alvo.querySelectorAll('.fp-ajuste input, #fpInvertida, #fpCadastro, #fpLinha').forEach(el => el.addEventListener('change', salvarAjuste));
+  alvo.querySelectorAll('.fp-ajuste input, .fp-ajuste select, #fpInvertida, #fpCadastro, #fpLinha').forEach(el => el.addEventListener('change', salvarAjuste));
   $('fpUnidade').addEventListener('change', () => { tela.unidade = $('fpUnidade').value; tela.marcados = null; desenhar(alvo, { aviso }); });
   $('fpMes').addEventListener('change', () => { tela.mes = $('fpMes').value; });
   alvo.querySelectorAll('[data-fp-p]').forEach(c => c.addEventListener('change', () => {
@@ -176,12 +198,13 @@ export function desenhar(alvo, { aviso }) {
 
 /* ---------------- folhas ---------------- */
 
-function campo(k, texto, extra = '') {
-  const c = CAMPOS[k];
+function campo(k, texto, aj) {
+  const a = campoAj(aj, k);
+  const c = { x: CAMPOS[k].x + a.dx, base: CAMPOS[k].base + a.dy, max: CAMPOS[k].max + a.dx, pt: a.pt };
   const em = c.pt * 0.3528;                          // pt → mm
   // Caixa de uma linha com line-height 1: a base fica ~0,79 em abaixo do topo (Arial).
   const topo = c.base - em * 0.79;
-  return `<span class="fp-campo fp-${k}${extra}" data-max="${(c.max - c.x).toFixed(1)}" data-base="${c.base}"
+  return `<span class="fp-campo fp-${k}" data-max="${(c.max - c.x).toFixed(1)}" data-base="${c.base}"
     style="left:${c.x}mm;top:${topo.toFixed(2)}mm;font-size:${c.pt}pt">${esc(texto)}</span>`;
 }
 
@@ -197,10 +220,10 @@ function envelope(lado, aj, miolo, teste = false) {
 function folha(p, u, lado, aj) {
   const [a, m] = tela.mes.split('-').map(Number);
   const nome = MAIUSC(p.nome) + (aj.cadastro && p.cadastro ? `  · nº ${p.cadastro}` : '');
-  return envelope(lado, aj, campo('empregador', textoEmpregador(u, aj.linha))
-    + campo('empregado', nome)
-    + campo('mes', MESES[m - 1])
-    + campo('ano', String(a).slice(2)));
+  return envelope(lado, aj, campo('empregador', textoEmpregador(u, aj.linha), aj)
+    + campo('empregado', nome, aj)
+    + campo('mes', MESES[m - 1], aj)
+    + campo('ano', String(a).slice(2), aj));
 }
 
 /* Folha de teste: as linhas do quadro "Empregado / Mês / Ano" e a linha
@@ -211,10 +234,10 @@ function folhaTeste(lado, aj) {
     + L(5.9, 17.15, 0.25, 8.4) + L(156.3, 17.15, 0.25, 8.4) + L(229.3, 17.15, 0.25, 8.4) + L(253.8, 17.15, 0.25, 8.4)
     + L(92, 14.8, 93.5, 0.25)
     + `<span class="fp-legenda" style="left:8mm;top:40mm">FOLHA DE TESTE — ${lado === 'verso' ? 'VERSO' : 'FRENTE'} · as linhas cinzas devem cair sobre as linhas do quadro da folha de ponto</span>`
-    + campo('empregador', 'EMPREGADOR — FAZENDA')
-    + campo('empregado', 'NOME DO FUNCIONÁRIO')
-    + campo('mes', 'MÊS')
-    + campo('ano', '26');
+    + campo('empregador', 'EMPREGADOR — FAZENDA', aj)
+    + campo('empregado', 'NOME DO FUNCIONÁRIO', aj)
+    + campo('mes', 'MÊS', aj)
+    + campo('ano', '26', aj);
   return envelope(lado, aj, miolo, true);
 }
 
