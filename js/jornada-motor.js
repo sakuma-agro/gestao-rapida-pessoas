@@ -304,7 +304,7 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
     .reduce((s, d) => s + (d.minDeficit || 0), 0);
 
   const passos = [];
-  let faltasInformadas = 0, faltasAbsorvidas = 0;
+  let faltasInformadas = 0, faltasAbsorvidas = 0, faltasJDescontar = 0, faltasJCompensadas = 0;
   // Data a data, para os relatórios de faltas (25/09/2026): qual foi
   // compensada por extras e qual foi informada ao DP.
   const faltasDatas = [];
@@ -317,6 +317,27 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
   for (const f of faltas) {
     const disponivel = extra50 + extra100;
     const base = { data: f.data, boletimId: f.boletimId || null, decisao: f.decisao || null, minDeficit: f.minDeficit };
+    /* Falta justificada (28/09/2026): por padrão não desconta. O analista pode
+       mandar compensar com horas extras (se cobrirem a falta inteira) ou
+       descontar no salário. Sem saldo para compensar, fica sem desconto. */
+    if (f.justificada) {
+      const j = { ...base, justificada: true };
+      if (f.decisao === 'descontar') {
+        faltasJDescontar += 1;
+        faltasDatas.push({ ...j, absorvida: false, desconta: true });
+        passos.push(`Falta justificada de ${f.data}: descontar no salário por decisão do analista.`);
+      } else if (f.decisao === 'compensar' && disponivel >= f.minDeficit) {
+        let resto = f.minDeficit;
+        const tira50 = Math.min(extra50, resto); extra50 -= tira50; resto -= tira50;
+        extra100 -= resto;
+        faltasJCompensadas += 1;
+        faltasDatas.push({ ...j, absorvida: true });
+        passos.push(`Falta justificada de ${f.data}: compensada com ${minParaHHMM(f.minDeficit)} de extras por decisão do analista.`);
+      } else {
+        faltasDatas.push({ ...j, absorvida: false, semSaldo: f.decisao === 'compensar' });
+      }
+      continue;
+    }
     if (f.decisao === 'descontar') {
       faltasInformadas += 1;
       faltasDatas.push({ ...base, absorvida: false, sugerida: disponivel >= f.minDeficit ? 'compensar' : 'descontar' });
@@ -350,6 +371,8 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
     minDeficitAvulso: deficitAvulso,
     faltasAbsorvidas,
     faltasInformadas,
+    faltasJDescontar,
+    faltasJCompensadas,
     faltasDatas,
     diasAtestado,
     avisos: dias.flatMap(d => d.avisos || []),

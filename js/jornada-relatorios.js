@@ -160,7 +160,7 @@ export function relatorioDP(competencia, destinoId) {
           <td class="rel-num"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
-          <td class="rel-c">${l.faltasJ.length || ''}</td>
+          <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
           <td class="rel-c">${l.faltasInformadas || ''}</td>
           <td class="rel-num">${parcela > 0.004 ? brl(parcela) : ''}</td>
         </tr>`; }).join('')}</tbody>
@@ -176,6 +176,7 @@ export function relatorioDP(competencia, destinoId) {
   const nota = `${notaAtrasadas}
     ${c.totais.intervaloSuprimido ? `<div class="rel-resumo"><b>Intervalo suprimido:</b> ${minParaHHMM(c.totais.intervaloSuprimido)} no destino — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras (ver Relatório Detalhado).</div>` : ''}
     <p class="rel-nota">Horas extras em ${fmt === 'hm' ? 'horas e minutos' : 'decimal, duas casas'}. Faltas não justificadas: só as que as horas extras do mês não cobriram.
+    Faltas justificadas "a descontar": o analista decidiu descontar no salário.
     Saldo devedor: parcela do empréstimo a descontar neste mês.</p>`;
 
   return documentoDP({
@@ -259,7 +260,8 @@ export function relatorioFaltas(competencia, destinoId, { totais = false } = {})
           qJ += l.faltasJ.length; qNJ += n.length; qComp += n.filter(f => f.absorvida).length;
           return `<tr>
           <td>${esc(l.nome)}</td>
-          <td class="rel-c">${l.faltasJ.map(dataBR).join(', ') || '—'}</td>
+          <td class="rel-c">${l.faltasJ.map(d => dataBR(d) + (l.faltasJDesc.includes(d) ? ' <span class="rel-mini">(descontar)</span>'
+            : totais && l.faltasJComp.includes(d) ? ' <span class="rel-mini">(compensada)</span>' : '')).join(', ') || '—'}</td>
           <td class="rel-c">${datas(l).join(', ') || '—'}</td>
           <td class="rel-num"><b>${l.faltasJ.length + n.length}</b></td>
         </tr>`; }).join('')}</tbody>
@@ -478,12 +480,12 @@ export function planilhaDP(competencia, destinoId) {
 
   const colunas = ['Codigo da empresa', 'Matricula', 'CPF', 'Nome', 'Unidade', 'CAEPF',
                    'Horas extras', 'Horas extras de competencia anterior (ja somadas)', 'Deficit', 'Intervalo suprimido (min)',
-                   'Faltas (dias)', 'Atestado (dias)', 'Emprestimo a descontar'];
+                   'Faltas (dias)', 'Faltas justificadas a descontar (dias)', 'Atestado (dias)', 'Emprestimo a descontar'];
 
   const linhas = c.linhas.map(l => [
     l.codigoEmpresa, l.matricula, cpfBR(l.cpf), l.nome, l.unidadeNome, l.caepf,
     h(l.minExtraPagar), h(l.minExtraAnterior || 0), h(l.minDeficitAvulso), l.minIntervaloSuprimido,
-    l.faltasInformadas, l.diasAtestado,
+    l.faltasInformadas, l.faltasJDesc.length, l.diasAtestado,
     // Parcela do empréstimo: a lançada no envio, ou a prevista enquanto aberta.
     valorParaFolha(l.vinculo.funcionario_id, competencia).toFixed(2).replace('.', ','),
   ]);

@@ -27,9 +27,23 @@ export function consolidar(competencia, destinoId) {
       b.competencia === competencia &&
       b.situacao !== 'cancelado');
 
+    /* Falta justificada (28/09/2026) entra na conta das faltas com a dedução
+       que teria se não fosse justificada — 8h no Campo, jornada do dia no
+       Administrativo —, para o analista poder compensar ou descontar. Sem
+       decisão, o motor a deixa sem desconto. */
+    const codigoDe = b => jd.dados.tipos.find(t => t.id === b.tipo_id)?.codigo || '';
+    const regime = jd.setorDe(v)?.regime || 'boletim';
+
     // Um "dia" por boletim apurado, do jeito que o motor da competência espera.
     const dias = boletins.filter(b => !jd.deCompetenciaAnterior(b)).map(b => {
       const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      if (codigoDe(b) === 'FALTAJ') {
+        const ded = regime === 'excecao' ? (a.min_previstos || 0)
+          : Number(jd.parametrosEm(b.data_fato).falta_campo_min ?? 480);
+        return { data: b.data_fato, minExtra50: 0, minExtra100: 0, minDeficit: ded,
+          minIntervaloSuprimido: 0, minNoturnos: 0, contaDias: ded > 0 ? 1 : 0,
+          boletimId: b.id, decisao: b.compensacao || null, justificada: true, avisos: a.avisos || [] };
+      }
       return {
         data: b.data_fato,
         minExtra50: a.min_extra_50 || 0,
@@ -91,7 +105,10 @@ export function consolidar(competencia, destinoId) {
       porMes,
       // O que vai para a folha: as extras do mês + as de competência anterior.
       minExtraPagar: r.minExtraTotal + minExtraAnterior,
-      faltasNJ: r.faltasDatas || [],            // [{ data, absorvida }]
+      faltasNJ: (r.faltasDatas || []).filter(x => !x.justificada),   // [{ data, absorvida }]
+      faltasTodas: r.faltasDatas || [],                              // não justificadas + justificadas
+      faltasJDesc: (r.faltasDatas || []).filter(x => x.justificada && x.desconta).map(x => x.data),
+      faltasJComp: (r.faltasDatas || []).filter(x => x.justificada && x.absorvida).map(x => x.data),
       faltasJ: datasDe('FALTAJ'),               // falta justificada não desconta
       atestadoDatas: datasDe('ATESTADO'),
       /* Correção (25/09/2026): o motor contava atestado como "dia sem
