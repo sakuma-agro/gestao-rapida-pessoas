@@ -1086,7 +1086,8 @@ async function desenharFechamento() {
           ${sit === 'enviada' ? `<button class="btn principal" data-aprovar="${d.id}">Aprovar e travar</button>` : ''}
           ${['enviada','aprovada','travada'].includes(sit)
             ? `<button class="btn mini" data-reabrir="${d.id}">Reabrir com motivo</button>` : ''}
-          <button class="btn mini" data-verdp="${d.id}">Ver Relatório Horas Extras</button>
+          <button class="btn" data-verdp="${d.id}">Visualizar Relatório Horas Extras</button>
+          <button class="btn mini" data-imprimirdp="${d.id}">Imprimir</button>
         </div>
       </section>`;
   }));
@@ -1128,7 +1129,11 @@ async function desenharFechamento() {
   }));
 
   document.querySelectorAll('[data-verdp]').forEach(b => b.addEventListener('click', () => {
-    rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.verdp));
+    rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.verdp), { barra: true });
+  }));
+  document.querySelectorAll('[data-imprimirdp]').forEach(b => b.addEventListener('click', () => {
+    rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.imprimirdp), { barra: true });
+    setTimeout(() => rel.imprimir(), 300);   // deixa a marca carregar antes do papel
   }));
 }
 

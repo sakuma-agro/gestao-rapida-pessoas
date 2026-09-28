@@ -89,20 +89,20 @@ const MAIUSC = s => String(s || '').toLocaleUpperCase('pt-BR');
 const mesRef = c => { const [a, m] = c.split('-').map(Number); return `REFERENTE AO MÊS DE ${MAIUSC(MESES[m - 1])} ${a}`; };
 const compCurta = c => { const [a, m] = c.split('-').map(Number); return `${MESES[m - 1]}/${a}`; };
 
-function documentoDP({ titulo, competencia, destino, versao, corpo, assinaturas, interno }) {
+function documentoDP({ titulo, competencia, destino, versao, corpo, assinaturas, interno, classe = '', pagina = '' }) {
   const tarjaInterna = interno
     ? '<div class="rel-tarja rel-tarja--interna">USO INTERNO — não enviar ao escritório</div>' : '';
   const tarjaVersao = versao > 1
     ? `<div class="rel-tarja">VERSÃO ${versao} — substitui a versão anterior desta competência</div>` : '';
   return `
-  <article class="rel rel-dp">
+  <article class="rel rel-dp ${classe}">
     <header class="rel-cabecalho rel-cab-dp">
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-titulo">
         <h1>${esc(titulo)}</h1>
         <p>${esc(mesRef(competencia))}</p>
       </div>
-      <div class="rel-comp">${esc(destino?.nome || '')}<br>${interno ? 'uso interno' : `versão ${versao || 1}`}</div>
+      <div class="rel-comp">${esc(destino?.nome || '')}<br>${interno ? 'uso interno' : `versão ${versao || 1}`}${pagina ? `<br>${esc(pagina)}` : ''}</div>
     </header>
     ${tarjaInterna}${tarjaVersao}
     ${corpo}
@@ -143,46 +143,66 @@ export function relatorioDP(competencia, destinoId) {
   const comp = jd.competenciaDoDestino(competencia, destinoId);
   const h = m => m ? formatarHoras(m, fmt) : '';
 
-  const grupos = porEmpregador(c);
-  const corpo = grupos.map(g => `
+  /* 28/09/2026: uma folha por CAEPF (raiz de 9 dígitos), em paisagem. No DP 1
+     o Lote 35 (001.141591) sai numa folha — Massato e Fabio — e Faca, Morro
+     Branco e Três Riachos (004.143000) na outra. Unidade sem CAEPF: folha própria. */
+  const raiz = u => String(u?.caepf || '').replace(/\D/g, '').slice(0, 9) || 'sem';
+  const paginas = [];
+  for (const g of porEmpregador(c)) {
+    const k = raiz(g.u);
+    let p = paginas.find(x => x.k === k);
+    if (!p) paginas.push(p = { k, grupos: [], caepf: g.u?.caepf || '' });
+    p.grupos.push(g);
+  }
+  paginas.sort((a, b) => (a.k === 'sem') - (b.k === 'sem') || a.k.localeCompare(b.k));
+
+  const tabela = g => `
       ${blocoEmp(g.rotulo)}
-      <table class="rel-tabela rel-tabela-dp">
+      <table class="rel-tabela rel-tabela-dp rel-he">
         <thead><tr>
-          <th>Funcionário</th><th class="rel-num">Horas extras</th>
-          <th class="rel-c">Insalubridade</th><th class="rel-c">Periculosidade 30%</th>
+          <th>Funcionário</th><th class="rel-c">Horas extras</th>
+          <th class="rel-c rel-justo">Insalubridade</th><th class="rel-c rel-justo">Periculosidade 30%</th>
           <th class="rel-c">Faltas justif.</th><th class="rel-c">Faltas não justif.</th>
-          <th class="rel-num">Saldo devedor</th>
+          <th class="rel-c">Saldo devedor</th>
         </tr></thead>
         <tbody>${g.linhas.map(l => {
           const parcela = valorParaFolha(l.vinculo.funcionario_id, competencia);
           return `<tr>
           <td>${esc(l.nome)}</td>
-          <td class="rel-num"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
+          <td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
           <td class="rel-c">${l.faltasInformadas || ''}</td>
-          <td class="rel-num">${parcela > 0.004 ? brl(parcela) : ''}</td>
+          <td class="rel-c">${parcela > 0.004 ? brl(parcela) : ''}</td>
         </tr>`; }).join('')}</tbody>
-      </table>`).join('') || '<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>';
+      </table>`;
 
-  // Boletim atrasado (RN-18): soma nas horas extras, e a nota diz de onde veio.
-  const atrasadas = c.linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
-    .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
-  const notaAtrasadas = atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas de competência anterior</b>, lançadas depois do envio
+  // Notas da folha: só das pessoas daquela folha.
+  const nota = linhas => {
+    const atrasadas = linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
+      .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
+    const supr = linhas.reduce((s, l) => s + (l.minIntervaloSuprimido || 0), 0);
+    return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas de competência anterior</b>, lançadas depois do envio
       daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
-      Total de ${h(c.totais.extraAnterior)}. Abertura por mês no Relatório Horas Extras por Mês.</div>` : '';
+      Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
+    ${supr ? `<div class="rel-resumo"><b>Intervalo suprimido:</b> ${minParaHHMM(supr)} nesta folha — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras (ver Relatório Detalhado).</div>` : ''}
+`;   // a frase de explicação das colunas saiu a pedido dele (28/09/2026)
+  };
 
-  const nota = `${notaAtrasadas}
-    ${c.totais.intervaloSuprimido ? `<div class="rel-resumo"><b>Intervalo suprimido:</b> ${minParaHHMM(c.totais.intervaloSuprimido)} no destino — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras (ver Relatório Detalhado).</div>` : ''}
-    <p class="rel-nota">Horas extras em ${fmt === 'hm' ? 'horas e minutos' : 'decimal, duas casas'}. Faltas não justificadas: só as que as horas extras do mês não cobriram.
-    Faltas justificadas "a descontar": o analista decidiu descontar no salário.
-    Saldo devedor: parcela do empréstimo a descontar neste mês.</p>`;
-
-  return documentoDP({
-    titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino,
-    versao: comp?.versao || 1, corpo: corpo + nota, assinaturas: assinaturasDP,
+  if (!paginas.length) return documentoDP({
+    titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino, classe: 'rel-paisagem',
+    versao: comp?.versao || 1, corpo: '<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>', assinaturas: null,
   });
+
+  return paginas.map((p, i) => documentoDP({
+    titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino,
+    classe: 'rel-paisagem' + (i ? ' folha2' : ''),
+    pagina: `${p.k === 'sem' ? 'sem CAEPF' : `CAEPF ${p.k.slice(0, 3)}.${p.k.slice(3)}`}${paginas.length > 1 ? ` · folha ${i + 1} de ${paginas.length}` : ''}`,
+    versao: comp?.versao || 1,
+    corpo: p.grupos.map(tabela).join('') + nota(p.grupos.flatMap(g => g.linhas)),
+    assinaturas: assinaturasDP,
+  })).join('');
 }
 
 /* ------------------------------------------------------------------
@@ -448,10 +468,17 @@ export function extratoIndividual(competencia, funcionarioId) {
    Impressão — prévia na tela primeiro, salvar é escolha do usuário
    ------------------------------------------------------------------ */
 
-export function mostrar(html) {
+/* `barra: true` põe no alto da prévia os botões Imprimir e Fechar (só na tela —
+   o CSS esconde no papel). Serve a telas que não têm barra própria, como o
+   Fechamento (28/09/2026). */
+export function mostrar(html, { barra = false } = {}) {
   const alvo = document.getElementById('jorImpressao');
   if (!alvo) return;
-  alvo.innerHTML = html;
+  alvo.innerHTML = (barra ? `<div class="rel-barra-tela">
+      <button class="btn principal" type="button" data-rel-imprimir>Imprimir / salvar em PDF</button>
+      <button class="btn mini" type="button" data-rel-fechar>Fechar prévia</button></div>` : '') + html;
+  alvo.querySelector('[data-rel-imprimir]')?.addEventListener('click', () => imprimir());
+  alvo.querySelector('[data-rel-fechar]')?.addEventListener('click', () => { alvo.hidden = true; alvo.innerHTML = ''; });
   alvo.hidden = false;
   alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
