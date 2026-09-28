@@ -395,3 +395,21 @@
 .fp-campos th, .fp-campos td { text-align: left; padding: 4px 10px 4px 0; font-size: 13px; }
 .fp-campos th { color: #8A8D86; font-weight: 600; }
 .fp-campos input { width: 80px; }
+
+/* Folha de ponto em Cadastros: lista com "impresso" (28/09/2026) */
+.fp-lista { border: 1px solid #DDDED6; border-radius: 8px; padding: 10px 12px; margin: 6px 0 12px; }
+.fp-lista__topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.fp-barra { flex: 1; min-width: 120px; max-width: 320px; height: 8px; background: #EEEFEA; border-radius: 4px; overflow: hidden; }
+.fp-barra i { display: block; height: 100%; background: #84BD00; }
+.fp-grupo { margin-top: 10px; }
+.fp-grupo__nome { font-size: 12px; font-weight: 700; color: #744F28; text-transform: uppercase; letter-spacing: .03em; padding: 4px 0; border-bottom: 1px solid #EFEFEA; }
+.fp-linha-f { display: grid; grid-template-columns: 110px 1fr auto auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #F3F3EF; }
+.fp-linha-f.feito .fp-linha-f__nome { color: #8A8D86; }
+.fp-linha-f .btn { padding: 5px 14px; }
+@media (max-width: 600px) { .fp-linha-f { grid-template-columns: 1fr auto; } .fp-linha-f > .dc-sem { display: none; } }
+#telaFolhaPonto .jor-barra { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; }
+#telaFolhaPonto .jor-inline { white-space: normal; }
+@media (max-width: 600px) {
+  .fp-campos th, .fp-campos td { padding-right: 4px; font-size: 12px; }
+  .fp-campos input { width: 56px; }
+}
