@@ -284,6 +284,7 @@
 .fp-rot { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; }
 .fp-girada { width: 165mm; height: 260mm; }
 .fp-girada .fp-rot { transform-origin: 0 0; transform: translate(165mm, 0) rotate(90deg); }
+.fp-girada-dir .fp-rot { transform: translate(0, 260mm) rotate(-90deg); }
 .fp-fundo { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; opacity: .5; pointer-events: none; }
 .fp-area { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; transform-origin: 50% 50%; }
 .fp-campo { position: absolute; white-space: nowrap; line-height: 1; font-family: Arial, Helvetica, sans-serif;
