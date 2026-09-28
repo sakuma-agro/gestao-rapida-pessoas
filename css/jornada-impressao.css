@@ -228,3 +228,23 @@
    quando pede atenção — sem preto, como o resto da identidade. */
 .rel-ok { color: #5f8a00; font-weight: 700; }
 .rel-pend { color: #744F28; font-weight: 700; }
+
+/* ---- Relatório Horas Extras em paisagem, uma folha por CAEPF (28/09/2026) ----
+   A página nomeada "paisagem" já existe no app.css (@page paisagem). Aqui só
+   se aponta a folha para ela — nenhum @page novo neste arquivo. */
+.rel.rel-paisagem { max-width: 297mm; }
+.rel.rel-paisagem + .rel.rel-paisagem { margin-top: 14px; }
+.rel-barra-tela { display: flex; gap: 8px; justify-content: flex-end; max-width: 297mm; margin: 0 auto 10px; }
+@media print {
+  .rel-barra-tela { display: none !important; }
+  .rel.rel-paisagem { page: paisagem; width: 297mm; box-sizing: border-box; padding: 7mm 12mm; }
+  .rel.rel-paisagem + .rel.rel-paisagem { margin-top: 0; }
+  .rel.rel-paisagem.folha2 { break-before: page; page-break-before: always; }
+}
+
+/* Relatório Horas Extras (28/09/2026): números centralizados; Insalubridade e
+   Periculosidade só da largura do título; o nome fica com a sobra. */
+.rel-tabela.rel-he { table-layout: auto; width: 100%; }
+.rel-tabela.rel-he th.rel-c, .rel-tabela.rel-he td.rel-c { text-align: center; }
+.rel-tabela.rel-he th.rel-justo { width: 1%; white-space: nowrap; }
+.rel-tabela.rel-he th:not(:first-child):not(.rel-justo) { width: 11%; }
