@@ -459,23 +459,8 @@ const ORIGENS = {
   digitacao: 'Erro de digitação no lançamento',
   outro:     'Outro',
 };
-const selOrigem = id => `<select id="${id}" required><option value="">— escolha —</option>
+const selOrigem = id => `<select id="${id}"><option value="">— escolha —</option>
   ${Object.entries(ORIGENS).map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>`;
-
-/* Marcado × Conferido (28/09/2026): na primeira alteração ou exclusão, o
-   boletim guarda uma foto do que foi lançado do talão (o que o funcionário
-   marcou). Alterações seguintes não mexem na foto. */
-function fotoMarcado(b) {
-  if (b.marcado) return b.marcado;
-  const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
-  return {
-    hora_ini: b.hora_ini, hora_fim: b.hora_fim, intervalo_min: b.intervalo_min,
-    tipo_id: b.tipo_id, he_especial_min: b.he_especial_min || 0,
-    min_extra_50: a.min_extra_50 || 0, min_extra_100: a.min_extra_100 || 0,
-    min_deficit: a.min_deficit || 0, min_trabalhados: a.min_trabalhados || 0,
-    lancado_por: b.criado_por || null, lancado_em: b.criado_em || null,
-  };
-}
 
 /* Marcado × correto já no lançamento (28/09/2026): a caixa "O funcionário
    marcou diferente" guarda o que veio no talão; os campos de cima são o
@@ -503,8 +488,7 @@ function prepararEdicao() {
     <b>Editando</b> o lançamento de ${esc(f?.nome || '—')} de ${dataBR(b.data_fato)}${b.numero ? ` (boletim nº ${esc(b.numero)})` : ''}.
     <button class="btn mini" type="button" id="bCancelarEdicao">Cancelar edição</button></div>`);
   $('bObs').closest('label').insertAdjacentHTML('afterend',
-    `<label>Por que mudou? (obrigatório) ${selOrigem('bOrigemAlt')}</label>
-     <label>Motivo da alteração (obrigatório) <input type="text" id="bMotivoAlt" maxlength="200" required></label>`);
+    `<label>Motivo da alteração (obrigatório) <input type="text" id="bMotivoAlt" maxlength="200" required></label>`);
   if (![...$('bFunc').options].some(o => o.value === b.funcionario_id))
     $('bFunc').insertAdjacentHTML('beforeend', `<option value="${b.funcionario_id}">${esc(f?.nome || '—')}</option>`);
   $('bFunc').value = b.funcionario_id; cadastroDoSelecionado();
@@ -520,7 +504,15 @@ function prepararEdicao() {
   mostrarMotivo();
   $('bMotivo').value = b.motivo || '';
   form.querySelector('[type=submit]').textContent = 'Salvar alteração';
-  $('bDifRot').hidden = true; $('bDif').checked = false; mostrarMarcado();
+  // Editar tem a mesma caixa do Lançar: marcado × correto só quando você marca.
+  const mc = b.marcado;
+  $('bDif').checked = !!mc;
+  $('bMIni').value = mc ? String(mc.hora_ini || '').slice(0, 5) : '';
+  $('bMFim').value = mc ? String(mc.hora_fim || '').slice(0, 5) : '';
+  $('bMInterv').value = mc ? (mc.intervalo_min ?? '') : '';
+  $('bMOrigem').value = mc ? (b.origem_alteracao || '') : '';
+  $('bMMotivo').value = mc ? (b.motivo_alteracao || '') : '';
+  mostrarMarcado();
   $('bJorPadrao').textContent = '';
   $('bCancelarEdicao').addEventListener('click', () => { estadoTela.editando = null; irPara('jorBoletins'); });
 }
@@ -742,12 +734,11 @@ async function gravarBoletim(ev) {
   const motivoAlt = $('bMotivoAlt')?.value.trim() || '';
   if (original) {
     if (situacaoBoletim(original).fechado) { aviso('Este lançamento já está fechado — para corrigir, reabra a competência no Fechamento.'); return; }
-    if (!$('bOrigemAlt').value) { aviso('Escolha por que o lançamento mudou.'); $('bOrigemAlt').focus(); return; }
     if (motivoAlt.length < 5) { aviso('Escreva o motivo da alteração (pelo menos 5 letras).'); $('bMotivoAlt').focus(); return; }
   }
 
   let marcadoNovo = null;
-  if (!original && $('bDif').checked) {
+  if ($('bDif').checked) {
     const em = entradaMarcada(entrada);
     if (!em) { aviso('Preencha a entrada e a saída que o funcionário marcou (ou desmarque "marcou diferente").'); $('bMIni').focus(); return; }
     if ($('bMIni').value === $('bIni').value && $('bMFim').value === $('bFim').value
@@ -755,6 +746,8 @@ async function gravarBoletim(ev) {
       aviso('O marcado está igual ao correto. Corrija o horário em cima ou desmarque "marcou diferente".'); return;
     }
     if (!$('bMOrigem').value) { aviso('Escolha por que o marcado é diferente.'); $('bMOrigem').focus(); return; }
+    // No Editar, o motivo da alteração serve também para a diferença.
+    if (!$('bMMotivo').value.trim() && original) $('bMMotivo').value = motivoAlt;
     if ($('bMMotivo').value.trim().length < 5) { aviso('Escreva o motivo da diferença (pelo menos 5 letras).'); $('bMMotivo').focus(); return; }
     const m = apurarComplemento(em);
     marcadoNovo = {
@@ -762,7 +755,8 @@ async function gravarBoletim(ev) {
       tipo_id: $('bTipo').value || null, he_especial_min: minutosHe(),
       min_extra_50: m.minExtra50, min_extra_100: m.minExtra100, min_deficit: m.minDeficit,
       min_trabalhados: m.minTrabalhados, no_lancamento: true,
-      lancado_por: estado.sessao?.user?.email || null, lancado_em: new Date().toISOString(),
+      lancado_por: original?.marcado?.lancado_por || estado.sessao?.user?.email || null,
+      lancado_em: original?.marcado?.lancado_em || new Date().toISOString(),
     };
   }
 
@@ -797,9 +791,7 @@ async function gravarBoletim(ev) {
   }
   if (original) {
     b.id = original.id; b.compensacao = original.compensacao ?? null;
-    b.marcado = fotoMarcado(original);
-    b.origem_alteracao = $('bOrigemAlt').value;
-    b.motivo_alteracao = motivoAlt;
+    if (!marcadoNovo) { b.marcado = null; b.origem_alteracao = null; b.motivo_alteracao = null; }
   }
 
   // Nº repetido gera alerta, nunca bloqueio (RN-04).
@@ -900,7 +892,7 @@ function desenharBoletins() {
           <td>${esc(f?.nome || '—')}</td>
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
             : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
-              ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · ${b.marcado.no_lancamento ? 'corrigido no lançamento' : 'alterado'}</span>` : ''}</td>
+              ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · marcou diferente</span>` : ''}</td>
           <td class="ce">${horas(a?.min_extra_50)}</td>
           <td class="ce">${horas(a?.min_extra_100)}</td>
           <td class="ce">${horas(a?.min_deficit)}</td>
@@ -924,7 +916,6 @@ function desenharBoletins() {
     <dialog id="dlgJorExcluir"><form method="dialog" id="formJorExcluir">
       <h3>Excluir lançamento</h3>
       <p class="dc-sem" id="jorExcluirQual"></p>
-      <label class="campo plena">Por que excluir? (obrigatório) ${selOrigem('jorExcluirOrigem')}</label>
       <label class="campo plena">Motivo (obrigatório)<textarea id="jorExcluirMotivo" rows="3" maxlength="300"></textarea></label>
       <p class="jor-pend" id="jorExcluirErro"></p>
       <div class="barra entre"><button class="btn" type="button" data-fechar-exc>Cancelar</button>
@@ -943,21 +934,18 @@ function desenharBoletins() {
     const f = estado.funcionarios.find(x => x.id === excluindo.funcionario_id);
     $('jorExcluirQual').textContent = `${f?.nome || '—'} · ${dataBR(excluindo.data_fato)}${excluindo.numero ? ` · boletim nº ${excluindo.numero}` : ''}. `
       + 'O lançamento sai das contas do mês; fica guardado no histórico com o motivo.';
-    $('jorExcluirMotivo').value = ''; $('jorExcluirOrigem').value = ''; $('jorExcluirErro').textContent = '';
+    $('jorExcluirMotivo').value = ''; $('jorExcluirErro').textContent = '';
     $('dlgJorExcluir').showModal();
   }));
   $('dlgJorExcluir').querySelector('[data-fechar-exc]').addEventListener('click', () => $('dlgJorExcluir').close());
   $('formJorExcluir').addEventListener('submit', async ev => {
     ev.preventDefault();
     const motivo = $('jorExcluirMotivo').value.trim();
-    const origem = $('jorExcluirOrigem').value;
-    if (!origem) { $('jorExcluirErro').textContent = 'Escolha por que está excluindo.'; return; }
     if (motivo.length < 5) { $('jorExcluirErro').textContent = 'Escreva o motivo (pelo menos 5 letras).'; return; }
     const b = excluindo;
     if (!b || situacaoBoletim(b).fechado) { $('jorExcluirErro').textContent = 'Este lançamento já está fechado.'; return; }
     try {
-      const depois = { ...b, situacao: 'cancelado', marcado: fotoMarcado(b), origem_alteracao: origem,
-        motivo_alteracao: motivo, atualizado_em: new Date().toISOString() };
+      const depois = { ...b, situacao: 'cancelado', atualizado_em: new Date().toISOString() };
       await jd.salvar('boletins', depois);
       await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'cancelar', antes: b, depois, justificativa: motivo });
       $('dlgJorExcluir').close();

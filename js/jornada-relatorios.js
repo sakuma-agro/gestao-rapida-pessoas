@@ -320,8 +320,8 @@ function periodos(datas) {
 
 /* ------------------------------------------------------------------
    REL-CONF — Marcado × Conferido (28/09/2026), uso interno
-   O que o funcionário marcou (foto guardada no boletim na primeira
-   alteração ou exclusão) contra o que ficou depois da conferência.
+   O que o funcionário marcou (informado na caixa "marcou diferente" do
+   Lançar/Editar) contra o que ficou valendo.
    ------------------------------------------------------------------ */
 const ORIGEM_REL = { gerente: 'Gerente de campo', digitacao: 'Erro de digitação', outro: 'Outro' };
 const faixa = (ini, fim, intv) => ini || fim
@@ -386,7 +386,7 @@ export function relatorioConferencia(competencia, destinoId) {
           .map(([n, p]) => `<tr><td>${esc(n)}</td><td class="rel-c">${p.n}</td><td class="rel-c"><b>${hs(p.dif)}</b></td></tr>`).join('')}</tbody>
       </table>` : '';
 
-  const nota = `<p class="rel-nota">Marcado = o que o funcionário marcou no boletim (informado no lançamento ou a primeira versão lançada, antes da alteração). Conferido = o que ficou valendo e foi para a folha.</p>`;
+  const nota = `<p class="rel-nota">Marcado = o que o funcionário marcou no boletim, informado em Lançar jornada ou Editar ("O funcionário marcou diferente do correto"). Conferido = o que ficou valendo e foi para a folha.</p>`;
   return documentoDP({
     titulo: 'MARCADO × CONFERIDO', competencia, destino, interno: true,
     versao: comp?.versao || 1, corpo: tabela + resumo + nota,
