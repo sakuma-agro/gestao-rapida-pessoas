@@ -10,6 +10,8 @@
 //             (o boletim atrasado aparece no mês em que aconteceu), 28/09/2026
 // REL-CONF    Marcado × Conferido — o que o funcionário marcou × o que ficou
 //             depois da conferência (uso interno), 28/09/2026
+// REL-QUAL    Qualidade dos boletins — nota Ruim/Bom/Ótimo, individual ou do
+//             destino, por período (uso interno), 28/09/2026
 // REL-DP-DET  Detalhado DP — abertura por percentual, intervalo e déficit
 // REL-EXT     Extrato individual — dia a dia, com a memória de cálculo
 //
@@ -393,6 +395,127 @@ export function relatorioConferencia(competencia, destinoId) {
     assinaturas: ['Gerente de Campo', 'Gerente Administrativo'],
     classe: 'rel-paisagem',
   });
+}
+
+/* ------------------------------------------------------------------
+   REL-QUAL — Qualidade dos boletins (28/09/2026), uso interno
+   Nota que quem lança dá ao boletim de papel: Ruim (1), Bom (2), Ótimo (3).
+   Individual: indicadores, mês a mês e os boletins Ruim. Todos: um por
+   funcionário do destino, do pior para o melhor.
+   ------------------------------------------------------------------ */
+const NOTA = { ruim: 1, bom: 2, otimo: 3 };
+const NIVEL_TXT = { ruim: 'Ruim', bom: 'Bom', otimo: 'Ótimo' };
+const pct = (n, t) => t ? Math.round(n * 100 / t) + '%' : '—';
+const media = l => l.length ? l.reduce((s, b) => s + NOTA[b.qualidade], 0) / l.length : null;
+const mediaTxt = m => m == null ? '—' : m.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const conceito = m => m == null ? 'sem avaliação' : m >= 2.5 ? 'Ótimo' : m >= 1.75 ? 'Bom' : 'Ruim';
+const conceitoTag = m => m == null ? '<span class="rel-mini">—</span>'
+  : `<span class="rel-qconc rel-qconc--${m >= 2.5 ? 'otimo' : m >= 1.75 ? 'bom' : 'ruim'}">${conceito(m)}</span>`;
+const mesesEntre = (de, ate) => {
+  const out = []; let [a, m] = de.split('-').map(Number);
+  const [a2, m2] = ate.split('-').map(Number);
+  while (a < a2 || (a === a2 && m <= m2)) { out.push(`${a}-${String(m).padStart(2, '0')}`); if (++m > 12) { m = 1; a++; } }
+  return out;
+};
+const rotMes = ym => { const [a, m] = ym.split('-').map(Number); return `${MESES[m - 1].slice(0, 3)}/${String(a).slice(2)}`; };
+const rotPeriodo = (de, ate) => de === ate ? rotMes(de) : `${rotMes(de)} a ${rotMes(ate)}`;
+
+function contar(lista) {
+  const validos = lista.filter(b => b.situacao !== 'cancelado');
+  const aval = validos.filter(b => NOTA[b.qualidade]);
+  const n = k => aval.filter(b => b.qualidade === k).length;
+  return { total: validos.length, aval: aval.length, otimo: n('otimo'), bom: n('bom'), ruim: n('ruim'),
+           media: media(aval), marcou: validos.filter(b => b.marcado).length, validos };
+}
+
+/* Barra empilhada: cor + número escrito (não depende só da cor no papel). */
+function barra(c) {
+  if (!c.aval) return '<span class="rel-mini">sem avaliação</span>';
+  const w = k => (c[k] * 100 / c.aval).toFixed(1);
+  return `<div class="rel-qbarra">${['otimo', 'bom', 'ruim'].filter(k => c[k])
+    .map(k => `<span class="rel-q--${k}" style="width:${w(k)}%">${c[k]}</span>`).join('')}</div>`;
+}
+
+export function relatorioQualidade({ boletins, de, ate, funcionarioId, destinoId }) {
+  const destino = jd.dados.destinos.find(d => d.id === destinoId) || null;
+  const pessoa = funcionarioId ? estado.funcionarios.find(f => f.id === funcionarioId) : null;
+  const legenda = `<p class="rel-nota">Nota do boletim dada em Lançar jornada: Ruim = 1, Bom = 2, Ótimo = 3.
+    Nota média ≥ 2,5 = Ótimo · ≥ 1,75 = Bom · abaixo = Ruim. "Marcou diferente" = lançamentos em que o funcionário marcou um horário diferente do correto.</p>`;
+
+  let corpo;
+  if (pessoa) {
+    const minhas = boletins.filter(b => b.funcionario_id === pessoa.id);
+    const c = contar(minhas);
+    const meses = mesesEntre(de, ate);
+    const porMes = meses.map(m => ({ m, c: contar(minhas.filter(b => String(b.data_fato).slice(0, 7) === m)) }));
+    const ruins = c.validos.filter(b => b.qualidade === 'ruim');
+    const u = jd.unidadeDe(jd.vinculoDe(pessoa.id));
+    corpo = `
+      <div class="rel-qpessoa"><b>${esc(pessoa.nome)}</b>${pessoa.cadastro ? ` · cadastro nº ${esc(pessoa.cadastro)}` : ''}
+        ${u ? ` · ${esc(jd.nomeUnidade(u))}` : ''} · período ${esc(rotPeriodo(de, ate))}</div>
+      <div class="rel-qkpis">
+        <div><span>Nota média</span><strong>${mediaTxt(c.media)}</strong><small>${conceitoTag(c.media)}</small></div>
+        <div><span>Boletins avaliados</span><strong>${c.aval}</strong><small>de ${c.total} lançados</small></div>
+        <div class="rel-q--otimo-t"><span>Ótimo</span><strong>${c.otimo}</strong><small>${pct(c.otimo, c.aval)}</small></div>
+        <div class="rel-q--bom-t"><span>Bom</span><strong>${c.bom}</strong><small>${pct(c.bom, c.aval)}</small></div>
+        <div class="rel-q--ruim-t"><span>Ruim</span><strong>${c.ruim}</strong><small>${pct(c.ruim, c.aval)}</small></div>
+        <div><span>Marcou diferente</span><strong>${c.marcou}</strong><small>${pct(c.marcou, c.total)} dos lançados</small></div>
+      </div>
+      <p class="rel-emp">MÊS A MÊS</p>
+      <table class="rel-tabela rel-tabela-dp rel-he">
+        <thead><tr><th>Mês</th><th class="rel-c">Lançados</th><th class="rel-c">Avaliados</th>
+          <th class="rel-c">Ótimo</th><th class="rel-c">Bom</th><th class="rel-c">Ruim</th>
+          <th class="rel-c">Nota média</th><th class="rel-c">Marcou diferente</th><th style="width:28%">Distribuição</th></tr></thead>
+        <tbody>${porMes.map(({ m, c: x }) => `<tr><td>${esc(rotMes(m))}</td>
+          <td class="rel-c">${x.total || '—'}</td><td class="rel-c">${x.aval || '—'}</td>
+          <td class="rel-c">${x.otimo || '—'}</td><td class="rel-c">${x.bom || '—'}</td><td class="rel-c">${x.ruim || '—'}</td>
+          <td class="rel-c"><b>${mediaTxt(x.media)}</b></td><td class="rel-c">${x.marcou || '—'}</td>
+          <td>${barra(x)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td>Período</td><td class="rel-c">${c.total}</td><td class="rel-c">${c.aval}</td>
+          <td class="rel-c">${c.otimo}</td><td class="rel-c">${c.bom}</td><td class="rel-c">${c.ruim}</td>
+          <td class="rel-c">${mediaTxt(c.media)}</td><td class="rel-c">${c.marcou}</td><td>${barra(c)}</td></tr></tfoot>
+      </table>
+      <p class="rel-emp">BOLETINS AVALIADOS COMO RUIM</p>
+      ${ruins.length ? `<table class="rel-tabela rel-tabela-dp rel-he">
+        <thead><tr><th class="rel-c" style="width:12%">Dia</th><th class="rel-c" style="width:14%">Nº do boletim</th><th class="rel-c" style="width:14%">Horário</th><th style="width:60%">Observação</th></tr></thead>
+        <tbody>${ruins.map(b => `<tr><td class="rel-c">${dataBR(b.data_fato)}</td><td class="rel-c">${esc(b.numero || '—')}</td>
+          <td class="rel-c">${b.hora_ini ? `${String(b.hora_ini).slice(0, 5)}–${String(b.hora_fim || '').slice(0, 5)}` : '—'}</td>
+          <td>${esc([b.observacao, b.motivo_alteracao].filter(Boolean).join(' · ') || '—')}</td></tr>`).join('')}</tbody></table>`
+        : '<p class="rel-vazio">Nenhum boletim Ruim no período.</p>'}`;
+  } else {
+    const doDestino = boletins.filter(b => jd.dados.unidades.find(u => u.id === b.unidade_id)?.destino_id === destinoId);
+    const ids = [...new Set(doDestino.map(b => b.funcionario_id))];
+    const linhas = ids.map(id => ({ nome: estado.funcionarios.find(f => f.id === id)?.nome || '—',
+      c: contar(doDestino.filter(b => b.funcionario_id === id)) }))
+      .filter(l => l.c.total)
+      .sort((x, y) => (x.c.media ?? 9) - (y.c.media ?? 9) || y.c.ruim - x.c.ruim || x.nome.localeCompare(y.nome, 'pt-BR'));
+    const g = contar(doDestino);
+    corpo = `
+      <div class="rel-qpessoa">Todos do destino · período ${esc(rotPeriodo(de, ate))} · do pior para o melhor</div>
+      <div class="rel-qkpis">
+        <div><span>Nota média</span><strong>${mediaTxt(g.media)}</strong><small>${conceitoTag(g.media)}</small></div>
+        <div><span>Boletins avaliados</span><strong>${g.aval}</strong><small>de ${g.total} lançados</small></div>
+        <div class="rel-q--otimo-t"><span>Ótimo</span><strong>${g.otimo}</strong><small>${pct(g.otimo, g.aval)}</small></div>
+        <div class="rel-q--bom-t"><span>Bom</span><strong>${g.bom}</strong><small>${pct(g.bom, g.aval)}</small></div>
+        <div class="rel-q--ruim-t"><span>Ruim</span><strong>${g.ruim}</strong><small>${pct(g.ruim, g.aval)}</small></div>
+        <div><span>Marcou diferente</span><strong>${g.marcou}</strong><small>${pct(g.marcou, g.total)} dos lançados</small></div>
+      </div>
+      ${linhas.length ? `<table class="rel-tabela rel-tabela-dp rel-he">
+        <thead><tr><th>Funcionário</th><th class="rel-c">Lançados</th><th class="rel-c">Avaliados</th>
+          <th class="rel-c">Ótimo</th><th class="rel-c">Bom</th><th class="rel-c">Ruim</th>
+          <th class="rel-c">Nota média</th><th class="rel-c">Conceito</th><th class="rel-c">Marcou diferente</th><th style="width:22%">Distribuição</th></tr></thead>
+        <tbody>${linhas.map(({ nome, c }) => `<tr><td>${esc(nome)}</td>
+          <td class="rel-c">${c.total}</td><td class="rel-c">${c.aval || '—'}</td>
+          <td class="rel-c">${c.otimo || '—'}</td><td class="rel-c">${c.bom || '—'}</td><td class="rel-c">${c.ruim || '—'}</td>
+          <td class="rel-c"><b>${mediaTxt(c.media)}</b></td><td class="rel-c">${conceitoTag(c.media)}</td>
+          <td class="rel-c">${c.marcou || '—'}</td><td>${barra(c)}</td></tr>`).join('')}</tbody>
+      </table>` : '<p class="rel-vazio">Nenhum boletim lançado neste destino no período.</p>'}`;
+  }
+
+  return documentoDP({
+    titulo: 'QUALIDADE DOS BOLETINS', competencia: ate + '-01', destino: pessoa ? null : destino,
+    interno: true, corpo: corpo + legenda, classe: 'rel-paisagem',
+  }).replace(/REFERENTE AO MÊS DE [^<]*/, 'PERÍODO: ' + MAIUSC(rotPeriodo(de, ate)));
 }
 
 export function relatorioAtestados(competencia, destinoId) {

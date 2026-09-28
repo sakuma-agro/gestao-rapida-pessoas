@@ -55,6 +55,13 @@ function horas(min, formato = 'decimal') {
 const DIAS_FECHAMENTO = 10;
 let competenciaDecidida = false;
 
+/** 'aaaa-mm' de n meses antes da competência (inclusive a própria como 0). */
+function mesesAntes(comp, n) {
+  const [a, m] = comp.split('-').map(Number);
+  const d = new Date(Date.UTC(a, m - 1 - n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
 function mesAnteriorPendente() {
   if (new Date().getDate() > DIAS_FECHAMENTO) return null;
   const [a, m] = jd.competenciaAtual().split('-').map(Number);
@@ -337,6 +344,10 @@ function desenharLancar() {
           </label>
           <label class="jor-inline"><input type="checkbox" id="bInsal"> Insalubridade no dia</label>
         </div>
+        <div class="jor-nivel" role="radiogroup" aria-label="Nível do boletim">
+          <span>Nível do boletim</span>
+          ${NIVEIS.map(([k, t]) => `<label class="jor-nivel__op jor-nivel--${k}"><input type="radio" name="bNivel" value="${k}"> ${t}</label>`).join('')}
+        </div>
         <label>Observação <input type="text" id="bObs" maxlength="200"></label>
         <div class="jor-acoes">
           <button type="submit" class="btn principal">Lançar</button>
@@ -454,6 +465,12 @@ function apurarComplemento(entrada) {
 /* Editar lançamento em aberto (28/09/2026): a tela Lançados manda o id em
    estadoTela.editando; o formulário abre preenchido, pede o motivo da
    alteração e grava por cima do mesmo boletim (situação "corrigido"). */
+/* Nível do boletim (28/09/2026): nota de quem lança sobre a qualidade do
+   boletim preenchido à mão. Opcional; vai para o painel Qualidade dos boletins. */
+const NIVEIS = [['ruim', 'Ruim'], ['bom', 'Bom'], ['otimo', 'Ótimo']];
+const nivelMarcado = () => document.querySelector('input[name="bNivel"]:checked')?.value || null;
+const nivelTexto = k => (NIVEIS.find(n => n[0] === k) || [])[1] || '';
+
 const ORIGENS = {
   gerente:   'Conferido com o gerente de campo — o funcionário marcou diferente',
   digitacao: 'Erro de digitação no lançamento',
@@ -501,6 +518,7 @@ function prepararEdicao() {
   $('bEspecial').value = b.he_especial_tipo_id || '';
   $('bInsal').checked = !!b.insalubridade_dia;
   $('bObs').value = b.observacao || '';
+  document.querySelectorAll('input[name="bNivel"]').forEach(r => { r.checked = r.value === b.qualidade; });
   mostrarMotivo();
   $('bMotivo').value = b.motivo || '';
   form.querySelector('[type=submit]').textContent = 'Salvar alteração';
@@ -778,6 +796,7 @@ async function gravarBoletim(ev) {
     he_especial_tipo_id: $('bEspecial').value || null,
     insalubridade_dia: $('bInsal').checked,
     observacao: $('bObs').value || null,
+    qualidade: nivelMarcado(),
     motivo: $('bMotivoRot').hidden ? null : ($('bMotivo').value.trim() || null),
     situacao: original ? 'corrigido' : 'lancado',
     criado_por: original ? original.criado_por : (estado.sessao?.user?.email || null),
@@ -826,6 +845,7 @@ async function gravarBoletim(ev) {
   $('bNumero').value = '';
   $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
   $('bDif').checked = false; ['bMIni','bMFim','bMInterv','bMOrigem','bMMotivo'].forEach(id => { $(id).value = ''; });
+  document.querySelectorAll('input[name="bNivel"]').forEach(r => { r.checked = false; });
   mostrarMarcado();
   dia.chave = '';
   preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
@@ -888,7 +908,7 @@ function desenharBoletins() {
       </tr></thead><tbody>
         ${linhas.map(({ b, f, a, s }) => `<tr>
           <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? `<br><span class="jor-pend">pago em ${esc(rotuloCompetencia(b.competencia))}</span>` : ''}</td>
-          <td>${esc(b.numero || '—')}</td>
+          <td>${esc(b.numero || '—')}${b.qualidade ? `<br><span class="jor-nivel-tag jor-nivel--${b.qualidade}">${nivelTexto(b.qualidade)}</span>` : ''}</td>
           <td>${esc(f?.nome || '—')}</td>
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
             : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
@@ -1287,6 +1307,20 @@ function desenharRelatorios() {
         <button class="btn" id="relExtrato">Extrato individual</button>
       </div>
 
+      <h3 class="jor-h3">Qualidade dos boletins · uso interno</h3>
+      <div class="jor-barra">
+        <label>Funcionário
+          <select id="relQualPessoa">
+            <option value="">Todos do destino (${esc(destinos[0]?.nome || '')})</option>
+            ${pessoas.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')}
+          </select>
+        </label>
+        <label>De <input type="month" id="relQualDe" value="${mesesAntes(estadoTela.competencia, 5)}"></label>
+        <label>Até <input type="month" id="relQualAte" value="${estadoTela.competencia.slice(0, 7)}"></label>
+        <button class="btn" id="relQual">Ver painel</button>
+      </div>
+      <p class="dc-sem jor-nota">Usa o "Nível do boletim" marcado em Lançar jornada (Ruim, Bom, Ótimo). "Todos" usa o destino escolhido lá em cima.</p>
+
       ${emp.podeVerEmprestimo() ? `<h3 class="jor-h3">Empréstimo Funcionário</h3>
       <div class="jor-barra">
         <button class="btn" id="relEmpDev">Extrato geral — todos que devem</button>
@@ -1338,6 +1372,20 @@ function desenharRelatorios() {
     preview(rel.relatorioPorMes(estadoTela.competencia, $('relDestino').value)));
   $('relDet').addEventListener('click', () =>
     preview(rel.relatorioDetalhado(estadoTela.competencia, $('relDestino').value)));
+  const rotuloTodos = () => {
+    const o = $('relQualPessoa').options[0];
+    o.textContent = `Todos do destino (${$('relDestino').selectedOptions[0]?.textContent || ''})`;
+  };
+  $('relDestino').addEventListener('change', rotuloTodos);
+  $('relQual').addEventListener('click', async () => {
+    const de = $('relQualDe').value, ate = $('relQualAte').value;
+    if (!de || !ate || de > ate) { aviso('Escolha o período: "De" antes de "Até".'); return; }
+    const [a, m] = ate.split('-').map(Number);
+    const fim = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+    const boletins = await jd.boletinsDoPeriodo(de + '-01', fim);
+    preview(rel.relatorioQualidade({ boletins, de, ate,
+      funcionarioId: $('relQualPessoa').value || null, destinoId: $('relDestino').value }));
+  });
   $('relExtrato').addEventListener('click', () =>
     preview(rel.extratoIndividual(estadoTela.competencia, $('relPessoa').value)));
   $('relCsv').addEventListener('click', () =>

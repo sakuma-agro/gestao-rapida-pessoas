@@ -215,6 +215,19 @@ function somarDia(iso) {
    "não entregou" e "em correção" em aberto (são poucos e alimentam as pendências). Também
    traz os boletins lançados na Gestão de jornada no intervalo — boletim
    lançado lá conta como entregue. Junta com o que já está no cache. */
+/** Qualidade dos boletins (28/09/2026): boletins de um período, só os campos
+ *  do painel. Sem rede, usa o que já está carregado. */
+export async function boletinsDoPeriodo(ini, fim) {
+  const c = estado.cliente;
+  const campos = 'id,funcionario_id,unidade_id,data_fato,numero,hora_ini,hora_fim,qualidade,marcado,situacao,observacao,motivo_alteracao';
+  const local = () => dados.boletins.filter(b => b.data_fato >= ini && b.data_fato <= fim);
+  if (!c || !estado.sessao) return local();
+  try {
+    return await todas(() => c.from(TABELAS.boletins).select(campos)
+      .gte('data_fato', ini).lte('data_fato', fim).order('data_fato'));
+  } catch { return local(); }
+}
+
 export async function carregarEntregas(ini, fim) {
   const c = estado.cliente;
   if (!c || !estado.sessao) return;
