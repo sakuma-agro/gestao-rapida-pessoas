@@ -47,10 +47,39 @@ function horas(min, formato = 'decimal') {
    ENTRADA DO MÓDULO
    =================================================================== */
 
+/* Início do mês (28/09/2026): do dia 1 ao DIAS_FECHAMENTO, se o mês anterior
+   ainda não foi enviado ao DP em algum destino, o DP abre nele — é o mês que
+   precisa ser fechado. Só na primeira abertura: depois vale o seletor. */
+const DIAS_FECHAMENTO = 10;
+let competenciaDecidida = false;
+
+function mesAnteriorPendente() {
+  if (new Date().getDate() > DIAS_FECHAMENTO) return null;
+  const [a, m] = jd.competenciaAtual().split('-').map(Number);
+  const ant = m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
+  const pendentes = jd.dados.destinos.filter(d => d.ativo !== false)
+    .filter(d => jd.dados.unidades.some(u => u.destino_id === d.id &&
+      jd.dados.vinculos.some(v => v.unidade_id === u.id && v.ativo !== false)))
+    .filter(d => !jd.travada(ant, d.id));
+  return pendentes.length ? { ant, pendentes } : null;
+}
+
 export async function abrirJornada(tela) {
   if (!jd.dados.carregado) {
     try { await jd.carregar(estadoTela.competencia); }
     catch (e) { aviso('Não consegui carregar os dados do módulo: ' + e.message); }
+  }
+  if (!competenciaDecidida && jd.dados.carregado) {
+    competenciaDecidida = true;
+    const p = mesAnteriorPendente();
+    if (p && estadoTela.competencia !== p.ant) {
+      estadoTela.competencia = p.ant;
+      try {
+        await jd.carregar(p.ant);
+        aviso(`Aberto em ${rotuloCompetencia(p.ant)}: ainda não enviado ao ${p.pendentes.map(d => d.nome).join(' e ')}. `
+          + `Confira, feche e envie. Para ver o mês novo, troque a competência no alto — o lançamento de boletins segue sempre a data do fato.`, true);
+      } catch (e) { aviso(e.message); }
+    }
   }
   if (tela === 'jorPainel')       desenharPainel();
   if (tela === 'jorLancar')       desenharLancar();
@@ -67,7 +96,7 @@ export function limparJornada() {
   fer.limparFerias();
   bol.limparBoletins();
   estadoTela.competencia = jd.competenciaAtual();
-
+  competenciaDecidida = false;
 }
 
 function aviso(texto, ok = false) {
