@@ -323,3 +323,9 @@
 .jor-abat { margin: 0 0 14px; }
 .jor-abat__topo { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin: 0 0 6px; }
 .jor-abat select { min-width: 190px; max-width: 100%; }
+
+/* Lançados: ações por linha e situação (28/09/2026) */
+.jor-bol-acoes { white-space: nowrap; }
+.jor-bol-acoes .btn + .btn { margin-left: 4px; }
+#bEditando { margin-bottom: 12px; }
+#jorFiltroSit { width: auto; flex: 0 0 auto; max-width: 100%; }
