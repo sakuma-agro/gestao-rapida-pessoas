@@ -1266,157 +1266,140 @@ async function desenharFechamento() {
    J.6 — RELATÓRIOS
    =================================================================== */
 
+/* Relatórios em abas por assunto (28/09/2026, opção C escolhida por ele):
+   Escritório (DP) · Conferência interna · Por funcionário · Empréstimo · Férias.
+   Cada aba mostra só os filtros que usa; cada relatório tem Visualizar e
+   Imprimir. A prévia abre com Imprimir/Fechar no alto (rel.mostrar barra). */
+const relTela = { aba: 'esc', destino: '', pessoa: '', de: '', ate: '', ferDest: '', ferMes: '' };
+
 function desenharRelatorios() {
   const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
   const pessoas = estado.funcionarios.filter(f => jd.vinculoDe(f.id));
+  if (!destinos.some(d => d.id === relTela.destino)) relTela.destino = destinos[0]?.id || '';
+  if (!relTela.de) relTela.de = mesesAntes(estadoTela.competencia, 5);
+  if (!relTela.ate) relTela.ate = estadoTela.competencia.slice(0, 7);
+  if (!relTela.ferMes) relTela.ferMes = mesAnterior();
 
-  $('telaJorRelatorios').innerHTML = cabecalho('Relatórios', 'Prévia na tela primeiro; salvar é escolha sua') + `
-    <div class="jor-corpo">
-      <div class="jor-caixa">
-        Todo relatório sai de <b>um destino de DP só</b>. Não existe emissão que junte destinos —
-        é bloqueio, não filtro.
-      </div>
+  // Atalho do Painel de Férias: abre direto a aba Férias com o relatório pedido.
+  const pedido = fer.podeVerFerias() ? fer.tomarPedidoRelatorio() : null;
+  if (pedido) { relTela.aba = 'fer'; relTela.ferDest = pedido.destino || ''; if (pedido.mes) relTela.ferMes = pedido.mes; }
 
-      <h3 class="jor-h3">Da competência</h3>
-      <div class="jor-barra">
-        <label>Destino
-          <select id="relDestino">
-            ${destinos.map(d => `<option value="${d.id}">${esc(d.nome)}</option>`).join('')}
-          </select>
-        </label>
-        <button class="btn principal" id="relDP">Relatório Horas Extras</button>
-        <button class="btn" id="relFaltas">Faltas</button>
-        <button class="btn" id="relAtest">Atestados</button>
-        <button class="btn" id="relMes">Horas extras por mês</button>
-        <button class="btn" id="relConf">Marcado × Conferido</button>
-        <button class="btn" id="relDet">Detalhado DP</button>
-        <button class="btn mini" id="relCsv">Baixar dados (Excel)</button>
-      </div>
-      <div class="jor-barra">
-        <button class="btn" id="relFaltasTot">Faltas totais · uso interno</button>
-        <span class="dc-sem">Todas as faltas do mês, inclusive as compensadas por horas extras. Não vai ao escritório.</span>
-      </div>
+  const abas = [
+    ['esc', 'Escritório (DP)'], ['conf', 'Conferência interna'], ['pessoa', 'Por funcionário'],
+    ...(emp.podeVerEmprestimo() ? [['emp', 'Empréstimo']] : []),
+    ...(fer.podeVerFerias() ? [['fer', 'Férias']] : []),
+  ];
+  if (!abas.some(a => a[0] === relTela.aba)) relTela.aba = 'esc';
 
-      <h3 class="jor-h3">De uma pessoa</h3>
-      <div class="jor-barra">
-        <label>Funcionário
-          <select id="relPessoa">
-            ${pessoas.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')}
-          </select>
-        </label>
-        <button class="btn" id="relExtrato">Extrato individual</button>
-      </div>
-
-      <h3 class="jor-h3">Qualidade dos boletins · uso interno</h3>
-      <div class="jor-barra">
-        <label>Funcionário
-          <select id="relQualPessoa">
-            <option value="">Todos do destino (${esc(destinos[0]?.nome || '')})</option>
-            ${pessoas.map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')}
-          </select>
-        </label>
-        <label>De <input type="month" id="relQualDe" value="${mesesAntes(estadoTela.competencia, 5)}"></label>
-        <label>Até <input type="month" id="relQualAte" value="${estadoTela.competencia.slice(0, 7)}"></label>
-        <button class="btn" id="relQual">Ver painel</button>
-      </div>
-      <p class="dc-sem jor-nota">Usa o "Nível do boletim" marcado em Lançar jornada (Ruim, Bom, Ótimo). "Todos" usa o destino escolhido lá em cima.</p>
-
-      ${emp.podeVerEmprestimo() ? `<h3 class="jor-h3">Empréstimo Funcionário</h3>
-      <div class="jor-barra">
-        <button class="btn" id="relEmpDev">Extrato geral — todos que devem</button>
-        <button class="btn mini" id="relEmpCsv">Baixar dados (Excel)</button>
-      </div>` : ''}
-
-      ${fer.podeVerFerias() ? `<h3 class="jor-h3">Férias</h3>
-      <div class="jor-barra fer-barra-rel">
-        <label>Relatório
-          <select id="relFerTipo">
-            <option value="conc">Período de concessão — em aberto e concedidas</option>
-            <option value="venc">Venceram no mês</option>
-            <option value="prev">Previsão dos próximos 12 meses</option>
-            <option value="sit">Situação da equipe</option>
-          </select>
-        </label>
-        <label id="relFerMesRot">Mês <input type="month" id="relFerMes" value="${mesAnterior()}"></label>
-        <label>Destino
-          <select id="relFerDest">
-            <option value="">Todos</option>
-            ${destinos.map(d => `<option value="${d.id}">${esc(d.nome)}</option>`).join('')}
-            <option value="-">Sem destino</option>
-          </select>
-        </label>
-        <button class="btn" id="relFerVer">Ver relatório</button>
-        <button class="btn mini" id="relFerCsv">Baixar dados (Excel)</button>
-      </div>
-      <p class="dc-sem jor-nota">No início de cada mês, emita "Venceram no mês" do mês anterior.</p>` : ''}
-
-      <div class="jor-acoes" id="relAcoes" hidden>
-        <button class="btn principal" id="relImprimir">Imprimir / salvar em PDF</button>
-        <button class="btn mini" id="relFechar">Fechar prévia</button>
-      </div>
-    </div>` + assinatura();
-
-  const preview = html => { rel.mostrar(html); $('relAcoes').hidden = false; };
-
-  $('relDP').addEventListener('click', () =>
-    preview(rel.relatorioDP(estadoTela.competencia, $('relDestino').value)));
-  $('relFaltas').addEventListener('click', () =>
-    preview(rel.relatorioFaltas(estadoTela.competencia, $('relDestino').value)));
-  $('relFaltasTot').addEventListener('click', () =>
-    preview(rel.relatorioFaltas(estadoTela.competencia, $('relDestino').value, { totais: true })));
-  $('relAtest').addEventListener('click', () =>
-    preview(rel.relatorioAtestados(estadoTela.competencia, $('relDestino').value)));
-  $('relConf').addEventListener('click', () =>
-    preview(rel.relatorioConferencia(estadoTela.competencia, $('relDestino').value)));
-  $('relMes').addEventListener('click', () =>
-    preview(rel.relatorioPorMes(estadoTela.competencia, $('relDestino').value)));
-  $('relDet').addEventListener('click', () =>
-    preview(rel.relatorioDetalhado(estadoTela.competencia, $('relDestino').value)));
-  const rotuloTodos = () => {
-    const o = $('relQualPessoa').options[0];
-    o.textContent = `Todos do destino (${$('relDestino').selectedOptions[0]?.textContent || ''})`;
-  };
-  $('relDestino').addEventListener('change', rotuloTodos);
-  $('relQual').addEventListener('click', async () => {
-    const de = $('relQualDe').value, ate = $('relQualAte').value;
-    if (!de || !ate || de > ate) { aviso('Escolha o período: "De" antes de "Até".'); return; }
+  const comp = () => estadoTela.competencia;
+  const dest = () => relTela.destino;
+  const semPessoa = () => { aviso('Escolha um funcionário para o extrato.'); return null; };
+  const qualidade = async () => {
+    const { de, ate } = relTela;
+    if (!de || !ate || de > ate) { aviso('Escolha o período: "De" antes de "Até".'); return null; }
     const [a, m] = ate.split('-').map(Number);
     const fim = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
     const boletins = await jd.boletinsDoPeriodo(de + '-01', fim);
-    preview(rel.relatorioQualidade({ boletins, de, ate,
-      funcionarioId: $('relQualPessoa').value || null, destinoId: $('relDestino').value }));
-  });
-  $('relExtrato').addEventListener('click', () =>
-    preview(rel.extratoIndividual(estadoTela.competencia, $('relPessoa').value)));
-  $('relCsv').addEventListener('click', () =>
-    rel.baixar(rel.planilhaDP(estadoTela.competencia, $('relDestino').value)));
-  $('relEmpDev')?.addEventListener('click', () => preview(emp.devedoresHTML()));
-  $('relEmpCsv')?.addEventListener('click', () => emp.baixarCSV(emp.devedoresCSV()));
-  const ferHtml = () => {
-    const t = $('relFerTipo').value, d = $('relFerDest').value;
-    return t === 'venc' ? fer.relVencidos($('relFerMes').value || mesAnterior(), d)
-      : t === 'conc' ? fer.relConcessao(d)
-      : t === 'prev' ? fer.relPrevisao(d) : fer.relSituacao(d);
+    return rel.relatorioQualidade({ boletins, de, ate, funcionarioId: relTela.pessoa || null, destinoId: dest() });
   };
-  $('relFerTipo')?.addEventListener('change', () => { $('relFerMesRot').hidden = $('relFerTipo').value !== 'venc'; });
-  if ($('relFerTipo')) $('relFerMesRot').hidden = $('relFerTipo').value !== 'venc';
-  // Atalho do Painel de Férias: já abre com o relatório de concessão na prévia.
-  const pedido = fer.tomarPedidoRelatorio();
-  if (pedido && $('relFerTipo')) {
-    $('relFerTipo').value = pedido.tipo; $('relFerDest').value = pedido.destino || '';
-    if (pedido.mes) $('relFerMes').value = pedido.mes;
-    $('relFerMesRot').hidden = pedido.tipo !== 'venc';
-    preview(ferHtml());
-  }
-  $('relFerVer')?.addEventListener('click', () => preview(ferHtml()));
-  $('relFerCsv')?.addEventListener('click', () =>
-    rel.baixar(fer.csvFerias($('relFerTipo').value, $('relFerMes').value || mesAnterior(), $('relFerDest').value)));
-  $('relImprimir').addEventListener('click', () => rel.imprimir());
-  $('relFechar').addEventListener('click', () => {
-    $('jorImpressao').hidden = true;
-    $('jorImpressao').innerHTML = '';
-    $('relAcoes').hidden = true;
-  });
+  const ferRel = t => t === 'venc' ? fer.relVencidos(relTela.ferMes || mesAnterior(), relTela.ferDest)
+    : t === 'conc' ? fer.relConcessao(relTela.ferDest)
+    : t === 'prev' ? fer.relPrevisao(relTela.ferDest) : fer.relSituacao(relTela.ferDest);
+  const ferCsv = t => rel.baixar(fer.csvFerias(t, relTela.ferMes || mesAnterior(), relTela.ferDest));
+
+  // Cada relatório: nome, o que é, como gerar (html) e, se tiver, o Excel.
+  const RELS = {
+    esc: [
+      { k: 'dp', nome: 'Relatório Horas Extras', desc: 'Horas extras, insalubridade, periculosidade, faltas e saldo devedor — uma folha por CAEPF', principal: true,
+        html: () => rel.relatorioDP(comp(), dest()) },
+      { k: 'fal', nome: 'Faltas', desc: 'Só as informadas ao DP, com as datas', html: () => rel.relatorioFaltas(comp(), dest()) },
+      { k: 'ate', nome: 'Atestados', desc: 'Períodos e dias, sem motivo', html: () => rel.relatorioAtestados(comp(), dest()) },
+      { k: 'csv', nome: 'Baixar dados', desc: 'Planilha do mês para o escritório', csv: () => rel.baixar(rel.planilhaDP(comp(), dest())) },
+    ],
+    conf: [
+      { k: 'mes', nome: 'Horas extras por mês', desc: 'Uma coluna por mês do fato — mostra o boletim atrasado no mês em que aconteceu', html: () => rel.relatorioPorMes(comp(), dest()) },
+      { k: 'mxc', nome: 'Marcado × Conferido', desc: 'O que o funcionário marcou × o que ficou valendo', html: () => rel.relatorioConferencia(comp(), dest()) },
+      { k: 'ftot', nome: 'Faltas totais', desc: 'Todas as faltas do mês, inclusive as compensadas por horas extras', html: () => rel.relatorioFaltas(comp(), dest(), { totais: true }) },
+      { k: 'det', nome: 'Detalhado DP', desc: 'Abertura por percentual, intervalo e déficit', html: () => rel.relatorioDetalhado(comp(), dest()) },
+    ],
+    pessoa: [
+      { k: 'ext', nome: 'Extrato individual', desc: 'Dia a dia da competência, com a memória de cálculo — precisa de um funcionário',
+        html: () => relTela.pessoa ? rel.extratoIndividual(comp(), relTela.pessoa) : semPessoa() },
+      { k: 'qual', nome: 'Qualidade dos boletins', desc: 'Nível do boletim (Ruim, Bom, Ótimo) no período — de um funcionário ou de todos do destino', html: qualidade },
+    ],
+    emp: [
+      { k: 'empdev', nome: 'Extrato geral', desc: 'Todos que devem, com saldo e parcelas', html: () => emp.devedoresHTML(), csv: () => emp.baixarCSV(emp.devedoresCSV()) },
+    ],
+    fer: [
+      { k: 'conc', nome: 'Período de concessão', desc: 'Em aberto e concedidas', html: () => ferRel('conc'), csv: () => ferCsv('conc') },
+      { k: 'venc', nome: 'Venceram no mês', desc: 'Emita no início de cada mês, do mês anterior (usa o Mês acima)', html: () => ferRel('venc'), csv: () => ferCsv('venc') },
+      { k: 'prev', nome: 'Previsão dos próximos 12 meses', desc: 'Quem vence e quando', html: () => ferRel('prev'), csv: () => ferCsv('prev') },
+      { k: 'sit', nome: 'Situação da equipe', desc: 'Saldo e período de cada um', html: () => ferRel('sit'), csv: () => ferCsv('sit') },
+    ],
+  };
+
+  const optDest = (sel, extra = '') => extra + destinos.map(d => `<option value="${d.id}"${d.id === sel ? ' selected' : ''}>${esc(d.nome)}</option>`).join('');
+  const selDestino = `<label>Destino de DP <select data-rel-f="destino">${optDest(relTela.destino)}</select></label>`;
+  const filtros = {
+    esc: selDestino, conf: selDestino,
+    pessoa: `<label>Funcionário <select data-rel-f="pessoa">
+        <option value="">Todos do destino (só Qualidade)</option>
+        ${pessoas.map(f => `<option value="${f.id}"${f.id === relTela.pessoa ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
+      ${selDestino}
+      <label>De <input type="month" data-rel-f="de" value="${relTela.de}"></label>
+      <label>Até <input type="month" data-rel-f="ate" value="${relTela.ate}"></label>`,
+    emp: '',
+    fer: `<label>Mês <input type="month" data-rel-f="ferMes" value="${relTela.ferMes}"></label>
+      <label>Destino <select data-rel-f="ferDest">${optDest(relTela.ferDest, `<option value="">Todos</option>`)}
+        <option value="-"${relTela.ferDest === '-' ? ' selected' : ''}>Sem destino</option></select></label>`,
+  };
+  const dicas = {
+    esc: 'O que vai ao escritório no fechamento. Competência: troque no alto, à direita. Todo relatório sai de <b>um destino de DP só</b>.',
+    conf: 'Uso interno — para conferir antes de enviar. Não vai ao escritório.',
+    pessoa: 'Uso interno. O Extrato usa a competência do alto; a Qualidade usa De/Até.',
+    emp: 'Não depende da competência.',
+    fer: 'O Mês vale só para "Venceram no mês".',
+  };
+
+  const linha = r => `<div class="rel-linha">
+      <b>${esc(r.nome)}</b><span class="dc-sem">${esc(r.desc)}</span>
+      <span class="rel-linha__acoes">
+        ${r.html ? `<button class="btn${r.principal ? ' principal' : ''}" data-rel-ver="${r.k}">Visualizar</button>
+        <button class="btn" data-rel-imp="${r.k}">Imprimir</button>` : ''}
+        ${r.csv ? `<button class="btn mini" data-rel-csv="${r.k}">Excel</button>` : ''}
+      </span></div>`;
+
+  $('telaJorRelatorios').innerHTML = cabecalho('Relatórios', 'Uma aba por assunto; prévia na tela primeiro') + `
+    <div class="jor-corpo">
+      <div class="rel-abas" role="tablist">
+        ${abas.map(([k, t]) => `<button type="button" role="tab" class="rel-aba${k === relTela.aba ? ' ativa' : ''}" data-rel-aba="${k}">${t}</button>`).join('')}
+      </div>
+      <div class="rel-abacorpo">
+        ${filtros[relTela.aba] ? `<div class="jor-barra rel-filtros">${filtros[relTela.aba]}</div>` : ''}
+        <p class="dc-sem jor-nota rel-dica">${dicas[relTela.aba]}</p>
+        ${RELS[relTela.aba].map(linha).join('')}
+      </div>
+    </div>` + assinatura();
+
+  const achar = k => RELS[relTela.aba].find(r => r.k === k);
+  const gerar = async (k, imprimir) => {
+    const html = await achar(k)?.html();
+    if (!html) return;
+    rel.mostrar(html, { barra: true });
+    if (imprimir) setTimeout(() => rel.imprimir(), 300);   // deixa a marca carregar antes do papel
+  };
+  const tela = $('telaJorRelatorios');
+  tela.querySelectorAll('[data-rel-aba]').forEach(b => b.addEventListener('click', () => {
+    relTela.aba = b.dataset.relAba;
+    $('jorImpressao').hidden = true; $('jorImpressao').innerHTML = '';
+    desenharRelatorios();
+  }));
+  tela.querySelectorAll('[data-rel-f]').forEach(el => el.addEventListener('change', () => { relTela[el.dataset.relF] = el.value; }));
+  tela.querySelectorAll('[data-rel-ver]').forEach(b => b.addEventListener('click', () => gerar(b.dataset.relVer, false)));
+  tela.querySelectorAll('[data-rel-imp]').forEach(b => b.addEventListener('click', () => gerar(b.dataset.relImp, true)));
+  tela.querySelectorAll('[data-rel-csv]').forEach(b => b.addEventListener('click', () => achar(b.dataset.relCsv)?.csv()));
+
+  if (pedido) gerar(pedido.tipo, false);
 }
 
 const mesAnterior = () => {
