@@ -287,7 +287,7 @@
 .fp-fundo { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; opacity: .5; pointer-events: none; }
 .fp-area { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; transform-origin: 50% 50%; }
 .fp-campo { position: absolute; white-space: nowrap; line-height: 1; font-family: Arial, Helvetica, sans-serif;
-  font-weight: 700; color: #1F3A8A; }
+  font-weight: 700; color: #000; }   /* preto, pedido dele: é preenchimento de formulário, não relatório */
 .fp-linha { position: absolute; display: block; background: #9A9C93; }
 .fp-legenda { position: absolute; font: 700 9pt Arial, sans-serif; color: #744F28; }
 @media print {
@@ -297,4 +297,5 @@
   .fp-folha.fp-girada { page: folhapontor; }
   .fp-folha + .fp-folha { break-before: page; page-break-before: always; }
   .fp-linha { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .fp-campo { color: #000 !important; }
 }
