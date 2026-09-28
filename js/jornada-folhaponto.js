@@ -142,7 +142,13 @@ export function desenhar(alvo, { aviso }) {
           <td><input type="number" step="0.5" min="6" max="16" data-fpc="${k}" data-fpk="pt" value="${c.pt}"></td></tr>`; }).join('')}</tbody>
       </table>
       <div class="jor-barra">
-        <label class="jor-inline"><input type="checkbox" id="fpGirar"${aj.girar ? ' checked' : ''}> Girar 90° (se o teste sair de lado)</label>
+        <label>Posição na bandeja
+          <select id="fpGirar">
+            <option value=""${!aj.girar ? ' selected' : ''}>Deitada (sem girar)</option>
+            <option value="esq"${aj.girar === true || aj.girar === 'esq' ? ' selected' : ''}>Em pé, cabeçalho à esquerda (girar 90°)</option>
+            <option value="dir"${aj.girar === 'dir' ? ' selected' : ''}>Em pé, cabeçalho à direita (girar 270°)</option>
+          </select>
+        </label>
         <label class="jor-inline"><input type="checkbox" id="fpVerso180"${aj.verso180 ? ' checked' : ''}> Verso de cabeça para baixo (girar 180°)</label>
       </div>
       <div class="jor-barra">
@@ -159,7 +165,7 @@ export function desenhar(alvo, { aviso }) {
   const salvarAjuste = () => {
     const n = id => Number(String($(id).value).replace(',', '.')) || 0;
     Object.assign(aj, { dx: n('fpDx'), dy: n('fpDy'), dxV: n('fpDxV'), dyV: n('fpDyV'),
-      girar: $('fpGirar').checked, verso180: $('fpVerso180').checked,
+      girar: $('fpGirar').value || false, verso180: $('fpVerso180').checked,
       invertida: $('fpInvertida').checked, cadastro: $('fpCadastro').checked, linha: $('fpLinha').value });
     aj.campos = {};
     alvo.querySelectorAll('[data-fpc]').forEach(el => {
@@ -212,7 +218,11 @@ function envelope(lado, aj, miolo, teste = false) {
   const dx = lado === 'verso' ? aj.dxV : aj.dx, dy = lado === 'verso' ? aj.dyV : aj.dy;
   const gira180 = lado === 'verso' && aj.verso180;
   // A folha da gráfica fica parada ao fundo (só na tela); o texto é que se move com o ajuste.
-  return `<div class="fp-folha${aj.girar ? ' fp-girada' : ''}${teste ? ' fp-teste' : ''}"><div class="fp-rot">
+  // Em pé: "esq" = cabeçalho à esquerda na bandeja (90°); "dir" = à direita (270°).
+  // Com o cabeçalho à direita, o ano fica na borda que entra primeiro e não
+  // cai na margem do fim da folha, onde a impressora não imprime (28/09/2026).
+  const giro = aj.girar === true ? 'esq' : (aj.girar || '');
+  return `<div class="fp-folha${giro ? ' fp-girada fp-girada-' + giro : ''}${teste ? ' fp-teste' : ''}"><div class="fp-rot">
     <img class="fp-fundo" src="img/folha-ponto.png" alt="">
     <div class="fp-area" style="transform:translate(${dx}mm,${dy}mm)${gira180 ? ' rotate(180deg)' : ''}">${miolo}</div></div></div>`;
 }
