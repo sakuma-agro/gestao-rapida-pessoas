@@ -359,3 +359,21 @@
 .jor-nivel-tag.jor-nivel--ruim  { background: #D32F2F; color: #fff; }
 .jor-nivel-tag.jor-nivel--bom   { background: #F2B705; color: #3D2E00; }
 .jor-nivel-tag.jor-nivel--otimo { background: #84BD00; color: #fff; }
+
+/* Relatórios em abas (28/09/2026) */
+.rel-abas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.rel-aba { border: 0; border-top: 3px solid transparent; background: #E3E4DC; color: #51534A; font: inherit; font-weight: 700;
+  font-size: 14px; padding: 10px 18px; border-radius: 10px 10px 0 0; cursor: pointer; }
+.rel-aba:hover { background: #ECEDE6; }
+.rel-aba.ativa { background: #fff; border-top-color: #84BD00; }
+.rel-abacorpo { background: #fff; border: 1px solid #DDDED6; border-radius: 0 10px 10px 10px; padding: 14px 18px 8px; }
+.rel-filtros { margin-bottom: 4px; }
+.rel-dica { margin: 4px 0 8px; }
+.rel-linha { display: grid; grid-template-columns: 220px 1fr auto; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid #EFEFEA; }
+.rel-linha b { font-size: 14.5px; }
+.rel-linha__acoes { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 700px) {
+  .rel-linha { grid-template-columns: 1fr; gap: 4px; }
+  .rel-linha__acoes { justify-content: flex-start; }
+  .rel-aba { padding: 8px 12px; font-size: 13px; }
+}
