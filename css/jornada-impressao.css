@@ -250,3 +250,26 @@
 .rel-tabela.rel-he th.rel-c, .rel-tabela.rel-he td.rel-c { text-align: center; }
 .rel-tabela.rel-he th.rel-justo { width: 1%; white-space: nowrap; }
 .rel-tabela.rel-he th:not(:first-child):not(.rel-justo) { width: 11%; }
+
+/* ---- Qualidade dos boletins (28/09/2026) ---- */
+.rel-qpessoa { font-size: 12px; color: #51534A; margin: 10px 0 8px; }
+.rel-qkpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 0 0 14px; }
+.rel-qkpis > div { border: 1px solid #D6D8CF; border-top: 3px solid #84BD00; padding: 7px 9px; }
+.rel-qkpis span { display: block; font-size: 9.5px; color: #8A8D86; text-transform: uppercase; letter-spacing: .03em; }
+.rel-qkpis strong { display: block; font-size: 20px; color: #51534A; line-height: 1.2; }
+.rel-qkpis small { font-size: 10px; color: #8A8D86; }
+.rel-qkpis .rel-q--otimo-t { border-top-color: #84BD00; }
+.rel-qkpis .rel-q--bom-t { border-top-color: #F2B705; }
+.rel-qkpis .rel-q--ruim-t { border-top-color: #D32F2F; }
+.rel-qkpis .rel-q--otimo-t strong { color: #4F7300; } .rel-qkpis .rel-q--bom-t strong { color: #9A7400; } .rel-qkpis .rel-q--ruim-t strong { color: #C62828; }
+.rel-qbarra { display: flex; height: 14px; border: 1px solid #D6D8CF; }
+.rel-qbarra span { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; min-width: 14px; }
+.rel-q--otimo { background: #84BD00; } .rel-q--bom { background: #F2B705; color: #3D2E00 !important; } .rel-q--ruim { background: #D32F2F; }
+.rel-qconc { display: inline-block; padding: 0 7px; border-radius: 8px; font-weight: 700; border: 1px solid; }
+.rel-qconc--otimo { color: #4F7300; } .rel-qconc--bom { color: #9A7400; } .rel-qconc--ruim { color: #C62828; }
+@media print {
+  .rel-qbarra span, .rel-qkpis > div, .rel-qconc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+@media (max-width: 640px) { .rel-qkpis { grid-template-columns: repeat(2, 1fr); } }
+.rel-qkpis small .rel-qconc { display: inline-block; text-transform: none; letter-spacing: 0; font-size: 10px; color: inherit; }
+.rel-qkpis small .rel-qconc--otimo { color: #4F7300; } .rel-qkpis small .rel-qconc--bom { color: #9A7400; } .rel-qkpis small .rel-qconc--ruim { color: #C62828; }

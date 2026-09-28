@@ -339,3 +339,23 @@
 .jor-marcado[hidden] { display: none; }
 .jor-marcado-res { margin-top: 8px; font-size: 13px; line-height: 1.5; }
 #bDifRot[hidden] { display: none; }
+
+/* Nível do boletim (28/09/2026) — cores pedidas: Ruim vermelho, Bom amarelo, Ótimo verde */
+.jor-nivel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 12px; }
+.jor-nivel > span { font-size: 14px; color: #51534A; margin-right: 4px; }
+.jor-nivel__op { display: inline-flex !important; align-items: center; gap: 6px; padding: 6px 14px;
+  border: 2px solid; border-radius: 999px; background: #fff; cursor: pointer; font-size: 14px; font-weight: 600; margin: 0 !important; }
+.jor-nivel__op input { margin: 0; }
+.jor-nivel--ruim  { border-color: #D32F2F; color: #B71C1C; }
+.jor-nivel--bom   { border-color: #F2B705; color: #7A5B00; }
+.jor-nivel--otimo { border-color: #84BD00; color: #4F7300; }
+.jor-nivel--ruim input  { accent-color: #D32F2F; }
+.jor-nivel--bom input   { accent-color: #F2B705; }
+.jor-nivel--otimo input { accent-color: #84BD00; }
+.jor-nivel--ruim:has(input:checked)  { background: #D32F2F; color: #fff; }
+.jor-nivel--bom:has(input:checked)   { background: #F2B705; color: #3D2E00; }
+.jor-nivel--otimo:has(input:checked) { background: #84BD00; color: #fff; }
+.jor-nivel-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 8px; border: 1px solid; }
+.jor-nivel-tag.jor-nivel--ruim  { background: #D32F2F; color: #fff; }
+.jor-nivel-tag.jor-nivel--bom   { background: #F2B705; color: #3D2E00; }
+.jor-nivel-tag.jor-nivel--otimo { background: #84BD00; color: #fff; }
