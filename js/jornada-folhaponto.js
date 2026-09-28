@@ -26,7 +26,7 @@ const CAMPOS = {
   empregador: { x: 93.5,  base: 14.2, max: 185.0, pt: 10 },
   empregado:  { x: 29.5,  base: 24.0, max: 155.0, pt: 11 },
   mes:        { x: 168.0, base: 24.0, max: 228.0, pt: 11 },
-  ano:        { x: 245.0, base: 24.0, max: 252.5, pt: 11 },
+  ano:        { x: 248.5, base: 24.0, max: 253.3, pt: 11 },   // +3,5 mm depois do 1º teste na L4260 (28/09)
 };
 const FOLHA = { w: 260, h: 165 };
 
