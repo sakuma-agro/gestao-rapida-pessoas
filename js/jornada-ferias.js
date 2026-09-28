@@ -321,7 +321,9 @@ function cabecalhoDoc(titulo, sub, direita) {
     <div class="rel-comp">${direita}</div></header>`;
 }
 const rodapeLop = () => `<footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>`;
-const assinaNota = () => `<p class="rel-nota">Emitido em ${br(hoje())} por ${esc(usuario() || '—')} · responsável: Guilherme Lopes, Gerente Administrativo.</p>`;
+/* 28/09/2026: a linha "Emitido em … por … · responsável: …" saiu de todos os
+   relatórios, a pedido do Guilherme. Fica só a marca da LOP no pé. */
+const assinaNota = () => '';
 const rotDestino = filtro => !filtro ? 'Todos os destinos' : filtro === '-' ? 'Sem destino de DP' :
   (jd.dados.destinos.find(d => d.id === filtro)?.nome || '—');
 const doFiltro = filtro => ativos().filter(f => casaDestino(f.id, filtro));

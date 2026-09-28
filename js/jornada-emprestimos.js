@@ -572,7 +572,6 @@ export function devedoresHTML() {
     }).join('') || '<p class="rel-vazio">Ninguém deve nada hoje.</p>'}
     <table class="rel-tabela"><tfoot><tr><td>Total geral em aberto</td><td class="rel-num">${brl(tot)}</td></tr></tfoot></table>
     <p class="rel-nota">Sem juros e sem correção. "Faltam" é o número de parcelas previstas; mês sem desconto ou desconto parcial empurra para o fim.</p>
-    <p class="rel-nota">Emitido por Guilherme Lopes · Gerente Administrativo</p>
     ${rodapeLop()}</article>`;
 }
 
