@@ -333,3 +333,9 @@
 /* Lançar jornada: já existe lançamento no dia — complemento (28/09/2026) */
 .jor-dia-ja { margin: -4px 0 12px; padding: 8px 10px; border-left: 3px solid #744F28; background: #F7F1EA; color: #51534A; font-size: 12.5px; line-height: 1.5; border-radius: 0; }
 .jor-dia-ja[hidden] { display: none; }
+
+/* Marcado × correto no lançamento (28/09/2026) */
+.jor-marcado { margin: 6px 0 10px; border-left-color: #744F28; background: #FAF6EF; }
+.jor-marcado[hidden] { display: none; }
+.jor-marcado-res { margin-top: 8px; font-size: 13px; line-height: 1.5; }
+#bDifRot[hidden] { display: none; }
