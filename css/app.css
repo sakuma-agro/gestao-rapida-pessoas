@@ -589,6 +589,9 @@ dialog h3{margin:0 0 14px;font-size:16px}
 @page{size:A4 portrait;margin:0}
 /* A folha marcada com `.deitada` sai em paisagem; o resto continua em pé. */
 @page paisagem{size:A4 landscape;margin:0}
+/* Folha de ponto da gráfica, 26 × 16,5 cm (28/09/2026); "folhapontor" = girada 90°. */
+@page folhaponto{size:260mm 165mm;margin:0}
+@page folhapontor{size:165mm 260mm;margin:0}
 @media print{
   :root{--imp-margem:4mm;--imp-escala:1.11}
   body{background:#fff}

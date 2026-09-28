@@ -377,3 +377,17 @@
   .rel-linha__acoes { justify-content: flex-start; }
   .rel-aba { padding: 8px 12px; font-size: 13px; }
 }
+
+/* Folha de ponto (28/09/2026) */
+.fp-pessoas { border: 1px solid #DDDED6; border-radius: 8px; padding: 10px 12px; margin: 6px 0 12px; }
+.fp-pessoas__topo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+.fp-pessoas__lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 14px; }
+.fp-passos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 6px 0 12px; }
+.fp-passo { display: flex; gap: 10px; border: 1px solid #DDDED6; border-radius: 8px; padding: 10px 12px; }
+.fp-passo > span { flex: none; width: 26px; height: 26px; border-radius: 50%; background: #84BD00; color: #fff;
+  font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.fp-passo .btn { margin-top: 6px; }
+.fp-ajuste { border: 1px solid #DDDED6; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; }
+.fp-ajuste summary { cursor: pointer; }
+.fp-num input { width: 70px; }
+@media (max-width: 800px) { .fp-passos { grid-template-columns: 1fr; } }

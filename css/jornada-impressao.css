@@ -273,3 +273,28 @@
 @media (max-width: 640px) { .rel-qkpis { grid-template-columns: repeat(2, 1fr); } }
 .rel-qkpis small .rel-qconc { display: inline-block; text-transform: none; letter-spacing: 0; font-size: 10px; color: inherit; }
 .rel-qkpis small .rel-qconc--otimo { color: #4F7300; } .rel-qkpis small .rel-qconc--bom { color: #9A7400; } .rel-qkpis small .rel-qconc--ruim { color: #C62828; }
+
+/* ---- Folha de ponto: só o cabeçalho sobre a folha da gráfica (28/09/2026) ----
+   Páginas nomeadas "folhaponto" (26 × 16,5 cm) e "folhapontor" (girada) ficam
+   no app.css, como a "paisagem". Aqui só se aponta a folha para elas. */
+.fp-lote { padding: 8px 0; }
+.fp-aviso-tela { max-width: 260mm; margin: 0 auto 10px; font-size: 12px; color: #51534A; }
+.fp-folha { position: relative; width: 260mm; height: 165mm; margin: 0 auto 14px; overflow: hidden;
+  background: #fff; outline: 1px dashed #A8AA9E; }
+.fp-rot { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; }
+.fp-girada { width: 165mm; height: 260mm; }
+.fp-girada .fp-rot { transform-origin: 0 0; transform: translate(165mm, 0) rotate(90deg); }
+.fp-fundo { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; opacity: .5; pointer-events: none; }
+.fp-area { position: absolute; left: 0; top: 0; width: 260mm; height: 165mm; transform-origin: 50% 50%; }
+.fp-campo { position: absolute; white-space: nowrap; line-height: 1; font-family: Arial, Helvetica, sans-serif;
+  font-weight: 700; color: #1F3A8A; }
+.fp-linha { position: absolute; display: block; background: #9A9C93; }
+.fp-legenda { position: absolute; font: 700 9pt Arial, sans-serif; color: #744F28; }
+@media print {
+  .fp-lote { padding: 0; }
+  .fp-aviso-tela, .fp-fundo { display: none !important; }
+  .fp-folha { page: folhaponto; margin: 0; outline: 0; break-inside: avoid; }
+  .fp-folha.fp-girada { page: folhapontor; }
+  .fp-folha + .fp-folha { break-before: page; page-break-before: always; }
+  .fp-linha { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
