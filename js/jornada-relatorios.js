@@ -370,7 +370,7 @@ export function relatorioConferencia(competencia, destinoId) {
           <td class="rel-c">${h(soma('heM'))}</td><td></td>
           <td class="rel-c">${h(soma('heC'))}</td>
           <td class="rel-c">${hs(soma('dif'))}</td><td colspan="2"></td></tr></tfoot>
-      </table>` : '<p class="rel-vazio">Nenhum lançamento alterado ou excluído nesta competência.</p>';
+      </table>` : '<p class="rel-vazio">Nenhum lançamento com marcado diferente do conferido nesta competência.</p>';
 
   // Resumo por funcionário: quantas vezes o marcado não bateu com o conferido pelo gerente.
   const porPessoa = {};
@@ -386,7 +386,7 @@ export function relatorioConferencia(competencia, destinoId) {
           .map(([n, p]) => `<tr><td>${esc(n)}</td><td class="rel-c">${p.n}</td><td class="rel-c"><b>${hs(p.dif)}</b></td></tr>`).join('')}</tbody>
       </table>` : '';
 
-  const nota = `<p class="rel-nota">Marcado = como o boletim foi lançado pela primeira vez (o que o funcionário marcou no talão). Conferido = como ficou depois da alteração.</p>`;
+  const nota = `<p class="rel-nota">Marcado = o que o funcionário marcou no boletim (informado no lançamento ou a primeira versão lançada, antes da alteração). Conferido = o que ficou valendo e foi para a folha.</p>`;
   return documentoDP({
     titulo: 'MARCADO × CONFERIDO', competencia, destino, interno: true,
     versao: comp?.versao || 1, corpo: tabela + resumo + nota,

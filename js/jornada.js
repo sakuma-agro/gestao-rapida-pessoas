@@ -316,6 +316,18 @@ function desenharLancar() {
           <label>Intervalo (min) <input type="number" id="bInterv" min="0" step="5" value="60"></label>
         </div>
         <small class="jor-dica" id="bJorPadrao"></small>
+        <label class="jor-inline" id="bDifRot"><input type="checkbox" id="bDif"> O funcionário marcou diferente do correto</label>
+        <div class="jor-caixa jor-marcado" id="bMarcadoBox" hidden>
+          <p class="dc-sem" style="margin:0 0 6px">Em cima fica o <b>correto</b> — é o que vai para a folha.
+            Aqui fica o que o funcionário <b>marcou</b> no boletim.</p>
+          <div class="jor-linha">
+            <label>Entrada marcada <input type="time" id="bMIni"></label>
+            <label>Saída marcada <input type="time" id="bMFim"></label>
+            <label>Intervalo marcado (min) <input type="number" id="bMInterv" min="0" step="5"></label>
+          </div>
+          <label>Por que é diferente? ${selOrigem('bMOrigem')}</label>
+          <label>Motivo <input type="text" id="bMMotivo" maxlength="200" placeholder="Ex.: gerente de campo confirmou saída às 16h"></label>
+        </div>
         <div class="jor-linha">
           <label>Hora extra especial
             <select id="bEspecial">
@@ -335,8 +347,18 @@ function desenharLancar() {
       <aside class="jor-apurado" id="jorApurado"></aside>
     </div>` + assinatura();
 
-  ['bFunc','bData','bTipo','bIni','bFim','bInterv','bEspecial'].forEach(id =>
+  ['bFunc','bData','bTipo','bIni','bFim','bInterv','bEspecial','bMIni','bMFim','bMInterv'].forEach(id =>
     $(id).addEventListener('input', mostrarApurado));
+  $('bDif').addEventListener('change', () => {
+    // Ao marcar, o que está em cima (o que veio do talão) desce para "marcado";
+    // aí é só corrigir em cima o horário certo.
+    if ($('bDif').checked && !$('bMIni').value && !$('bMFim').value) {
+      $('bMIni').value = $('bIni').value; $('bMFim').value = $('bFim').value;
+      $('bMInterv').value = $('bInterv').value;
+      if (!$('bMOrigem').value) $('bMOrigem').value = 'gerente';
+    }
+    mostrarMarcado(); mostrarApurado();
+  });
   // Funcionário, data ou tipo do dia mudou → a jornada padrão entra de novo.
   ['bFunc','bData','bTipo'].forEach(id => $(id).addEventListener('change', () => {
     if (id === 'bFunc') cadastroDoSelecionado();
@@ -349,7 +371,7 @@ function desenharLancar() {
   });
   $('bLimpar').addEventListener('click', () => {
     $('jorFormBoletim').reset(); $('bCadAviso').innerHTML = ''; $('bJorPadrao').textContent = '';
-    mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
+    mostrarDiaAuto(); mostrarMotivo(); mostrarMarcado(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
   prepararEdicao();
@@ -455,6 +477,23 @@ function fotoMarcado(b) {
   };
 }
 
+/* Marcado × correto já no lançamento (28/09/2026): a caixa "O funcionário
+   marcou diferente" guarda o que veio no talão; os campos de cima são o
+   correto e é só ele que vai para a apuração e para a folha. */
+function mostrarMarcado() {
+  const box = $('bMarcadoBox');
+  if (box) box.hidden = !$('bDif')?.checked;
+}
+function entradaMarcada(e) {
+  if (!$('bDif')?.checked) return null;
+  const m = { ini: $('bMIni').value, fim: $('bMFim').value, intervalo: Number($('bMInterv').value || 0) };
+  if (!m.ini || !m.fim) return null;
+  const bs = [...e.boletins];
+  const novo = ($('bIni').value && $('bFim').value) ? bs.pop() : { numero: $('bNumero').value, heEspecial: minutosHe() };
+  bs.push({ ...novo, ...m });
+  return { ...e, boletins: bs };
+}
+
 function prepararEdicao() {
   const b = estadoTela.editando && jd.dados.boletins.find(x => x.id === estadoTela.editando);
   if (!b || b.situacao === 'cancelado' || situacaoBoletim(b).fechado) { estadoTela.editando = null; return; }
@@ -481,6 +520,7 @@ function prepararEdicao() {
   mostrarMotivo();
   $('bMotivo').value = b.motivo || '';
   form.querySelector('[type=submit]').textContent = 'Salvar alteração';
+  $('bDifRot').hidden = true; $('bDif').checked = false; mostrarMarcado();
   $('bJorPadrao').textContent = '';
   $('bCancelarEdicao').addEventListener('click', () => { estadoTela.editando = null; irPara('jorBoletins'); });
 }
@@ -669,7 +709,22 @@ function mostrarApurado() {
       <dt>Noturnas</dt><dd>${minParaHHMM(r.minNoturnos)}</dd>
     </dl>
     ${r.avisos.length ? `<ul class="jor-avisos">${r.avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+    ${blocoMarcado(entrada, r)}
     <details><summary>Memória de cálculo</summary><pre>${esc(r.memoria)}</pre></details>`;
+}
+
+function blocoMarcado(entrada, r) {
+  const em = entradaMarcada(entrada);
+  if (!em) return $('bDif')?.checked ? '<p class="jor-pend">Preencha a entrada e a saída que o funcionário marcou.</p>' : '';
+  const m = apurarComplemento(em);
+  const exM = m.minExtra50 + m.minExtra100, exC = r.minExtra50 + r.minExtra100;
+  const dif = exC - exM;
+  return `<div class="jor-caixa jor-marcado-res">
+      <b>Marcado × correto</b><br>
+      Marcado: ${esc($('bMIni').value)}–${esc($('bMFim').value)} · extras ${horas(exM)}${m.minDeficit ? ` · déficit ${horas(m.minDeficit)}` : ''}<br>
+      Correto: ${esc($('bIni').value || '—')}–${esc($('bFim').value || '—')} · extras ${horas(exC)}${r.minDeficit ? ` · déficit ${horas(r.minDeficit)}` : ''}<br>
+      Diferença em extras: <b>${dif ? (dif < 0 ? '−' : '+') + horas(Math.abs(dif)) : 'nenhuma'}</b>
+    </div>`;
 }
 
 async function gravarBoletim(ev) {
@@ -689,6 +744,26 @@ async function gravarBoletim(ev) {
     if (situacaoBoletim(original).fechado) { aviso('Este lançamento já está fechado — para corrigir, reabra a competência no Fechamento.'); return; }
     if (!$('bOrigemAlt').value) { aviso('Escolha por que o lançamento mudou.'); $('bOrigemAlt').focus(); return; }
     if (motivoAlt.length < 5) { aviso('Escreva o motivo da alteração (pelo menos 5 letras).'); $('bMotivoAlt').focus(); return; }
+  }
+
+  let marcadoNovo = null;
+  if (!original && $('bDif').checked) {
+    const em = entradaMarcada(entrada);
+    if (!em) { aviso('Preencha a entrada e a saída que o funcionário marcou (ou desmarque "marcou diferente").'); $('bMIni').focus(); return; }
+    if ($('bMIni').value === $('bIni').value && $('bMFim').value === $('bFim').value
+        && Number($('bMInterv').value || 0) === Number($('bInterv').value || 0)) {
+      aviso('O marcado está igual ao correto. Corrija o horário em cima ou desmarque "marcou diferente".'); return;
+    }
+    if (!$('bMOrigem').value) { aviso('Escolha por que o marcado é diferente.'); $('bMOrigem').focus(); return; }
+    if ($('bMMotivo').value.trim().length < 5) { aviso('Escreva o motivo da diferença (pelo menos 5 letras).'); $('bMMotivo').focus(); return; }
+    const m = apurarComplemento(em);
+    marcadoNovo = {
+      hora_ini: $('bMIni').value, hora_fim: $('bMFim').value, intervalo_min: Number($('bMInterv').value || 0),
+      tipo_id: $('bTipo').value || null, he_especial_min: minutosHe(),
+      min_extra_50: m.minExtra50, min_extra_100: m.minExtra100, min_deficit: m.minDeficit,
+      min_trabalhados: m.minTrabalhados, no_lancamento: true,
+      lancado_por: estado.sessao?.user?.email || null, lancado_em: new Date().toISOString(),
+    };
   }
 
   // O motor roda ANTES da gravação: boletim e apuração nascem juntos. Com
@@ -715,6 +790,11 @@ async function gravarBoletim(ev) {
     criado_em: original ? original.criado_em : new Date().toISOString(),
     atualizado_em: new Date().toISOString(),
   };
+  if (marcadoNovo) {
+    b.marcado = marcadoNovo;
+    b.origem_alteracao = $('bMOrigem').value;
+    b.motivo_alteracao = $('bMMotivo').value.trim();
+  }
   if (original) {
     b.id = original.id; b.compensacao = original.compensacao ?? null;
     b.marcado = fotoMarcado(original);
@@ -753,6 +833,8 @@ async function gravarBoletim(ev) {
 
   $('bNumero').value = '';
   $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
+  $('bDif').checked = false; ['bMIni','bMFim','bMInterv','bMOrigem','bMMotivo'].forEach(id => { $(id).value = ''; });
+  mostrarMarcado();
   dia.chave = '';
   preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
   carregarDia();
@@ -818,7 +900,7 @@ function desenharBoletins() {
           <td>${esc(f?.nome || '—')}</td>
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
             : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
-              ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · alterado</span>` : ''}</td>
+              ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · ${b.marcado.no_lancamento ? 'corrigido no lançamento' : 'alterado'}</span>` : ''}</td>
           <td class="ce">${horas(a?.min_extra_50)}</td>
           <td class="ce">${horas(a?.min_extra_100)}</td>
           <td class="ce">${horas(a?.min_deficit)}</td>
