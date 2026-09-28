@@ -3,18 +3,18 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v106';
+const VERSAO = 'gr-v107';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
   './js/planilha.js', './js/aniversarios.js', './js/seed.js', './js/sst.js', './js/sst-ficha.js', './js/ca.js', './js/rh.js', './js/aso.js',
   './js/acesso.js', './js/atalhos.js', './js/termos.js', './js/backup.js', './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
   './js/jornada.js', './js/jornada-dados.js', './js/jornada-motor.js',
-  './js/jornada-fechamento.js', './js/jornada-relatorios.js', './js/jornada-cadastros.js', './js/jornada-emprestimos.js', './js/jornada-ferias.js', './js/jornada-boletins.js',
+  './js/jornada-fechamento.js', './js/jornada-relatorios.js', './js/jornada-cadastros.js', './js/jornada-emprestimos.js', './js/jornada-ferias.js', './js/jornada-boletins.js', './js/jornada-folhaponto.js',
   './css/jornada.css', './css/jornada-marca.css', './css/jornada-impressao.css',
   './img/sakuma-logo.png', './img/sakuma-marca-vertical.png',
   './img/lop-assinatura-laser-claro.png', './img/lop-assinatura-laser-escuro.png',
-  './img/lop-marca.png', './img/whatsapp.png',
+  './img/lop-marca.png', './img/whatsapp.png', './img/folha-ponto.png',
   './vendor/supabase.js', './manifest.webmanifest',
   // Os ícones levam o número da versão no nome. Quando a arte mudar, suba
   // para .v3 aqui, no manifest e no index.html — assim o navegador é obrigado
