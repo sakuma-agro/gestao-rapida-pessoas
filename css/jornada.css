@@ -427,3 +427,10 @@
 .fer-concessao__acao{grid-column:2;grid-row:1/4;align-self:center;padding:7px 12px;border:1px solid #84BD00;border-radius:8px;background:#fff;
   font-size:13px;font-weight:600;color:#51534A;white-space:nowrap}
 @media (max-width:560px){.fer-concessao{grid-template-columns:1fr}.fer-concessao__acao{grid-column:1;grid-row:auto;justify-self:start;margin-top:6px}}
+
+/* Férias › Previsão — botão Liberados em aberto (29/09/2026) */
+.fer-aberto{font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:6px 12px;border:1px solid #84BD00;border-radius:8px;background:#f3f9e6;color:#51534A}
+.fer-aberto b{display:inline-block;min-width:22px;margin-left:6px;padding:1px 7px;border-radius:10px;background:#84BD00;color:#fff;text-align:center}
+.fer-aberto:hover{border-color:#744F28}
+.fer-aberto[aria-pressed="true"]{background:#744F28;border-color:#744F28;color:#fff}
+.fer-aberto[aria-pressed="true"] b{background:#fff;color:#744F28}
