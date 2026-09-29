@@ -165,7 +165,10 @@ export const FAIXAS = {
   f30:     { rot: 'Até 30 dias',    cls: 'pv-alerta',  tag: 'alerta', txt: 'limite em até 30 dias' },
   f60:     { rot: '31 a 60 dias',   cls: 'pv-atencao', tag: 'alerta', txt: 'limite em 31 a 60 dias' },
   f90:     { rot: '61 a 90 dias',   cls: 'pv-calma',   tag: 'ativo',  txt: 'limite em 61 a 90 dias' },
-  emdia:   { rot: 'Em dia',         cls: 'pv-ok',      tag: 'neutra', txt: 'mais de 90 dias ou nada a tirar' },
+  /* 29/09/2026: "Em dia" misturava quem já pode tirar férias com quem ainda
+     não completou o período. Agora são dois cartões separados. */
+  livre:   { rot: 'Liberado · +90 dias', cls: 'pv-livre', tag: 'ativo', txt: 'pode tirar; limite em mais de 90 dias' },
+  formacao:{ rot: 'Em formação',    cls: 'pv-ok',      tag: 'neutra', txt: 'ainda não completou o período ou já tirou tudo' },
   semini:  { rot: 'Sem situação inicial', cls: 'pv-ok', tag: 'neutra', txt: 'informe o último período quitado' },
   sem:     { rot: 'Sem admissão',   cls: 'pv-ok',      tag: 'neutra', txt: 'cadastro sem data de admissão' },
 };
@@ -173,13 +176,13 @@ export function faixa(fid) {
   if (!admissao(pessoa(fid))) return 'sem';
   if (precisaInicial(fid)) return 'semini';
   const pend = pendentes(fid);
-  if (!pend.length) return 'emdia';
+  if (!pend.length) return 'formacao';
   const f = dias(hoje(), pend[0].limite);
   if (f < 0) return 'vencida';
   if (f <= 30) return 'f30';
   if (f <= 60) return 'f60';
   if (f <= 90) return 'f90';
-  return 'emdia';
+  return 'livre';
 }
 
 /** Faltas lançadas dentro de um período (todas, compensadas ou não). */
@@ -436,7 +439,8 @@ let pedidoRelatorio = null;
 export const pedirRelatorio = tipo => { pedidoRelatorio = tipo; };
 export const tomarPedidoRelatorio = () => { const t = pedidoRelatorio; pedidoRelatorio = null; return t; };
 
-const ORDEM_FX = ['vencida', 'f30', 'f60', 'f90', 'emdia', 'semini', 'sem'];
+const ORDEM_FX = ['vencida', 'f30', 'f60', 'f90', 'livre', 'formacao', 'semini', 'sem'];
+const LIBERADO = ['vencida', 'f30', 'f60', 'f90', 'livre'];
 export function relSituacao(filtro = '') {
   const l = doFiltro(filtro).slice().sort((a, b) =>
     ORDEM_FX.indexOf(faixa(a.id)) - ORDEM_FX.indexOf(faixa(b.id)) || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -452,7 +456,7 @@ export function relSituacao(filtro = '') {
         <td>${p ? `${p.k}º${pend.length > 1 ? ` (+${pend.length - 1})` : ''}` : '—'}</td>
         <td>${p ? br(p.vence) : '—'}</td><td>${p ? br(p.limite) : '—'}</td>
         <td class="rel-num">${p ? p.saldo + ' dias' : '—'}</td>
-        <td class="${fx === 'emdia' ? 'rel-ok' : 'rel-pend'}">${FAIXAS[fx].rot}</td></tr>`;
+        <td class="${['livre', 'formacao'].includes(fx) ? 'rel-ok' : 'rel-pend'}">${FAIXAS[fx].rot}</td></tr>`;
     }).join('')}</tbody>
     <tfoot><tr><td colspan="6">Pessoas com férias a tirar</td><td>${comPend} de ${l.length}</td></tr></tfoot></table>
     <p class="rel-nota">O app controla o direito e o prazo. Valor das férias, 1/3, abono e a dobra do art. 137 ficam com o escritório.</p>
@@ -512,7 +516,12 @@ const filtroDestino = () => `<label class="fer-filtro">Destino de DP
       `<option value="${d.id}" ${est.destino === d.id ? 'selected' : ''}>${esc(d.nome)}</option>`).join('')}
     <option value="-" ${est.destino === '-' ? 'selected' : ''}>Sem destino</option>
   </select></label>`;
-const ligarFiltro = redesenhar => $('ferDestino')?.addEventListener('change', ev => { est.destino = ev.target.value; redesenhar(); });
+/* 29/09/2026: o Painel e a Previsão têm cada um o seu #ferDestino, e a tela
+   escondida continua no documento. $('ferDestino') pegava o do Painel, então
+   trocar o destino na Previsão não redesenhava nada — a lista ficava com todos.
+   Agora o ouvinte é ligado no seletor da própria tela. */
+const ligarFiltro = (redesenhar, telaId) => $(telaId)?.querySelector('#ferDestino')
+  ?.addEventListener('change', ev => { est.destino = ev.target.value; redesenhar(); });
 
 export async function abrirFerias(tela) {
   if (!jd.dados.carregado) {
@@ -532,21 +541,35 @@ function desenharPainel() {
   const lista = ativos().filter(f => casaDestino(f.id, est.destino));
   const cont = Object.fromEntries(Object.keys(FAIXAS).map(k => [k, 0]));
   lista.forEach(f => cont[faixa(f.id)]++);
-  const vis = est.faixa ? lista.filter(f => faixa(f.id) === est.faixa) : lista;
+  const ordem = f => { const p = pendentes(f.id)[0], nx = proximo(f.id); return (p ? p.limite : nx ? nx.vence : '9999'); };
+  const vis = (est.faixa === 'liberados' ? lista.filter(f => LIBERADO.includes(faixa(f.id)))
+    : est.faixa ? lista.filter(f => faixa(f.id) === est.faixa) : lista).slice().sort((a, b) =>
+      ORDEM_FX.indexOf(faixa(a.id)) - ORDEM_FX.indexOf(faixa(b.id)) || ordem(a).localeCompare(ordem(b)) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  // Período de concessão: quem já ganhou o direito e ainda tem dias a tirar.
+  const liberados = lista.filter(f => LIBERADO.includes(faixa(f.id)));
+  const diasAbertos = liberados.reduce((s, f) => s + pendentes(f.id).reduce((t, p) => t + p.saldo, 0), 0);
+  const maisPerto = liberados.map(f => ({ f, p: pendentes(f.id)[0] })).sort((a, b) => a.p.limite.localeCompare(b.p.limite))[0];
   const risco = emRisco().filter(r => r.passa && !r.perda && casaDestino(r.fid, est.destino));
   const bol = lista.filter(f => bolNasFerias(f.id).length);
   const mostrar = Object.keys(FAIXAS).filter(k => cont[k] || !['semini', 'sem'].includes(k));
 
-  $('telaFerPainel').innerHTML = cabecalho('Férias da equipe', 'Quem venceu, até quando pode tirar e quanto falta') + `
+  $('telaFerPainel').innerHTML = cabecalho('Férias da equipe', 'Quem já pode tirar férias, até quando e quantos dias faltam') + `
     <div class="jor-corpo">
       <div class="jor-barra">${filtroDestino()}<span class="dc-sem">${lista.length} pessoa(s) ativa(s)</span>
         <button class="btn mini" type="button" id="ferRelConc">Relatório: período de concessão</button></div>
+      <button type="button" class="fer-concessao" data-fx="liberados" aria-pressed="${est.faixa === 'liberados'}">
+        <span class="fer-concessao__rot">Período de concessão</span>
+        <span class="fer-concessao__num"><strong>${liberados.length}</strong> ${liberados.length === 1 ? 'pessoa liberada' : 'pessoas liberadas'} para tirar férias</span>
+        <span class="fer-concessao__det">${diasAbertos} dia(s) em aberto${maisPerto ? ` · limite mais próximo: ${esc(maisPerto.f.nome)} até ${br(maisPerto.p.limite)}` : ''}</span>
+        <span class="fer-concessao__acao">${est.faixa === 'liberados' ? 'Mostrar todos' : 'Ver só os liberados'}</span>
+      </button>
       <div class="pv-cards">
         ${mostrar.map(k => `<button type="button" class="pv-card ${FAIXAS[k].cls} ${cont[k] ? '' : 'pv-zero'}" aria-pressed="${est.faixa === k}" data-fx="${k}">
           <span>${FAIXAS[k].rot}</span><strong>${cont[k]}</strong><small>${FAIXAS[k].txt}</small></button>`).join('')}
       </div>
-      <p class="dc-sem jor-nota">A cor mostra a distância do <b>limite de gozo</b> (fim do período concessivo). As faixas não se repetem:
-        a soma dos cartões é ${lista.length}. Clique num cartão para filtrar a lista; clique na pessoa para ver os períodos.</p>
+      <p class="dc-sem jor-nota"><b>Período de concessão</b> = os 12 meses depois que a pessoa completa o período aquisitivo: começa no dia em que ela ganha o direito
+        e termina no <b>limite de gozo</b>. A cor mostra quanto falta para esse limite. As faixas não se repetem: a soma dos cartões é ${lista.length}.
+        Clique num cartão para filtrar; clique na pessoa para ver todos os períodos.</p>
       ${cont.semini ? `<div class="jor-caixa alerta"><b>${cont.semini} pessoa(s) sem situação inicial.</b> Sem ela o app não sabe o que já foi tirado.
         <button class="btn mini" type="button" data-ir="ferIni">Informar situação inicial</button></div>` : ''}
       ${risco.length ? `<div class="jor-caixa alerta"><b>${risco.length} período(s) aquisitivo(s) em risco</b> — afastamento do INSS acima de 6 meses (art. 133, IV). O app não encerra sozinho.
@@ -556,8 +579,8 @@ function desenharPainel() {
         <button class="btn mini" type="button" data-ir="ferLanc">Abrir lançamentos</button></div>` : ''}
       ${bol.length ? `<div class="jor-caixa"><b>${bol.reduce((s, f) => s + bolNasFerias(f.id).length, 0)} boletim(ns) lançado(s) dentro de férias</b>
         (${bol.map(f => esc(f.nome)).join(', ')}). Informativo — nada foi bloqueado.</div>` : ''}
-      <div class="fer-rola"><table class="dc-planilha fer-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Período a tirar</th><th>Venceu em</th>
-        <th>Limite de gozo</th><th class="ce">Saldo</th><th class="ce">Faltas no aquisitivo</th><th>Situação</th></tr></thead><tbody>
+      <div class="fer-rola"><table class="dc-planilha fer-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Período de concessão</th>
+        <th class="ce">Saldo</th><th class="ce">Faltas no aquisitivo</th><th>Situação</th></tr></thead><tbody>
         ${vis.map(f => {
           const fx = faixa(f.id), pend = pendentes(f.id), p = pend[0], nx = proximo(f.id);
           const n = p ? dias(hoje(), p.limite) : null;
@@ -567,17 +590,17 @@ function desenharPainel() {
             <td>${esc(f.fazenda || '—')}<br><span class="dc-sem">${esc(nomeDestino(f.id))}</span></td>
             <td>${p ? `${p.k}º · ${br(p.iniAq)} a ${br(p.fimAq)}${pend.length > 1 ? `<br><span class="dc-sem">+${pend.length - 1} período(s) anterior(es) pendente(s)</span>` : ''}`
               : nx ? `<span class="dc-sem">em formação até ${br(nx.fimAq)}</span>` : '—'}</td>
-            <td>${p ? br(p.vence) : nx ? `<span class="dc-sem">vence ${br(nx.vence)}</span>` : '—'}</td>
-            <td>${p ? `${br(p.limite)}<br><span class="dc-sem">${n < 0 ? `há ${-n} dia(s)` : `em ${n} dia(s)`}</span>` : '—'}</td>
-            <td class="ce">${p ? `${p.saldo} dias${p.goz || p.vend ? `<br><span class="dc-sem">tirou ${p.goz}${p.vend ? ` · vendeu ${p.vend}` : ''}</span>` : ''}` : '—'}</td>
+            <td>${p ? `<b>${br(p.vence)} a ${br(p.limite)}</b><br><span class="dc-sem">${n < 0 ? `limite vencido há ${-n} dia(s)` : `faltam ${n} dia(s) para o limite`}</span>`
+              : nx ? `<span class="dc-sem">libera em ${br(nx.vence)}<br>daqui a ${dias(hoje(), nx.vence)} dia(s)</span>` : '—'}</td>
+            <td class="ce">${p ? `<b>${p.saldo} dias</b>${p.goz || p.vend ? `<br><span class="dc-sem">tirou ${p.goz}${p.vend ? ` · vendeu ${p.vend}` : ''}</span>` : ''}` : '—'}</td>
             <td class="ce">${admissao(f) ? faltasEm(f.id, p || nx) : '—'}</td>
             <td><span class="tag ${FAIXAS[fx].tag}">${FAIXAS[fx].rot}</span></td></tr>`;
-        }).join('') || '<tr><td colspan="8" class="vazio">Ninguém nesta faixa.</td></tr>'}
+        }).join('') || '<tr><td colspan="7" class="vazio">Ninguém nesta faixa.</td></tr>'}
       </tbody></table></div>
       <p class="dc-sem jor-nota">"Faltas no aquisitivo" conta todas as faltas lançadas no período, compensadas ou não. Só informa: o app não reduz os dias.</p>
     </div>`;
 
-  ligarFiltro(desenharPainel);
+  ligarFiltro(desenharPainel, 'telaFerPainel');
   document.querySelectorAll('#telaFerPainel [data-fx]').forEach(b => b.addEventListener('click', () => {
     est.faixa = est.faixa === b.dataset.fx ? null : b.dataset.fx; desenharPainel();
   }));
@@ -650,7 +673,7 @@ function desenharPrevisao() {
         <button class="btn principal" type="button" id="ferPrevTabela">Emitir esta tabela (${MESES[+sel.slice(5) - 1]}/${sel.slice(0, 4)})</button>
         <button class="btn" type="button" data-ir="jorRelatorios">Emitir relatório (DP › Relatórios)</button></div>
     </div>`;
-  ligarFiltro(desenharPrevisao);
+  ligarFiltro(desenharPrevisao, 'telaFerPrev');
   document.querySelectorAll('#telaFerPrev [data-mes]').forEach(b => b.addEventListener('click', () => { est.mes = b.dataset.mes; desenharPrevisao(); }));
   document.querySelectorAll('#telaFerPrev [data-ir]').forEach(b => b.addEventListener('click', () => irPara(b.dataset.ir)));
   // 28/09/2026: emite a tabela do mês escolhido no gráfico, já na prévia de impressão.
