@@ -595,7 +595,7 @@ dialog h3{margin:0 0 14px;font-size:16px}
 @media print{
   :root{--imp-margem:4mm;--imp-escala:1.11}
   body{background:#fff}
-  .topo,.abas,.aba2s,.subabas,.rodape-fixo,.naoimprimir,dialog,.aviso{display:none !important}
+  .topo,.abas,.aba2s,.aba3s,.subabas,.rodape-fixo,.naoimprimir,dialog,.aviso{display:none !important}
   main{padding:0;max-width:none}
   .cartao{display:none}
   .previa{margin:0;gap:0;display:block}
@@ -862,3 +862,34 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
 .msel-lista li:hover .msel-so,.msel-so:focus-visible{visibility:visible}
 @media (hover:none){.msel-so{visibility:visible}}
 .msel-rodape{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid #eef0ea;font-size:12px;color:#8A8D86}
+
+/* ---- Faixa de ícones do menu (29/09/2026) — js/acesso.js desenharFaixa ---- */
+.aba2s.rb{padding:10px 16px 12px;gap:8px;align-items:stretch;scrollbar-width:thin}
+.rb-grupo{flex:0 0 auto;display:flex;flex-direction:column;border:1px solid var(--linha);border-radius:10px;overflow:hidden;background:var(--papel)}
+.rb-botoes{display:flex;gap:2px;padding:6px 6px 5px;flex:1}
+.rb-btn{width:84px;min-height:68px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:5px;
+  padding:7px 4px 6px;font:inherit;font-size:11.5px;line-height:1.2;font-weight:600;text-align:center;color:var(--texto);
+  background:transparent;border:1px solid transparent;border-radius:8px;cursor:pointer}
+.rb-btn svg{width:26px;height:26px;flex:0 0 auto}
+.rb-btn span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.rb-btn:hover{background:var(--verde-fundo);border-color:var(--linha)}
+.rb-btn:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
+.rb-btn[aria-selected="true"]{background:var(--verde-fundo);border-color:var(--verde);color:var(--verde-esc)}
+.rb-rotulo{padding:3px 8px;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-align:center;text-transform:uppercase;white-space:nowrap}
+.rb-verde .rb-btn svg{color:#5f8a00} .rb-verde .rb-rotulo{background:#e6f1cc;color:#3f5c00}
+.rb-marrom .rb-btn svg{color:#744F28} .rb-marrom .rb-rotulo{background:#efe6dc;color:#5a3d1f}
+.rb-cinza .rb-btn svg{color:#51534A} .rb-cinza .rb-rotulo{background:#e7e8e3;color:#3a3b35}
+.rb-btn[aria-selected="true"] svg{color:var(--verde-esc)}
+.aba3s.rb-caminho{gap:8px;align-items:center;padding:8px 16px 10px;font-size:12.5px;color:var(--suave);border-top:1px solid var(--linha)}
+.rb-caminho b{color:var(--texto)}
+.rb-sep{color:#a3a69c}
+@media (max-width:640px){
+  .rb-btn{width:70px;min-height:60px;font-size:10.5px}
+  .rb-btn svg{width:22px;height:22px}
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  .rb-verde .rb-btn svg{color:#a3d626} .rb-verde .rb-rotulo{background:rgba(132,189,0,.18);color:#c6e87a}
+  .rb-marrom .rb-btn svg{color:#c9a06a} .rb-marrom .rb-rotulo{background:rgba(201,160,106,.18);color:#e2c49c}
+  .rb-cinza .rb-btn svg{color:#b8bdb0} .rb-cinza .rb-rotulo{background:rgba(255,255,255,.08);color:#d7dbd0}
+} }
+.aba2s.rb.rb-mais{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent)}
