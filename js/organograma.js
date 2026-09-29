@@ -31,6 +31,9 @@ const est = {
   funcoes: [],
   vinculos: [],
   fazendas: [],
+  unidades: [],
+  destinos: [],
+  dp: '',          // '' = todos; senão o id do destino de DP (29/09/2026)
   nomes: true,
   vazias: false,
   editar: false,
@@ -40,14 +43,22 @@ const est = {
 async function carregar() {
   const c = estado.cliente;
   if (!c) throw new Error('Sem conexão com o banco.');
-  const [f, v] = await Promise.all([
+  const [f, v, u, d] = await Promise.all([
     c.from('jor_funcoes').select('id,nome,nivel,ordem,superior_id,categoria,ativo').order('ordem', { nullsFirst: false }).order('nome'),
-    c.from('jor_vinculos').select('funcionario_id,funcao_id,ativo'),
+    c.from('jor_vinculos').select('funcionario_id,funcao_id,unidade_id,ativo'),
+    c.from('jor_unidades').select('id,destino_id'),
+    c.from('jor_destinos_dp').select('id,nome,ativo').order('nome'),
   ]);
   if (f.error) throw f.error;
   if (v.error) throw v.error;
-  est.funcoes = (f.data || []).filter(x => x.ativo !== false);
   est.vinculos = (v.data || []).filter(x => x.ativo !== false);
+  /* Função inativa que ainda tem gente ligada (a "Tratorista" e a "Trabalhador
+     Rural" antigas, sem grau) continua no desenho — senão a pessoa sumia. */
+  const usadas = new Set(est.vinculos.map(x => x.funcao_id));
+  est.funcoes = (f.data || []).filter(x => x.ativo !== false || usadas.has(x.id))
+    .map(x => ({ ...x, _antiga: x.ativo === false }));
+  est.unidades = u.error ? [] : (u.data || []);
+  est.destinos = d.error ? [] : (d.data || []).filter(x => x.ativo !== false);
   est.carregado = true;
 }
 
@@ -62,14 +73,24 @@ function pessoasPorFuncao() {
     .map(f => [f.id, f]));
   const mapa = new Map();
   const comFuncao = new Set();
+  /* Organograma por DP (29/09/2026): cada pessoa entra no DP da unidade dela.
+     O nível Estratégico (Diretor, Gerente Administrativo) é comum aos dois. */
+  const destinoDe = v => est.unidades.find(u => u.id === v.unidade_id)?.destino_id || '';
+  const nivelDe = id => est.funcoes.find(x => x.id === id)?.nivel || '';
+  const vale = v => !est.dp || destinoDe(v) === est.dp || nivelDe(v.funcao_id) === 'Estratégico';
   for (const v of est.vinculos) {
     const f = ativos.get(v.funcionario_id);
-    if (!f || !v.funcao_id) continue;
+    if (!f || !vale(v)) { ativos.delete(v.funcionario_id); continue; }
+    if (!v.funcao_id) continue;
     comFuncao.add(f.id);
     if (!mapa.has(v.funcao_id)) mapa.set(v.funcao_id, []);
     mapa.get(v.funcao_id).push(f);
   }
   mapa.forEach(l => l.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')));
+  if (est.dp) {                      // sem vínculo não tem DP: fica fora do recorte de um DP
+    const comVinculo = new Set(est.vinculos.map(v => v.funcionario_id));
+    [...ativos.keys()].forEach(id => { if (!comVinculo.has(id)) ativos.delete(id); });
+  }
   const semFuncao = [...ativos.values()].filter(f => !comFuncao.has(f.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   return { mapa, semFuncao, total: ativos.size };
 }
@@ -105,7 +126,7 @@ function arvore(mapa) {
    IV debaixo do mesmo chefe — viram uma caixa só, "Tratorista". Cada pessoa
    leva o grau ao lado do nome. Vale na tela e no papel. */
 const cat = f => limpo(f.categoria);
-const grau = (f, c) => { const n = limpo(f.nome); return n.toLowerCase().startsWith(c.toLowerCase()) ? (n.slice(c.length).trim() || n) : n; };
+const grau = (f, c) => { const n = limpo(f.nome); return n.toLowerCase().startsWith(c.toLowerCase()) ? n.slice(c.length).trim() : n; };
 function juntar(irmas) {
   const out = [];
   const grupos = new Map();
@@ -157,7 +178,8 @@ const desenhoArvore = (raizes, papel = false) => raizes.length
   ? `<div class="og-arvore${papel ? ' og-papel' : ''}"><ul>${raizes.map(r => ramo(r, papel)).join('')}</ul></div>`
   : '<p class="vazio">Nenhuma função com gente neste recorte.</p>';
 
-const recorte = () => est.fazendas.length ? est.fazendas.map(z => z === '-' ? 'sem fazenda' : z).join(', ') : 'todas as fazendas';
+const nomeDp = () => est.dp ? (est.destinos.find(d => d.id === est.dp)?.nome || '') : '';
+const recorte = () => [nomeDp(), est.fazendas.length ? est.fazendas.map(z => z === '-' ? 'sem fazenda' : z).join(', ') : 'todas as fazendas'].filter(Boolean).join(' · ');
 
 /* ---------------- documento ---------------- */
 
@@ -173,7 +195,7 @@ function documento() {
   <article class="rel rel-paisagem og-doc">
     <header class="rel-cabecalho">
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-titulo"><h1>ORGANOGRAMA</h1><p>SAKUMA Agronegócios · hierarquia por função</p></div>
+      <div class="rel-titulo"><h1>ORGANOGRAMA${nomeDp() ? ' · ' + esc(nomeDp().toUpperCase()) : ''}</h1><p>SAKUMA Agronegócios · hierarquia por função</p></div>
       <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${esc(recorte())} · ${total} pessoa(s) ativa(s)</span></div>
     </header>
     ${desenhoArvore(raizes, true)}
@@ -198,7 +220,7 @@ function csv() {
   const blob = new Blob(['﻿' + l.map(r => r.map(limpar).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `organograma-${hoje()}.csv`;
+  a.download = `organograma-${(nomeDp() || 'todos').replace(/\W+/g, '').toLowerCase()}-${hoje()}.csv`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
@@ -240,6 +262,11 @@ function desenhar() {
           <button class="btn principal" type="button" id="ogImp">Imprimir</button>
         </span>
       </div>
+      <div class="rel-abas og-dps" role="tablist">
+        <button type="button" role="tab" class="rel-aba${!est.dp ? ' ativa' : ''}" data-og-dp="">Todos</button>
+        ${est.destinos.map(d => `<button type="button" role="tab" class="rel-aba${est.dp === d.id ? ' ativa' : ''}" data-og-dp="${d.id}">${esc(d.nome)}</button>`).join('')}
+      </div>
+      ${est.dp ? '<p class="dica og-dica">Recorte por destino de DP: cada pessoa entra no DP da unidade dela. O nível <b>Estratégico</b> aparece nos dois organogramas.</p>' : ''}
       <div class="jor-barra og-barra">
         <div class="cr-campo">Fazenda <div id="ogFaz"></div></div>
         <label class="og-chk"><input type="checkbox" id="ogNomes" ${est.nomes ? 'checked' : ''}> Mostrar nomes</label>
@@ -263,6 +290,7 @@ function desenhar() {
     marcados: est.fazendas, todas: 'Todas as fazendas', plural: 'fazendas',
   });
   $('ogFaz').addEventListener('change', () => { est.fazendas = $('ogFaz').valores; desenhar(); });
+  alvo.querySelectorAll('[data-og-dp]').forEach(b => b.addEventListener('click', () => { est.dp = b.dataset.ogDp; desenhar(); }));
   $('ogNomes').addEventListener('change', ev => { est.nomes = ev.target.checked; desenhar(); });
   $('ogVazias').addEventListener('change', ev => { est.vazias = ev.target.checked; desenhar(); });
   $('ogEditar')?.addEventListener('click', () => { est.editar = !est.editar; if (est.editar) est.vazias = true; desenhar(); });
@@ -310,7 +338,7 @@ function editor() {
       <table class="dc-planilha"><thead><tr><th>Função</th><th>Nível</th><th>Categoria</th><th>Responde a</th></tr></thead><tbody>
         ${lista.map(f => {
           const proibidos = abaixoDe(f.id); proibidos.add(f.id);
-          return `<tr><td><b>${esc(f.nome)}</b></td><td class="dc-sem">${esc(f.nivel || '—')}</td>
+          return `<tr><td><b>${esc(f.nome)}</b>${f._antiga ? ' <span class="tag neutra" title="Função desativada no cadastro que ainda tem gente ligada">antiga</span>' : ''}</td><td class="dc-sem">${esc(f.nivel || '—')}</td>
             <td><input class="dc-mini og-cat" list="ogCategorias" data-og-cat="${f.id}" value="${esc(cat(f))}" placeholder="—"></td>
             <td><select class="dc-mini" data-og-sup="${f.id}">
               <option value="">— topo —</option>

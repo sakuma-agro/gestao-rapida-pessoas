@@ -46,10 +46,10 @@ export const MODULOS = [
       ['cadRelatorios', 'Relatórios'],
       ['rhQuadro', 'Quadro de pessoal'],
     ] },
-    { id: 'funcoes', nome: 'Funções e setores', admin: true, telas: [
+    /* "Estrutura" (29/09/2026): Funções e setores e Empregador e fazenda viraram
+       um submódulo só, a pedido dele. As chaves das telas não mudaram. */
+    { id: 'estrutura', nome: 'Estrutura', admin: true, telas: [
       ['cadFuncoes', 'Funções e setores'],
-    ] },
-    { id: 'estrutura', nome: 'Empregador e fazenda', admin: true, telas: [
       ['cadEstrutura', 'Empregador e fazenda'],
     ] },
   ] },
