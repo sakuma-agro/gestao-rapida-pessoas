@@ -44,10 +44,10 @@ async function carregar() {
   const c = estado.cliente;
   if (!c) throw new Error('Sem conexão com o banco.');
   const [f, v, u, d] = await Promise.all([
-    c.from('jor_funcoes').select('id,nome,nivel,ordem,superior_id,categoria,ativo').order('ordem', { nullsFirst: false }).order('nome'),
+    c.from('jor_funcoes').select('id,nome,nivel,ordem,superior_id,categoria,atua,ativo').order('ordem', { nullsFirst: false }).order('nome'),
     c.from('jor_vinculos').select('funcionario_id,funcao_id,unidade_id,ativo'),
     c.from('jor_unidades').select('id,destino_id'),
-    c.from('jor_destinos_dp').select('id,nome,ativo').order('nome'),
+    c.from('jor_destinos_dp').select('id,nome,organograma,ativo').order('nome'),
   ]);
   if (f.error) throw f.error;
   if (v.error) throw v.error;
@@ -58,7 +58,9 @@ async function carregar() {
   est.funcoes = (f.data || []).filter(x => x.ativo !== false || usadas.has(x.id))
     .map(x => ({ ...x, _antiga: x.ativo === false }));
   est.unidades = u.error ? [] : (u.data || []);
-  est.destinos = d.error ? [] : (d.data || []).filter(x => x.ativo !== false);
+  /* No organograma o destino tem nome próprio: DP 1 = MATRIZ, DP 2 = QC. */
+  est.destinos = d.error ? [] : (d.data || []).filter(x => x.ativo !== false)
+    .map(x => ({ ...x, rotulo: limpo(x.organograma) || x.nome }));
   est.carregado = true;
 }
 
@@ -73,11 +75,16 @@ function pessoasPorFuncao() {
     .map(f => [f.id, f]));
   const mapa = new Map();
   const comFuncao = new Set();
-  /* Organograma por DP (29/09/2026): cada pessoa entra no DP da unidade dela.
-     O nível Estratégico (Diretor, Gerente Administrativo) é comum aos dois. */
+  /* Organograma por MATRIZ / QC (29/09/2026): a função pode dizer onde atua
+     (jor_funcoes.atua — ex.: Gerente Administrativo atua na MATRIZ e no QC).
+     Função sem "atua" segue o destino da unidade de cada pessoa. */
   const destinoDe = v => est.unidades.find(u => u.id === v.unidade_id)?.destino_id || '';
-  const nivelDe = id => est.funcoes.find(x => x.id === id)?.nivel || '';
-  const vale = v => !est.dp || destinoDe(v) === est.dp || nivelDe(v.funcao_id) === 'Estratégico';
+  const atuaDe = id => est.funcoes.find(x => x.id === id)?.atua || [];
+  const vale = v => {
+    if (!est.dp) return true;
+    const a = atuaDe(v.funcao_id);
+    return a.length ? a.includes(est.dp) : destinoDe(v) === est.dp;
+  };
   for (const v of est.vinculos) {
     const f = ativos.get(v.funcionario_id);
     if (!f || !vale(v)) { ativos.delete(v.funcionario_id); continue; }
@@ -178,7 +185,7 @@ const desenhoArvore = (raizes, papel = false) => raizes.length
   ? `<div class="og-arvore${papel ? ' og-papel' : ''}"><ul>${raizes.map(r => ramo(r, papel)).join('')}</ul></div>`
   : '<p class="vazio">Nenhuma função com gente neste recorte.</p>';
 
-const nomeDp = () => est.dp ? (est.destinos.find(d => d.id === est.dp)?.nome || '') : '';
+const nomeDp = () => est.dp ? (est.destinos.find(d => d.id === est.dp)?.rotulo || '') : '';
 const recorte = () => [nomeDp(), est.fazendas.length ? est.fazendas.map(z => z === '-' ? 'sem fazenda' : z).join(', ') : 'todas as fazendas'].filter(Boolean).join(' · ');
 
 /* ---------------- documento ---------------- */
@@ -190,6 +197,7 @@ function documento() {
   const linhas = est.funcoes.slice().sort(ordem)
     .filter(f => est.vazias || (mapa.get(f.id) || []).length)
     .map(f => `<tr><td>${esc(f.nome)}</td><td>${esc(cat(f) || '—')}</td><td>${esc(f.nivel || '—')}</td><td>${esc(f.superior_id ? nomeSup(f.superior_id) : 'topo')}</td>
+      <td>${esc((f.atua || []).map(id => est.destinos.find(d => d.id === id)?.rotulo).filter(Boolean).join(' e ') || 'pela unidade')}</td>
       <td class="rel-num">${(mapa.get(f.id) || []).length}</td></tr>`).join('');
   return `
   <article class="rel rel-paisagem og-doc">
@@ -201,8 +209,8 @@ function documento() {
     ${desenhoArvore(raizes, true)}
     ${semFuncao.length ? `<p class="rel-nota"><b>${semFuncao.length} pessoa(s) sem função no Cadastro Nível 1:</b> ${semFuncao.map(p => esc(p.nome)).join(', ')}.</p>` : ''}
     <h2 class="rel-secao">Funções e a quem respondem</h2>
-    <table class="rel-tabela"><thead><tr><th>Função</th><th>Categoria</th><th>Nível</th><th>Responde a</th><th class="rel-num">Pessoas</th></tr></thead>
-      <tbody>${linhas || '<tr><td colspan="5" class="rel-vazio">Nenhuma função.</td></tr>'}</tbody></table>
+    <table class="rel-tabela"><thead><tr><th>Função</th><th>Categoria</th><th>Nível</th><th>Responde a</th><th>Atua em</th><th class="rel-num">Pessoas</th></tr></thead>
+      <tbody>${linhas || '<tr><td colspan="6" class="rel-vazio">Nenhuma função.</td></tr>'}</tbody></table>
     <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>
   </article>`;
 }
@@ -264,9 +272,10 @@ function desenhar() {
       </div>
       <div class="rel-abas og-dps" role="tablist">
         <button type="button" role="tab" class="rel-aba${!est.dp ? ' ativa' : ''}" data-og-dp="">Todos</button>
-        ${est.destinos.map(d => `<button type="button" role="tab" class="rel-aba${est.dp === d.id ? ' ativa' : ''}" data-og-dp="${d.id}">${esc(d.nome)}</button>`).join('')}
+        ${est.destinos.map(d => `<button type="button" role="tab" class="rel-aba${est.dp === d.id ? ' ativa' : ''}" data-og-dp="${d.id}" title="${esc(d.nome)}">${esc(d.rotulo)}</button>`).join('')}
       </div>
-      ${est.dp ? '<p class="dica og-dica">Recorte por destino de DP: cada pessoa entra no DP da unidade dela. O nível <b>Estratégico</b> aparece nos dois organogramas.</p>' : ''}
+      ${est.dp ? `<p class="dica og-dica">Cada pessoa entra pela unidade dela (${est.destinos.map(d => `${esc(d.rotulo)} = ${esc(d.nome)}`).join(', ')}).
+        Função com <b>Atua em</b> marcado aparece onde foi marcada — veja em Definir hierarquia.</p>` : ''}
       <div class="jor-barra og-barra">
         <div class="cr-campo">Fazenda <div id="ogFaz"></div></div>
         <label class="og-chk"><input type="checkbox" id="ogNomes" ${est.nomes ? 'checked' : ''}> Mostrar nomes</label>
@@ -308,6 +317,15 @@ function desenhar() {
   $('ogImp').addEventListener('click', () => { verDoc(); setTimeout(() => imprimir(), 300); });
   $('ogCsv').addEventListener('click', csv);
 
+  alvo.querySelectorAll('[data-og-atua]').forEach(c => c.addEventListener('change', async () => {
+    const f = est.funcoes.find(x => x.id === c.dataset.ogAtua);
+    const antes = f.atua;
+    const marcados = [...alvo.querySelectorAll(`[data-og-atua="${f.id}"]:checked`)].map(x => x.value);
+    f.atua = marcados.length ? marcados : null;
+    const { error } = await estado.cliente.from('jor_funcoes').update({ atua: f.atua }).eq('id', f.id);
+    if (error) { f.atua = antes; alert('Não deu para gravar: ' + error.message); }
+    desenhar();
+  }));
   alvo.querySelectorAll('[data-og-cat]').forEach(i => i.addEventListener('change', async () => {
     const f = est.funcoes.find(x => x.id === i.dataset.ogCat);
     const antes = f.categoria;
@@ -333,9 +351,10 @@ function editor() {
   return `
     <div class="og-editor">
       <p class="dica" style="margin:0 0 8px">Para cada função, escolha a quem ela responde. Grava na hora. Deixe <b>— topo —</b> para quem não responde a ninguém.
+        <b>Atua em</b>: marque MATRIZ e/ou QC quando a função aparece nesse organograma independente da unidade da pessoa (ex.: Gerente Administrativo nos dois); sem marca, cada pessoa entra pela unidade dela.
         <b>Categoria</b> junta funções numa caixa só (ex.: Tratorista I a IV = Tratorista); deixe em branco para a função ter caixa própria.</p>
       <datalist id="ogCategorias">${[...new Set(est.funcoes.map(cat).filter(Boolean))].sort().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-      <table class="dc-planilha"><thead><tr><th>Função</th><th>Nível</th><th>Categoria</th><th>Responde a</th></tr></thead><tbody>
+      <table class="dc-planilha"><thead><tr><th>Função</th><th>Nível</th><th>Categoria</th><th>Responde a</th><th>Atua em</th></tr></thead><tbody>
         ${lista.map(f => {
           const proibidos = abaixoDe(f.id); proibidos.add(f.id);
           return `<tr><td><b>${esc(f.nome)}</b>${f._antiga ? ' <span class="tag neutra" title="Função desativada no cadastro que ainda tem gente ligada">antiga</span>' : ''}</td><td class="dc-sem">${esc(f.nivel || '—')}</td>
@@ -343,7 +362,8 @@ function editor() {
             <td><select class="dc-mini" data-og-sup="${f.id}">
               <option value="">— topo —</option>
               ${lista.filter(x => !proibidos.has(x.id)).map(x => `<option value="${x.id}"${x.id === f.superior_id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}
-            </select></td></tr>`;
+            </select></td>
+            <td class="og-atua">${est.destinos.map(d => `<label class="og-chk"><input type="checkbox" data-og-atua="${f.id}" value="${d.id}"${(f.atua || []).includes(d.id) ? ' checked' : ''}> ${esc(d.rotulo)}</label>`).join('')}</td></tr>`;
         }).join('')}
       </tbody></table>
     </div>`;
