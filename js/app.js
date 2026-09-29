@@ -25,6 +25,7 @@ import * as jd from './jornada-dados.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
+import { desenharCadRelatorios } from './cad-relatorios.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 
 const $ = id => document.getElementById(id);
@@ -122,6 +123,8 @@ function abrirAba(nome) {
   $('telaRhCargos').hidden   = nome !== 'rhCargos';
   $('telaRhProposta').hidden = nome !== 'rhProposta';
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
+  $('telaCadRelatorios').hidden = nome !== 'cadRelatorios';
+  if (nome === 'cadRelatorios') desenharCadRelatorios();
   if (nome === 'disc') abrirDisc();
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();

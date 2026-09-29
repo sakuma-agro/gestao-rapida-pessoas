@@ -40,6 +40,12 @@ export const MODULOS = [
       ['termoSindical', 'Termo de liberdade sindical'],
       ['termoContrato', 'Recebimento do contrato'],
     ] },
+    /* Quadro de pessoal (29/09/2026): saiu de RH › Relatórios a pedido dele — é
+       relatório do cadastro de funcionários. A chave da tela (rhQuadro) não mudou. */
+    { id: 'relatoriosCad', nome: 'Relatórios', telas: [
+      ['cadRelatorios', 'Relatórios'],
+      ['rhQuadro', 'Quadro de pessoal'],
+    ] },
     { id: 'funcoes', nome: 'Funções e setores', admin: true, telas: [
       ['cadFuncoes', 'Funções e setores'],
     ] },
@@ -72,9 +78,6 @@ export const MODULOS = [
     { id: 'cargos', nome: 'Cargos e salários', telas: [
       ['rhCargos', 'Plano de cargos'],
       ['rhProposta', 'Gerar proposta'],
-    ] },
-    { id: 'relatorios', nome: 'Relatórios', telas: [
-      ['rhQuadro', 'Quadro de pessoal'],
     ] },
   ] },
   /* DP em submódulos (21/09/2026). O Painel é a tela de abertura, fora dos

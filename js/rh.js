@@ -262,6 +262,14 @@ function baixarCsv(nome, linhas) {
 /* =============== abrir uma tela =============== */
 export async function abrirRh(tela) {
   if (!['rhCargos', 'rhProposta', 'rhQuadro'].includes(tela)) return;
+  /* O Quadro de pessoal mora em Cadastros (29/09/2026) e só usa o cadastro de
+     funcionários: quem não tem o RH abre do mesmo jeito. Do RH ele só pega a
+     assinatura do modelo, quando dá para ler. */
+  if (tela === 'rhQuadro') {
+    if (!R.carregado) { try { await carregarRh(); } catch { /* sem RH: segue sem a assinatura do modelo */ } }
+    desenharQuadro();
+    return;
+  }
   if (!R.carregado) {
     try { await carregarRh(); } catch (e) {
       const alvo = tela === 'rhCargos' ? 'rhTabelaCargos' : (tela === 'rhProposta' ? 'rhUltimas' : 'rhQuadroResumo');
@@ -807,7 +815,16 @@ async function excluirProposta(p) {
 /* ==================================================================
    3 · QUADRO DE PESSOAL
    ================================================================== */
+/* Cadastros › Relatórios (29/09/2026) gera o mesmo Quadro de pessoal com os
+   filtros de lá. `fora` troca, só durante a geração, o que vem da tela. */
+let fora = null;
+export function quadroPara(opcoes) {
+  fora = opcoes;
+  try { return { html: documentoQuadro(), csv: csvQuadro() }; } finally { fora = null; }
+}
+
 function gentePara() {
+  if (fora) return fora.gente;
   const sit = $('qpSituacao').value;
   const emp = $('qpEmpregador').value;
   const faz = $('qpFazenda').valores || [];   // várias fazendas (29/09/2026); vazio = todas
@@ -819,6 +836,7 @@ function gentePara() {
 
 /** Como o recorte escolhido é dito no documento e no CSV. */
 function recorte() {
+  if (fora) return fora.rotulo;
   /* O valor da opção virou a chave do grupo, que é minúscula e sem acento —
      boa para comparar, péssima para escrever no documento. Então aqui vale o
      que está ESCRITO na opção escolhida. */
@@ -854,8 +872,10 @@ const contarFaixa = (gente, valorDe, tabela) => {
 /** Os blocos do relatório. O que o filtro já fixou não vira tabela de uma linha. */
 function blocosDe(g) {
   const blocos = [];
-  if (!$('qpEmpregador').value) blocos.push(['Empregador', contarPor(g, 'empregador')]);
-  if (($('qpFazenda').valores || []).length !== 1) blocos.push(['Fazenda', contarPor(g, 'fazenda')]);
+  const empFixo = fora ? fora.empFixo : !!$('qpEmpregador').value;
+  const fazUma = fora ? fora.fazUma : ($('qpFazenda').valores || []).length === 1;
+  if (!empFixo) blocos.push(['Empregador', contarPor(g, 'empregador')]);
+  if (!fazUma) blocos.push(['Fazenda', contarPor(g, 'fazenda')]);
   blocos.push(['Setor', contarPor(g, 'setor')]);
   blocos.push(['Cargo', contarPor(g, 'cargo')]);
   blocos.push(['Faixa etária', contarFaixa(g, f => anosDesde(f.nascimento), FAIXA_IDADE)]);
@@ -1080,7 +1100,7 @@ function documentoQuadro() {
       <div><span>Mulheres</span><b>${n.mu} · ${pct(n.mu, n.total)}</b></div>
       <div><span>Idade média</span><b>${n.idadeMedia == null ? '—' : n.idadeMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Tempo de casa</span><b>${n.casaMedia == null ? '—' : n.casaMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
-      <div><span>Situação</span><b>${esc($('qpSituacao').value || 'todas')}</b></div>
+      <div><span>Situação</span><b>${esc(fora ? fora.situacao : ($('qpSituacao').value || 'todas'))}</b></div>
       <div><span>Recorte</span><b>${esc(recorte())}</b></div>
     </div>
     <h2 class="rel-secao">Homens e mulheres</h2>

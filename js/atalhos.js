@@ -54,6 +54,7 @@ const PROPRIOS = {
   disc:          ['disc', 'Perfil DISC'],
   rhCargos:      ['cargo', 'Plano de cargos'],
   rhQuadro:      ['pessoas', 'Quadro de pessoal'],
+  cadRelatorios: ['pessoas', 'Relatórios de cadastro'],
   jorPainel:     ['painel', 'Painel DP'],
   jorLancar:     ['relogio', 'Lançar jornada'],
   jorBoletins:   ['relogio', 'Jornadas lançadas'],
