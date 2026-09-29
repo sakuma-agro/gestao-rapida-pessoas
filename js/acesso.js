@@ -79,6 +79,10 @@ export const MODULOS = [
       ['rhCargos', 'Plano de cargos'],
       ['rhProposta', 'Gerar proposta'],
     ] },
+    /* Organograma (29/09/2026): hierarquia por função — js/organograma.js. */
+    { id: 'organograma', nome: 'Organograma', telas: [
+      ['rhOrganograma', 'Organograma'],
+    ] },
   ] },
   /* DP em submódulos (21/09/2026). O Painel é a tela de abertura, fora dos
      submódulos — submódulo de uma tela só esconde a terceira faixa. As chaves

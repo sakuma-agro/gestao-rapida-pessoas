@@ -53,6 +53,7 @@ const PROPRIOS = {
   trPainel:      ['treino', 'Painel de treinamentos'],
   disc:          ['disc', 'Perfil DISC'],
   rhCargos:      ['cargo', 'Plano de cargos'],
+  rhOrganograma: ['pessoas', 'Organograma'],
   rhQuadro:      ['pessoas', 'Quadro de pessoal'],
   cadRelatorios: ['pessoas', 'Relatórios de cadastro'],
   jorPainel:     ['painel', 'Painel DP'],
