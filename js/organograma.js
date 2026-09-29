@@ -41,7 +41,7 @@ async function carregar() {
   const c = estado.cliente;
   if (!c) throw new Error('Sem conexão com o banco.');
   const [f, v] = await Promise.all([
-    c.from('jor_funcoes').select('id,nome,nivel,ordem,superior_id,ativo').order('ordem', { nullsFirst: false }).order('nome'),
+    c.from('jor_funcoes').select('id,nome,nivel,ordem,superior_id,categoria,ativo').order('ordem', { nullsFirst: false }).order('nome'),
     c.from('jor_vinculos').select('funcionario_id,funcao_id,ativo'),
   ]);
   if (f.error) throw f.error;
@@ -97,8 +97,41 @@ function arvore(mapa) {
     n.sub = n.sub.filter(x => est.vazias || x.total > 0).map(podar);
     return n;
   };
-  return raizes.sort(ordem).map(r => no(r)).filter(Boolean)
+  return juntar(raizes.sort(ordem).map(r => no(r)).filter(Boolean))
     .filter(n => est.vazias || n.total > 0).map(podar);
+}
+
+/* Categoria (29/09/2026): irmãs da mesma categoria — Tratorista I, II, III e
+   IV debaixo do mesmo chefe — viram uma caixa só, "Tratorista". Cada pessoa
+   leva o grau ao lado do nome. Vale na tela e no papel. */
+const cat = f => limpo(f.categoria);
+const grau = (f, c) => { const n = limpo(f.nome); return n.toLowerCase().startsWith(c.toLowerCase()) ? (n.slice(c.length).trim() || n) : n; };
+function juntar(irmas) {
+  const out = [];
+  const grupos = new Map();
+  for (const n of irmas) {
+    n.sub = juntar(n.sub);
+    const c = cat(n.f);
+    if (!c) { out.push(n); continue; }
+    let g = grupos.get(c.toLowerCase());
+    if (!g) {
+      g = { f: { id: 'cat:' + c, nome: c, nivel: n.f.nivel, ordem: n.f.ordem, categoria: c }, gente: [], sub: [], total: 0, membros: [] };
+      grupos.set(c.toLowerCase(), g);
+      out.push(g);
+    }
+    g.membros.push(n.f);
+    (g.nos ||= []).push(n);
+    if ((n.f.ordem ?? 9999) < (g.f.ordem ?? 9999)) g.f.ordem = n.f.ordem;
+    g.gente.push(...n.gente.map(p => ({ ...p, _grau: p._grau || grau(n.f, c) })));
+    g.sub.push(...n.sub);
+    g.total += n.total;
+  }
+  grupos.forEach(g => {
+    g.gente.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    g.sub = juntar(g.sub);
+  });
+  // Categoria com uma função só (ex.: Motorista = Motorista) fica como estava.
+  return out.map(n => n.nos && n.nos.length === 1 ? n.nos[0] : n).sort((a, b) => ordem(a.f, b.f));
 }
 
 /* Descendentes, para não deixar escolher como chefe alguém que está abaixo. */
@@ -115,8 +148,8 @@ function abaixoDe(id) {
 const caixa = (n, papel = false) => `
   <div class="og-caixa ${clsNivel(n.f.nivel)}">
     <b>${esc(n.f.nome)}</b>
-    <span class="og-meta">${esc(n.f.nivel || 'sem nível')} · ${n.gente.length} ${n.gente.length === 1 ? 'pessoa' : 'pessoas'}</span>
-    ${est.nomes && n.gente.length ? `<ul class="og-nomes">${n.gente.map(p => `<li>${esc(p.nome)}${!papel && limpo(p.fazenda) ? ` <small>${esc(p.fazenda)}</small>` : ''}</li>`).join('')}</ul>` : ''}
+    <span class="og-meta">${esc(n.f.nivel || 'sem nível')} · ${n.gente.length} ${n.gente.length === 1 ? 'pessoa' : 'pessoas'}${n.membros ? ` · ${n.membros.length} graus` : ''}</span>
+    ${est.nomes && n.gente.length ? `<ul class="og-nomes">${n.gente.map(p => `<li>${esc(p.nome)}${p._grau ? ` <em class="og-grau">${esc(p._grau)}</em>` : ''}${!papel && limpo(p.fazenda) ? ` <small>${esc(p.fazenda)}</small>` : ''}</li>`).join('')}</ul>` : ''}
   </div>`;
 
 const ramo = (n, papel) => `<li>${caixa(n, papel)}${n.sub.length ? `<ul>${n.sub.map(x => ramo(x, papel)).join('')}</ul>` : ''}</li>`;
@@ -134,7 +167,7 @@ function documento() {
   const nomeSup = id => est.funcoes.find(f => f.id === id)?.nome || '—';
   const linhas = est.funcoes.slice().sort(ordem)
     .filter(f => est.vazias || (mapa.get(f.id) || []).length)
-    .map(f => `<tr><td>${esc(f.nome)}</td><td>${esc(f.nivel || '—')}</td><td>${esc(f.superior_id ? nomeSup(f.superior_id) : 'topo')}</td>
+    .map(f => `<tr><td>${esc(f.nome)}</td><td>${esc(cat(f) || '—')}</td><td>${esc(f.nivel || '—')}</td><td>${esc(f.superior_id ? nomeSup(f.superior_id) : 'topo')}</td>
       <td class="rel-num">${(mapa.get(f.id) || []).length}</td></tr>`).join('');
   return `
   <article class="rel rel-paisagem og-doc">
@@ -146,8 +179,8 @@ function documento() {
     ${desenhoArvore(raizes, true)}
     ${semFuncao.length ? `<p class="rel-nota"><b>${semFuncao.length} pessoa(s) sem função no Cadastro Nível 1:</b> ${semFuncao.map(p => esc(p.nome)).join(', ')}.</p>` : ''}
     <h2 class="rel-secao">Funções e a quem respondem</h2>
-    <table class="rel-tabela"><thead><tr><th>Função</th><th>Nível</th><th>Responde a</th><th class="rel-num">Pessoas</th></tr></thead>
-      <tbody>${linhas || '<tr><td colspan="4" class="rel-vazio">Nenhuma função.</td></tr>'}</tbody></table>
+    <table class="rel-tabela"><thead><tr><th>Função</th><th>Categoria</th><th>Nível</th><th>Responde a</th><th class="rel-num">Pessoas</th></tr></thead>
+      <tbody>${linhas || '<tr><td colspan="5" class="rel-vazio">Nenhuma função.</td></tr>'}</tbody></table>
     <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>
   </article>`;
 }
@@ -155,11 +188,11 @@ function documento() {
 function csv() {
   const { mapa } = pessoasPorFuncao();
   const nomeSup = id => est.funcoes.find(f => f.id === id)?.nome || '';
-  const l = [['Funcao', 'Nivel', 'Responde a', 'Pessoa', 'Fazenda']];
+  const l = [['Funcao', 'Categoria', 'Nivel', 'Responde a', 'Pessoa', 'Fazenda']];
   est.funcoes.slice().sort(ordem).forEach(f => {
     const g = mapa.get(f.id) || [];
-    if (!g.length) { if (est.vazias) l.push([f.nome, f.nivel || '', nomeSup(f.superior_id), '', '']); return; }
-    g.forEach(p => l.push([f.nome, f.nivel || '', nomeSup(f.superior_id), p.nome, limpo(p.fazenda)]));
+    if (!g.length) { if (est.vazias) l.push([f.nome, cat(f), f.nivel || '', nomeSup(f.superior_id), '', '']); return; }
+    g.forEach(p => l.push([f.nome, cat(f), f.nivel || '', nomeSup(f.superior_id), p.nome, limpo(p.fazenda)]));
   });
   const limpar = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
   const blob = new Blob(['﻿' + l.map(r => r.map(limpar).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8;' });
@@ -247,6 +280,15 @@ function desenhar() {
   $('ogImp').addEventListener('click', () => { verDoc(); setTimeout(() => imprimir(), 300); });
   $('ogCsv').addEventListener('click', csv);
 
+  alvo.querySelectorAll('[data-og-cat]').forEach(i => i.addEventListener('change', async () => {
+    const f = est.funcoes.find(x => x.id === i.dataset.ogCat);
+    const antes = f.categoria;
+    f.categoria = limpo(i.value) || null;
+    i.disabled = true;
+    const { error } = await estado.cliente.from('jor_funcoes').update({ categoria: f.categoria }).eq('id', f.id);
+    if (error) { f.categoria = antes; alert('Não deu para gravar: ' + error.message); }
+    desenhar();
+  }));
   alvo.querySelectorAll('[data-og-sup]').forEach(s => s.addEventListener('change', async () => {
     const f = est.funcoes.find(x => x.id === s.dataset.ogSup);
     const antes = f.superior_id;
@@ -262,11 +304,14 @@ function editor() {
   const lista = est.funcoes.slice().sort(ordem);
   return `
     <div class="og-editor">
-      <p class="dica" style="margin:0 0 8px">Para cada função, escolha a quem ela responde. Grava na hora. Deixe <b>— topo —</b> para quem não responde a ninguém.</p>
-      <table class="dc-planilha"><thead><tr><th>Função</th><th>Nível</th><th>Responde a</th></tr></thead><tbody>
+      <p class="dica" style="margin:0 0 8px">Para cada função, escolha a quem ela responde. Grava na hora. Deixe <b>— topo —</b> para quem não responde a ninguém.
+        <b>Categoria</b> junta funções numa caixa só (ex.: Tratorista I a IV = Tratorista); deixe em branco para a função ter caixa própria.</p>
+      <datalist id="ogCategorias">${[...new Set(est.funcoes.map(cat).filter(Boolean))].sort().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      <table class="dc-planilha"><thead><tr><th>Função</th><th>Nível</th><th>Categoria</th><th>Responde a</th></tr></thead><tbody>
         ${lista.map(f => {
           const proibidos = abaixoDe(f.id); proibidos.add(f.id);
           return `<tr><td><b>${esc(f.nome)}</b></td><td class="dc-sem">${esc(f.nivel || '—')}</td>
+            <td><input class="dc-mini og-cat" list="ogCategorias" data-og-cat="${f.id}" value="${esc(cat(f))}" placeholder="—"></td>
             <td><select class="dc-mini" data-og-sup="${f.id}">
               <option value="">— topo —</option>
               ${lista.filter(x => !proibidos.has(x.id)).map(x => `<option value="${x.id}"${x.id === f.superior_id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}
