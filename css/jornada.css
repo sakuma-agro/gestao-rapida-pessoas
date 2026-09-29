@@ -434,3 +434,8 @@
 .fer-aberto:hover{border-color:#744F28}
 .fer-aberto[aria-pressed="true"]{background:#744F28;border-color:#744F28;color:#fff}
 .fer-aberto[aria-pressed="true"] b{background:#fff;color:#744F28}
+
+/* Cadastros › Relatórios (29/09/2026) */
+.cr-filtros{flex-wrap:wrap;align-items:flex-end;gap:10px 14px}
+.cr-filtros label,.cr-campo{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#51534A}
+.cr-campo .msel{min-width:220px}
