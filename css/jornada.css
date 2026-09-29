@@ -439,3 +439,48 @@
 .cr-filtros{flex-wrap:wrap;align-items:flex-end;gap:10px 14px}
 .cr-filtros label,.cr-campo{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#51534A}
 .cr-campo .msel{min-width:220px}
+
+/* RH › Organograma (29/09/2026) — linhas e caixas só com borda: imprime igual à tela */
+.og-barra{flex-wrap:wrap;align-items:flex-end;gap:10px 16px;margin-top:12px}
+.og-chk{display:flex;align-items:center;gap:6px;font-size:13px;color:#51534A}
+.og-chk input{accent-color:#84BD00}
+.og-legenda{display:flex;gap:14px;margin:10px 0 4px;font-size:12px;color:#51534A}
+.og-legenda span{padding-left:20px;position:relative}
+.og-legenda span::before{content:'';position:absolute;left:0;top:3px;width:9px;height:9px;border-radius:2px;border:3px solid}
+.og-legenda .og-estr::before{border-color:#744F28} .og-legenda .og-tat::before{border-color:#5f8a00} .og-legenda .og-oper::before{border-color:#84BD00}
+.og-rola{overflow-x:auto;padding:8px 0 4px;max-width:100%}
+.og-arvore{display:flex;justify-content:center;min-width:max-content;padding:4px 8px}
+.og-arvore ul{display:flex;justify-content:center;margin:0;padding:18px 0 0;position:relative}
+.og-arvore > ul{padding-top:0}
+.og-arvore li{list-style:none;position:relative;padding:18px 5px 0;text-align:center}
+.og-arvore > ul > li{padding-top:0}
+.og-arvore li::before,.og-arvore li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:18px;border-top:2px solid #b9c79a}
+.og-arvore li::after{right:auto;left:50%;border-left:2px solid #b9c79a}
+.og-arvore li:only-child::before,.og-arvore li:only-child::after{display:none}
+.og-arvore li:only-child{padding-top:18px}
+.og-arvore li:only-child::after{display:block;border-top:0;height:18px;width:0}
+.og-arvore li:first-child::before,.og-arvore li:last-child::after{border:0 none}
+.og-arvore li:last-child::before{border-right:2px solid #b9c79a;border-radius:0 6px 0 0}
+.og-arvore li:first-child::after{border-radius:6px 0 0 0}
+.og-arvore ul ul::before{content:'';position:absolute;top:0;left:50%;height:18px;border-left:2px solid #b9c79a}
+.og-arvore > ul > li::before,.og-arvore > ul > li::after{display:none}
+.og-caixa{display:inline-block;min-width:130px;max-width:190px;padding:7px 9px;text-align:left;background:#fff;
+  border:1px solid #d8dbd2;border-top:4px solid #84BD00;border-radius:8px;color:#51534A;font-size:12px;vertical-align:top}
+.og-caixa b{display:block;font-size:12.5px;line-height:1.25}
+.og-meta{display:block;font-size:10.5px;color:#8A8D86;margin-top:1px}
+.og-arvore ul.og-nomes{display:block;margin:5px 0 0;padding:5px 0 0;border-top:1px dashed #d8dbd2;list-style:none}
+.og-arvore ul.og-nomes::before{display:none}
+.og-arvore .og-nomes li{display:block;padding:1px 0;font-size:11px;text-align:left}
+.og-nomes li::before,.og-nomes li::after{display:none!important}
+.og-nomes small{color:#8A8D86;font-size:9.5px}
+.og-caixa.og-estr{border-top-color:#744F28} .og-caixa.og-tat{border-top-color:#5f8a00}
+.og-caixa.og-oper{border-top-color:#84BD00} .og-caixa.og-sem{border-top-color:#C9CCC2}
+.og-editor{margin:10px 0;padding:10px;border:1px solid #e2e5dc;border-radius:10px;background:#fafbf7}
+.og-editor .dc-mini{max-width:260px}
+/* no papel */
+.og-doc .og-arvore{justify-content:flex-start;min-width:0;padding:6px 0 10px}
+.og-doc .og-arvore > ul{margin:0 auto}
+.og-papel .og-caixa{min-width:105px;max-width:150px;font-size:10px;padding:5px 7px}
+.og-papel .og-caixa b{font-size:10.5px}
+.og-papel .og-nomes li{font-size:9px!important}
+@media print{.og-doc{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
