@@ -58,6 +58,7 @@ const PROPRIOS = {
   jorLancar:     ['relogio', 'Lançar jornada'],
   jorBoletins:   ['relogio', 'Jornadas lançadas'],
   jorFechamento: ['calendario', 'Fechamento DP'],
+  jorHistorico: ['calendario', 'Histórico de fechamentos'],
   jorRelatorios: ['documento', 'Relatórios DP'],
   bdDia:         ['boletim', 'Marcar boletins'],
   bdMes:         ['calendario', 'Boletins do mês'],

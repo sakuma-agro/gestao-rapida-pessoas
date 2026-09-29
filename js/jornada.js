@@ -94,6 +94,7 @@ export async function abrirJornada(tela) {
   if (tela === 'jorLancar')       desenharLancar();
   if (tela === 'jorBoletins')     desenharBoletins();
   if (tela === 'jorFechamento')   desenharFechamento();
+  if (tela === 'jorHistorico')    desenharHistorico();
   if (tela === 'jorAbatimento')   desenharAbatimento();
   if (tela === 'jorRelatorios')   desenharRelatorios();
   if (tela === 'jorConfig')       desenharConfigJornada();
@@ -1231,9 +1232,16 @@ async function desenharFechamento() {
     const prep = emp.prepararAbatimentos(estadoTela.competencia, b.dataset.enviar);
     if (prep.erro) { aviso(prep.erro); return; }
     try {
-      await fech.enviar(c);
+      const gravada = await fech.enviar(c);
       await emp.lancarAbatimentos(estadoTela.competencia, b.dataset.enviar, prep);
-      aviso('Competência enviada. Falta aprovar para travar.', true);
+      // Congela os relatórios como foram enviados — Histórico de fechamentos.
+      try {
+        const pacote = await rel.pacoteEnvio(estadoTela.competencia, b.dataset.enviar);
+        await fech.arquivar(gravada, fech.consolidar(estadoTela.competencia, b.dataset.enviar).totais, pacote);
+        aviso('Competência enviada e arquivada no Histórico de fechamentos. Falta aprovar para travar.', true);
+      } catch (e) {
+        aviso('Competência enviada, mas não consegui arquivar os relatórios: ' + e.message + '. Avise para arquivar de novo.');
+      }
       desenharFechamento();
     }
     catch (e) { aviso(e.message); }
@@ -1408,6 +1416,97 @@ function desenharRelatorios() {
   if (pedido) gerar(pedido.tipo, false);
 }
 
+/* ===================================================================
+   HISTÓRICO DE FECHAMENTOS (29/09/2026) — todo envio ao DP, versão a versão,
+   com os relatórios exatamente como saíram. Não depende da competência do
+   alto: mostra todos os meses. Nada aqui altera o que foi enviado.
+   =================================================================== */
+
+const histTela = { destino: '' };
+
+async function desenharHistorico() {
+  const alvo = $('telaJorHistorico');
+  alvo.innerHTML = cabecalho('Histórico de fechamentos', 'O que foi enviado ao DP, como foi enviado — cada reenvio vira uma versão nova')
+    + `<div class="jor-corpo"><p class="dc-sem">Carregando…</p></div>`;
+  let lista = [];
+  try { lista = await fech.listarArquivo(); }
+  catch (e) { aviso('Não consegui ler o histórico: ' + e.message); }
+
+  const destinos = jd.dados.destinos;
+  const nomeDest = id => destinos.find(d => d.id === id)?.nome || '—';
+  const filtrada = lista.filter(x => !histTela.destino || x.destino_id === histTela.destino);
+  const porComp = new Map();
+  filtrada.forEach(x => { if (!porComp.has(x.competencia)) porComp.set(x.competencia, []); porComp.get(x.competencia).push(x); });
+  // A versão mais alta de cada destino no mês é a que vale; as outras ficam como substituídas.
+  const vigente = new Set();
+  lista.forEach(x => {
+    const top = lista.filter(y => y.competencia === x.competencia && y.destino_id === x.destino_id)
+      .reduce((a, y) => (y.versao > a.versao ? y : a), x);
+    vigente.add(top.id);
+  });
+  const quando = iso => iso ? new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  const opcoes = rel.RELATORIOS_ARQUIVADOS.map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('');
+
+  const linha = x => {
+    const d = destinos.find(y => y.id === x.destino_id);
+    const h = m => fech.formatarHoras(m || 0, d?.formato_horas);
+    const t = x.totais || {};
+    return `<tr>
+      <td><b>${esc(nomeDest(x.destino_id))}</b></td>
+      <td class="ce">v${x.versao}${vigente.has(x.id) ? ' <span class="tag ativo">vale</span>' : ' <span class="tag neutra">substituída</span>'}</td>
+      <td>${esc(quando(x.enviada_em))}<br><span class="dc-sem">${esc(x.enviada_por || '')}</span></td>
+      <td class="ce">${h(t.extraPagar ?? t.extraTotal)}</td>
+      <td class="ce">${t.pessoas ?? '—'}</td>
+      <td class="dc-sem">${x.motivo_reabertura ? 'Reaberta: ' + esc(x.motivo_reabertura) : '—'}</td>
+      <td><span class="rel-linha__acoes">
+        <select data-hist-rel="${x.id}">${opcoes}</select>
+        <button class="btn principal" type="button" data-hist-ver="${x.id}">Visualizar</button>
+        <button class="btn" type="button" data-hist-imp="${x.id}">Imprimir</button>
+        ${x.csv_nome ? `<button class="btn mini" type="button" data-hist-csv="${x.id}">Excel</button>` : ''}
+      </span></td></tr>`;
+  };
+
+  alvo.innerHTML = cabecalho('Histórico de fechamentos', 'O que foi enviado ao DP, como foi enviado — cada reenvio vira uma versão nova') + `
+    <div class="jor-corpo">
+      <div class="jor-barra">
+        <label>Destino <select data-hist-dest><option value="">Todos</option>
+          ${destinos.map(d => `<option value="${d.id}"${d.id === histTela.destino ? ' selected' : ''}>${esc(d.nome)}</option>`).join('')}
+        </select></label>
+      </div>
+      <p class="dc-sem jor-nota">Cada envio fica guardado aqui do jeito que saiu — reabrir e reenviar cria uma versão nova e mantém a anterior para consulta.
+        O arquivo começa nos envios feitos a partir de 29/09/2026.</p>
+      ${porComp.size ? [...porComp.entries()].map(([comp, l]) => `
+        <section class="jor-destino">
+          <div class="jor-destino__topo"><h3>${esc(rotuloCompetencia(comp))}</h3></div>
+          <table class="dc-planilha"><thead><tr>
+            <th>Destino</th><th class="ce">Versão</th><th>Enviado em / por</th>
+            <th class="ce">Horas extras</th><th class="ce">Pessoas</th><th>Motivo</th><th>Relatórios</th>
+          </tr></thead><tbody>${l.map(linha).join('')}</tbody></table>
+        </section>`).join('')
+        : '<p class="vazio">Nenhum fechamento arquivado ainda. O primeiro aparece aqui quando você enviar uma competência ao DP.</p>'}
+    </div>` + assinatura();
+
+  alvo.querySelector('[data-hist-dest]')?.addEventListener('change', ev => { histTela.destino = ev.target.value; desenharHistorico(); });
+  const abrir = async (id, imprimir) => {
+    try {
+      const reg = await fech.abrirArquivo(id);
+      const k = alvo.querySelector(`[data-hist-rel="${id}"]`)?.value || 'dp';
+      const r = reg?.relatorios?.[k];
+      if (!r?.html) { aviso('Este relatório não foi arquivado neste envio.'); return; }
+      rel.mostrar(r.html, { barra: true });
+      if (imprimir) setTimeout(() => rel.imprimir(), 300);
+    } catch (e) { aviso(e.message); }
+  };
+  alvo.querySelectorAll('[data-hist-ver]').forEach(b => b.addEventListener('click', () => abrir(b.dataset.histVer, false)));
+  alvo.querySelectorAll('[data-hist-imp]').forEach(b => b.addEventListener('click', () => abrir(b.dataset.histImp, true)));
+  alvo.querySelectorAll('[data-hist-csv]').forEach(b => b.addEventListener('click', async () => {
+    try {
+      const reg = await fech.abrirArquivo(b.dataset.histCsv);
+      if (reg?.csv) rel.baixar({ nome: reg.csv_nome, conteudo: reg.csv });
+    } catch (e) { aviso(e.message); }
+  }));
+}
+
 const mesAnterior = () => {
   const d = new Date();
   d.setDate(1); d.setMonth(d.getMonth() - 1);
@@ -1455,5 +1554,5 @@ export function ligarJornada(navegar) {
 }
 
 const telaAtual = () =>
-  ['jorPainel','jorLancar','jorBoletins','jorAbatimento','jorFechamento','jorRelatorios','jorConfig']
+  ['jorPainel','jorLancar','jorBoletins','jorAbatimento','jorFechamento','jorHistorico','jorRelatorios','jorConfig']
     .find(t => !$('tela' + t.charAt(0).toUpperCase() + t.slice(1))?.hidden) || 'jorPainel';

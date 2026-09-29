@@ -308,3 +308,42 @@ export async function reabrir(competencia, destinoId, motivo) {
 
 export const formatarHoras = (min, formato) =>
   formato === 'hm' ? minParaHHMM(min) : minParaDecimal(min).toFixed(2).replace('.', ',');
+
+/* ------------------------------------------------------------------
+   Histórico de fechamentos (29/09/2026) — jor_fechamentos guarda, a cada
+   envio, os relatórios como saíram. Só insere; o banco não deixa alterar
+   nem apagar. Reabrir e reenviar gera uma linha nova (v2, v3…).
+   ------------------------------------------------------------------ */
+
+export async function arquivar(gravada, totais, pacote) {
+  if (!estado.cliente || !estado.sessao) throw new Error('Sem conexão para arquivar o envio.');
+  const linha = {
+    competencia: gravada.competencia,
+    destino_id: gravada.destino_id,
+    versao: gravada.versao || 1,
+    enviada_por: gravada.enviada_por,
+    enviada_em: gravada.enviada_em,
+    motivo_reabertura: (gravada.versao || 1) > 1 ? (gravada.motivo_reabertura || null) : null,
+    totais,
+    ...pacote,
+  };
+  const { error } = await estado.cliente.from('jor_fechamentos')
+    .upsert(linha, { onConflict: 'competencia,destino_id,versao', ignoreDuplicates: true });
+  if (error) throw new Error(error.message);
+}
+
+export async function listarArquivo() {
+  if (!estado.cliente || !estado.sessao) return [];
+  const { data, error } = await estado.cliente.from('jor_fechamentos')
+    .select('id,competencia,destino_id,versao,enviada_por,enviada_em,motivo_reabertura,totais,csv_nome')
+    .order('competencia', { ascending: false }).order('versao', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function abrirArquivo(id) {
+  const { data, error } = await estado.cliente.from('jor_fechamentos')
+    .select('id,relatorios,csv_nome,csv').eq('id', id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}

@@ -742,3 +742,29 @@ export function baixar({ nome, conteudo }) {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
+
+/* ------------------------------------------------------------------
+   Arquivo do envio (29/09/2026) — no momento em que a competência vai ao
+   DP, os relatórios saem congelados em jor_fechamentos. O Histórico de
+   fechamentos abre exatamente o que foi enviado, versão a versão, mesmo que
+   depois alguém mude cadastro, percentual ou reabra o mês.
+   ------------------------------------------------------------------ */
+
+export const RELATORIOS_ARQUIVADOS = [
+  ['dp',        'Relatório Horas Extras',          (c, d) => relatorioDP(c, d)],
+  ['porMes',    'Horas extras por mês',            (c, d) => relatorioPorMes(c, d)],
+  ['faltas',    'Relatório de Faltas',             (c, d) => relatorioFaltas(c, d)],
+  ['faltasTot', 'Faltas Totais (uso interno)',     (c, d) => relatorioFaltas(c, d, { totais: true })],
+  ['atestados', 'Relatório de Atestados',          (c, d) => relatorioAtestados(c, d)],
+  ['detalhado', 'Detalhado DP',                    (c, d) => relatorioDetalhado(c, d)],
+];
+
+export async function pacoteEnvio(competencia, destinoId) {
+  const relatorios = {};
+  for (const [k, nome, gerar] of RELATORIOS_ARQUIVADOS) {
+    try { relatorios[k] = { nome, html: await gerar(competencia, destinoId) }; }
+    catch (e) { relatorios[k] = { nome, html: `<p class="rel-vazio">Não foi possível gerar: ${esc(e.message)}</p>` }; }
+  }
+  const csv = planilhaDP(competencia, destinoId);
+  return { relatorios, csv_nome: csv.nome, csv: csv.conteudo };
+}

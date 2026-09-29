@@ -95,6 +95,7 @@ function abrirAba(nome) {
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
   $('telaJorFechamento').hidden   = nome !== 'jorFechamento';
   $('telaJorAbatimento').hidden   = nome !== 'jorAbatimento';
+  $('telaJorHistorico').hidden    = nome !== 'jorHistorico';
   $('telaJorRelatorios').hidden   = nome !== 'jorRelatorios';
   $('telaJorConfig').hidden       = nome !== 'jorConfig';
   $('telaEmpEmissao').hidden      = nome !== 'empEmissao';
