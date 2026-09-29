@@ -655,14 +655,15 @@ function desenharPrevisao() {
   const lista = ativos().filter(f => casaDestino(f.id, est.destino));
   const meses = mesesPrevisao().map(ym => ({ ym, l: vencimentosNoMes(ym, lista) }));
   const max = Math.max(1, ...meses.map(m => m.l.length));
-  const sel = meses.find(m => m.ym === est.mes) ? est.mes : meses[0].ym;
-  const ms = meses.find(m => m.ym === sel);
-  $('telaFerPrev').innerHTML = cabecalho('Previsão de vencimentos', 'Quantas pessoas ganham o direito às férias em cada mês') + `
-    <div class="jor-corpo">
-      <div class="jor-barra">${filtroDestino()}</div>
-      <div class="fer-prev">${meses.map(m => `<button type="button" data-mes="${m.ym}" aria-pressed="${m.ym === sel}"
-        title="${m.l.length} em ${MESES_L[+m.ym.slice(5) - 1]}"><b>${m.l.length}</b><span class="fer-barra" style="height:${Math.round(m.l.length / max * 100)}%"></span></button>`).join('')}</div>
-      <div class="fer-prev-rot">${meses.map(m => `<span>${MESES[+m.ym.slice(5) - 1]}/${m.ym.slice(2, 4)}</span>`).join('')}</div>
+  /* 29/09/2026: o gráfico começa no mês atual, então quem venceu antes (julho,
+     agosto…) e ainda não tirou sumia daqui. "Liberados em aberto" lista todos
+     que já ganharam o direito e ainda têm dias a tirar, de qualquer mês. */
+  const abertas = concessao(est.destino).abertas;
+  const nAbertos = new Set(abertas.map(x => x.f.id)).size;
+  const verAberto = est.mes === 'aberto';
+  const sel = verAberto ? null : meses.find(m => m.ym === est.mes) ? est.mes : meses[0].ym;
+  const ms = sel && meses.find(m => m.ym === sel);
+  const tabelaMes = () => `
       <h3 class="jor-h3">${MESES_L[+sel.slice(5) - 1]} de ${sel.slice(0, 4)} · ${ms.l.length} ${ms.l.length === 1 ? 'pessoa' : 'pessoas'}</h3>
       <table class="dc-planilha"><thead><tr><th>Vence em</th><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Limite de gozo</th></tr></thead><tbody>
         ${ms.l.map(x => `<tr><td>${br(x.per.vence)}</td><td>${esc(x.f.nome)}</td><td>${esc(x.f.fazenda || '—')}</td>
@@ -671,15 +672,39 @@ function desenharPrevisao() {
       </tbody></table>
       <div class="jor-acoes">
         <button class="btn principal" type="button" id="ferPrevTabela">Emitir esta tabela (${MESES[+sel.slice(5) - 1]}/${sel.slice(0, 4)})</button>
-        <button class="btn" type="button" data-ir="jorRelatorios">Emitir relatório (DP › Relatórios)</button></div>
+        <button class="btn" type="button" data-ir="jorRelatorios">Emitir relatório (DP › Relatórios)</button></div>`;
+  const tabelaAberto = () => `
+      <h3 class="jor-h3">Liberados para tirar férias e ainda em aberto · ${nAbertos} ${nAbertos === 1 ? 'pessoa' : 'pessoas'}</h3>
+      <p class="dc-sem jor-nota">Todos que já completaram o período aquisitivo e ainda têm dias a tirar, venha de qual mês vier. Ordem: limite de gozo mais próximo primeiro.</p>
+      <table class="dc-planilha"><thead><tr><th>Venceu em</th><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Período de concessão</th><th class="ce">Saldo</th></tr></thead><tbody>
+        ${abertas.map(x => `<tr><td>${br(x.p.vence)}</td><td>${esc(x.f.nome)}</td><td>${esc(x.f.fazenda || '—')}</td>
+          <td>${x.p.k}º · ${br(x.p.iniAq)} a ${br(x.p.fimAq)}</td>
+          <td><b>${br(x.p.vence)} a ${br(x.p.limite)}</b><br><span class="dc-sem">${x.prazo < 0 ? `limite vencido há ${-x.prazo} dia(s)` : `faltam ${x.prazo} dia(s) para o limite`}</span></td>
+          <td class="ce"><b>${x.p.saldo} dias</b>${x.p.goz || x.p.vend ? `<br><span class="dc-sem">tirou ${x.p.goz}${x.p.vend ? ` · vendeu ${x.p.vend}` : ''}</span>` : ''}</td></tr>`).join('')
+          || '<tr><td colspan="6" class="vazio">Ninguém com férias em aberto.</td></tr>'}
+      </tbody></table>
+      <div class="jor-acoes">
+        <button class="btn principal" type="button" id="ferPrevConc">Emitir relatório de período de concessão</button></div>`;
+  $('telaFerPrev').innerHTML = cabecalho('Previsão de vencimentos', 'Quantas pessoas ganham o direito às férias em cada mês') + `
+    <div class="jor-corpo">
+      <div class="jor-barra">${filtroDestino()}
+        <button type="button" class="fer-aberto" id="ferVerAberto" aria-pressed="${verAberto}">
+          Liberados em aberto <b>${nAbertos}</b></button>
+        <span class="dc-sem">${verAberto ? 'clique num mês do gráfico para voltar à previsão' : 'quem já pode tirar férias, de qualquer mês'}</span></div>
+      <div class="fer-prev">${meses.map(m => `<button type="button" data-mes="${m.ym}" aria-pressed="${m.ym === sel}"
+        title="${m.l.length} em ${MESES_L[+m.ym.slice(5) - 1]}"><b>${m.l.length}</b><span class="fer-barra" style="height:${Math.round(m.l.length / max * 100)}%"></span></button>`).join('')}</div>
+      <div class="fer-prev-rot">${meses.map(m => `<span>${MESES[+m.ym.slice(5) - 1]}/${m.ym.slice(2, 4)}</span>`).join('')}</div>
+      ${verAberto ? tabelaAberto() : tabelaMes()}
     </div>`;
   ligarFiltro(desenharPrevisao, 'telaFerPrev');
   document.querySelectorAll('#telaFerPrev [data-mes]').forEach(b => b.addEventListener('click', () => { est.mes = b.dataset.mes; desenharPrevisao(); }));
   document.querySelectorAll('#telaFerPrev [data-ir]').forEach(b => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  $('ferVerAberto')?.addEventListener('click', () => { est.mes = verAberto ? null : 'aberto'; desenharPrevisao(); });
   // 28/09/2026: emite a tabela do mês escolhido no gráfico, já na prévia de impressão.
   $('ferPrevTabela')?.addEventListener('click', () => {
     pedirRelatorio({ tipo: 'venc', mes: sel, destino: est.destino }); irPara('jorRelatorios');
   });
+  $('ferPrevConc')?.addEventListener('click', () => { pedirRelatorio({ tipo: 'conc', destino: est.destino }); irPara('jorRelatorios'); });
 }
 
 /* ---------------- Lançamentos ---------------- */
