@@ -9,6 +9,7 @@
 //
 // Salário é dado sensível: as tabelas rh_* só abrem para quem tem o módulo RH,
 // e isso é conferido no banco (política app_pode('rh')), não só na tela.
+import { montarMulti } from './multisel.js';
 import { estado } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -809,11 +810,11 @@ async function excluirProposta(p) {
 function gentePara() {
   const sit = $('qpSituacao').value;
   const emp = $('qpEmpregador').value;
-  const faz = $('qpFazenda').value;
+  const faz = $('qpFazenda').valores || [];   // várias fazendas (29/09/2026); vazio = todas
   return estado.funcionarios.filter(f =>
     (!sit || f.situacao === sit) &&
     (!emp || chaveDeGrupo(f.empregador) === emp) &&
-    (!faz || chaveDeGrupo(f.fazenda) === faz));
+    (!faz.length || faz.includes(chaveDeGrupo(f.fazenda))));
 }
 
 /** Como o recorte escolhido é dito no documento e no CSV. */
@@ -826,7 +827,7 @@ function recorte() {
     return sel.value ? (sel.selectedOptions[0]?.textContent || '').trim() : '';
   };
   const emp = escolhido('qpEmpregador');
-  const faz = escolhido('qpFazenda');
+  const faz = ($('qpFazenda').rotulos || []).join(', ');
   if (emp && faz) return `${faz} · ${emp}`;
   if (faz) return faz;
   if (emp) return emp;
@@ -854,7 +855,7 @@ const contarFaixa = (gente, valorDe, tabela) => {
 function blocosDe(g) {
   const blocos = [];
   if (!$('qpEmpregador').value) blocos.push(['Empregador', contarPor(g, 'empregador')]);
-  if (!$('qpFazenda').value) blocos.push(['Fazenda', contarPor(g, 'fazenda')]);
+  if (($('qpFazenda').valores || []).length !== 1) blocos.push(['Fazenda', contarPor(g, 'fazenda')]);
   blocos.push(['Setor', contarPor(g, 'setor')]);
   blocos.push(['Cargo', contarPor(g, 'cargo')]);
   blocos.push(['Faixa etária', contarFaixa(g, f => anosDesde(f.nascimento), FAIXA_IDADE)]);
@@ -977,13 +978,17 @@ function preencherFiltros() {
   // só as fazendas de quem está selecionado — nada de opção que não traz ninguém
   const emp = sel.value;
   const selFaz = $('qpFazenda');
-  const escolhida = selFaz.value;
+  const escolhidas = selFaz.valores || [];
   const sit = $('qpSituacao').value;
   const grupos = agrupar(estado.funcionarios.filter(f =>
     (!emp || chaveDeGrupo(f.empregador) === emp) && (!sit || f.situacao === sit)), 'fazenda');
 
-  selFaz.innerHTML = opcoes(grupos, 'Todas as fazendas');
-  selFaz.value = grupos.has(escolhida) ? escolhida : '';
+  /* 29/09/2026: caixas de marcar — dá para escolher mais de uma fazenda. */
+  montarMulti(selFaz, {
+    opcoes: [...grupos.entries()].filter(([k]) => k)
+      .sort((a, b) => a[1].rotulo.localeCompare(b[1].rotulo, 'pt-BR')).map(([k, g]) => [k, g.rotulo]),
+    marcados: escolhidas, todas: 'Todas as fazendas', plural: 'fazendas',
+  });
 }
 
 function desenharQuadro() {

@@ -27,6 +27,7 @@
 // app_pode('jornada'). O "não entregou" que chega depois vira Entregou com
 // entregue_em = dia em que chegou: some das pendências e fica o atraso.
 
+import { montarMulti } from './multisel.js';
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
 
@@ -157,7 +158,11 @@ function semMarcacao(lista, ini, fim) {
   return r;
 }
 
-const casaFazenda = (f, fz) => !fz || (fz === '-' ? !f.fazenda : f.fazenda === fz);
+/* 29/09/2026: filtro de fazenda com caixas de marcar — `fz` é uma lista; vazia = todas. */
+const casaFazenda = (f, fz) => { const l = [].concat(fz || []).filter(Boolean);
+  return !l.length || l.some(z => z === '-' ? !f.fazenda : f.fazenda === z); };
+const rotFazendas = fz => [].concat(fz || []).filter(Boolean).map(z => z === '-' ? 'sem fazenda' : z).join(', ');
+const opcoesFazenda = (semFazenda = false) => [...fazendas().map(z => [z, z]), ...(semFazenda ? [['-', 'Sem fazenda']] : [])];
 const fazendas = () => [...new Set(equipe().map(f => f.fazenda).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
 /* ---------------- escrita ---------------- */
@@ -287,7 +292,7 @@ export function relGeral(ini = '', fim = '', fazenda = '', tipo = '') {
   return `<article class="rel">
     ${cabecalhoDoc(tipo === 'correcao' ? 'Boletins devolvidos para correção' : 'Boletins de serviço pendentes',
       `Todos os funcionários · ${TIPOS_PEND[tipo].toLowerCase()}`,
-      `posição em<strong>${br(hoje())}</strong>${esc(rotPeriodo(ini, fim))}${fazenda ? ' · ' + esc(fazenda === '-' ? 'sem fazenda' : fazenda) : ''}`)}
+      `posição em<strong>${br(hoje())}</strong>${esc(rotPeriodo(ini, fim))}${rotFazendas(fazenda) ? ' · ' + esc(rotFazendas(fazenda)) : ''}`)}
     <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th class="rel-num">Pendentes</th><th>Datas</th></tr></thead>
     <tbody>${l.map(x => `<tr><td>${esc(x.f.nome)}${ativa(x.f) ? '' : ' <span class="rel-mini">(inativo)</span>'}</td><td>${esc(x.f.fazenda || '—')}</td>
       <td class="rel-num">${x.p.length}</td><td>${x.p.map(data).join(', ')}</td></tr>`).join('')
@@ -373,7 +378,7 @@ function ligarBarraDoc(raiz) {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { dia: null, mes: null, busca: '', fazenda: '', pIni: '', pFim: '', pFaz: '', pTipo: '' };
+const est = { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '' };
 
 function cabecalho(titulo, sub, direita) {
   return `<header class="jor-cabecalho"><div>
@@ -383,11 +388,7 @@ function cabecalho(titulo, sub, direita) {
 }
 const filtros = (idBusca, idFaz) => `
   <input id="${idBusca}" type="search" placeholder="Buscar funcionário" value="${esc(est.busca)}">
-  <select id="${idFaz}" class="dc-mini bd-sel" aria-label="Fazenda">
-    <option value="">Todas as fazendas</option>
-    ${fazendas().map(z => `<option ${est.fazenda === z ? 'selected' : ''}>${esc(z)}</option>`).join('')}
-    <option value="-" ${est.fazenda === '-' ? 'selected' : ''}>Sem fazenda</option>
-  </select>`;
+  <div id="${idFaz}" aria-label="Fazenda"></div>`;
 const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 const filtrada = () => equipe().filter(f => casaFazenda(f, est.fazenda) &&
   (!est.busca || normal(f.nome + ' ' + (f.apelido || '')).includes(normal(est.busca))));
@@ -396,7 +397,8 @@ function ligarFiltros(idBusca, idFaz, redesenhar) {
     est.busca = ev.target.value; redesenhar();
     const el = $(idBusca); el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {}
   });
-  $(idFaz)?.addEventListener('change', ev => { est.fazenda = ev.target.value; redesenhar(); });
+  montarMulti($(idFaz), { opcoes: opcoesFazenda(true), marcados: est.fazenda, todas: 'Todas as fazendas', plural: 'fazendas' });
+  $(idFaz)?.addEventListener('change', () => { est.fazenda = $(idFaz).valores; redesenhar(); });
 }
 
 export async function abrirBoletins(tela) {
@@ -647,11 +649,8 @@ function desenharPend() {
         <select id="bdPTipo" class="dc-mini bd-sel" aria-label="O que cobrar">
           ${Object.entries(TIPOS_PEND).map(([k, v]) => `<option value="${k}" ${est.pTipo === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
-        <select id="bdPFaz" class="dc-mini bd-sel" aria-label="Fazenda">
-          <option value="">Todas as fazendas</option>
-          ${fazendas().map(z => `<option ${est.pFaz === z ? 'selected' : ''}>${esc(z)}</option>`).join('')}
-        </select>
-        ${est.pIni || est.pFim || est.pFaz || est.pTipo ? '<button class="btn mini" type="button" id="bdPLimpa">Limpar filtro</button>' : ''}
+        <div id="bdPFaz" aria-label="Fazenda"></div>
+        ${est.pIni || est.pFim || est.pFaz.length || est.pTipo ? '<button class="btn mini" type="button" id="bdPLimpa">Limpar filtro</button>' : ''}
       </div>
       <div class="pv-cards bd-cards">
         <button type="button" class="pv-card ${nNao ? 'pv-atencao' : 'pv-ok'}" data-tipo="nao_entregou" aria-pressed="${est.pTipo === 'nao_entregou'}"><span>Não entregou</span><strong>${nNao}</strong><small>${est.pIni || est.pFim ? 'no período' : 'todos em aberto'}</small></button>
@@ -682,11 +681,12 @@ function desenharPend() {
   const setP = (k, v) => { est[k] = v; desenharPend(); };
   $('bdPIni').addEventListener('change', ev => setP('pIni', ev.target.value));
   $('bdPFim').addEventListener('change', ev => setP('pFim', ev.target.value));
-  $('bdPFaz').addEventListener('change', ev => setP('pFaz', ev.target.value));
+  montarMulti($('bdPFaz'), { opcoes: opcoesFazenda(), marcados: est.pFaz, todas: 'Todas as fazendas', plural: 'fazendas' });
+  $('bdPFaz').addEventListener('change', () => setP('pFaz', $('bdPFaz').valores));
   $('bdPTipo').addEventListener('change', ev => setP('pTipo', ev.target.value));
   document.querySelectorAll('#telaBdPend [data-tipo]').forEach(b => b.addEventListener('click', () =>
     setP('pTipo', est.pTipo === b.dataset.tipo ? '' : b.dataset.tipo)));
-  $('bdPLimpa')?.addEventListener('click', () => { est.pIni = ''; est.pFim = ''; est.pFaz = ''; est.pTipo = ''; desenharPend(); });
+  $('bdPLimpa')?.addEventListener('click', () => { est.pIni = ''; est.pFim = ''; est.pFaz = []; est.pTipo = ''; desenharPend(); });
   $('bdIrMes')?.addEventListener('click', () => { est.mes = sm[0].d.slice(0, 7); irPara('bdMes'); });
   $('bdRelGeral').addEventListener('click', () => mostrarDoc(relGeral(est.pIni, est.pFim, est.pFaz, est.pTipo), 'bdBarraPend'));
   ligarBarraDoc($('telaBdPend'));
@@ -775,5 +775,5 @@ export function ligarBoletins(navegar, aviso) {
 
 export function limparBoletins() {
   carregados.clear();
-  Object.assign(est, { dia: null, mes: null, busca: '', fazenda: '', pIni: '', pFim: '', pFaz: '', pTipo: '' });
+  Object.assign(est, { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '' });
 }
