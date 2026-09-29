@@ -1492,7 +1492,10 @@ function ligar(nome, fn) {
 
 ligar('DISC', ligarDisc);
 ligar('acesso', ligarAcesso);
-ligar('DP', () => ligarJornada(abrirAba));
+/* Quando o DP manda para outra tela (ex.: "Emitir relatório"), a faixa de
+   ícones e o caminho acompanham (29/09/2026). */
+const irParaTela = t => { const m = moduloDe(t); if (m) abrirModulo(m, t); else abrirAba(t); };
+ligar('DP', () => ligarJornada(irParaTela));
 ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);

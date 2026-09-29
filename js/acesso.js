@@ -2,6 +2,7 @@
 // A lista fica na tabela app_usuarios. Quem é administrador enxerga tudo
 // e pode mexer nesta lista; os outros só leem a própria linha.
 import { estado } from './store.js';
+import { ICONE_TELA, ICONE_MODULO, svgIcone } from './icones.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -263,38 +264,64 @@ export function abrirModulo(id, tela) {
 
   const subs = subsLiberados(id);
   if (!subs.length) return;
-
-  // Módulo sem submódulo: a segunda faixa mostra as telas, como sempre foi.
-  if (subs.length === 1) {
-    $('navSub').hidden = true;
-    desenharTelas($('navTelas'), 'aba2', subs[0].telas, tela);
-    return;
-  }
-
-  // Com submódulo: segunda faixa são os submódulos, terceira são as telas.
-  const sub = subs.find(s => s.telas.some(([t]) => t === tela)) || subs[0];
-  $('navTelas').hidden = false;
-  $('navTelas').innerHTML = subs.map(s =>
-    `<button class="aba2" role="tab" data-sub="${s.id}" aria-selected="${s.id === sub.id}">${esc(s.nome)}</button>`).join('');
-  $('navTelas').querySelectorAll('.aba2').forEach(b =>
-    b.addEventListener('click', () => abrirModulo(id, (subs.find(s => s.id === b.dataset.sub)?.telas[0] || [])[0])));
-
-  desenharTelas($('navSub'), 'aba3', sub.telas, tela);
+  desenharFaixa(id, subs, tela);
 }
 
-/** Desenha uma faixa de telas e abre a escolhida (ou a primeira). */
-function desenharTelas(faixa, classe, telas, tela) {
-  const alvo = telas.some(([t]) => t === tela) ? tela : telas[0][0];
-  faixa.hidden = telas.length < 2;
-  faixa.innerHTML = telas.map(([t, rot]) =>
-    `<button class="${classe}" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${esc(rot)}</button>`).join('');
+/* Faixa de ícones (29/09/2026, pedido dele a partir de um protótipo): no lugar
+   das duas faixas de botões de texto (submódulo e tela), todas as telas do
+   módulo aparecem de uma vez, como botões com ícone, agrupadas pelo
+   submódulo, com o nome do grupo numa faixa colorida embaixo. Acima do
+   conteúdo fica o caminho "Módulo › Submódulo › Tela". Permissão continua
+   igual: só entra o que subsLiberados() devolve. */
+const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
+
+function desenharFaixa(id, subs, tela) {
+  const todas = subs.flatMap(s => s.telas);
+  const alvo = todas.some(([t]) => t === tela) ? tela : todas[0][0];
+  const faixa = $('navTelas');
+  faixa.hidden = false;
+  faixa.classList.add('rb');
+  const unico = subs.length === 1;
+  faixa.innerHTML = subs.map((s, i) => `
+    <section class="rb-grupo ${CORES_GRUPO[i % CORES_GRUPO.length]}" aria-label="${esc(s.nome)}">
+      <div class="rb-botoes">${s.telas.map(([t, rot]) => `
+        <button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === alvo}" title="${esc(rot)}">
+          ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`).join('')}
+      </div>
+      ${unico ? '' : `<div class="rb-rotulo">${esc(s.nome)}</div>`}
+    </section>`).join('');
   faixa.querySelectorAll('[data-tela]').forEach(b =>
-    b.addEventListener('click', () => {
-      faixa.querySelectorAll('[data-tela]').forEach(x =>
-        x.setAttribute('aria-selected', String(x === b)));
-      aoTrocar(b.dataset.tela);
-    }));
-  aoTrocar(alvo);
+    b.addEventListener('click', () => marcarTela(id, subs, b.dataset.tela, true)));
+  marcarTela(id, subs, alvo, true);
+  faixa.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  sombraFaixa();
+  requestAnimationFrame(sombraFaixa);
+}
+
+/* Faixa maior que a tela (o DP tem muitas telas): um esmaecido na borda avisa
+   que há mais para o lado; some quando se chega ao fim. */
+function sombraFaixa() {
+  const f = $('navTelas');
+  if (!f) return;
+  const resto = f.scrollWidth - f.clientWidth - f.scrollLeft;
+  f.classList.toggle('rb-mais', resto > 4);
+}
+addEventListener('resize', sombraFaixa);
+document.addEventListener('scroll', ev => { if (ev.target?.id === 'navTelas') sombraFaixa(); }, true);
+
+function marcarTela(id, subs, tela, abrir) {
+  $('navTelas').querySelectorAll('[data-tela]').forEach(x =>
+    x.setAttribute('aria-selected', String(x.dataset.tela === tela)));
+  const mod = MODULOS.find(m => m.id === id);
+  const sub = subs.find(s => s.telas.some(([t]) => t === tela));
+  const rot = sub?.telas.find(([t]) => t === tela)?.[1] || '';
+  const partes = [mod?.nome, subs.length > 1 && sub && sub.nome !== rot ? sub.nome : null, rot].filter(Boolean);
+  const cam = $('navSub');
+  cam.hidden = false;
+  cam.classList.add('rb-caminho');
+  cam.innerHTML = partes.map((p, i) => i === partes.length - 1
+    ? `<b>${esc(p)}</b>` : `<span>${esc(p)}</span><span class="rb-sep" aria-hidden="true">›</span>`).join('');
+  if (abrir) aoTrocar(tela);
 }
 
 /* =============== tela de configurações =============== */
