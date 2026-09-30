@@ -476,6 +476,8 @@ function desenharMes() {
   const docs = docsGrade(ym, lista);
   const conta = (doc, fn) => lista.filter(f => fn(registro(f.id, ym, doc))).length;
   const vazios = lista.reduce((s, f) => s + docsDaPessoa(f.id, ym).filter(d => semValor(registro(f.id, ym, d))).length, 0);
+  const rolaAntes = document.querySelector('#telaDmMes .dm-rola');
+  const posAntes = rolaAntes ? [rolaAntes.scrollTop, rolaAntes.scrollLeft] : null;
 
   $('telaDmMes').innerHTML = cabecalho('Documentos do mês', 'Uma linha por pessoa, uma coluna por documento — clique na célula para marcar',
     `mês de referência<strong class="jor-cabecalho__competencia">${rotMes(ym)}</strong>`) + `
@@ -500,7 +502,7 @@ function desenharMes() {
         <button class="btn mini" type="button" data-lote="entregue">como Entregue</button>
         <button class="btn mini" type="button" data-lote="nao_entregue">como Não entregue</button>
       </div>` : ''}
-      <div class="bd-rola"><table class="bd-grade dm-grade"><thead><tr><th class="bd-nome">Funcionário</th>
+      <div class="bd-rola dm-rola"><table class="bd-grade dm-grade"><thead><tr><th class="bd-nome">Funcionário</th>
         ${docs.map(d => `<th>${esc(DOCS[d].curto)}</th>`).join('')}<th class="bd-tot" title="Pendentes (não entregue + em correção)">Pend.</th></tr></thead><tbody>
         ${lista.map(f => {
           let n = 0;
@@ -524,6 +526,10 @@ function desenharMes() {
       <p class="dc-sem jor-nota">Clique na célula e escolha no menu (Esc fecha) — é ali também que se marca o escaneado.
         Clique no nome para ver tudo o que a pessoa deve. Holerite de férias: botão <b>+ férias</b> ao lado do nome. Só aparece quem está ativo e já admitido no mês, e quem tiver marcação nele.</p>
     </div>`;
+
+  ajustarAltura();
+  const rola = document.querySelector('#telaDmMes .dm-rola');
+  if (rola && posAntes) { rola.scrollTop = posAntes[0]; rola.scrollLeft = posAntes[1]; }
 
   const irMes = m => { est.mes = m; desenharMes(); };
   $('dmAnt').addEventListener('click', () => irMes(somaMes(ym, -1)));
@@ -559,6 +565,17 @@ function desenharMes() {
     desenharMes();
   }));
 }
+
+/* Grade com cabeçalho congelado (30/09/2026, pedido dele): os controles e a
+   linha verde ficam parados e só os funcionários rolam. A grade ganha a altura
+   que sobra na tela abaixo dela; o cabeçalho da tabela é sticky dentro dela. */
+function ajustarAltura() {
+  const rola = document.querySelector('#telaDmMes .dm-rola');
+  if (!rola || $('telaDmMes').hidden) return;
+  const livre = window.innerHeight - Math.max(rola.getBoundingClientRect().top, 0) - 16;
+  rola.style.maxHeight = Math.max(320, livre) + 'px';
+}
+window.addEventListener('resize', () => ajustarAltura());
 
 /* Menu ao clicar na célula — o mesmo jeito dos Boletins diários. */
 function fecharMenu() {
