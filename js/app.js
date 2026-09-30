@@ -23,6 +23,7 @@ import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
+import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
@@ -777,11 +778,23 @@ function desenharFuncionarios() {
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
       <span class="acoes">
+        ${iv.desligPendente(f) ? `<button class="btn mini perigo" data-deslig="${f.id}" title="Inativo sem data, tipo e motivo do desligamento">Registrar desligamento</button>` : ''}
         <button class="btn mini" data-ficha="${f.id}">Ficha</button>
         <button class="btn mini" data-editar="${f.id}">Editar</button>
       </span>
     </div>`).join('')
     : '<div class="vazio">Nenhum funcionário encontrado.</div>';
+
+  /* Inativado sem passar pelo diálogo (ex.: importação de planilha): o
+     turnover precisa da data, do tipo e do motivo (D-28). */
+  $('listaFunc').querySelectorAll('[data-deslig]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const f = estado.funcionarios.find(x => x.id === b.dataset.deslig);
+      const mov = f && await iv.pedirMovimento('desligar', { nome: f.nome, admissao: iv.abertoDe(f.id)?.admissao || f.admissao });
+      if (!mov) return;
+      await iv.desligar(f, mov);
+      desenharFuncionarios();
+    }));
 
   $('listaFunc').querySelectorAll('[data-editar]').forEach(b =>
     b.addEventListener('click', () => abrirFuncionario(b.dataset.editar)));
@@ -1012,6 +1025,7 @@ function abrirFuncN2(id) {
   $('n2Matricula').value = v.matricula || f.cadastro || '';
   $('n2Insal').value = v.insalubridade || 'nao';
   $('n2Peric').checked = !!v.periculosidade;
+  $('n2Contrato').value = v.tipo_contrato || 'fixo';
   $('dlgFuncN2').showModal();
 }
 
@@ -1025,7 +1039,11 @@ $('formFuncN2').addEventListener('submit', async ev => {
     matricula: $('n2Matricula').value.trim() || null,
     periculosidade: $('n2Peric').checked,
     insalubridade: $('n2Insal').value,
+    tipo_contrato: $('n2Contrato').value,
   });
+  // O tipo de contrato também vai para o vínculo dos indicadores (D-24).
+  const fN2 = estado.funcionarios.find(x => x.id === editandoN2.id);
+  if (fN2) try { await iv.sincronizar(fN2); } catch (e) { console.warn('vínculo dos indicadores', e); }
   $('dlgFuncN2').close();
   desenharFuncN2();
 });
@@ -1054,12 +1072,36 @@ $('formFunc').addEventListener('submit', async ev => {
     ...lerFichaCompleta(),
   };
   if (!f.nome) return;
+  // Unidade, setor e função são do módulo Cadastros: quem tem Cadastros grava.
+  const temDP = pode('jornada') || pode('pessoas');
+
+  /* Indicadores (30/09/2026): antes de salvar, pergunta o que aconteceu
+     quando a situação ou o empregador muda. Cancelar = não salva nada. */
+  const antes = estado.funcionarios.find(x => x.id === f.id) || null;
+  const eraAtivo = antes ? (antes.situacao || 'ATIVO') === 'ATIVO' : null;
+  const vAntes = jd.vinculoDe(f.id);
+  const retratoAntes = antes ? iv.retrato(antes) : null;
+  const uNova = temDP ? jd.dados.unidades.find(u => u.id === $('fuUnidade').value) : null;
+  let mov = null;
+  if (antes && eraAtivo && f.situacao === 'INATIVO') {
+    mov = await iv.pedirMovimento('desligar', { nome: f.nome, admissao: iv.abertoDe(f.id)?.admissao || f.admissao });
+    if (!mov) return;
+  } else if (antes && !eraAtivo && f.situacao === 'ATIVO') {
+    mov = await iv.pedirMovimento('reativar', { nome: f.nome });
+    if (!mov) return;
+    if (mov.escolha === 'readmissao') f.admissao = mov.data;
+  } else if (antes && eraAtivo && f.situacao === 'ATIVO' && vAntes?.unidade_id && uNova && uNova.id !== vAntes.unidade_id) {
+    const uVelha = jd.dados.unidades.find(u => u.id === vAntes.unidade_id);
+    mov = await iv.pedirMovimento('transferir', {
+      nome: f.nome, de: jd.nomeUnidade(uVelha), para: jd.nomeUnidade(uNova),
+      mesmoEmpregador: uVelha?.empregador_id === uNova.empregador_id,
+    });
+    if (!mov) return;
+  }
 
   /* O que foi escolhido nas listas vira também texto no cadastro, porque a
      ficha de EPI e a lista de presença imprimem esses nomes. Sem escolha,
      o que já estava escrito fica como estava. */
-  // Unidade, setor e função são do módulo Cadastros: quem tem Cadastros grava.
-  const temDP = pode('jornada') || pode('pessoas');
   const unidade = temDP ? jd.dados.unidades.find(u => u.id === $('fuUnidade').value) : null;
   const setor   = temDP ? jd.dados.setores.find(s => s.id === $('fuSetor').value) : null;
   const funcao  = temDP ? jd.dados.funcoes.find(x => x.id === $('fuCargo').value) : null;
@@ -1093,6 +1135,16 @@ $('formFunc').addEventListener('submit', async ev => {
       ativo: f.situacao === 'ATIVO',
     });
   }
+
+  /* Vínculo dos indicadores: desligamento, readmissão, transferência ou só
+     manter em dia o retrato (unidade, setor, sexo…) do vínculo aberto. */
+  try {
+    if (mov?.modo === 'desligar') await iv.desligar(f, mov);
+    else if (mov?.modo === 'reativar') await (mov.escolha === 'readmissao' ? iv.readmitir(f, mov.data) : iv.corrigirReativacao(f));
+    else if (mov?.modo === 'transferir' && mov.escolha === 'transferencia')
+      await iv.transferir(f, retratoAntes, mov.data, mov.tipo, jd.nomeUnidade(uNova));
+    else await iv.sincronizar(f);
+  } catch (e) { console.warn('vínculo dos indicadores', e); }
 
   $('dlgFunc').close();
   preencherControles(); desenharFuncionarios(); desenharSelecao();
@@ -1460,6 +1512,7 @@ $('bRestaurarModelo').addEventListener('click', async () => {
 });
 
 /* =============== geral =============== */
+iv.ligarMovVinc();
 document.querySelectorAll('[data-fechar]').forEach(b =>
   b.addEventListener('click', () => b.closest('dialog').close()));
 

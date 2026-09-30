@@ -48,6 +48,10 @@ export const TABELAS = {
   // Folha, holerite e recibo (30/09/2026): entrega mensal dos documentos
   // assinados. Chave = funcionario_id|AAAA-MM|documento.
   docEntregas:   'jor_doc_entregas',
+  // Indicadores de absenteísmo e turnover (30/09/2026): histórico de vínculos
+  // (admissão e desligamento) e a lista de tipos de desligamento.
+  indVinculos:   'rh_ind_vinculos',
+  tiposDeslig:   'rh_ind_tipos_deslig',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
@@ -156,6 +160,11 @@ export async function carregar(competencia = competenciaAtual()) {
   } catch { /* tabela sem permissão ou sem rede: o DP abre mesmo assim */ }
   // Folha, holerite e recibo: tabela pequena, vem inteira (painel do DP).
   try { await carregarDocs(); } catch { /* idem */ }
+  // Vínculos dos indicadores: pequenos, vêm inteiros. Sem permissão ou
+  // tabela ainda ausente, o cadastro abre do mesmo jeito.
+  const IND = ['indVinculos', 'tiposDeslig'];
+  const ind = await Promise.all(IND.map(k => c.from(TABELAS[k]).select('*')));
+  IND.forEach((k, i) => { dados[k] = ind[i].error ? (dados[k] || []) : (ind[i].data || []); });
 
   dados.carregado = true;
   salvarCache();
