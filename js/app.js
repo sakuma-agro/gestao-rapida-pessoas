@@ -15,6 +15,7 @@ import { ligarJornada, abrirJornada, limparJornada } from './jornada.js';
 import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
 import { abrirFerias, etiquetaFicha } from './jornada-ferias.js';
 import { abrirBoletins, fecharDocBoletins, fecharMenuBoletins } from './jornada-boletins.js';
+import { abrirDocumentos, fecharDocDocumentos, fecharMenuDocumentos } from './jornada-documentos.js';
 import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from './atalhos.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
@@ -59,6 +60,8 @@ function limparPrevias() {
   fecharDocEmprestimo();    // esconde a barra do recibo / extrato do empréstimo
   fecharDocBoletins();      // esconde a barra do relatório de boletins
   fecharMenuBoletins();     // fecha o menu da célula da grade do mês
+  fecharDocDocumentos();    // barra do relatório de folha/holerite/recibo
+  fecharMenuDocumentos();   // menu da célula da grade de documentos
   const alvo = $('jorImpressao');
   if (alvo) { alvo.innerHTML = ''; alvo.hidden = true; }
 }
@@ -106,7 +109,7 @@ function abrirAba(nome) {
   $('telaEmpSalarios').hidden     = nome !== 'empSalarios';
   ['ferPainel', 'ferPrev', 'ferLanc', 'ferAfast', 'ferRisco', 'ferIni'].forEach(t =>
     { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
-  ['bdDia', 'bdMes', 'bdPend'].forEach(t =>
+  ['bdDia', 'bdMes', 'bdPend', 'dmPainel', 'dmMes', 'dmScan'].forEach(t =>
     { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
@@ -137,6 +140,7 @@ function abrirAba(nome) {
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
   if (nome.startsWith('fer')) abrirFerias(nome);
   if (nome.startsWith('bd')) abrirBoletins(nome);
+  if (nome.startsWith('dm')) abrirDocumentos(nome);
 }
 
 /* =============== login =============== */
@@ -959,10 +963,8 @@ function desenharFuncN2() {
 
   $('listaFuncN2').innerHTML = lista.length ? lista.map(f => {
     const v = jd.vinculoDe(f.id);
-    const jornada = jd.jornadaDe(v);
-    const origem = jd.origemJornada(v);
+    const jornada = jd.dados.jornadas.find(j => j.id === v?.jornada_id);
     const setor = jd.dados.setores.find(s => s.id === v?.setor_id);
-    const funcao = jd.funcaoDe(v);
     const riscos = [
       v?.periculosidade ? 'periculosidade 30%' : null,
       v?.insalubridade && v.insalubridade !== 'nao' ? 'insalubridade ' + v.insalubridade : null,
@@ -970,10 +972,7 @@ function desenharFuncN2() {
     return `<div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(!jornada ? 'sem jornada definida'
-          : origem === 'funcao' ? `${jornada.nome} (da função ${funcao?.nome || ''})`
-          : origem === 'setor' ? `${jornada.nome} (do setor ${setor?.nome || ''})`
-          : `${jornada.nome} (própria)`)}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}</span>
+        <span class="sub">${esc(jornada?.nome || (setor ? 'jornada do setor ' + setor.nome : 'sem jornada definida'))}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}</span>
       </span>
       <span class="tag ${riscos ? 'inativo' : 'ativo'}">${riscos ? 'com adicional' : 'sem adicional'}</span>
       <span class="acoes"><button class="btn mini" data-n2="${f.id}">Editar</button></span>
@@ -1000,11 +999,6 @@ function abrirFuncN2(id) {
     ? jd.nomeUnidade(unidade)
     : 'Sem unidade no Nível 1 — a apuração precisa dela para saber o destino de DP.';
   $('n2Jornada').innerHTML = opcoes(jd.dados.jornadas, v.jornada_id);
-  /* Em branco vale a jornada da função (29/09/2026) — a dica diz qual é. */
-  const jf = jd.dados.jornadas.find(j => j.id === jd.funcaoDe(v)?.jornada_id);
-  const js = jd.dados.jornadas.find(j => j.id === jd.setorDe(v)?.jornada_id);
-  $('n2JornadaDica').textContent = jf ? `Em branco = usa a jornada da função: ${jf.nome}.`
-    : js ? `Em branco = usa a jornada do setor: ${js.nome}.` : 'Em branco = sem jornada (a função e o setor não têm).';
   $('n2Matricula').value = v.matricula || f.cadastro || '';
   $('n2Insal').value = v.insalubridade || 'nao';
   $('n2Peric').checked = !!v.periculosidade;

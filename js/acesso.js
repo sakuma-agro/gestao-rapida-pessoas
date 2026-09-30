@@ -108,6 +108,14 @@ export const MODULOS = [
       ['bdMes',           'Mês'],
       ['bdPend',          'Pendências'],
     ] },
+    /* Folha, holerite e recibo (30/09/2026): os documentos que todo mês o
+       funcionário assina e devolve — mais o 13º em novembro e dezembro —, e o
+       escaneamento depois. js/jornada-documentos.js. */
+    { id: 'docMensais', nome: 'Folha, holerite e recibo', telas: [
+      ['dmPainel',        'Painel'],
+      ['dmMes',           'Mês'],
+      ['dmScan',          'Escanear'],
+    ] },
     { id: 'emprestimo', nome: 'Empréstimo Funcionário', telas: [
       ['empEmissao',      'Emissão recibo'],
       ['empRecibos',      'Recibos emitidos'],

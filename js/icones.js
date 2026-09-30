@@ -49,6 +49,7 @@ export const ICONE_TELA = {
   jorPainel: 'painel', jorLancar: 'relogio', jorBoletins: 'lista', jorAbatimento: 'ajuste',
   jorFechamento: 'calendario', jorHistorico: 'historico',
   bdDia: 'boletim', bdMes: 'calendario', bdPend: 'alerta',
+  dmPainel: 'painel', dmMes: 'recibo', dmScan: 'check',
   empEmissao: 'recibo', empRecibos: 'lista', empHistorico: 'dinheiro',
   ferPainel: 'sol', ferPrev: 'grafico', ferLanc: 'lista', ferAfast: 'calendario', ferRisco: 'risco', ferIni: 'lapis',
   jorRelatorios: 'grafico', jorConfig: 'config', empSalarios: 'dinheiro',

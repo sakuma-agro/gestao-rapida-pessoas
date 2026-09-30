@@ -45,6 +45,9 @@ export const TABELAS = {
   // Boletins diários (24/09/2026): entrega do boletim de serviço, uma linha
   // por pessoa por dia. Chave = funcionario_id|AAAA-MM-DD.
   bolEntregas:   'jor_bol_entregas',
+  // Folha, holerite e recibo (30/09/2026): entrega mensal dos documentos
+  // assinados. Chave = funcionario_id|AAAA-MM|documento.
+  docEntregas:   'jor_doc_entregas',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
@@ -54,7 +57,7 @@ const APOIO = ['faltas', 'bolFerias', 'bolJornada'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave' };
 const chaveDe = c => CHAVE[c] || 'id';
 
 export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
@@ -151,6 +154,8 @@ export async function carregar(competencia = competenciaAtual()) {
     const [a, m] = competencia.split('-').map(Number);
     await carregarEntregas(competencia, new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10));
   } catch { /* tabela sem permissão ou sem rede: o DP abre mesmo assim */ }
+  // Folha, holerite e recibo: tabela pequena, vem inteira (painel do DP).
+  try { await carregarDocs(); } catch { /* idem */ }
 
   dados.carregado = true;
   salvarCache();
@@ -243,6 +248,21 @@ export async function apuracoesDe(ids) {
     }
     return out;
   } catch { return local(); }
+}
+
+/* Folha, holerite e recibo (30/09/2026): pessoa × mês × documento. Pequena
+   (≈ 50 pessoas × 3 documentos × 12 meses), vem inteira. O que ainda está na
+   fila (a nuvem não sabe dele) fica como está no aparelho. */
+export async function carregarDocs() {
+  const c = estado.cliente;
+  if (!c || !estado.sessao) return;
+  await enviarFila();
+  const todos = await todas(() => c.from(TABELAS.docEntregas).select('*').order('competencia'));
+  const fila = new Set(ler(CHAVE_FILA, []).filter(p => p.colecao === 'docEntregas').map(p => p.item.chave));
+  const mapa = new Map(todos.filter(x => !fila.has(x.chave)).map(x => [x.chave, x]));
+  for (const x of dados.docEntregas || []) if (fila.has(x.chave)) mapa.set(x.chave, x);
+  dados.docEntregas = [...mapa.values()];
+  salvarCache();
 }
 
 export async function carregarEntregas(ini, fim) {
@@ -408,19 +428,10 @@ export const vinculoDe = funcionarioId =>
 export const setorDe = vinculo =>
   dados.setores.find(s => s.id === vinculo?.setor_id) || null;
 
-/** De onde vem a jornada (29/09/2026): a própria do vínculo; senão a da
-    função (cadastrada em Cadastros › Estrutura › Funções); senão a do setor
-    (RN-07.1). */
-export const funcaoDe = vinculo => (dados.funcoes || []).find(f => f.id === vinculo?.funcao_id) || null;
-export function origemJornada(vinculo) {
-  if (vinculo?.jornada_id) return 'propria';
-  if (funcaoDe(vinculo)?.jornada_id) return 'funcao';
-  if (setorDe(vinculo)?.jornada_id) return 'setor';
-  return '';
-}
+/** Jornada própria do vínculo ou, se não tiver, a do setor (RN-07.1). */
 export function jornadaDe(vinculo) {
   const s = setorDe(vinculo);
-  const id = vinculo?.jornada_id || funcaoDe(vinculo)?.jornada_id || s?.jornada_id;
+  const id = vinculo?.jornada_id || s?.jornada_id;
   return dados.jornadas.find(j => j.id === id) || null;
 }
 

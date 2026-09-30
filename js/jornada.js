@@ -13,6 +13,7 @@ import * as rel from './jornada-relatorios.js';
 import * as emp from './jornada-emprestimos.js';
 import * as fer from './jornada-ferias.js';
 import * as bol from './jornada-boletins.js';
+import * as docm from './jornada-documentos.js';
 import { podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
@@ -105,6 +106,7 @@ export function limparJornada() {
   emp.limparEmprestimos();
   fer.limparFerias();
   bol.limparBoletins();
+  docm.limparDocumentos();
   estadoTela.competencia = jd.competenciaAtual();
   competenciaDecidida = false;
   estadoTela.editando = null;
@@ -165,6 +167,7 @@ function desenharPainel() {
       ${painelEmprestimos()}
       ${painelFerias()}
       ${painelBoletins()}
+      ${painelDocumentos()}
       ${painelAtrasados()}
 
       ${semVinculo ? `<div class="jor-caixa alerta">
@@ -214,6 +217,16 @@ function painelBoletins() {
   if (!r.pendentes) return '';
   return `<div class="jor-caixa alerta"><b>${r.pendentes} boletim(ns) de serviço pendente(s)</b> — ${r.naoEntregou} não entregue(s), ${r.correcao} em correção — de ${r.pessoas} pessoa(s).
     <button class="btn mini" data-ir-fer="bdPend">Ver pendências</button></div>`;
+}
+
+/* Folha, holerite e recibo no painel: só para quem enxerga o Painel do submódulo. */
+function painelDocumentos() {
+  if (!podeTela('dmPainel')) return '';
+  const r = docm.resumoPainel();
+  if (!r.pendentes && !r.escanear) return '';
+  return `<div class="jor-caixa ${r.pendentes ? 'alerta' : ''}">${r.pendentes ? `<b>${r.pendentes} documento(s) mensal(is) pendente(s)</b> — ${r.naoEntregue} não entregue(s), ${r.correcao} em correção — de ${r.pessoas} pessoa(s)` : ''}${
+    r.pendentes && r.escanear ? '; ' : ''}${r.escanear ? `${r.escanear} entregue(s) falta(m) escanear` : ''}.
+    <button class="btn mini" data-ir-fer="dmPainel">Folha, holerite e recibo</button></div>`;
 }
 
 /* Férias no painel: só para quem enxerga o submódulo. As faixas são as do
@@ -1525,6 +1538,7 @@ export function ligarJornada(navegar) {
   emp.ligarEmprestimos(irPara, aviso);
   fer.ligarFerias(irPara, aviso);
   bol.ligarBoletins(irPara, aviso);
+  docm.ligarDocumentos(irPara, aviso);
 
   /* Seletor de competência no cabeçalho de toda tela do DP (28/09/2026). O
      cabeçalho é redesenhado a cada tela, então o ouvinte fica no documento. */
