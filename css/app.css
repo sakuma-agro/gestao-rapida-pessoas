@@ -936,3 +936,10 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
   .aba-config span{display:none}
   .aba-config{padding:7px 10px}
 }
+/* Faixa de ícones: botões centralizados no grupo e rótulo que não vaza (30/09/2026).
+   O grupo fica da largura do nome dele (ex.: FOLHA DE PONTO) e o botão ficava
+   encostado à esquerda; palavra longa ("comportamental") passava da borda. */
+.rb-botoes{justify-content:center}
+.rb-btn{width:auto;min-width:84px;max-width:124px;padding-left:8px;padding-right:8px}
+.rb-btn span{overflow-wrap:anywhere;hyphens:auto}
+@media (max-width:640px){ .rb-btn{min-width:70px;max-width:104px} }
