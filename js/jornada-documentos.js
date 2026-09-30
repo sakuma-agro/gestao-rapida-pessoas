@@ -61,6 +61,9 @@ export const DOCS = {
   recibo:      { rot: 'Recibo',           curto: 'Recibo' },
   decimo1:     { rot: '13º · 1ª parcela', curto: '13º 1ª' },
   decimo2:     { rot: '13º · 2ª parcela', curto: '13º 2ª' },
+  /* Holerite de férias (30/09/2026): não é de todo mês nem de todo mundo —
+     quem tem a tela Mês acrescenta na pessoa, no mês em que ele saiu. */
+  ferias:      { rot: 'Holerite de férias', curto: 'Hol. férias' },
 };
 /** Os documentos de cada mês: os três de sempre, mais o 13º em novembro e dezembro. */
 export const docsDoMes = ym => {
@@ -74,8 +77,10 @@ export const SIT = {
   nao_entregue:  { rot: 'Não entregue',  curto: '✗',  cls: 'bd-nao' },
   correcao:      { rot: 'Em correção',   curto: 'EC', cls: 'bd-corr' },
   nao_se_aplica: { rot: 'Não se aplica', curto: 'NA', cls: 'bd-neutro' },
+  /* Só do holerite de férias: acrescentado e ainda sem marcação. */
+  previsto:      { rot: 'Sem marcação',  curto: '',   cls: 'bd-vazio-cob' },
 };
-const ORDEM = Object.keys(SIT);
+const ORDEM = Object.keys(SIT).filter(k => k !== 'previsto');
 export const PEND = ['nao_entregue', 'correcao'];
 const ehPend = s => PEND.includes(s);
 const faltaEscanear = r => r.situacao === 'entregue' && !r.escaneado;
@@ -97,6 +102,12 @@ export function equipeDoMes(ym) {
 
 const chave = (fid, ym, doc) => `${fid}|${ym}|${doc}`;
 export const registro = (fid, ym, doc) => regs().find(r => r.chave === chave(fid, ym, doc)) || null;
+const temFerias = (fid, ym) => !!registro(fid, ym, 'ferias');
+/** Os documentos que a pessoa deve naquele mês (os do mês + holerite de férias, se tiver). */
+const docsDaPessoa = (fid, ym) => [...docsDoMes(ym), ...(temFerias(fid, ym) ? ['ferias'] : [])];
+/** Colunas da grade: as do mês, e "Hol. férias" quando alguém da lista tem. */
+const docsGrade = (ym, lista) => [...docsDoMes(ym), ...(lista.some(f => temFerias(f.id, ym)) ? ['ferias'] : [])];
+const semValor = r => !r || r.situacao === 'previsto';
 
 /* O controle começa no primeiro mês que tiver marcação. */
 const inicioControle = () => regs().reduce((m, r) => !m || r.competencia < m ? r.competencia : m, null);
@@ -150,7 +161,7 @@ function semMarcacao(de = '', ate = '', fz = []) {
     if (!dentro(ym, de, ate)) continue;
     for (const f of equipeDoMes(ym)) {
       if (!casaFazenda(f, fz)) continue;
-      for (const doc of docsDoMes(ym)) if (!registro(f.id, ym, doc)) r.push({ f, ym, doc });
+      for (const doc of docsDaPessoa(f.id, ym)) if (semValor(registro(f.id, ym, doc))) r.push({ f, ym, doc });
     }
   }
   return r;
@@ -259,10 +270,11 @@ const linkZap = t => `https://wa.me/?text=${encodeURIComponent(t)}`;
 
 function csvMes(ym, lista) {
   const q = c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`;
-  const docs = docsDoMes(ym);
+  const docs = docsGrade(ym, lista);
   const cols = ['Funcionario', 'Fazenda', ...docs.flatMap(d => [DOCS[d].rot, DOCS[d].rot + ' - escaneado'])];
   const linhas = lista.map(f => [f.nome, f.fazenda || '', ...docs.flatMap(d => {
     const r = registro(f.id, ym, d);
+    if (d === 'ferias' && !r) return ['', ''];
     return [r ? SIT[r.situacao].rot : '', r?.situacao === 'entregue' ? (r.escaneado ? 'Sim' : 'Nao') : ''];
   })]);
   return { nome: `Documentos_${ym}.csv`, conteudo: '﻿' + [cols, ...linhas].map(l => l.map(q).join(';')).join('\r\n') };
@@ -353,18 +365,19 @@ function desenharPainel() {
   const meses = [...new Set([...mesesControlados(), ...regs().map(r => r.competencia)])]
     .filter(ym => dentro(ym, de, ate)).sort().reverse();
   const cel = (ym, doc) => {
-    if (!docsDoMes(ym).includes(doc)) return '<td class="ce dc-sem">—</td>';
-    const eq = equipeDoMes(ym).filter(f => casaFazenda(f, pFaz));
+    const eq = equipeDoMes(ym).filter(f => casaFazenda(f, pFaz) && docsDaPessoa(f.id, ym).includes(doc));
+    if (!docsDoMes(ym).includes(doc) && !eq.length) return '<td class="ce dc-sem">—</td>';
     const rs = eq.map(f => registro(f.id, ym, doc));
     const pend = rs.filter(r => r && ehPend(r.situacao)).length;
     const ok = rs.filter(r => r && ['entregue', 'nao_se_aplica'].includes(r.situacao)).length;
-    const vaz = rs.filter(r => !r).length;
+    const vaz = rs.filter(semValor).length;
     return `<td class="ce">${pend ? `<span class="pv-num-perigo">${pend}</span> <span class="dc-sem">devem</span>`
       : vaz ? `<span class="dc-sem">${ok}/${eq.length}</span>` : '<span class="dm-tudo">✓ ok</span>'}${
       vaz && pend ? `<br><span class="dc-sem">${vaz} sem marcação</span>` : ''}</td>`;
   };
   const docsCol = ['folha_ponto', 'holerite', 'recibo'];
   const temDecimo = meses.some(ym => ['11', '12'].includes(ym.slice(5)));
+  const temFer = meses.some(ym => regs().some(r => r.competencia === ym && r.documento === 'ferias'));
 
   $('telaDmPainel').innerHTML = cabecalho('Folha, holerite e recibo', 'O que cada funcionário ainda deve ao DP e o que falta escanear',
     `posição em<strong class="jor-cabecalho__competencia">${br(hoje())}</strong>`) + `
@@ -389,14 +402,15 @@ function desenharPainel() {
 
       <h3 class="jor-h3">Por mês</h3>
       <div class="fer-rola"><table class="dc-planilha fer-tabela dm-meses"><thead><tr><th>Mês</th>
-        ${docsCol.map(d => `<th class="ce">${DOCS[d].rot}</th>`).join('')}${temDecimo ? '<th class="ce">13º salário</th>' : ''}<th class="ce">Falta escanear</th></tr></thead><tbody>
+        ${docsCol.map(d => `<th class="ce">${DOCS[d].rot}</th>`).join('')}${temDecimo ? '<th class="ce">13º salário</th>' : ''}${temFer ? '<th class="ce">Hol. férias</th>' : ''}<th class="ce">Falta escanear</th></tr></thead><tbody>
         ${meses.map(ym => {
           const sc = scan.filter(r => r.competencia === ym).length;
           const dec = ym.slice(5) === '11' ? 'decimo1' : ym.slice(5) === '12' ? 'decimo2' : null;
           return `<tr ${podeMarcar() ? `class="fer-clica" data-mes="${ym}" tabindex="0"` : ''}><td><b>${rotMes(ym)}</b></td>${docsCol.map(d => cel(ym, d)).join('')}
             ${temDecimo ? (dec ? cel(ym, dec) : '<td class="ce dc-sem">—</td>') : ''}
+            ${temFer ? cel(ym, 'ferias') : ''}
             <td class="ce">${sc ? `<span class="dm-scan-n">${sc}</span>` : '<span class="dc-sem">—</span>'}</td></tr>`;
-        }).join('') || `<tr><td colspan="${5 + (temDecimo ? 1 : 0)}" class="vazio">Nenhum mês controlado ainda.</td></tr>`}
+        }).join('') || `<tr><td colspan="${5 + (temDecimo ? 1 : 0) + (temFer ? 1 : 0)}" class="vazio">Nenhum mês controlado ainda.</td></tr>`}
       </tbody></table></div>
 
       <h3 class="jor-h3">Quem deve</h3>
@@ -458,10 +472,10 @@ const filtrada = ym => equipeDoMes(ym).filter(f => casaFazenda(f, est.fazenda) &
 
 function desenharMes() {
   const ym = est.mes;
-  const docs = docsDoMes(ym);
   const lista = filtrada(ym);
+  const docs = docsGrade(ym, lista);
   const conta = (doc, fn) => lista.filter(f => fn(registro(f.id, ym, doc))).length;
-  const vazios = lista.reduce((s, f) => s + docs.filter(d => !registro(f.id, ym, d)).length, 0);
+  const vazios = lista.reduce((s, f) => s + docsDaPessoa(f.id, ym).filter(d => semValor(registro(f.id, ym, d))).length, 0);
 
   $('telaDmMes').innerHTML = cabecalho('Documentos do mês', 'Uma linha por pessoa, uma coluna por documento — clique na célula para marcar',
     `mês de referência<strong class="jor-cabecalho__competencia">${rotMes(ym)}</strong>`) + `
@@ -476,7 +490,7 @@ function desenharMes() {
         <div id="dmFaz" aria-label="Fazenda"></div>
         <button class="btn mini" type="button" id="dmCsv">Baixar o mês (CSV)</button>
       </div>
-      ${docs.length > 3 ? `<div class="jor-caixa">Em ${MESES_L[+ym.slice(5) - 1]} entra também o <b>${DOCS[docs[3]].rot}</b>.</div>` : ''}
+      ${docsDoMes(ym).length > 3 ? `<div class="jor-caixa">Em ${MESES_L[+ym.slice(5) - 1]} entra também o <b>${DOCS[docsDoMes(ym)[3]].rot}</b>.</div>` : ''}
       <div class="bd-legenda">${ORDEM.map(k => `<span><i class="bd-cel ${SIT[k].cls}">${SIT[k].curto}</i>${SIT[k].rot}${k === 'entregue' ? ' (falta escanear)' : ''}</span>`).join('')}
         <span><i class="bd-cel bd-ok dm-esc">ESC</i>Entregue e escaneado</span><span><i class="bd-cel bd-vazio-cob"></i>Sem marcação</span></div>
       ${vazios ? `<div class="jor-acoes dm-lote">
@@ -492,21 +506,23 @@ function desenharMes() {
           let n = 0;
           const cels = docs.map(d => {
             const r = registro(f.id, ym, d);
+            if (d === 'ferias' && !r) return '<td class="bd-fora" title="Sem holerite de férias neste mês"></td>';
             if (r && ehPend(r.situacao)) n++;
             return `<td class="${r ? clsCel(r) : 'bd-vazio-cob'}"><button type="button" data-fid="${f.id}" data-doc="${d}" title="${esc(titCel(f, ym, d, r))}">${rotCel(r)}</button></td>`;
           }).join('');
           return `<tr><th class="bd-nome"><button type="button" class="bd-pessoa" data-pessoa="${f.id}">${esc(f.nome)}</button>${
-            ativa(f) ? '' : ' <span class="tag inativo">inativo</span>'}</th>${cels}<td class="bd-tot ${n ? 'bd-tem' : ''}">${n || ''}</td></tr>`;
+            ativa(f) ? '' : ' <span class="tag inativo">inativo</span>'}${podeMarcar() && !temFerias(f.id, ym)
+            ? `<button type="button" class="dm-add-fer" data-add-fer="${f.id}" title="Acrescentar holerite de férias de ${esc(f.nome)} em ${rotMes(ym)}">+ férias</button>` : ''}</th>${cels}<td class="bd-tot ${n ? 'bd-tem' : ''}">${n || ''}</td></tr>`;
         }).join('') || `<tr><td colspan="${docs.length + 2}" class="vazio">Ninguém com esse filtro.</td></tr>`}
       </tbody><tfoot>
         <tr><th class="bd-nome">Entregues</th>${docs.map(d => `<td>${conta(d, r => r?.situacao === 'entregue') || ''}</td>`).join('')}<td class="bd-tot"></td></tr>
         <tr><th class="bd-nome">Devem</th>${docs.map(d => `<td>${conta(d, r => r && ehPend(r.situacao)) || ''}</td>`).join('')}
-          <td class="bd-tot">${lista.reduce((s, f) => s + docs.filter(d => ehPend(registro(f.id, ym, d)?.situacao)).length, 0) || ''}</td></tr>
+          <td class="bd-tot">${lista.reduce((s, f) => s + docsDaPessoa(f.id, ym).filter(d => ehPend(registro(f.id, ym, d)?.situacao)).length, 0) || ''}</td></tr>
         <tr><th class="bd-nome">Falta escanear</th>${docs.map(d => `<td>${conta(d, r => r && faltaEscanear(r)) || ''}</td>`).join('')}<td class="bd-tot"></td></tr>
       </tfoot></table></div>
       ${barraDoc('dmBarraMes')}
       <p class="dc-sem jor-nota">Clique na célula e escolha no menu (Esc fecha) — é ali também que se marca o escaneado.
-        Clique no nome para ver tudo o que a pessoa deve. Só aparece quem está ativo e já admitido no mês, e quem tiver marcação nele.</p>
+        Clique no nome para ver tudo o que a pessoa deve. Holerite de férias: botão <b>+ férias</b> ao lado do nome. Só aparece quem está ativo e já admitido no mês, e quem tiver marcação nele.</p>
     </div>`;
 
   const irMes = m => { est.mes = m; desenharMes(); };
@@ -524,7 +540,8 @@ function desenharMes() {
   document.querySelectorAll('#telaDmMes [data-lote]').forEach(b => b.addEventListener('click', async () => {
     const sit = b.dataset.lote, so = $('dmLoteDoc').value;
     const alvo = [];
-    for (const f of filtrada(ym)) for (const d of (so ? [so] : docs)) if (!registro(f.id, ym, d)) alvo.push([f.id, d]);
+    for (const f of filtrada(ym)) for (const d of (so ? [so] : docs))
+      if (docsDaPessoa(f.id, ym).includes(d) && semValor(registro(f.id, ym, d))) alvo.push([f.id, d]);
     if (!alvo.length) return;
     if (!confirm(`Marcar ${alvo.length} documento(s) sem marcação de ${rotMes(ym)} como ${SIT[sit].rot}?`)) return;
     for (const [fid, d] of alvo) await marcar(fid, ym, d, sit);
@@ -535,6 +552,12 @@ function desenharMes() {
     ev.stopPropagation(); menuCelula(b);
   }));
   document.querySelectorAll('#telaDmMes [data-pessoa]').forEach(b => b.addEventListener('click', () => dlgPessoa(b.dataset.pessoa)));
+  document.querySelectorAll('#telaDmMes [data-add-fer]').forEach(b => b.addEventListener('click', async ev => {
+    ev.stopPropagation();
+    await marcar(b.dataset.addFer, ym, 'ferias', 'previsto');
+    avisar(`Holerite de férias acrescentado em ${rotMes(ym)} — marque a entrega na coluna "Hol. férias".`, true);
+    desenharMes();
+  }));
 }
 
 /* Menu ao clicar na célula — o mesmo jeito dos Boletins diários. */
@@ -567,7 +590,10 @@ function menuCelula(cel) {
     ${r?.situacao === 'entregue' ? `<button type="button" role="menuitem" data-scan="${r.escaneado ? '0' : '1'}" class="dm-menu-scan">
       <i class="bd-cel bd-ok dm-esc">ESC</i>${r.escaneado ? 'Desfazer escaneado' : 'Escaneado'}${r.escaneado && r.escaneado_em ? ` <small>(${br(r.escaneado_em)})</small>` : ''}</button>`
       : `<button type="button" role="menuitem" data-sit="entregue" data-escaneia="1" class="dm-menu-scan"><i class="bd-cel bd-ok dm-esc">ESC</i>Entregue e já escaneado</button>`}
-    ${r ? `<button type="button" role="menuitem" data-sit="" class="bd-menu-apaga"><i class="bd-cel"></i>Apagar marcação</button>` : ''}
+    ${doc === 'ferias'
+      ? `${r && r.situacao !== 'previsto' ? `<button type="button" role="menuitem" data-sit="previsto" class="bd-menu-apaga"><i class="bd-cel"></i>Apagar marcação</button>` : ''}
+         <button type="button" role="menuitem" data-sit="" class="bd-menu-apaga"><i class="bd-cel">×</i>Tirar holerite de férias</button>`
+      : r ? `<button type="button" role="menuitem" data-sit="" class="bd-menu-apaga"><i class="bd-cel"></i>Apagar marcação</button>` : ''}
     ${r?.entregue_em ? `<div class="bd-menu-nota">Entregue em ${br(r.entregue_em)}.</div>` : ''}`;
   document.body.appendChild(m);
   const rc = cel.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
