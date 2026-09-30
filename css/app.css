@@ -893,3 +893,28 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
   .rb-cinza .rb-btn svg{color:#b8bdb0} .rb-cinza .rb-rotulo{background:rgba(255,255,255,.08);color:#d7dbd0}
 } }
 .aba2s.rb.rb-mais{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 56px),transparent)}
+
+/* Configurações · Quem acessa o quê (30/09/2026) */
+.cf-chips{display:flex;flex-wrap:wrap;gap:5px}
+.cf-chip{font:inherit;font-size:11.5px;padding:2px 9px;border-radius:12px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);cursor:pointer;white-space:nowrap}
+.cf-chip.cf-tudo{border-color:#84BD00;background:rgba(132,189,0,.14);color:#4f7300}
+.cf-chip.cf-parte{border-color:#B08A5A;background:rgba(116,79,40,.10);color:#744F28}
+.cf-chip.cf-admin{border-color:#51534A;background:rgba(81,83,74,.10);color:#51534A;cursor:default}
+.us-admin{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--linha);border-radius:6px;font-size:13px}
+.us-admin input{width:auto;margin:3px 0 0}
+.us-copiar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.us-copiar select{flex:1 1 220px;width:auto}
+.us-sub{display:flex;align-items:center;gap:6px}
+.us-sub input{width:auto;margin:0}
+.us-soadmin{font-weight:400;text-transform:none;letter-spacing:0;color:var(--marrom)}
+.us-tela span small{display:block;font-size:10.5px;color:var(--marrom);white-space:normal;line-height:1.25}
+.us-tela.com-acao{align-items:flex-start}
+.us-tela.com-acao input{margin-top:2px}
+@media (max-width:600px){
+  .cf-tab, .cf-tab tbody{display:block}
+  .cf-tab thead{display:none}
+  .cf-tab tr{display:block;border:1px solid var(--linha);border-radius:6px;margin-bottom:8px;padding:6px 0}
+  .cf-tab td{display:block;border:0 !important;padding:4px 10px;text-align:left !important}
+  .cf-tab td:first-child{min-width:0}
+  .cf-chip{white-space:normal}
+}
