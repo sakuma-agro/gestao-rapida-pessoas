@@ -1334,8 +1334,8 @@
       <label class="campo">Nº de cadastro <input type="text" id="fuCadastro"></label>
       <label class="campo">Nascimento <input type="date" id="fuNascimento"></label>
       <label class="campo">Sexo
-        <select id="fuSexo">
-          <option value="">Não informado</option>
+        <select id="fuSexo" required>
+          <option value="">Escolha…</option>
           <option value="M">Masculino</option>
           <option value="F">Feminino</option>
         </select>
@@ -1660,12 +1660,46 @@
         </select>
       </label>
       <label class="campo fu-inline"><input type="checkbox" id="n2Peric"> Periculosidade 30%</label>
+      <label class="campo">Tipo de contrato
+        <select id="n2Contrato">
+          <option value="fixo">Fixo</option>
+          <option value="safra">Safra</option>
+        </select>
+      </label>
     </div>
     <div class="barra entre">
       <span></span>
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: MOVIMENTO DO VÍNCULO (indicadores, 30/09/2026) ============
+     Desligamento, readmissão e troca de unidade — js/rh-ind-vinculos.js. -->
+<dialog id="dlgMovVinc">
+  <form method="dialog" id="formMovVinc">
+    <h3 id="mvTitulo">Desligamento</h3>
+    <p class="dica" id="mvDica"></p>
+    <div class="aviso erro" id="mvErro" hidden></div>
+    <div class="grade">
+      <label class="campo plena" id="mvEscolhaCampo">O que aconteceu?
+        <select id="mvEscolha"></select>
+      </label>
+      <label class="campo" id="mvDataCampo"><span id="mvDataRotulo">Data</span> <input type="date" id="mvData"></label>
+      <label class="campo" id="mvTipoCampo">Tipo de desligamento <select id="mvTipo"></select></label>
+      <label class="campo plena" id="mvMotivoCampo">Motivo
+        <input type="text" id="mvMotivo" placeholder="Ex.: mudou de cidade, fim da safra, baixo rendimento">
+      </label>
+      <label class="campo plena" id="mvObsCampo">Observação <textarea id="mvObs" rows="2"></textarea></label>
+    </div>
+    <div class="barra entre">
+      <span></span>
+      <span>
+        <button class="btn" type="button" id="mvCancelar">Cancelar</button>
+        <button class="btn principal" type="submit">Confirmar</button>
       </span>
     </div>
   </form>
