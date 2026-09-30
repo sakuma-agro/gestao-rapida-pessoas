@@ -24,6 +24,13 @@
 import { montarMulti } from './multisel.js';
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
+import { podeTela } from './acesso.js';
+
+/* Quem faz o quê (30/09/2026, pedido dele): marcar entregue / não entregue /
+   em correção é de quem tem a tela Mês; o auxiliar tem Painel + Escanear e só
+   marca o escaneado. O banco confere a mesma coisa (gatilho em jor_doc_entregas). */
+const podeMarcar = () => podeTela('dmMes');
+const podeEscanear = () => podeTela('dmScan') || podeMarcar();
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -151,6 +158,7 @@ function semMarcacao(de = '', ate = '', fz = []) {
 
 /* ---------------- escrita ---------------- */
 async function marcar(fid, ym, doc, sit, extra = {}) {
+  if (!podeMarcar()) { avisar('Seu acesso só permite marcar o escaneado.'); return; }
   const k = chave(fid, ym, doc);
   if (!sit) { await jd.apagar('docEntregas', k); return; }
   const antes = registro(fid, ym, doc);
@@ -165,6 +173,7 @@ async function marcar(fid, ym, doc, sit, extra = {}) {
   });
 }
 async function escanear(r, sim) {
+  if (!podeEscanear()) { avisar('Seu acesso não permite marcar o escaneado.'); return; }
   await jd.salvar('docEntregas', { ...r, escaneado: !!sim, escaneado_em: sim ? hoje() : null,
     marcado_por: usuario(), marcado_em: agora() });
 }
@@ -372,11 +381,11 @@ function desenharPainel() {
       <div class="pv-cards bd-cards">
         <button type="button" class="pv-card ${nNao ? 'pv-atencao' : 'pv-ok'}" data-tipo="nao_entregue" aria-pressed="${tipo === 'nao_entregue'}"><span>Não entregue</span><strong>${nNao}</strong><small>${de || ate ? 'no período' : 'todos em aberto'}</small></button>
         <button type="button" class="pv-card ${nCor ? 'pv-alerta' : 'pv-ok'}" data-tipo="correcao" aria-pressed="${tipo === 'correcao'}"><span>Em correção</span><strong>${nCor}</strong><small>devolvidos para corrigir</small></button>
-        <button type="button" class="pv-card ${scan.length ? 'pv-alerta' : 'pv-ok'}" data-ir="dmScan"><span>Falta escanear</span><strong>${scan.length}</strong><small>entregues, sem escanear</small></button>
-        <button type="button" class="pv-card ${sm.length ? 'pv-alerta' : 'pv-ok'}" data-ir="dmMes"><span>Sem marcação</span><strong>${sm.length}</strong><small>${inicioControle() ? 'desde ' + rotMes(inicioControle()) : 'nada marcado ainda'}</small></button>
+        <button type="button" class="pv-card ${scan.length ? 'pv-alerta' : 'pv-ok'}" ${podeTela('dmScan') ? 'data-ir="dmScan"' : 'disabled'}><span>Falta escanear</span><strong>${scan.length}</strong><small>entregues, sem escanear</small></button>
+        <button type="button" class="pv-card ${sm.length ? 'pv-alerta' : 'pv-ok'}" ${podeMarcar() ? 'data-ir="dmMes"' : 'disabled'}><span>Sem marcação</span><strong>${sm.length}</strong><small>${inicioControle() ? 'desde ' + rotMes(inicioControle()) : 'nada marcado ainda'}</small></button>
       </div>
-      ${!inicioControle() ? `<div class="jor-caixa">Nenhum documento marcado ainda. Comece em <b>Mês</b>: escolha o mês e marque o que cada um entregou.
-        <button class="btn mini" type="button" data-ir="dmMes">Abrir o mês</button></div>` : ''}
+      ${!inicioControle() ? `<div class="jor-caixa">Nenhum documento marcado ainda. ${podeMarcar() ? `Comece em <b>Mês</b>: escolha o mês e marque o que cada um entregou.
+        <button class="btn mini" type="button" data-ir="dmMes">Abrir o mês</button>` : 'Quem tem a tela Mês marca as entregas; depois elas aparecem aqui.'}</div>` : ''}
 
       <h3 class="jor-h3">Por mês</h3>
       <div class="fer-rola"><table class="dc-planilha fer-tabela dm-meses"><thead><tr><th>Mês</th>
@@ -384,7 +393,7 @@ function desenharPainel() {
         ${meses.map(ym => {
           const sc = scan.filter(r => r.competencia === ym).length;
           const dec = ym.slice(5) === '11' ? 'decimo1' : ym.slice(5) === '12' ? 'decimo2' : null;
-          return `<tr class="fer-clica" data-mes="${ym}" tabindex="0"><td><b>${rotMes(ym)}</b></td>${docsCol.map(d => cel(ym, d)).join('')}
+          return `<tr ${podeMarcar() ? `class="fer-clica" data-mes="${ym}" tabindex="0"` : ''}><td><b>${rotMes(ym)}</b></td>${docsCol.map(d => cel(ym, d)).join('')}
             ${temDecimo ? (dec ? cel(ym, dec) : '<td class="ce dc-sem">—</td>') : ''}
             <td class="ce">${sc ? `<span class="dm-scan-n">${sc}</span>` : '<span class="dc-sem">—</span>'}</td></tr>`;
         }).join('') || `<tr><td colspan="${5 + (temDecimo ? 1 : 0)}" class="vazio">Nenhum mês controlado ainda.</td></tr>`}
@@ -407,7 +416,7 @@ function desenharPainel() {
           || '<tr><td colspan="4" class="vazio">Ninguém devendo documento. 👏</td></tr>'}
       </tbody></table></div>
       <p class="dc-sem jor-nota">Em marrom: não entregue · em amarelo: devolvido para correção. Clique nos cartões para cobrar só um tipo,
-        no mês para abrir a grade, na pessoa para dar baixa quando o documento chegar. "Sem marcação" só vira cobrança quando for marcado como Não entregue.</p>
+        ${podeMarcar() ? 'no mês para abrir a grade, na pessoa para dar baixa quando o documento chegar.' : 'na pessoa para ver o recado.'} "Sem marcação" só vira cobrança quando for marcado como Não entregue.</p>
     </div>`;
 
   const t = $('telaDmPainel');
@@ -680,7 +689,7 @@ function dlgPessoa(fid) {
     ${p.length ? `<table class="dc-planilha"><thead><tr><th>Mês</th><th>Documento</th><th>Situação</th><th></th></tr></thead><tbody>
       ${p.map(r => `<tr><td>${rotMes(r.competencia)}</td><td>${esc(DOCS[r.documento].rot)}</td>
         <td><span class="bd-dt ${SIT[r.situacao].cls}">${SIT[r.situacao].rot}</span></td>
-        <td class="ce"><button class="btn mini" type="button" data-chegou="${esc(r.chave)}">${r.situacao === 'correcao' ? 'Voltou corrigido' : 'Chegou hoje'}</button></td></tr>`).join('')}
+        <td class="ce">${podeMarcar() ? `<button class="btn mini" type="button" data-chegou="${esc(r.chave)}">${r.situacao === 'correcao' ? 'Voltou corrigido' : 'Chegou hoje'}</button>` : ''}</td></tr>`).join('')}
     </tbody></table>` : '<div class="vazio">Nada pendente.</div>'}
     ${sc.length ? `<p class="dc-sem" style="margin-top:8px">Entregues e ainda sem escanear: ${sc.map(r => esc(`${rotMes(r.competencia)} · ${DOCS[r.documento].curto}`)).join(', ')}.</p>` : ''}
     <label class="campo plena" style="margin-top:10px">Recado para o WhatsApp

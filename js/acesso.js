@@ -150,6 +150,15 @@ export const telasDe = m => subsDe(m).flatMap(s => s.telas);
 export const moduloDe = tela =>
   MODULOS.find(m => telasDe(m).some(([t]) => t === tela))?.id || null;
 
+/* O que algumas telas deixam FAZER, além de ver. Aparece embaixo da tela na
+   lista de permissões (Configurações), para quem dá o acesso saber o que está
+   liberando. Quem não tem a tela não tem a ação — e o banco confere também. */
+export const ACAO_TELA = {
+  dmPainel: 'consulta: quem deve e o que falta escanear',
+  dmMes:    'marca entregue, não entregue, em correção',
+  dmScan:   'marca escaneado (só o que já foi entregue)',
+};
+
 // Quem ainda não estiver na lista entra com estes módulos — assim ninguém
 // fica trancado do lado de fora; RH e Configurações ficam sempre de fora.
 const PADRAO = ['pessoas', 'sst'];
@@ -333,6 +342,45 @@ function marcarTela(id, subs, tela, abrir) {
 }
 
 /* =============== tela de configurações =============== */
+
+/* Telas que dá para liberar a quem não é administrador (as de submódulo
+   `admin: true` ficam de fora: essas só o administrador vê). */
+const telasLiberaveis = m => subsDe(m).filter(s => !s.admin).flatMap(s => s.telas.map(([t]) => t));
+
+/** O que a pessoa u enxerga no módulo m: lista de telas (vazia = nada). */
+function telasVistas(u, m) {
+  const todas = telasLiberaveis(m);
+  if (u.admin) return telasDe(m).map(([t]) => t);
+  if (!(u.modulos || []).includes(m.id)) return [];
+  const marc = (u.telas || []).filter(x => x.startsWith(m.id + ':')).map(x => x.slice(m.id.length + 1));
+  return marc.length ? todas.filter(t => marc.includes(t)) : todas;
+}
+
+/** Grava em u a lista de telas vistas de um módulo, no formato do banco:
+ *  nenhuma = sem o módulo; todas = módulo inteiro (sem restrição, pega telas
+ *  novas no futuro); algumas = só elas. */
+function definirTelas(u, m, vistas) {
+  const todas = telasLiberaveis(m);
+  const set = new Set(vistas.filter(t => todas.includes(t)));
+  const mods = new Set(u.modulos || []);
+  let telas = (u.telas || []).filter(x => !x.startsWith(m.id + ':'));
+  if (!set.size) mods.delete(m.id);
+  else {
+    mods.add(m.id);
+    if (set.size < todas.length) telas = [...telas, ...[...set].map(t => m.id + ':' + t)];
+  }
+  u.modulos = [...mods];
+  u.telas = telas;
+}
+
+function resumoModulo(u, m) {
+  const v = telasVistas(u, m), total = telasLiberaveis(m).length;
+  if (u.admin) return { txt: 'tudo', cls: 'cf-tudo' };
+  if (!v.length) return null;
+  if (v.length >= total) return { txt: 'tudo', cls: 'cf-tudo' };
+  return { txt: `${v.length} de ${total} telas`, cls: 'cf-parte' };
+}
+
 export function desenharConfig() {
   const aviso = $('cfAviso');
   if (!acesso.admin) {
@@ -345,55 +393,26 @@ export function desenharConfig() {
 
   $('cfTabela').innerHTML = usuarios.length ? `
     <table class="dc-planilha cf-tab"><thead><tr>
-      <th>Pessoa</th><th>Login</th><th class="ce">Admin</th>
-      ${MODULOS.map(m => `<th class="ce">${esc(m.nome)}</th>`).join('')}
-      <th></th>
+      <th>Pessoa</th><th>Login</th><th>O que enxerga</th><th></th>
     </tr></thead><tbody>${usuarios.map(u => {
       const eu = (u.email || '').toLowerCase() === acesso.email;
+      const chips = u.admin
+        ? '<span class="cf-chip cf-admin">Administrador · tudo, inclusive Configurações</span>'
+        : MODULOS.map(m => { const r = resumoModulo(u, m);
+            return r ? `<button type="button" class="cf-chip ${r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${r.txt}</button>` : ''; })
+            .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';
       return `<tr>
-        <td>
-          <b>${esc(u.nome || u.email)}</b>${eu ? ' <span class="tag ativo">você</span>' : ''}
-          <br><span class="dc-sem">${esc(u.email)}</span>
-        </td>
-        <td>${u.usuario
-          ? `<code>${esc(u.usuario)}</code>`
-          : '<span class="dc-sem">entra pelo e-mail</span>'}</td>
-        <td class="ce"><input type="checkbox" class="cf-cx" data-email="${esc(u.email)}"
-          data-campo="admin" ${u.admin ? 'checked' : ''} ${eu ? 'disabled title="Você não pode tirar o próprio acesso de administrador"' : ''}></td>
-        ${MODULOS.map(m => `<td class="ce"><input type="checkbox" class="cf-cx"
-          data-email="${esc(u.email)}" data-modulo="${m.id}"
-          ${u.admin || (u.modulos || []).includes(m.id) ? 'checked' : ''}
-          ${u.admin ? 'disabled title="Administrador enxerga tudo"' : ''}></td>`).join('')}
-        <td class="ce"><button class="btn mini" data-editar-us="${esc(u.email)}">Editar</button></td>
+        <td><b>${esc(u.nome || u.email)}</b>${eu ? ' <span class="tag ativo">você</span>' : ''}
+          <br><span class="dc-sem">${esc(u.email)}</span></td>
+        <td>${u.usuario ? `<code>${esc(u.usuario)}</code>` : '<span class="dc-sem">entra pelo e-mail</span>'}</td>
+        <td><div class="cf-chips">${chips}</div></td>
+        <td class="ce"><button class="btn mini" data-editar-us="${esc(u.email)}">Editar acesso</button></td>
       </tr>`;
     }).join('')}</tbody></table>`
     : '<div class="vazio">Ninguém cadastrado ainda.</div>';
 
-  $('cfTabela').querySelectorAll('.cf-cx').forEach(cx =>
-    cx.addEventListener('change', () => trocarPermissao(cx)));
   $('cfTabela').querySelectorAll('[data-editar-us]').forEach(b =>
-    b.addEventListener('click', () => abrirUsuario(b.dataset.editarUs)));
-}
-
-async function trocarPermissao(cx) {
-  const u = usuarios.find(x => x.email === cx.dataset.email);
-  if (!u) return;
-  const antes = { admin: u.admin, modulos: [...(u.modulos || [])] };
-  if (cx.dataset.campo === 'admin') u.admin = cx.checked;
-  else {
-    const m = cx.dataset.modulo;
-    const lista = new Set(u.modulos || []);
-    cx.checked ? lista.add(m) : lista.delete(m);
-    u.modulos = [...lista];
-  }
-  const ok = await gravar(u);
-  if (!ok) { u.admin = antes.admin; u.modulos = antes.modulos; }
-  desenharConfig();
-  if ((u.email || '').toLowerCase() === acesso.email) {
-    await carregarAcesso();
-    montarMenu();
-    abrirModulo('config');
-  }
+    b.addEventListener('click', () => abrirUsuario(b.dataset.editarUs, b.dataset.foco)));
 }
 
 async function gravar(u) {
@@ -507,7 +526,7 @@ async function trocarEmail(antigo, novo) {
   }
 }
 
-function abrirUsuario(email) {
+function abrirUsuario(email, foco) {
   const u = email ? usuarios.find(x => x.email === email) : null;
   editando = u ? { ...u, telas: [...(u.telas || [])], novo: false, emailOriginal: u.email }
                 : { email: '', nome: '', usuario: '', admin: false,
@@ -525,61 +544,84 @@ function abrirUsuario(email) {
   $('bNovaSenha').hidden = !u;
   desenharPermissoes();
   $('dlgUsuario').showModal();
+  if (foco) $('usPermissoes').querySelector(`[data-bloco="${foco}"]`)?.scrollIntoView({ block: 'start' });
 }
 
-/* O que a pessoa enxerga: o módulo e, dentro dele, as telas.
-   Deixar todas as telas desmarcadas quer dizer "o módulo inteiro" — é o
-   caso normal. Marcar uma só é o que se faz para quem vem de fora. */
+/* O que a pessoa enxerga, em árvore: módulo → submódulo → tela.
+   Marcado = enxerga. Tudo marcado num módulo é gravado como "módulo
+   inteiro" (e aí tela nova que surgir depois já entra); parte marcada é
+   gravada tela a tela. O banco lê o mesmo formato (app_pode_tela). */
 function desenharPermissoes() {
   const e = editando;
   if (!e) return;
-  const temModulo = m => e.admin || (e.modulos || []).includes(m);
-  const marcada = (m, t) => (e.telas || []).includes(m + ':' + t);
-  const restrito = m => (e.telas || []).some(x => x.startsWith(m + ':'));
+  const outros = usuarios.filter(u => u.email !== e.email && !u.admin);
 
-  $('usPermissoes').innerHTML = MODULOS.map(m => `
-    <div class="us-mod ${temModulo(m.id) ? '' : 'desligado'}">
-      <label class="us-mod__topo">
-        <input type="checkbox" data-mod="${m.id}" ${temModulo(m.id) ? 'checked' : ''}
-          ${e.admin ? 'disabled title="Administrador enxerga tudo"' : ''}>
-        <b>${esc(m.nome)}</b>
-        <span class="dc-sem">${restrito(m.id)
-          ? 'só as telas marcadas'
-          : 'todas as telas'}</span>
-      </label>
-      ${subsDe(m).map(s => `
-        ${m.subs ? `<div class="us-sub">${esc(s.nome)}</div>` : ''}
-        <div class="us-telas">
-          ${s.telas.map(([tid, rot]) => `
-            <label class="us-tela">
-              <input type="checkbox" data-mod="${m.id}" data-tela="${tid}"
-                ${marcada(m.id, tid) ? 'checked' : ''}
-                ${temModulo(m.id) && !e.admin ? '' : 'disabled'}>
-              ${esc(rot)}
-            </label>`).join('')}
-        </div>`).join('')}
-    </div>`).join('');
+  $('usPermissoes').innerHTML = `
+    <label class="us-admin"><input type="checkbox" id="usAdmin" ${e.admin ? 'checked' : ''}
+        ${(e.email || '').toLowerCase() === acesso.email ? 'disabled title="Você não pode tirar o próprio acesso de administrador"' : ''}>
+      <span><b>Administrador</b><br><span class="dc-sem">Enxerga e faz tudo, inclusive esta tela de Configurações.</span></span></label>
+    ${e.admin ? '' : `
+    <div class="us-copiar">
+      <select id="usCopiar" aria-label="Copiar acesso de outra pessoa">
+        <option value="">Copiar o acesso de outra pessoa…</option>
+        ${outros.map(u => `<option value="${esc(u.email)}">${esc(u.nome || u.email)}</option>`).join('')}
+      </select>
+      <button type="button" class="btn mini" data-tudo="1">Marcar tudo</button>
+      <button type="button" class="btn mini" data-tudo="0">Limpar tudo</button>
+    </div>
+    ${MODULOS.map(m => {
+      const vistas = telasVistas(e, m), todas = telasLiberaveis(m);
+      const estadoCx = !vistas.length ? '' : vistas.length >= todas.length ? 'checked' : 'data-meio="1"';
+      return `<div class="us-mod ${vistas.length ? '' : 'desligado'}" data-bloco="${m.id}">
+        <label class="us-mod__topo">
+          <input type="checkbox" data-mod="${m.id}" ${estadoCx}>
+          <b>${esc(m.nome)}</b>
+          <span class="dc-sem">${!vistas.length ? 'não enxerga' : vistas.length >= todas.length ? 'o módulo inteiro' : `${vistas.length} de ${todas.length} telas`}</span>
+        </label>
+        ${subsDe(m).map(sb => {
+          const ts = sb.telas.map(([t]) => t);
+          const nSub = ts.filter(t => vistas.includes(t)).length;
+          return `<div class="us-subbloco">
+          ${m.subs ? `<label class="us-sub">${sb.admin ? '' : `<input type="checkbox" data-mod="${m.id}" data-sub="${sb.id}"
+              ${nSub === ts.length ? 'checked' : nSub ? 'data-meio="1"' : ''}>`}${esc(sb.nome)}${sb.admin ? ' <span class="us-soadmin">só administrador</span>' : ''}</label>` : ''}
+          <div class="us-telas">
+            ${sb.telas.map(([tid, rot]) => `
+              <label class="us-tela ${ACAO_TELA[tid] ? 'com-acao' : ''}">
+                <input type="checkbox" data-mod="${m.id}" data-tela="${tid}" ${vistas.includes(tid) ? 'checked' : ''} ${sb.admin ? 'disabled' : ''}>
+                <span>${esc(rot)}${ACAO_TELA[tid] ? `<small>${esc(ACAO_TELA[tid])}</small>` : ''}</span>
+              </label>`).join('')}
+          </div></div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}`}`;
 
-  $('usPermissoes').querySelectorAll('input[data-mod]').forEach(cx =>
-    cx.addEventListener('change', () => {
-      const m = cx.dataset.mod;
-      if (cx.dataset.tela) {
-        const chave = m + ':' + cx.dataset.tela;
-        const lista = new Set(e.telas || []);
-        cx.checked ? lista.add(chave) : lista.delete(chave);
-        e.telas = [...lista];
-      } else {
-        const lista = new Set(e.modulos || []);
-        if (cx.checked) lista.add(m);
-        else {
-          lista.delete(m);
-          // tirou o módulo: as telas dele não fazem mais sentido
-          e.telas = (e.telas || []).filter(x => !x.startsWith(m + ':'));
-        }
-        e.modulos = [...lista];
-      }
-      desenharPermissoes();
-    }));
+  const raiz = $('usPermissoes');
+  raiz.querySelectorAll('[data-meio]').forEach(cx => { cx.indeterminate = true; });
+  $('usAdmin')?.addEventListener('change', ev => { e.admin = ev.target.checked; desenharPermissoes(); });
+  $('usCopiar')?.addEventListener('change', ev => {
+    const o = usuarios.find(u => u.email === ev.target.value);
+    if (!o) return;
+    e.modulos = [...(o.modulos || [])]; e.telas = [...(o.telas || [])];
+    desenharPermissoes();
+  });
+  raiz.querySelectorAll('[data-tudo]').forEach(b => b.addEventListener('click', () => {
+    MODULOS.forEach(m => definirTelas(e, m, b.dataset.tudo === '1' ? telasLiberaveis(m) : []));
+    desenharPermissoes();
+  }));
+  raiz.querySelectorAll('input[data-mod]').forEach(cx => cx.addEventListener('change', () => {
+    const m = MODULOS.find(x => x.id === cx.dataset.mod);
+    let vistas = telasVistas(e, m);
+    if (cx.dataset.tela) {
+      vistas = cx.checked ? [...vistas, cx.dataset.tela] : vistas.filter(t => t !== cx.dataset.tela);
+    } else if (cx.dataset.sub) {
+      const ts = subsDe(m).find(x => x.id === cx.dataset.sub).telas.map(([t]) => t);
+      vistas = cx.checked ? [...vistas, ...ts] : vistas.filter(t => !ts.includes(t));
+    } else {
+      vistas = cx.checked ? telasLiberaveis(m) : [];
+    }
+    definirTelas(e, m, vistas);
+    desenharPermissoes();
+  }));
 }
 
 export function ligarAcesso() {
