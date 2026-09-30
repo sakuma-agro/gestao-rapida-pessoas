@@ -504,3 +504,8 @@
 .dm-tudo { color: #4f7300; font-weight: 700; }
 .dm-scan-n { color: #6b5500; font-weight: 700; }
 .bd-menu .dm-menu-scan { border-top: 1px solid var(--linha); border-radius: 0; margin-top: 4px; }
+/* botão "+ férias" ao lado do nome, na grade de documentos (30/09/2026) */
+.dm-add-fer { font: inherit; font-size: 10.5px; font-weight: 700; margin-left: 6px; padding: 1px 6px; border-radius: 9px;
+  border: 1px dashed #B08A5A; background: transparent; color: #744F28; cursor: pointer; white-space: nowrap; vertical-align: 1px; }
+.dm-add-fer:hover { background: rgba(116,79,40,.10); }
+@media (prefers-color-scheme: dark) { .dm-add-fer { color: #c9a06a; } }
