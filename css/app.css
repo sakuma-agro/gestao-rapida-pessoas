@@ -918,3 +918,21 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
   .cf-tab td:first-child{min-width:0}
   .cf-chip{white-space:normal}
 }
+
+/* Módulos principais em destaque (30/09/2026): botão com ícone, o aberto verde cheio */
+.abas{gap:8px;padding:8px 16px 10px;align-items:center}
+.aba{display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:700;padding:8px 16px;
+  border:1px solid var(--linha);border-radius:22px;background:var(--papel);color:var(--texto);
+  border-bottom-width:1px;transition:background .15s,border-color .15s}
+.aba svg{width:18px;height:18px;flex:none;color:var(--verde)}
+.aba:hover{border-color:var(--verde);background:var(--verde-fundo)}
+.aba[aria-selected="true"]{background:var(--verde);border-color:var(--verde);color:#fff}
+.aba[aria-selected="true"] svg{color:#fff}
+.aba:focus-visible{outline:2px solid var(--marrom);outline-offset:2px}
+.aba-config{margin-left:auto}
+@media (max-width:600px){
+  .abas{gap:6px;padding:6px 10px 8px}
+  .aba{padding:7px 12px;font-size:13px}
+  .aba-config span{display:none}
+  .aba-config{padding:7px 10px}
+}
