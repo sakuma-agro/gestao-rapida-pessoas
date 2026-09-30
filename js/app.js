@@ -959,8 +959,10 @@ function desenharFuncN2() {
 
   $('listaFuncN2').innerHTML = lista.length ? lista.map(f => {
     const v = jd.vinculoDe(f.id);
-    const jornada = jd.dados.jornadas.find(j => j.id === v?.jornada_id);
+    const jornada = jd.jornadaDe(v);
+    const origem = jd.origemJornada(v);
     const setor = jd.dados.setores.find(s => s.id === v?.setor_id);
+    const funcao = jd.funcaoDe(v);
     const riscos = [
       v?.periculosidade ? 'periculosidade 30%' : null,
       v?.insalubridade && v.insalubridade !== 'nao' ? 'insalubridade ' + v.insalubridade : null,
@@ -968,7 +970,10 @@ function desenharFuncN2() {
     return `<div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
       <span>
         <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(jornada?.nome || (setor ? 'jornada do setor ' + setor.nome : 'sem jornada definida'))}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}</span>
+        <span class="sub">${esc(!jornada ? 'sem jornada definida'
+          : origem === 'funcao' ? `${jornada.nome} (da função ${funcao?.nome || ''})`
+          : origem === 'setor' ? `${jornada.nome} (do setor ${setor?.nome || ''})`
+          : `${jornada.nome} (própria)`)}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}</span>
       </span>
       <span class="tag ${riscos ? 'inativo' : 'ativo'}">${riscos ? 'com adicional' : 'sem adicional'}</span>
       <span class="acoes"><button class="btn mini" data-n2="${f.id}">Editar</button></span>
@@ -995,6 +1000,11 @@ function abrirFuncN2(id) {
     ? jd.nomeUnidade(unidade)
     : 'Sem unidade no Nível 1 — a apuração precisa dela para saber o destino de DP.';
   $('n2Jornada').innerHTML = opcoes(jd.dados.jornadas, v.jornada_id);
+  /* Em branco vale a jornada da função (29/09/2026) — a dica diz qual é. */
+  const jf = jd.dados.jornadas.find(j => j.id === jd.funcaoDe(v)?.jornada_id);
+  const js = jd.dados.jornadas.find(j => j.id === jd.setorDe(v)?.jornada_id);
+  $('n2JornadaDica').textContent = jf ? `Em branco = usa a jornada da função: ${jf.nome}.`
+    : js ? `Em branco = usa a jornada do setor: ${js.nome}.` : 'Em branco = sem jornada (a função e o setor não têm).';
   $('n2Matricula').value = v.matricula || f.cadastro || '';
   $('n2Insal').value = v.insalubridade || 'nao';
   $('n2Peric').checked = !!v.periculosidade;

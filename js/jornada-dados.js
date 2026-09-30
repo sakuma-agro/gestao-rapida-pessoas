@@ -408,10 +408,19 @@ export const vinculoDe = funcionarioId =>
 export const setorDe = vinculo =>
   dados.setores.find(s => s.id === vinculo?.setor_id) || null;
 
-/** Jornada própria do vínculo ou, se não tiver, a do setor (RN-07.1). */
+/** De onde vem a jornada (29/09/2026): a própria do vínculo; senão a da
+    função (cadastrada em Cadastros › Estrutura › Funções); senão a do setor
+    (RN-07.1). */
+export const funcaoDe = vinculo => (dados.funcoes || []).find(f => f.id === vinculo?.funcao_id) || null;
+export function origemJornada(vinculo) {
+  if (vinculo?.jornada_id) return 'propria';
+  if (funcaoDe(vinculo)?.jornada_id) return 'funcao';
+  if (setorDe(vinculo)?.jornada_id) return 'setor';
+  return '';
+}
 export function jornadaDe(vinculo) {
   const s = setorDe(vinculo);
-  const id = vinculo?.jornada_id || s?.jornada_id;
+  const id = vinculo?.jornada_id || funcaoDe(vinculo)?.jornada_id || s?.jornada_id;
   return dados.jornadas.find(j => j.id === id) || null;
 }
 

@@ -100,10 +100,11 @@ const CADASTROS = {
     travado: f => f.rh_cargo_id
       ? 'Esta função vem do plano de cargos. Para mudar o nome, o nível ou desativar, vá em RH › Cargos e salários › Plano de cargos — a função acompanha sozinha.'
       : '',
-    colunas: ['Função', 'Nível', 'Plano de cargos', 'Pessoas'],
+    colunas: ['Função', 'Nível', 'Jornada padrão', 'Plano de cargos', 'Pessoas'],
     linha: f => [
       `<b>${esc(f.nome)}</b>`,
       esc(f.nivel || '—'),
+      esc(jd.dados.jornadas.find(j => j.id === f.jornada_id)?.nome || '—'),
       f.rh_cargo_id ? 'no plano' : '<span class="dc-sem">fora do plano</span>',
       String(jd.dados.vinculos.filter(v => v.funcao_id === f.id && v.ativo !== false).length),
     ],
@@ -111,6 +112,11 @@ const CADASTROS = {
       { k: 'nome', rotulo: 'Nome', t: 't', req: true, plena: true },
       { k: 'nivel', rotulo: 'Nível', t: 's',
         opcoes: () => NIVEIS.map(n => [n, n]) },
+      /* Jornada padrão da função (29/09/2026): quem tem esta função entra
+         nela, a menos que o Cadastro Nível 2 dê uma jornada própria. `livre`:
+         editável mesmo quando a função vem do plano de cargos. */
+      { k: 'jornada_id', rotulo: 'Jornada padrão', t: 's', livre: true, plena: true,
+        opcoes: () => ativos(jd.dados.jornadas).sort(porNome).map(j => [j.id, j.nome]) },
     ],
   },
 
@@ -197,8 +203,9 @@ Object.assign(CADASTROS, {
       `${hm(j.carga_semanal_min)}${j.carga_semanal_min > 2640 ? ' <span class="jor-pend">acima de 44h</span>' : ''}`,
       (() => {
         const setores = jd.dados.setores.filter(x => x.jornada_id === j.id).map(x => x.nome);
+        const funcoes = (jd.dados.funcoes || []).filter(x => x.jornada_id === j.id && x.ativo !== false).map(x => x.nome);
         const proprios = jd.dados.vinculos.filter(v => v.jornada_id === j.id).length;
-        return [setores.length ? 'setor ' + esc(setores.join(', ')) : '', proprios ? `${proprios} com jornada própria` : '']
+        return [funcoes.length ? 'função ' + esc(funcoes.join(', ')) : '', setores.length ? 'setor ' + esc(setores.join(', ')) : '', proprios ? `${proprios} com jornada própria` : '']
           .filter(Boolean).join(' · ') || '—';
       })(),
     ],
@@ -337,16 +344,33 @@ function abrir(chave, id) {
 
   // Registro que é de outro cadastro (função do plano de cargos): só se lê.
   const trava = item && c.travado ? c.travado(item) : '';
-  $('formCadastro').querySelector('[type=submit]').hidden = !!trava;
+  const livres = trava ? c.campos.filter(f => f.livre) : [];
+  $('formCadastro').querySelector('[type=submit]').hidden = !!trava && !livres.length;
   if (trava) {
     $('cadCampos').innerHTML = `<p style="grid-column:1/-1;margin:0"><b>${esc(item.nome)}</b>`
-      + `${item.nivel ? ' · nível ' + esc(item.nivel) : ''}</p><p class="dc-sem" style="grid-column:1/-1;margin:0">${esc(trava)}</p>`;
+      + `${item.nivel ? ' · nível ' + esc(item.nivel) : ''}</p><p class="dc-sem" style="grid-column:1/-1;margin:0">${esc(trava)}</p>`
+      + livres.map(campoHtml).join('');
     $('bDesativarCad').hidden = true;
     $('dlgCadastro').showModal();
     return;
   }
 
-  $('cadCampos').innerHTML = c.campos.map(f => {
+  $('cadCampos').innerHTML = c.campos.map(campoHtml).join('') + `
+    <label class="campo">Situação
+      <select data-campo="ativo">
+        <option value="1"${editando.item.ativo === false ? '' : ' selected'}>Em uso</option>
+        <option value="0"${editando.item.ativo === false ? ' selected' : ''}>Inativo</option>
+      </select>
+    </label>`;
+
+  $('bDesativarCad').hidden = !item || item.ativo === false;
+  ligarGradeDias();
+  $('dlgCadastro').showModal();
+}
+
+function campoHtml(f) {
+  const item = editando.item.id ? editando.item : null;
+  {
     const v = editando.item[f.k] ?? (item ? '' : (f.padrao ?? ''));
     if (f.t === 'dias') {
       const dias = editando.item.dias || {};
@@ -382,17 +406,7 @@ function abrir(chave, id) {
     }
     return `<label class="campo${f.plena ? ' plena' : ''}">${esc(f.rotulo)}
       <input type="${f.t === 'd' ? 'date' : 'text'}" data-campo="${f.k}" value="${esc(v)}"></label>`;
-  }).join('') + `
-    <label class="campo">Situação
-      <select data-campo="ativo">
-        <option value="1"${editando.item.ativo === false ? '' : ' selected'}>Em uso</option>
-        <option value="0"${editando.item.ativo === false ? ' selected' : ''}>Inativo</option>
-      </select>
-    </label>`;
-
-  $('bDesativarCad').hidden = !item || item.ativo === false;
-  ligarGradeDias();
-  $('dlgCadastro').showModal();
+  }
 }
 
 /* Grade de dias da jornada: marcar "Trabalha" sugere o horário da linha de
