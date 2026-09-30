@@ -323,7 +323,7 @@ function ligarBarraDoc(raiz) {
 let avisar = () => {};
 let irPara = () => {};
 /* Mês padrão: o anterior — é dele que se recolhe folha, holerite e recibo. */
-const est = { mes: null, busca: '', fazenda: [], de: '', ate: '', pFaz: [], tipo: '', sDe: '', sAte: '', sFaz: [], sTodos: false, sel: new Set() };
+const est = { mes: null, busca: '', fazenda: [], de: '', ate: '', pFaz: [], tipo: '', sDe: '', sAte: '', sFaz: [], sTodos: false, sPessoa: '', sGrupo: 'mes', sel: new Set() };
 const TIPOS = { '': 'Todos os pendentes', nao_entregue: 'Só não entregue', correcao: 'Só em correção' };
 
 function cabecalho(titulo, sub, direita) {
@@ -646,16 +646,29 @@ export const fecharMenuDocumentos = fecharMenu;
 /* ---------------- Escanear ---------------- */
 
 function desenharScan() {
-  const { sDe, sAte, sFaz, sTodos } = est;
-  const falta = paraEscanear(sDe, sAte, sFaz);
+  const { sDe, sAte, sFaz, sTodos, sPessoa, sGrupo } = est;
+  const doFiltro = paraEscanear(sDe, sAte, sFaz);
+  // Pedido dele (30/09/2026): escolher o funcionário e ver tudo dele de uma vez.
+  const falta = sPessoa ? doFiltro.filter(r => r.funcionario_id === sPessoa) : doFiltro;
   const feitos = sTodos ? regs().filter(r => r.situacao === 'entregue' && r.escaneado && dentro(r.competencia, sDe, sAte) &&
-    casaFazenda(pessoa(r.funcionario_id) || {}, sFaz)).sort(ordemReg).reverse() : [];
+    casaFazenda(pessoa(r.funcionario_id) || {}, sFaz) && (!sPessoa || r.funcionario_id === sPessoa)).sort(ordemReg).reverse() : [];
   // A seleção só guarda o que ainda está na lista.
   est.sel = new Set([...est.sel].filter(k => falta.some(r => r.chave === k)));
-  const porMes = [...new Set(falta.map(r => r.competencia))].sort();
+  const nome = fid => pessoa(fid)?.nome || '—';
+  // Quem tem algo para escanear (no filtro de mês e fazenda), com a contagem.
+  const pessoas = [...doFiltro.reduce((m, r) => m.set(r.funcionario_id, (m.get(r.funcionario_id) || 0) + 1), new Map())]
+    .sort((a, b) => nome(a[0]).localeCompare(nome(b[0]), 'pt-BR'));
+  const porPessoa = sGrupo === 'pessoa';
+  const grupos = porPessoa
+    ? [...new Set(falta.map(r => r.funcionario_id))].sort((a, b) => nome(a).localeCompare(nome(b), 'pt-BR'))
+        .map(fid => ({ k: fid, itens: falta.filter(r => r.funcionario_id === fid).sort(ordemReg),
+          tit: `${esc(nome(fid))} <span class="dc-sem">· ${esc(pessoa(fid)?.fazenda || 'sem fazenda')}</span>` }))
+    : [...new Set(falta.map(r => r.competencia))].sort()
+        .map(ym => ({ k: ym, itens: falta.filter(r => r.competencia === ym), tit: rotMes(ym) }));
   const linha = r => { const f = pessoa(r.funcionario_id);
     return `<tr><td class="ce"><input type="checkbox" data-k="${esc(r.chave)}" ${est.sel.has(r.chave) ? 'checked' : ''} aria-label="Selecionar"></td>
-      <td><b>${esc(f?.nome || '—')}</b><br><span class="dc-sem">${esc(f?.fazenda || 'sem fazenda')}</span></td>
+      ${porPessoa ? `<td><b>${rotMes(r.competencia)}</b></td>`
+        : `<td><button type="button" class="ds-nome" data-so="${r.funcionario_id}" title="Ver só os documentos de ${esc(f?.nome || '')}"><b>${esc(f?.nome || '—')}</b></button><br><span class="dc-sem">${esc(f?.fazenda || 'sem fazenda')}</span></td>`}
       <td>${esc(DOCS[r.documento].rot)}</td><td>${br(r.entregue_em)}</td>
       <td class="ce"><button class="btn mini" type="button" data-um="${esc(r.chave)}">Escaneado</button></td></tr>`; };
 
@@ -663,36 +676,51 @@ function desenharScan() {
     `faltam<strong class="jor-cabecalho__competencia">${falta.length}</strong>`) + `
     <div class="jor-corpo">
       <div class="jor-barra bd-barra">
+        <select id="dsPessoa" class="dc-mini bd-sel" aria-label="Funcionário">
+          <option value="">Todos os funcionários (${pessoas.length})</option>
+          ${pessoas.map(([fid, n]) => `<option value="${fid}" ${sPessoa === fid ? 'selected' : ''}>${esc(nome(fid))} · ${n}</option>`).join('')}
+          ${sPessoa && !pessoas.some(([fid]) => fid === sPessoa) ? `<option value="${sPessoa}" selected>${esc(nome(sPessoa))} · 0</option>` : ''}
+        </select>
+        <span class="ds-grupo" role="group" aria-label="Agrupar">
+          <button type="button" class="btn mini" data-grupo="mes" aria-pressed="${!porPessoa}">Por mês</button>
+          <button type="button" class="btn mini" data-grupo="pessoa" aria-pressed="${porPessoa}">Por funcionário</button></span>
         <label class="fer-filtro">De <input type="month" id="dsDe" value="${sDe}" max="${mesAtual()}"></label>
         <label class="fer-filtro">até <input type="month" id="dsAte" value="${sAte}" max="${mesAtual()}"></label>
         <div id="dsFaz" aria-label="Fazenda"></div>
         <label class="fer-filtro"><input type="checkbox" id="dsTodos" ${sTodos ? 'checked' : ''}> mostrar os já escaneados</label>
+        ${sPessoa ? '<button class="btn mini" type="button" id="dsLimpaPessoa">Ver todos</button>' : ''}
       </div>
       <div class="jor-acoes">
         <button class="btn principal" type="button" id="dsMarcar" ${est.sel.size ? '' : 'disabled'}>Marcar ${est.sel.size || ''} como escaneado${est.sel.size === 1 ? '' : 's'}</button>
         <button class="btn mini" type="button" id="dsTudo" ${falta.length ? '' : 'disabled'}>${est.sel.size === falta.length && falta.length ? 'Desmarcar todos' : 'Selecionar todos'}</button>
       </div>
-      ${porMes.map(ym => `<h3 class="jor-h3">${rotMes(ym)} <span class="dc-sem">· ${falta.filter(r => r.competencia === ym).length}</span>
-          <button class="btn mini" type="button" data-selmes="${ym}">Selecionar o mês</button></h3>
-        <div class="fer-rola"><table class="dc-planilha fer-tabela"><thead><tr><th></th><th>Funcionário</th><th>Documento</th><th>Entregue em</th><th></th></tr></thead>
-        <tbody>${falta.filter(r => r.competencia === ym).map(linha).join('')}</tbody></table></div>`).join('')
-        || '<div class="vazio">Nada para escanear. 👏</div>'}
+      ${grupos.map(g => `<h3 class="jor-h3 ds-grupo-tit">${g.tit} <span class="dc-sem">· ${g.itens.length}</span>
+          <button class="btn mini" type="button" data-selgrupo="${esc(g.k)}">${porPessoa ? 'Selecionar tudo dele' : 'Selecionar o mês'}</button>
+          ${porPessoa ? `<button class="btn mini" type="button" data-escgrupo="${esc(g.k)}">Escanear tudo dele (${g.itens.length})</button>` : ''}</h3>
+        <div class="fer-rola"><table class="dc-planilha fer-tabela"><thead><tr><th></th><th>${porPessoa ? 'Mês' : 'Funcionário'}</th><th>Documento</th><th>Entregue em</th><th></th></tr></thead>
+        <tbody>${g.itens.map(linha).join('')}</tbody></table></div>`).join('')
+        || `<div class="vazio">${sPessoa ? `Nada para escanear de ${esc(nome(sPessoa))}.` : 'Nada para escanear. 👏'}</div>`}
       ${sTodos ? `<h3 class="jor-h3">Já escaneados <span class="dc-sem">· ${feitos.length}</span></h3>
         <div class="fer-rola"><table class="dc-planilha fer-tabela"><thead><tr><th>Mês</th><th>Funcionário</th><th>Documento</th><th>Escaneado em</th><th></th></tr></thead>
-        <tbody>${feitos.slice(0, 300).map(r => `<tr><td>${rotMes(r.competencia)}</td><td>${esc(pessoa(r.funcionario_id)?.nome || '—')}</td>
+        <tbody>${feitos.slice(0, 300).map(r => `<tr><td>${rotMes(r.competencia)}</td><td>${esc(nome(r.funcionario_id))}</td>
           <td>${esc(DOCS[r.documento].rot)}</td><td>${br(r.escaneado_em)}</td>
           <td class="ce"><button class="btn mini" type="button" data-desfaz="${esc(r.chave)}">Desfazer</button></td></tr>`).join('')
           || '<tr><td colspan="5" class="vazio">Nenhum ainda.</td></tr>'}</tbody></table></div>` : ''}
-      <p class="dc-sem jor-nota">Aqui só entra o que foi marcado como <b>Entregue</b>. O que estiver em correção ou não entregue aparece no Painel.</p>
+      <p class="dc-sem jor-nota">Escolha o funcionário na lista (ou clique no nome) para ver só os documentos dele. "Por funcionário" junta tudo de cada pessoa —
+        bom para escanear a pasta de uma vez. Aqui só entra o que foi marcado como <b>Entregue</b>.</p>
     </div>`;
 
   const set = (k, v) => { est[k] = v; desenharScan(); };
   $('dsDe').addEventListener('change', ev => set('sDe', ev.target.value));
   $('dsAte').addEventListener('change', ev => set('sAte', ev.target.value));
   $('dsTodos').addEventListener('change', ev => set('sTodos', ev.target.checked));
+  $('dsPessoa').addEventListener('change', ev => set('sPessoa', ev.target.value));
+  $('dsLimpaPessoa')?.addEventListener('click', () => set('sPessoa', ''));
   montarMulti($('dsFaz'), { opcoes: opcoesFazenda(), marcados: est.sFaz, todas: 'Todas as fazendas', plural: 'fazendas' });
   $('dsFaz').addEventListener('change', () => set('sFaz', $('dsFaz').valores));
   const t = $('telaDmScan');
+  t.querySelectorAll('[data-grupo]').forEach(b => b.addEventListener('click', () => set('sGrupo', b.dataset.grupo)));
+  t.querySelectorAll('[data-so]').forEach(b => b.addEventListener('click', () => set('sPessoa', b.dataset.so)));
   t.querySelectorAll('input[data-k]').forEach(c => c.addEventListener('change', () => {
     if (c.checked) est.sel.add(c.dataset.k); else est.sel.delete(c.dataset.k);
     desenharScan();
@@ -700,10 +728,17 @@ function desenharScan() {
   $('dsTudo').addEventListener('click', () => {
     est.sel = est.sel.size === falta.length ? new Set() : new Set(falta.map(r => r.chave)); desenharScan();
   });
-  t.querySelectorAll('[data-selmes]').forEach(b => b.addEventListener('click', () => {
-    falta.filter(r => r.competencia === b.dataset.selmes).forEach(r => est.sel.add(r.chave)); desenharScan();
+  const doGrupo = k => (grupos.find(g => g.k === k)?.itens || []);
+  t.querySelectorAll('[data-selgrupo]').forEach(b => b.addEventListener('click', () => {
+    doGrupo(b.dataset.selgrupo).forEach(r => est.sel.add(r.chave)); desenharScan();
   }));
   const acha = k => regs().find(r => r.chave === k);
+  t.querySelectorAll('[data-escgrupo]').forEach(b => b.addEventListener('click', async () => {
+    const itens = doGrupo(b.dataset.escgrupo);
+    for (const r of itens) await escanear(r, true);
+    avisar(`${itens.length} documento(s) de ${nome(b.dataset.escgrupo)} marcado(s) como escaneado(s).`, true);
+    desenharScan();
+  }));
   $('dsMarcar').addEventListener('click', async () => {
     const ks = [...est.sel];
     for (const k of ks) { const r = acha(k); if (r) await escanear(r, true); }
@@ -782,5 +817,5 @@ export function ligarDocumentos(navegar, aviso) {
 }
 export function limparDocumentos() {
   carregado = false;
-  Object.assign(est, { mes: null, busca: '', fazenda: [], de: '', ate: '', pFaz: [], tipo: '', sDe: '', sAte: '', sFaz: [], sTodos: false, sel: new Set() });
+  Object.assign(est, { mes: null, busca: '', fazenda: [], de: '', ate: '', pFaz: [], tipo: '', sDe: '', sAte: '', sFaz: [], sTodos: false, sPessoa: '', sGrupo: 'mes', sel: new Set() });
 }
