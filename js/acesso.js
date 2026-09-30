@@ -244,10 +244,12 @@ export function montarMenu(callback) {
   if (callback) aoTrocar = callback;
   const libs = modulosLiberados();
 
+  /* Módulos como botões com ícone (30/09/2026, pedido dele: "dar mais
+     destaque"). O aberto fica verde cheio; Configurações vai para a direita. */
   $('navModulos').innerHTML = libs.map(m =>
-    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${m.nome}</button>`).join('')
+    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(ICONE_MODULO[m.id] || 'lista')}<span>${esc(m.nome)}</span></button>`).join('')
     + (acesso.admin
-      ? '<button class="aba" role="tab" data-modulo="config" aria-selected="false">Configurações</button>'
+      ? `<button class="aba aba-config" role="tab" data-modulo="config" aria-selected="false">${svgIcone('config')}<span>Configurações</span></button>`
       : '');
 
   $('navModulos').querySelectorAll('.aba').forEach(b =>
