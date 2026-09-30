@@ -514,3 +514,12 @@
 .dm-rola thead th { position: sticky; top: 0; z-index: 2; }
 .dm-rola thead th.bd-nome { z-index: 3; }
 .dm-rola tbody .bd-nome { z-index: 1; }
+/* Escanear: nome clicável, agrupar por mês/funcionário (30/09/2026) */
+.ds-nome { font: inherit; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; text-align: left; }
+.ds-nome:hover b { text-decoration: underline; color: #744F28; }
+.ds-grupo { display: inline-flex; gap: 0; }
+.ds-grupo .btn { border-radius: 0; }
+.ds-grupo .btn:first-child { border-radius: 8px 0 0 8px; }
+.ds-grupo .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.ds-grupo .btn[aria-pressed="true"] { background: #84BD00; border-color: #84BD00; color: #fff; }
+.ds-grupo-tit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
