@@ -509,3 +509,8 @@
   border: 1px dashed #B08A5A; background: transparent; color: #744F28; cursor: pointer; white-space: nowrap; vertical-align: 1px; }
 .dm-add-fer:hover { background: rgba(116,79,40,.10); }
 @media (prefers-color-scheme: dark) { .dm-add-fer { color: #c9a06a; } }
+/* Grade de documentos com cabeçalho congelado (30/09/2026): rola só por dentro */
+.dm-rola { overflow: auto; overscroll-behavior: contain; }
+.dm-rola thead th { position: sticky; top: 0; z-index: 2; }
+.dm-rola thead th.bd-nome { z-index: 3; }
+.dm-rola tbody .bd-nome { z-index: 1; }
