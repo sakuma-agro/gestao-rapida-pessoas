@@ -492,3 +492,15 @@
 .og-dica{margin:6px 0 0}
 .og-atua{white-space:nowrap}
 .og-atua .og-chk{display:inline-flex;margin-right:10px}
+
+/* ---------- DP → Folha, holerite e recibo (30/09/2026) ---------- */
+.dm-grade th:not(.bd-nome), .dm-grade td { min-width: 78px; }
+.dm-grade td button { height: 30px; }
+.dm-esc, .bd-cel.dm-esc { background: #84BD00; color: #fff; font-size: 10px; letter-spacing: .3px; }
+.bd-cel.dm-esc { width: 28px; }
+.dm-lote { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dm-lote select { width: auto; flex: 0 0 auto; max-width: 100%; }
+.dm-meses td { white-space: nowrap; }
+.dm-tudo { color: #4f7300; font-weight: 700; }
+.dm-scan-n { color: #6b5500; font-weight: 700; }
+.bd-menu .dm-menu-scan { border-top: 1px solid var(--linha); border-radius: 0; margin-top: 4px; }
