@@ -294,24 +294,85 @@ export function abrirModulo(id, tela) {
    igual: só entra o que subsLiberados() devolve. */
 const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
 
+/* Submódulos primeiro (30/09/2026, pedido dele — "está com muitos itens
+   abertos"). Módulo com mais de um submódulo abre mostrando só um ícone por
+   submódulo; clicar num submódulo de várias telas troca a faixa para as telas
+   dele, com "← Módulo" para voltar. Submódulo de uma tela só abre direto.
+   Módulo de um submódulo só continua mostrando as telas. */
+const ICONE_SUB = {
+  gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
+  epis: 'escudo', exames: 'exame', treinamentos: 'treino',
+  disc: 'disc', cargos: 'cargo', organograma: 'organograma',
+  dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
+  emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
+};
+const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
+/* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
+const faixaEstado = { modulo: null, sub: null, tela: null };
+const ultimaTela = {};
+
 function desenharFaixa(id, subs, tela) {
   const todas = subs.flatMap(s => s.telas);
   const alvo = todas.some(([t]) => t === tela) ? tela : todas[0][0];
+  const subAlvo = subs.find(s => s.telas.some(([t]) => t === alvo));
+  // Veio com tela escolhida (atalho, link de outra tela) e ela mora num
+  // submódulo de várias telas: já abre dentro dele. Senão, nível dos submódulos.
+  const dentro = subs.length > 1 && tela && subAlvo.telas.length > 1 ? subAlvo.id : null;
+  faixaEstado.modulo = id; faixaEstado.sub = subs.length > 1 ? dentro : subAlvo.id; faixaEstado.tela = alvo;
+  pintarFaixa(id, subs);
+  marcarTela(id, subs, alvo, true);
+}
+
+function pintarFaixa(id, subs) {
   const faixa = $('navTelas');
   faixa.hidden = false;
   faixa.classList.add('rb');
-  const unico = subs.length === 1;
-  faixa.innerHTML = subs.map((s, i) => `
-    <section class="rb-grupo ${CORES_GRUPO[i % CORES_GRUPO.length]}" aria-label="${esc(s.nome)}">
-      <div class="rb-botoes">${s.telas.map(([t, rot]) => `
-        <button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === alvo}" title="${esc(rot)}">
-          ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`).join('')}
-      </div>
-      ${unico ? '' : `<div class="rb-rotulo">${esc(s.nome)}</div>`}
-    </section>`).join('');
+  const mod = MODULOS.find(m => m.id === id);
+  const atual = subs.find(s => s.telas.some(([t]) => t === faixaEstado.tela));
+  const botaoTela = (t, rot) => `<button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}" title="${esc(rot)}">
+          ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`;
+
+  if (subs.length === 1) {
+    // Um submódulo só: as telas direto, como sempre foi.
+    faixa.innerHTML = `<section class="rb-grupo ${CORES_GRUPO[0]}" aria-label="${esc(subs[0].nome)}">
+      <div class="rb-botoes">${subs[0].telas.map(([t, rot]) => botaoTela(t, rot)).join('')}</div></section>`;
+  } else if (!faixaEstado.sub) {
+    // Nível dos submódulos: um ícone por submódulo.
+    faixa.innerHTML = `<section class="rb-grupo rb-subs" aria-label="${esc(mod?.nome || '')}"><div class="rb-botoes">${subs.map(s => `
+      <button type="button" class="rb-btn rb-sub" data-sub="${s.id}" aria-selected="${s === atual}" title="${esc(s.nome)}">
+        ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span>${s.telas.length > 1 ? `<small>${s.telas.length} telas</small>` : ''}</button>`).join('')}
+    </div></section>`;
+  } else {
+    // Dentro de um submódulo: voltar + as telas dele.
+    const s = subs.find(x => x.id === faixaEstado.sub);
+    const i = subs.indexOf(s);
+    faixa.innerHTML = `<button type="button" class="rb-voltar" data-voltar title="Voltar aos submódulos de ${esc(mod?.nome || '')}">
+        ${svgIcone('seta-esq')}<span>${esc(mod?.nome || 'Voltar')}</span></button>
+      <section class="rb-grupo ${CORES_GRUPO[i % CORES_GRUPO.length]}" aria-label="${esc(s.nome)}">
+        <div class="rb-botoes">${s.telas.map(([t, rot]) => botaoTela(t, rot)).join('')}</div>
+        <div class="rb-rotulo">${esc(s.nome)}</div></section>`;
+  }
+
   faixa.querySelectorAll('[data-tela]').forEach(b =>
-    b.addEventListener('click', () => marcarTela(id, subs, b.dataset.tela, true)));
-  marcarTela(id, subs, alvo, true);
+    b.addEventListener('click', () => {
+      faixaEstado.tela = b.dataset.tela;
+      if (faixaEstado.sub) ultimaTela[faixaEstado.sub] = b.dataset.tela;
+      marcarTela(id, subs, b.dataset.tela, true);
+    }));
+  faixa.querySelectorAll('[data-sub]').forEach(b =>
+    b.addEventListener('click', () => {
+      const s = subs.find(x => x.id === b.dataset.sub);
+      const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
+      faixaEstado.tela = t;
+      faixaEstado.sub = s.telas.length > 1 ? s.id : null;
+      pintarFaixa(id, subs);
+      marcarTela(id, subs, t, true);
+    }));
+  faixa.querySelector('[data-voltar]')?.addEventListener('click', () => {
+    faixaEstado.sub = null;
+    pintarFaixa(id, subs);   // só a faixa: a tela aberta continua a mesma
+  });
+  faixa.scrollLeft = 0;
   faixa.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   sombraFaixa();
   requestAnimationFrame(sombraFaixa);
@@ -331,6 +392,9 @@ document.addEventListener('scroll', ev => { if (ev.target?.id === 'navTelas') so
 function marcarTela(id, subs, tela, abrir) {
   $('navTelas').querySelectorAll('[data-tela]').forEach(x =>
     x.setAttribute('aria-selected', String(x.dataset.tela === tela)));
+  const subDaTela = subs.find(s => s.telas.some(([t]) => t === tela));
+  $('navTelas').querySelectorAll('[data-sub]').forEach(x =>
+    x.setAttribute('aria-selected', String(x.dataset.sub === subDaTela?.id)));
   const mod = MODULOS.find(m => m.id === id);
   const sub = subs.find(s => s.telas.some(([t]) => t === tela));
   const rot = sub?.telas.find(([t]) => t === tela)?.[1] || '';
