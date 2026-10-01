@@ -30,6 +30,7 @@ import { ligarBackup } from './backup.js';
 import { desenharCadRelatorios } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
+import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 
 const $ = id => document.getElementById(id);
@@ -132,6 +133,8 @@ function abrirAba(nome) {
   if (nome === 'rhOrganograma') abrirOrganograma();
   for (const t of TELAS_INDICADORES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_INDICADORES.includes(nome)) abrirIndicadores(nome);
+  for (const t of TELAS_SALARIOS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_SALARIOS.includes(nome)) abrirSalarios(nome);
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
   $('telaCadRelatorios').hidden = nome !== 'cadRelatorios';
   if (nome === 'cadRelatorios') desenharCadRelatorios();
@@ -197,7 +200,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma(); limparIndicadores();
+  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios();
   mostrar('login');
 });
 

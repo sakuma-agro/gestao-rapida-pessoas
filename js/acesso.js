@@ -78,6 +78,9 @@ export const MODULOS = [
     ] },
     { id: 'cargos', nome: 'Cargos e salários', telas: [
       ['rhCargos', 'Plano de cargos'],
+      /* Salários e projeção por pessoa (01/10/2026) — js/rh-salarios.js. */
+      ['rhSalarios', 'Salários'],
+      ['rhSalProj', 'Projeção'],
       ['rhProposta', 'Gerar proposta'],
     ] },
     /* Organograma (29/09/2026): hierarquia por função — js/organograma.js. */
