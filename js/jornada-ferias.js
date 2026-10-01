@@ -403,14 +403,25 @@ export function concessao(filtro = '') {
 const periodosLanc = p => p.lanc.map(g => `${br(g.data_ini)} a ${br(g.data_fim)}${g.data_ini > hoje() ? ' (programada)' : ''}`)
   .concat(p.vend ? [`${p.vend} vendido(s)`] : []).join('<br>');
 
-export function relConcessao(filtro = '') {
-  const { abertas, concedidas, semInicial } = concessao(filtro);
+/* 01/10/2026: `sel` é a lista de linhas marcadas na tela "Liberados em aberto"
+   (chave funcionário|início do aquisitivo). Sem `sel` sai todo mundo, como
+   antes. Com `sel`, só os marcados — e "Concedidas" mostra só essas pessoas. */
+export const chaveConc = x => `${x.f.id}|${x.p.iniAq}`;
+export function relConcessao(filtro = '', sel = null) {
+  const tudo = concessao(filtro);
+  const marcadas = sel && new Set(sel);
+  const abertas = marcadas ? tudo.abertas.filter(x => marcadas.has(chaveConc(x))) : tudo.abertas;
+  const quem = new Set(abertas.map(x => x.f.id));
+  const concedidas = marcadas ? tudo.concedidas.filter(x => quem.has(x.f.id)) : tudo.concedidas;
+  const semInicial = marcadas ? [] : tudo.semInicial;
+  const recorte = marcadas && abertas.length < tudo.abertas.length;
   const prazo = n => n < 0 ? `<span class="rel-pend">vencido há ${-n} dia(s)</span>`
     : n <= 60 ? `<span class="rel-pend">faltam ${n} dia(s)</span>` : `faltam ${n} dia(s)`;
-  return `<article class="rel">
+  return `<article class="rel rel-paisagem">
     ${cabecalhoDoc('Férias — período de concessão', 'Quem já tem direito: em aberto e concedidas',
       `posição em<strong>${br(hoje())}</strong>${esc(rotDestino(filtro))}`)}
-    <div class="rel-resumo"><b>${abertas.length} em aberto</b> · <b>${concedidas.length} concedida(s)</b> no período concessivo atual.</div>
+    <div class="rel-resumo"><b>${abertas.length} em aberto</b> · <b>${concedidas.length} concedida(s)</b> no período concessivo atual.${
+      recorte ? ` Seleção: ${abertas.length} de ${tudo.abertas.length} em aberto.` : ''}</div>
 
     <div class="rel-secao">Em aberto — férias a conceder</div>
     <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th>
@@ -420,12 +431,12 @@ export function relConcessao(filtro = '') {
       <td class="rel-num"><b>${p.saldo}</b>${p.goz || p.vend ? `<br><span class="rel-mini">já tirou ${p.goz}${p.vend ? ` · vendeu ${p.vend}` : ''}</span>` : ''}</td>
       <td>${prazo(n)}</td></tr>`).join('') || '<tr><td colspan="7" class="rel-vazio">Ninguém com férias em aberto.</td></tr>'}</tbody></table>
 
-    <div class="rel-secao">Concedidas — período concessivo em curso</div>
+    ${marcadas && !concedidas.length ? '' : `<div class="rel-secao">Concedidas — período concessivo em curso</div>
     <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Férias</th><th class="rel-num">Dias</th></tr></thead>
     <tbody>${concedidas.map(({ f, p }) => `<tr><td>${esc(f.nome)}</td><td>${esc(f.fazenda || '—')}</td>
       <td>${p.k}º · ${br(p.iniAq)} a ${br(p.fimAq)}</td><td>${periodosLanc(p)}</td>
       <td class="rel-num"><span class="rel-ok">${p.goz + p.vend}</span></td></tr>`).join('')
-      || '<tr><td colspan="5" class="rel-vazio">Nenhuma concedida no período concessivo em curso.</td></tr>'}</tbody></table>
+      || '<tr><td colspan="5" class="rel-vazio">Nenhuma concedida no período concessivo em curso.</td></tr>'}</tbody></table>`}
 
     ${semInicial.length ? `<p class="rel-nota"><b>Fora do relatório por falta de situação inicial:</b> ${semInicial.map(f => esc(f.nome)).join(', ')}.
       Informe em DP › Férias › Situação inicial.</p>` : ''}
@@ -500,7 +511,7 @@ export function csvFerias(tipo, ym, filtro = '') {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { faixa: null, destino: '', mes: null, rascunhoIni: new Map(), buscaIni: '' };
+const est = { faixa: null, destino: '', mes: null, foraConc: new Set(), rascunhoIni: new Map(), buscaIni: '' };
 
 function cabecalho(titulo, sub) {
   return `<header class="jor-cabecalho"><div>
@@ -673,18 +684,24 @@ function desenharPrevisao() {
       <div class="jor-acoes">
         <button class="btn principal" type="button" id="ferPrevTabela">Emitir esta tabela (${MESES[+sel.slice(5) - 1]}/${sel.slice(0, 4)})</button>
         <button class="btn" type="button" data-ir="jorRelatorios">Emitir relatório (DP › Relatórios)</button></div>`;
+  const marcadas = abertas.filter(x => !est.foraConc.has(chaveConc(x)));
+  const todasMarcadas = marcadas.length === abertas.length;
   const tabelaAberto = () => `
       <h3 class="jor-h3">Liberados para tirar férias e ainda em aberto · ${nAbertos} ${nAbertos === 1 ? 'pessoa' : 'pessoas'}</h3>
       <p class="dc-sem jor-nota">Todos que já completaram o período aquisitivo e ainda têm dias a tirar, venha de qual mês vier. Ordem: limite de gozo mais próximo primeiro.</p>
-      <table class="dc-planilha"><thead><tr><th>Venceu em</th><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Período de concessão</th><th class="ce">Saldo</th></tr></thead><tbody>
-        ${abertas.map(x => `<tr><td>${br(x.p.vence)}</td><td>${esc(x.f.nome)}</td><td>${esc(x.f.fazenda || '—')}</td>
+      <table class="dc-planilha fer-sel"><thead><tr><th class="ce"><input type="checkbox" id="ferSelTodos" title="Marcar ou desmarcar todos"
+        ${todasMarcadas && abertas.length ? 'checked' : ''} ${abertas.length ? '' : 'disabled'}></th><th>Venceu em</th><th>Funcionário</th><th>Fazenda</th><th>Período aquisitivo</th><th>Período de concessão</th><th class="ce">Saldo</th></tr></thead><tbody>
+        ${abertas.map(x => `<tr class="${est.foraConc.has(chaveConc(x)) ? 'fer-fora' : ''}"><td class="ce"><input type="checkbox" data-selconc="${esc(chaveConc(x))}"
+          ${est.foraConc.has(chaveConc(x)) ? '' : 'checked'} aria-label="Incluir ${esc(x.f.nome)} no relatório"></td><td>${br(x.p.vence)}</td><td>${esc(x.f.nome)}</td><td>${esc(x.f.fazenda || '—')}</td>
           <td>${x.p.k}º · ${br(x.p.iniAq)} a ${br(x.p.fimAq)}</td>
           <td><b>${br(x.p.vence)} a ${br(x.p.limite)}</b><br><span class="dc-sem">${x.prazo < 0 ? `limite vencido há ${-x.prazo} dia(s)` : `faltam ${x.prazo} dia(s) para o limite`}</span></td>
           <td class="ce"><b>${x.p.saldo} dias</b>${x.p.goz || x.p.vend ? `<br><span class="dc-sem">tirou ${x.p.goz}${x.p.vend ? ` · vendeu ${x.p.vend}` : ''}</span>` : ''}</td></tr>`).join('')
-          || '<tr><td colspan="6" class="vazio">Ninguém com férias em aberto.</td></tr>'}
+          || '<tr><td colspan="7" class="vazio">Ninguém com férias em aberto.</td></tr>'}
       </tbody></table>
       <div class="jor-acoes">
-        <button class="btn principal" type="button" id="ferPrevConc">Emitir relatório de período de concessão</button></div>`;
+        <button class="btn principal" type="button" id="ferPrevConc" ${abertas.length && !marcadas.length ? 'disabled' : ''}>Emitir relatório de período de concessão${
+          todasMarcadas ? '' : ` (${marcadas.length} de ${abertas.length})`}</button>
+        <span class="dc-sem">${todasMarcadas ? 'Desmarque quem não deve sair no relatório.' : !marcadas.length ? 'Marque ao menos uma pessoa.' : 'Só os marcados saem no relatório.'}</span></div>`;
   $('telaFerPrev').innerHTML = cabecalho('Previsão de vencimentos', 'Quantas pessoas ganham o direito às férias em cada mês') + `
     <div class="jor-corpo">
       <div class="jor-barra">${filtroDestino()}
@@ -704,7 +721,15 @@ function desenharPrevisao() {
   $('ferPrevTabela')?.addEventListener('click', () => {
     pedirRelatorio({ tipo: 'venc', mes: sel, destino: est.destino }); irPara('jorRelatorios');
   });
-  $('ferPrevConc')?.addEventListener('click', () => { pedirRelatorio({ tipo: 'conc', destino: est.destino }); irPara('jorRelatorios'); });
+  document.querySelectorAll('#telaFerPrev [data-selconc]').forEach(c => c.addEventListener('change', () => {
+    c.checked ? est.foraConc.delete(c.dataset.selconc) : est.foraConc.add(c.dataset.selconc); desenharPrevisao();
+  }));
+  $('ferSelTodos')?.addEventListener('change', e => {
+    abertas.forEach(x => e.target.checked ? est.foraConc.delete(chaveConc(x)) : est.foraConc.add(chaveConc(x))); desenharPrevisao();
+  });
+  $('ferPrevConc')?.addEventListener('click', () => {
+    pedirRelatorio({ tipo: 'conc', destino: est.destino, sel: todasMarcadas ? null : marcadas.map(chaveConc) }); irPara('jorRelatorios');
+  });
 }
 
 /* ---------------- Lançamentos ---------------- */
