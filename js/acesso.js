@@ -87,6 +87,9 @@ export const MODULOS = [
     /* Indicadores (01/10/2026): absenteísmo e turnover — js/rh-indicadores.js. */
     { id: 'indicadores', nome: 'Indicadores', telas: [
       ['rhIndPainel', 'Painel'],
+      ['rhIndPessoa', 'Por pessoa'],
+      ['rhIndCert', 'Certificação'],
+      ['rhIndMetas', 'Metas'],
     ] },
   ] },
   /* DP em submódulos (21/09/2026). O Painel é a tela de abertura, fora dos

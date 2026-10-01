@@ -29,7 +29,7 @@ import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
 import { desenharCadRelatorios } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
-import { abrirIndicadores, limparIndicadores } from './rh-indicadores.js';
+import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 
 const $ = id => document.getElementById(id);
@@ -130,8 +130,8 @@ function abrirAba(nome) {
   $('telaRhProposta').hidden = nome !== 'rhProposta';
   $('telaRhOrganograma').hidden = nome !== 'rhOrganograma';
   if (nome === 'rhOrganograma') abrirOrganograma();
-  $('telaRhIndPainel').hidden = nome !== 'rhIndPainel';
-  if (nome === 'rhIndPainel') abrirIndicadores(nome);
+  for (const t of TELAS_INDICADORES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_INDICADORES.includes(nome)) abrirIndicadores(nome);
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
   $('telaCadRelatorios').hidden = nome !== 'cadRelatorios';
   if (nome === 'cadRelatorios') desenharCadRelatorios();
