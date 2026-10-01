@@ -1052,86 +1052,229 @@ function resumoJornada(j) {
 /* ===================================================================
    ABATIMENTO DE HORAS (28/09/2026) — decisão falta a falta
    A regra automática (RN-23.1, Leitura A) vem marcada; o analista troca
-   para "compensar com horas extras" ou "descontar no salário". Grava em
-   jor_boletins.compensacao (null = automático). Competência enviada trava.
+   para "compensar com horas extras", "compensar com horas guardadas" ou
+   "descontar no salário". Grava em jor_boletins.compensacao (null =
+   automático). Competência enviada trava.
+
+   HORAS GUARDADAS (01/10/2026) — antes de fechar, o analista guarda parte
+   das extras que sobraram no mês (50% e 100% separadas) para abater falta
+   ou pagar depois. Sem vencimento: ele decide quando pagar ou abater.
+   Movimentos em jor_banco_horas (guardar / pagar / usar).
    =================================================================== */
 
+/* Aceita 10, 10:30, 10,5 ou 10.5 (horas). Vazio = 0. null = inválido. */
+function lerHoras(txt) {
+  const t = String(txt || '').trim();
+  if (!t) return 0;
+  if (t.includes(':')) {
+    const [h, m] = t.split(':');
+    const hh = Number(h || 0), mm = Number(m || 0);
+    if (!Number.isInteger(hh) || !Number.isInteger(mm) || hh < 0 || mm < 0 || mm > 59) return null;
+    return hh * 60 + mm;
+  }
+  const n = Number(t.replace(',', '.'));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 60);
+}
+const hm = min => min ? minParaHHMM(min) : '';
+
+/* Uso de horas guardadas sem falta por trás (lançamento excluído ou decisão
+   trocada fora desta tela) devolve as horas ao saldo. Só olha o mês aberto,
+   que é o que está carregado. */
+function limparUsosOrfaos(comp) {
+  if (!jd.dados.carregado) return;
+  const ativos = new Set(jd.dados.boletins
+    .filter(b => b.situacao !== 'cancelado' && b.compensacao === 'compensar').map(b => b.id));
+  (jd.dados.banco || [])
+    .filter(m => m.tipo === 'usar' && m.competencia === comp && !ativos.has(m.boletim_id))
+    .forEach(m => { jd.apagar('banco', m.chave).catch(() => {}); });
+}
+
 function desenharAbatimento() {
+  const comp = estadoTela.competencia;
+  limparUsosOrfaos(comp);
   const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
-  let nFaltas = 0, nComp = 0, nDP = 0, minAbatido = 0;
+  let nFaltas = 0, nComp = 0, nDP = 0, minAbatido = 0, minGuardadoMes = 0, minSaldo = 0;
 
   const blocos = destinos.map(d => {
-    const c = fech.consolidar(estadoTela.competencia, d.id);
-    const comp = jd.competenciaDoDestino(estadoTela.competencia, d.id);
-    const sit = comp?.situacao || 'aberta';
+    const c = fech.consolidar(comp, d.id);
+    const sit = jd.competenciaDoDestino(comp, d.id)?.situacao || 'aberta';
     const pode = sit === 'aberta' || sit === 'reaberta';
     const h = m => fech.formatarHoras(m, d.formato_horas);
     const pessoas = c.linhas.filter(l => (l.faltasTodas || []).length);
-    if (!pessoas.length) return '';
+    const noBanco = c.linhas.filter(l => (l.minExtraMes50 + l.minExtraMes100) > 0
+      || l.minGuardado || l.minBancoPago || fech.saldoInicio(l.vinculo.funcionario_id, comp).total > 0);
+    if (!pessoas.length && !noBanco.length) return '';
+    noBanco.forEach(l => { minGuardadoMes += l.minGuardado || 0; minSaldo += Math.max(0, l.saldoBanco.total); });
+
+    const faltasHtml = pessoas.map(l => {
+      const fid = l.vinculo.funcionario_id;
+      const fs = l.faltasTodas;
+      const abatido = fs.filter(f => f.absorvida && !f.banco).reduce((s, f) => s + (f.minDeficit || 0), 0);
+      const doBanco = fs.filter(f => f.banco).reduce((s, f) => s + (f.minDeficit || 0), 0);
+      const sobrou = l.minExtraMes50 + l.minExtraMes100;
+      const antes = sobrou + abatido;
+      nFaltas += fs.length; nComp += fs.filter(f => f.absorvida).length; minAbatido += abatido + doBanco;
+      nDP += fs.filter(f => f.justificada ? f.desconta : !f.absorvida).length;
+      return `<div class="jor-abat">
+        <div class="jor-abat__topo"><b>${esc(l.nome)}</b>
+          <span class="dc-sem">horas extras do mês <b>${h(antes)}</b> → abatido <b>${h(abatido)}</b>${l.minGuardado ? ` → guardado <b>${h(l.minGuardado)}</b>` : ''}${l.minBancoPago ? ` → pago do saldo <b>+${h(l.minBancoPago)}</b>` : ''} → vão para a folha <b>${h(l.minExtraTotal)}</b>${l.minExtraAnterior ? ` + ${h(l.minExtraAnterior)} de comp. anterior` : ''}</span></div>
+        <div class="jor-rolar"><table class="dc-planilha"><thead><tr><th>Data</th><th>Falta</th><th>Motivo</th><th class="ce">Horas</th><th>Decisão</th><th>Resultado</th></tr></thead><tbody>
+        ${fs.slice().sort((x, y) => x.data.localeCompare(y.data)).map(f => {
+          const b = jd.dados.boletins.find(x => x.id === f.boletimId);
+          const res = f.atrasada ? '<span class="jor-pend">mês anterior — vai ao DP</span>'
+            : f.banco ? `compensada — sai ${h(f.minDeficit)} das horas guardadas`
+            : f.absorvida ? `compensada — sai ${h(f.minDeficit)} das extras`
+            : f.semBanco ? `<span class="jor-pend">horas guardadas insuficientes — ${f.justificada ? 'fica sem desconto' : 'vai ao DP'}</span>`
+            : f.justificada ? (f.desconta ? '<span class="jor-pend">vai ao DP — desconto em folha</span>'
+              : f.semSaldo ? `<span class="jor-pend">extras insuficientes — fica sem desconto</span>`
+              : 'sem desconto (justificada)')
+            : f.semSaldo ? `<span class="jor-pend">extras insuficientes (${h(antes - abatido)}) — vai ao DP</span>`
+            : '<span class="jor-pend">vai ao DP — desconto em folha</span>';
+          const disp = b ? fech.disponivel(fid, comp, fech.chaveUsar(b.id)).total : 0;
+          const sel = f.atrasada || !b ? '<span class="dc-sem">—</span>'
+            : `<select data-abat="${b.id}" data-min="${f.minDeficit || 0}" ${pode ? '' : 'disabled'}>
+                <option value="" ${!f.decisao ? 'selected' : ''}>${f.justificada ? 'Não descontar'
+                  : `Automático${!f.decisao ? ` (${f.sugerida === 'compensar' ? 'compensar' : 'descontar'})` : ''}`}</option>
+                <option value="compensar" ${f.decisao === 'compensar' ? 'selected' : ''}>Compensar com horas extras</option>
+                <option value="banco" ${f.decisao === 'banco' ? 'selected' : ''}>Compensar com horas guardadas (saldo ${h(disp)})</option>
+                <option value="descontar" ${f.decisao === 'descontar' ? 'selected' : ''}>Descontar no salário</option>
+              </select>`;
+          return `<tr><td>${dataBR(f.data)}</td><td>${f.justificada ? 'Justificada' : '<b>Não justificada</b>'}</td><td>${esc(b?.motivo || '—')}</td>
+            <td class="ce">${f.minDeficit ? h(f.minDeficit) : '—'}</td><td>${sel}</td><td>${res}</td></tr>`;
+        }).join('')}</tbody></table></div></div>`;
+    }).join('');
+
+    const bancoHtml = noBanco.length ? `<div class="jor-abat">
+      <div class="jor-abat__topo"><b>Horas guardadas</b>
+        <span class="dc-sem">guarde parte do que sobrou no mês ou pague do saldo — horas em h:mm (ex.: 10:00)</span></div>
+      <div class="jor-rolar"><table class="dc-planilha jor-banco"><thead><tr>
+        <th>Funcionário</th><th class="ce">Sobrou no mês<br>50% · 100%</th><th class="ce">Guardar<br>50%</th><th class="ce">Guardar<br>100%</th>
+        <th class="ce">Saldo do mês anterior<br>50% · 100%</th><th class="ce">Pagar do saldo<br>50%</th><th class="ce">Pagar do saldo<br>100%</th>
+        <th class="ce">Saldo ao fim<br>50% · 100%</th><th class="ce">Folha</th><th></th></tr></thead><tbody>
+      ${noBanco.map(l => {
+        const fid = l.vinculo.funcionario_id;
+        const g = fech.guardadoEm(fid, comp), p = fech.pagoEm(fid, comp);
+        const ini = fech.saldoInicio(fid, comp), fim = l.saldoBanco;
+        const par = (a, b) => `${h(a)} · ${h(b)}`;
+        const dis = pode ? '' : 'disabled';
+        const inp = (campo, val) => `<input class="jor-banco__h" data-campo="${campo}" value="${hm(val)}" placeholder="0:00" inputmode="decimal" ${dis}>`;
+        return `<tr data-banco="${fid}">
+          <td>${esc(l.nome)}${l.guardadoAcima ? '<br><span class="jor-pend">guardado acima do que sobrou — vale só o que sobrou</span>' : ''}</td>
+          <td class="ce">${par(l.minExtraMes50, l.minExtraMes100)}</td>
+          <td class="ce">${inp('g50', g.min_50)}</td><td class="ce">${inp('g100', g.min_100)}</td>
+          <td class="ce">${par(ini.min_50, ini.min_100)}</td>
+          <td class="ce">${inp('p50', p.min_50)}</td><td class="ce">${inp('p100', p.min_100)}</td>
+          <td class="ce"><b>${par(fim.min_50, fim.min_100)}</b></td>
+          <td class="ce">${h(l.minExtraTotal)}</td>
+          <td>${pode ? `<button class="btn mini" data-banco-gravar="${fid}" data-destino="${d.id}">Gravar</button>` : ''}</td></tr>`;
+      }).join('')}</tbody></table></div>
+      <p class="dc-sem" style="margin:6px 0 0">O que é guardado neste mês sai das extras da folha e entra no saldo a partir do mês seguinte.
+      Pagar do saldo soma às extras deste mês, no mesmo percentual. As horas guardadas não vencem sozinhas — você decide quando pagar ou abater.</p>
+    </div>` : '';
 
     return `<section class="jor-destino">
       <div class="jor-destino__topo"><div><h3>${esc(d.nome)}</h3>
-        <span class="dc-sem">${pessoas.length} pessoa(s) com falta</span></div>
+        <span class="dc-sem">${pessoas.length} pessoa(s) com falta · ${noBanco.length} com horas extras ou saldo guardado</span></div>
         <span class="tag ${pode ? 'ativo' : ''}">${esc(sit)}</span></div>
       ${pode ? '' : `<div class="jor-caixa">Competência ${esc(sit)} — as decisões estão travadas. Para mudar, reabra com motivo no Fechamento.</div>`}
-      ${pessoas.map(l => {
-        const fs = l.faltasTodas;
-        const abatido = fs.filter(f => f.absorvida).reduce((s, f) => s + (f.minDeficit || 0), 0);
-        const antes = l.minExtraTotal + abatido;
-        nFaltas += fs.length; nComp += fs.filter(f => f.absorvida).length; minAbatido += abatido;
-        nDP += fs.filter(f => f.justificada ? f.desconta : !f.absorvida).length;
-        return `<div class="jor-abat">
-          <div class="jor-abat__topo"><b>${esc(l.nome)}</b>
-            <span class="dc-sem">horas extras do mês <b>${h(antes)}</b> → abatido <b>${h(abatido)}</b> → vão para a folha <b>${h(l.minExtraTotal)}</b>${l.minExtraAnterior ? ` + ${h(l.minExtraAnterior)} de comp. anterior` : ''}</span></div>
-          <table class="dc-planilha"><thead><tr><th>Data</th><th>Falta</th><th>Motivo</th><th class="ce">Horas</th><th>Decisão</th><th>Resultado</th></tr></thead><tbody>
-          ${fs.slice().sort((x, y) => x.data.localeCompare(y.data)).map(f => {
-            const b = jd.dados.boletins.find(x => x.id === f.boletimId);
-            const res = f.atrasada ? '<span class="jor-pend">mês anterior — vai ao DP</span>'
-              : f.absorvida ? `compensada — sai ${h(f.minDeficit)} das extras`
-              : f.justificada ? (f.desconta ? '<span class="jor-pend">vai ao DP — desconto em folha</span>'
-                : f.semSaldo ? `<span class="jor-pend">extras insuficientes — fica sem desconto</span>`
-                : 'sem desconto (justificada)')
-              : f.semSaldo ? `<span class="jor-pend">extras insuficientes (${h(antes - abatido)}) — vai ao DP</span>`
-              : '<span class="jor-pend">vai ao DP — desconto em folha</span>';
-            const sel = f.atrasada || !b ? '<span class="dc-sem">—</span>'
-              : `<select data-abat="${b.id}" ${pode ? '' : 'disabled'}>
-                  <option value="" ${!f.decisao ? 'selected' : ''}>${f.justificada ? 'Não descontar'
-                    : `Automático${!f.decisao ? ` (${f.sugerida === 'compensar' ? 'compensar' : 'descontar'})` : ''}`}</option>
-                  <option value="compensar" ${f.decisao === 'compensar' ? 'selected' : ''}>Compensar com horas extras</option>
-                  <option value="descontar" ${f.decisao === 'descontar' ? 'selected' : ''}>Descontar no salário</option>
-                </select>`;
-            return `<tr><td>${dataBR(f.data)}</td><td>${f.justificada ? 'Justificada' : '<b>Não justificada</b>'}</td><td>${esc(b?.motivo || '—')}</td>
-              <td class="ce">${f.minDeficit ? h(f.minDeficit) : '—'}</td><td>${sel}</td><td>${res}</td></tr>`;
-          }).join('')}</tbody></table></div>`;
-      }).join('')}
+      ${faltasHtml}${bancoHtml}
     </section>`;
   }).join('');
 
-  $('telaJorAbatimento').innerHTML = cabecalho('Abatimento de horas', 'Faltas justificadas e não justificadas: compensar com horas extras ou descontar no salário') + `
+  $('telaJorAbatimento').innerHTML = cabecalho('Abatimento de horas', 'Faltas e horas guardadas: compensar com horas extras, com horas guardadas ou descontar no salário') + `
     <div class="jor-corpo">
-      <div class="jor-cartoes">
+      <div class="jor-cartoes seis">
         ${cartao(nFaltas, 'FALTAS NO MÊS')}
         ${cartao(nComp, 'COMPENSADAS')}
         ${cartao(nDP, 'VÃO AO DP', nDP ? 'alerta' : '')}
         ${cartao(horas(minAbatido), 'HORAS ABATIDAS')}
+        ${cartao(horas(minGuardadoMes), 'GUARDADAS NO MÊS')}
+        ${cartao(horas(minSaldo), 'SALDO GUARDADO')}
       </div>
       <p class="dc-sem jor-nota" style="margin:0 0 12px"><b>Não justificada:</b> a sugestão automática compensa quando as horas extras do mês
       cobrem a falta inteira, da mais antiga para a mais recente. <b>Justificada:</b> por padrão não desconta; escolha compensar ou descontar
       só quando quiser. A falta vale 8h no Campo e a jornada do dia no Administrativo. <b>Descontar no salário</b> preserva as horas extras
-      para a folha. Atestado nunca desconta e não aparece aqui.</p>
-      ${blocos || '<div class="vazio">Nenhuma falta nesta competência.</div>'}
+      para a folha. <b>Compensar com horas guardadas</b> usa o saldo de meses anteriores e não mexe nas extras deste mês. Atestado nunca desconta e não aparece aqui.</p>
+      ${blocos || '<div class="vazio">Nenhuma falta, hora extra ou saldo guardado nesta competência.</div>'}
     </div>` + assinatura();
 
   document.querySelectorAll('#telaJorAbatimento [data-abat]').forEach(s => s.addEventListener('change', async () => {
     const b = jd.dados.boletins.find(x => x.id === s.dataset.abat);
     if (!b) return;
-    const antes = b.compensacao || null;
+    const antes = fech.decisaoDe(b);
     const depois = s.value || null;
+    const chaveU = fech.chaveUsar(b.id);
     try {
-      await jd.salvar('boletins', { ...b, compensacao: depois, atualizado_em: new Date().toISOString() });
+      if (depois === 'banco') {
+        const min = Number(s.dataset.min) || 0;
+        const disp = fech.disponivel(b.funcionario_id, comp, chaveU);
+        if (disp.total < min) {
+          aviso(`Horas guardadas insuficientes: o saldo disponível é ${minParaHHMM(disp.total)} e a falta pede ${minParaHHMM(min)}.`);
+          desenharAbatimento();
+          return;
+        }
+        const uso = { chave: chaveU, funcionario_id: b.funcionario_id, competencia: comp, tipo: 'usar',
+          boletim_id: b.id, data_falta: b.data_fato, ...fech.partir(min, disp),
+          usuario: estado.sessao?.user?.email || null, atualizado_em: new Date().toISOString() };
+        const furo = fech.saldoFicaNegativo(b.funcionario_id, uso);
+        if (furo) {
+          aviso(`Assim o saldo guardado fica negativo em ${fech.mesCurto(furo)}: essas horas já foram pagas ou usadas depois.`);
+          desenharAbatimento();
+          return;
+        }
+        await jd.salvar('banco', uso);
+      } else if (fech.usoDe(b.id)) {
+        await jd.apagar('banco', chaveU);
+      }
+      await jd.salvar('boletins', { ...b, compensacao: depois === 'banco' ? 'compensar' : depois, atualizado_em: new Date().toISOString() });
       await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'update',
         antes: { compensacao: antes }, depois: { compensacao: depois },
         justificativa: 'Abatimento de horas: ' + (depois || 'automático') });
+    } catch (e) { aviso(e.message); }
+    desenharAbatimento();
+  }));
+
+  document.querySelectorAll('#telaJorAbatimento [data-banco-gravar]').forEach(bt => bt.addEventListener('click', async () => {
+    const fid = bt.dataset.bancoGravar;
+    const tr = bt.closest('tr');
+    const v = {};
+    for (const i of tr.querySelectorAll('[data-campo]')) {
+      const m = lerHoras(i.value);
+      if (m === null) { aviso(`Valor inválido: "${i.value}". Use h:mm (10:30) ou horas (10,5).`); i.focus(); return; }
+      v[i.dataset.campo] = m;
+    }
+    const linha = fech.consolidar(comp, bt.dataset.destino).linhas.find(l => l.vinculo.funcionario_id === fid);
+    if (!linha) return;
+    if (v.g50 > linha.minExtraMes50 || v.g100 > linha.minExtraMes100) {
+      aviso(`Só dá para guardar o que sobrou no mês: ${minParaHHMM(linha.minExtraMes50)} de 50% e ${minParaHHMM(linha.minExtraMes100)} de 100%.`);
+      return;
+    }
+    const chP = fech.chavePagar(fid, comp), chG = fech.chaveGuardar(fid, comp);
+    const disp = fech.disponivel(fid, comp, chP);
+    if (v.p50 > disp.min_50 || v.p100 > disp.min_100) {
+      aviso(`O saldo guardado disponível é ${minParaHHMM(disp.min_50)} de 50% e ${minParaHHMM(disp.min_100)} de 100%.`);
+      return;
+    }
+    const agoraISO = new Date().toISOString(), quem = estado.sessao?.user?.email || null;
+    const novoG = { chave: chG, funcionario_id: fid, competencia: comp, tipo: 'guardar', min_50: v.g50, min_100: v.g100, usuario: quem, atualizado_em: agoraISO };
+    const novoP = { chave: chP, funcionario_id: fid, competencia: comp, tipo: 'pagar', min_50: v.p50, min_100: v.p100, usuario: quem, atualizado_em: agoraISO };
+    const furo = fech.saldoFicaNegativo(fid, novoG) || fech.saldoFicaNegativo(fid, novoP);
+    if (furo) {
+      aviso(`Assim o saldo fica negativo em ${fech.mesCurto(furo)}: as horas guardadas aqui já foram usadas ou pagas depois. Desfaça aquele movimento antes.`);
+      return;
+    }
+    const antes = { guardar: fech.guardadoEm(fid, comp), pagar: fech.pagoEm(fid, comp) };
+    try {
+      for (const n of [novoG, novoP]) {
+        if (n.min_50 || n.min_100) await jd.salvar('banco', n);
+        else if ((jd.dados.banco || []).some(m => m.chave === n.chave)) await jd.apagar('banco', n.chave);
+      }
+      await jd.registrar({ tabela: 'jor_banco_horas', registro_id: fid, acao: 'update',
+        antes: { guardar: [antes.guardar.min_50, antes.guardar.min_100], pagar: [antes.pagar.min_50, antes.pagar.min_100] },
+        depois: { guardar: [v.g50, v.g100], pagar: [v.p50, v.p100] },
+        justificativa: `Horas guardadas ${fech.mesCurto(comp)}: guardar ${minParaHHMM(v.g50 + v.g100)}, pagar do saldo ${minParaHHMM(v.p50 + v.p100)}` });
+      aviso(`${linha.nome}: horas guardadas gravadas.`, true);
     } catch (e) { aviso(e.message); }
     desenharAbatimento();
   }));
@@ -1142,6 +1285,7 @@ function desenharAbatimento() {
    =================================================================== */
 
 async function desenharFechamento() {
+  limparUsosOrfaos(estadoTela.competencia);
   const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
 
   const blocos = await Promise.all(destinos.map(async d => {

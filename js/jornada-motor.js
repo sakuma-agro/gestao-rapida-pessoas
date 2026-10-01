@@ -320,8 +320,21 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
     /* Falta justificada (28/09/2026): por padrão não desconta. O analista pode
        mandar compensar com horas extras (se cobrirem a falta inteira) ou
        descontar no salário. Sem saldo para compensar, fica sem desconto. */
+    /* Horas guardadas (01/10/2026): 'banco' abate do saldo guardado em meses
+       anteriores — não consome as extras deste mês. Quem confere o saldo é o
+       fechamento (bancoOk); sem saldo, segue como sem compensação. */
+    if (f.decisao === 'banco' && f.bancoOk) {
+      faltasDatas.push({ ...base, justificada: !!f.justificada, absorvida: true, banco: true });
+      if (f.justificada) faltasJCompensadas += 1; else faltasAbsorvidas += 1;
+      passos.push(`Falta de ${f.data}: compensada com ${minParaHHMM(f.minDeficit)} de horas guardadas por decisão do analista.`);
+      continue;
+    }
     if (f.justificada) {
       const j = { ...base, justificada: true };
+      if (f.decisao === 'banco') {
+        faltasDatas.push({ ...j, absorvida: false, semSaldo: true, semBanco: true });
+        continue;
+      }
       if (f.decisao === 'descontar') {
         faltasJDescontar += 1;
         faltasDatas.push({ ...j, absorvida: false, desconta: true });
@@ -336,6 +349,12 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
       } else {
         faltasDatas.push({ ...j, absorvida: false, semSaldo: f.decisao === 'compensar' });
       }
+      continue;
+    }
+    if (f.decisao === 'banco') {
+      faltasInformadas += 1;
+      faltasDatas.push({ ...base, absorvida: false, sugerida: disponivel >= f.minDeficit ? 'compensar' : 'descontar', semSaldo: true, semBanco: true });
+      passos.push(`Falta de ${f.data}: horas guardadas insuficientes — vai ao DP.`);
       continue;
     }
     if (f.decisao === 'descontar') {

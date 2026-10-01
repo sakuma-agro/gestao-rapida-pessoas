@@ -42,7 +42,8 @@ export function consolidar(competencia, destinoId) {
           : Number(jd.parametrosEm(b.data_fato).falta_campo_min ?? 480);
         return { data: b.data_fato, minExtra50: 0, minExtra100: 0, minDeficit: ded,
           minIntervaloSuprimido: 0, minNoturnos: 0, contaDias: ded > 0 ? 1 : 0,
-          boletimId: b.id, decisao: b.compensacao || null, justificada: true, avisos: a.avisos || [] };
+          boletimId: b.id, decisao: decisaoDe(b), justificada: true,
+          bancoOk: !!usoDe(b.id), avisos: a.avisos || [] };
       }
       return {
         data: b.data_fato,
@@ -53,7 +54,8 @@ export function consolidar(competencia, destinoId) {
         minNoturnos: a.min_noturnos || 0,
         contaDias: (a.min_deficit || 0) > 0 && !b.hora_ini ? 1 : 0,
         boletimId: b.id,
-        decisao: b.compensacao || null,
+        decisao: decisaoDe(b),
+        bancoOk: !!usoDe(b.id),
         avisos: a.avisos || [],
       };
     });
@@ -72,6 +74,21 @@ export function consolidar(competencia, destinoId) {
     const minExtraAnterior = atrasados.reduce((s, x) => s + x.extra, 0);
 
     const r = apurarCompetencia({ dias, parametros: jd.parametrosEm(competencia), minExtraAnterior });
+
+    /* Horas guardadas (01/10/2026). Depois das faltas: o que o analista
+       guardou sai das extras deste mês; o que mandou pagar do saldo entra. */
+    const mesExtra50 = r.minExtra50, mesExtra100 = r.minExtra100;
+    const g = guardadoEm(v.funcionario_id, competencia);
+    const p = pagoEm(v.funcionario_id, competencia);
+    const g50 = Math.min(g.min_50, mesExtra50), g100 = Math.min(g.min_100, mesExtra100);
+    r.minExtraMes50 = mesExtra50; r.minExtraMes100 = mesExtra100;
+    r.minGuardado50 = g50; r.minGuardado100 = g100; r.minGuardado = g50 + g100;
+    r.guardadoAcima = g.min_50 > mesExtra50 || g.min_100 > mesExtra100;
+    r.minBancoPago50 = p.min_50; r.minBancoPago100 = p.min_100; r.minBancoPago = p.min_50 + p.min_100;
+    r.minExtra50 = mesExtra50 - g50 + p.min_50;
+    r.minExtra100 = mesExtra100 - g100 + p.min_100;
+    r.minExtraTotal = r.minExtra50 + r.minExtra100;
+    r.saldoBanco = saldoFim(v.funcionario_id, competencia);
     const faltasAtrasadas = atrasados.filter(x => x.falta).map(x => ({ data: x.data, absorvida: false, atrasada: true }));
     r.faltasInformadas += faltasAtrasadas.length;
     r.faltasDatas = [...(r.faltasDatas || []), ...faltasAtrasadas];
@@ -140,6 +157,8 @@ export function consolidar(competencia, destinoId) {
       extraTotal: total('minExtraTotal'),
       extraAnterior: total('minExtraAnterior'),
       extraPagar: total('minExtraPagar'),
+      guardado: total('minGuardado'),
+      bancoPago: total('minBancoPago'),
       atrasados: linhas.reduce((s, l) => s + l.atrasados.length, 0),
       deficit: total('minDeficitAvulso'),
       intervaloSuprimido: total('minIntervaloSuprimido'),
@@ -198,9 +217,23 @@ export function podeEnviar(consolidado) {
 
   const faltas = linhas.flatMap(l => l.faltasNJ || []);
   if (faltas.length) {
-    const comp = faltas.filter(f => f.absorvida).length;
-    informativos.push(`${faltas.length} falta(s) não justificada(s): ${comp} compensada(s) com horas extras, ${faltas.length - comp} vão ao DP para desconto. `
+    const comp = faltas.filter(f => f.absorvida && !f.banco).length;
+    const doBanco = faltas.filter(f => f.banco).length;
+    informativos.push(`${faltas.length} falta(s) não justificada(s): ${comp} compensada(s) com horas extras, `
+      + `${doBanco ? `${doBanco} com horas guardadas, ` : ''}${faltas.length - comp - doBanco} vão ao DP para desconto. `
       + `Para mudar, use Gestão de jornada › Abatimento de horas.`);
+  }
+
+  const comBanco = linhas.filter(l => l.minGuardado || l.minBancoPago);
+  if (comBanco.length) {
+    const g = comBanco.reduce((s, l) => s + (l.minGuardado || 0), 0), p = comBanco.reduce((s, l) => s + (l.minBancoPago || 0), 0);
+    informativos.push(`Horas guardadas: ${minParaHHMM(g)} guardadas neste mês e ${minParaHHMM(p)} pagas do saldo, em ${comBanco.length} pessoa(s) — `
+      + `os relatórios já saem com esse ajuste. Para mudar, use Gestão de jornada › Abatimento de horas.`);
+  }
+  const acima = linhas.filter(l => l.guardadoAcima);
+  if (acima.length) {
+    bloqueios.push(`${acima.length} pessoa(s) com horas guardadas acima das extras que sobraram no mês (${acima.slice(0, 3).map(l => l.nome).join(', ')}${acima.length > 3 ? '…' : ''}). `
+      + `Acerte em Gestão de jornada › Abatimento de horas antes de enviar.`);
   }
 
   const comArt59 = linhas.filter(l => (l.avisos || []).some(a => a.includes('art. 59')));
@@ -346,4 +379,80 @@ export async function abrirArquivo(id) {
     .select('id,relatorios,csv_nome,csv').eq('id', id).maybeSingle();
   if (error) throw new Error(error.message);
   return data;
+}
+
+/* ------------------------------------------------------------------
+   Horas guardadas (01/10/2026) — jor_banco_horas.
+   guardar: sai das extras do mês e vai para o saldo (vale do mês seguinte).
+   pagar:   sai do saldo e entra nas extras do mês em que foi pago.
+   usar:    sai do saldo para compensar uma falta (um por boletim).
+   Tudo separado em 50% e 100%. Sem vencimento: quem decide é o analista.
+   ------------------------------------------------------------------ */
+
+export const chaveGuardar = (fid, comp) => `bh|g|${fid}|${comp}`;
+export const chavePagar   = (fid, comp) => `bh|p|${fid}|${comp}`;
+export const chaveUsar    = boletimId => `bh|u|${boletimId}`;
+
+/* A decisão "compensar com horas guardadas" fica gravada no boletim como
+   'compensar' + um movimento "usar" (o banco ainda não aceita o valor
+   'banco' em jor_boletins.compensacao). Aqui ela volta a ser 'banco'. */
+export const decisaoDe = b => (b.compensacao === 'compensar' && usoDe(b.id)) ? 'banco' : (b.compensacao || null);
+
+const ZERO = { min_50: 0, min_100: 0 };
+const movsDe = fid => (jd.dados.banco || []).filter(m => m.funcionario_id === fid);
+const mov = chave => (jd.dados.banco || []).find(m => m.chave === chave) || null;
+
+export const guardadoEm = (fid, comp) => mov(chaveGuardar(fid, comp)) || ZERO;
+export const pagoEm     = (fid, comp) => mov(chavePagar(fid, comp)) || ZERO;
+export const usoDe      = boletimId => mov(chaveUsar(boletimId));
+
+function somar(lista) {
+  return lista.reduce((s, m) => ({ min_50: s.min_50 + (m.min_50 || 0), min_100: s.min_100 + (m.min_100 || 0) }), { min_50: 0, min_100: 0 });
+}
+const menos = (a, b) => ({ min_50: a.min_50 - b.min_50, min_100: a.min_100 - b.min_100 });
+
+/** Saldo ao fim da competência (inclusive). */
+export function saldoFim(fid, comp) {
+  const ms = movsDe(fid).filter(m => m.competencia <= comp);
+  const s = menos(somar(ms.filter(m => m.tipo === 'guardar')), somar(ms.filter(m => m.tipo !== 'guardar')));
+  return { ...s, total: s.min_50 + s.min_100 };
+}
+
+/** Saldo do fim do mês anterior — o que existia ao abrir a competência. */
+export function saldoInicio(fid, comp) {
+  const ms = movsDe(fid).filter(m => m.competencia < comp);
+  const s = menos(somar(ms.filter(m => m.tipo === 'guardar')), somar(ms.filter(m => m.tipo !== 'guardar')));
+  return { ...s, total: s.min_50 + s.min_100 };
+}
+
+/**
+ * O que dá para pagar ou usar na competência: guardado em meses anteriores,
+ * menos o que já saiu (pago ou usado) até esta competência — fora o próprio
+ * movimento que está sendo editado.
+ */
+export function disponivel(fid, comp, excetoChave = null) {
+  const ms = movsDe(fid).filter(m => m.chave !== excetoChave);
+  const entra = somar(ms.filter(m => m.tipo === 'guardar' && m.competencia < comp));
+  const sai = somar(ms.filter(m => m.tipo !== 'guardar' && m.competencia <= comp));
+  const s = menos(entra, sai);
+  return { min_50: Math.max(0, s.min_50), min_100: Math.max(0, s.min_100), total: Math.max(0, s.min_50) + Math.max(0, s.min_100) };
+}
+
+/** Confere se, trocando um movimento, o saldo fica negativo em algum mês. */
+export function saldoFicaNegativo(fid, novo) {
+  const ms = movsDe(fid).filter(m => m.chave !== novo.chave);
+  if (novo.min_50 || novo.min_100) ms.push(novo);
+  const meses = [...new Set(ms.map(m => m.competencia))].sort();
+  for (const c of meses) {
+    const entra = somar(ms.filter(m => m.tipo === 'guardar' && m.competencia < c));
+    const sai = somar(ms.filter(m => m.tipo !== 'guardar' && m.competencia <= c));
+    if (entra.min_50 - sai.min_50 < 0 || entra.min_100 - sai.min_100 < 0) return c;
+  }
+  return null;
+}
+
+/** Parte um total em 50% e 100%, tirando primeiro das de 50%. */
+export function partir(min, de) {
+  const a = Math.min(de.min_50, min);
+  return { min_50: a, min_100: min - a };
 }

@@ -52,6 +52,12 @@ export const TABELAS = {
   // (admissão e desligamento) e a lista de tipos de desligamento.
   indVinculos:   'rh_ind_vinculos',
   tiposDeslig:   'rh_ind_tipos_deslig',
+  /* Horas guardadas (01/10/2026): movimentos guardar / pagar / usar.
+     PROVISÓRIO: a tabela própria (jor_banco_horas, ver supabase.sql) não pôde
+     ser criada; cada movimento é uma linha de jor_folha_ponto_config, com a
+     chave começando por "bh|" e o movimento inteiro em `valor`. A folha de
+     ponto só lê a chave 'ajuste', então as duas não se misturam. */
+  banco:         'jor_folha_ponto_config',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
@@ -61,7 +67,7 @@ const APOIO = ['faltas', 'bolFerias', 'bolJornada'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave' };
 const chaveDe = c => CHAVE[c] || 'id';
 
 export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
@@ -162,6 +168,9 @@ export async function carregar(competencia = competenciaAtual()) {
   try { await carregarDocs(); } catch { /* idem */ }
   // Vínculos dos indicadores: pequenos, vêm inteiros. Sem permissão ou
   // tabela ainda ausente, o cadastro abre do mesmo jeito.
+  // Horas guardadas: tabela pequena, vem inteira — o saldo é de todo o histórico.
+  const bh = await c.from(TABELAS.banco).select('*').like('chave', 'bh|%');
+  dados.banco = bh.error ? (dados.banco || []) : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave }));
   const IND = ['indVinculos', 'tiposDeslig'];
   const ind = await Promise.all(IND.map(k => c.from(TABELAS[k]).select('*')));
   IND.forEach((k, i) => { dados[k] = ind[i].error ? (dados[k] || []) : (ind[i].data || []); });
@@ -300,6 +309,15 @@ export async function carregarEntregas(ini, fim) {
 
 /* ---------------- escrita ---------------- */
 
+/* Coleções gravadas num formato diferente do que a tela usa. */
+const PARA_BANCO = {
+  banco: m => {
+    const { chave, ...resto } = m;
+    return { chave, valor: resto, atualizado_em: new Date().toISOString(), atualizado_por: estado.sessao?.user?.email || null };
+  },
+};
+const paraBanco = (colecao, item) => (PARA_BANCO[colecao] ? PARA_BANCO[colecao](item) : item);
+
 function enfileirar(colecao, acao, item) {
   const fila = ler(CHAVE_FILA, []);
   fila.push({ colecao, acao, item, em: Date.now() });
@@ -315,7 +333,7 @@ export async function enviarFila() {
       const q = estado.cliente.from(TABELAS[p.colecao]);
       const { error } = p.acao === 'apagar'
         ? await q.delete().eq(chaveDe(p.colecao), p.item[chaveDe(p.colecao)])
-        : await q.upsert(p.item, { onConflict: chaveDe(p.colecao) });
+        : await q.upsert(paraBanco(p.colecao, p.item), { onConflict: chaveDe(p.colecao) });
       if (error) throw error;
     } catch { restantes.push(p); }
   }
@@ -328,7 +346,7 @@ async function enviar(colecao, acao, item) {
     const q = estado.cliente.from(TABELAS[colecao]);
     const { error } = acao === 'apagar'
       ? await q.delete().eq(chaveDe(colecao), item[chaveDe(colecao)])
-      : await q.upsert(item, { onConflict: chaveDe(colecao) });
+      : await q.upsert(paraBanco(colecao, item), { onConflict: chaveDe(colecao) });
     if (error) throw error;
     return true;
   } catch {
