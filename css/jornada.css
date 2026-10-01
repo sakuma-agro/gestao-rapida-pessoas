@@ -537,3 +537,11 @@
 .fer-plano__campos input[type=number]{width:58px}
 .fer-plano__txt{display:block;font-size:11px;color:#51534A;margin-top:3px}
 .fer-plano__aviso{color:#744F28}
+
+/* Horas guardadas (01/10/2026) */
+.jor-cartoes.seis { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 760px) { .jor-cartoes.seis { grid-template-columns: repeat(2, 1fr); } }
+.jor-rolar { overflow-x: auto; max-width: 100%; }
+.jor-banco th { white-space: nowrap; }
+.jor-banco td { white-space: nowrap; }
+.jor-banco__h { width: 72px; text-align: center; padding: 4px 6px; }
