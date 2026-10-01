@@ -29,6 +29,7 @@ import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
 import { desenharCadRelatorios } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
+import { abrirIndicadores, limparIndicadores } from './rh-indicadores.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 
 const $ = id => document.getElementById(id);
@@ -129,6 +130,8 @@ function abrirAba(nome) {
   $('telaRhProposta').hidden = nome !== 'rhProposta';
   $('telaRhOrganograma').hidden = nome !== 'rhOrganograma';
   if (nome === 'rhOrganograma') abrirOrganograma();
+  $('telaRhIndPainel').hidden = nome !== 'rhIndPainel';
+  if (nome === 'rhIndPainel') abrirIndicadores(nome);
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
   $('telaCadRelatorios').hidden = nome !== 'cadRelatorios';
   if (nome === 'cadRelatorios') desenharCadRelatorios();
@@ -194,7 +197,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma();
+  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma(); limparIndicadores();
   mostrar('login');
 });
 

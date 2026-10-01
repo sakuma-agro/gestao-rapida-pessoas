@@ -84,6 +84,10 @@ export const MODULOS = [
     { id: 'organograma', nome: 'Organograma', telas: [
       ['rhOrganograma', 'Organograma'],
     ] },
+    /* Indicadores (01/10/2026): absenteísmo e turnover — js/rh-indicadores.js. */
+    { id: 'indicadores', nome: 'Indicadores', telas: [
+      ['rhIndPainel', 'Painel'],
+    ] },
   ] },
   /* DP em submódulos (21/09/2026). O Painel é a tela de abertura, fora dos
      submódulos — submódulo de uma tela só esconde a terceira faixa. As chaves
@@ -302,7 +306,7 @@ const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
 const ICONE_SUB = {
   gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
   epis: 'escudo', exames: 'exame', treinamentos: 'treino',
-  disc: 'disc', cargos: 'cargo', organograma: 'organograma',
+  disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
 };
