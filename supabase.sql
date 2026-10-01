@@ -262,3 +262,29 @@ create policy app_usuarios_ler on public.app_usuarios for select to authenticate
 drop policy if exists app_usuarios_admin on public.app_usuarios;
 create policy app_usuarios_admin on public.app_usuarios for all to authenticated
   using (public.app_admin()) with check (public.app_admin());
+
+-- Horas guardadas (01/10/2026): o analista guarda parte das extras do mês para
+-- abater falta ou pagar depois. guardar (um por pessoa x mês), pagar (um por
+-- pessoa x mês), usar (um por falta). Saldo = guardar - pagar - usar, em 50% e 100%.
+create table if not exists public.jor_banco_horas (
+  chave text primary key,
+  funcionario_id uuid not null,
+  competencia date not null,
+  tipo text not null check (tipo in ('guardar','pagar','usar')),
+  boletim_id uuid,
+  data_falta date,
+  min_50 integer not null default 0 check (min_50 >= 0),
+  min_100 integer not null default 0 check (min_100 >= 0),
+  obs text,
+  usuario text,
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists jor_banco_horas_func on public.jor_banco_horas (funcionario_id, competencia);
+alter table public.jor_banco_horas enable row level security;
+drop policy if exists jornada_modulo on public.jor_banco_horas;
+create policy jornada_modulo on public.jor_banco_horas for all to authenticated
+  using (app_pode('jornada')) with check (app_pode('jornada'));
+alter table public.jor_boletins drop constraint if exists jor_boletins_compensacao_check;
+alter table public.jor_boletins add constraint jor_boletins_compensacao_check
+  check (compensacao is null or compensacao in ('compensar','descontar','banco'));
