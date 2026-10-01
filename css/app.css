@@ -989,3 +989,30 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
 .ind-barra:hover{fill:var(--verde-esc)}
 .ind-legenda{font-size:11.5px;color:var(--suave);margin:4px 0 0}
 .ind-cx{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px -1px 0}
+/* Indicadores · etapas 4/5 (01/10/2026): Por pessoa, Certificação, Metas e Modo TV */
+.ind-h3{font-size:14px;margin:14px 0 4px;color:var(--marrom)}
+.ind-oculto{font-style:italic;color:var(--suave);font-size:12px}
+input.ind-meta{width:84px;text-align:right;padding:4px 6px}
+.ind-doc .ind-tab{min-width:0;font-size:9pt}
+.ind-doc .ind-tab th,.ind-doc .ind-tab td{padding:3px 5px}
+/* Modo TV: tela cheia, fundo claro SAKUMA, número grande legível de longe */
+.ind-tv{position:fixed;inset:0;z-index:1000;background:#f6f8f1;color:#51534A;font-family:Arial,Helvetica,sans-serif;
+  display:flex;flex-direction:column;padding:3vh 4vw;overflow:hidden}
+.ind-tv-confirma{margin:auto;max-width:560px;background:#fff;border:2px solid #84BD00;border-radius:14px;padding:28px;text-align:center}
+.ind-tv-confirma h2{color:#744F28;margin:0 0 10px}
+.ind-tv-confirma p{margin:0 0 18px}
+.ind-tv-topo{display:flex;align-items:center;gap:2vw;border-bottom:4px solid #84BD00;padding-bottom:2vh}
+.ind-tv-topo img{height:8vh;width:auto}
+.ind-tv-topo div{flex:1;min-width:0}
+.ind-tv-topo h1{margin:0;font-size:clamp(22px,4.4vh,54px);color:#744F28}
+.ind-tv-topo p{margin:.4vh 0 0;font-size:clamp(13px,2.2vh,26px)}
+.ind-tv-corpo{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:3vw;align-items:center;padding:3vh 0}
+.ind-tv-num{border-radius:18px;padding:3vh 2vw;text-align:center;border:3px solid transparent;background:#fff}
+.ind-tv-num span{display:block;font-size:clamp(16px,3.4vh,40px);font-weight:700}
+.ind-tv-num strong{display:block;font-size:clamp(56px,16vh,200px);line-height:1.05;margin:1vh 0}
+.ind-tv-num em{display:block;font-style:normal;font-weight:700;font-size:clamp(16px,3vh,36px)}
+.ind-tv-verde{border-color:#84BD00}.ind-tv-verde strong,.ind-tv-verde em{color:#5f8a00}
+.ind-tv-atencao{border-color:#E8A317}.ind-tv-atencao strong,.ind-tv-atencao em{color:#b67a00}
+.ind-tv-critico{border-color:#B5462E}.ind-tv-critico strong,.ind-tv-critico em{color:#B5462E}
+.ind-tv-sem strong,.ind-tv-sem em{color:#8b8d84}
+.ind-tv-pe{font-size:clamp(14px,2.6vh,30px);text-align:center;border-top:1px solid #dcdfd6;padding-top:1.5vh}
