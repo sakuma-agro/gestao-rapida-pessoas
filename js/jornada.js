@@ -1291,7 +1291,7 @@ async function desenharFechamento() {
    Escritório (DP) · Conferência interna · Por funcionário · Empréstimo · Férias.
    Cada aba mostra só os filtros que usa; cada relatório tem Visualizar e
    Imprimir. A prévia abre com Imprimir/Fechar no alto (rel.mostrar barra). */
-const relTela = { aba: 'esc', destino: '', pessoa: '', de: '', ate: '', ferDest: '', ferMes: '', ferSel: null };
+const relTela = { aba: 'esc', destino: '', pessoa: '', de: '', ate: '', ferDest: '', ferMes: '', ferSel: null, ferPlano: null };
 
 function desenharRelatorios() {
   const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
@@ -1306,6 +1306,7 @@ function desenharRelatorios() {
   if (pedido) { relTela.aba = 'fer'; relTela.ferDest = pedido.destino || ''; if (pedido.mes) relTela.ferMes = pedido.mes; }
   // A seleção da tela "Liberados em aberto" só vale para o relatório pedido por ela.
   relTela.ferSel = pedido?.sel || null;
+  relTela.ferPlano = pedido?.plano || null;
 
   const abas = [
     ['esc', 'Escritório (DP)'], ['conf', 'Conferência interna'], ['pessoa', 'Por funcionário'],
@@ -1332,7 +1333,7 @@ function desenharRelatorios() {
     return rel.relatorioConferencia({ ...p, apuracoes: await jd.apuracoesDe(ids) });
   };
   const ferRel = t => t === 'venc' ? fer.relVencidos(relTela.ferMes || mesAnterior(), relTela.ferDest)
-    : t === 'conc' ? fer.relConcessao(relTela.ferDest, relTela.ferSel)
+    : t === 'conc' ? fer.relConcessao(relTela.ferDest, relTela.ferSel, relTela.ferPlano)
     : t === 'prev' ? fer.relPrevisao(relTela.ferDest) : fer.relSituacao(relTela.ferDest);
   const ferCsv = t => rel.baixar(fer.csvFerias(t, relTela.ferMes || mesAnterior(), relTela.ferDest));
 
