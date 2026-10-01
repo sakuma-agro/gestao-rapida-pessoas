@@ -956,3 +956,36 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
 .rb-voltar svg{width:22px;height:22px}
 .rb-voltar:hover{color:var(--verde-esc);border-color:var(--verde);background:var(--verde-fundo)}
 .rb-voltar:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
+
+/* ===== RH › Indicadores (01/10/2026) — absenteísmo e turnover ===== */
+.ind-filtros{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.ind-avisos{margin-top:8px;font-size:12.5px;color:var(--suave)}
+.ind-avisos p{margin:2px 0}
+.ind-avisos .ind-alerta{color:var(--alerta);font-weight:600}
+.ind-rolagem{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:6px 0 10px}
+.ind-tab{border-collapse:collapse;width:100%;font-size:13px;min-width:560px}
+.ind-tab th,.ind-tab td{border:1px solid var(--linha);padding:6px 8px;text-align:right;white-space:nowrap}
+.ind-tab thead th{background:var(--verde);color:#fff;font-weight:700;text-align:center}
+.ind-tab thead th small{font-weight:400;opacity:.9}
+.ind-tab tbody th{text-align:left;font-weight:600;color:var(--texto)}
+.ind-tab tbody tr:nth-child(odd){background:var(--verde-fundo)}
+.ind-tab tr.ind-forte td,.ind-tab tr.ind-forte th{font-weight:700;font-size:13.5px}
+.ind-tab tr.ind-sub th{font-weight:400;color:var(--suave);padding-left:16px}
+.ind-tab td small{color:var(--suave)}
+.ind-tab td.ind-g-acum,.ind-tab td.ind-g-tres{background:rgba(116,79,40,.07)}
+.ind-tab thead th.ind-g-acum,.ind-tab thead th.ind-g-tres{background:var(--marrom)}
+.ind-graf svg{max-height:240px}
+.ind-selo{margin-left:6px}
+.ind-graf{margin:8px 0 0}
+.ind-graf figcaption{font-size:12.5px;font-weight:700;color:var(--texto);margin-bottom:4px}
+.ind-graf svg{width:100%;height:auto;display:block}
+.ind-fx-verde{fill:rgba(132,189,0,.12);background:rgba(132,189,0,.25)}
+.ind-fx-atencao{fill:rgba(232,163,23,.12);background:rgba(232,163,23,.35)}
+.ind-fx-critico{fill:rgba(181,70,46,.10);background:rgba(181,70,46,.30)}
+.ind-eixo{stroke:var(--linha);stroke-width:1}
+.ind-txt{font-size:10px;fill:var(--suave)}
+.ind-sem{font-style:italic}
+.ind-barra{fill:var(--verde)}
+.ind-barra:hover{fill:var(--verde-esc)}
+.ind-legenda{font-size:11.5px;color:var(--suave);margin:4px 0 0}
+.ind-cx{display:inline-block;width:10px;height:10px;border-radius:2px;margin:0 4px -1px 0}
