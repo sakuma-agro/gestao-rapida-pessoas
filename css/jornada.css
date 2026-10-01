@@ -523,3 +523,9 @@
 .ds-grupo .btn:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
 .ds-grupo .btn[aria-pressed="true"] { background: #84BD00; border-color: #84BD00; color: #fff; }
 .ds-grupo-tit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Liberados em aberto: escolha de quem sai no relatório (01/10/2026) */
+.dc-planilha.fer-sel input[type=checkbox]{width:16px;height:16px;accent-color:#84BD00;cursor:pointer}
+.dc-planilha.fer-sel th:first-child{width:34px}
+.dc-planilha.fer-sel tr.fer-fora td{opacity:.45}
+.dc-planilha.fer-sel tr.fer-fora td:first-child{opacity:1}
