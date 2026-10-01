@@ -11,7 +11,7 @@
 // no mês; o verso é só virar a folha e clicar de novo (mesmo cabeçalho).
 // Posição que deu certo na L4260: em pé, cabeçalho à direita (270°).
 // Posições medidas no PDF da gráfica (mm, a partir do canto de cima à
-// esquerda). O ajuste fino por impressora fica guardado no navegador.
+// esquerda). O ajuste fino da impressora fica no banco (vale em todos os PCs).
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
@@ -45,19 +45,72 @@ function lerAjuste() {
     return a;
   } catch { return { ...PADRAO, campos: {} }; }
 }
-function gravarAjuste(a) { try { localStorage.setItem(CHAVE, JSON.stringify(a)); } catch { /* sem armazenamento: vale só agora */ } }
+function gravarAjuste(a) {
+  try { localStorage.setItem(CHAVE, JSON.stringify(a)); } catch { /* sem armazenamento: vale só agora */ }
+  subir(T_CONFIG, { chave: 'ajuste', valor: a, atualizado_em: new Date().toISOString(), atualizado_por: quem() });
+}
+
+/* ---------------- no banco (01/10/2026) ----------------
+   Pedido dele: em outro PC a folha saiu em outro lado, porque o ajuste ficava
+   só no navegador. Agora o ajuste e o "impresso" moram no banco e valem em
+   todos os computadores; o localStorage fica só como cópia para abrir rápido
+   e para funcionar sem rede. Na primeira abertura, se o banco ainda não tem
+   ajuste, sobe o deste computador (é assim que o ajuste já acertado na L4260
+   vai para o banco). */
+const T_CONFIG = 'jor_folha_ponto_config';
+const T_IMP = 'jor_folha_ponto_impressos';
+let sincronizado = false;
+const quem = () => estado.sessao?.user?.email || null;
+async function subir(tabela, linha) {
+  if (!estado.cliente || !estado.sessao) return;
+  try { const { error } = await estado.cliente.from(tabela).upsert(linha, { onConflict: 'chave' }); if (error) throw error; }
+  catch (e) { console.warn('folha de ponto: não gravou no banco', e); }
+}
+async function tirar(tabela, chave) {
+  if (!estado.cliente || !estado.sessao) return;
+  try { const { error } = await estado.cliente.from(tabela).delete().eq('chave', chave); if (error) throw error; }
+  catch (e) { console.warn('folha de ponto: não apagou no banco', e); }
+}
+async function sincronizar() {
+  if (!estado.cliente || !estado.sessao) return false;
+  const c = estado.cliente;
+  const [cfg, imp] = await Promise.all([
+    c.from(T_CONFIG).select('*').eq('chave', 'ajuste').maybeSingle(),
+    c.from(T_IMP).select('*'),
+  ]);
+  if (cfg.error || imp.error) throw (cfg.error || imp.error);
+  // Ajuste: o do banco manda; banco vazio recebe o deste computador.
+  if (cfg.data && cfg.data.valor) {
+    try { localStorage.setItem(CHAVE, JSON.stringify({ ...PADRAO, ...cfg.data.valor })); } catch {}
+  } else if (localStorage.getItem(CHAVE)) {
+    await subir(T_CONFIG, { chave: 'ajuste', valor: lerAjuste(), atualizado_em: new Date().toISOString(), atualizado_por: quem() });
+  }
+  // Impressos: o banco manda; o que só existe aqui (marcado antes desta
+  // versão ou sem rede) sobe junto.
+  const local = lerImpressos(), banco = {};
+  for (const r of imp.data || []) (banco[r.mes] = banco[r.mes] || {})[r.funcionario_id] = r.impresso_em;
+  const subirLista = [];
+  for (const [mes, t] of Object.entries(local)) for (const [fid, em] of Object.entries(t || {}))
+    if (!banco[mes]?.[fid]) { (banco[mes] = banco[mes] || {})[fid] = em; subirLista.push({ chave: `${fid}|${mes}`, funcionario_id: fid, mes, impresso_em: em, por: quem() }); }
+  if (subirLista.length) await subir(T_IMP, subirLista);
+  try { localStorage.setItem(CHAVE_IMP, JSON.stringify(banco)); } catch {}
+  return true;
+}
 
 const tela = { mes: '', busca: '', filtro: '' };
 
 /* Controle de "já impresso" por mês (28/09/2026, pedido dele): ele imprime
    uma folha por vez; cada funcionário tem a caixinha marcada sozinha quando
-   clica em Imprimir, e pode marcar/desmarcar à mão. Fica neste computador. */
+   clica em Imprimir, e pode marcar/desmarcar à mão. Fica no banco (01/10/2026). */
 const CHAVE_IMP = 'gr-folha-ponto-impressos';
 function lerImpressos() { try { return JSON.parse(localStorage.getItem(CHAVE_IMP)) || {}; } catch { return {}; } }
 function marcarImpresso(mes, fid, sim) {
   const t = lerImpressos(); t[mes] = t[mes] || {};
-  if (sim) t[mes][fid] = new Date().toISOString(); else delete t[mes][fid];
+  const em = new Date().toISOString();
+  if (sim) t[mes][fid] = em; else delete t[mes][fid];
   try { localStorage.setItem(CHAVE_IMP, JSON.stringify(t)); } catch { /* sem armazenamento */ }
+  if (sim) subir(T_IMP, { chave: `${fid}|${mes}`, funcionario_id: fid, mes, impresso_em: em, por: quem() });
+  else tirar(T_IMP, `${fid}|${mes}`);
 }
 
 function mesPadrao() {
@@ -89,6 +142,12 @@ function textoEmpregador(u, linha) {
 /* ---------------- tela ---------------- */
 
 export function desenhar(alvo, { aviso }) {
+  // Primeira abertura nesta sessão: busca ajuste e impressos no banco e redesenha.
+  if (!sincronizado) {
+    sincronizado = true;
+    sincronizar().then(ok => { if (ok && alvo.isConnected) desenhar(alvo, { aviso }); })
+      .catch(e => { sincronizado = false; console.warn('folha de ponto: sem banco, usando o deste computador', e); });
+  }
   const aj = lerAjuste();
   const grupos = unidadesComGente();
   if (!tela.mes) tela.mes = mesPadrao();
@@ -142,7 +201,7 @@ export function desenhar(alvo, { aviso }) {
     </div>
 
     <details class="fp-ajuste">
-      <summary><b>Acertar a posição na impressora</b> — já acertado; fica guardado neste computador</summary>
+      <summary><b>Acertar a posição na impressora</b> — já acertado; vale em todos os computadores</summary>
       <ol class="dc-sem">
         <li>Clique em <b>Folha de teste</b> e imprima em <b>papel comum</b> no tamanho da folha de ponto (26 × 16,5 cm), do mesmo jeito que vai colocar a folha de ponto.</li>
         <li>Ponha o teste sobre uma folha de ponto contra a luz: as <b>linhas cinzas</b> têm de cair em cima das linhas do quadro "Empregado / Mês / Ano".</li>
