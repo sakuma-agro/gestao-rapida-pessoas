@@ -529,3 +529,11 @@
 .dc-planilha.fer-sel th:first-child{width:34px}
 .dc-planilha.fer-sel tr.fer-fora td{opacity:.45}
 .dc-planilha.fer-sel tr.fer-fora td:first-child{opacity:1}
+.fer-so-papel{display:block;font-weight:400;font-size:10px;opacity:.85}
+.fer-plano{min-width:250px}
+.fer-plano__campos{display:flex;gap:6px}
+.fer-plano__campos label{display:flex;flex-direction:column;font-size:10px;color:#8A8D86}
+.fer-plano__campos input{font:inherit;font-size:12px;padding:3px 5px;border:1px solid #D6D8CF;border-radius:5px;background:#fff;color:#51534A}
+.fer-plano__campos input[type=number]{width:58px}
+.fer-plano__txt{display:block;font-size:11px;color:#51534A;margin-top:3px}
+.fer-plano__aviso{color:#744F28}
