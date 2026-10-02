@@ -316,6 +316,182 @@ export function textoZap(fid, ini = '', fim = '', tipo = '') {
 }
 const linkZap = t => `https://wa.me/?text=${encodeURIComponent(t)}`;
 
+/* ---------------- Relatório individual como imagem (WhatsApp) ----------------
+   Pedido dele (02/10/2026): o botão WhatsApp manda o relatório individual
+   como JPEG e, de texto, só o nome da pessoa. Desenhado em canvas, como a
+   imagem dos aniversariantes — mesmo conteúdo da folha (calendários pintados,
+   legenda e recado). O wa.me só carrega texto; por isso navigator.share. */
+const carregarImg = src => new Promise(ok => {
+  const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src;
+});
+
+function quebrar(g, texto, larg) {
+  const linhas = []; let lin = '';
+  texto.split(' ').forEach(p => {
+    const t = lin ? lin + ' ' + p : p;
+    if (g.measureText(t).width > larg && lin) { linhas.push(lin); lin = p; } else lin = t;
+  });
+  if (lin) linhas.push(lin);
+  return linhas;
+}
+
+function caixa(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+export async function imagemIndividual(fid, ini = '', fim = '', tipo = '') {
+  const f = pessoa(fid);
+  const p = pendenciasDe(fid, ini, fim, tipo);
+  const meses = [...new Set(p.map(x => x.data.slice(0, 7)))].sort();
+  const marca = new Map(p.map(x => [x.data, x.situacao]));
+  (jd.dados.bolEntregas || []).filter(x => x.funcionario_id === fid && ['faltou', 'atestado'].includes(x.situacao) &&
+    meses.includes(x.data.slice(0, 7))).forEach(x => { if (!marca.has(x.data)) marca.set(x.data, x.situacao); });
+  const n = k => [...marca.values()].filter(v => v === k).length;
+  const nNao = n('nao_entregou'), nCor = n('correcao'), nFal = n('faltou'), nAte = n('atestado');
+  const partes = [nNao && tipo !== 'correcao' ? `${nNao} não ${nNao === 1 ? 'entregue' : 'entregues'}` : '',
+                  nCor && tipo !== 'nao_entregou' ? `${nCor} em correção` : ''].filter(Boolean);
+  const titulo = tipo === 'correcao' ? 'Boletins devolvidos para correção' : 'Boletins que faltam entregar';
+  const recado = !p.length ? 'Tudo em dia. Nenhum boletim pendente.'
+    : tipo === 'correcao' ? 'Corrija os boletins dos dias pintados e devolva no escritório (DP).'
+    : tipo === 'nao_entregou' ? 'Entregue no escritório (DP) os boletins dos dias pintados.'
+    : 'Entregue no escritório (DP) os boletins dos dias pintados — os amarelos precisam ser corrigidos antes.';
+  const leg = [
+    tipo !== 'correcao' && ['nao_entregou', 'Não entregou', nNao, 'Entregar o boletim no DP'],
+    tipo !== 'nao_entregou' && ['correcao', 'Em correção', nCor, 'Boletim devolvido: corrigir e devolver ao DP'],
+    nFal && ['faltou', 'Falta', nFal, 'Dia de falta — só informação'],
+    nAte && ['atestado', 'Atestado', nAte, 'Dia com atestado — só informação'],
+    ['', 'Dia normal', null, 'Nada a fazer'],
+  ].filter(Boolean);
+
+  const [logo, lop] = await Promise.all([carregarImg('img/sakuma-logo.png'), carregarImg('img/lop-marca.png')]);
+  const F = (t, peso = '') => `${peso} ${t}px Arial, Helvetica, sans-serif`.trim();
+  const SUAVE = '#8A8D86', VERDE = '#84BD00';
+  const L = 1080, m = 56;
+  const cel = 66, gap = 6, wCal = 7 * cel + 6 * gap;            // 498
+  const semanas = ym => Math.ceil((dow(ym + '-01') + +fimDoMes(ym).slice(8)) / 7);
+  const hCal = ym => 44 + 36 + semanas(ym) * (cel * .82 + gap);
+  const xLeg = m + wCal + 40, wLeg = L - m - xLeg;
+  const hLeg = 56 + leg.length * 86;
+
+  // medir o recado antes de criar a tela
+  const med = document.createElement('canvas').getContext('2d');
+  med.font = F(24);
+  const linhasRec = quebrar(med, recado, L - 2 * m - 48);
+  const yCorpo = 330;
+  const hCorpo = p.length ? Math.max(meses.reduce((s, ym) => s + hCal(ym) + 28, 0), hLeg) : 0;
+  const yRec = yCorpo + hCorpo + (p.length ? 20 : 0);
+  const hRec = 36 + linhasRec.length * 34;
+  const A = yRec + hRec + 120;
+
+  const tela = document.createElement('canvas');
+  tela.width = L; tela.height = A;
+  const g = tela.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, L, A);
+  g.textBaseline = 'alphabetic';
+
+  // cabeçalho: marca, título, data
+  let xTit = m;
+  if (logo) { const h = 84, w = h * logo.naturalWidth / logo.naturalHeight; g.drawImage(logo, m, 40, w, h); xTit = m + w + 28; }
+  g.fillStyle = '#744F28'; g.font = F(34, 'bold'); g.fillText(titulo, xTit, 86);
+  g.fillStyle = SUAVE; g.font = F(22); g.fillText('Aviso ao funcionário', xTit, 118);
+  g.textAlign = 'right'; g.fillStyle = SUAVE; g.font = F(18); g.fillText('data', L - m, 70);
+  g.fillStyle = CINZA; g.font = F(26, 'bold'); g.fillText(br(hoje()), L - m, 102);
+  g.textAlign = 'left';
+  g.fillStyle = VERDE; g.fillRect(m, 146, L - 2 * m, 5);
+
+  // pessoa
+  g.fillStyle = CINZA; g.font = F(34, 'bold'); g.fillText(f?.nome || '', m, 206);
+  g.fillStyle = SUAVE; g.font = F(22); g.fillText([f?.cargo, f?.fazenda].filter(Boolean).join(' · '), m, 240);
+  if (p.length) {
+    g.fillStyle = CINZA; g.font = F(26);
+    const a = 'Faltam ', b = nBol(p.length), c = partes.length > 1 ? `: ${partes.join(' e ')}.` : '.';
+    g.fillText(a, m, 292); let x = m + g.measureText(a).width;
+    g.font = F(26, 'bold'); g.fillText(b, x, 292); x += g.measureText(b).width;
+    g.font = F(26); g.fillText(c, x, 292);
+  }
+
+  if (p.length) {
+    // calendários
+    let y = yCorpo;
+    meses.forEach(ym => {
+      g.fillStyle = CINZA; g.font = F(26, 'bold'); g.textAlign = 'left';
+      const nomeMes = MESES_L[+ym.slice(5) - 1];
+      g.fillText(nomeMes[0].toUpperCase() + nomeMes.slice(1) + ' ' + ym.slice(0, 4), m, y + 28);
+      const yT = y + 44, hC = cel * .82;
+      g.textAlign = 'center';
+      SEM_LETRA.forEach((l, i) => { g.fillStyle = SUAVE; g.font = F(20, 'bold'); g.fillText(l, m + i * (cel + gap) + cel / 2, yT + 24); });
+      const pul = dow(ym + '-01'), dias = +fimDoMes(ym).slice(8);
+      for (let d = 1; d <= dias; d++) {
+        const pos = pul + d - 1, cx = m + (pos % 7) * (cel + gap), cy = yT + 36 + Math.floor(pos / 7) * (hC + gap);
+        const k = marca.get(`${ym}-${String(d).padStart(2, '0')}`);
+        caixa(g, cx, cy, cel, hC, 7);
+        if (k) { g.fillStyle = COR_CAL[k].fundo; g.fill(); g.fillStyle = COR_CAL[k].letra; g.font = F(22, 'bold'); }
+        else { g.strokeStyle = '#E4E5E1'; g.lineWidth = 1.5; g.stroke(); g.fillStyle = CINZA; g.font = F(22); }
+        g.fillText(String(d), cx + cel / 2, cy + hC / 2 + 8);
+      }
+      g.textAlign = 'left';
+      y += hCal(ym) + 28;
+    });
+
+    // legenda
+    caixa(g, xLeg, yCorpo, wLeg, hLeg, 12);
+    g.fillStyle = '#F7F8F5'; g.fill(); g.strokeStyle = '#E1E2DE'; g.lineWidth = 2; g.stroke();
+    g.fillStyle = SUAVE; g.font = F(17, 'bold'); g.fillText('LEGENDA', xLeg + 22, yCorpo + 36);
+    leg.forEach(([k, rot, qtd, nota], i) => {
+      const ly = yCorpo + 58 + i * 86;
+      caixa(g, xLeg + 22, ly, 28, 28, 5);
+      if (k) { g.fillStyle = COR_CAL[k].fundo; g.fill(); } else { g.strokeStyle = '#D5D7D0'; g.lineWidth = 2; g.stroke(); }
+      g.fillStyle = CINZA; g.font = F(22, 'bold');
+      g.fillText(rot + (qtd == null ? '' : ` — ${qtd}`), xLeg + 64, ly + 22);
+      g.fillStyle = SUAVE; g.font = F(17);
+      quebrar(g, nota, wLeg - 86).slice(0, 2).forEach((t, j) => g.fillText(t, xLeg + 64, ly + 48 + j * 21));
+    });
+  }
+
+  // recado
+  caixa(g, m, yRec, L - 2 * m, hRec, 10);
+  g.fillStyle = '#F1F7E3'; g.fill();
+  g.fillStyle = VERDE; g.fillRect(m, yRec, 7, hRec);
+  g.fillStyle = CINZA; g.font = F(24, !p.length ? 'bold' : '');
+  linhasRec.forEach((t, i) => g.fillText(t, m + 28, yRec + 42 + i * 34));
+
+  // pé: marca da LOP, pequena, à direita
+  if (lop) { const h = 40, w = h * lop.naturalWidth / lop.naturalHeight; g.globalAlpha = .75; g.drawImage(lop, L - m - w, A - 70, w, h); g.globalAlpha = 1; }
+
+  return new Promise(ok => tela.toBlob(ok, 'image/jpeg', 0.92));
+}
+
+const nomeArquivo = (f) => 'boletins-' + String(f?.nome || 'funcionario').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.jpg';
+
+/** Botão WhatsApp: a imagem do relatório individual e, de texto, só o nome. */
+async function enviarZap(fid, botao) {
+  const f = pessoa(fid);
+  const nome = f?.nome || '';
+  const rotulo = botao?.innerHTML;
+  if (botao) { botao.disabled = true; botao.textContent = 'Preparando...'; }
+  try {
+    const meses = [...new Set(pendenciasDe(fid, est.pIni, est.pFim, est.pTipo).map(x => x.data.slice(0, 7)))];
+    for (const ym of meses) await garantir(ym + '-01', fimDoMes(ym));
+    const jpg = await imagemIndividual(fid, est.pIni, est.pFim, est.pTipo);
+    const arquivo = new File([jpg], nomeArquivo(f), { type: 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+      await navigator.share({ files: [arquivo], text: nome });
+    } else {
+      const url = URL.createObjectURL(jpg), a = document.createElement('a');
+      a.href = url; a.download = arquivo.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      window.open(linkZap(nome), '_blank', 'noopener');
+      avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
+    }
+  } catch (e) {
+    if (!(e && e.name === 'AbortError')) avisar('Não consegui preparar a imagem: ' + (e?.message || e));
+  } finally {
+    if (botao) { botao.disabled = false; botao.innerHTML = rotulo; }
+  }
+}
+
 export function csvMes(ym, lista) {
   const q = c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`;
   const dias = diasDoMes(ym);
@@ -695,7 +871,7 @@ function desenharPend() {
     ev.stopPropagation(); verRelatorio(b.dataset.rel, 'bdBarraPend');
   }));
   t.querySelectorAll('[data-zap]').forEach(b => b.addEventListener('click', ev => {
-    ev.stopPropagation(); window.open(linkZap(textoZap(b.dataset.zap, est.pIni, est.pFim, est.pTipo)), '_blank', 'noopener');
+    ev.stopPropagation(); enviarZap(b.dataset.zap, b);
   }));
   t.querySelectorAll('tr[data-pessoa]').forEach(r => {
     r.addEventListener('click', () => dlgPessoa(r.dataset.pessoa));
@@ -732,7 +908,7 @@ function dlgPessoa(fid) {
     try { await navigator.clipboard.writeText(t); avisar('Texto copiado — é só colar na conversa.', true); }
     catch { $('bdZapTexto').select(); document.execCommand?.('copy'); avisar('Texto selecionado — use Ctrl+C.', true); }
   });
-  $('bdDlgZap').addEventListener('click', () => window.open(linkZap(textoZap(fid, est.pIni, est.pFim, est.pTipo)), '_blank', 'noopener'));
+  $('bdDlgZap').addEventListener('click', ev => enviarZap(fid, ev.currentTarget));
   $('bdDlgRel').addEventListener('click', () => {
     dlg.close();
     const tela = !$('telaBdMes')?.hidden ? 'bdMes' : 'bdPend';
