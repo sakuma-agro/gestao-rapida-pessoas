@@ -268,6 +268,144 @@ export function textoZap(fid, de = '', ate = '', tipo = '') {
 }
 const linkZap = t => `https://wa.me/?text=${encodeURIComponent(t)}`;
 
+/* ---------------- Aviso individual como imagem (WhatsApp) ----------------
+   Pedido dele (02/10/2026), igual ao das Pendências de boletim: o botão
+   WhatsApp manda o aviso individual em JPEG e, de texto, só o nome.
+   Desenhado em canvas com o mesmo conteúdo da folha (tabela mês a mês). */
+const carregarImg = src => new Promise(ok => {
+  const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src;
+});
+function quebrar(g, texto, larg) {
+  const linhas = []; let lin = '';
+  texto.split(' ').forEach(p => {
+    const t = lin ? lin + ' ' + p : p;
+    if (g.measureText(t).width > larg && lin) { linhas.push(lin); lin = p; } else lin = t;
+  });
+  if (lin) linhas.push(lin);
+  return linhas;
+}
+function caixa(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+
+export async function imagemIndividual(fid, de = '', ate = '', tipo = '') {
+  const f = pessoa(fid);
+  const p = pendenciasDe(fid, de, ate, tipo);
+  const nNao = p.filter(r => r.situacao === 'nao_entregue').length, nCor = p.length - nNao;
+  const oque = r => r.situacao === 'correcao' ? 'Corrigir e devolver ao DP' : 'Assinar e entregar no DP';
+  const recado = !p.length ? 'Tudo em dia. Nenhum documento pendente.'
+    : `Entregue no escritório (DP) os documentos da lista${nCor ? ' — os que estão em correção precisam ser corrigidos antes' : ''}.`;
+
+  const [logo, lop] = await Promise.all([carregarImg('img/sakuma-logo.png'), carregarImg('img/lop-marca.png')]);
+  const F = (t, peso = '') => `${peso} ${t}px Arial, Helvetica, sans-serif`.trim();
+  const CINZA = '#51534A', SUAVE = '#8A8D86', VERDE = '#84BD00', MARROM = '#744F28';
+  const L = 1080, m = 56, W = L - 2 * m;
+  const cols = [[m, 'Mês'], [m + 250, 'Documento'], [m + 520, 'Situação'], [m + 700, 'O que fazer']];
+  const hTh = 52, hLin = 50;
+
+  const med = document.createElement('canvas').getContext('2d');
+  med.font = F(24);
+  const linhasRec = quebrar(med, recado, W - 48);
+  const yTab = 320;
+  const hTab = p.length ? hTh + p.length * hLin + hLin : 0;
+  const yRec = p.length ? yTab + hTab + 28 : 280;
+  const hRec = 36 + linhasRec.length * 34;
+  const A = yRec + hRec + 120;
+
+  const tela = document.createElement('canvas');
+  tela.width = L; tela.height = A;
+  const g = tela.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, L, A);
+
+  // cabeçalho
+  let xTit = m;
+  if (logo) { const h = 84, w = h * logo.naturalWidth / logo.naturalHeight; g.drawImage(logo, m, 40, w, h); xTit = m + w + 28; }
+  g.fillStyle = MARROM; g.font = F(34, 'bold'); g.fillText('Documentos a entregar no DP', xTit, 86);
+  g.fillStyle = SUAVE; g.font = F(22); g.fillText('Aviso ao funcionário', xTit, 118);
+  g.textAlign = 'right'; g.font = F(18); g.fillText('data', L - m, 70);
+  g.fillStyle = CINZA; g.font = F(26, 'bold'); g.fillText(br(hoje()), L - m, 102);
+  g.textAlign = 'left';
+  g.fillStyle = VERDE; g.fillRect(m, 146, W, 5);
+
+  // pessoa
+  g.fillStyle = CINZA; g.font = F(34, 'bold'); g.fillText(f?.nome || '', m, 206);
+  g.fillStyle = SUAVE; g.font = F(22); g.fillText([f?.cargo, f?.fazenda].filter(Boolean).join(' · '), m, 240);
+
+  if (p.length) {
+    g.fillStyle = CINZA; g.font = F(26);
+    const a = 'Faltam ', b = nDoc(p.length),
+      c = nNao && nCor ? `: ${nNao} não ${nNao === 1 ? 'entregue' : 'entregues'} e ${nCor} em correção.` : '.';
+    g.fillText(a, m, 288); let x = m + g.measureText(a).width;
+    g.font = F(26, 'bold'); g.fillText(b, x, 288); x += g.measureText(b).width;
+    g.font = F(26); g.fillText(c, x, 288);
+
+    // tabela: cabeçalho verde, linhas alternadas em verde claro, total sombreado, grade visível
+    let y = yTab;
+    g.fillStyle = VERDE; g.fillRect(m, y, W, hTh);
+    g.fillStyle = '#fff'; g.font = F(21, 'bold');
+    cols.forEach(([cx, rot]) => g.fillText(rot, cx + 16, y + 34));
+    y += hTh;
+    p.forEach((r, i) => {
+      g.fillStyle = i % 2 ? '#F1F7E3' : '#fff'; g.fillRect(m, y, W, hLin);
+      g.fillStyle = CINZA; g.font = F(21);
+      const mes = rotMesLongo(r.competencia);
+      g.fillText(mes[0].toUpperCase() + mes.slice(1), cols[0][0] + 16, y + 33);
+      g.fillText(DOCS[r.documento].rot, cols[1][0] + 16, y + 33);
+      g.fillStyle = r.situacao === 'correcao' ? '#8a6d00' : MARROM; g.font = F(21, 'bold');
+      g.fillText(SIT[r.situacao].rot, cols[2][0] + 16, y + 33);
+      g.fillStyle = CINZA; g.font = F(21);
+      g.fillText(oque(r), cols[3][0] + 16, y + 33);
+      y += hLin;
+    });
+    g.fillStyle = '#E3E5DE'; g.fillRect(m, y, W, hLin);
+    g.fillStyle = CINZA; g.font = F(21, 'bold');
+    g.fillText('Total', cols[0][0] + 16, y + 33); g.fillText(nDoc(p.length), cols[3][0] + 16, y + 33);
+    y += hLin;
+    // grade
+    g.strokeStyle = '#C9CCC3'; g.lineWidth = 1;
+    for (let yy = yTab; yy <= y + .5; yy += yy === yTab ? hTh : hLin) { g.beginPath(); g.moveTo(m, yy + .5); g.lineTo(m + W, yy + .5); g.stroke(); }
+    [...cols.map(c => c[0]), m + W].forEach(cx => { g.beginPath(); g.moveTo(cx + .5, yTab); g.lineTo(cx + .5, y); g.stroke(); });
+  }
+
+  // recado
+  caixa(g, m, yRec, W, hRec, 10);
+  g.fillStyle = '#F1F7E3'; g.fill();
+  g.fillStyle = VERDE; g.fillRect(m, yRec, 7, hRec);
+  g.fillStyle = CINZA; g.font = F(24, !p.length ? 'bold' : '');
+  linhasRec.forEach((t, i) => g.fillText(t, m + 28, yRec + 42 + i * 34));
+
+  if (lop) { const h = 40, w = h * lop.naturalWidth / lop.naturalHeight; g.globalAlpha = .75; g.drawImage(lop, L - m - w, A - 70, w, h); g.globalAlpha = 1; }
+  return new Promise(ok => tela.toBlob(ok, 'image/jpeg', 0.92));
+}
+
+const nomeArquivo = f => 'documentos-' + normal(f?.nome || 'funcionario').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.jpg';
+
+/** Botão WhatsApp: a imagem do aviso individual e, de texto, só o nome. */
+async function enviarZap(fid, botao) {
+  const f = pessoa(fid);
+  const nome = f?.nome || '';
+  const rotulo = botao?.innerHTML;
+  if (botao) { botao.disabled = true; botao.textContent = 'Preparando...'; }
+  try {
+    const jpg = await imagemIndividual(fid, est.de, est.ate, est.tipo);
+    const arquivo = new File([jpg], nomeArquivo(f), { type: 'image/jpeg' });
+    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+      await navigator.share({ files: [arquivo], text: nome });
+    } else {
+      const url = URL.createObjectURL(jpg), a = document.createElement('a');
+      a.href = url; a.download = arquivo.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      window.open(linkZap(nome), '_blank', 'noopener');
+      avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
+    }
+  } catch (e) {
+    if (!(e && e.name === 'AbortError')) avisar('Não consegui preparar a imagem: ' + (e?.message || e));
+  } finally {
+    if (botao) { botao.disabled = false; botao.innerHTML = rotulo; }
+  }
+}
+
 function csvMes(ym, lista) {
   const q = c => `"${String(c == null ? '' : c).replace(/"/g, '""')}"`;
   const docs = docsGrade(ym, lista);
@@ -457,7 +595,7 @@ function desenharPainel() {
     ev.stopPropagation(); mostrarDoc(relIndividual(b.dataset.rel, de, ate, tipo), 'dmBarraPainel');
   }));
   t.querySelectorAll('[data-zap]').forEach(b => b.addEventListener('click', ev => {
-    ev.stopPropagation(); window.open(linkZap(textoZap(b.dataset.zap, de, ate, tipo)), '_blank', 'noopener');
+    ev.stopPropagation(); enviarZap(b.dataset.zap, b);
   }));
   t.querySelectorAll('tr[data-pessoa]').forEach(r => {
     r.addEventListener('click', () => dlgPessoa(r.dataset.pessoa));
@@ -783,7 +921,7 @@ function dlgPessoa(fid) {
     try { await navigator.clipboard.writeText(t); avisar('Texto copiado — é só colar na conversa.', true); }
     catch { $('dmZapTexto').select(); document.execCommand?.('copy'); avisar('Texto selecionado — use Ctrl+C.', true); }
   });
-  $('dmDlgZap').addEventListener('click', () => window.open(linkZap(textoZap(fid, est.de, est.ate, est.tipo)), '_blank', 'noopener'));
+  $('dmDlgZap').addEventListener('click', ev => enviarZap(fid, ev.currentTarget));
   $('dmDlgRel').addEventListener('click', () => {
     dlg.close();
     const barra = !$('telaDmMes')?.hidden ? 'dmBarraMes' : 'dmBarraPainel';
