@@ -514,6 +514,9 @@
 .dm-rola thead th { position: sticky; top: 0; z-index: 2; }
 .dm-rola thead th.bd-nome { z-index: 3; }
 .dm-rola tbody .bd-nome { z-index: 1; }
+/* Boletins do mês: também a linha "Pendentes no dia" fica presa no pé (02/10/2026) */
+.bd-fixa tfoot th, .bd-fixa tfoot td { position: sticky; bottom: 0; z-index: 2; }
+.bd-fixa tfoot th.bd-nome { z-index: 3; }
 /* Escanear: nome clicável, agrupar por mês/funcionário (30/09/2026) */
 .ds-nome { font: inherit; border: 0; background: none; padding: 0; cursor: pointer; color: inherit; text-align: left; }
 .ds-nome:hover b { text-decoration: underline; color: #744F28; }
