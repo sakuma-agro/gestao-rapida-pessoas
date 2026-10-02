@@ -689,6 +689,8 @@ function desenharMes() {
   const pendMes = lista.reduce((s, f) => s + dias.filter(d => ehPend(situacaoDia(f.id, d).sit)).length, 0);
   const sm = semMarcacao(lista, ym + '-01', fimDoMes(ym)).length;
   const ini0 = inicioControle();
+  const rolaAntes = document.querySelector('#telaBdMes .bd-rola');
+  const posAntes = rolaAntes ? [rolaAntes.scrollTop, rolaAntes.scrollLeft] : null;
 
   $('telaBdMes').innerHTML = cabecalho('Boletins do mês', 'A grade da planilha: uma linha por pessoa, uma coluna por dia',
     `mês<strong class="jor-cabecalho__competencia">${MESES[+ym.slice(5) - 1]}/${ym.slice(0, 4)}</strong>`) + `
@@ -701,7 +703,7 @@ function desenharMes() {
       ${sm ? `<div class="jor-caixa alerta"><b>${sm} dia(s) cobrado(s) sem marcação</b> neste mês (segunda a sábado, fora feriado). Aparecem com contorno tracejado.</div>` : ''}
       <div class="bd-legenda">${ORDEM.map(k => `<span><i class="bd-cel ${SIT[k].cls}">${SIT[k].curto}</i>${SIT[k].rot}</span>`).join('')}
         <span><i class="bd-cel bd-nc"></i>Domingo / feriado</span><span><i class="bd-cel bd-vazio-cob"></i>Sem marcação</span></div>
-      <div class="bd-rola"><table class="bd-grade"><thead><tr><th class="bd-nome">Funcionário</th>
+      <div class="bd-rola dm-rola bd-fixa"><table class="bd-grade"><thead><tr><th class="bd-nome">Funcionário</th>
         ${dias.map(d => `<th class="${naoCobra(d) ? 'bd-nc' : ''}" title="${SEMANA[dow(d)]}${feriado(d) ? ' · ' + esc(feriado(d).nome) : ''}">${+d.slice(8)}<small>${SEM_LETRA[dow(d)]}</small></th>`).join('')}
         <th class="bd-tot" title="Pendentes no mês (não entregou + em correção)">Pend.</th></tr></thead><tbody>
         ${lista.map(f => {
@@ -729,6 +731,10 @@ function desenharMes() {
         Clique no nome para ver as pendências da pessoa e emitir o relatório. Célula com ponto marrom: boletim que chegou atrasado.</p>
     </div>`;
 
+  ajustarAltura();
+  const rola = document.querySelector('#telaBdMes .bd-rola');
+  if (rola && posAntes) { rola.scrollTop = posAntes[0]; rola.scrollLeft = posAntes[1]; }
+
   $('bdMesSel').addEventListener('change', ev => { if (ev.target.value) { est.mes = ev.target.value; abrirBoletins('bdMes'); } });
   ligarFiltros('bdBuscaMes', 'bdFazMes', desenharMes);
   $('bdCsvMes').addEventListener('click', () => baixarCSV(csvMes(ym, lista)));
@@ -742,6 +748,18 @@ function desenharMes() {
 
 /* Menu ao clicar na célula (pedido dele em 24/09/2026 — ficar clicando até
    chegar na situação certa dava trabalho). Um clique abre, outro escolhe. */
+/* Grade congelada (02/10/2026, pedido dele): o cabeçalho dos dias, a coluna
+   dos nomes e a linha "Pendentes no dia" ficam parados; só os funcionários
+   rolam. A caixa da grade ocupa a altura que sobra da janela. Mesma receita
+   da grade de Folha, holerite e recibo (.dm-rola). */
+function ajustarAltura() {
+  const rola = document.querySelector('#telaBdMes .bd-rola');
+  if (!rola || $('telaBdMes').hidden) return;
+  const livre = window.innerHeight - Math.max(rola.getBoundingClientRect().top, 0) - 16;
+  rola.style.maxHeight = Math.max(320, livre) + 'px';
+}
+window.addEventListener('resize', () => ajustarAltura());
+
 function fecharMenu() {
   const m = $('bdMenu');
   if (m) m.remove();
@@ -789,10 +807,8 @@ function menuCelula(cel) {
   m.querySelectorAll('button[data-sit]').forEach(b => b.addEventListener('click', async () => {
     fecharMenu();
     await marcar(fid, d, b.dataset.sit || null);
-    const x = document.querySelector('#telaBdMes .bd-rola')?.scrollLeft || 0;
-    desenharMes();
-    const r2 = document.querySelector('#telaBdMes .bd-rola'); if (r2) r2.scrollLeft = x;
-    document.querySelector(`#telaBdMes button[data-fid="${fid}"][data-d="${d}"]`)?.focus();
+    desenharMes();                                   // guarda e devolve a rolagem da grade
+    document.querySelector(`#telaBdMes button[data-fid="${fid}"][data-d="${d}"]`)?.focus({ preventScroll: true });
   }));
   setTimeout(() => {
     document.addEventListener('pointerdown', foraDoMenu, true);
