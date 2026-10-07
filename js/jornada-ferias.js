@@ -59,11 +59,11 @@ const fimDoMes = comp => addDias(addMeses(comp.slice(0, 8) + '01', 1), -1);
 const usuario = () => estado.sessao?.user?.email || null;
 const agora = () => new Date().toISOString();
 
-const pessoa = id => estado.funcionarios.find(f => f.id === id) || null;
+const pessoa = id => jd.pessoasDp().find(f => f.id === id) || null;
 const nomeDe = id => pessoa(id)?.nome || '—';
 const admissao = f => (f?.admissao || '').slice(0, 10) || null;
 const ativa = f => (f.situacao || 'ATIVO') === 'ATIVO';
-const ativos = () => estado.funcionarios.filter(ativa)
+const ativos = () => jd.pessoasDp().filter(ativa)
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
 /* ===================================================================
@@ -546,7 +546,7 @@ function cabecalho(titulo, sub) {
 const filtroDestino = () => `<label class="fer-filtro">Destino de DP
   <select id="ferDestino" class="dc-mini">
     <option value="">Todos</option>
-    ${jd.dados.destinos.filter(d => d.ativo !== false).map(d =>
+    ${jd.destinosDp().map(d =>
       `<option value="${d.id}" ${est.destino === d.id ? 'selected' : ''}>${esc(d.nome)}</option>`).join('')}
     <option value="-" ${est.destino === '-' ? 'selected' : ''}>Sem destino</option>
   </select></label>`;

@@ -173,9 +173,22 @@ export const ACAO_TELA = {
 // fica trancado do lado de fora; RH e Configurações ficam sempre de fora.
 const PADRAO = ['pessoas', 'sst'];
 
-export const acesso = { email: '', admin: false, modulos: [...PADRAO], telas: [], carregado: false };
+export const acesso = { email: '', admin: false, modulos: [...PADRAO], telas: [], destinos: [], carregado: false };
+
+/* DP que o login enxerga (07/10/2026, pedido dele: "um cadastro que tem acesso
+   somente ao DP 2"). Lista de jor_destinos_dp.id em app_usuarios.destinos;
+   vazia = todos, como sempre foi. Administrador vê tudo. O recorte é de tela —
+   decisão dele: quem tem esse login não acessa o banco por fora. */
+export const dpRestrito = () => !acesso.admin && (acesso.destinos || []).length > 0;
+export const veDestino = id => !dpRestrito() || acesso.destinos.includes(id);
+/* Configurações do DP valem para a empresa toda: ficam fora de quem vê um DP só. */
+const SO_DP_INTEIRO = new Set(['jorConfig', 'empSalarios']);
 let usuarios = [];
 let editando = null;
+/* Destinos de DP para o campo "DP que enxerga" (lidos ao abrir Configurações). */
+let destinosDp = [];
+const rotuloDp = d => d.organograma ? `${d.nome} · ${d.organograma}` : d.nome;
+const nomesDp = ids => ids.map(id => destinosDp.find(d => d.id === id)).filter(Boolean).map(rotuloDp).join(' e ') || 'DP escolhido';
 
 export const pode = m => acesso.admin || acesso.modulos.includes(m);
 
@@ -194,6 +207,7 @@ const soAdmin = new Set(
 export function podeTela(tela) {
   if (acesso.admin) return true;
   if (soAdmin.has(tela)) return false;
+  if (SO_DP_INTEIRO.has(tela) && dpRestrito()) return false;
   const m = moduloDe(tela);
   if (!m || !pode(m)) return false;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
@@ -226,6 +240,7 @@ export async function carregarAcesso() {
     // quem tinha o módulo antigo "EPIs" enxerga o SST, que tomou o lugar dele
     if (acesso.modulos.includes('epis') && !acesso.modulos.includes('sst')) acesso.modulos.push('sst');
     acesso.telas = meu ? (meu.telas || []) : [];
+    acesso.destinos = meu ? (meu.destinos || []) : [];
     /* "Certificação" era módulo próprio e virou submódulo de Cadastros. Quem
        tinha só ela continua entrando na lista de presença — e só nela, pelo
        recorte por tela; quem já tinha Cadastros não muda nada. */
@@ -237,6 +252,7 @@ export async function carregarAcesso() {
     acesso.admin = false;
     acesso.modulos = [...PADRAO];
     acesso.telas = [];
+    acesso.destinos = [];
   }
   acesso.carregado = true;
   return acesso;
@@ -466,6 +482,13 @@ export function desenharConfig() {
     return;
   }
   aviso.hidden = true;
+  if (!destinosDp.length && estado.cliente) {
+    estado.cliente.from('jor_destinos_dp').select('id,nome,organograma,ativo').order('nome')
+      .then(({ data }) => {
+        destinosDp = (data || []).filter(d => d.ativo !== false);
+        if (destinosDp.length) desenharConfig();
+      });
+  }
 
   $('cfTabela').innerHTML = usuarios.length ? `
     <table class="dc-planilha cf-tab"><thead><tr>
@@ -475,7 +498,9 @@ export function desenharConfig() {
       const chips = u.admin
         ? '<span class="cf-chip cf-admin">Administrador · tudo, inclusive Configurações</span>'
         : MODULOS.map(m => { const r = resumoModulo(u, m);
-            return r ? `<button type="button" class="cf-chip ${r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${r.txt}</button>` : ''; })
+            const dp = r && m.id === 'jornada' && (u.destinos || []).length
+              ? (r.txt === 'tudo' ? '' : r.txt + ' · ') + 'só ' + nomesDp(u.destinos) : '';
+            return r ? `<button type="button" class="cf-chip ${dp ? 'cf-parte' : r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${esc(dp || r.txt)}</button>` : ''; })
             .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';
       return `<tr>
         <td><b>${esc(u.nome || u.email)}</b>${eu ? ' <span class="tag ativo">você</span>' : ''}
@@ -496,6 +521,7 @@ async function gravar(u) {
     email: u.email.trim().toLowerCase(), nome: u.nome || null,
     usuario: u.usuario || null,
     admin: !!u.admin, modulos: u.modulos || [], telas: u.telas || [],
+    destinos: u.admin ? [] : (u.destinos || []),
     atualizado_em: new Date().toISOString(),
   }, { onConflict: 'email' });
   if (error) {
@@ -604,9 +630,9 @@ async function trocarEmail(antigo, novo) {
 
 function abrirUsuario(email, foco) {
   const u = email ? usuarios.find(x => x.email === email) : null;
-  editando = u ? { ...u, telas: [...(u.telas || [])], novo: false, emailOriginal: u.email }
+  editando = u ? { ...u, telas: [...(u.telas || [])], destinos: [...(u.destinos || [])], novo: false, emailOriginal: u.email }
                 : { email: '', nome: '', usuario: '', admin: false,
-                    modulos: [...PADRAO], telas: [], novo: true };
+                    modulos: [...PADRAO], telas: [], destinos: [], novo: true };
   $('usSenha').hidden = true;
   $('usSenha').className = 'us-senha';
   $('usSenha').innerHTML = '';
@@ -654,6 +680,14 @@ function desenharPermissoes() {
           <b>${esc(m.nome)}</b>
           <span class="dc-sem">${!vistas.length ? 'não enxerga' : vistas.length >= todas.length ? 'o módulo inteiro' : `${vistas.length} de ${todas.length} telas`}</span>
         </label>
+        ${m.id === 'jornada' && vistas.length && destinosDp.length ? `
+        <label class="us-dp campo">DP que enxerga
+          <select id="usDestinos">
+            <option value="">Todos os DP</option>
+            ${destinosDp.map(d => `<option value="${d.id}"${(e.destinos || []).length === 1 && e.destinos[0] === d.id ? ' selected' : ''}>Só ${esc(rotuloDp(d))}</option>`).join('')}
+          </select>
+          <small class="dc-sem">Com um DP só, as telas do DP mostram apenas as pessoas dele; Jornada e Salário base (configurações) ficam fora.</small>
+        </label>` : ''}
         ${subsDe(m).map(sb => {
           const ts = sb.telas.map(([t]) => t);
           const nSub = ts.filter(t => vistas.includes(t)).length;
@@ -674,10 +708,11 @@ function desenharPermissoes() {
   const raiz = $('usPermissoes');
   raiz.querySelectorAll('[data-meio]').forEach(cx => { cx.indeterminate = true; });
   $('usAdmin')?.addEventListener('change', ev => { e.admin = ev.target.checked; desenharPermissoes(); });
+  $('usDestinos')?.addEventListener('change', ev => { e.destinos = ev.target.value ? [ev.target.value] : []; });
   $('usCopiar')?.addEventListener('change', ev => {
     const o = usuarios.find(u => u.email === ev.target.value);
     if (!o) return;
-    e.modulos = [...(o.modulos || [])]; e.telas = [...(o.telas || [])];
+    e.modulos = [...(o.modulos || [])]; e.telas = [...(o.telas || [])]; e.destinos = [...(o.destinos || [])];
     desenharPermissoes();
   });
   raiz.querySelectorAll('[data-tudo]').forEach(b => b.addEventListener('click', () => {
@@ -727,13 +762,19 @@ export function ligarAcesso() {
 
     const u = { ...editando, email, nome: $('usNome').value.trim(),
                  usuario: usuario || null,
-                 modulos: editando.modulos || [], telas: editando.telas || [] };
+                 modulos: editando.modulos || [], telas: editando.telas || [],
+                 destinos: editando.destinos || [] };
 
     if (editando.novo) {
       // Pessoa nova: o login precisa ser criado no servidor, porque a chave
       // que cria login não pode existir no navegador.
       const ok = await criarLogin(u);
       if (!ok) return;                 // erro já apareceu; o diálogo fica aberto
+      // A função do servidor grava módulos e telas; o recorte de DP vai à parte.
+      if ((u.destinos || []).length && await gravar(u)) {
+        const i = usuarios.findIndex(x => x.email === u.email);
+        if (i >= 0) usuarios[i] = { ...usuarios[i], destinos: u.destinos };
+      }
       desenharConfig();
       return;                          // fica aberto para copiar a senha
     }
@@ -823,5 +864,6 @@ export function ligarAcesso() {
 export function limparAcesso() {
   usuarios = []; editando = null;
   acesso.email = ''; acesso.admin = false;
-  acesso.modulos = [...PADRAO]; acesso.carregado = false;
+  acesso.modulos = [...PADRAO]; acesso.destinos = []; acesso.carregado = false;
+  destinosDp = [];
 }

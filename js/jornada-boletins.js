@@ -76,14 +76,14 @@ const ehPend = s => PEND.includes(s);
 const TIPOS_PEND = { '': 'Todos os pendentes', nao_entregou: 'Só não entregou', correcao: 'Só em correção' };
 
 /* ---------------- quem entra ---------------- */
-const pessoa = id => estado.funcionarios.find(f => f.id === id) || null;
+const pessoa = id => jd.pessoasDp().find(f => f.id === id) || null;
 const ativa = f => (f.situacao || 'ATIVO') === 'ATIVO';
 const doCampo = f => {
   const s = jd.setorDe(jd.vinculoDe(f.id));
   if (s) return s.regime === 'boletim';
   return String(f.setor || '').trim().toUpperCase() === 'CAMPO';
 };
-export const equipe = () => estado.funcionarios.filter(f => ativa(f) && doCampo(f))
+export const equipe = () => jd.pessoasDp().filter(f => ativa(f) && doCampo(f))
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 const admissao = f => (f?.admissao || '').slice(0, 10) || null;
 

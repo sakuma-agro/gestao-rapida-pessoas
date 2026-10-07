@@ -55,9 +55,9 @@ const cpfBR = c => {
   return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : (c || '—');
 };
 
-const pessoa = id => estado.funcionarios.find(f => f.id === id) || null;
+const pessoa = id => jd.pessoasDp().find(f => f.id === id) || null;
 const nomeDe = id => pessoa(id)?.nome || '—';
-const ativos = () => estado.funcionarios
+const ativos = () => jd.pessoasDp()
   .filter(f => (f.situacao || 'ATIVO') === 'ATIVO')
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
@@ -1008,7 +1008,7 @@ function desligamento(fid) {
 function desenharHistorico() {
   const comEmp = new Set(emprestimos().map(e => e.funcionario_id));
   // Quem tem ou já teve empréstimo vem primeiro; desligado só aparece se tiver.
-  const pessoas = estado.funcionarios
+  const pessoas = jd.pessoasDp()
     .filter(f => comEmp.has(f.id) || (f.situacao || 'ATIVO') === 'ATIVO')
     .sort((a, b) => (comEmp.has(b.id) - comEmp.has(a.id)) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const fid = est.pessoa;

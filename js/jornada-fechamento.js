@@ -21,7 +21,7 @@ export function consolidar(competencia, destinoId) {
   const vinculos = jd.dados.vinculos.filter(v => idsUnidade.has(v.unidade_id) && v.ativo !== false);
 
   const linhas = vinculos.map(v => {
-    const f = estado.funcionarios.find(x => x.id === v.funcionario_id);
+    const f = jd.pessoasDp().find(x => x.id === v.funcionario_id);
     const boletins = jd.dados.boletins.filter(b =>
       b.funcionario_id === v.funcionario_id &&
       b.competencia === competencia &&

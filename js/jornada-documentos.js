@@ -86,7 +86,7 @@ const ehPend = s => PEND.includes(s);
 const faltaEscanear = r => r.situacao === 'entregue' && !r.escaneado;
 
 /* ---------------- quem entra ---------------- */
-const pessoa = id => estado.funcionarios.find(f => f.id === id) || null;
+const pessoa = id => jd.pessoasDp().find(f => f.id === id) || null;
 const ativa = f => (f.situacao || 'ATIVO') === 'ATIVO';
 const admissao = f => (f?.admissao || '').slice(0, 10) || null;
 const regs = () => jd.dados.docEntregas || [];
@@ -96,7 +96,7 @@ const regs = () => jd.dados.docEntregas || [];
 export function equipeDoMes(ym) {
   const fim = fimDoMes(ym);
   const comReg = new Set(regs().filter(r => r.competencia === ym).map(r => r.funcionario_id));
-  return estado.funcionarios.filter(f => comReg.has(f.id) || (ativa(f) && (!admissao(f) || admissao(f) <= fim)))
+  return jd.pessoasDp().filter(f => comReg.has(f.id) || (ativa(f) && (!admissao(f) || admissao(f) <= fim)))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
@@ -126,7 +126,7 @@ function mesesControlados() {
 const casaFazenda = (f, fz) => { const l = [].concat(fz || []).filter(Boolean);
   return !l.length || l.some(z => z === '-' ? !f.fazenda : f.fazenda === z); };
 const rotFazendas = fz => [].concat(fz || []).filter(Boolean).map(z => z === '-' ? 'sem fazenda' : z).join(', ');
-const fazendas = () => [...new Set(estado.funcionarios.filter(ativa).map(f => f.fazenda).filter(Boolean))]
+const fazendas = () => [...new Set(jd.pessoasDp().filter(ativa).map(f => f.fazenda).filter(Boolean))]
   .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 const opcoesFazenda = () => [...fazendas().map(z => [z, z]), ['-', 'Sem fazenda']];
 const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();

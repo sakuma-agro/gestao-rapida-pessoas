@@ -7,6 +7,7 @@
 // Nada aqui altera tabela existente: só as tabelas jor_*.
 
 import { estado, novoId } from './store.js';
+import { acesso, dpRestrito, veDestino } from './acesso.js';
 
 const CHAVE_CACHE = 'jor.cache';
 const CHAVE_FILA = 'jor.fila';
@@ -88,7 +89,41 @@ function carregarCache() {
   const c = ler(CHAVE_CACHE, null);
   if (!c) return;
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = c[k] || [];
+  recortar();
 }
+
+/* ---------------- recorte por DP (07/10/2026) ----------------
+   Login com "DP que enxerga" = um DP só (acesso.destinos): o movimento das
+   pessoas dos outros DP sai da memória logo depois de cada leitura, e as telas
+   do DP listam pessoas por pessoasDp() e destinos por destinosDp(). Assim
+   contagens, listas e relatórios ficam no DP dele sem cada tela ter de saber.
+   Cadastros (vínculos, unidades, destinos) e os vínculos dos indicadores
+   ficam inteiros: a aba Cadastros continua mostrando todo mundo. */
+const POR_PESSOA = ['boletins', 'ocorrencias', 'emprestimos', 'abatimentos', 'salarios',
+  'afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas', 'bolEntregas',
+  'docEntregas', 'banco', 'faltas', 'bolFerias', 'bolJornada'];
+
+/** Destino de DP da pessoa, pelo vínculo → unidade. */
+export const destinoIdDoFuncionario = fid => unidadeDe(vinculoDe(fid))?.destino_id || null;
+/** A pessoa é do DP que este login enxerga? (sem recorte: sempre sim) */
+export const noMeuDp = fid => !dpRestrito() || veDestino(destinoIdDoFuncionario(fid));
+/** As pessoas que as telas do DP mostram. */
+export const pessoasDp = () => dpRestrito() ? estado.funcionarios.filter(f => noMeuDp(f.id)) : estado.funcionarios;
+/** Os destinos ativos que este login enxerga. */
+export const destinosDp = () => dados.destinos.filter(d => d.ativo !== false && veDestino(d.id));
+export { dpRestrito };
+
+/** Tira da memória o movimento de quem é de outro DP. */
+export function recortar() {
+  if (!dpRestrito()) return;
+  for (const k of POR_PESSOA) {
+    if (Array.isArray(dados[k])) dados[k] = dados[k].filter(x => !x?.funcionario_id || noMeuDp(x.funcionario_id));
+  }
+  dados.competencias = (dados.competencias || []).filter(c => veDestino(c.destino_id));
+  const bol = new Set(dados.boletins.map(b => b.id));
+  dados.apuracoes = (dados.apuracoes || []).filter(a => bol.has(a.boletim_id));
+}
+const soMeuDp = lista => dpRestrito() ? (lista || []).filter(x => !x?.funcionario_id || noMeuDp(x.funcionario_id)) : lista;
 
 function salvarCache() {
   const c = {};
@@ -175,6 +210,7 @@ export async function carregar(competencia = competenciaAtual()) {
   const ind = await Promise.all(IND.map(k => c.from(TABELAS[k]).select('*')));
   IND.forEach((k, i) => { dados[k] = ind[i].error ? (dados[k] || []) : (ind[i].data || []); });
 
+  recortar();
   dados.carregado = true;
   salvarCache();
   avisar();
@@ -202,7 +238,7 @@ export async function carregarApoioFerias() {
   dados.faltas = lista;
 
   const gozos = (dados.feriasGozos || []).filter(g => g.situacao === 'lancado');
-  if (!gozos.length) { dados.bolFerias = []; salvarCache(); return; }
+  if (!gozos.length) { dados.bolFerias = []; recortar(); salvarCache(); return; }
   // Uma consulta por férias lançada: cada uma traz no máximo ~30 boletins, e
   // assim nenhuma resposta bate no limite de 1.000 linhas do Supabase.
   const rs = await Promise.all(gozos.map(g => c.from(TABELAS.boletins)
@@ -213,6 +249,7 @@ export async function carregarApoioFerias() {
   const vistos = new Set();
   dados.bolFerias = rs.flatMap(r => r.data || [])
     .filter(b => b.situacao !== 'cancelado' && !vistos.has(b.id) && vistos.add(b.id));
+  recortar();
   salvarCache();
 }
 
@@ -246,8 +283,8 @@ export async function boletinsDoPeriodo(ini, fim) {
   const local = () => dados.boletins.filter(b => b.data_fato >= ini && b.data_fato <= fim);
   if (!c || !estado.sessao) return local();
   try {
-    return await todas(() => c.from(TABELAS.boletins).select(campos)
-      .gte('data_fato', ini).lte('data_fato', fim).order('data_fato'));
+    return soMeuDp(await todas(() => c.from(TABELAS.boletins).select(campos)
+      .gte('data_fato', ini).lte('data_fato', fim).order('data_fato')));
   } catch { return local(); }
 }
 
@@ -280,6 +317,7 @@ export async function carregarDocs() {
   const mapa = new Map(todos.filter(x => !fila.has(x.chave)).map(x => [x.chave, x]));
   for (const x of dados.docEntregas || []) if (fila.has(x.chave)) mapa.set(x.chave, x);
   dados.docEntregas = [...mapa.values()];
+  recortar();
   salvarCache();
 }
 
@@ -304,6 +342,7 @@ export async function carregarEntregas(ini, fim) {
   dados.bolEntregas = [...mapa.values()];
   const outros = (dados.bolJornada || []).filter(b => b.data_fato < ini || b.data_fato > fim);
   dados.bolJornada = [...outros, ...bol.filter(b => b.situacao !== 'cancelado')];
+  recortar();
   salvarCache();
 }
 

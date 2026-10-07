@@ -67,7 +67,7 @@ function mesAnteriorPendente() {
   if (new Date().getDate() > DIAS_FECHAMENTO) return null;
   const [a, m] = jd.competenciaAtual().split('-').map(Number);
   const ant = m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
-  const pendentes = jd.dados.destinos.filter(d => d.ativo !== false)
+  const pendentes = jd.destinosDp()
     .filter(d => jd.dados.unidades.some(u => u.destino_id === d.id &&
       jd.dados.vinculos.some(v => v.unidade_id === u.id && v.ativo !== false)))
     .filter(d => !jd.travada(ant, d.id));
@@ -152,7 +152,7 @@ function desenharPainel() {
 
   const extras = somar('min_extra_50') + somar('min_extra_100');
   const avisos = aps.flatMap(a => a.avisos || []);
-  const semVinculo = estado.funcionarios.filter(f =>
+  const semVinculo = jd.pessoasDp().filter(f =>
     (f.situacao || 'ATIVO') === 'ATIVO' && !jd.vinculoDe(f.id)).length;
 
   $('telaJorPainel').innerHTML = cabecalho('Departamento Pessoal', 'Apuração de jornada · Campo e Administrativo') + `
@@ -203,7 +203,7 @@ function painelAtrasados() {
     <tbody>${lista.map(b => {
       const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
       const u = jd.dados.unidades.find(x => x.id === b.unidade_id);
-      return `<tr><td>${esc(estado.funcionarios.find(f => f.id === b.funcionario_id)?.nome || '—')}</td>
+      return `<tr><td>${esc(jd.pessoasDp().find(f => f.id === b.funcionario_id)?.nome || '—')}</td>
         <td>${dataBR(b.data_fato)}</td><td>${dataBR(String(b.criado_em || '').slice(0, 10))}</td>
         <td class="ce">${horas((a.min_extra_50 || 0) + (a.min_extra_100 || 0))}</td>
         <td>${esc(jd.destinoDe(u)?.nome || '—')}</td></tr>`;
@@ -274,7 +274,7 @@ function tabelaDestinos() {
   return `<table class="dc-planilha"><thead><tr>
     <th>Destino</th><th>Unidades</th><th class="ce">Boletins</th>
     <th class="ce">Extras</th><th class="ce">Situação</th></tr></thead><tbody>
-    ${jd.dados.destinos.filter(d => d.ativo !== false).map(d => {
+    ${jd.destinosDp().map(d => {
       const unids = jd.dados.unidades.filter(u => u.destino_id === d.id);
       const ids = new Set(unids.map(u => u.id));
       const bs = jd.dados.boletins.filter(b => ids.has(b.unidade_id));
@@ -299,7 +299,7 @@ function tabelaDestinos() {
    =================================================================== */
 
 function desenharLancar() {
-  const ativos = estado.funcionarios
+  const ativos = jd.pessoasDp()
     .filter(f => (f.situacao || 'ATIVO') === 'ATIVO' && jd.vinculoDe(f.id));
 
   $('telaJorLancar').innerHTML = cabecalho('Lançar jornada', 'O número vem do talão; o cálculo é do sistema') + `
@@ -513,7 +513,7 @@ function entradaMarcada(e) {
 function prepararEdicao() {
   const b = estadoTela.editando && jd.dados.boletins.find(x => x.id === estadoTela.editando);
   if (!b || b.situacao === 'cancelado' || situacaoBoletim(b).fechado) { estadoTela.editando = null; return; }
-  const f = estado.funcionarios.find(x => x.id === b.funcionario_id);
+  const f = jd.pessoasDp().find(x => x.id === b.funcionario_id);
   const form = $('jorFormBoletim');
   form.insertAdjacentHTML('afterbegin', `<div class="jor-caixa alerta" id="bEditando">
     <b>Editando</b> o lançamento de ${esc(f?.nome || '—')} de ${dataBR(b.data_fato)}${b.numero ? ` (boletim nº ${esc(b.numero)})` : ''}.
@@ -598,7 +598,7 @@ function buscarPorCadastro() {
   const n = numCad($('bCadastro').value);
   const aviso = $('bCadAviso');
   if (!n) { aviso.innerHTML = ''; return; }
-  const achados = estado.funcionarios.filter(f => numCad(f.cadastro) === n);
+  const achados = jd.pessoasDp().filter(f => numCad(f.cadastro) === n);
   const bom = achados.find(f => (f.situacao || 'ATIVO') === 'ATIVO' && jd.vinculoDe(f.id));
   if (bom) {
     $('bFunc').value = bom.id;
@@ -612,7 +612,7 @@ function buscarPorCadastro() {
 }
 
 function cadastroDoSelecionado() {
-  const f = estado.funcionarios.find(x => x.id === $('bFunc').value);
+  const f = jd.pessoasDp().find(x => x.id === $('bFunc').value);
   $('bCadastro').value = f?.cadastro || '';
   $('bCadAviso').innerHTML = '';
 }
@@ -890,7 +890,7 @@ function desenharBoletins() {
     .filter(b => b.competencia === estadoTela.competencia && b.situacao !== 'cancelado')
     .map(b => ({
       b,
-      f: estado.funcionarios.find(x => x.id === b.funcionario_id),
+      f: jd.pessoasDp().find(x => x.id === b.funcionario_id),
       a: jd.dados.apuracoes.find(x => x.boletim_id === b.id),
       s: situacaoBoletim(b),
     }));
@@ -965,7 +965,7 @@ function desenharBoletins() {
   document.querySelectorAll('#telaJorBoletins [data-excluir-bol]').forEach(btn => btn.addEventListener('click', () => {
     excluindo = jd.dados.boletins.find(x => x.id === btn.dataset.excluirBol);
     if (!excluindo) return;
-    const f = estado.funcionarios.find(x => x.id === excluindo.funcionario_id);
+    const f = jd.pessoasDp().find(x => x.id === excluindo.funcionario_id);
     $('jorExcluirQual').textContent = `${f?.nome || '—'} · ${dataBR(excluindo.data_fato)}${excluindo.numero ? ` · boletim nº ${excluindo.numero}` : ''}. `
       + 'O lançamento sai das contas do mês; fica guardado no histórico com o motivo.';
     $('jorExcluirMotivo').value = ''; $('jorExcluirErro').textContent = '';
@@ -1093,7 +1093,7 @@ function limparUsosOrfaos(comp) {
 function desenharAbatimento() {
   const comp = estadoTela.competencia;
   limparUsosOrfaos(comp);
-  const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
+  const destinos = jd.destinosDp();
   let nFaltas = 0, nComp = 0, nDP = 0, minAbatido = 0, minGuardadoMes = 0, minSaldo = 0;
 
   const blocos = destinos.map(d => {
@@ -1286,7 +1286,7 @@ function desenharAbatimento() {
 
 async function desenharFechamento() {
   limparUsosOrfaos(estadoTela.competencia);
-  const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
+  const destinos = jd.destinosDp();
 
   const blocos = await Promise.all(destinos.map(async d => {
     const c = fech.consolidar(estadoTela.competencia, d.id);
@@ -1438,8 +1438,8 @@ async function desenharFechamento() {
 const relTela = { aba: 'esc', destino: '', pessoa: '', de: '', ate: '', ferDest: '', ferMes: '', ferSel: null, ferPlano: null };
 
 function desenharRelatorios() {
-  const destinos = jd.dados.destinos.filter(d => d.ativo !== false);
-  const pessoas = estado.funcionarios.filter(f => jd.vinculoDe(f.id));
+  const destinos = jd.destinosDp();
+  const pessoas = jd.pessoasDp().filter(f => jd.vinculoDe(f.id));
   if (!destinos.some(d => d.id === relTela.destino)) relTela.destino = destinos[0]?.id || '';
   if (!relTela.de) relTela.de = mesesAntes(estadoTela.competencia, 5);
   if (!relTela.ate) relTela.ate = estadoTela.competencia.slice(0, 7);
@@ -1592,8 +1592,10 @@ async function desenharHistorico() {
   try { lista = await fech.listarArquivo(); }
   catch (e) { aviso('Não consegui ler o histórico: ' + e.message); }
 
-  const destinos = jd.dados.destinos;
-  const nomeDest = id => destinos.find(d => d.id === id)?.nome || '—';
+  const destinos = jd.destinosDp();
+  const nomeDest = id => jd.dados.destinos.find(d => d.id === id)?.nome || '—';
+  // Login de um DP só: o histórico dos outros DP não aparece.
+  lista = lista.filter(x => destinos.some(d => d.id === x.destino_id) || !jd.dpRestrito());
   const filtrada = lista.filter(x => !histTela.destino || x.destino_id === histTela.destino);
   const porComp = new Map();
   filtrada.forEach(x => { if (!porComp.has(x.competencia)) porComp.set(x.competencia, []); porComp.get(x.competencia).push(x); });
@@ -1608,7 +1610,7 @@ async function desenharHistorico() {
   const opcoes = rel.RELATORIOS_ARQUIVADOS.map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('');
 
   const linha = x => {
-    const d = destinos.find(y => y.id === x.destino_id);
+    const d = jd.dados.destinos.find(y => y.id === x.destino_id);
     const h = m => fech.formatarHoras(m || 0, d?.formato_horas);
     const t = x.totais || {};
     return `<tr>

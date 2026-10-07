@@ -333,11 +333,11 @@ const faixa = (ini, fim, intv) => ini || fim
    ou todos do destino; boletins e apurações vêm do banco para o período. */
 export function relatorioConferencia({ boletins, apuracoes, de, ate, funcionarioId, destinoId }) {
   const destino = jd.dados.destinos.find(d => d.id === destinoId) || null;
-  const pessoa = funcionarioId ? estado.funcionarios.find(f => f.id === funcionarioId) : null;
+  const pessoa = funcionarioId ? jd.pessoasDp().find(f => f.id === funcionarioId) : null;
   const fmt = destino?.formato_horas || 'decimal';
   const h = m => m ? formatarHoras(m, fmt) : '—';
   const hs = m => !m ? '—' : (m < 0 ? '−' : '+') + formatarHoras(Math.abs(m), fmt);
-  const nomeDe = id => estado.funcionarios.find(f => f.id === id)?.nome || '—';
+  const nomeDe = id => jd.pessoasDp().find(f => f.id === id)?.nome || '—';
 
   const linhas = boletins.filter(b => b.marcado && (pessoa ? b.funcionario_id === pessoa.id
       : jd.dados.unidades.find(u => u.id === b.unidade_id)?.destino_id === destinoId))
@@ -443,7 +443,7 @@ function barra(c) {
 
 export function relatorioQualidade({ boletins, de, ate, funcionarioId, destinoId }) {
   const destino = jd.dados.destinos.find(d => d.id === destinoId) || null;
-  const pessoa = funcionarioId ? estado.funcionarios.find(f => f.id === funcionarioId) : null;
+  const pessoa = funcionarioId ? jd.pessoasDp().find(f => f.id === funcionarioId) : null;
   const legenda = `<p class="rel-nota">Nota do boletim dada em Lançar jornada: Ruim = 1, Bom = 2, Ótimo = 3.
     Nota média ≥ 2,5 = Ótimo · ≥ 1,75 = Bom · abaixo = Ruim. "Marcou diferente" = lançamentos em que o funcionário marcou um horário diferente do correto.</p>`;
 
@@ -490,7 +490,7 @@ export function relatorioQualidade({ boletins, de, ate, funcionarioId, destinoId
   } else {
     const doDestino = boletins.filter(b => jd.dados.unidades.find(u => u.id === b.unidade_id)?.destino_id === destinoId);
     const ids = [...new Set(doDestino.map(b => b.funcionario_id))];
-    const linhas = ids.map(id => ({ nome: estado.funcionarios.find(f => f.id === id)?.nome || '—',
+    const linhas = ids.map(id => ({ nome: jd.pessoasDp().find(f => f.id === id)?.nome || '—',
       c: contar(doDestino.filter(b => b.funcionario_id === id)) }))
       .filter(l => l.c.total)
       .sort((x, y) => (x.c.media ?? 9) - (y.c.media ?? 9) || y.c.ruim - x.c.ruim || x.nome.localeCompare(y.nome, 'pt-BR'));
@@ -615,7 +615,7 @@ export function relatorioDetalhado(competencia, destinoId) {
    ------------------------------------------------------------------ */
 
 export function extratoIndividual(competencia, funcionarioId) {
-  const f = estado.funcionarios.find(x => x.id === funcionarioId);
+  const f = jd.pessoasDp().find(x => x.id === funcionarioId);
   const v = jd.vinculoDe(funcionarioId);
   const unidade = jd.unidadeDe(v);
   const destino = jd.destinoDe(unidade);
