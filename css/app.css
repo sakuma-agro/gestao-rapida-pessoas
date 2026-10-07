@@ -641,6 +641,10 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .us-mod__topo{display:flex;align-items:center;gap:8px;font-size:13px}
 .us-mod__topo input{width:auto;margin:0}
 .us-mod__topo .dc-sem{margin-left:auto;font-size:11px}
+.us-dp{display:flex;flex-direction:column;gap:4px;margin:8px 0 6px 26px;font-size:12px;font-weight:700;color:#744F28}
+.us-dp select{max-width:260px;font-weight:400}
+.us-dp small{font-weight:400;text-transform:none;letter-spacing:0;font-size:11px}
+.us-mod.desligado .us-dp{display:none}
 .us-telas{display:flex;flex-wrap:wrap;gap:6px 14px;margin:7px 0 0 24px}
 .us-tela{display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap}
 .us-tela input{width:auto;margin:0}
