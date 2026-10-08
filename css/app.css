@@ -94,7 +94,7 @@ main{max-width:1180px;margin:0 auto;padding:18px 16px 80px}
 label.campo,div.campo{display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:700;
   color:var(--suave);text-transform:uppercase;letter-spacing:.5px}
 label.campo.plena{grid-column:1/-1}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=month],input[type=search],select,textarea{
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=time],input[type=month],input[type=search],select,textarea{
   font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;text-transform:none;letter-spacing:0;
   border:1px solid var(--linha);background:var(--fundo);color:var(--texto);width:100%}
 textarea{resize:vertical;min-height:70px;line-height:1.4}
@@ -193,6 +193,40 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .pv-num-alerta{color:#8a5f00;font-weight:700}
 .pv-num-atencao{color:var(--marrom);font-weight:700}
 .pv-num-calma{color:var(--verde-esc);font-weight:700}
+/* painel de um tipo só, na tela de Vencimentos: aparece ao escolher o tipo */
+.sst-tp{margin-top:14px;border:1px solid var(--linha);border-radius:12px;padding:12px 14px}
+.sst-tp-tit{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0 0 10px}
+.sst-tp-tit h3{margin:0;font-size:15px;color:var(--marrom)}
+.sst-tp-tit span{font-size:13px;color:var(--suave)}
+.sst-tp-barra{height:8px;border-radius:4px;border:1px solid var(--linha);overflow:hidden;margin:0 0 12px}
+.sst-tp-barra i{display:block;height:100%;background:var(--verde)}
+.pv-card[aria-pressed="true"]{outline:2px solid var(--marrom);outline-offset:1px}
+.pv-falta{border-left-color:var(--cinza,#51534A)} .pv-falta strong{color:var(--cinza,#51534A)}
+.sst-tp-falta{margin-top:12px}
+.sst-tp-falta h4{margin:0 0 6px;font-size:13px;color:var(--marrom)}
+.sst-tp-falta td.ce{white-space:nowrap}
+/* ---- SST · Acidentes e CAT ---- */
+#dlgAc [hidden]{display:none !important}
+#dlgAc .grade > p.plena{grid-column:1/-1;margin:0}  /* label.campo é flex e venceria o hidden */
+.ac-placar{display:flex;align-items:center;gap:14px;margin-top:14px;padding:12px 16px;
+  border:1px solid var(--linha);border-left:6px solid var(--verde);border-radius:12px}
+.ac-placar strong{font-size:40px;line-height:1;color:var(--verde-esc)}
+.ac-placar span{font-size:14px;color:var(--marrom);font-weight:700}
+.ac-placar small{display:block;font-weight:400;font-size:12px;color:var(--suave)}
+.ac-placar-recente{border-left-color:#c0392b} .ac-placar-recente strong{color:#a5342a}
+.ac-grade3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0 18px}
+.ac-rola{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.ac-meses .ac-barra-cel{width:30%;min-width:80px}
+.ac-barra{display:block;width:100%;height:10px}
+.ac-meses tr:last-child td{border-top:2px solid var(--linha)}
+.ac-h4{margin:16px 0 6px;font-size:13px;color:var(--marrom);border-bottom:1px solid var(--linha);padding-bottom:4px}
+.ac-rot{margin:10px 0 2px;font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
+#dlgAc .rel-ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 14px;
+  border:1px solid var(--linha);border-radius:10px;padding:10px 12px}
+#dlgAc .rel-ficha span{display:block;font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
+#dlgAc .rel-memoria{white-space:pre-wrap;font-size:13px}
+.qp-link{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--verde-esc);
+  cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}
 
 /* ---- exames por função e a conferência dentro do ASO ---- */
 .jor-cad{margin:0 0 22px}
