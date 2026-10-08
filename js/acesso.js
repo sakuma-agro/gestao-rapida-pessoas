@@ -71,6 +71,11 @@ export const MODULOS = [
       ['trVenc', 'Vencimentos'],
       ['trTipos', 'Tipos e periodicidade'],
     ] },
+    /* Acidentes e CAT (08/10/2026): js/sst-acidentes.js, tabela sst_acidentes. */
+    { id: 'acidentes', nome: 'Acidentes', telas: [
+      ['acPainel', 'Painel'],
+      ['acLista', 'Registros e CAT'],
+    ] },
   ] },
   { id: 'rh', nome: 'RH', subs: [
     { id: 'disc', nome: 'DISC', telas: [

@@ -18,6 +18,7 @@ import { abrirBoletins, fecharDocBoletins, fecharMenuBoletins } from './jornada-
 import { abrirDocumentos, fecharDocDocumentos, fecharMenuDocumentos } from './jornada-documentos.js';
 import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from './atalhos.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
+import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
@@ -146,6 +147,8 @@ function abrirAba(nome) {
   if (nome === 'config') desenharConfig();
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
+  for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
   if (nome.startsWith('jor')) abrirJornada(nome);
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
   if (nome.startsWith('fer')) abrirFerias(nome);
@@ -203,7 +206,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
+  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
   mostrar('login');
 });
 

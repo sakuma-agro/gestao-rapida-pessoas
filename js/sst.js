@@ -76,7 +76,7 @@ const RECEITAS = {
       pCards: 'exPnCards', pAlerta: 'exPnAlerta', pTipos: 'exPnTipos', pSemNada: 'exPnSemNada',
       pSaida: 'exPnSaida', pImprimir: 'bImprimirPnEx', pZoom: 'zoomPnEx', pZoomV: 'zoomVPnEx',
       busca: 'exBusca', fTipo: 'exFiltroTipo', fStatus: 'exFiltroStatus', fSit: 'exFiltroSit',
-      resumo: 'exResumo', historico: 'exHistorico', tabela: 'exTabela', semNada: 'exSemNada',
+      tPainel: 'exTipoPn', resumo: 'exResumo', historico: 'exHistorico', tabela: 'exTabela', semNada: 'exSemNada',
       saida: 'exSaida', zoom: 'zoomEx', zoomV: 'zoomVEx', imprimir: 'bImprimirEx',
       novo: 'bNovoExame', listaTipos: 'listaTipoEx', novoTipo: 'bNovoTipoEx',
       ficha: 'bFichaEx', barraFicha: 'barraFichaEx', barraLista: 'rodapeEx',
@@ -103,7 +103,7 @@ const RECEITAS = {
       pCards: 'trPnCards', pAlerta: 'trPnAlerta', pTipos: 'trPnTipos', pSemNada: 'trPnSemNada',
       pSaida: 'trPnSaida', pImprimir: 'bImprimirPnTr', pZoom: 'zoomPnTr', pZoomV: 'zoomVPnTr',
       busca: 'trBusca', fTipo: 'trFiltroTipo', fStatus: 'trFiltroStatus', fSit: 'trFiltroSit',
-      resumo: 'trResumo', historico: 'trHistorico', tabela: 'trTabela', semNada: 'trSemNada',
+      tPainel: 'trTipoPn', resumo: 'trResumo', historico: 'trHistorico', tabela: 'trTabela', semNada: 'trSemNada',
       saida: 'trSaida', zoom: 'zoomTr', zoomV: 'zoomVTr', imprimir: 'bImprimirTr',
       novo: 'bNovoTrein', listaTipos: 'listaTipoTr', novoTipo: 'bNovoTipoTr',
       ficha: 'bFichaTr', barraFicha: 'barraFichaTr', barraLista: 'rodapeTr',
@@ -414,7 +414,7 @@ function desenharPainel(r) {
       const dele = linhas.filter(x => grupoDe(r, x.tipo_id) === t.id);
       const c = ch => dele.filter(x => x.sit.faixa === ch).length;
       return `<tr>
-        <td><b>${esc(t.nome)}</b></td>
+        <td><button type="button" class="qp-link" data-tipo="${t.id}" title="Ver todos deste ${esc(r.rotuloTipo.toLowerCase())}">${esc(t.nome)}</button></td>
         ${FAIXAS.map(fx => {
           const n = c(fx.chave);
           return `<td class="ce${n ? ' pv-num-' + fx.cor : ' dc-sem'}">${n || '—'}</td>`;
@@ -424,6 +424,9 @@ function desenharPainel(r) {
       </tr>`;
     }).join('')}</tbody></table>`
     : '<div class="vazio">Nenhum lançamento ainda.</div>';
+
+  $(r.el.pTipos).querySelectorAll('[data-tipo]').forEach(b =>
+    b.addEventListener('click', () => irParaVencimentos(r, '', b.dataset.tipo)));
 
   /* ---- e quem nem começou ---- */
   const faltando = semNenhum(r);
@@ -438,11 +441,13 @@ function desenharPainel(r) {
 }
 
 /** Clicar no cartão leva para a lista já filtrada — o painel aponta, a outra tela resolve. */
-function irParaVencimentos(r, faixa) {
+function irParaVencimentos(r, faixa, tipo = '') {
   $(r.el.fStatus).value = faixa;
   $(r.el.fSit).value = 'ATIVO';
   $(r.el.busca).value = '';
-  $(r.el.fTipo).value = '';
+  // o select só ganha as opções ao desenhar; guardar o pedido para ele
+  $(r.el.fTipo).dataset.pedido = tipo;
+  $(r.el.fTipo).value = tipo;
   $(r.el.historico).checked = false;
   abrirModulo('sst', r.tela);
 }
@@ -450,20 +455,26 @@ function irParaVencimentos(r, faixa) {
 function desenharVenc(r) {
   // filtro de tipos
   const sel = $(r.el.fTipo);
-  const antes = sel.value;
+  const antes = sel.dataset.pedido != null && sel.dataset.pedido !== '' ? sel.dataset.pedido : sel.value;
+  delete sel.dataset.pedido;
   sel.innerHTML = '<option value="">Todos</option>' +
-    S[r.id].tipos.map(t => `<option value="${t.id}">${esc(t.nome)}</option>`).join('');
+    S[r.id].tipos.map(t => `<option value="${t.id}">${esc(t.nome)}${t.ativo === false ? ' (inativo)' : ''}</option>`).join('');
   sel.value = antes;
 
   const linhas = visiveis(r);
+  const tipoSel = sel.value;
 
-  // resumo (conta sempre o último de cada par, sem os filtros de situação)
+  // resumo (conta sempre o último de cada par, sem os filtros de situação).
+  // Com um tipo escolhido quem conta é o painel do tipo, logo acima.
   const retrato = atuais(r);
   const conta = c => retrato.filter(x => x.sit.chave === c).length;
-  $(r.el.resumo).innerHTML = `
+  $(r.el.resumo).hidden = !!tipoSel;
+  $(r.el.resumo).innerHTML = tipoSel ? '' : `
     <span class="contagem"><b>${conta('emdia')}</b> em dia</span>
     <span class="contagem"><b>${conta('vencendo')}</b> vencendo</span>
     <span class="contagem"><b>${conta('vencido')}</b> vencido(s)</span>`;
+  const doTipo = tipoSel ? painelDoTipo(r, tipoSel) : null;
+  if (!tipoSel) { $(r.el.tPainel).hidden = true; $(r.el.tPainel).innerHTML = ''; $(r.el.tPainel).dataset.sem = ''; }
 
   $(r.el.tabela).innerHTML = linhas.length ? `
     <table class="dc-planilha"><thead><tr>
@@ -492,16 +503,93 @@ function desenharVenc(r) {
   $(r.el.tabela).querySelectorAll('[data-reg]').forEach(b =>
     b.addEventListener('click', () => abrirReg(r, b.dataset.reg)));
 
-  // quem ainda não tem nenhum lançamento
+  // quem ainda não tem nenhum lançamento (com tipo escolhido, a lista de quem
+  // falta é a do tipo, e mora no painel dele)
   const faltando = semNenhum(r);
   const aviso = $(r.el.semNada);
-  if (faltando.length) {
+  if (faltando.length && !tipoSel) {
     aviso.innerHTML = `<b>${faltando.length} funcionário(s) ativo(s) sem nenhum ${r.id} lançado:</b> ` +
       faltando.map(f => esc(f.nome)).join(' · ');
     aviso.hidden = false;
   } else aviso.hidden = true;
 
-  $(r.el.saida).innerHTML = montarFolhas(r, linhas);
+  $(r.el.saida).innerHTML = montarFolhas(r, linhas, doTipo);
+}
+
+/* O painel de um tipo só. Escolhido o treinamento no filtro, mostra quantos
+   ativos têm, quantos não têm e como estão os que têm — nas mesmas faixas
+   exclusivas do painel geral, e saindo do mesmo atuais(), para os números
+   baterem com o painel. Cada cartão filtra a tabela embaixo. */
+function painelDoTipo(r, tipoId) {
+  const caixa = $(r.el.tPainel);
+  const grupo = grupoDe(r, tipoId);
+  const t = tipoDe(r, grupo) || tipoDe(r, tipoId) || {};
+  const ativos = estado.funcionarios.filter(f => f.situacao === 'ATIVO');
+  const com = atuais(r).filter(x => grupoDe(r, x.tipo_id) === grupo);
+  const temIds = new Set(com.map(x => x.funcionario_id));
+  // exame não se cobra de todo mundo (quem exige é a função): "sem" só no treinamento
+  const sem = r.id === 'treinamento'
+    ? ativos.filter(f => !temIds.has(f.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    : [];
+  const c = ch => com.filter(x => x.sit.faixa === ch).length;
+  const pct = ativos.length ? Math.round(com.length * 100 / ativos.length) : 0;
+  const status = $(r.el.fStatus).value;
+  const vendoSem = caixa.dataset.sem === '1' && r.id === 'treinamento';
+  const reciclagens = S[r.id].tipos.filter(x => x.id !== grupo && grupoDe(r, x.id) === grupo);
+
+  const cartao = (filtro, cor, rotulo, n, dica, ativo) =>
+    `<button type="button" class="pv-card pv-${cor}${n ? '' : ' pv-zero'}" data-filtro="${filtro}"
+      aria-pressed="${ativo ? 'true' : 'false'}">
+      <span>${esc(rotulo)}</span><strong>${n}</strong><small>${esc(dica)}</small>
+    </button>`;
+
+  caixa.innerHTML = `
+    <div class="sst-tp-tit">
+      <h3>${esc(t.nome || '—')}</h3>
+      <span>${r.id === 'treinamento'
+        ? `<b>${com.length}</b> de <b>${ativos.length}</b> funcionários ativos têm este treinamento (${pct}%)`
+        : `<b>${com.length}</b> funcionário(s) ativo(s) com este exame lançado`}${
+        reciclagens.length ? ` · conta junto: ${reciclagens.map(x => esc(x.nome)).join(', ')}` : ''}</span>
+    </div>
+    ${r.id === 'treinamento' ? `<div class="sst-tp-barra" aria-hidden="true"><i style="width:${pct}%"></i></div>` : ''}
+    <div class="pv-cards">
+      ${cartao('', 'calma', r.id === 'treinamento' ? 'Têm o treinamento' : 'Com o exame', com.length,
+        'ver todos', !status && !vendoSem)}
+      ${FAIXAS.map(fx => cartao(fx.chave, fx.cor, fx.curto, c(fx.chave), fx.dica, status === fx.chave && !vendoSem)).join('')}
+      ${cartao('emdia', 'ok', 'Em dia', c('emdia') + c('semvalidade'),
+        c('semvalidade') ? `${c('semvalidade')} sem validade` : 'mais de 90 dias', status === 'emdia' && !vendoSem)}
+      ${r.id === 'treinamento' ? cartao('sem', 'falta', 'Não têm', sem.length,
+        sem.length ? 'ver quem falta' : 'todos fizeram', vendoSem) : ''}
+    </div>
+    ${vendoSem ? `<div class="sst-tp-falta">
+      <h4>Ativos sem ${esc(t.nome || 'este treinamento')} (${sem.length})</h4>
+      ${sem.length ? `<table class="dc-planilha"><thead><tr>
+        <th>Funcionário</th><th>Setor</th><th class="ce"></th></tr></thead><tbody>
+        ${sem.map(f => `<tr>
+          <td><b>${esc(f.nome)}</b><br><span class="dc-sem">${esc(f.cargo || '—')}</span></td>
+          <td>${esc(f.setor || '—')}</td>
+          <td class="ce"><button type="button" class="btn mini" data-lancar="${f.id}">Lançar</button></td>
+        </tr>`).join('')}</tbody></table>`
+        : '<div class="vazio">Todos os ativos têm este treinamento.</div>'}
+    </div>` : ''}`;
+  caixa.hidden = false;
+
+  caixa.querySelectorAll('[data-filtro]').forEach(b => b.addEventListener('click', () => {
+    const f = b.dataset.filtro;
+    if (f === 'sem') caixa.dataset.sem = vendoSem ? '' : '1';
+    else { caixa.dataset.sem = ''; $(r.el.fStatus).value = f; }
+    desenharVenc(r);
+  }));
+  caixa.querySelectorAll('[data-lancar]').forEach(b => b.addEventListener('click', () => {
+    abrirReg(r, null);
+    $(r.el.func).value = b.dataset.lancar;
+    $(r.el.tipo).value = tipoId;
+    $(r.el.func).dispatchEvent(new Event('change'));
+    $(r.el.tipo).dispatchEvent(new Event('change'));
+  }));
+
+  return { nome: t.nome || '', com: com.length, ativos: ativos.length, sem: sem.length,
+    temSem: r.id === 'treinamento' };
 }
 
 /** "3 de 5 exames" quando o ASO ainda tem exame da função por fazer. */
@@ -574,7 +662,7 @@ function atualizarVencimento(r, forcar) {
 /* =============== folha para imprimir =============== */
 const POR_FOLHA = 13;
 
-function montarFolhas(r, linhas) {
+function montarFolhas(r, linhas, doTipo = null) {
   if (!linhas.length) return '';
   const total = Math.ceil(linhas.length / POR_FOLHA);
   const titulo = r.id === 'exame' ? 'EXAMES OCUPACIONAIS' : 'TREINAMENTOS';
@@ -586,7 +674,7 @@ function montarFolhas(r, linhas) {
         <img src="${LOGO}" alt="">
         <div class="an-tit">
           <h1>${titulo}</h1>
-          <p>Controle de vencimento · ${dataBr(hoje())} · SAKUMA Agronegócios</p>
+          <p>${doTipo ? `${esc(doTipo.nome)} · ` : ''}Controle de vencimento · ${dataBr(hoje())} · SAKUMA Agronegócios</p>
         </div>
       </div>
       <table class="an-tab sst-folha-tab">
@@ -611,7 +699,8 @@ function montarFolhas(r, linhas) {
         }).join('')}</tbody>
       </table>
       <div class="an-pe">
-        <span>${linhas.length} lançamento(s)</span>
+        <span>${linhas.length} lançamento(s)${doTipo && doTipo.temSem
+          ? ` · ${doTipo.com} de ${doTipo.ativos} ativos com o treinamento · ${doTipo.sem} sem` : ''}</span>
         <span>${total > 1 ? `folha ${p + 1} de ${total}` : ''}</span>
       </div>
       ${PE_LOP}
@@ -784,6 +873,8 @@ function abrirEscolhaFicha(r) {
 /* =============== ligações =============== */
 function ligarReceita(r, avisar) {
   // filtros
+  // trocar de tipo fecha a lista de "quem não tem" do tipo anterior
+  $(r.el.fTipo).addEventListener('input', () => { $(r.el.tPainel).dataset.sem = ''; });
   [r.el.busca, r.el.fTipo, r.el.fStatus, r.el.fSit, r.el.historico].forEach(id =>
     $(id).addEventListener('input', () => desenharVenc(r)));
 
