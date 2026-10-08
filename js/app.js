@@ -31,6 +31,7 @@ import { desenharCadRelatorios } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
+import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 
 const $ = id => document.getElementById(id);
@@ -135,6 +136,8 @@ function abrirAba(nome) {
   if (TELAS_INDICADORES.includes(nome)) abrirIndicadores(nome);
   for (const t of TELAS_SALARIOS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_SALARIOS.includes(nome)) abrirSalarios(nome);
+  for (const t of TELAS_SALARIO_DIGNO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_SALARIO_DIGNO.includes(nome)) abrirSalarioDigno(nome, { abrirFuncionario });
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
   $('telaCadRelatorios').hidden = nome !== 'cadRelatorios';
   if (nome === 'cadRelatorios') desenharCadRelatorios();
@@ -200,7 +203,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios();
+  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
   mostrar('login');
 });
 

@@ -35,6 +35,7 @@ export const ICONES = {
   cargo: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M3 12h18"/>',
   mais: '<path d="M12 5v14M5 12h14"/>',
   'seta-esq': '<path d="M15 5l-7 7 7 7"/>',
+  balanca: '<path d="M12 4v16M7 20h10M5 7h14"/><path d="M5 7l-3 6a3 3 0 006 0zM19 7l-3 6a3 3 0 006 0z"/>',
   lapis: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
 };
 
@@ -46,7 +47,7 @@ export const ICONE_TELA = {
   fichas: 'escudo', epis: 'lista', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exFuncoes: 'cargo', exTipos: 'ajuste',
   trPainel: 'painel', trVenc: 'treino', trTipos: 'ajuste',
-  disc: 'disc', rhCargos: 'cargo', rhProposta: 'documento', rhOrganograma: 'organograma',
+  disc: 'disc', rhCargos: 'cargo', sdQuadro: 'balanca', sdPlanos: 'check', sdConfig: 'config', rhProposta: 'documento', rhOrganograma: 'organograma',
   jorPainel: 'painel', jorLancar: 'relogio', jorBoletins: 'lista', jorAbatimento: 'ajuste',
   jorFechamento: 'calendario', jorHistorico: 'historico',
   bdDia: 'boletim', bdMes: 'calendario', bdPend: 'alerta',

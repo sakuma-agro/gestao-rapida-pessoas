@@ -87,6 +87,13 @@ export const MODULOS = [
     { id: 'organograma', nome: 'Organograma', telas: [
       ['rhOrganograma', 'Organograma'],
     ] },
+    /* Salário digno (07/10/2026): função + faixa em uso × benchmark, planos de
+       ação e parâmetros com vigência — js/rh-salario-digno.js. */
+    { id: 'salarioDigno', nome: 'Salário digno', telas: [
+      ['sdQuadro', 'Funções'],
+      ['sdPlanos', 'Planos de ação'],
+      ['sdConfig', 'Configurações'],
+    ] },
     /* Indicadores (01/10/2026): absenteísmo e turnover — js/rh-indicadores.js. */
     { id: 'indicadores', nome: 'Indicadores', telas: [
       ['rhIndPainel', 'Painel'],
@@ -328,7 +335,7 @@ const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
 const ICONE_SUB = {
   gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
   epis: 'escudo', exames: 'exame', treinamentos: 'treino',
-  disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico',
+  disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
 };
