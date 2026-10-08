@@ -1041,3 +1041,46 @@ dialog.rs-largo{width:min(860px,96vw)}
 dialog.rs-largo form{max-height:88vh;overflow:auto}
 #telaRhSalarios .rolagem,#telaRhSalProj .rolagem,#dlgRhSal .rolagem{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
 #telaRhSalarios .acoes,#telaRhSalProj .acoes{flex-wrap:wrap}
+
+/* ===== RH · Salário digno (07/10/2026) ===== */
+.sd-selo{margin-top:14px;border:1px solid var(--linha);border-left:4px solid #84BD00;border-radius:8px;padding:10px 14px;background:var(--papel);display:flex;flex-direction:column;gap:3px}
+.sd-selo.sd-prov{border-left-color:#c98a00}
+.sd-selo>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sd-selo span:first-child{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--suave)}
+.sd-selo strong{font-size:20px}
+.sd-selo small{font-size:11.5px;color:var(--suave)}
+.sd-atraso{color:#a5342a !important;font-weight:700}
+.rs-kpis .sd-k-ok{border-top-color:#84BD00}
+.rs-kpis .sd-k-at{border-top-color:#c98a00}
+.sd-tab td{vertical-align:middle}
+.sd-tab tr.sd-l-nao td{background:rgba(116,79,40,.07)}
+.sd-tab tr.sd-l-atencao td{background:rgba(201,138,0,.07)}
+.sd-falta{margin-top:12px;border:1px dashed #c98a00;border-radius:8px;padding:8px 12px;background:rgba(201,138,0,.05)}
+.sd-falta summary{cursor:pointer;font-size:13px}
+.sd-falta-t{margin:10px 0 4px;font-size:12px;font-weight:700;color:#744F28}
+.sd-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sd-chip{border:1px solid var(--linha);background:var(--papel);border-radius:16px;padding:3px 10px;font:inherit;font-size:12px;cursor:pointer;color:inherit;text-align:left}
+.sd-chip small{display:block;font-size:10px;color:var(--suave)}
+.sd-chip:hover{border-color:#84BD00}
+.sd-confirmar>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:3px 0}
+.sd-ands{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+.sd-ands>div{border-left:3px solid #84BD00;padding:3px 10px;font-size:13px;background:var(--papel)}
+.sd-ands small{display:block;font-size:10.5px;color:var(--suave)}
+.sd-params{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px}
+.sd-param{border:1px solid var(--linha);border-top:3px solid #84BD00;border-radius:8px;padding:10px 12px;background:var(--papel)}
+.sd-param-n{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--suave)}
+.sd-param strong{font-size:19px;margin-right:6px}
+.sd-param .dica{margin:6px 0 0}
+.sd-param details{margin-top:6px}
+.sd-conta{margin-top:12px;font-size:13px}
+.sd-tab tr.sd-l-nao td{background:rgba(116,79,40,.10) !important}
+.sd-tab tr.sd-l-atencao td{background:rgba(201,138,0,.09) !important}
+.sd-conf{grid-column:1/-1;font-size:13px;line-height:1.7;border:1px solid var(--linha);border-radius:8px;padding:8px 12px;background:var(--papel)}
+.sd-conf b:first-child{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--suave)}
+#telaSdQuadro .acoes,#telaSdPlanos .acoes{display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:600px){#telaSdQuadro .barra.entre,#telaSdPlanos .barra.entre{flex-wrap:wrap;gap:8px}}
+.sd-rola{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+.sd-param-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.sd-param-top>div{min-width:0}
+.sd-param-top .btn{flex:none}
+@media (max-width:600px){#telaSdQuadro .rs-kpis,#telaSdPlanos .rs-kpis{grid-template-columns:1fr 1fr}}
