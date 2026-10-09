@@ -15,6 +15,8 @@
    aqui com as telas que já existem em TELAS — o menu, a tela de
    configurações e as permissões passam a enxergá-lo sozinhos. */
 const MODULOS = [
+  // Painel (09/10/2026): o retrato do dia, no modelo dos painéis da área Pessoas.
+  { id: 'painel',      nome: 'Painel',            telas: [['painel', 'Painel']] },
   { id: 'maquinas',    nome: 'Máquinas',          telas: [['maquinas', 'Máquinas']] },
   { id: 'vencimentos', nome: 'Vencimentos',       telas: [['vencimentos', 'Vencimentos']] },
   { id: 'ordens',      nome: 'Ordens de serviço', telas: [['ordens', 'Ordens de serviço']] },
@@ -23,7 +25,7 @@ const MODULOS = [
 
 /* Quem ainda não tiver módulo marcado entra com estes — assim ninguém fica
    trancado do lado de fora por esquecimento. */
-const MODULOS_PADRAO = ['maquinas', 'vencimentos', 'ordens', 'checklist'];
+const MODULOS_PADRAO = ['painel', 'maquinas', 'vencimentos', 'ordens', 'checklist'];
 
 const Acesso = {
   admin: false,
@@ -80,8 +82,9 @@ let moduloAberto = null;
 /** Monta a primeira faixa (módulos) e abre a tela de marca. */
 function montarMenu() {
   const libs = modulosLiberados();
+  // Botões com ícone, como os módulos da área Pessoas (09/10/2026).
   $('#menu').innerHTML = libs.map(m =>
-    `<button type="button" data-modulo="${m.id}">${esc(m.nome)}</button>`).join('')
+    `<button type="button" data-modulo="${m.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_MODULO_M[m.id]] || ''}</svg><span>${esc(m.nome)}</span></button>`).join('')
 ;
   $$('#menu button').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
   $('#menu').hidden = false;
@@ -157,8 +160,10 @@ const ICONE_ATALHO = {
   horimetro: '<circle cx="12" cy="13" r="8"/><path d="M12 13l4-3M9 2h6"/>',
   bens: '<rect x="3" y="11" width="18" height="6" rx="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M6 11l2-5h8l2 5"/>',
 };
+const ICONE_MODULO_M = { painel: 'painel', maquinas: 'bens', vencimentos: 'venc', ordens: 'os', checklist: 'check' };
 const ATALHOS_INICIO = [
-  ['vencimentos', 'venc', 'Vencimentos', 'prim'],
+  ['painel', 'painel', 'Painel', 'prim'],
+  ['vencimentos', 'venc', 'Vencimentos'],
   ['ordens', 'os', 'Ordens de serviço'],
   ['maquinas', 'bens', 'Máquinas'],
   ['checklist', 'check', 'Check list'],

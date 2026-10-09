@@ -281,22 +281,46 @@ async function inativar(tabela, id) {
 
 /* ---------------------------------------------------------------- carga da base */
 
-async function baixarBase(forcar = false) {
+/* Com internet, a base é baixada inteira a cada abertura: o que o mecânico
+   fechou no celular aparece no escritório na próxima vez que o app abre.
+   Só fica marcada como "baixada" se TODAS as tabelas vieram — uma carga que
+   falhou (banco fora do ar, permissão faltando) tenta de novo na próxima vez,
+   em vez de deixar a tela vazia por horas. */
+async function baixarBase() {
   if (!App.online) return false;
-  const versao = await meta('versao_base');
-  const baixadaEm = await meta('baixada_em');
-  const recente = baixadaEm && (Date.now() - new Date(baixadaEm).getTime() < 6 * 3600 * 1000);
-  if (!forcar && recente && versao === CONFIG.VERSAO_BASE) return false;
-
+  const falhas = [];
   for (const t of TABELAS_BASE) {
     const { data, error } = await App.sb.from(t).select('*');
-    if (error) { console.warn('não baixou', t, error.message); continue; }
+    if (error) { console.warn('não baixou', t, error.message); falhas.push(t); continue; }
+    await limparLocal(t);
     await gravarLocal(t, data);
     App.dados[t] = data;
+  }
+  // O que foi feito neste aparelho e ainda não subiu continua aparecendo.
+  for (const item of await itensDaFila()) {
+    if (item.operacao !== 'upsert' || item.status === 'enviado') continue;
+    await gravarLocal(item.tabela, [item.registro]);
+    const lista = App.dados[item.tabela] || (App.dados[item.tabela] = []);
+    const chave = pk(item.tabela), id = idDe(item.tabela, item.registro);
+    const i = lista.findIndex(x => idDe(item.tabela, x) === id);
+    if (i >= 0) lista[i] = item.registro; else lista.push(item.registro);
+  }
+  if (falhas.length) {
+    aviso('Não consegui baixar ' + falhas.length + ' cadastro(s) do servidor. Usando o que está guardado neste aparelho.', true);
+    return false;
   }
   await meta('versao_base', CONFIG.VERSAO_BASE);
   await meta('baixada_em', new Date().toISOString());
   return true;
+}
+
+/* Apaga a cópia local de uma tabela antes de gravar a nova: assim o que foi
+   inativado ou apagado no servidor some daqui também. */
+async function limparLocal(tabela) {
+  const s = tx('cache', 'readwrite');
+  const chaves = await promessa(s.index('por_tabela').getAllKeys(tabela));
+  for (const k of chaves) s.delete(k);
+  return new Promise(ok => { s.transaction.oncomplete = () => ok(true); });
 }
 
 async function carregarDaBaseLocal() {
