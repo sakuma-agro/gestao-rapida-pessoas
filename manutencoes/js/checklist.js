@@ -607,7 +607,7 @@ async function gravarChecklist(e, modelo, vinculo, versao, grupos, r, t) {
    Texto longo quebra em duas linhas na coluna do item (~104 mm) — entra na conta.
    Se nem com linha de 5,6 mm couber em uma folha, vai frente e verso com
    letra e espaço maiores. */
-const fonteFolha = alt => Math.min(12.5, Math.max(8.5, alt * 1.6));
+const fonteFolha = alt => Math.min(12.5, Math.max(8, alt * 1.6));
 function layoutFolha(grupos) {
   const textos = grupos.flatMap(g => itensDoGrupo(g.id).map(i => i.texto || ''));
   const nG = grupos.length, FIXO = 66, PAG = 279;
@@ -823,7 +823,12 @@ function ajustarFolhas(alvo) {
   alvo.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;width:188mm;visibility:hidden';
   const pxmm = 96 / 25.4, PAG = 277;
   alvo.querySelectorAll('.ck-folha[data-ck=""]').forEach(f => {
-    const aplicar = a => { f.style.setProperty('--lin', a.toFixed(2) + 'mm'); f.style.setProperty('--fonte', fonteFolha(a).toFixed(1) + 'pt'); };
+    const aplicar = a => {
+      f.style.setProperty('--lin', a.toFixed(2) + 'mm');
+      f.style.setProperty('--fonte', fonteFolha(a).toFixed(1) + 'pt');
+      f.style.setProperty('--cx', Math.min(3.8, a - 1.3).toFixed(2) + 'mm');   // caixinha acompanha a linha
+      f.style.setProperty('--th', Math.min(6, a + 0.6).toFixed(2) + 'mm');       // faixa verde do grupo também
+    };
     // Simula a impressão: cada bloco (grupo, observação, assinaturas…) não
     // se parte; o que não cabe no resto da página desce inteiro para a próxima.
     const paginas = () => {
@@ -836,19 +841,19 @@ function ajustarFolhas(alvo) {
       });
       return pag;
     };
-    // Sempre UMA folha. 1º: uma coluna, com OBS. por item, se couber com
-    // linha de pelo menos 5,2 mm. Senão: grupos em duas colunas (a OBS. vai
-    // para o quadro de observações gerais). Só em último caso reduz a folha.
+    // Sempre UMA folha, uma coluna, com OBS. em todos os itens. Acha a maior
+    // linha que cabe; modelo grande fica com linha justa (estilo planilha) e
+    // quadro de observações gerais menor. Só em último caso reduz a folha.
     f.style.zoom = '';
-    f.classList.remove('duas');
-    const buscar = (lo, hi) => { for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; aplicar(m); if (paginas() <= 1) lo = m; else hi = m; } aplicar(lo); return lo; };
+    f.classList.remove('compacta');
+    const buscar = lo => { let hi = 13; for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; aplicar(m); if (paginas() <= 1) lo = m; else hi = m; } aplicar(lo); return lo; };
     aplicar(5.2);
-    if (paginas() <= 1) buscar(5.2, 13);
+    if (paginas() <= 1) buscar(5.2);
     else {
-      f.classList.add('duas');
-      aplicar(4.2);
-      if (paginas() <= 1) buscar(4.2, 13);
-      else { let z = 1; while (paginas() > 1 && z > 0.6) { z -= 0.03; f.style.zoom = z; } }
+      f.classList.add('compacta');
+      aplicar(3.9);
+      if (paginas() <= 1) buscar(3.9);
+      else { let z = 1; while (paginas() > 1 && z > 0.6) { z -= 0.02; f.style.zoom = z; } }
     }
     f.dataset.pags = 1;
   });

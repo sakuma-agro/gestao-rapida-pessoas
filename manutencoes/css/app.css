@@ -1183,14 +1183,21 @@ body.embutido .modal header button{color:var(--cinza)}
 .ck-folha .id col.iv{width:26mm}
 .ck-folha .id col.ires{width:66mm}
 .ck-folha .id td.rot{width:auto;white-space:nowrap}
-/* Modelo com muitos itens: os grupos em duas colunas, para caber em uma folha
-   sem diminuir a letra. A anotação vai para o quadro de observações gerais. */
-.ck-folha.duas .ck-grupos{column-count:2;column-gap:5mm}
-.ck-folha.duas table.grp{break-inside:avoid;page-break-inside:avoid;margin-bottom:2mm}
-.ck-folha.duas table.grp col.co{width:0}
-.ck-folha.duas table.grp col.cc{width:10mm}
-.ck-folha.duas table.grp th:last-child,.ck-folha.duas table.grp td.obs{display:none}
-.ck-folha.duas table.grp th.nome{font-size:9pt}
-.ck-folha.duas .obs-geral{min-height:20mm}
-.ck-folha.duas table.grp col.cc{width:11mm}
-.ck-folha.duas table.grp th.c{font-size:6.5pt;letter-spacing:0}
+/* Modelo com muitos itens: linha justa, estilo planilha. A caixinha e a
+   faixa do grupo acompanham a altura da linha (--cx, --th); o quadro de
+   observações gerais encolhe, porque cada item já tem a sua OBS. */
+.ck-folha .cxq{width:var(--cx,3.8mm);height:var(--cx,3.8mm)}
+.ck-folha table.grp th{height:var(--th,6mm)}
+.ck-folha.compacta table.grp td{padding:0 2mm;line-height:1.05}
+.ck-folha.compacta table.grp{margin-bottom:0}
+.ck-folha.compacta table.grp+table.grp th{border-top:1.5mm solid #fff}
+.ck-folha.compacta table.grp th{font-size:7.5pt;padding:0 2mm;line-height:1}
+.ck-folha.compacta table.grp th.nome{font-size:8.5pt}
+.ck-folha.compacta .cxq{border-width:1px;vertical-align:middle}
+.ck-folha.compacta .cab{padding-bottom:2mm;margin-bottom:2mm}
+.ck-folha.compacta .cab img{height:11mm}
+.ck-folha.compacta .id{margin-bottom:2mm}
+.ck-folha.compacta .id td{height:5.4mm}
+.ck-folha.compacta .obs-geral{min-height:8mm;margin-top:2mm}
+.ck-folha.compacta .assin{margin-top:6mm}
+.ck-folha.compacta .rod{margin-top:2mm;padding-top:1.5mm}
