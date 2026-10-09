@@ -668,7 +668,7 @@ function folhaChecklist(e, modelo, opts) {
     ${preenchido ? '<div class="fotos" data-fotos></div>' : ''}
     <div class="rod">
       <span>${preenchido && proximo ? '<strong>Próximo check list: ' + formatarData(proximo) + '</strong>' : 'Periodicidade: a cada ' + dias + ' dias'}</span>
-      <span>SAKUMA Agronegócios · <strong>Guilherme Lopes</strong> · Desenvolvido por LOP · Inteligência para o agronegócio</span>
+      <span class="os-pe ck-pe"><img src="../img/lop-marca.png" alt="LOP"><span>Inteligência para o agronegócio</span></span>
     </div>
   </div>`;
 }
