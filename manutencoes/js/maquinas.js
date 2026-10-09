@@ -55,6 +55,7 @@ TELAS.maquinas = el => {
       <select id="mq-local"><option value="">Todos os locais</option>
         ${q.ordenado('locais').map(l => `<option value="${esc(l.id)}"${l.id === filtroMaq.local ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}
       </select>
+      ${seletorGrupo('mq-grupo')}
       <select id="mq-tipo"><option value="">Todos os tipos</option>
         ${q.ordenado('tipos_equipamento').filter(t => !grupoAtual || (t.grupo || 'outros') === grupoAtual).map(t => `<option value="${esc(t.id)}"${t.id === filtroMaq.tipo ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}
       </select>
@@ -99,6 +100,7 @@ TELAS.maquinas = el => {
   const bn = $('#mq-nova'); if (bn) bn.onclick = () => formMaquina();
   const bi = $('#mq-importar'); if (bi) bi.onclick = telaImportarRealtec;
   const bt = $('#mq-itens'); if (bt) bt.onclick = telaItensManutencao;
+  ligarSeletorGrupo('mq-grupo');
   const bg = $('#mq-tipos'); if (bg) bg.onclick = telaTiposMaquina;
   desenhar();
 };
@@ -416,8 +418,29 @@ function telaItensManutencao() {
 function telaTiposMaquina() {
   const unidades = [['HORIMETRO', 'Horímetro (h)'], ['HODOMETRO', 'Hodômetro (km)'], ['ACUMULADO', 'Horas somadas (implemento)'], ['CALENDARIO', 'Só por data']];
   const desenhar = () => {
+    lerGrupos();
     const tipos = q.todos('tipos_equipamento').slice().sort((a, b) => (Number(a.ordem) || 999) - (Number(b.ordem) || 999));
+    const qtdTipos = id => tipos.filter(t => (t.grupo || 'outros') === id).length;
+    const opIcone = sel => ICONES_ESCOLHA.map(([id, nome]) => `<option value="${id}"${sel === id ? ' selected' : ''}>${esc(nome)}</option>`).join('');
     abrirModal('Tipos de máquina e grupos', `
+      <h3 style="margin:0 0 6px">Grupos da frota</h3>
+      <p class="sub">São os botões da faixa "Frota". Pode criar, renomear, trocar o ícone e a ordem.
+         "Outros" fica sempre, para o tipo que ainda não tem grupo.</p>
+      <table class="tabela"><thead><tr><th>Ordem</th><th>Nome do grupo</th><th>Ícone</th><th>Tipos</th><th></th></tr></thead><tbody>
+      ${GRUPOS.map((g, i) => `<tr>
+          <td style="white-space:nowrap"><button type="button" class="btn-fantasma" data-sobe="${i}" ${i === 0 ? 'disabled' : ''} aria-label="Subir">▲</button>
+              <button type="button" class="btn-fantasma" data-desce="${i}" ${i === GRUPOS.length - 1 ? 'disabled' : ''} aria-label="Descer">▼</button></td>
+          <td><input type="text" data-gnome="${i}" value="${esc(g.nome)}" maxlength="40"></td>
+          <td><select data-gic="${i}">${opIcone(g.ic)}</select></td>
+          <td>${qtdTipos(g.id)}</td>
+          <td>${g.id === 'outros' ? '' : `<button type="button" class="btn-fantasma" data-gapaga="${i}">Apagar</button>`}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="colunas" style="margin-top:8px;align-items:end">
+        ${campoTexto('Grupo novo', 'gn_nome', '', 'text', 'Ex.: Geradores, Oficina, Veículos de apoio')}
+        ${campoLista('Ícone', 'gn_ic', ICONES_ESCOLHA.map(([id, nome]) => ({ id, nome })), 'outros', null)}
+        <div class="acoes"><button type="button" class="btn" id="gn-criar">Criar grupo</button></div>
+      </div>
+      <h3 style="margin:22px 0 6px">Tipos de máquina</h3>
       <p class="sub">O grupo decide em qual botão da faixa "Frota" a máquina aparece. Trocar aqui
          muda o grupo de todas as máquinas do tipo.</p>
       <table class="tabela"><thead><tr><th>Tipo</th><th>Máquinas</th><th>Grupo</th></tr></thead><tbody>
@@ -435,6 +458,39 @@ function telaTiposMaquina() {
         </div>
         <div class="acoes"><button type="button" class="btn" id="tn-criar">Criar tipo</button></div>
       </fieldset>`, corpo => {
+      const lista = () => GRUPOS.map(g => ({ ...g }));
+      const salvar = async (l, msg) => { await gravarGrupos(l); if (msg) aviso(msg); desenhar(); };
+      corpo.querySelectorAll('[data-sobe],[data-desce]').forEach(b => b.onclick = () => {
+        const l = lista(); const i = Number(b.dataset.sobe ?? b.dataset.desce); const j = b.dataset.sobe != null ? i - 1 : i + 1;
+        [l[i], l[j]] = [l[j], l[i]]; salvar(l);
+      });
+      corpo.querySelectorAll('[data-gnome]').forEach(inp => inp.onchange = () => {
+        const nome = inp.value.trim(); const l = lista(); const i = Number(inp.dataset.gnome);
+        if (!nome) { inp.value = l[i].nome; return aviso('O grupo precisa de um nome.', true); }
+        if (l.some((g, k) => k !== i && g.nome.toLowerCase() === nome.toLowerCase())) { inp.value = l[i].nome; return aviso('Já existe um grupo com esse nome.', true); }
+        l[i].nome = nome; salvar(l, 'Grupo renomeado.');
+      });
+      corpo.querySelectorAll('[data-gic]').forEach(sel => sel.onchange = () => {
+        const l = lista(); l[Number(sel.dataset.gic)].ic = sel.value; salvar(l);
+      });
+      corpo.querySelectorAll('[data-gapaga]').forEach(b => b.onclick = async () => {
+        const l = lista(); const g = l[Number(b.dataset.gapaga)];
+        const doGrupo = q.todos('tipos_equipamento').filter(t => t.grupo === g.id);
+        if (!confirm(`Apagar o grupo "${g.nome}"?` + (doGrupo.length ? ` Os ${doGrupo.length} tipo(s) dele vão para "Outros".` : ''))) return;
+        for (const t of doGrupo) { t.grupo = 'outros'; await gravar('tipos_equipamento', t); }
+        salvar(l.filter(x => x.id !== g.id), 'Grupo apagado.');
+      });
+      corpo.querySelector('#gn-criar').onclick = () => {
+        const nome = corpo.querySelector('#f-gn_nome').value.trim();
+        if (!nome) return aviso('Informe o nome do grupo.', true);
+        const l = lista();
+        if (l.some(g => g.nome.toLowerCase() === nome.toLowerCase())) return aviso('Já existe um grupo com esse nome.', true);
+        let id = nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'grupo';
+        while (l.some(g => g.id === id)) id += '_2';
+        const iOutros = l.findIndex(g => g.id === 'outros');
+        l.splice(iOutros < 0 ? l.length : iOutros, 0, { id, nome, ic: corpo.querySelector('#f-gn_ic').value });
+        salvar(l, `Grupo "${nome}" criado. Agora escolha abaixo quais tipos de máquina ficam nele.`);
+      };
       corpo.querySelectorAll('select[data-tipo]').forEach(sel => sel.onchange = async () => {
         const t = q.por_id('tipos_equipamento', sel.dataset.tipo);
         t.grupo = sel.value; await gravar('tipos_equipamento', t);

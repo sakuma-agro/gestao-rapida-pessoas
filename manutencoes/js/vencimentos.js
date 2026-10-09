@@ -76,6 +76,7 @@ TELAS.vencimentos = el => {
         <option value="SEM_DADO">Sem última troca</option>
         <option value="todos">Todas as situações</option>
       </select>
+      ${seletorGrupo('vc-grupo')}
       <select id="vc-letra"><option value="">Toda a frota (T, F, P, V…)</option>
         ${letrasDaFrota().map(([l, n]) => `<option value="${esc(l)}">${esc(l)} — ${n} ${n === 1 ? 'bem' : 'bens'}</option>`).join('')}</select>
       <select id="vc-local"><option value="">Todas as fazendas</option>
@@ -181,6 +182,7 @@ TELAS.vencimentos = el => {
   ['vc-busca', 'vc-sit', 'vc-local', 'vc-item', 'vc-letra', 'vc-modo'].forEach(id => {
     const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar;
   });
+  ligarSeletorGrupo('vc-grupo');
   $('#vc-limpar').onclick = () => { marcadosVenc.clear(); desenhar(); };
   $('#vc-gerar').onclick = gerarOSMarcadas;
   desenhar();
