@@ -10,8 +10,8 @@ function dadosDoPainel() {
   const planos = q.ativos('planos_manutencao')
     .map(p => ({ p, c: calcular(p) }))
     .filter(x => x.c.equipamento && x.c.equipamento.ativo !== false
-      && !['VENDIDO', 'BAIXADO'].includes(x.c.equipamento.status));
-  const osAbertas = q.todos('ordens_servico').filter(o => ABERTAS.includes(o.status));
+      && !['VENDIDO', 'BAIXADO'].includes(x.c.equipamento.status) && noGrupo(x.c.equipamento));
+  const osAbertas = q.todos('ordens_servico').filter(o => ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id));
   const agenda = (typeof agendaChecklists === 'function') ? agendaChecklists() : [];
   return { planos, osAbertas, agenda };
 }
@@ -35,7 +35,7 @@ TELAS.painel = el => {
 
   const fazendas = q.ordenado('locais').map(l => {
     const pl = planos.filter(x => x.c.equipamento.local_id === l.id);
-    const maqs = new Set(q.ativos('equipamentos').filter(e => e.local_id === l.id && !['VENDIDO', 'BAIXADO'].includes(e.status)).map(e => e.id));
+    const maqs = new Set(q.ativos('equipamentos').filter(e => e.local_id === l.id && !['VENDIDO', 'BAIXADO'].includes(e.status) && noGrupo(e)).map(e => e.id));
     return {
       l, maquinas: maqs.size,
       vencido: pl.filter(x => x.c.status === 'VENCIDO').length,
@@ -50,7 +50,7 @@ TELAS.painel = el => {
 
   el.innerHTML = `
     <div class="pn-cabeca">
-      <div><h1>Painel</h1>
+      <div><h1>Painel${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
         <p class="sub">Como está a manutenção hoje. Toque num cartão para abrir a lista já filtrada.</p></div>
       <button type="button" class="btn neutro" id="pn-atualizar">Atualizar</button>
     </div>

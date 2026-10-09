@@ -175,6 +175,7 @@ TELAS.ordens = el => {
     Object.assign(filtroOS, { busca: $('#os-busca').value, tipo: $('#os-tipo').value, local: $('#os-local').value });
     const b = filtroOS.busca.toLowerCase();
     const lista = q.todos('ordens_servico').filter(o => {
+      if (!noGrupoId(o.equipamento_id)) return false;
       const e = q.por_id('equipamentos', o.equipamento_id) || {};
       if (filtroOS.aba === 'abertas' ? !ABERTAS.includes(o.status) : o.status !== 'CONCLUIDA') return false;
       if (filtroOS.tipo && (o.tipo || 'PREVENTIVA') !== filtroOS.tipo) return false;

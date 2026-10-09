@@ -41,13 +41,14 @@ let filtroMaq = { busca: '', local: '', tipo: '' };
 
 TELAS.maquinas = el => {
   el.innerHTML = `
-    <h1>Máquinas</h1>
+    <h1>Máquinas${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
     <p class="sub">Cadastro das máquinas e dos itens de manutenção de cada uma — a cada quantas
        horas ou dias, e qual óleo e filtro ela usa.</p>
     <div class="acoes">
       ${ehAdmin() ? '<button type="button" class="btn" id="mq-nova">Cadastrar máquina</button>' : ''}
       ${ehAdmin() ? '<button type="button" class="btn neutro" id="mq-importar">Importar horímetros (Realtec)</button>' : ''}
       ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de itens de manutenção</button>' : ''}
+      ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
     </div>
     <div class="filtros">
       <input type="search" id="mq-busca" placeholder="Buscar por código ou descrição" value="${esc(filtroMaq.busca)}">
@@ -55,7 +56,7 @@ TELAS.maquinas = el => {
         ${q.ordenado('locais').map(l => `<option value="${esc(l.id)}"${l.id === filtroMaq.local ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}
       </select>
       <select id="mq-tipo"><option value="">Todos os tipos</option>
-        ${q.ordenado('tipos_equipamento').map(t => `<option value="${esc(t.id)}"${t.id === filtroMaq.tipo ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}
+        ${q.ordenado('tipos_equipamento').filter(t => !grupoAtual || (t.grupo || 'outros') === grupoAtual).map(t => `<option value="${esc(t.id)}"${t.id === filtroMaq.tipo ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}
       </select>
     </div>
     <div id="mq-lista"></div>`;
@@ -63,7 +64,7 @@ TELAS.maquinas = el => {
   const desenhar = () => {
     filtroMaq = { busca: $('#mq-busca').value, local: $('#mq-local').value, tipo: $('#mq-tipo').value };
     const b = filtroMaq.busca.toLowerCase();
-    const lista = q.ativos('equipamentos').filter(e =>
+    const lista = q.ativos('equipamentos').filter(e => noGrupo(e) &&
       (!filtroMaq.local || e.local_id === filtroMaq.local) &&
       (!filtroMaq.tipo || e.tipo_equipamento_id === filtroMaq.tipo) &&
       (!b || (e.codigo + ' ' + e.descricao).toLowerCase().includes(b))
@@ -98,6 +99,7 @@ TELAS.maquinas = el => {
   const bn = $('#mq-nova'); if (bn) bn.onclick = () => formMaquina();
   const bi = $('#mq-importar'); if (bi) bi.onclick = telaImportarRealtec;
   const bt = $('#mq-itens'); if (bt) bt.onclick = telaItensManutencao;
+  const bg = $('#mq-tipos'); if (bg) bg.onclick = telaTiposMaquina;
   desenhar();
 };
 
@@ -199,7 +201,9 @@ function formMaquina(e, modelo) {
     <div class="colunas">
       ${campoTexto('Código', 'codigo', base.codigo, 'text', 'Ex.: T.01, P.28, V.04, C.06')}
       ${campoTexto('Descrição', 'descricao', base.descricao)}
-      ${campoLista('Tipo', 'tipo_equipamento_id', q.ordenado('tipos_equipamento'), base.tipo_equipamento_id)}
+      ${campoLista('Tipo', 'tipo_equipamento_id',
+          q.ordenado('tipos_equipamento').map(t => ({ id: t.id, nome: t.nome + ' — ' + nomeGrupo(t.grupo || 'outros') })),
+          base.tipo_equipamento_id || (grupoAtual ? (q.ordenado('tipos_equipamento').find(t => (t.grupo || 'outros') === grupoAtual) || {}).id : ''))}
       ${campoLista('Local', 'local_id', q.ordenado('locais'), base.local_id)}
       ${campoLista('Marca', 'marca_id', q.ordenado('marcas'), base.marca_id, '—')}
       ${campoTexto('Modelo', 'modelo', base.modelo)}
@@ -405,4 +409,51 @@ function telaItensManutencao() {
   desenhar();
 }
 
-Object.assign(window, { fichaMaquina, formMaquina, formItem, planosDa, limparBem, ehAdmin });
+/* ---------------------------------------------------------------- tipos e grupos
+
+   Cada tipo de máquina pertence a um grupo da frota (a faixa abaixo do menu).
+   Mudar o grupo de um tipo leva junto todas as máquinas dele. */
+function telaTiposMaquina() {
+  const unidades = [['HORIMETRO', 'Horímetro (h)'], ['HODOMETRO', 'Hodômetro (km)'], ['ACUMULADO', 'Horas somadas (implemento)'], ['CALENDARIO', 'Só por data']];
+  const desenhar = () => {
+    const tipos = q.todos('tipos_equipamento').slice().sort((a, b) => (Number(a.ordem) || 999) - (Number(b.ordem) || 999));
+    abrirModal('Tipos de máquina e grupos', `
+      <p class="sub">O grupo decide em qual botão da faixa "Frota" a máquina aparece. Trocar aqui
+         muda o grupo de todas as máquinas do tipo.</p>
+      <table class="tabela"><thead><tr><th>Tipo</th><th>Máquinas</th><th>Grupo</th></tr></thead><tbody>
+      ${tipos.map(t => {
+        const n = q.ativos('equipamentos').filter(e => e.tipo_equipamento_id === t.id).length;
+        return `<tr><td><strong>${esc(t.nome)}</strong>${t.ativo === false ? ' <small>desativado</small>' : ''}</td>
+          <td>${n}</td>
+          <td><select data-tipo="${esc(t.id)}">${GRUPOS.map(g => `<option value="${g.id}"${(t.grupo || 'outros') === g.id ? ' selected' : ''}>${esc(g.nome)}</option>`).join('')}</select></td></tr>`;
+      }).join('')}</tbody></table>
+      <fieldset style="margin-top:16px"><legend>Tipo novo</legend>
+        <div class="colunas">
+          ${campoTexto('Nome do tipo', 'tn_nome', '', 'text', 'Ex.: Bomba de diesel, Gerador, Roçadeira')}
+          ${campoLista('Grupo', 'tn_grupo', GRUPOS.map(g => ({ id: g.id, nome: g.nome })), grupoAtual || 'outros', null)}
+          ${campoLista('Como é medido', 'tn_unid', unidades.map(([id, nome]) => ({ id, nome })), 'HORIMETRO', null)}
+        </div>
+        <div class="acoes"><button type="button" class="btn" id="tn-criar">Criar tipo</button></div>
+      </fieldset>`, corpo => {
+      corpo.querySelectorAll('select[data-tipo]').forEach(sel => sel.onchange = async () => {
+        const t = q.por_id('tipos_equipamento', sel.dataset.tipo);
+        t.grupo = sel.value; await gravar('tipos_equipamento', t);
+        aviso(`${t.nome} agora está em ${nomeGrupo(t.grupo)}.`);
+        pintarGrupos();
+      });
+      corpo.querySelector('#tn-criar').onclick = async () => {
+        const nome = corpo.querySelector('#f-tn_nome').value.trim();
+        if (!nome) return aviso('Informe o nome do tipo.', true);
+        if (q.todos('tipos_equipamento').some(t => t.nome.toLowerCase() === nome.toLowerCase())) return aviso('Esse tipo já existe.', true);
+        const maior = Math.max(0, ...q.todos('tipos_equipamento').map(t => Number(t.ordem) || 0));
+        await gravar('tipos_equipamento', { id: crypto.randomUUID(), nome, grupo: corpo.querySelector('#f-tn_grupo').value,
+          unidade_padrao: corpo.querySelector('#f-tn_unid').value, ordem: maior + 1, ativo: true });
+        aviso('Tipo criado. Já aparece no cadastro de máquina.');
+        pintarGrupos(); desenhar();
+      };
+    });
+  };
+  desenhar();
+}
+
+Object.assign(window, { fichaMaquina, formMaquina, formItem, planosDa, limparBem, ehAdmin, telaTiposMaquina });

@@ -1079,3 +1079,19 @@ body.embutido .modal header{background:#fff;border-bottom:3px solid #CFE3A0}
 body.embutido .modal header h2{color:var(--cinza)}
 body.embutido .modal header button{color:var(--cinza)}
 .ck-pe{margin-top:0}
+
+/* ---------- faixa Frota: grupo escolhido vale para todas as telas ---------- */
+.grupos{display:flex;align-items:center;gap:6px;padding:7px 14px;background:#F6F7F4;
+  border-bottom:1px solid var(--linha);overflow-x:auto;scrollbar-width:thin}
+.grupos[hidden]{display:none}
+.gr-rot{font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:#6B7480;margin-right:4px;flex:none}
+.gr-btn{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;
+  border:1px solid var(--linha);border-radius:18px;background:#fff;font:inherit;font-size:13px;color:#33404C;cursor:pointer;white-space:nowrap}
+.gr-btn svg{width:16px;height:16px;flex:none;color:#6B7480}
+.gr-btn small{font-size:11px;background:#EEF0EC;border-radius:10px;padding:1px 7px;color:#56606B}
+.gr-btn:hover{border-color:#1B232B}
+.gr-btn.ativo{background:#1B232B;border-color:#1B232B;color:#fff;font-weight:bold}
+.gr-btn.ativo svg{color:#fff}
+.gr-btn.ativo small{background:rgba(255,255,255,.18);color:#fff}
+@media (max-width:600px){ .grupos{padding:6px 10px} .gr-btn{min-height:32px;padding:0 10px} }
+@media print{ .grupos{display:none!important} }

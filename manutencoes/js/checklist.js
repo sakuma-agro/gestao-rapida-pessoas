@@ -90,6 +90,7 @@ function agendaChecklists() {
   const linhas = [];
   for (const e of q.ativos('equipamentos')) {
     if (['VENDIDO', 'BAIXADO'].includes(e.status)) continue;
+    if (window.noGrupo && !noGrupo(e)) continue;      // grupo escolhido na faixa da frota
     const { modelo, vinculo } = modeloDaMaquina(e);
     if (!modelo) continue;
     if (vinculo && vinculo.suspenso) continue;
@@ -227,7 +228,7 @@ function escolherMaquina(linhas) {
 }
 
 function desenharRealizados(el) {
-  const lista = q.todos('checklists').slice()
+  const lista = q.todos('checklists').filter(c => !window.noGrupoId || noGrupoId(c.equipamento_id))
     .sort((a, b) => (b.preenchido_em || '').localeCompare(a.preenchido_em || ''));
   el.innerHTML = `
     <div class="filtros"><input type="search" id="ck-rb" placeholder="Buscar por máquina"></div>

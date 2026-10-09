@@ -28,7 +28,7 @@ function letraDe(e) {
 }
 function letrasDaFrota() {
   const conta = new Map();
-  q.ativos('equipamentos').forEach(e => { const l = letraDe(e); if (l) conta.set(l, (conta.get(l) || 0) + 1); });
+  q.ativos('equipamentos').filter(noGrupo).forEach(e => { const l = letraDe(e); if (l) conta.set(l, (conta.get(l) || 0) + 1); });
   return [...conta.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
 }
 
@@ -58,12 +58,12 @@ TELAS.vencimentos = el => {
   const todos = q.ativos('planos_manutencao')
     .map(p => ({ p, c: calcular(p) }))
     .filter(x => x.c.equipamento && x.c.equipamento.ativo !== false
-      && !['VENDIDO', 'BAIXADO'].includes(x.c.equipamento.status));
-  const abertas = q.todos('ordens_servico').filter(o => ABERTAS.includes(o.status)).length;
+      && !['VENDIDO', 'BAIXADO'].includes(x.c.equipamento.status) && noGrupo(x.c.equipamento));
+  const abertas = q.todos('ordens_servico').filter(o => ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id)).length;
 
   el.innerHTML = `
     <div class="pn-cabeca">
-      <div><h1>Vencimentos</h1>
+      <div><h1>Vencimentos${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
         <p class="sub">Toda a frota no desenho da planilha. Toque nos itens para marcar e gere a OS de uma vez.</p></div>
     </div>
     <div class="pn-cards" id="vc-cards"></div>
