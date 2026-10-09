@@ -15,6 +15,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+/* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
+const VERSAO_AREA = '4';
+
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/gr-192.v2.png',
     desc: 'Cadastros · SST · RH · DP' },
@@ -128,7 +131,9 @@ export function entrarNaArea(id, tela, extra) {
     const moldura = $('molduraManut');
     if (!molduraCarregada || extra) {
       molduraCarregada = true;
-      moldura.src = 'manutencoes/' + (extra ? '?' + extra : '');
+      // ?v= muda a cada publicação: o navegador guarda as páginas por alguns
+      // minutos e, sem isto, abria a área com a versão anterior.
+      moldura.src = 'manutencoes/?v=' + VERSAO_AREA + (extra ? '&' + extra : '');
     } else {
       // já aberta: volta para o início da área, sem recarregar a base
       try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
