@@ -995,3 +995,86 @@ body.modo-quadro .pn-card small{display:none}
 body.modo-quadro .pn-cabeca .sub{display:none}
 .vc-conta{margin:0 0 6px}
 .pl td[data-plano],.quadro td[data-plano]{cursor:pointer}
+
+/* ---------- OS de oficina (09/10/2026) ----------
+   Modelo das ordens de serviço de concessionária, em cores suaves: a folha vai
+   para a oficina, muitas vezes impressa em preto e branco. Nada de faixa verde
+   cheia — o verde fica num fio fino e no fundo claro dos títulos. */
+.os-folha{background:#fff;color:var(--cinza);font-size:13px;line-height:1.35;padding:4px 2px}
+.os-cab{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;
+  padding-bottom:10px;border-bottom:2px solid #CFE3A0;margin-bottom:12px}
+.os-logo{height:46px;width:auto;display:block}
+.os-titulo{text-align:center}
+.os-titulo h2{margin:0;font-size:20px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza)}
+.os-tipo{display:inline-block;margin-top:4px;padding:2px 12px;border-radius:12px;font-size:11.5px;font-weight:bold;
+  letter-spacing:.06em;text-transform:uppercase;border:1px solid}
+.os-tipo.prev{color:#4E7A0A;border-color:#BFD98A;background:#F4F9E8}
+.os-tipo.corr{color:var(--marrom);border-color:#D9C2A6;background:#FAF4EC}
+.os-numero{border:1.5px solid var(--cinza);border-radius:8px;padding:6px 14px;text-align:center;min-width:110px}
+.os-numero span{display:block;font-size:10px;letter-spacing:.1em;color:var(--cinza-claro)}
+.os-numero b{display:block;font-size:24px;line-height:1.1;color:var(--cinza)}
+.os-numero small{display:block;font-size:10.5px;color:var(--cinza-claro)}
+
+.os-bloco{margin:0 0 12px;break-inside:avoid;page-break-inside:avoid}
+.os-bloco h3{margin:0 0 6px;padding:4px 8px;background:#F2F6E8;border-left:3px solid #A9C95B;
+  font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#4A5A2A}
+.os-bloco h3 small{text-transform:none;letter-spacing:0;font-weight:normal;color:var(--cinza-claro);margin-left:6px}
+
+.os-grade{display:grid;gap:0;border:1px solid #D5D7CF;border-radius:6px;overflow:hidden}
+.os-g4{grid-template-columns:repeat(4,1fr)}
+.os-g5{grid-template-columns:2fr 1.3fr 1fr 1fr 1.3fr}
+.os-cx{padding:5px 8px;border-right:1px solid #E3E5DE;border-bottom:1px solid #E3E5DE;min-height:42px}
+.os-cx span{display:block;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--cinza-claro)}
+.os-cx b{display:block;font-size:13.5px;font-weight:bold;color:var(--cinza);margin-top:2px}
+.os-cx.forte b{font-size:17px;color:var(--marrom)}
+.os-cx.larga{grid-column:span 2}
+.os-preencher{display:inline-block;min-width:80%;border-bottom:1px solid #B9BCB2;height:14px;vertical-align:bottom}
+
+.os-tab{width:100%;border-collapse:collapse;font-size:12.5px}
+.os-tab th{background:#F7F8F4;color:var(--cinza);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;
+  text-align:left;padding:5px 6px;border:1px solid #D5D7CF}
+.os-tab td{padding:6px;border:1px solid #D5D7CF;vertical-align:top}
+.os-tab td small{display:block;color:var(--cinza-claro);font-size:11px}
+.os-tab .os-ok{width:46px;text-align:center}
+.os-mat{font-weight:bold;white-space:pre-line}
+.os-mat i{font-weight:normal;color:#A0662E}
+.os-motivo{color:var(--cinza-claro);font-size:12px}
+.os-quad{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:1.8px solid var(--cinza);
+  border-radius:3px;font-weight:bold;font-style:normal;color:#4E7A0A;vertical-align:middle}
+.os-quad.on{background:#F4F9E8}
+.os-pecas td{height:24px}
+.os-texto{border:1px solid #D5D7CF;border-left:3px solid #D9A06A;border-radius:6px;padding:8px 10px;min-height:34px;font-size:13.5px}
+.os-origem{font-size:11.5px;color:var(--cinza-claro);margin:4px 0 0}
+.os-linhas{display:flex;flex-direction:column}
+.os-linhas span{display:block;height:26px;border-bottom:1px solid #C9CCC2}
+.os-obs{margin-top:6px;border:1px solid #D5D7CF;border-radius:6px;padding:5px 8px 8px}
+.os-obs > span{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--cinza-claro)}
+.os-obs p{margin:4px 0 0}
+.os-checks{display:flex;flex-wrap:wrap;gap:8px 22px;padding:4px 2px}
+.os-checks span{display:inline-flex;align-items:center;gap:7px;font-size:12.5px}
+.os-checks .os-quad{width:16px;height:16px}
+.os-assinaturas{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin:26px 0 8px;break-inside:avoid}
+.os-assinaturas div{text-align:center;font-size:11px;color:var(--cinza-claro)}
+.os-assinaturas span{display:block;border-bottom:1px solid var(--cinza);height:30px;margin-bottom:4px}
+/* pé: só a marca da LOP no canto, como nos relatórios da área Pessoas */
+.os-pe{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin-top:10px;line-height:0}
+.os-pe img{height:19px;width:auto;opacity:.7}
+.os-pe span{font-size:8px;line-height:1;color:#8A8D86;letter-spacing:.2px;transform:translateY(4px)}
+@media (max-width:640px){
+  .os-g4{grid-template-columns:repeat(2,1fr)} .os-cx.larga{grid-column:span 2}
+  .os-g5{grid-template-columns:repeat(2,1fr)}
+  .os-assinaturas{grid-template-columns:1fr;gap:12px}
+  .os-cab{grid-template-columns:auto 1fr} .os-numero{grid-column:span 2}
+}
+@media print{
+  body.imprimindo-os #os-impresso{padding-bottom:0}
+  body.imprimindo-os .os-g4{grid-template-columns:repeat(4,1fr)}
+  body.imprimindo-os .os-g5{grid-template-columns:2fr 1.3fr 1fr 1fr 1.3fr}
+  .os-folha{font-size:10pt}
+  .os-bloco h3,.os-tab th,.os-quad.on,.os-tipo{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* janelas com cabeçalho claro, sem a faixa verde cheia */
+body.embutido .modal header{background:#fff;border-bottom:3px solid #CFE3A0}
+body.embutido .modal header h2{color:var(--cinza)}
+body.embutido .modal header button{color:var(--cinza)}

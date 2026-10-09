@@ -251,73 +251,119 @@ function abrirOS(idOS) {
   const corretiva = os.tipo === 'CORRETIVA';
   const ck = os.checklist_id ? q.por_id('checklists', os.checklist_id) : null;
 
+  /* OS de oficina (09/10/2026, refeita no modelo das ordens de serviço de
+     concessionária — John Deere, Fiat, Volkswagen): identificação do bem em
+     caixas, o que fazer com uma caixa grande de "feito" na frente, peças
+     usadas, mão de obra com hora de início e fim, inspeção de saída e as
+     assinaturas. Na corretiva, o roteiro "problema → causa → correção".
+     Cores suaves (a folha vai para a oficina, preto e branco) e, no pé, só a
+     marca da LOP no canto, como nos relatórios da área Pessoas. */
+  const lt = u === 'km' ? 'Km' : 'Horímetro';
+  const linhaBranca = '<span class="os-preencher"></span>';
+  const val = (v, vazio = linhaBranca) => (v === null || v === undefined || v === '') ? vazio : esc(v);
+  const caixa = (rot, conteudo, cls = '') => `<div class="os-cx ${cls}"><span>${rot}</span><b>${conteudo}</b></div>`;
+  const marcaModelo = [q.nome('marcas', e.marca_id), e.modelo].filter(Boolean).join(' ');
+  const serie = [(e.dados_tecnicos || {}).placa, e.numero_serie, e.patrimonio ? 'Pat. ' + e.patrimonio : ''].filter(Boolean).join(' · ');
+
   const blocoPreventiva = `
-    <h3 class="os-sec">Serviços a executar</h3>
-    <table class="tabela os-itens"><thead><tr>
-      <th>Item</th><th>A cada</th><th>O que usar</th><th>Última troca</th><th>Motivo</th><th class="c">Feito</th>
-    </tr></thead><tbody>` + itens.map(it => {
-      const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
-      return `<tr>
-        <td><strong>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</strong></td>
-        <td>${p ? esc(periodicidadeTexto(p, e)) : '—'}</td>
-        <td class="os-usa">${p && p.materiais ? esc(p.materiais) : '<span class="falta">não informado no cadastro</span>'}</td>
-        <td>${feita && it.data_troca ? '' : (p && p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '—')}
-            ${!feita && p && p.ultima_troca_leitura != null ? '<small>' + nHoras(p.ultima_troca_leitura) + ' ' + u + '</small>' : ''}
-            ${feita && it.data_troca ? 'trocado em ' + formatarData(it.data_troca) : ''}</td>
-        <td>${esc(it.motivo || '')}</td>
-        <td class="c os-caixa">${it.feito ? '☑' : '☐'}</td>
-      </tr>`;
-    }).join('') + '</tbody></table>';
+    <section class="os-bloco">
+      <h3>Serviços a executar <small>marque o quadrado do que for feito</small></h3>
+      <table class="os-tab"><thead><tr>
+        <th class="os-ok">Feito</th><th>Serviço</th><th>A cada</th><th>Material a usar</th><th>Última troca</th><th>Por que entrou</th>
+      </tr></thead><tbody>` + itens.map(it => {
+        const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
+        return `<tr>
+          <td class="os-ok"><span class="os-quad${it.feito ? ' on' : ''}">${it.feito ? '✓' : ''}</span></td>
+          <td><b>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</b></td>
+          <td>${p ? esc(periodicidadeTexto(p, e)) : '—'}</td>
+          <td class="os-mat">${p && p.materiais ? esc(p.materiais) : '<i>informar no cadastro da máquina</i>'}</td>
+          <td>${feita && it.data_troca ? 'trocado em ' + formatarData(it.data_troca)
+               : (p && p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '—') +
+                 (p && p.ultima_troca_leitura != null ? '<small>' + nHoras(p.ultima_troca_leitura) + ' ' + u + '</small>' : '')}</td>
+          <td class="os-motivo">${esc(it.motivo || '')}</td>
+        </tr>`;
+      }).join('') + `
+        <tr class="os-extra"><td class="os-ok"><span class="os-quad"></span></td><td colspan="5">Outro serviço: ${linhaBranca}</td></tr>
+      </tbody></table>
+    </section>`;
 
   const blocoCorretiva = `
-    <h3 class="os-sec">Problema</h3>
-    <div class="os-problema">${esc(os.descricao || '')}</div>
-    ${ck ? `<p class="os-origem">Apontado no check list ${ck.numero ? 'nº ' + ck.numero : ''} de ${formatarData(ck.data_verificacao)}${ck.operador ? ' · operador ' + esc(ck.operador) : ''}</p>` : ''}`;
+    <section class="os-bloco">
+      <h3>1 · Problema relatado</h3>
+      <div class="os-texto">${esc(os.descricao || '')}</div>
+      ${ck ? `<p class="os-origem">Apontado no check list ${ck.numero ? 'nº ' + ck.numero : ''} de ${formatarData(ck.data_verificacao)}${ck.operador ? ' · operador ' + esc(ck.operador) : ''}</p>` : ''}
+    </section>
+    <section class="os-bloco">
+      <h3>2 · Causa encontrada <small>o que o mecânico viu</small></h3>
+      <div class="os-linhas">${feita ? '' : '<span></span><span></span>'}</div>
+    </section>`;
 
-  const campo = (rot, val) => `<td>${rot}<br><strong>${val || '&nbsp;'}</strong></td>`;
-  const execucao = feita
-    ? `<table class="tabela os-manual"><tbody><tr>
-        ${campo('Data', formatarData(os.data_execucao))}
-        ${campo(u === 'km' ? 'Km' : 'Horímetro', os.leitura_execucao != null ? nHoras(os.leitura_execucao) + ' ' + u : '—')}
-        ${campo('Quem fez', esc(os.executado_por || ''))}
-      </tr><tr><td colspan="3">O que foi feito<br><strong>${esc(os.observacao || '—')}</strong></td></tr></tbody></table>`
-    : `<table class="tabela os-manual"><tbody><tr>
-        <td>Data<br>____ / ____ / ______</td>
-        <td>${u === 'km' ? 'Km' : 'Horímetro'} na hora do serviço<br>________________</td>
-        <td>Quem fez<br>______________________</td>
-      </tr><tr><td colspan="3" style="height:22mm">O que foi feito / observação</td></tr></tbody></table>`;
+  const blocoPecas = `
+    <section class="os-bloco">
+      <h3>Peças e materiais usados</h3>
+      <table class="os-tab os-pecas"><thead><tr>
+        <th style="width:22%">Código / part number</th><th>Descrição</th><th style="width:10%">Qtd</th><th style="width:10%">Unid.</th>
+      </tr></thead><tbody>${'<tr><td></td><td></td><td></td><td></td></tr>'.repeat(4)}</tbody></table>
+    </section>`;
+
+  const blocoExecucao = `
+    <section class="os-bloco">
+      <h3>${corretiva ? '3 · Correção — o que foi feito' : 'Execução'}</h3>
+      <div class="os-grade os-g5">
+        ${caixa('Mecânico', feita ? val(os.executado_por) : linhaBranca)}
+        ${caixa('Data', feita ? formatarData(os.data_execucao) : '___ /___ /_____')}
+        ${caixa('Hora início', linhaBranca)}
+        ${caixa('Hora fim', linhaBranca)}
+        ${caixa(lt + ' na saída', feita && os.leitura_execucao != null ? nHoras(os.leitura_execucao) + ' ' + u : linhaBranca)}
+      </div>
+      <div class="os-obs"><span>${corretiva ? 'O que foi feito' : 'Observações'}</span>
+        ${feita && os.observacao ? `<p>${esc(os.observacao)}</p>` : '<div class="os-linhas"><span></span><span></span></div>'}</div>
+    </section>
+    <section class="os-bloco os-saida">
+      <h3>Antes de liberar a máquina</h3>
+      <div class="os-checks">
+        ${['Sem vazamento', 'Níveis completos', 'Máquina testada', 'Área limpa', corretiva ? 'Problema resolvido' : 'Adesivo de troca colado e fotografado']
+          .map(t => `<span><i class="os-quad"></i>${t}</span>`).join('')}
+      </div>
+    </section>`;
 
   const html = `
     <div id="os-impresso" class="os-folha">
-      <header class="os-topo">
+      <header class="os-cab">
         <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios" class="os-logo">
-        <div class="os-num"><span>${corretiva ? 'OS CORRETIVA' : 'OS PREVENTIVA'}</span><b>${esc(numeroOS(os))}</b></div>
+        <div class="os-titulo">
+          <h2>Ordem de serviço</h2>
+          <span class="os-tipo ${corretiva ? 'corr' : 'prev'}">${corretiva ? 'Corretiva' : 'Preventiva'}</span>
+        </div>
+        <div class="os-numero"><span>Nº</span><b>${esc(os.numero || '—')}</b><small>aberta em ${formatarData(os.data_emissao)}</small></div>
       </header>
-      <div class="os-regua"></div>
-      <table class="tabela os-id"><tbody>
-        <tr><td>Máquina</td><td colspan="3"><strong>${esc(e.codigo)}</strong> — ${esc(e.descricao)}</td></tr>
-        <tr><td>Local</td><td>${esc(q.nome('locais', os.local_id))}</td>
-            <td>Marca / modelo</td><td>${esc([q.nome('marcas', e.marca_id), e.modelo].filter(Boolean).join(' ') || '—')}</td></tr>
-        <tr><td>Aberta em</td><td>${formatarData(os.data_emissao)}</td>
-            <td>${u === 'km' ? 'Km' : 'Horímetro'} na abertura</td><td>${os.leitura_emissao != null ? nHoras(os.leitura_emissao) + ' ' + u : '—'}</td></tr>
-      </tbody></table>
+
+      <section class="os-bloco">
+        <h3>Equipamento</h3>
+        <div class="os-grade os-g4">
+          ${caixa('Código', esc(e.codigo || '—'), 'forte')}
+          ${caixa('Descrição', esc(e.descricao || '—'), 'larga')}
+          ${caixa('Prazo', os.prazo ? formatarData(os.prazo) : linhaBranca)}
+          ${caixa('Fazenda', esc(q.nome('locais', os.local_id) || '—'))}
+          ${caixa('Marca / modelo', marcaModelo ? esc(marcaModelo) : linhaBranca)}
+          ${caixa('Placa / série', serie ? esc(serie) : linhaBranca)}
+          ${caixa(lt + ' na abertura', os.leitura_emissao != null ? nHoras(os.leitura_emissao) + ' ' + u : linhaBranca)}
+        </div>
+      </section>
 
       ${corretiva ? blocoCorretiva : blocoPreventiva}
+      ${blocoPecas}
+      ${blocoExecucao}
 
-      <h3 class="os-sec">Execução</h3>
-      ${execucao}
+      <section class="os-assinaturas">
+        <div><span></span>Mecânico</div>
+        <div><span></span>Responsável pela manutenção</div>
+        <div><span></span>Operador / recebido por</div>
+      </section>
 
-      <table class="tabela os-assinaturas"><tbody><tr>
-        <td>Assinatura do mecânico<br><br>_____________________________</td>
-        <td>Conferente<br><br>_____________________________</td>
-      </tr></tbody></table>
-      ${corretiva ? '' : '<p class="os-lembrete">A foto do adesivo de troca é obrigatória e precisa estar legível.</p>'}
-
-      <footer class="os-rodape">
-        <div class="os-barra"></div>
-        <p class="os-ass"><strong>Guilherme Lopes</strong> <span>· Gerente Administrativo</span></p>
-        <p class="os-empresa">SAKUMA Agronegócios</p>
-        <p class="os-lop">Desenvolvido por LOP · Inteligência para o agronegócio</p>
+      <footer class="os-pe">
+        <img src="../img/lop-marca.png" alt="LOP">
+        <span>Inteligência para o agronegócio</span>
       </footer>
     </div>
 
