@@ -607,7 +607,7 @@ async function gravarChecklist(e, modelo, vinculo, versao, grupos, r, t) {
    Texto longo quebra em duas linhas na coluna do item (~104 mm) — entra na conta.
    Se nem com linha de 5,6 mm couber em uma folha, vai frente e verso com
    letra e espaço maiores. */
-const fonteFolha = alt => Math.min(12.5, Math.max(9.5, alt * 1.55));
+const fonteFolha = alt => Math.min(12.5, Math.max(8.5, alt * 1.6));
 function layoutFolha(grupos) {
   const textos = grupos.flatMap(g => itensDoGrupo(g.id).map(i => i.texto || ''));
   const nG = grupos.length, FIXO = 66, PAG = 279;
@@ -618,8 +618,8 @@ function layoutFolha(grupos) {
       + textos.reduce((soma, t) => soma + Math.max(alt, Math.ceil(t.length / porLinha) * lh + 1.8), 0);
   };
   for (let alt = 10; alt >= 5.6; alt -= 0.1) if (FIXO + altura(alt) <= PAG * 0.97) return { alt, fonte: fonteDe(alt), pags: 1 };
-  for (let alt = 8.5; alt >= 5.6; alt -= 0.1) if (FIXO + altura(alt) + 10 <= PAG * 2 * 0.9) return { alt, fonte: fonteDe(alt), pags: 2 };
-  return { alt: 5.6, fonte: 9.5, pags: 3 };
+  for (let alt = 5.5; alt >= 3.8; alt -= 0.1) if (FIXO + altura(alt) <= PAG * 0.97) return { alt, fonte: fonteDe(alt), pags: 1 };
+  return { alt: 3.8, fonte: fonteDe(3.8), pags: 1 };
 }
 const tituloModelo = nome => String(nome || '').replace(/^CHECK\s*LIST\s*(\d+\s*DIAS)?\s*[-–—]?\s*/i, '') || nome;
 
@@ -696,7 +696,7 @@ function folhaChecklist(e, modelo, opts) {
       <div class="tit"><small>CHECK LIST DE CAMPO</small><h2>${esc(tituloModelo(modelo.nome))}</h2></div>
       <div class="cab-dir">${preenchido
         ? `<strong>Nº ${esc(ck.numero || '—')}</strong><span>${formatarData(ck.data_verificacao)}</span>`
-        : `<strong>A cada ${dias} dias</strong><span>${lay.pags > 1 ? 'frente e verso' : 'folha de campo'}</span>`}</div>
+        : `<strong>A cada ${dias} dias</strong><span>folha de campo</span>`}</div>
     </div>
     <table class="id"><colgroup><col class="ir"><col><col class="ir"><col class="iv"><col class="ir"><col class="ires"></colgroup>
       <tr><td class="rot">Máquina</td><td class="val" colspan="3">${esc(e.codigo)} — ${esc(e.descricao)}</td>
@@ -713,7 +713,7 @@ function folhaChecklist(e, modelo, opts) {
       <div><b>${ck.total_bom || 0}</b>bom</div><div><b>${ck.total_medio || 0}</b>médio</div><div><b>${ck.total_ruim || 0}</b>ruim</div>
       <div class="res ${resCls}"><b>${esc(res)}</b>resultado</div></div>
       <h3>NÃO CONFORMIDADES</h3>${blocoNC}<h3>CHECK LIST COMPLETO</h3>` : ''}
-    ${linhasGrupo}
+    <div class="ck-grupos">${linhasGrupo}</div>
     ${preenchido ? (ck.observacao_geral ? `<h3>OBSERVAÇÕES</h3><div class="obs-geral">${esc(ck.observacao_geral)}</div>` : '')
                  : '<div class="obs-geral"><span>OBSERVAÇÕES GERAIS</span></div>'}
     <table class="assin"><tr><td><div>Ass. avaliador</div></td><td><div>Ass. operador</div></td></tr></table>
@@ -836,13 +836,21 @@ function ajustarFolhas(alvo) {
       });
       return pag;
     };
-    aplicar(5.6);
-    const alvoPags = paginas();
-    let lo = 5.6, hi = 13;
-    for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; aplicar(m); if (paginas() <= alvoPags) lo = m; else hi = m; }
-    aplicar(lo);
-    f.dataset.pags = alvoPags;
-    const rot = f.querySelector('.cab-dir span'); if (rot) rot.textContent = alvoPags > 1 ? 'frente e verso' : 'folha de campo';
+    // Sempre UMA folha. 1º: uma coluna, com OBS. por item, se couber com
+    // linha de pelo menos 5,2 mm. Senão: grupos em duas colunas (a OBS. vai
+    // para o quadro de observações gerais). Só em último caso reduz a folha.
+    f.style.zoom = '';
+    f.classList.remove('duas');
+    const buscar = (lo, hi) => { for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; aplicar(m); if (paginas() <= 1) lo = m; else hi = m; } aplicar(lo); return lo; };
+    aplicar(5.2);
+    if (paginas() <= 1) buscar(5.2, 13);
+    else {
+      f.classList.add('duas');
+      aplicar(4.2);
+      if (paginas() <= 1) buscar(4.2, 13);
+      else { let z = 1; while (paginas() > 1 && z > 0.6) { z -= 0.03; f.style.zoom = z; } }
+    }
+    f.dataset.pags = 1;
   });
   alvo.setAttribute('style', antes);
 }
