@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v154';
+const VERSAO = 'gr-v155';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -32,7 +32,7 @@ const ARQUIVOS = [
   './manutencoes/', './manutencoes/index.html', './manutencoes/css/app.css',
   './manutencoes/js/config.js', './manutencoes/js/base.js', './manutencoes/js/comum.js',
   './manutencoes/js/acesso.js', './manutencoes/js/maquinas.js', './manutencoes/js/ordens.js',
-  './manutencoes/js/horimetro.js', './manutencoes/js/checklist.js', './manutencoes/js/painel.js', './manutencoes/js/vencimentos.js', './manutencoes/js/grupos.js',
+  './manutencoes/js/horimetro.js', './manutencoes/js/checklist.js', './manutencoes/js/painel.js', './manutencoes/js/vencimentos.js', './manutencoes/js/grupos.js', './manutencoes/js/modelos_ck.js',
 ];
 
 self.addEventListener('install', ev => {

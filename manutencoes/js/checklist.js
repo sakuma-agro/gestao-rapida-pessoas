@@ -114,6 +114,8 @@ function agendaChecklists() {
 /* ---------------------------------------------------------------- tela principal */
 
 let abaChecklist = 'agenda';
+/* Máquinas marcadas para imprimir a folha em branco (várias de uma vez). */
+const marcadosCk = new Set();
 
 TELAS.checklist = el => {
   el.innerHTML = `
@@ -123,11 +125,13 @@ TELAS.checklist = el => {
     <div class="abas">
       <button type="button" data-aba="agenda">Agenda</button>
       <button type="button" data-aba="realizados">Realizados</button>
+      ${window.ehAdmin && ehAdmin() ? '<button type="button" data-aba="modelos">Modelos (editar itens)</button>' : ''}
     </div>
     <div id="ck-corpo"></div>`;
   el.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { abaChecklist = b.dataset.aba; TELAS.checklist(el); });
+  if (abaChecklist === 'modelos' && !el.querySelector('[data-aba="modelos"]')) abaChecklist = 'agenda';
   el.querySelector(`[data-aba="${abaChecklist}"]`).classList.add('ativo');
-  (abaChecklist === 'agenda' ? desenharAgenda : desenharRealizados)(el.querySelector('#ck-corpo'));
+  ({ agenda: desenharAgenda, realizados: desenharRealizados, modelos: window.desenharModelosCk }[abaChecklist])(el.querySelector('#ck-corpo'));
 };
 
 function desenharAgenda(el) {
@@ -156,6 +160,8 @@ function desenharAgenda(el) {
     <div class="acoes">
       <button type="button" class="btn" id="ck-novo">Novo check list</button>
       <button type="button" class="btn neutro" id="ck-lote">Imprimir folhas em branco</button>
+      <button type="button" class="btn-fantasma" id="ck-marcar">Marcar todas da lista</button>
+      <button type="button" class="btn-fantasma" id="ck-desmarcar" hidden>Desmarcar</button>
       <button type="button" class="btn-fantasma" id="ck-atualizar" title="Baixar do servidor os check lists feitos em outros aparelhos">Atualizar dados</button>
     </div>
     <ul class="lista ck-agenda" id="ck-lista"></ul>`;
@@ -177,7 +183,8 @@ function desenharAgenda(el) {
         const etq = { atrasado: ['urgente', l.atraso + (l.atraso === 1 ? ' dia de atraso' : ' dias de atraso')],
                       hoje: ['vencido', 'vence hoje'], semana: ['atencao', 'vence em ' + (-l.atraso) + ' dias'],
                       ok: ['ok', 'em dia'], nunca: ['neutro', 'nunca feito'] }[l.status];
-        return `<li class="st-${l.status}">
+        return `<li class="st-${l.status}${marcadosCk.has(l.e.id) ? ' marcado' : ''}">
+          <label class="ck-marca" title="Marcar para imprimir"><input type="checkbox" data-marca="${esc(l.e.id)}"${marcadosCk.has(l.e.id) ? ' checked' : ''} aria-label="Marcar ${esc(l.e.codigo)} para imprimir"></label>
           <div class="info">
             <strong><span class="codigo">${esc(l.e.codigo)}</span> ${esc(l.e.descricao)}</strong>
             <small>${esc(q.nome('locais', l.e.local_id))} · ${esc(l.modelo.nome)} · a cada ${l.dias} dias</small>
@@ -190,6 +197,18 @@ function desenharAgenda(el) {
       }).join('');
     $('#ck-lista').querySelectorAll('[data-preencher]').forEach(b => b.onclick = () => preencherChecklist(b.dataset.preencher));
     $('#ck-lista').querySelectorAll('[data-branco]').forEach(b => b.onclick = () => imprimirLote([b.dataset.branco]));
+    $('#ck-lista').querySelectorAll('[data-marca]').forEach(c => c.onchange = () => {
+      if (c.checked) marcadosCk.add(c.dataset.marca); else marcadosCk.delete(c.dataset.marca);
+      c.closest('li').classList.toggle('marcado', c.checked); pintarLote();
+    });
+    visiveis = lista;
+    pintarLote();
+  };
+  let visiveis = [];
+  const pintarLote = () => {
+    const n = marcadosCk.size;
+    $('#ck-lote').textContent = n ? `Imprimir ${n} ${n === 1 ? 'folha marcada' : 'folhas marcadas'}` : 'Imprimir folhas em branco';
+    $('#ck-desmarcar').hidden = !n;
   };
   ['ck-busca', 'ck-local', 'ck-st'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
   desenhar();
@@ -199,9 +218,13 @@ function desenharAgenda(el) {
     if (!App.online) return aviso('Sem internet: mostrando o que está neste aparelho.', true);
     aviso('Atualizando…'); await baixarBase(true); irPara('checklist');
   };
+  $('#ck-marcar').onclick = () => { visiveis.forEach(l => marcadosCk.add(l.e.id)); desenhar(); };
+  $('#ck-desmarcar').onclick = () => { marcadosCk.clear(); desenhar(); };
   $('#ck-lote').onclick = () => {
-    const local = $('#ck-local').value;
-    const ids = linhas.filter(l => !local || l.e.local_id === local).map(l => l.e.id);
+    // Marcadas primeiro; sem nada marcado, todas as que a lista está mostrando.
+    const ids = marcadosCk.size
+      ? linhas.filter(l => marcadosCk.has(l.e.id)).map(l => l.e.id)
+      : visiveis.map(l => l.e.id);
     if (!ids.length) return aviso('Nenhuma máquina com modelo de check list neste filtro.', true);
     if (ids.length > 12 && !confirm(`Vão sair ${ids.length} folhas. Continuar?`)) return;
     imprimirLote(ids);
@@ -644,7 +667,7 @@ function folhaChecklist(e, modelo, opts) {
   const avaliador = preenchido ? (ck.avaliador_id === (App.usuario.id || null) ? App.usuario.nome : (q.nome('usuarios', ck.avaliador_id) || '')) : '';
   return `<div class="ck-folha ${opts.quebra ? 'quebra' : ''}" data-ck="${esc(ck.id || '')}">
     <div class="cab">
-      <img src="sakuma-logo-horizontal.svg" alt="SAKUMA Agronegócios">
+      <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <h2>${esc(modelo.nome)}<small>${preenchido ? 'CHECK LIST Nº ' + (ck.numero || '(aguardando envio)') : 'A CADA ' + dias + ' DIAS'}</small></h2>
     </div>
     <table class="id">
