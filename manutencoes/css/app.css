@@ -985,3 +985,13 @@ button.pn-os:hover{border-color:var(--verde)}
 .pn-os-txt small{color:var(--cinza-claro);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pn-dias{font-size:12.5px;font-weight:bold;color:var(--cinza-claro);white-space:nowrap}
 .pn-mais{margin-top:8px}
+
+/* ---------- vencimentos no desenho da planilha (09/10/2026) ---------- */
+.pn-card.pn-ativo{box-shadow:0 0 0 2px var(--marrom) inset}
+body.modo-quadro .pn-cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:2px 0 10px}
+body.modo-quadro .pn-card{padding:6px 10px;flex-direction:row;align-items:baseline;gap:8px}
+body.modo-quadro .pn-card strong{font-size:22px;order:-1}
+body.modo-quadro .pn-card small{display:none}
+body.modo-quadro .pn-cabeca .sub{display:none}
+.vc-conta{margin:0 0 6px}
+.pl td[data-plano],.quadro td[data-plano]{cursor:pointer}

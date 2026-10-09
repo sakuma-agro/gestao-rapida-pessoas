@@ -113,7 +113,7 @@ TELAS.vencimentos = el => {
 
 /* Abre a OS preventiva do item. Se a máquina já tem uma preventiva aberta,
    o item entra nela — o mecânico faz tudo numa ida só. */
-async function abrirOSPreventiva(idPlano) {
+async function abrirOSPreventiva(idPlano, opcoes = {}) {
   const p = q.por_id('planos_manutencao', idPlano);
   const e = q.por_id('equipamentos', p.equipamento_id);
   const c = calcular(p);
@@ -134,10 +134,14 @@ async function abrirOSPreventiva(idPlano) {
     plano_id: p.id, motivo: c.motivo, periodicidade_horas: p.periodicidade_horas,
     periodicidade_dias: p.periodicidade_dias, horas_restantes: c.horas_restantes, feito: false
   });
+  // Vários itens marcados na planilha geram as OS de uma vez: aí quem avisa e
+  // abre a tela é quem chamou.
+  if (opcoes.silencioso) return os;
   aviso(juntou ? `Item incluído na OS ${numeroOS(os)} que já estava aberta para o ${e.codigo}.`
                : `OS preventiva aberta para o ${e.codigo}.`);
   if (document.querySelector('#vc-lista')) irPara('vencimentos');
   abrirOS(os.id);
+  return os;
 }
 
 /* ================================================================ ORDENS DE SERVIÇO */
