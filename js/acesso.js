@@ -204,6 +204,82 @@ const nomesDp = ids => ids.map(id => destinosDp.find(d => d.id === id)).filter(B
 
 export const pode = m => acesso.admin || acesso.modulos.includes(m);
 
+/* ---------- área Manutenções (LOP - Gestão Rápida, 09/10/2026) ----------
+   Quem entra na área é quem tem 'manutencoes' em app_usuarios.modulos (ou é
+   administrador). Além disso, cada pessoa vê as máquinas das FAZENDAS marcadas
+   para ela (manutencao.usuario_fazendas) e pode ser administradora só da área
+   (manutencao.administradores) — mexe nos cadastros de lá sem ser
+   administradora do app inteiro. As duas listas usam o e-mail como chave,
+   igual a app_usuarios. */
+const manut = { carregado: false, erro: '', locais: [], fazendas: {}, admins: new Set() };
+const temManut = u => !!u && (u.admin || (u.modulos || []).includes('manutencoes'));
+
+async function carregarManut() {
+  manut.carregado = true;   // marca antes: um erro aqui não pode virar laço
+  if (!estado.cliente || !acesso.admin) return;
+  const sc = estado.cliente.schema('manutencao');
+  try {
+    const [l, f, a] = await Promise.all([
+      sc.from('locais').select('id,codigo,nome,ativo').order('nome'),
+      sc.from('usuario_fazendas').select('email,local_id'),
+      sc.from('administradores').select('email'),
+    ]);
+    const erro = l.error || f.error || a.error;
+    if (erro) throw erro;
+    manut.locais = (l.data || []).filter(x => x.ativo !== false);
+    manut.fazendas = {};
+    (f.data || []).forEach(x => { const k = x.email.toLowerCase(); (manut.fazendas[k] = manut.fazendas[k] || []).push(x.local_id); });
+    manut.admins = new Set((a.data || []).map(x => x.email.toLowerCase()));
+    manut.erro = '';
+  } catch (e) {
+    manut.erro = 'Não consegui ler as fazendas da área Manutenções: ' + (e.message || e);
+  }
+}
+
+/* Grava fazendas e administrador da área de uma pessoa (troca a lista inteira). */
+async function gravarManut(email, dados) {
+  if (!dados || manut.erro) return true;
+  const sc = estado.cliente.schema('manutencao');
+  const k = email.toLowerCase();
+  const tem = temManut(dados.u);
+  const quer = tem && !dados.u.admin ? (dados.fazendas || []) : [];
+  const antes = manut.fazendas[k] || [];
+  const sai = antes.filter(id => !quer.includes(id));
+  const entra = quer.filter(id => !antes.includes(id));
+  try {
+    if (sai.length) { const r = await sc.from('usuario_fazendas').delete().eq('email', k).in('local_id', sai); if (r.error) throw r.error; }
+    if (entra.length) { const r = await sc.from('usuario_fazendas').insert(entra.map(id => ({ email: k, local_id: id }))); if (r.error) throw r.error; }
+    manut.fazendas[k] = quer;
+    const adm = tem && !dados.u.admin && !!dados.admin;
+    if (adm && !manut.admins.has(k)) { const r = await sc.from('administradores').insert({ email: k }); if (r.error) throw r.error; manut.admins.add(k); }
+    if (!adm && manut.admins.has(k)) { const r = await sc.from('administradores').delete().eq('email', k); if (r.error) throw r.error; manut.admins.delete(k); }
+    return true;
+  } catch (e) {
+    const a = $('cfAviso');
+    a.textContent = 'O acesso foi salvo, mas as fazendas da área Manutenções não: ' + (e.message || e);
+    a.hidden = false;
+    return false;
+  }
+}
+
+/* E-mail trocado: as duas listas da área acompanham. */
+async function trocarEmailManut(antigo, novo) {
+  if (manut.erro) return;
+  const sc = estado.cliente.schema('manutencao');
+  await sc.from('usuario_fazendas').update({ email: novo }).eq('email', antigo);
+  await sc.from('administradores').update({ email: novo }).eq('email', antigo);
+  if (manut.fazendas[antigo]) { manut.fazendas[novo] = manut.fazendas[antigo]; delete manut.fazendas[antigo]; }
+  if (manut.admins.delete(antigo)) manut.admins.add(novo);
+}
+
+function resumoManut(u) {
+  if (!temManut(u) || u.admin) return null;
+  const k = (u.email || '').toLowerCase();
+  if (manut.admins.has(k)) return 'administra · todas as fazendas';
+  const n = (manut.fazendas[k] || []).length;
+  return n ? (n === 1 ? (manut.locais.find(l => l.id === manut.fazendas[k][0])?.nome || '1 fazenda') : n + ' fazendas') : 'nenhuma fazenda marcada';
+}
+
 /* Permissão por tela (submódulo). A lista guarda 'modulo:tela'.
    Enquanto nenhuma tela de um módulo estiver na lista, a pessoa vê o módulo
    inteiro — que é como sempre funcionou. Basta marcar uma para o resto sumir. */
@@ -248,6 +324,7 @@ export async function carregarAcesso() {
     usuarios = data || [];
     const meu = usuarios.find(u => (u.email || '').toLowerCase() === acesso.email);
     acesso.admin = !!meu?.admin;
+    acesso.nome = meu?.nome || meu?.usuario || '';
     acesso.modulos = meu ? (meu.modulos || []) : [...PADRAO];
     // quem tinha o módulo antigo "EPIs" enxerga o SST, que tomou o lugar dele
     if (acesso.modulos.includes('epis') && !acesso.modulos.includes('sst')) acesso.modulos.push('sst');
@@ -502,6 +579,8 @@ export function desenharConfig() {
       });
   }
 
+  if (!manut.carregado) carregarManut().then(() => desenharConfig());
+
   $('cfTabela').innerHTML = usuarios.length ? `
     <table class="dc-planilha cf-tab"><thead><tr>
       <th>Pessoa</th><th>Login</th><th>O que enxerga</th><th></th>
@@ -513,6 +592,8 @@ export function desenharConfig() {
             const dp = r && m.id === 'jornada' && (u.destinos || []).length
               ? (r.txt === 'tudo' ? '' : r.txt + ' · ') + 'só ' + nomesDp(u.destinos) : '';
             return r ? `<button type="button" class="cf-chip ${dp ? 'cf-parte' : r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${esc(dp || r.txt)}</button>` : ''; })
+            .concat([resumoManut(u)].filter(Boolean).map(t =>
+              `<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="manutencoes">Manutenções · ${esc(t)}</button>`))
             .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';
       return `<tr>
         <td><b>${esc(u.nome || u.email)}</b>${eu ? ' <span class="tag ativo">você</span>' : ''}
@@ -645,6 +726,8 @@ function abrirUsuario(email, foco) {
   editando = u ? { ...u, telas: [...(u.telas || [])], destinos: [...(u.destinos || [])], novo: false, emailOriginal: u.email }
                 : { email: '', nome: '', usuario: '', admin: false,
                     modulos: [...PADRAO], telas: [], destinos: [], novo: true };
+  const k = (editando.email || '').toLowerCase();
+  editando.manut = { fazendas: [...(manut.fazendas[k] || [])], admin: manut.admins.has(k) };
   $('usSenha').hidden = true;
   $('usSenha').className = 'us-senha';
   $('usSenha').innerHTML = '';
@@ -715,16 +798,30 @@ function desenharPermissoes() {
           </div></div>`;
         }).join('')}
       </div>`;
-    }).join('')}`}`;
+    }).join('')}
+    ${blocoManut(e)}`}`;
 
   const raiz = $('usPermissoes');
   raiz.querySelectorAll('[data-meio]').forEach(cx => { cx.indeterminate = true; });
   $('usAdmin')?.addEventListener('change', ev => { e.admin = ev.target.checked; desenharPermissoes(); });
   $('usDestinos')?.addEventListener('change', ev => { e.destinos = ev.target.value ? [ev.target.value] : []; });
+  $('usManut')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('manutencoes'); else mods.delete('manutencoes');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usManutAdmin')?.addEventListener('change', ev => { e.manut.admin = ev.target.checked; desenharPermissoes(); });
+  raiz.querySelectorAll('input[data-fazenda]').forEach(cx => cx.addEventListener('change', () => {
+    const id = cx.dataset.fazenda;
+    e.manut.fazendas = cx.checked ? [...new Set([...e.manut.fazendas, id])] : e.manut.fazendas.filter(x => x !== id);
+  }));
   $('usCopiar')?.addEventListener('change', ev => {
     const o = usuarios.find(u => u.email === ev.target.value);
     if (!o) return;
     e.modulos = [...(o.modulos || [])]; e.telas = [...(o.telas || [])]; e.destinos = [...(o.destinos || [])];
+    const ko = (o.email || '').toLowerCase();
+    e.manut = { fazendas: [...(manut.fazendas[ko] || [])], admin: manut.admins.has(ko) };
     desenharPermissoes();
   });
   raiz.querySelectorAll('[data-tudo]').forEach(b => b.addEventListener('click', () => {
@@ -745,6 +842,27 @@ function desenharPermissoes() {
     definirTelas(e, m, vistas);
     desenharPermissoes();
   }));
+}
+
+/* Bloco "Área Manutenções" na ficha da pessoa: entra ou não, é administradora
+   da área ou não, e quais fazendas enxerga. */
+function blocoManut(e) {
+  const tem = temManut(e);
+  const m = e.manut || { fazendas: [], admin: false };
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="manutencoes">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usManut" ${tem ? 'checked' : ''}>
+      <b>Área Manutenções</b>
+      <span class="dc-sem">${!tem ? 'não entra' : m.admin ? 'administra a área · todas as fazendas' : `${m.fazendas.length} fazenda(s)`}</span>
+    </label>
+    ${!tem ? '' : manut.erro ? `<p class="dc-sem">${esc(manut.erro)}</p>` : `
+    <label class="us-tela"><input type="checkbox" id="usManutAdmin" ${m.admin ? 'checked' : ''}>
+      <span>Administrador da área<small>mexe nos cadastros de máquinas, planos e check lists; vê todas as fazendas</small></span></label>
+    ${m.admin ? '' : `<div class="us-subbloco"><span class="us-sub">Fazendas que enxerga</span>
+      <div class="us-telas">${manut.locais.map(l => `
+        <label class="us-tela"><input type="checkbox" data-fazenda="${l.id}" ${m.fazendas.includes(l.id) ? 'checked' : ''}>
+          <span>${esc(l.nome)}</span></label>`).join('') || '<span class="dc-sem">Nenhuma fazenda cadastrada.</span>'}</div></div>`}`}
+  </div>`;
 }
 
 export function ligarAcesso() {
@@ -782,6 +900,7 @@ export function ligarAcesso() {
       // que cria login não pode existir no navegador.
       const ok = await criarLogin(u);
       if (!ok) return;                 // erro já apareceu; o diálogo fica aberto
+      await gravarManut(u.email, { u, ...editando.manut });
       // A função do servidor grava módulos e telas; o recorte de DP vai à parte.
       if ((u.destinos || []).length && await gravar(u)) {
         const i = usuarios.findIndex(x => x.email === u.email);
@@ -803,6 +922,7 @@ export function ligarAcesso() {
       const ok = await trocarEmail(antigo, email);
       if (!ok) return;                 // erro já apareceu; o diálogo fica aberto
       usuarios = usuarios.filter(x => (x.email || '').toLowerCase() !== antigo);
+      await trocarEmailManut(antigo, email);
       editando.email = email;
       editando.emailOriginal = email;
       // Foi o próprio e-mail: o token atual ainda carrega o endereço velho, e
@@ -820,6 +940,7 @@ export function ligarAcesso() {
       const i = usuarios.findIndex(x => x.email === email);
       if (i >= 0) usuarios[i] = u; else usuarios.push(u);
       usuarios.sort((a, b) => a.email.localeCompare(b.email));
+      await gravarManut(email, { u, ...editando.manut });
     }
 
     if (trocouEmail && antigo === acesso.email) {
@@ -868,6 +989,7 @@ export function ligarAcesso() {
     const { error } = await estado.cliente.from('app_usuarios').delete().eq('email', editando.email);
     if (error) { alert('Não consegui tirar: ' + error.message); return; }
     usuarios = usuarios.filter(x => x.email !== editando.email);
+    await gravarManut(editando.email, { u: { email: editando.email, modulos: [] } });
     $('dlgUsuario').close();
     desenharConfig();
   });
@@ -878,4 +1000,5 @@ export function limparAcesso() {
   acesso.email = ''; acesso.admin = false;
   acesso.modulos = [...PADRAO]; acesso.destinos = []; acesso.carregado = false;
   destinosDp = [];
+  manut.carregado = false; manut.erro = ''; manut.locais = []; manut.fazendas = {}; manut.admins = new Set();
 }

@@ -1118,3 +1118,68 @@ dialog.rs-largo form{max-height:88vh;overflow:auto}
 .sd-param-top>div{min-width:0}
 .sd-param-top .btn{flex:none}
 @media (max-width:600px){#telaSdQuadro .rs-kpis,#telaSdPlanos .rs-kpis{grid-template-columns:1fr 1fr}}
+
+/* =========================================================
+   LOP - Gestão Rápida (09/10/2026)
+   O app virou plataforma: no alto, a logo da LOP e o nome do sistema
+   (levam à escolha das áreas), a etiqueta da área aberta e a SAKUMA.
+   ========================================================= */
+.abas[hidden]{display:none}
+.topo-plataforma{gap:11px}
+.topo .topo-lop-logo{height:36px;width:auto;border-radius:0;mix-blend-mode:multiply}
+.topo-barra{width:2px;height:30px;background:#1B232B;border-radius:1px}
+.topo-nome{display:flex;flex-direction:column;line-height:1.15;text-align:left;color:#1B232B}
+.topo-nome h1{font-size:17px;font-weight:800;color:inherit}
+.topo-nome small{font-size:9.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#3A4249}
+.topo-plataforma:hover .topo-nome h1{color:var(--verde-esc)}
+.topo-area{display:inline-flex;align-items:center;gap:7px;border:0;cursor:pointer;
+  padding:5px 12px 5px 6px;border-radius:20px;background:var(--verde-fundo);color:var(--verde-esc);
+  font:inherit;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase}
+.topo-area[hidden]{display:none}
+.topo .topo-area img{height:24px;width:24px;border-radius:6px}
+.topo-area:hover{background:var(--verde);color:#fff}
+.topo-area:focus-visible{outline:2px solid var(--marrom);outline-offset:2px}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .topo .topo-lop-logo{filter:invert(1);mix-blend-mode:screen}
+  :root:not([data-theme="light"]) .topo-barra{background:var(--texto)}
+  :root:not([data-theme="light"]) .topo-nome,:root:not([data-theme="light"]) .topo-nome small{color:var(--texto)} }
+:root[data-theme="dark"] .topo .topo-lop-logo{filter:invert(1);mix-blend-mode:screen}
+:root[data-theme="dark"] .topo-barra{background:var(--texto)}
+:root[data-theme="dark"] .topo-nome,:root[data-theme="dark"] .topo-nome small{color:var(--texto)}
+@media (max-width:640px){
+  .topo .topo-lop-logo{height:28px}
+  .topo-barra{height:24px}
+  .topo-nome h1{font-size:15px}
+  .topo-nome small{display:none}
+}
+.caixa img.login-lop{height:64px;width:auto;border-radius:0;mix-blend-mode:multiply}
+
+/* ---- escolha das áreas ---- */
+.areas{padding:26px 0 30px}
+.ar-cabeca{display:flex;flex-direction:column;gap:4px;margin-bottom:22px}
+.ar-ola{color:var(--marrom);font-weight:700;font-size:12.5px;letter-spacing:.6px;text-transform:uppercase}
+.ar-cabeca h2{margin:0;font-size:26px;letter-spacing:-.4px}
+.ar-cabeca .dica{margin:0}
+.ar-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.ar-cartao{display:flex;align-items:center;gap:16px;text-align:left;font:inherit;color:var(--texto);
+  background:var(--papel);border:1.5px solid var(--linha);border-radius:16px;padding:20px;cursor:pointer;
+  box-shadow:var(--sombra);transition:border-color .15s,box-shadow .15s}
+.ar-cartao:hover{border-color:var(--verde);box-shadow:0 6px 18px rgba(79,115,0,.14)}
+.ar-cartao:focus-visible{outline:2px solid var(--marrom);outline-offset:2px}
+.ar-cartao img{width:58px;height:58px;border-radius:14px;flex:none}
+.ar-txt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ar-txt b{font-size:20px;letter-spacing:-.3px}
+.ar-txt small{color:var(--suave);font-size:12.5px}
+.ar-ir{color:var(--verde-esc);font-weight:700;white-space:nowrap}
+.ar-cartao.ar-embreve{cursor:default;background:transparent;border-style:dashed;box-shadow:none;color:var(--suave)}
+.ar-cartao.ar-embreve img{filter:grayscale(1);opacity:.55}
+.ar-cartao.ar-embreve .ar-ir{color:var(--suave);font-weight:600}
+.ar-pe{margin-top:22px}
+
+/* ---- área Manutenções: a moldura ocupa a tela abaixo do topo ---- */
+body.na-moldura main{max-width:none;padding:0}
+.area-moldura{display:block;width:100%;border:0;height:calc(100vh - var(--topo-h, 64px));
+  height:calc(100dvh - var(--topo-h, 64px));background:var(--fundo)}
+@media print{ body.na-moldura .topo{display:none !important} body.na-moldura .area-moldura{height:auto} }
+.cf-chip.cf-manut{border-color:#84BD00;background:rgba(132,189,0,.08);color:#4f7300}
+.us-manut{margin-top:10px;border-color:#84BD00}
+.us-manut .us-sub{display:block;margin-top:8px}

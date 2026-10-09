@@ -34,6 +34,7 @@ import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-ind
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
+import { ligarAreas, abrirPrimeiraTela, limparAreas } from './areas.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -77,6 +78,9 @@ function limparPrevias() {
 function abrirAba(nome) {
   limparPrevias();
   $('telaInicio').hidden = nome !== 'inicio';
+  $('telaAreas').hidden = nome !== 'areas';
+  $('telaManut').hidden = nome !== 'manutencoes';
+  document.body.classList.toggle('na-moldura', nome === 'manutencoes');
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
@@ -173,11 +177,9 @@ $('formLogin').addEventListener('submit', async ev => {
   }
 });
 
-/* O nome do app no alto volta para a tela de marca e desmarca o módulo —
-   é o mesmo gesto de clicar no logotipo de um site. */
-$('bInicio').addEventListener('click', () => {
-  if (!$('app').hidden) mostrarInicio();
-});
+/* A logo da LOP e o nome do sistema, no alto, levam à escolha das áreas; a
+   etiqueta da área leva ao início dela (js/areas.js, 09/10/2026). */
+ligarAreas(abrirAba);
 
 /* Trocar a própria senha já logado. Usa a mesma tela do link do e-mail —
    é o caminho que não depende do e-mail de recuperação chegar certo. */
@@ -206,7 +208,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
   mostrar('login');
 });
 
@@ -352,6 +354,8 @@ async function carregarTudo() {
   }
 
   montarMenu(abrirAba);
+  // Primeira tela: a escolha das áreas (ou a área pedida no endereço).
+  abrirPrimeiraTela();
 
   try {
     preencherControles();

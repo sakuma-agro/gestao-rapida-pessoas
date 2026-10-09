@@ -1,0 +1,942 @@
+/* =====================================================================
+   Gestão Rápida · Manutenções — SAKUMA Agronegócios — estilo
+   Identidade: verde #84BD00, marrom #744F28, cinza #51534A, Arial.
+   Sem preto puro. Botões grandes: o app é usado de luva, no campo.
+   Topo no padrão do Gestão Rápida (Pessoas): marca SAKUMA no alto,
+   assinatura LOP gravada a laser no canto e no rodapé.
+   ===================================================================== */
+
+:root{
+  --verde:#84BD00;
+  --verde-escuro:#6A9800;
+  --marrom:#744F28;
+  --cinza:#51534A;
+  --cinza-claro:#8A8C83;
+  --linha:#DCDDD7;
+  --fundo:#F6F7F3;
+  --branco:#FFFFFF;
+  --grafite:#1B232B;
+  --verde-lop:#0D4D31;
+
+  --urgente:#C0392B;
+  --atencao:#E1A200;
+  --vencido:#D2691E;
+  --ok:#4E8B1F;
+
+  --toque:48px;              /* alvo mínimo de toque, uso com luva */
+  --raio:6px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:Arial,Helvetica,sans-serif;
+  color:var(--cinza);
+  background:var(--fundo);
+  font-size:16px;
+  line-height:1.45;
+  -webkit-text-size-adjust:100%;
+}
+.oculto{display:none !important}
+
+/* ---------- topo ----------
+   Uma barra só, como no Gestão Rápida (Pessoas): o nome do app à
+   esquerda (clicável, volta ao início), a marca SAKUMA ao lado, e à
+   direita o estado da conexão e os botões da sessão. Nada de barra
+   grafite separada: a SAKUMA é a dona da tela e a LOP assina embaixo,
+   gravada a laser — as duas marcas nunca no mesmo lugar. */
+.topo{
+  position:sticky;top:0;z-index:20;
+  background:var(--branco);border-bottom:3px solid var(--verde);
+  padding-top:env(safe-area-inset-top);
+}
+/* Largura útil da tela. O monitor do escritório é largo e a planilha de
+   vencimentos tem coluna para gastar: 1100px deixava um palmo de fundo vazio
+   de cada lado. --largura é o valor normal; os painéis em tabela abrem mais
+   (regra em body.modo-quadro, lá embaixo). */
+:root{ --largura:1560px }
+
+.topo-int{
+  max-width:var(--largura);margin:0 auto;padding:10px 14px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.topo-int .cresce{flex:1}
+
+/* ícone e nome viram um botão só, mas continuam parecendo texto */
+.topo-inicio{
+  display:flex;align-items:center;gap:10px;border:0;background:none;
+  padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;border-radius:10px;
+}
+.topo-inicio img{height:34px;width:34px;border-radius:7px;display:block}
+.topo-inicio:hover h1{color:var(--verde-escuro)}
+.topo-inicio:focus-visible{outline:3px solid var(--marrom);outline-offset:3px}
+.topo h1{font-size:16px;margin:0;font-weight:bold;letter-spacing:-.2px;color:var(--cinza)}
+.topo h1 .modulo{
+  display:inline-block;margin-left:6px;padding:2px 8px;border-radius:20px;
+  background:rgba(132,189,0,.12);color:var(--verde-escuro);
+  font-size:11px;font-weight:bold;letter-spacing:.4px;text-transform:uppercase;vertical-align:2px;
+}
+
+/* marca SAKUMA: entra como o arquivo veio, só a altura é ajustada */
+.topo-divisor{width:1px;height:28px;background:var(--linha);margin:0 2px}
+.topo-marca{height:31px;width:auto;display:block}
+
+.local{color:var(--marrom);font-weight:bold;font-size:14px}
+.estado{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--cinza-claro)}
+.ponto{width:10px;height:10px;border-radius:50%;background:var(--cinza-claro);display:inline-block}
+.ponto.online{background:var(--verde)}
+.ponto.offline{background:var(--atencao)}
+.fila{
+  background:var(--marrom);color:#fff;border:0;border-radius:20px;
+  padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;
+}
+
+/* No celular o topo encolhe: quem trabalha no campo precisa de tela,
+   não de cabeçalho. O essencial continua ali — nome, marca, estado da
+   conexão e a fila de envio. */
+@media (max-width:640px){
+  .topo-divisor{display:none}
+  .topo-marca{height:22px}
+  .topo-int{gap:8px;padding:8px 12px}
+  .topo-inicio{gap:8px}
+  .topo-inicio img{height:30px;width:30px}
+  .topo h1{font-size:15px}
+  .topo h1 .modulo{font-size:10px;padding:1px 6px;margin-left:5px}
+  .local{font-size:13px}
+  .estado{font-size:12.5px}
+  .fila{font-size:12.5px;padding:4px 10px}
+  .topo .btn-fantasma{min-height:34px;padding:0 10px;font-size:13px}
+}
+
+/* ---------- menu ---------- */
+.menu{
+  display:flex;gap:2px;background:var(--branco);
+  border-bottom:1px solid var(--linha);overflow-x:auto;
+}
+.menu button{
+  flex:1 0 auto;min-height:var(--toque);padding:0 16px;
+  border:0;border-bottom:3px solid transparent;background:none;
+  font:inherit;font-size:15px;color:var(--cinza);cursor:pointer;white-space:nowrap;
+}
+.menu button.ativo{color:var(--verde-escuro);border-bottom-color:var(--verde);font-weight:bold}
+.menu button:focus-visible,.btn:focus-visible,.btn-fantasma:focus-visible{
+  outline:3px solid var(--marrom);outline-offset:2px;
+}
+
+/* ---------- conteúdo ---------- */
+.conteudo{max-width:var(--largura);margin:0 auto;padding:16px 14px 90px}
+h1{font-size:21px;margin:0 0 4px}
+h2{font-size:17px;margin:22px 0 8px}
+.sub{color:var(--cinza-claro);font-size:14px;margin:0 0 16px}
+.carregando{text-align:center;color:var(--cinza-claro);padding:40px 0}
+
+/* ---------- botões ---------- */
+.btn{
+  min-height:var(--toque);padding:0 20px;border:0;border-radius:var(--raio);
+  background:var(--verde);color:#fff;font:inherit;font-size:16px;font-weight:bold;
+  cursor:pointer;
+}
+.btn:hover{background:var(--verde-escuro)}
+.btn.secundario{background:var(--marrom)}
+.btn.neutro{background:var(--branco);color:var(--cinza);border:1px solid var(--linha)}
+.btn-fantasma{
+  min-height:38px;padding:0 12px;background:none;border:1px solid var(--linha);
+  border-radius:var(--raio);font:inherit;font-size:14px;color:var(--cinza);cursor:pointer;
+}
+.acoes{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+
+/* ---------- cartões do início ---------- */
+.painel{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.cartao{
+  background:var(--branco);border:1px solid var(--linha);border-left:5px solid var(--verde);
+  border-radius:var(--raio);padding:14px;
+}
+.cartao b{display:block;font-size:28px;line-height:1.1;color:var(--cinza)}
+.cartao span{font-size:13px;color:var(--cinza-claro)}
+.cartao.alerta{border-left-color:var(--marrom)}
+
+/* ---------- busca e filtros ---------- */
+.filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filtros input,.filtros select{
+  min-height:var(--toque);padding:0 12px;border:1px solid var(--linha);
+  border-radius:var(--raio);font:inherit;font-size:16px;background:var(--branco);color:var(--cinza);
+}
+.filtros input[type=search]{flex:1 1 220px}
+
+/* ---------- listas e tabelas ---------- */
+.tabela{width:100%;border-collapse:collapse;background:var(--branco);
+  border:1px solid var(--linha);border-radius:var(--raio);overflow:hidden}
+.tabela th{
+  background:var(--verde);color:#fff;text-align:left;font-size:13px;
+  padding:10px;font-weight:bold;
+}
+.tabela td{padding:10px;border-top:1px solid var(--linha);font-size:15px;vertical-align:top}
+.tabela tbody tr:hover{background:#FAFBF7}
+.tabela .num{text-align:right;white-space:nowrap}
+.codigo{font-weight:bold;color:var(--marrom);white-space:nowrap}
+
+.lista{list-style:none;margin:0;padding:0}
+.lista li{
+  background:var(--branco);border:1px solid var(--linha);border-radius:var(--raio);
+  padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;
+  align-items:center;gap:12px;flex-wrap:wrap;
+}
+.lista .info{flex:1 1 240px}
+.lista .info small{display:block;color:var(--cinza-claro);font-size:13px}
+
+/* ---------- etiquetas de status: cor E texto ---------- */
+.etq{
+  display:inline-block;padding:3px 10px;border-radius:12px;
+  font-size:12px;font-weight:bold;color:#fff;white-space:nowrap;
+}
+.etq.urgente{background:var(--urgente)}
+.etq.atencao{background:var(--atencao)}
+.etq.vencido{background:var(--vencido)}
+.etq.ok{background:var(--ok)}
+.etq.neutro{background:var(--cinza-claro)}
+.etq.inativo{background:var(--branco);color:var(--cinza-claro);border:1px solid var(--linha)}
+
+/* ---------- formulários ---------- */
+.campo{margin-bottom:14px}
+.campo label{display:block;font-size:14px;margin-bottom:4px;color:var(--cinza)}
+.campo input,.campo select,.campo textarea{
+  width:100%;min-height:var(--toque);padding:10px 12px;
+  border:1px solid var(--linha);border-radius:var(--raio);
+  font:inherit;font-size:16px;background:var(--branco);color:var(--cinza);
+}
+.campo textarea{min-height:90px;resize:vertical}
+.campo .ajuda{font-size:13px;color:var(--cinza-claro);margin-top:3px}
+.colunas{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 14px}
+fieldset{border:1px solid var(--linha);border-radius:var(--raio);padding:14px;margin:0 0 16px}
+legend{padding:0 8px;font-weight:bold;font-size:14px;color:var(--marrom)}
+
+/* ---------- modal ---------- */
+.modal{position:fixed;inset:0;background:rgba(81,83,74,.55);display:flex;
+  align-items:flex-end;justify-content:center;z-index:50}
+.modal .caixa{
+  background:var(--fundo);width:100%;max-width:760px;max-height:92vh;
+  overflow:auto;border-radius:12px 12px 0 0;
+}
+.modal header{
+  position:sticky;top:0;background:var(--verde);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;padding:12px 16px;
+}
+.modal header h2{margin:0;font-size:17px;color:#fff}
+.modal header button{background:none;border:0;color:#fff;font-size:30px;
+  line-height:1;cursor:pointer;min-width:44px;min-height:44px}
+.modal #modal-corpo{padding:16px}
+@media(min-width:700px){
+  .modal{align-items:center}
+  .modal .caixa{border-radius:12px}
+}
+
+/* ---------- aviso ---------- */
+.aviso{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:24px;
+  background:var(--grafite);color:#fff;padding:12px 20px;border-radius:24px;
+  font-size:15px;z-index:60;max-width:90vw;text-align:center;
+}
+.aviso.erro{background:var(--urgente)}
+
+/* ---------- rodapé ---------- */
+.rodape{
+  position:fixed;bottom:0;left:0;right:0;background:var(--branco);
+  border-top:1px solid var(--linha);
+  display:flex;align-items:center;justify-content:center;
+  padding:6px 8px;
+  padding-bottom:calc(6px + env(safe-area-inset-bottom));
+}
+/* A assinatura vem num arquivo de 1400 px de largura com quase metade
+   em transparente à direita. As margens negativas encolhem a caixa até
+   a tinta, para a marca ficar centralizada de verdade — sem recortar o
+   arquivo nem mexer no desenho. */
+.rodape-lop{
+  --lop:300px;
+  width:var(--lop);height:auto;display:block;opacity:.92;
+  margin-left:calc(var(--lop) * -0.0429);
+  margin-right:calc(var(--lop) * -0.455);
+}
+@media (max-width:560px){ .rodape-lop{ --lop:230px } }
+
+.vazio{
+  background:var(--branco);border:1px dashed var(--linha);border-radius:var(--raio);
+  padding:28px 20px;text-align:center;color:var(--cinza-claro);
+}
+.vazio p{margin:0 0 14px}
+
+@media(prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+
+/* ---------- quadro consolidado ----------
+   Toda a frota numa tela: uma linha por máquina ou implemento, uma coluna por
+   item de manutenção. Em cada cruzamento, o que ele quer ver de relance é a
+   MARCA DA PRÓXIMA TROCA; embaixo, em letra miúda, a situação e quanto falta.
+   A cor diz o estado e a palavra repete — cor sozinha não conta a ninguém.
+   O cabeçalho e as duas primeiras colunas ficam grudados: dá para rolar 40
+   máquinas e 6 itens sem perder de vista quem é quem. */
+.rolagem{overflow-x:auto;-webkit-overflow-scrolling:touch;max-height:calc(100vh - 210px)}
+
+/* No consolidado o cabeçalho da tela cede espaço para a tabela: o texto de
+   apoio sai, os quatro cartões viram uma faixa baixa e a rolagem cresce. */
+body.modo-quadro #tela > h1 + .sub{display:none}
+body.modo-quadro .filtros{margin-bottom:10px}
+body.modo-quadro #pv-resumo{
+  display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;
+}
+body.modo-quadro #pv-resumo .cartao{
+  flex:1 1 120px;display:flex;align-items:baseline;gap:6px;padding:6px 10px;
+}
+body.modo-quadro #pv-resumo .cartao b{font-size:20px;line-height:1}
+body.modo-quadro #pv-resumo .cartao span{font-size:11px}
+body.modo-quadro h1{margin-bottom:4px;font-size:20px}
+body.modo-quadro .rolagem{max-height:calc(100vh - 150px)}
+/* Planilha e consolidado usam a tela inteira: cada pixel de largura é uma
+   coluna a mais visível sem rolar para o lado. */
+body.modo-quadro .conteudo,
+body.modo-quadro .topo-int{max-width:none;padding-left:18px;padding-right:18px}
+/* mesmo motivo da .pl: overflow:hidden herdado de .tabela desligava o
+   congelamento das duas primeiras colunas */
+.quadro{min-width:900px;border-collapse:separate;border-spacing:0;overflow:visible;border-radius:0}
+.quadro th{
+  font-size:11.5px;padding:7px 6px;vertical-align:bottom;text-align:center;
+  position:sticky;top:0;z-index:3;
+}
+.quadro thead th.col-cod{left:0;z-index:5}
+.quadro thead th.col-maq{left:64px;z-index:5;text-align:left}
+.quadro td{padding:5px 8px;font-size:13.5px;border-top:1px solid var(--linha)}
+.quadro tbody tr:hover td{background:#FAFBF7}
+
+/* as duas colunas de identificação acompanham a rolagem lateral.
+   O fundo branco vale só no corpo: no cabeçalho elas continuam verdes, senão
+   o texto branco do cabeçalho some no branco. */
+.quadro .col-cod{position:sticky;left:0;z-index:2;width:64px}
+.quadro .col-maq{position:sticky;left:64px;z-index:2;min-width:210px;line-height:1.2}
+.quadro tbody .col-cod,
+.quadro tbody .col-maq{background:var(--branco)}
+.quadro thead .col-cod,
+.quadro thead .col-maq{background:var(--verde)}
+.quadro tbody tr:hover .col-cod,
+.quadro tbody tr:hover .col-maq{background:#FAFBF7}
+.quadro .col-maq small{display:block;font-size:11px;color:var(--cinza-claro)}
+.quadro .agora{white-space:nowrap;font-weight:bold;color:var(--cinza)}
+.quadro .agora small{font-weight:normal;color:var(--cinza-claro);font-size:11px;margin-left:3px}
+
+.quadro .cel{
+  text-align:center;cursor:pointer;user-select:none;min-width:104px;
+  border-left:1px solid var(--linha);line-height:1.25;
+}
+/* a marca da próxima troca é o que salta */
+.quadro .cel strong{display:block;font-size:14px;font-weight:bold}
+.quadro .cel span{display:block;font-size:10px;letter-spacing:.02em}
+.quadro .cel i{font-style:normal;color:var(--marrom);font-weight:bold;margin-left:2px}
+.quadro .cel.vazia{color:var(--linha);cursor:default;background:#FCFCFA}
+
+/* legenda: a cor sozinha não explica nada para quem chega agora */
+.legenda{display:flex;flex-wrap:wrap;gap:6px 10px;margin:0 0 10px;font-size:11.5px}
+.legenda .lg{padding:2px 9px;border-radius:12px;border:1px solid var(--linha)}
+.legenda .lg-pe{color:var(--marrom);font-weight:bold;padding:2px 0}
+.tabela .prox strong{color:var(--marrom)}
+.tabela .prox span{font-size:12.5px;color:var(--cinza-claro)}
+.cel.st-urgente{background:#FBE9E7;color:var(--urgente)}
+.cel.st-vencido{background:#FDF0E3;color:var(--vencido)}
+.cel.st-atencao{background:#FFF8E1;color:#8A6400}
+.cel.st-ok{background:#F1F7EA;color:var(--ok)}
+
+/* ---------- planilha ----------------------------------------------------
+   O desenho da "NOVO Controle_Troca_Oleo": bloco de seis colunas por item de
+   manutenção, cabeçalho em três andares (item / última-próxima / campo) e o
+   STATUS pintado cheio, como as células coloridas do Excel. Código e
+   descrição ficam grudados à esquerda enquanto os blocos correm ao lado. */
+/* overflow:hidden vem de .tabela (para arredondar o canto). Numa tabela com
+   coluna congelada ele mata o position:sticky — o navegador passa a considerar
+   a própria tabela como caixa de recorte. Por isso aqui volta a visible. */
+.pl{border-collapse:separate;border-spacing:0;min-width:1100px;overflow:visible;border-radius:0}
+.pl th{
+  position:sticky;z-index:3;text-align:center;vertical-align:middle;
+  font-size:11px;padding:5px 6px;letter-spacing:.02em;
+  border-left:1px solid rgba(255,255,255,.35);
+}
+.pl thead tr:nth-child(1) th{top:0;height:26px}
+.pl thead tr:nth-child(2) th{top:26px;height:22px}
+.pl thead tr:nth-child(3) th{top:48px;height:30px}
+
+/* o nome do item manda no bloco: faixa mais escura, como na planilha */
+.pl th.bl-tipo{
+  background:var(--verde-lop);color:var(--branco);font-size:12px;
+  text-transform:uppercase;border-left:2px solid var(--branco);
+}
+.pl th.bl-ult{background:var(--verde-escuro);color:var(--branco)}
+.pl th.bl-prox{background:var(--cinza);color:var(--branco)}
+.pl thead tr.campos th{background:var(--verde);color:var(--branco);font-weight:bold}
+.pl thead tr.campos th.bl-ult{background:var(--verde-escuro)}
+
+.pl thead th.col-cod,.pl thead th.col-maq,.pl thead th.agora{
+  background:var(--verde-lop);color:var(--branco);z-index:6;
+}
+/* Os deslocamentos das colunas grudadas são medidos em tela (grudarColunas),
+   porque a descrição da máquina não tem largura fixa: chutar o valor fazia a
+   coluna DATA ÚLTIMA sumir por baixo do AGORA. */
+.pl th.col-cod{left:0}
+.pl th.col-maq{left:var(--l1,56px);text-align:left}
+.pl th.agora{left:var(--l2,266px)}
+
+.pl td{
+  padding:4px 7px;font-size:12.5px;border-top:1px solid var(--linha);
+  white-space:nowrap;cursor:pointer;user-select:none;
+}
+.pl .col-cod{position:sticky;left:0;z-index:2;width:56px;font-weight:bold}
+.pl .col-maq{position:sticky;left:var(--l1,56px);z-index:2;min-width:220px;max-width:280px;
+             white-space:normal;line-height:1.15}
+.pl .agora{position:sticky;left:var(--l2,266px);z-index:2;width:92px;font-weight:bold;
+           box-shadow:2px 0 0 var(--linha)}
+.pl tbody .col-cod,.pl tbody .col-maq,.pl tbody .agora{background:var(--branco);cursor:default}
+.pl .col-maq small{display:block;font-size:10px;color:var(--cinza-claro)}
+.pl .agora small{font-weight:normal;color:var(--cinza-claro);font-size:10px;margin-left:3px}
+
+/* o que já foi feito vem em verde sobre fundo claro, como na planilha dele */
+.pl .pl-ult{background:#F1F7EA;color:var(--ok);border-left:2px solid var(--linha)}
+.pl .falta.neg{color:var(--urgente);font-weight:bold}
+.pl .pl-vazia{
+  text-align:center;color:var(--linha);background:#FCFCFA;cursor:default;
+  border-left:2px solid var(--linha);
+}
+
+/* STATUS: célula cheia, texto branco — é o que o olho procura primeiro */
+.pl .pl-status{
+  text-align:center;font-weight:bold;font-size:11px;color:var(--branco);
+  letter-spacing:.03em;min-width:118px;
+}
+.pl .pl-status.st-ok{background:var(--ok)}
+.pl .pl-status.st-urgente{background:var(--urgente)}
+.pl .pl-status.st-vencido{background:var(--vencido)}
+.pl .pl-status.st-atencao{background:var(--atencao)}
+.pl .pl-status.st-neutro{background:var(--cinza-claro)}
+
+/* marcado para a OS: contorno marrom, a mesma tinta do resto do app */
+.pl td.marcada{box-shadow:inset 0 2px 0 var(--marrom),inset 0 -2px 0 var(--marrom)}
+.pl tbody tr:hover td{filter:brightness(.98)}
+.cel.st-neutro{background:#F7F7F5;color:var(--cinza-claro)}
+.cel.marcada{outline:3px solid var(--verde);outline-offset:-3px;font-weight:bold}
+.legenda .lg.st-urgente{background:#FBE9E7;color:var(--urgente);border-color:#F3C9C3}
+.legenda .lg.st-vencido{background:#FDF0E3;color:var(--vencido);border-color:#F0D6B8}
+.legenda .lg.st-atencao{background:#FFF8E1;color:#8A6400;border-color:#EFDFA8}
+.legenda .lg.st-ok{background:#F1F7EA;color:var(--ok);border-color:#D4E5C0}
+.legenda .lg.st-neutro{background:#F7F7F5;color:var(--cinza-claro)}
+
+@media (max-width:640px){
+  .rolagem{max-height:calc(100vh - 170px)}
+  .quadro .col-maq{min-width:150px}
+  .quadro .cel{min-width:96px}
+}
+tr.cel{cursor:pointer}
+tr.cel.marcada td{background:#F1F7EA}
+
+/* ---------- ordem de serviço ---------- */
+/* Mesmo desenho dos relatórios SAKUMA: marca sobre fundo neutro, régua verde,
+   título em marrom e rodapé com a barra verde e a assinatura. */
+.os-topo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.os-logo{height:44px;width:auto}
+.os-marca strong{display:block;font-size:20px;letter-spacing:.09em;color:var(--verde-escuro);line-height:1.1}
+.os-marca span{display:block;font-size:11px;letter-spacing:.06em;color:var(--cinza-claro)}
+.os-regua{height:5px;background:var(--verde);margin:0 0 12px}
+.os-titulo{margin-bottom:16px}
+.os-titulo h2{margin:0;font-size:19px;color:var(--marrom);letter-spacing:.02em}
+.os-titulo p{margin:3px 0 0;font-size:12px;color:var(--cinza-claro)}
+.os-servico{margin:18px 0;border:1px solid var(--linha);border-radius:var(--raio);
+  padding:14px;background:var(--branco)}
+.os-servico h3{margin:0 0 10px;font-size:16px;color:var(--marrom);
+  border-bottom:1px solid var(--linha);padding-bottom:6px;display:flex;gap:10px;align-items:center}
+.os-servico h4{margin:16px 0 6px;font-size:14px;color:var(--cinza)}
+.os-destaque{font-weight:bold;font-size:17px;color:var(--marrom)}
+.os-alerta{background:#FFF6E5;border-left:4px solid var(--atencao);padding:10px 12px;
+  margin:6px 0;font-size:14px}
+.os-caixa{text-align:center;font-size:20px;line-height:1}
+.os-manual td{background:#FAFBF7}
+.os-assinaturas td{padding:22px 12px 10px;text-align:center;font-size:13px;color:var(--cinza-claro)}
+.os-lembrete{font-size:12px;color:var(--cinza);background:#FAF7F3;
+  border-left:4px solid var(--marrom);padding:10px 12px;margin:16px 0 0}
+.os-rodape{border-top:1px solid var(--linha);padding-top:8px;margin-top:18px}
+.os-barra{width:100px;height:4px;background:var(--verde);margin-bottom:8px}
+.os-ass{margin:0;font-size:11px;color:var(--cinza)}
+.os-ass span{color:var(--cinza-claro)}
+.os-empresa{margin:2px 0 0;font-size:11px;color:var(--cinza-claro)}
+.os-lop{font-size:10px;color:var(--cinza-claro);margin:8px 0 0}
+
+/* ---------- impressão A4 ---------- */
+@media print{
+  .menu,.rodape,.acoes,.filtros,#btn-instalar,#btn-sair{display:none !important}
+  body.imprimindo-os .topo,body.imprimindo-os .conteudo{display:none !important}
+  body.imprimindo-os .modal{position:static;background:none;display:block}
+  body.imprimindo-os .modal .caixa{max-width:none;max-height:none;border-radius:0;background:#fff}
+  body.imprimindo-os .modal header{display:none !important}
+  .os-servico{break-inside:avoid;page-break-inside:avoid}
+  body.imprimindo-os .os-rodape{position:fixed;bottom:0;left:0;right:0;background:#fff}
+  body.imprimindo-os #os-impresso{padding-bottom:26mm}
+  body{background:#fff;font-size:11pt}
+  .conteudo{padding:0;max-width:none}
+  .topo{border-bottom:2px solid var(--verde)}
+  .tabela th{background:#fff;color:var(--cinza);border-bottom:2px solid var(--verde)}
+  @page{size:A4;margin:9mm 11mm}
+}
+
+/* =====================================================================
+   CHECK LIST DE CAMPO
+   Preenchimento no celular (de luva) e folha A4 idêntica ao formulário.
+   ===================================================================== */
+
+/* ---------- agenda ---------- */
+.ck-agenda li{border-left:5px solid var(--linha)}
+.ck-agenda li.st-atrasado{border-left-color:var(--urgente)}
+.ck-agenda li.st-hoje{border-left-color:var(--vencido)}
+.ck-agenda li.st-semana{border-left-color:var(--atencao)}
+.ck-agenda li.st-ok{border-left-color:var(--ok)}
+.ck-agenda li.st-nunca{border-left-color:var(--marrom)}
+.abas{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+.abas button{
+  min-height:var(--toque);padding:0 16px;border:1px solid var(--linha);background:var(--branco);
+  border-radius:20px;font:inherit;font-size:15px;color:var(--cinza);cursor:pointer;
+}
+.abas button.ativo{background:var(--verde);border-color:var(--verde);color:#fff;font-weight:bold}
+
+/* ---------- preenchimento ---------- */
+.ck-cab{background:var(--branco);border:1px solid var(--linha);border-radius:var(--raio);padding:14px;margin-bottom:14px}
+.ck-cab .maquina{font-size:18px;color:var(--marrom);margin:0 0 10px}
+.ck-cab .maquina small{display:block;color:var(--cinza-claro);font-size:13px;font-weight:normal}
+.ck-grupo{margin:0 0 16px}
+.ck-grupo h2{
+  background:var(--verde);color:#fff;margin:0;padding:8px 12px;font-size:15px;
+  border-radius:var(--raio) var(--raio) 0 0;letter-spacing:.03em;display:flex;justify-content:space-between
+}
+.ck-grupo h2 small{font-weight:normal;opacity:.85}
+.ck-item{
+  background:var(--branco);border:1px solid var(--linha);border-top:0;padding:10px 12px;
+  display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;
+}
+.ck-item:last-child{border-radius:0 0 var(--raio) var(--raio)}
+.ck-item.pendente{background:#FFFDF5}
+.ck-item .texto{font-size:15px}
+.ck-item .texto small{display:block;color:var(--cinza-claro);font-size:12px}
+.ck-resp{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ck-btn{
+  min-height:var(--toque);min-width:64px;padding:0 12px;border:2px solid var(--linha);
+  background:var(--branco);border-radius:var(--raio);font:inherit;font-size:14px;font-weight:bold;
+  color:var(--cinza);cursor:pointer;white-space:nowrap;
+}
+.ck-btn.bom.sel{background:var(--ok);border-color:var(--ok);color:#fff}
+.ck-btn.medio.sel{background:var(--atencao);border-color:var(--atencao);color:#fff}
+.ck-btn.ruim.sel{background:var(--urgente);border-color:var(--urgente);color:#fff}
+.ck-btn.na.sel{background:var(--cinza-claro);border-color:var(--cinza-claro);color:#fff}
+.ck-item input.ck-num,.ck-item input.ck-txt{
+  min-height:var(--toque);padding:0 10px;border:1px solid var(--linha);border-radius:var(--raio);
+  font:inherit;font-size:16px;width:140px;text-align:right;background:var(--branco);color:var(--cinza)
+}
+.ck-item input.ck-txt{width:220px;text-align:left}
+.ck-extra{grid-column:1 / -1;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.ck-extra input.obs{
+  flex:1 1 200px;min-height:42px;padding:0 10px;border:1px solid var(--linha);border-radius:var(--raio);
+  font:inherit;font-size:15px;background:var(--branco);color:var(--cinza)
+}
+.ck-extra input.obs.obrigatoria{border-color:var(--urgente);background:#FFF5F4}
+.ck-foto{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 12px;
+  border:1px dashed var(--cinza-claro);border-radius:var(--raio);font-size:14px;color:var(--cinza);
+  background:var(--branco);cursor:pointer}
+.ck-foto input{display:none}
+.ck-miniaturas{display:flex;gap:6px;flex-wrap:wrap}
+.ck-miniaturas img{width:56px;height:56px;object-fit:cover;border-radius:4px;border:1px solid var(--linha)}
+.ck-barra{
+  position:sticky;bottom:calc(36px + env(safe-area-inset-bottom));z-index:5;
+  background:var(--branco);border:1px solid var(--linha);border-radius:var(--raio);
+  padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  box-shadow:0 -2px 10px rgba(0,0,0,.06);margin-top:14px;
+}
+.chip{display:inline-block;padding:6px 12px;border-radius:20px;font-size:14px;font-weight:bold;background:#F7F7F5;color:var(--cinza-claro)}
+.chip.ok{background:#F1F7EA;color:var(--ok)}
+.chip.ressalva{background:#FFF8E1;color:#8A6400}
+.chip.parada{background:#FBE9E7;color:var(--urgente)}
+
+/* ---------- folha A4 (impressa e relatório) ---------- */
+.ck-folha{background:#fff;color:var(--cinza);font-size:10pt;line-height:1.15}
+.ck-folha .cab{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  border-bottom:3px solid var(--verde);padding-bottom:6px;margin-bottom:6px}
+.ck-folha .cab img{height:34px;width:auto}
+.ck-folha .cab h2{margin:0;font-size:13pt;color:var(--marrom);text-align:right;line-height:1.1}
+.ck-folha .cab h2 small{display:block;font-size:8pt;color:var(--cinza-claro);font-weight:normal;letter-spacing:.05em}
+.ck-folha .id{width:100%;border-collapse:collapse;margin-bottom:5px;font-size:9pt}
+.ck-folha .id td{padding:2px 5px;border:1px solid var(--linha)}
+.ck-folha .id td.rot{color:var(--cinza-claro);width:12%;white-space:nowrap}
+.ck-folha .id td.val{font-weight:bold}
+.ck-folha .id td.val.res{white-space:nowrap;font-size:9pt}
+.ck-folha .resumo{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+.ck-folha .resumo div{flex:1 1 90px;border:1px solid var(--linha);border-radius:4px;padding:6px 8px;text-align:center;font-size:9pt;color:var(--cinza-claro)}
+.ck-folha .resumo div b{display:block;font-size:15pt;color:var(--cinza)}
+.ck-folha .resumo div.res b{font-size:11pt}
+.ck-folha .resumo div.res.ok b{color:var(--ok)}
+.ck-folha .resumo div.res.ressalva b{color:#8A6400}
+.ck-folha .resumo div.res.parada b{color:var(--urgente)}
+.ck-folha h3{margin:8px 0 3px;font-size:10pt;color:var(--marrom);letter-spacing:.03em}
+.ck-folha table.grp{width:100%;border-collapse:collapse;margin-bottom:3px;font-size:8.5pt}
+.ck-folha table.grp tr{break-inside:avoid;page-break-inside:avoid}
+.ck-folha table.grp thead{display:table-header-group}
+.ck-folha table.grp th{background:var(--verde);color:#fff;font-size:7.5pt;padding:1px 5px;border:1px solid var(--verde);text-align:left;height:4.4mm}
+.ck-folha table.grp th.nome{font-size:8.5pt;letter-spacing:.04em}
+.ck-folha table.grp th.c{text-align:center;width:11mm}
+.ck-folha table.grp td{padding:0 5px;border:1px solid var(--linha);vertical-align:middle;height:4.7mm}
+.ck-folha table.grp thead{break-after:avoid;page-break-after:avoid}
+.ck-folha table.grp td.c{text-align:center;font-size:11pt;line-height:1}
+.ck-folha table.grp td.obs{width:38%;color:var(--cinza)}
+.ck-folha table.grp tr.nc td{background:#FFF5F4}
+.ck-folha table.grp tr.md td{background:#FFFBEA}
+.ck-folha table.nc{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:8px}
+.ck-folha table.nc th{background:var(--urgente);color:#fff;padding:4px 6px;font-size:9pt;text-align:left}
+.ck-folha table.nc td{padding:4px 6px;border:1px solid var(--linha);vertical-align:top}
+.ck-folha .nc-ok{border:1px solid var(--ok);color:var(--ok);padding:8px 10px;font-weight:bold;margin-bottom:8px}
+.ck-folha .obs-geral{border:1px solid var(--linha);min-height:18mm;padding:4px 6px;font-size:9pt;margin-top:3px}
+.ck-folha .assin{width:100%;margin-top:7mm;border-collapse:collapse;break-inside:avoid}
+.ck-folha .assin td{width:50%;text-align:center;font-size:8pt;color:var(--cinza-claro);padding:0 12mm}
+.ck-folha .assin td div{border-top:1px solid var(--cinza);padding-top:4px}
+.ck-folha .fotos{margin-top:10px}
+.ck-folha .fotos h3{font-size:10pt}
+.ck-folha .fotos .grade{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ck-folha .fotos figure{margin:0;break-inside:avoid;page-break-inside:avoid}
+.ck-folha .fotos img{width:100%;height:52mm;object-fit:cover;border:1px solid var(--linha)}
+.ck-folha .fotos figcaption{font-size:8pt;color:var(--cinza-claro);margin-top:2px}
+.ck-folha .rod{border-top:1px solid var(--linha);margin-top:6px;padding-top:4px;font-size:7.5pt;color:var(--cinza-claro);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ck-folha .rod strong{color:var(--cinza)}
+.ck-folha.quebra{break-after:page;page-break-after:always}
+
+/* impressão em lote: só as folhas aparecem */
+#impressao-lote{display:none}
+@media print{
+  body.imprimindo-lote .barra-lop,body.imprimindo-lote .topo,body.imprimindo-lote .menu,
+  body.imprimindo-lote .conteudo,body.imprimindo-lote .rodape,body.imprimindo-lote .modal,body.imprimindo-lote .aviso{display:none !important}
+  body.imprimindo-lote #impressao-lote{display:block}
+  body.imprimindo-lote{margin:0}
+  .ck-folha{font-size:10pt}
+  .ck-barra{display:none !important}
+}
+
+/* =====================================================================
+   ACESSO — menu de módulos, tela de marca, login e configurações
+   Mesma lógica do Gestão Rápida (Pessoas): a primeira faixa são os
+   módulos, a segunda são as telas do módulo aberto.
+   ===================================================================== */
+
+/* segunda faixa: as telas do módulo, em pílulas, para não competir com a
+   faixa de cima */
+.menu2{
+  display:flex;gap:6px;padding:8px 14px;background:var(--branco);
+  border-bottom:1px solid var(--linha);overflow-x:auto;
+}
+.menu2[hidden]{display:none}
+.menu2 button{
+  min-height:36px;padding:0 14px;border:1px solid var(--linha);border-radius:20px;
+  background:var(--branco);font:inherit;font-size:14px;color:var(--cinza);
+  cursor:pointer;white-space:nowrap;
+}
+.menu2 button:hover{border-color:var(--verde)}
+.menu2 button.ativo{
+  background:var(--verde);border-color:var(--verde);color:#fff;font-weight:bold;
+}
+
+/* Na tela de entrada quem assina é a marca grande do meio; o rodapé fixo sai,
+   para a LOP não aparecer duas vezes na mesma página. */
+body.sem-rodape .rodape{display:none}
+body.sem-rodape .conteudo{padding-bottom:24px}
+
+/* ---------- tela de entrada: só as duas marcas ----------
+   A SAKUMA entra na versão vertical, como o arquivo veio. A LOP assina
+   embaixo, gravada a laser. O arquivo da assinatura tem quase metade da
+   largura em transparente à direita; as margens negativas encolhem a caixa
+   até a tinta, senão a marca fica torta para a esquerda. */
+.marca-inicio{
+  min-height:min(60vh,460px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:40px 20px 30px;
+}
+.mi-sakuma{width:min(190px,46vw);height:auto}
+.marca-inicio h2{
+  margin:28px 0 0;font-size:21px;font-weight:normal;color:var(--marrom);letter-spacing:.2px;
+}
+.marca-inicio h2 span{
+  display:inline-block;margin-left:8px;padding:3px 10px;border-radius:20px;
+  background:rgba(132,189,0,.12);color:var(--verde-escuro);
+  font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;vertical-align:middle;
+}
+.mi-dica{margin:10px 0 0;color:var(--cinza-claro);font-size:14px}
+.mi-lop{
+  --lop:440px;width:var(--lop);height:auto;margin-top:48px;
+  margin-left:calc(var(--lop) * -0.0429);
+  margin-right:calc(var(--lop) * -0.455);
+}
+@media (max-width:560px){ .mi-lop{ --lop:300px } }
+
+/* ---------- login ---------- */
+.login{max-width:400px;margin:24px auto;text-align:left}
+.lg-icone{width:56px;height:56px;border-radius:12px;display:block;margin:0 auto 14px}
+.login h1{text-align:center;font-size:20px}
+.login h1 span{
+  display:inline-block;margin-left:6px;padding:2px 8px;border-radius:20px;
+  background:rgba(132,189,0,.12);color:var(--verde-escuro);
+  font-size:11px;font-weight:bold;letter-spacing:.4px;text-transform:uppercase;vertical-align:2px;
+}
+.login .sub{text-align:center}
+.login .btn{width:100%}
+.login p{text-align:center}
+
+/* ---------- configurações: quem entra vê o quê ---------- */
+.ce{text-align:center}
+.aviso-linha{
+  background:#FAF2EC;border:1px solid var(--marrom);border-radius:var(--raio);
+  padding:10px 12px;margin-bottom:12px;font-size:14px;
+}
+.aviso-linha.oculto{display:none}
+.cf-cx,.us-locais input,.us-telas input,.us-mod-topo input{width:18px;height:18px}
+
+.us-admin{display:flex;align-items:center;gap:8px;margin:14px 0}
+.us-admin small{color:var(--cinza-claro)}
+.us-locais{display:flex;flex-wrap:wrap;gap:10px 18px;margin-bottom:8px}
+.us-locais label{display:flex;align-items:center;gap:7px;font-size:15px}
+
+.us-mod{
+  border:1px solid var(--linha);border-radius:var(--raio);
+  padding:10px 12px;margin-bottom:8px;background:var(--branco);
+}
+.us-mod.desligado{opacity:.55}
+.us-mod-topo{display:flex;align-items:center;gap:8px;font-size:15px}
+.us-mod-topo small{margin-left:auto;color:var(--cinza-claro);font-size:12px}
+.us-telas{display:flex;flex-wrap:wrap;gap:8px 16px;margin:8px 0 0 26px}
+.us-telas label{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--cinza)}
+
+/* a senha gerada aparece uma vez só — precisa saltar aos olhos */
+.us-senha{
+  margin-top:12px;padding:12px;border-radius:var(--raio);
+  background:rgba(132,189,0,.10);border:1px solid var(--verde);font-size:14px;
+}
+.us-senha.erro{background:#FAF2EC;border-color:var(--marrom)}
+.us-senha code{
+  display:inline-block;font-size:18px;letter-spacing:.5px;background:#fff;
+  border:1px solid var(--linha);border-radius:4px;padding:4px 10px;user-select:all;
+}
+.us-senha.oculto{display:none}
+
+@media (max-width:640px){
+  .menu2{padding:6px 12px}
+  .us-telas{margin-left:0}
+}
+
+/* =====================================================================
+   PAINEL DE VENCIMENTOS EM CARTÕES
+   Um cartão por máquina: o horímetro de agora em cima, e dentro um item
+   por linha de manutenção. Cada item responde sempre na mesma ordem —
+   última troca, próxima troca, quanto falta — e a barra mostra quanto do
+   intervalo já foi rodado, que é o que se lê de relance, sem número.
+   ===================================================================== */
+/* align-items:start para o cartão ter a altura do que ele tem dentro —
+   máquina de um item só não vira um retângulo vazio do lado de outra de seis */
+.cartoes{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));
+  gap:14px;align-items:start;
+}
+
+.mq{
+  background:var(--branco);border:1px solid var(--linha);border-radius:var(--raio);
+  overflow:hidden;
+}
+/* máquina com item vencido ganha a tarja marrom na lateral: dá para varrer a
+   tela e achar quem precisa de oficina sem ler nada */
+.mq.urgente{border-left:5px solid var(--urgente)}
+
+.mq-topo{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 14px;border-bottom:1px solid var(--linha);background:#FAFBF7;
+}
+.mq-quem{min-width:0}
+.mq-quem .codigo{font-size:17px;margin-right:8px}
+.mq-quem strong{font-weight:normal;font-size:15px;color:var(--cinza)}
+.mq-quem small{display:block;font-size:12.5px;color:var(--cinza-claro);margin-top:1px}
+.mq-leitura{text-align:right;white-space:nowrap}
+.mq-leitura b{display:block;font-size:20px;line-height:1.1;color:var(--cinza)}
+.mq-leitura span{font-size:11.5px;color:var(--cinza-claro);letter-spacing:.03em}
+
+.mq-itens{padding:4px 0}
+
+/* ---------- o item ---------- */
+.it{
+  padding:10px 14px;border-top:1px solid #EFF1EA;cursor:pointer;
+  border-left:4px solid transparent;
+}
+.mq-itens .it:first-child{border-top:0}
+.it:hover{background:#FAFBF7}
+.it:focus-visible{outline:3px solid var(--marrom);outline-offset:-3px}
+.it.st-urgente{border-left-color:var(--urgente)}
+.it.st-vencido{border-left-color:var(--vencido)}
+.it.st-atencao{border-left-color:var(--atencao)}
+.it.st-ok{border-left-color:var(--ok)}
+.it.st-neutro{border-left-color:var(--linha)}
+.it.marcada{background:rgba(132,189,0,.12);border-left-color:var(--verde)}
+
+.it-topo{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.it-topo b{font-size:15px;color:var(--cinza)}
+
+/* três blocos na mesma ordem em todo item: o olho aprende o lugar e para de
+   procurar. O do meio é a resposta que ele pediu — em que marca troca. */
+/* as três respostas em colunas fixas: o olho decora o lugar e para de
+   procurar de item para item */
+.it-linha{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  gap:6px 14px;margin:6px 0 8px;
+}
+.it-dado{font-size:13.5px;color:var(--cinza)}
+.it-dado i{
+  display:block;font-style:normal;font-size:10.5px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--cinza-claro);
+}
+.it-dado.forte{font-weight:bold;color:var(--marrom)}
+.it-dado.tarde{color:var(--urgente);font-weight:bold}
+
+.it-barra{height:6px;border-radius:4px;background:#EDEFE6;overflow:hidden}
+.it-barra span{display:block;height:100%;background:var(--ok);border-radius:4px}
+.it.st-atencao .it-barra span{background:var(--atencao)}
+.it.st-vencido .it-barra span{background:var(--vencido)}
+.it.st-urgente .it-barra span{background:var(--urgente)}
+.it.st-neutro .it-barra span{background:var(--linha)}
+
+.it-pe{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:7px;font-size:12px;color:var(--cinza-claro);
+}
+.it-pe em{font-style:normal;color:var(--marrom);font-weight:bold}
+.it-marcar{
+  border:1px solid var(--linha);border-radius:20px;padding:2px 10px;
+  font-size:11.5px;color:var(--cinza-claro);white-space:nowrap;
+}
+.it.marcada .it-marcar{border-color:var(--verde);color:var(--verde-escuro);font-weight:bold}
+
+@media (max-width:640px){
+  .cartoes{grid-template-columns:1fr;gap:12px}
+  .mq-quem .codigo{font-size:16px}
+  .mq-leitura b{font-size:18px}
+  .it-linha{gap:6px 16px}
+}
+
+/* A barra de ação do painel gruda no pé da tela enquanto houver item marcado:
+   no celular a lista é longa e o botão ficava lá em cima, fora de alcance. */
+.pv-acoes{
+  position:sticky;bottom:0;z-index:5;margin:0 -14px 14px;padding:10px 14px;
+  background:var(--branco);border-top:1px solid var(--linha);
+  box-shadow:0 -6px 12px rgba(0,0,0,.05);
+}
+@media (max-width:640px){
+  /* min-width:0 deixa o select encolher: sem isso o texto da opção segura a
+     largura e cada filtro come uma linha inteira do celular */
+  .filtros select{flex:1 1 45%;min-width:0}
+  .cartao{padding:11px 12px}
+  .cartao b{font-size:22px}
+  .pv-acoes .btn{flex:1 1 100%}
+}
+
+/* ---------- tela inicial: acesso rápido na lateral (mesmo modelo do Programação Campo) ---------- */
+.ini-lateral{display:flex;gap:24px;align-items:flex-start}
+.ini-lateral .marca-inicio{flex:1;min-height:0;justify-content:flex-start;padding-top:clamp(20px,7vh,80px)}
+.ql{width:96px;flex:none;display:flex;flex-direction:column;gap:10px}
+.ql-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;
+  padding:12px 4px;border-radius:10px;background:var(--branco);border:1px solid var(--linha);color:var(--cinza);
+  font:inherit;font-size:11.5px;font-weight:bold;line-height:1.2;text-align:center;cursor:pointer}
+.ql-item svg{width:26px;height:26px;flex:none}
+.ql-item:hover{border-color:#B9CC8E;background:#F1F7E6}
+.ql-item.prim{background:var(--verde);border-color:var(--verde);color:#fff}
+.ql-item.prim:hover{background:var(--verde-escuro)}
+@media (max-width:700px){
+  .ini-lateral{flex-direction:column;gap:6px}
+  .ql{width:100%;flex-direction:row;overflow-x:auto;padding-bottom:4px}
+  .ql-item{min-width:86px}
+  .ini-lateral .marca-inicio{padding-top:24px}
+}
+/* assinatura LOP em texto, tamanho intermediário (antes era imagem com letra miúda) */
+.lop-ass{display:flex;align-items:center;gap:12px;color:#1B232B;--h:38px}
+.lop-ass img{height:var(--h);width:auto;display:block;mix-blend-mode:multiply}
+.lop-div{width:2px;align-self:stretch;min-height:calc(var(--h) * .9);background:#1B232B;border-radius:1px}
+.lop-txt{display:flex;flex-direction:column;line-height:1.25;text-align:left}
+.lop-txt b{font-size:13.5px;letter-spacing:1.5px}
+.lop-txt span{font-size:10.5px;letter-spacing:1.1px;color:#3A4249}
+.mi-lop.lop-ass{width:auto;margin:44px auto 0}
+@media (max-width:560px){ .lop-ass{--h:32px;gap:10px} .lop-txt b{font-size:11.5px;letter-spacing:1.1px} .lop-txt span{font-size:9px;letter-spacing:.8px} }
+
+/* botões: WhatsApp nas cores dele (com a logo), PDF em cinza, texto centralizado */
+.btn.btn-zap,.btn.btn-pdf{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;text-align:center}
+.btn.btn-zap{background:#25D366;color:#fff}
+.btn.btn-zap:hover{background:#1EBE5A}
+.btn.btn-zap .ic-zap{width:26px;height:26px;flex:none;border-radius:6px;background:#fff;display:block}
+.btn.btn-pdf{background:#ECEDE8;color:var(--cinza);border:1px solid #D3D5CD}
+.btn.btn-pdf:hover{background:#E1E3DC}
+
+/* =====================================================================
+   APP SIMPLIFICADO (08/10/2026) — Máquinas, Vencimentos, OS
+   ===================================================================== */
+.tabela small,.lista small{display:block;font-size:12.5px;color:var(--cinza-claro);margin-top:2px}
+.tabela td .etq + small{margin-top:4px}
+.mq-tabela tbody tr,.clicavel{cursor:pointer}
+.clicavel:hover{background:#FAFBF7}
+.mq-leitura small{font-size:12px}
+.falta{color:var(--vencido);font-style:italic;font-size:13px}
+.fm-usa,.os-usa{font-size:14px;white-space:pre-line;max-width:280px}
+.os-usa{font-weight:bold;color:var(--cinza)}
+
+/* cabeçalho da ficha da máquina */
+.mq-cab{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+.mq-cab div{background:var(--fundo);border-radius:var(--raio);padding:10px 12px}
+.mq-cab span{display:block;font-size:12px;color:var(--cinza-claro)}
+.mq-cab b{display:block;font-size:16px;color:var(--cinza)}
+.mq-cab small{font-size:12px;color:var(--cinza-claro)}
+.fm-titulo{display:flex;align-items:center;gap:12px;justify-content:space-between;
+  font-size:17px;color:var(--marrom);margin:22px 0 10px;border-bottom:2px solid var(--verde);padding-bottom:6px}
+.fm-titulo .btn{min-height:38px;padding:0 14px;font-size:14px}
+
+/* vencimentos: a borda conta a situação, além da etiqueta */
+.vc-tabela tbody tr{border-left:5px solid var(--linha)}
+.vc-tabela tbody tr.st-vencido td:first-child{box-shadow:inset 5px 0 0 var(--urgente)}
+.vc-tabela tbody tr.st-atencao td:first-child{box-shadow:inset 5px 0 0 var(--atencao)}
+.vc-tabela tbody tr.st-ok td:first-child{box-shadow:inset 5px 0 0 var(--ok)}
+.vc-tabela .codigo{font-weight:bold}
+.vc-acao{white-space:nowrap;text-align:right}
+.vc-acao .btn{min-height:42px;padding:0 16px}
+
+/* OS */
+.os-topo{justify-content:space-between}
+.os-num{text-align:right}
+.os-num span{display:block;font-size:12px;letter-spacing:.08em;color:var(--marrom);font-weight:bold}
+.os-num b{display:block;font-size:22px;color:var(--cinza)}
+.os-id td:nth-child(odd){color:var(--cinza-claro);font-size:13px;width:16%}
+.os-sec{font-size:14px;color:var(--marrom);margin:16px 0 6px;letter-spacing:.03em;text-transform:uppercase}
+.os-itens .c{text-align:center}
+.os-problema{border:1px solid var(--linha);border-left:4px solid var(--vencido);border-radius:var(--raio);
+  padding:12px;white-space:pre-line;font-size:15px;background:var(--branco)}
+.os-origem{font-size:12.5px;color:var(--cinza-claro);margin:6px 0 0}
+.os-manual td{font-size:12.5px;color:var(--cinza-claro)}
+.os-manual td strong{font-size:15px;color:var(--cinza)}
+.ff-item{display:flex;align-items:center;gap:10px;min-height:var(--toque);font-size:16px}
+.ff-item input{width:22px;height:22px}
+
+@media (max-width:760px){
+  /* no celular a tabela vira cartão */
+  .vc-tabela thead,.mq-tabela thead{display:none}
+  .vc-tabela,.vc-tabela tbody,.vc-tabela tr,.vc-tabela td,
+  .mq-tabela,.mq-tabela tbody,.mq-tabela tr,.mq-tabela td{display:block;width:100%}
+  .vc-tabela tr,.mq-tabela tr{border:1px solid var(--linha);border-radius:var(--raio);margin-bottom:10px;padding:6px 4px;background:var(--branco)}
+  .vc-tabela td,.mq-tabela td{border:0;padding:4px 10px}
+  .mq-tabela .num{text-align:left}
+  .vc-acao{text-align:left}
+  .vc-acao .btn{width:100%}
+  .fm-usa{max-width:none}
+}
+@media print{
+  .os-num b{font-size:16pt}
+  .os-itens,.os-manual{break-inside:avoid}
+}
+
+/* ---------- área Manutenções dentro do LOP - Gestão Rápida (09/10/2026) ----------
+   A página mora numa moldura do app principal: nome do sistema, marcas e Sair
+   ficam no topo de lá. Aqui sobra uma faixa fina com a fazenda e o estado do
+   envio, e as faixas de menu da área. */
+body.embutido .topo{border-bottom:0;padding-top:0}
+body.embutido .topo-int{padding:6px 14px;min-height:0}
+body.embutido .local{font-size:13px}
+body.embutido .conteudo{padding-bottom:40px}

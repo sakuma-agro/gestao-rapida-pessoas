@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Gestão Rápida (Pessoas) · SAKUMA</title>
-<meta name="description" content="Gestão de pessoas da SAKUMA Agronegócios: cadastro, fichas de EPI, listas, aniversariantes e perfil comportamental DISC.">
+<title>LOP - Gestão Rápida · SAKUMA</title>
+<meta name="description" content="LOP - Gestão Rápida: a plataforma de gestão da SAKUMA Agronegócios — Pessoas e Manutenções num lugar só.">
 <meta name="theme-color" content="#84BD00">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/favicon-gr.v2.ico" sizes="any">
-<link rel="icon" type="image/png" href="icons/gr-192.v2.png">
-<link rel="apple-touch-icon" href="icons/gr-180.v2.png">
+<link rel="icon" href="icons/lop-gr-favicon.v1.ico" sizes="any">
+<link rel="icon" type="image/png" href="icons/lop-gr-32.v1.png">
+<link rel="apple-touch-icon" href="icons/lop-gr-180.v1.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Gestão Rápida">
 <link rel="stylesheet" href="css/app.css">
@@ -22,9 +22,9 @@
 <!-- ============ TELA: LOGIN ============ -->
 <section class="centro tela" id="telaLogin" hidden>
   <div class="caixa">
-    <img src="icons/gr-192.v2.png" alt="">
+    <img class="login-lop" src="img/lop-marca.png" alt="LOP">
     <h1>Gestão Rápida</h1>
-    <p class="sub">Pessoas · SAKUMA Agronegócios</p>
+    <p class="sub">Inteligência para o agronegócio · SAKUMA Agronegócios</p>
     <div class="aviso erro" id="erroLogin" hidden></div>
     <form id="formLogin">
       <div class="grade">
@@ -62,7 +62,7 @@
 <!-- ============ NOVA SENHA (veio do link do e-mail, ou "Trocar senha" no topo) ============ -->
 <section class="centro tela" id="telaNovaSenha" hidden>
   <div class="caixa">
-    <img src="icons/gr-192.v2.png" alt="">
+    <img class="login-lop" src="img/lop-marca.png" alt="LOP">
     <h1>Nova senha</h1>
     <p class="sub" id="nsQuem">Escolha a senha que você vai usar daqui em diante.</p>
     <div class="aviso erro" id="erroNovaSenha" hidden></div>
@@ -88,10 +88,16 @@
 <div id="app" hidden>
   <header class="topo">
     <div class="topo-int">
-      <!-- O nome do app leva de volta à tela de marca, como o logotipo de um site. -->
-      <button type="button" class="topo-inicio" id="bInicio" title="Voltar ao início">
-        <img src="icons/gr-192.v2.png" alt="">
-        <h1>Gestão Rápida <span class="modulo">Pessoas</span></h1>
+      <!-- LOP - Gestão Rápida (09/10/2026): a logo da LOP e o nome do sistema
+           abrem a escolha das áreas; a etiqueta ao lado diz em qual área a
+           pessoa está e leva ao início dela. Depois, a SAKUMA, dona da operação. -->
+      <button type="button" class="topo-inicio topo-plataforma" id="bInicio" title="Escolher a área">
+        <img class="topo-lop-logo" src="img/lop-marca.png" alt="LOP">
+        <span class="topo-barra" aria-hidden="true"></span>
+        <span class="topo-nome"><h1>Gestão Rápida</h1><small>Inteligência para o agronegócio</small></span>
+      </button>
+      <button type="button" class="topo-area" id="bArea" title="Voltar ao início da área" hidden>
+        <img id="areaIcone" src="icons/gr-192.v2.png" alt=""><span id="areaNome">Pessoas</span>
       </button>
       <span class="topo-divisor"></span>
       <img class="topo-marca" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
@@ -100,8 +106,6 @@
       <button class="btn mini" id="btnInstalar" hidden>Instalar app</button>
       <button class="btn mini" id="btnTrocarSenha" title="Escolher uma senha nova">Trocar senha</button>
       <button class="btn mini" id="btnSair">Sair</button>
-      <img class="topo-lop" src="img/lop-assinatura-laser-claro.png"
-           alt="Desenvolvido por LOP — Inteligência para o agronegócio">
     </div>
     <nav class="abas" role="tablist" id="navModulos"></nav>
     <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
@@ -110,6 +114,23 @@
 
   <main>
     <div class="aviso info" id="avisoGlobal" hidden></div>
+
+    <!-- ---- ÁREAS do LOP - Gestão Rápida (09/10/2026): a primeira tela depois
+         do login. Cada área tem o seu menu; Pessoas é tudo o que já existia. ---- -->
+    <section class="tela areas" id="telaAreas" hidden>
+      <div class="ar-cabeca">
+        <div class="ar-ola" id="arOla">Bem-vindo</div>
+        <h2>Em qual área você vai trabalhar?</h2>
+        <p class="dica">Cada área tem o seu próprio menu. Para trocar, toque em <b>Gestão Rápida</b>, no alto.</p>
+      </div>
+      <div class="ar-grade" id="arGrade"></div>
+      <div class="ar-pe" id="arPe"></div>
+    </section>
+
+    <!-- ---- ÁREA MANUTENÇÕES: as telas moram em manutencoes/ e abrem nesta moldura ---- -->
+    <section class="tela area-manut" id="telaManut" hidden>
+      <iframe id="molduraManut" class="area-moldura" title="Manutenções"></iframe>
+    </section>
 
     <!-- ---- ENTRADA: nenhum módulo aberto, só as duas marcas ---- -->
     <section class="tela inicio" id="telaInicio">

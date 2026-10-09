@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Manutenções · LOP - Gestão Rápida</title>
+<meta name="theme-color" content="#84BD00">
+<link rel="stylesheet" href="css/app.css">
+<!-- Área Manutenções do LOP - Gestão Rápida.
+     Esta página não abre sozinha: ela mora dentro do app principal (a pasta de
+     cima), numa moldura, e usa o login de lá. Quem abrir este endereço direto
+     — por exemplo, o link do relatório de check list mandado por WhatsApp — é
+     levado para o app principal, que abre a área e a tela certa. -->
+<script>
+  (function () {
+    var dentro = false;
+    try { dentro = window.parent !== window && !!window.parent.grCliente; } catch (e) {}
+    if (!dentro) {
+      var q = location.search ? location.search.slice(1) + '&' : '';
+      location.replace('../?' + q + 'area=manutencoes');
+    }
+  })();
+</script>
+</head>
+<body class="embutido">
+
+<!-- Topo da área: só as faixas de menu e, à direita, a fazenda e o estado do
+     envio. O nome do sistema, as marcas e o Sair ficam no topo do app
+     principal, que está em volta desta página. -->
+<header class="topo">
+  <div class="topo-int">
+    <span id="lbl-local" class="local"></span>
+    <span class="cresce"></span>
+    <div class="estado" id="estado-conexao">
+      <span class="ponto" id="ponto-conexao"></span>
+      <span id="txt-conexao">verificando…</span>
+      <button type="button" id="btn-fila" class="fila oculto">0 aguardando envio</button>
+    </div>
+    <!-- usados pelo base.js; nesta versão ficam sempre escondidos -->
+    <button type="button" id="btn-inicio" class="oculto">Início</button>
+    <button type="button" id="btn-instalar" class="btn-fantasma oculto">Instalar o app</button>
+    <button type="button" id="btn-sair" class="btn-fantasma oculto">Sair</button>
+  </div>
+  <nav class="menu" id="menu" hidden></nav>
+  <nav class="menu2" id="menu2" hidden></nav>
+</header>
+
+<main id="tela" class="conteudo">
+  <section class="carregando">
+    <p>Abrindo a base local…</p>
+  </section>
+</main>
+
+<div id="modal" class="modal oculto" role="dialog" aria-modal="true">
+  <div class="caixa">
+    <header><h2 id="modal-titulo"></h2>
+      <button type="button" id="modal-fechar" aria-label="Fechar">×</button>
+    </header>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
+
+<div id="aviso" class="aviso oculto" role="status"></div>
+
+<script src="../vendor/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/base.js"></script>
+<script src="js/comum.js"></script>
+<script src="js/acesso.js"></script>
+<script src="js/maquinas.js"></script>
+<script src="js/ordens.js"></script>
+<script src="js/horimetro.js"></script>
+<script src="js/checklist.js"></script>
+</body>
+</html>

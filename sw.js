@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v145';
+const VERSAO = 'gr-v146';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -22,6 +22,17 @@ const ARQUIVOS = [
   './icons/favicon-gr.v2.ico', './icons/gr-32.v2.png', './icons/gr-180.v2.png',
   './icons/gr-192.v2.png', './icons/gr-512.v2.png',
   './icons/gr-maskable-192.v2.png', './icons/gr-maskable-512.v2.png',
+  // LOP - Gestão Rápida (09/10/2026): a plataforma, as áreas e a área Manutenções,
+  // que precisa abrir sem internet no pátio (a base dela mora no IndexedDB).
+  './js/areas.js',
+  './icons/lop-gr-favicon.v1.ico', './icons/lop-gr-32.v1.png', './icons/lop-gr-180.v1.png',
+  './icons/lop-gr-192.v1.png', './icons/lop-gr-512.v1.png',
+  './icons/lop-gr-maskable-192.v1.png', './icons/lop-gr-maskable-512.v1.png',
+  './icons/mod-manutencoes.v1.png', './icons/mod-certificacao.v1.png',
+  './manutencoes/', './manutencoes/index.html', './manutencoes/css/app.css',
+  './manutencoes/js/config.js', './manutencoes/js/base.js', './manutencoes/js/comum.js',
+  './manutencoes/js/acesso.js', './manutencoes/js/maquinas.js', './manutencoes/js/ordens.js',
+  './manutencoes/js/horimetro.js', './manutencoes/js/checklist.js',
 ];
 
 self.addEventListener('install', ev => {
