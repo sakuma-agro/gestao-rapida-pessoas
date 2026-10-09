@@ -20,7 +20,7 @@ const ESCALAS = {
   CONFORME:     [{ v: 'CONFORME', rot: 'Conforme', grau: 'bom' }, { v: 'NAO_CONFORME', rot: 'Não conforme', grau: 'ruim' }]
 };
 const ROTULO_ESCALA = {
-  ESCALA_BMR: ['BOM', 'MÉDIO', 'RUIM'], OK_REPARO_NA: ['OK', 'Nec. reparo', 'N/A'],
+  ESCALA_BMR: ['BOM', 'MÉDIO', 'RUIM'], OK_REPARO_NA: ['OK', 'REPARO', 'N/A'],
   SIM_NAO: ['Sim', 'Não', ''], CONFORME: ['Conforme', 'Não conf.', '']
 };
 
@@ -600,6 +600,29 @@ async function gravarChecklist(e, modelo, vinculo, versao, grupos, r, t) {
 
 /* Uma função só desenha a folha em branco (para o papel) e o relatório
    preenchido: o desenho é o mesmo do formulário que o campo já conhece. */
+/* Folha em branco: a altura da linha e o tamanho da letra saem da quantidade
+   de itens, para o modelo ocupar a folha A4 inteira. Conta em milímetros:
+   A4 tem 297 mm; tirando a margem (9 mm em cima e embaixo) sobram 279 mm,
+   e cabeçalho + identificação + observação + assinaturas + rodapé levam ~66 mm.
+   Texto longo quebra em duas linhas na coluna do item (~104 mm) — entra na conta.
+   Se nem com linha de 5,6 mm couber em uma folha, vai frente e verso com
+   letra e espaço maiores. */
+const fonteFolha = alt => Math.min(12.5, Math.max(9.5, alt * 1.55));
+function layoutFolha(grupos) {
+  const textos = grupos.flatMap(g => itensDoGrupo(g.id).map(i => i.texto || ''));
+  const nG = grupos.length, FIXO = 66, PAG = 279;
+  const fonteDe = fonteFolha;
+  const altura = alt => {
+    const f = fonteDe(alt), lh = f * 0.3528 * 1.2, porLinha = 104 / (f * 0.19);
+    return nG * Math.max(6.5, lh + 2.4)
+      + textos.reduce((soma, t) => soma + Math.max(alt, Math.ceil(t.length / porLinha) * lh + 1.8), 0);
+  };
+  for (let alt = 10; alt >= 5.6; alt -= 0.1) if (FIXO + altura(alt) <= PAG * 0.97) return { alt, fonte: fonteDe(alt), pags: 1 };
+  for (let alt = 8.5; alt >= 5.6; alt -= 0.1) if (FIXO + altura(alt) + 10 <= PAG * 2 * 0.9) return { alt, fonte: fonteDe(alt), pags: 2 };
+  return { alt: 5.6, fonte: 9.5, pags: 3 };
+}
+const tituloModelo = nome => String(nome || '').replace(/^CHECK\s*LIST\s*(\d+\s*DIAS)?\s*[-–—]?\s*/i, '') || nome;
+
 function folhaChecklist(e, modelo, opts) {
   const preenchido = !!opts.ck;
   const ck = opts.ck || {};
@@ -615,7 +638,7 @@ function folhaChecklist(e, modelo, opts) {
   const dias = periodicidadeDias(e, modelo, vinculo);
   const res = ck.resultado_geral || '';
   const resCls = { 'Liberada': 'ok', 'Liberada com ressalva': 'ressalva', 'Máquina parada': 'parada' }[res] || '';
-  const cx = (marcado) => marcado ? '☒' : '☐';
+  const cx = (marcado) => `<span class="cxq${marcado ? ' x' : ''}"></span>`;
 
   // Itens: em branco todos entram; preenchido, mostra os que tinham resposta na versão do dia.
   const linhasGrupo = grupos.map(g => {
@@ -642,7 +665,7 @@ function folhaChecklist(e, modelo, opts) {
       return `<tr class="${cls}"><td>${esc(it.texto)}</td>${cels}<td class="obs">${preenchido ? esc(x.observacao || '') : ''}</td></tr>`;
     }).join('');
     // Nome do grupo e colunas na mesma faixa verde: é o que faz a folha caber em uma página.
-    return `<table class="grp">
+    return `<table class="grp"><colgroup><col><col class="cc"><col class="cc"><col class="cc"><col class="co"></colgroup>
       <thead><tr><th class="nome">${esc(g.nome)}</th><th class="c">${rot[0]}</th><th class="c">${rot[1]}</th><th class="c">${rot[2]}</th><th>OBS.</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
   }).join('');
@@ -665,12 +688,17 @@ function folhaChecklist(e, modelo, opts) {
 
   const proximo = preenchido ? (ck.proximo_vencimento || somarDias(ck.data_verificacao, dias)) : null;
   const avaliador = preenchido ? (ck.avaliador_id === (App.usuario.id || null) ? App.usuario.nome : (q.nome('usuarios', ck.avaliador_id) || '')) : '';
-  return `<div class="ck-folha ${opts.quebra ? 'quebra' : ''}" data-ck="${esc(ck.id || '')}">
+  const lay = preenchido ? { alt: 5.6, fonte: 9.5, pags: 1 } : layoutFolha(grupos);
+  return `<div class="ck-folha ${opts.quebra ? 'quebra' : ''}" data-ck="${esc(ck.id || '')}" data-pags="${lay.pags}"
+      style="--lin:${lay.alt.toFixed(1)}mm;--fonte:${lay.fonte.toFixed(1)}pt">
     <div class="cab">
       <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <h2>${esc(modelo.nome)}<small>${preenchido ? 'CHECK LIST Nº ' + (ck.numero || '(aguardando envio)') : 'A CADA ' + dias + ' DIAS'}</small></h2>
+      <div class="tit"><small>CHECK LIST DE CAMPO</small><h2>${esc(tituloModelo(modelo.nome))}</h2></div>
+      <div class="cab-dir">${preenchido
+        ? `<strong>Nº ${esc(ck.numero || '—')}</strong><span>${formatarData(ck.data_verificacao)}</span>`
+        : `<strong>A cada ${dias} dias</strong><span>${lay.pags > 1 ? 'frente e verso' : 'folha de campo'}</span>`}</div>
     </div>
-    <table class="id">
+    <table class="id"><colgroup><col class="ir"><col><col class="ir"><col class="iv"><col class="ir"><col class="ires"></colgroup>
       <tr><td class="rot">Máquina</td><td class="val" colspan="3">${esc(e.codigo)} — ${esc(e.descricao)}</td>
           <td class="rot">Fazenda</td><td class="val">${esc(q.nome('locais', e.local_id))}</td></tr>
       <tr><td class="rot">Marca / modelo</td><td class="val">${esc(q.nome('marcas', e.marca_id))} ${esc(e.modelo || '')}</td>
@@ -678,7 +706,7 @@ function folhaChecklist(e, modelo, opts) {
           <td class="rot">Data</td><td class="val">${preenchido ? formatarData(ck.data_verificacao) : '____ / ____ / ______'}</td></tr>
       <tr><td class="rot">Operador</td><td class="val">${preenchido ? esc(ck.operador || '') : '&nbsp;'}</td>
           <td class="rot">Avaliador</td><td class="val">${esc(avaliador)}</td>
-          <td class="rot">Resultado</td><td class="val res">${preenchido ? esc(res) : '☐ Liberada &nbsp;☐ Ressalva &nbsp;☐ Parada'}</td></tr>
+          <td class="rot">Resultado</td><td class="val res">${preenchido ? esc(res) : '<span class="cxq"></span> Liberada <span class="cxq"></span> Ressalva <span class="cxq"></span> Parada'}</td></tr>
     </table>
     ${preenchido ? `<div class="resumo">
       <div><b>${(ck.total_bom || 0) + (ck.total_medio || 0) + (ck.total_ruim || 0)}</b>verificados</div>
@@ -687,12 +715,12 @@ function folhaChecklist(e, modelo, opts) {
       <h3>NÃO CONFORMIDADES</h3>${blocoNC}<h3>CHECK LIST COMPLETO</h3>` : ''}
     ${linhasGrupo}
     ${preenchido ? (ck.observacao_geral ? `<h3>OBSERVAÇÕES</h3><div class="obs-geral">${esc(ck.observacao_geral)}</div>` : '')
-                 : '<div class="obs-geral"><span style="color:var(--cinza-claro);font-size:8pt">OBS.:</span></div>'}
+                 : '<div class="obs-geral"><span>OBSERVAÇÕES GERAIS</span></div>'}
     <table class="assin"><tr><td><div>Ass. avaliador</div></td><td><div>Ass. operador</div></td></tr></table>
     ${preenchido ? '<div class="fotos" data-fotos></div>' : ''}
     <div class="rod">
-      <span>${preenchido && proximo ? '<strong>Próximo check list: ' + formatarData(proximo) + '</strong>' : 'Periodicidade: a cada ' + dias + ' dias'}</span>
-      <span class="os-pe ck-pe"><img src="../img/lop-marca.png" alt="LOP"><span>Inteligência para o agronegócio</span></span>
+      <span>${preenchido && proximo ? '<strong>Próximo check list: ' + formatarData(proximo) + '</strong>' : 'Item reprovado: anote na OBS. e avise a manutenção.'}</span>
+      <span class="rod-lop"><img src="../img/lop-marca.png" alt="LOP"><span>Inteligência para o agronegócio</span></span>
     </div>
   </div>`;
 }
@@ -786,7 +814,40 @@ async function enviarWhatsApp(ck, e, corretivas) {
 
 /* ---------------------------------------------------------------- impressão em branco */
 
-function imprimirLote(ids) {
+/* Ajuste fino na hora de imprimir: mede cada folha em branco na largura
+   útil da A4 (188 mm) e acha a maior linha (e letra) que ainda cabe em uma
+   folha — ou, se não couber nem com linha mínima, em frente e verso. A conta
+   do layoutFolha() é só o ponto de partida. */
+function ajustarFolhas(alvo) {
+  const antes = alvo.getAttribute('style') || '';
+  alvo.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;width:188mm;visibility:hidden';
+  const pxmm = 96 / 25.4, PAG = 277;
+  alvo.querySelectorAll('.ck-folha[data-ck=""]').forEach(f => {
+    const aplicar = a => { f.style.setProperty('--lin', a.toFixed(2) + 'mm'); f.style.setProperty('--fonte', fonteFolha(a).toFixed(1) + 'pt'); };
+    // Simula a impressão: cada bloco (grupo, observação, assinaturas…) não
+    // se parte; o que não cabe no resto da página desce inteiro para a próxima.
+    const paginas = () => {
+      const kids = [...f.children], fim = f.getBoundingClientRect().bottom;
+      let pag = 1, usado = 0;
+      kids.forEach((k, i) => {
+        const h = ((i < kids.length - 1 ? kids[i + 1].getBoundingClientRect().top : fim) - k.getBoundingClientRect().top) / pxmm;
+        if (usado + h > PAG && usado > 0) { pag++; usado = 0; }
+        usado += h;
+      });
+      return pag;
+    };
+    aplicar(5.6);
+    const alvoPags = paginas();
+    let lo = 5.6, hi = 13;
+    for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; aplicar(m); if (paginas() <= alvoPags) lo = m; else hi = m; }
+    aplicar(lo);
+    f.dataset.pags = alvoPags;
+    const rot = f.querySelector('.cab-dir span'); if (rot) rot.textContent = alvoPags > 1 ? 'frente e verso' : 'folha de campo';
+  });
+  alvo.setAttribute('style', antes);
+}
+
+async function imprimirLote(ids) {
   // A div fica direto no body: na impressão em lote todo o resto é escondido.
   let alvo = document.getElementById('impressao-lote');
   if (!alvo) { alvo = document.createElement('div'); alvo.id = 'impressao-lote'; document.body.appendChild(alvo); }
@@ -796,6 +857,10 @@ function imprimirLote(ids) {
   }).join('');
   if (!folhas) return aviso('Nenhuma folha para imprimir.', true);
   alvo.innerHTML = folhas;
+  // Espera as marcas (SAKUMA e LOP) carregarem: imprimir antes deixava o logo de fora.
+  await Promise.all([...alvo.querySelectorAll('img')].map(i => i.complete ? null
+    : new Promise(ok => { i.onload = i.onerror = ok; setTimeout(ok, 3000); })));
+  ajustarFolhas(alvo);
   document.body.classList.add('imprimindo-lote');
   window.print();
   setTimeout(() => { document.body.classList.remove('imprimindo-lote'); alvo.innerHTML = ''; }, 800);

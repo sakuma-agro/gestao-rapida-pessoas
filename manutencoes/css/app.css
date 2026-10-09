@@ -1127,3 +1127,59 @@ body.embutido .modal header button{color:var(--cinza)}
 .me-maq button{border:0;background:#EEF0EC;border-radius:50%;width:22px;height:22px;cursor:pointer;line-height:1}
 .ck-folha-prev{max-height:70vh;overflow:auto;background:#fff}
 @media (max-width:600px){ .me-cab{grid-template-columns:1fr} .mc-acoes{white-space:normal} }
+
+/* =====================================================================
+   FOLHA DO CHECK LIST — padrão dos relatórios do Gestão Rápida Pessoas
+   (09/10/2026). A altura da linha (--lin) e a letra (--fonte) vêm do
+   layoutFolha(): o modelo ocupa a A4 inteira. Colunas com largura fixa
+   (colgroup), então BOM/MÉDIO/RUIM ficam alinhados em todos os grupos.
+   Cores SAKUMA, sem preto.
+   ===================================================================== */
+.ck-folha{font-family:Arial,Helvetica,sans-serif;color:#51534A;font-size:var(--fonte,10pt);line-height:1.2;
+  width:100%;box-sizing:border-box;--lin:6mm}
+.ck-folha .cab{display:flex;align-items:center;gap:5mm;border-bottom:3px solid #84BD00;padding-bottom:3mm;margin-bottom:3mm;justify-content:flex-start}
+.ck-folha .cab img{height:13mm;width:auto;flex:none}
+.ck-folha .cab .tit{flex:1;min-width:0}
+.ck-folha .cab .tit small{display:block;font-size:8pt;letter-spacing:.12em;color:#8A8D86;font-weight:bold}
+.ck-folha .cab .tit h2{margin:1mm 0 0;font-size:15pt;line-height:1.1;color:#744F28;text-align:left;text-transform:uppercase;overflow-wrap:anywhere}
+.ck-folha .cab-dir{flex:none;text-align:right;font-size:8.5pt;color:#8A8D86;border-left:1px solid #E1E2DE;padding-left:4mm}
+.ck-folha .cab-dir strong{display:block;font-size:11pt;color:#744F28}
+.ck-folha .id{width:100%;border-collapse:collapse;margin-bottom:3mm;font-size:9.5pt;table-layout:fixed}
+.ck-folha .id td{padding:0 2mm;border:1px solid #C9CCC4;height:6.4mm}
+.ck-folha .id td.rot{color:#8A8D86;width:15mm;font-size:8.5pt}
+.ck-folha .id td.val{font-weight:bold}
+.ck-folha .id td.val.res{white-space:nowrap;font-weight:normal}
+.ck-folha table.grp{width:100%;table-layout:fixed;border-collapse:collapse;margin-bottom:2mm;font-size:var(--fonte,10pt)}
+.ck-folha table.grp col.cc{width:12mm}
+.ck-folha table.grp col.co{width:24%}
+.ck-folha table.grp th{background:#84BD00;color:#fff;border:1px solid #84BD00;height:6mm;padding:0 2mm;font-size:8pt;
+  letter-spacing:.04em;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ck-folha table.grp th.nome{font-size:9.5pt;text-align:left}
+.ck-folha table.grp th.c{text-align:center;padding:0;width:auto}
+.ck-folha table.grp th:last-child{text-align:left}
+.ck-folha table.grp td{height:var(--lin);padding:.6mm 2mm;border:1px solid #C9CCC4;vertical-align:middle}
+.ck-folha table.grp td.c{text-align:center;padding:0;font-size:inherit}
+.ck-folha table.grp td.obs{width:auto}
+.ck-folha table.grp tbody tr:nth-child(even) td{background:#F4F8EA;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.ck-folha table.grp{break-inside:avoid;page-break-inside:avoid}
+.ck-folha .cxq{display:inline-block;width:3.8mm;height:3.8mm;border:1.3px solid #51534A;border-radius:.7mm;background:#fff;vertical-align:-0.7mm;position:relative}
+.ck-folha .cxq.x::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:3.4mm;line-height:1;color:#744F28;font-weight:bold}
+.ck-folha .id .cxq{margin:0 .8mm 0 1.6mm;width:3.4mm;height:3.4mm}
+.ck-folha .obs-geral{border:1px solid #C9CCC4;min-height:13mm;padding:1.5mm 2mm;margin-top:1mm;font-size:9pt}
+.ck-folha .obs-geral>span{font-size:7.5pt;letter-spacing:.08em;color:#8A8D86;font-weight:bold}
+.ck-folha .assin{margin-top:9mm}
+.ck-folha .assin td{font-size:8.5pt;color:#8A8D86}
+.ck-folha .assin td div{border-top:1px solid #51534A}
+.ck-folha .rod{border-top:1px solid #E1E2DE;margin-top:3mm;padding-top:2mm;font-size:8pt;color:#8A8D86;display:flex;align-items:center;justify-content:space-between;gap:8px;line-height:1}
+.ck-folha .rod-lop{display:flex;align-items:center;gap:7px;line-height:0}
+.ck-folha .rod-lop img{height:19px;width:auto;opacity:.7}
+.ck-folha .rod-lop span{font-size:8px;line-height:1;color:#8A8D86;letter-spacing:.2px;transform:translateY(4px)}
+@media print{
+  @page{size:A4;margin:9mm 11mm}
+  .ck-folha{font-size:var(--fonte,10pt)}
+  #impressao-lote .ck-folha{max-width:none}
+}
+.ck-folha .id col.ir{width:21mm}
+.ck-folha .id col.iv{width:26mm}
+.ck-folha .id col.ires{width:66mm}
+.ck-folha .id td.rot{width:auto;white-space:nowrap}
