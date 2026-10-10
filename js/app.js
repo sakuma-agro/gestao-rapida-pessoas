@@ -1578,7 +1578,12 @@ function passosInstalar() {
     <ol><li>Toque no menu <b>☰</b> no canto de baixo.</li>
       <li>Toque em <b>Adicionar página a</b> → <b>Tela inicial</b>.</li></ol>`;
   if (/Android/.test(ua)) return `
-    <ol><li>No Chrome, toque nos <b>três pontinhos ⋮</b>, no canto de cima.</li>
+    <p><b>Abriu por um link do WhatsApp, do Claude ou de outro app?</b> Ali não dá
+      para instalar. Toque em <b>Copiar endereço</b>, abra o <b>Chrome</b> e cole na
+      barra de cima.</p>
+    <button class="btn" type="button" id="bCopiarEndereco">Copiar endereço</button>
+    <p style="margin-top:12px">Já no Chrome:</p>
+    <ol><li>Toque nos <b>três pontinhos ⋮</b>, no canto de cima.</li>
       <li>Toque em <b>Instalar aplicativo</b> (ou <b>Adicionar à tela inicial</b>).</li>
       <li>Confirme em <b>Instalar</b>.</li></ol>
     <p class="dica">Se a opção não aparecer, recarregue a página e espere alguns
@@ -1600,6 +1605,11 @@ async function instalar() {
     return;
   }
   $('instalarPassos').innerHTML = passosInstalar();
+  $('bCopiarEndereco')?.addEventListener('click', async ev => {
+    const url = location.origin + location.pathname.replace(/index\.html$/, '');
+    try { await navigator.clipboard.writeText(url); ev.target.textContent = 'Endereço copiado ✓'; }
+    catch { ev.target.textContent = url; }
+  });
   $('dlgInstalar').showModal();
 }
 
