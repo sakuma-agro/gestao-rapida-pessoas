@@ -1183,3 +1183,17 @@ body.na-moldura main{max-width:none;padding:0}
 .cf-chip.cf-manut{border-color:#84BD00;background:rgba(132,189,0,.08);color:#4f7300}
 .us-manut{margin-top:10px;border-color:#84BD00}
 .us-manut .us-sub{display:block;margin-top:8px}
+
+/* ---- Instalar o aplicativo e "manter conectado" (10/10/2026) ---- */
+.btn.instalar{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  margin-top:16px;padding:12px 16px;font-size:15px;font-weight:700;
+  background:var(--verde);border-color:var(--verde);color:#fff}
+.btn.instalar[hidden]{display:none}
+.btn.instalar span{font-size:17px;line-height:1}
+.ini-centro .btn.instalar{width:auto;margin:6px auto 18px}
+.caixa .us-tela.manter{margin:4px 0 6px;font-size:13px;white-space:normal}
+.caixa .us-tela.manter input{width:18px;height:18px;accent-color:var(--verde)}
+.caixa .manter-dica{margin:0 0 10px;font-size:12px;text-align:left}
+#instalarPassos ol{margin:0 0 12px;padding-left:20px;line-height:1.6;font-size:14px}
+#instalarPassos p{margin:0 0 10px;font-size:14px}
+#dlgInstalar{width:min(420px,94vw)}

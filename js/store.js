@@ -46,19 +46,40 @@ const gravar = (chave, valor) => {
 };
 
 /* ---------------- conexão ---------------- */
-/* A sessão fica em `sessionStorage`, não em `localStorage`: ela morre quando
-   a janela do app fecha. Foi pedido — computador desligado tem de voltar
-   pedindo senha. O preço é entrar de novo toda vez que fechar o navegador;
-   o cache dos dados continua em localStorage, então a abertura é rápida.
-   Onde sessionStorage não existir (modo estranho de navegador), o login
-   simplesmente não é guardado, que é o lado seguro do erro. */
-const guardaDaSessao = () => {
-  try {
-    sessionStorage.setItem('gr.teste', '1');
-    sessionStorage.removeItem('gr.teste');
-    return sessionStorage;
-  } catch { return undefined; }
-};
+/* Onde a sessão fica (10/10/2026).
+   Padrão: `sessionStorage` — morre quando a janela do app fecha. Foi pedido:
+   computador desligado tem de voltar pedindo senha.
+   Exceção: quem marca "Manter conectado neste aparelho" no login tem a sessão
+   em `localStorage` e volta a abrir o app já dentro. A escolha é POR APARELHO
+   (marca 'gr.manter' no localStorage), para o tablet de uso pessoal não
+   obrigar o computador do escritório a fazer o mesmo. "Sair" apaga a sessão
+   dos dois lugares — é o jeito de trancar um aparelho que ficou conectado.
+   A senha nunca é guardada: só o token que o Supabase já guardaria. */
+const MANTER = 'gr.manter';
+export function manterConectado() {
+  try { return localStorage.getItem(MANTER) === '1'; } catch { return false; }
+}
+export function definirManter(sim) {
+  try { sim ? localStorage.setItem(MANTER, '1') : localStorage.removeItem(MANTER); } catch {}
+}
+const tentar = fn => { try { return fn(); } catch { return null; } };
+const guardaDaSessao = () => ({
+  getItem: k => tentar(() => sessionStorage.getItem(k))
+             ?? (manterConectado() ? tentar(() => localStorage.getItem(k)) : null),
+  setItem: (k, v) => {
+    if (manterConectado()) {
+      tentar(() => localStorage.setItem(k, v));
+      tentar(() => sessionStorage.removeItem(k));
+    } else {
+      tentar(() => sessionStorage.setItem(k, v));
+      tentar(() => localStorage.removeItem(k));
+    }
+  },
+  removeItem: k => {
+    tentar(() => sessionStorage.removeItem(k));
+    tentar(() => localStorage.removeItem(k));
+  },
+});
 
 /* A sessão morava em localStorage sob 'epi.auth'. Mudou de lugar, mas a
    antiga ficaria lá para sempre — um token de acesso esquecido no navegador é

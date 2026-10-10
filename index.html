@@ -12,6 +12,16 @@
 <link rel="apple-touch-icon" href="icons/lop-gr-180.v1.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Gestão Rápida">
+<script>
+/* O Chrome avisa que dá para instalar logo no começo — às vezes antes de o
+   js/app.js (módulo, carrega por último) existir. Guarda o aviso aqui. */
+window.__promptInstalar = null;
+addEventListener('beforeinstallprompt', function (ev) {
+  ev.preventDefault();
+  window.__promptInstalar = ev;
+  document.dispatchEvent(new Event('gr-instalavel'));
+});
+</script>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/jornada-marca.css">
 <link rel="stylesheet" href="css/jornada.css">
@@ -36,6 +46,13 @@
           <input type="password" id="logSenha" required autocomplete="current-password">
         </label>
       </div>
+      <label class="us-tela manter">
+        <input type="checkbox" id="logManter"> Manter conectado neste aparelho
+      </label>
+      <p class="dica manter-dica" id="logManterDica" hidden>
+        O app vai abrir já dentro, sem pedir senha. Use só em aparelho que não
+        fica com outras pessoas. Para trancar, toque em <b>Sair</b>.
+      </p>
       <div class="barra entre">
         <button class="btn mini" type="button" id="bEsqueci">Esqueci minha senha</button>
         <button class="btn principal" type="submit" id="btnEntrar">Entrar</button>
@@ -56,6 +73,10 @@
         <button class="btn principal" type="submit" id="bEnviarLink">Enviar link</button>
       </div>
     </form>
+
+    <button class="btn instalar" type="button" id="bInstalarLogin" data-instalar hidden>
+      <span aria-hidden="true">⬇</span> Instalar o aplicativo
+    </button>
   </div>
 </section>
 
@@ -103,7 +124,7 @@
       <img class="topo-marca" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <span class="cresce"></span>
       <span class="estado" id="estadoRede"><span class="pt"></span><span id="estadoTexto">online</span></span>
-      <button class="btn mini" id="btnInstalar" hidden>Instalar app</button>
+      <button class="btn mini" id="btnInstalar" data-instalar hidden>Instalar app</button>
       <button class="btn mini" id="btnTrocarSenha" title="Escolher uma senha nova">Trocar senha</button>
       <button class="btn mini" id="btnSair">Sair</button>
     </div>
@@ -141,6 +162,9 @@
           <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
           <h2>Gestão Rápida <span>Pessoas</span></h2>
           <p class="in-dica">Escolha um atalho ao lado ou um módulo no menu acima.</p>
+          <button class="btn instalar" type="button" id="bInstalarInicio" data-instalar hidden>
+            <span aria-hidden="true">⬇</span> Instalar o aplicativo
+          </button>
           <div class="lop-ass in-lop-escuro" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
             <img src="img/lop-marca.png" alt=""><span class="lop-div"></span>
             <span class="lop-txt"><b>DESENVOLVIDO POR LOP</b><span>INTELIGÊNCIA PARA O AGRONEGÓCIO</span></span>
@@ -1896,5 +1920,16 @@
 
 <script src="vendor/supabase.js"></script>
 <script type="module" src="js/app.js"></script>
+
+<!-- Instalar: quando o navegador não oferece o convite direto -->
+<dialog id="dlgInstalar">
+  <form method="dialog">
+    <h3>Instalar o aplicativo</h3>
+    <div id="instalarPassos"></div>
+    <p class="dica">Depois de instalado, o ícone <b>Gestão Rápida</b> fica na tela
+      inicial e o app abre em janela própria, sem a barra do navegador.</p>
+    <div class="barra fim"><button class="btn principal" value="ok">Entendi</button></div>
+  </form>
+</dialog>
 </body>
 </html>

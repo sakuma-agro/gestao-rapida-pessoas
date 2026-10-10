@@ -166,6 +166,7 @@ $('formLogin').addEventListener('submit', async ev => {
   const erro = $('erroLogin'); erro.hidden = true;
   const botao = $('btnEntrar'); botao.disabled = true; botao.textContent = 'Entrando...';
   try {
+    db.definirManter($('logManter').checked);
     await db.entrar($('logEmail').value.trim(), $('logSenha').value);
     mostrar('app');
     await carregarTudo();
@@ -1540,20 +1541,73 @@ db.aoMudar(() => {
   $('estadoRede').querySelector('.pt').classList.toggle('off', !online || estado.pendentes > 0);
 });
 
-/* instalação do PWA */
-let promptInstalar = null;
-addEventListener('beforeinstallprompt', ev => {
-  ev.preventDefault();
-  promptInstalar = ev;
-  $('btnInstalar').hidden = false;
+/* =============== manter conectado neste aparelho =============== */
+$('logManter').checked = db.manterConectado();
+$('logManterDica').hidden = !$('logManter').checked;
+$('logManter').addEventListener('change', () => {
+  $('logManterDica').hidden = !$('logManter').checked;
 });
-$('btnInstalar').addEventListener('click', async () => {
-  if (!promptInstalar) return;
-  promptInstalar.prompt();
-  await promptInstalar.userChoice;
-  promptInstalar = null;
-  $('btnInstalar').hidden = true;
-});
+
+/* =============== instalar o aplicativo (10/10/2026) ===============
+   Botão em três lugares (login, tela de entrada e topo), todos com
+   data-instalar. Aparece sempre que o app NÃO está aberto como instalado:
+   - Chrome/Edge que já avisaram (beforeinstallprompt): abre o convite direto.
+   - Senão (iPhone, Chrome que ainda não avisou, Samsung Internet...): abre
+     um passo a passo do menu do próprio navegador. Nunca fica sem saída.
+   O aviso é capturado cedo por um script no <head> do index.html. */
+const jaInstalado = () =>
+  matchMedia('(display-mode: standalone)').matches ||
+  matchMedia('(display-mode: window-controls-overlay)').matches ||
+  navigator.standalone === true;
+
+let instalouAgora = false;
+function atualizarInstalar() {
+  const esconder = instalouAgora || jaInstalado();
+  document.querySelectorAll('[data-instalar]').forEach(b => { b.hidden = esconder; });
+}
+
+function passosInstalar() {
+  const ua = navigator.userAgent;
+  const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (ios) return `
+    <p>No iPhone e no iPad a instalação é pelo <b>Safari</b>:</p>
+    <ol><li>Toque no botão <b>Compartilhar</b> (quadrado com seta para cima).</li>
+      <li>Role a lista e toque em <b>Adicionar à Tela de Início</b>.</li>
+      <li>Toque em <b>Adicionar</b>.</li></ol>`;
+  if (/SamsungBrowser/.test(ua)) return `
+    <ol><li>Toque no menu <b>☰</b> no canto de baixo.</li>
+      <li>Toque em <b>Adicionar página a</b> → <b>Tela inicial</b>.</li></ol>`;
+  if (/Android/.test(ua)) return `
+    <ol><li>No Chrome, toque nos <b>três pontinhos ⋮</b>, no canto de cima.</li>
+      <li>Toque em <b>Instalar aplicativo</b> (ou <b>Adicionar à tela inicial</b>).</li>
+      <li>Confirme em <b>Instalar</b>.</li></ol>
+    <p class="dica">Se a opção não aparecer, recarregue a página e espere alguns
+      segundos — o Chrome só oferece depois de carregar o app inteiro.</p>`;
+  return `
+    <ol><li>No Chrome ou no Edge, procure o ícone de <b>instalar</b> no fim da
+      barra de endereço (um monitor com uma seta).</li>
+      <li>Ou abra o menu <b>⋮</b> / <b>…</b> e escolha <b>Instalar Gestão Rápida</b>
+      (no Edge: <b>Aplicativos → Instalar este site como aplicativo</b>).</li></ol>`;
+}
+
+async function instalar() {
+  const ev = window.__promptInstalar;
+  if (ev) {
+    ev.prompt();
+    try { await ev.userChoice; } catch {}
+    window.__promptInstalar = null;   // o convite só vale uma vez
+    atualizarInstalar();
+    return;
+  }
+  $('instalarPassos').innerHTML = passosInstalar();
+  $('dlgInstalar').showModal();
+}
+
+document.querySelectorAll('[data-instalar]').forEach(b => b.addEventListener('click', instalar));
+document.addEventListener('gr-instalavel', atualizarInstalar);
+addEventListener('appinstalled', () => { instalouAgora = true; window.__promptInstalar = null; atualizarInstalar(); });
+matchMedia('(display-mode: standalone)').addEventListener?.('change', atualizarInstalar);
+atualizarInstalar();
 
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
