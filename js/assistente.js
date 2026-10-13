@@ -10,7 +10,7 @@ import { estado, aoMudar } from './store.js';
 
 const SUGESTOES = [
   'Quais máquinas estão com troca de óleo vencida?',
-  'Quais exames vencem nos próximos 30 dias?',
+  'Quem está devendo boletim?',
   'Quantos funcionários ativos temos por fazenda?',
   'Quais OS estão abertas há mais de 7 dias?',
 ];

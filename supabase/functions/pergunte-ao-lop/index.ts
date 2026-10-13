@@ -73,6 +73,10 @@ const TABELAS: Record<string, Tabela> = {
       'tipo_contrato', 'admissao', 'desligamento', 'tipo_deslig', 'motivo', 'readmissao'] },
   rh_ind_ausencias: { esquema: 'public', para: 'ausências por vínculo (faltas, atestados etc.)',
     colunas: ['id', 'vinculo_id', 'data', 'tipo', 'planejada', 'horas', 'motivo'] },
+  jor_bol_entregas: { esquema: 'public', para: 'controle diário de entrega do boletim de serviço (situacao: entregou, nao_entregou, correcao, faltou, atestado, ferias, afastado, folga). Pendência = nao_entregou ou correcao',
+    colunas: ['funcionario_id', 'data', 'situacao', 'observacao', 'entregue_em'] },
+  jor_doc_entregas: { esquema: 'public', para: 'controle de entrega de documentos por funcionário e competência (situacao, entregue_em, escaneado)',
+    colunas: ['funcionario_id', 'competencia', 'documento', 'situacao', 'entregue_em', 'escaneado', 'observacao'] },
   // ---------- SST ----------
   sst_tipos_exame: { esquema: 'public', para: 'tipos de exame e periodicidade em meses',
     colunas: ['id', 'nome', 'meses', 'categoria', 'ativo'] },
@@ -157,6 +161,20 @@ const FERRAMENTAS = [
         filtros: { type: 'array', items: { type: 'object' } },
       },
       required: ['tabela'],
+    },
+  },
+  {
+    name: 'boletins_pendentes',
+    description: 'Lista quem está devendo boletim de serviço (dias marcados como "Não entregou" ou "Em correção"), ' +
+      'agrupado por funcionário, com os dias e o total — a mesma regra da tela DP › Boletins. Use para perguntas sobre boletins atrasados, pendentes ou devidos.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        de: { type: 'string', description: 'Data inicial AAAA-MM-DD (opcional; padrão: sem limite).' },
+        ate: { type: 'string', description: 'Data final AAAA-MM-DD (opcional; padrão: hoje).' },
+        tipo: { type: 'string', enum: ['todos', 'nao_entregou', 'correcao'], description: 'Padrão: todos os pendentes.' },
+        nome_contem: { type: 'string', description: 'Filtra pelo nome ou apelido do funcionário (opcional).' },
+      },
     },
   },
   {
@@ -307,11 +325,46 @@ async function vencimentosFrota(db: SupabaseClient, e: any, hoje: string) {
     itens: saida.slice(0, 80), observacao: saida.length > 80 ? `mostrando 80 de ${saida.length}; use codigo_contem para filtrar` : undefined };
 }
 
+/* Mesma regra de js/jornada-boletins.js: pendência = nao_entregou ou correcao. */
+// deno-lint-ignore no-explicit-any
+async function boletinsPendentes(db: SupabaseClient, e: any, hoje: string) {
+  const tipos = e.tipo === 'nao_entregou' || e.tipo === 'correcao' ? [e.tipo] : ['nao_entregou', 'correcao'];
+  let q = db.from('jor_bol_entregas').select('funcionario_id,data,situacao,observacao').in('situacao', tipos)
+    .lte('data', /^\d{4}-\d{2}-\d{2}$/.test(e.ate || '') ? e.ate : hoje).order('data').limit(5000);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(e.de || '')) q = q.gte('data', e.de);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const ids = [...new Set((data || []).map((x) => x.funcionario_id))];
+  const { data: fs, error: ef } = ids.length
+    ? await db.from('funcionarios').select('id,nome,apelido,fazenda,cargo').in('id', ids)
+    : { data: [], error: null };
+  if (ef) throw new Error(ef.message);
+  // deno-lint-ignore no-explicit-any
+  const fun = new Map<string, any>((fs || []).map((f: any) => [f.id, f]));
+  const filtro = String(e.nome_contem || '').toLowerCase();
+  // deno-lint-ignore no-explicit-any
+  const porPessoa = new Map<string, any>();
+  for (const r of data || []) {
+    const f = fun.get(r.funcionario_id) || {};
+    if (filtro && !`${f.nome ?? ''} ${f.apelido ?? ''}`.toLowerCase().includes(filtro)) continue;
+    const p = porPessoa.get(r.funcionario_id) || { nome: f.nome ?? '(sem cadastro)', fazenda: f.fazenda ?? null,
+      cargo: f.cargo ?? null, nao_entregou: [], em_correcao: [] };
+    (r.situacao === 'correcao' ? p.em_correcao : p.nao_entregou).push(r.data);
+    porPessoa.set(r.funcionario_id, p);
+  }
+  const pessoas = [...porPessoa.values()]
+    .map((p) => ({ ...p, total: p.nao_entregou.length + p.em_correcao.length }))
+    .sort((a, b) => b.total - a.total || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  return { regra: 'pendente = Não entregou ou Em correção; dia sem marcação não conta',
+    total_boletins: pessoas.reduce((s, p) => s + p.total, 0), total_pessoas: pessoas.length, pessoas: pessoas.slice(0, 60) };
+}
+
 // deno-lint-ignore no-explicit-any
 async function executar(db: SupabaseClient, nome: string, entrada: any, hoje: string) {
   if (nome === 'consultar_tabela') return await consultarTabela(db, entrada);
   if (nome === 'contar_registros') return await contarRegistros(db, entrada);
   if (nome === 'vencimentos_frota') return await vencimentosFrota(db, entrada, hoje);
+  if (nome === 'boletins_pendentes') return await boletinsPendentes(db, entrada, hoje);
   throw new Error(`ferramenta desconhecida: ${nome}`);
 }
 
@@ -322,7 +375,7 @@ function instrucoes(hoje: string, quem: string) {
   const mapa = Object.entries(TABELAS)
     .map(([n, t]) => `- ${n} (${t.para}): ${t.colunas.join(', ')}`).join('\n');
   return `Você é o "Pergunte ao LOP", assistente do sistema LOP - Gestão Rápida, usado pelo escritório da SAKUMA Agronegócios (agronegócio em Minas Gerais).
-Você responde perguntas sobre os dados do sistema: pessoas, EPIs, segurança do trabalho (exames, treinamentos, acidentes), RH e a frota (manutenções, ordens de serviço, horímetros, check lists).
+Você responde perguntas sobre os dados do sistema: pessoas, EPIs, boletins de serviço e documentos do DP, segurança do trabalho (exames, treinamentos, acidentes), RH e a frota (manutenções, ordens de serviço, horímetros, check lists).
 
 Regras:
 - Responda sempre em português do Brasil, curto e direto, como um colega do escritório. Comece pela resposta; detalhe só o necessário.
@@ -330,6 +383,7 @@ Regras:
 - Seja econômico: em geral 1 a 3 consultas bastam. Peça só as colunas necessárias e use filtros.
 - Se a consulta voltar vazia ou com erro de permissão, diga que não encontrou ou que o login da pessoa não tem acesso àquela área — não adivinhe.
 - Você só lê. Se pedirem para cadastrar, alterar ou apagar algo, explique que isso se faz na tela do sistema e diga qual.
+- Para boletins de serviço devidos, pendentes ou atrasados, use boletins_pendentes.
 - Para troca de óleo, preventiva vencida ou a vencer, use vencimentos_frota (uma chamada costuma bastar; use item_contem para separar itens, ex.: "motor" ou "transmissão"). Se a pergunta for ampla, responda com o total e os casos mais atrasados.
 - Datas no formato dd/mm/aaaa. Horas com "h", quilômetros com "km". Valores em R$.
 - Listas com até ~15 itens; se houver mais, diga o total e mostre os mais importantes.
