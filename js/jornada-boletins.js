@@ -821,10 +821,14 @@ function desenharMes() {
    rolam. A caixa da grade ocupa a altura que sobra da janela. Mesma receita
    da grade de Folha, holerite e recibo (.dm-rola). */
 function ajustarAltura() {
-  const rola = document.querySelector('#telaBdMes .bd-rola');
-  if (!rola || $('telaBdMes').hidden) return;
-  const livre = window.innerHeight - Math.max(rola.getBoundingClientRect().top, 0) - 16;
-  rola.style.maxHeight = Math.max(320, livre) + 'px';
+  // 13/10/2026: Pendências também — cabeçalho verde da tabela parado e a
+  // barra de botões (Relatório geral / Enviar selecionados) sempre à vista.
+  [['telaBdMes', '.bd-rola'], ['telaBdPend', '.bd-pend-rola']].forEach(([tela, sel]) => {
+    const rola = document.querySelector(`#${tela} ${sel}`);
+    if (!rola || $(tela).hidden) return;
+    const livre = window.innerHeight - Math.max(rola.getBoundingClientRect().top, 0) - 16;
+    rola.style.maxHeight = Math.max(320, livre) + 'px';
+  });
 }
 window.addEventListener('resize', () => ajustarAltura());
 
@@ -890,6 +894,8 @@ export const fecharMenuBoletins = fecharMenu;
 /* ---------------- Pendências ---------------- */
 
 function desenharPend() {
+  const rolaAntes = document.querySelector('#telaBdPend .bd-pend-rola');
+  const posAntes = rolaAntes ? rolaAntes.scrollTop : null;
   const l = comPendencia(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem);
   // seleção para o envio em lote: só vale para quem está na lista agora
   const naLista = new Set(l.map(x => x.f.id));
@@ -933,7 +939,7 @@ function desenharPend() {
         ${est.pTipo ? `<span class="dc-sem">Mostrando: <b>${TIPOS_PEND[est.pTipo].toLowerCase()}</b> — relatórios e WhatsApp seguem o filtro.</span>` : ''}
       </div>
       ${barraDoc('bdBarraPend')}
-      <div class="fer-rola"><table class="dc-planilha fer-tabela bd-pend"><thead><tr><th class="bd-sel-c"><input type="checkbox" id="bdSelTodos" aria-label="Selecionar todos" ${todosSel ? 'checked' : ''} ${l.length ? '' : 'disabled'}></th><th>Funcionário</th><th class="ce">Pendentes</th><th>Datas</th><th></th></tr></thead><tbody>
+      <div class="fer-rola dm-rola bd-pend-rola"><table class="dc-planilha fer-tabela bd-pend"><thead><tr><th class="bd-sel-c"><input type="checkbox" id="bdSelTodos" aria-label="Selecionar todos" ${todosSel ? 'checked' : ''} ${l.length ? '' : 'disabled'}></th><th>Funcionário</th><th class="ce">Pendentes</th><th>Datas</th><th></th></tr></thead><tbody>
         ${l.map(x => `<tr class="fer-clica${est.sel.has(x.f.id) ? ' bd-marcado' : ''}" data-pessoa="${x.f.id}" tabindex="0">
           <td class="bd-sel-c"><input type="checkbox" data-sel="${x.f.id}" aria-label="Selecionar ${esc(x.f.nome)}" ${est.sel.has(x.f.id) ? 'checked' : ''}></td>
           <td><b>${esc(x.f.nome)}</b>${ativa(x.f) ? '' : ' <span class="tag inativo">inativo</span>'}<br><span class="dc-sem">${esc(x.f.fazenda || 'sem fazenda')}</span></td>
@@ -948,6 +954,9 @@ function desenharPend() {
         Clique na pessoa para ver as datas e dar baixa quando o boletim chegar ou voltar corrigido.</p>
     </div>`;
 
+  ajustarAltura();
+  const rolaP = document.querySelector('#telaBdPend .bd-pend-rola');
+  if (rolaP && posAntes != null) rolaP.scrollTop = posAntes;
   const setP = (k, v) => { est[k] = v; desenharPend(); };
   $('bdPIni').addEventListener('change', ev => setP('pIni', ev.target.value));
   $('bdPFim').addEventListener('change', ev => setP('pFim', ev.target.value));
