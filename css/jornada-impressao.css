@@ -325,3 +325,5 @@
 .ce-mes-papel .ce-ev-vermelho { border-left-color: #a5342a; }
 .ce-mes-papel .ce-feito { text-decoration: line-through; }
 .ce-anual-papel td:nth-child(n+4) { width: 26px; }
+.rel a.rel-link { color: #51534A; font-weight: 700; text-decoration: none; border: 0; }
+.rel a.rel-link span { display: none; }

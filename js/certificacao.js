@@ -121,6 +121,11 @@ const docsDe = r => (r.documentos || []).map(id => S.docs.find(d => d.id === id)
   .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 const reqsDoDoc = d => S.reqs.filter(r => (r.documentos || []).includes(d.id));
 const rotDoc = d => `${d.codigo} · ${d.nome}`;
+/* Link da pasta/arquivo no OneDrive (13/10/2026): o código vira link que abre numa aba nova. */
+const linkOk = u => /^https?:\/\//i.test(so(u));
+const codigoLink = (d, cls = '') => linkOk(d.link)
+  ? `<a class="ce-cod-link ${cls}" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abrir no OneDrive: ${esc(d.nome)}">${esc(d.codigo)}<span aria-hidden="true">↗</span></a>`
+  : `<b>${esc(d.codigo)}</b>`;
 /** Códigos das normas que o documento atende, pelos requisitos ligados a ele
  *  (só das certificações ligadas, sem repetir, na ordem das certificações). */
 function codigosDoDoc(d) {
@@ -436,7 +441,7 @@ function tabelaRequisitos() {
   $('ceRqTabela').querySelectorAll('[data-vdoc]').forEach(b => b.addEventListener('click', () => formDocumento(Number(b.dataset.vdoc))));
 }
 
-const chipDoc = d => `<span class="ce-chip" data-did="${d.id}" title="${esc(d.nome)}"><b>${esc(d.codigo)}</b> ${esc(d.nome)}
+const chipDoc = d => `<span class="ce-chip" data-did="${d.id}" title="${esc(d.nome)}">${codigoLink(d)} ${esc(d.nome)}
   <button type="button" data-tirad title="Desligar este documento">✕</button></span>`;
 
 function formRequisito(id) {
@@ -546,7 +551,7 @@ function docFiltrados() {
   return S.docs.filter(d => {
     if (f.cat && d.categoria !== f.cat) return false;
     if (f.per && d.periodicidade !== f.per) return false;
-    if (f.sit === 'atencao' ? !(['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d)) : f.sit && d.situacao !== f.sit) return false;
+    if (f.sit === 'semlink' ? linkOk(d.link) : f.sit === 'atencao' ? !(['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d)) : f.sit && d.situacao !== f.sit) return false;
     if (f.resp && so(d.responsavel) !== f.resp) return false;
     if (q && ![d.codigo, d.nome, d.responsavel, d.observacao, codTexto(codigosDoDoc(d))].some(t => so(t).toLowerCase().includes(q))) return false;
     return true;
@@ -568,7 +573,7 @@ function desenharDocumentos() {
       <label class="campo">Buscar <input type="text" id="ceDcQ" value="${esc(f.q)}" placeholder="Código, nome ou código da norma (ex.: 4.6.1)"></label>
       <label class="campo">Categoria <select id="ceDcCat">${opcoes(cats, f.cat, 'Todas')}</select></label>
       <label class="campo">Periodicidade <select id="ceDcPer">${opcoes(pers, f.per, 'Todas')}</select></label>
-      <label class="campo">Situação <select id="ceDcSit">${opcoes([['atencao', 'Precisa de atenção'], ...SITUACOES_DOC], f.sit, 'Todas')}</select></label>
+      <label class="campo">Situação <select id="ceDcSit">${opcoes([['atencao', 'Precisa de atenção'], ['semlink', 'Sem link do OneDrive'], ...SITUACOES_DOC], f.sit, 'Todas')}</select></label>
       <label class="campo">Responsável <select id="ceDcResp">${opcoes([...new Set(S.docs.map(d => so(d.responsavel)).filter(Boolean))].sort(), f.resp, 'Todos')}</select></label>
     </div>
     <div class="barra" id="ceDcResumo"></div>
@@ -591,12 +596,13 @@ function tabelaDocumentos() {
   const conta = s => lista.filter(d => d.situacao === s).length;
   $('ceDcResumo').innerHTML = `<span class="contagem"><b>${lista.length}</b> documento(s)</span>
     ${SITUACOES_DOC.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_SIT[s])} <b>${conta(s)}</b></span>` : '').join('')}
-    ${lista.filter(docAtrasado).length ? `<span class="contagem">${tag('revisão vencida', 'perigo')} <b>${lista.filter(docAtrasado).length}</b></span>` : ''}`;
+    ${lista.filter(docAtrasado).length ? `<span class="contagem">${tag('revisão vencida', 'perigo')} <b>${lista.filter(docAtrasado).length}</b></span>` : ''}
+    <span class="contagem"><b>${lista.filter(d => !linkOk(d.link)).length}</b> sem link do OneDrive</span>`;
   $('ceDcTabela').innerHTML = lista.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr>
     <th>Código</th><th>Documento</th><th>Categoria</th><th class="ce">Periodicidade</th><th>Responsável</th><th class="ce">Revisão</th><th class="ce">Próxima</th><th>Códigos nas normas</th><th class="ce">Situação</th><th></th>
   </tr></thead><tbody>
   ${lista.map(d => { const p = proximaDoc(d); return `<tr>
-    <td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}${(d.certificacoes || []).length ? `<br><span class="dc-sem">${esc(d.certificacoes.join(', '))}</span>` : ''}</td>
+    <td>${codigoLink(d)}</td><td>${esc(d.nome)}${(d.certificacoes || []).length ? `<br><span class="dc-sem">${esc(d.certificacoes.join(', '))}</span>` : ''}</td>
     <td>${esc(d.categoria)}</td><td class="ce">${esc(d.periodicidade || '—')}</td><td>${esc(d.responsavel || '—')}</td>
     <td class="ce">${d.revisao ? 'Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? `<br><span class="dc-sem">${br(d.data_revisao)}</span>` : (d.revisao ? '' : '—')}</td>
     <td class="ce">${p ? (p < hoje() ? tag(br(p), 'perigo') : br(p)) : '—'}</td>
@@ -628,6 +634,9 @@ function formDocumento(id) {
       <label class="campo">Situação <select id="cedSit">${opcoes(SITUACOES_DOC, v.situacao)}</select></label>
       <label class="campo">Revisão nº <input type="text" id="cedRev" maxlength="10" value="${val('revisao')}"></label>
       <label class="campo">Data da revisão <input type="date" id="cedData" value="${val('data_revisao')}"></label>
+      <label class="campo plena">Link no OneDrive <small>da pasta ou do arquivo — no OneDrive: Compartilhar › Copiar link</small>
+        <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://…sharepoint.com/… ou https://1drv.ms/…">
+        <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" ${linkOk(v.link) ? `href="${esc(v.link)}"` : 'hidden'}>Abrir ↗</a></span></label>
       <p class="dica plena" id="cedProx"></p>
       <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
       <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
@@ -649,6 +658,10 @@ function formDocumento(id) {
         : MESES_PERIODO[$('cedPer').value] ? 'Informe a data da revisão para o documento aparecer no calendário.' : '';
     };
     $('cedPer').addEventListener('change', prox); $('cedData').addEventListener('change', prox); prox();
+    $('cedLink').addEventListener('input', () => {
+      const u = so($('cedLink').value), a = $('cedLinkAbrir');
+      if (linkOk(u)) { a.href = u; a.hidden = false; } else { a.removeAttribute('href'); a.hidden = true; }
+    });
     document.querySelectorAll('#dlgCe [data-lreq]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.lreq))));
     $('cedGravar').addEventListener('click', () => gravarDocumento(d));
     $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
@@ -666,8 +679,9 @@ async function gravarDocumento(d) {
   const linha = {
     codigo: g('cedCod'), nome: g('cedNome'), categoria: (g('cedCat') || 'ANEXO').toUpperCase(), periodicidade: g('cedPer'),
     responsavel: g('cedResp'), situacao: $('cedSit').value, revisao: g('cedRev'), data_revisao: g('cedData'),
-    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), atualizado_em: new Date().toISOString(),
+    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), atualizado_em: new Date().toISOString(),
   };
+  if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https:// — copie pelo botão Compartilhar › Copiar link do OneDrive.');
   if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
   if (S.docs.some(x => x.id !== d?.id && so(x.codigo).toLowerCase() === linha.codigo.toLowerCase()))
     return erroDlg(`Já existe um documento com o código ${linha.codigo}.`);
@@ -1078,7 +1092,7 @@ function docListaDocs(lista) {
     canto: `${lista.length} documento(s)`,
     corpo: `<table class="rel-tabela"><thead><tr><th>Código</th><th>Documento</th><th>Rev.</th><th>Data</th><th>Periodicidade</th><th>Responsável</th><th>Códigos nas normas</th><th>Situação</th></tr></thead><tbody>
       ${porCat.map(([cat, ds]) => `<tr class="rel-grupo"><td colspan="8">${esc(cat)} · ${ds.length}</td></tr>
-        ${ds.map(d => `<tr><td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}</td><td>${esc(d.revisao || '')}</td><td>${d.data_revisao ? br(d.data_revisao) : ''}</td>
+        ${ds.map(d => `<tr><td>${codigoLink(d, 'rel-link')}</td><td>${esc(d.nome)}</td><td>${esc(d.revisao || '')}</td><td>${d.data_revisao ? br(d.data_revisao) : ''}</td>
           <td>${esc(d.periodicidade || '')}</td><td>${esc(d.responsavel || '')}</td>
           <td class="rel-miudo">${esc(codTexto(codigosDoDoc(d)))}</td>
           <td class="${d.situacao === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : d.situacao === 'Obsoleto' ? '' : 'rel-pend'}">${esc(d.situacao)}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
@@ -1152,9 +1166,9 @@ async function exportarDocs(lista) {
       nome: 'Lista mestra', titulo: 'Lista mestra · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Código', larg: 10 }, { rot: 'Documento', larg: 55 }, { rot: 'Categoria', larg: 15 }, { rot: 'Periodicidade', larg: 13 },
         { rot: 'Responsável', larg: 18 }, { rot: 'Revisão', larg: 8 }, { rot: 'Data da revisão', tipo: 'data', larg: 12 },
-        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Códigos nas normas', larg: 40 }, { rot: 'Requisitos ligados', tipo: 'num', casas: 0, larg: 10 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
+        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Códigos nas normas', larg: 40 }, { rot: 'Requisitos ligados', tipo: 'num', casas: 0, larg: 10 }, { rot: 'Link OneDrive', larg: 40 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
       linhas: lista.map(d => [d.codigo, d.nome, d.categoria, d.periodicidade || '', d.responsavel || '', d.revisao || '', d.data_revisao || '',
-        proximaDoc(d) || '', codTexto(codigosDoDoc(d)), reqsDoDoc(d).length, d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
+        proximaDoc(d) || '', codTexto(codigosDoDoc(d)), reqsDoDoc(d).length, d.link || '', d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
     }]);
   } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
 }
