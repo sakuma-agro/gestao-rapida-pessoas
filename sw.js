@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v160';
+const VERSAO = 'gr-v161';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -25,6 +25,8 @@ const ARQUIVOS = [
   // LOP - Gestão Rápida (09/10/2026): a plataforma, as áreas e a área Manutenções,
   // que precisa abrir sem internet no pátio (a base dela mora no IndexedDB).
   './js/areas.js',
+  // Pergunte ao LOP (13/10/2026)
+  './js/assistente.js', './css/assistente.css',
   './icons/lop-gr-favicon.v1.ico', './icons/lop-gr-32.v1.png', './icons/lop-gr-180.v1.png',
   './icons/lop-gr-192.v1.png', './icons/lop-gr-512.v1.png',
   './icons/lop-gr-maskable-192.v1.png', './icons/lop-gr-maskable-512.v1.png',
