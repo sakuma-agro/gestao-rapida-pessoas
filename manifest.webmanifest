@@ -40,5 +40,11 @@
       "purpose": "maskable"
     }
   ],
-  "id": "/gestao-rapida-pessoas/"
+  "id": "/gestao-rapida-pessoas/",
+  "launch_handler": {
+    "client_mode": [
+      "focus-existing",
+      "auto"
+    ]
+  }
 }

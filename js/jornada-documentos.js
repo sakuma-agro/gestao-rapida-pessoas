@@ -21,6 +21,7 @@
 // Banco: jor_doc_entregas (chave = funcionario_id|AAAA-MM|documento), RLS
 // app_pode('jornada').
 
+import { abrirZapWeb } from './jornada-boletins.js';
 import { montarMulti } from './multisel.js';
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
@@ -396,7 +397,7 @@ async function enviarZap(fid, botao) {
       const url = URL.createObjectURL(jpg), a = document.createElement('a');
       a.href = url; a.download = arquivo.name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
-      window.open('https://web.whatsapp.com/', '_blank', 'noopener');
+      abrirZapWeb();
       avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
     }
   } catch (e) {

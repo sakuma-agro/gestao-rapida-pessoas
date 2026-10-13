@@ -472,6 +472,13 @@ const nomeArquivo = (f) => 'boletins-' + String(f?.nome || 'funcionario').normal
 /* 13/10/2026 (pedido dele): vai só a imagem — o nome e o recado já estão
    escritos dentro dela; nada de texto separado na conversa. */
 const ZAP_WEB = 'https://web.whatsapp.com/';
+/* 13/10/2026: uma aba só do WhatsApp Web — reaproveita a que já abriu. */
+let janZap = null;
+export function abrirZapWeb() {
+  if (janZap && !janZap.closed) { try { janZap.focus(); } catch {} return; }
+  janZap = window.open(ZAP_WEB, 'lop-whatsapp');
+  try { if (janZap) janZap.opener = null; } catch {}
+}
 const podeCompartilhar = arqs => !!(navigator.canShare && navigator.canShare({ files: arqs }));
 function baixarArquivos(arqs) {
   arqs.forEach((arq, i) => setTimeout(() => {
@@ -498,7 +505,7 @@ async function enviarZap(fid, botao) {
       await navigator.share({ files: [arquivo] });
     } else {
       baixarArquivos([arquivo]);
-      window.open(ZAP_WEB, '_blank', 'noopener');
+      abrirZapWeb();
       avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
     }
   } catch (e) {
@@ -548,7 +555,7 @@ async function enviarLote(ids, botao) {
   $('bdLoteFechar').addEventListener('click', () => dlg.close());
   $('bdLoteBaixar').addEventListener('click', () => {
     baixarArquivos(arqs);
-    if (!compartilha) window.open(ZAP_WEB, '_blank', 'noopener');
+    if (!compartilha) abrirZapWeb();
   });
   $('dlgBdCorpo').querySelectorAll('[data-parte]').forEach(b => b.addEventListener('click', async () => {
     try {
