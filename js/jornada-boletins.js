@@ -130,11 +130,15 @@ export const pendenciasDe = (fid, ini = '', fim = '', tipo = '') => (jd.dados.bo
   .sort((a, b) => a.data.localeCompare(b.data));
 
 /** Todas as pessoas com pendência — inclusive quem saiu do Campo ou foi desligado. */
-function comPendencia(ini, fim, fazenda, tipo = '') {
+/* Ordem (13/10/2026, pedido dele): 'qtd' = quem mais deve boletim primeiro;
+   'nome' = ordem alfabética. */
+const ORDENS = { qtd: 'Mais pendências primeiro', nome: 'Nome (A a Z)' };
+function comPendencia(ini, fim, fazenda, tipo = '', ordem = 'qtd') {
   const ids = [...new Set((jd.dados.bolEntregas || []).filter(x => ehPend(x.situacao)).map(x => x.funcionario_id))];
+  const porNome = (a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR');
   return ids.map(id => ({ f: pessoa(id), p: pendenciasDe(id, ini, fim, tipo) }))
     .filter(x => x.f && x.p.length && casaFazenda(x.f, fazenda))
-    .sort((a, b) => b.p.length - a.p.length || a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
+    .sort(ordem === 'nome' ? porNome : (a, b) => b.p.length - a.p.length || porNome(a, b));
 }
 
 /* O controle começou no dia da primeira marcação (nada foi importado da
@@ -285,8 +289,8 @@ export function relIndividual(fid, ini = '', fim = '', tipo = '') {
 }
 
 /** Relatório geral: todos que têm pendência. */
-export function relGeral(ini = '', fim = '', fazenda = '', tipo = '') {
-  const l = comPendencia(ini, fim, fazenda, tipo);
+export function relGeral(ini = '', fim = '', fazenda = '', tipo = '', ordem = 'qtd', so = null) {
+  const l = comPendencia(ini, fim, fazenda, tipo, ordem).filter(x => !so || so.has(x.f.id));
   const tot = l.reduce((s, x) => s + x.p.length, 0);
   const data = y => y.situacao === 'correcao' ? `${brCurto(y.data)} <span class="rel-mini">(correção)</span>` : brCurto(y.data);
   return `<article class="rel">
@@ -465,24 +469,36 @@ export async function imagemIndividual(fid, ini = '', fim = '', tipo = '') {
 const nomeArquivo = (f) => 'boletins-' + String(f?.nome || 'funcionario').normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.jpg';
 
-/** Botão WhatsApp: a imagem do relatório individual e, de texto, só o nome. */
+/* 13/10/2026 (pedido dele): vai só a imagem — o nome e o recado já estão
+   escritos dentro dela; nada de texto separado na conversa. */
+const ZAP_WEB = 'https://web.whatsapp.com/';
+const podeCompartilhar = arqs => !!(navigator.canShare && navigator.canShare({ files: arqs }));
+function baixarArquivos(arqs) {
+  arqs.forEach((arq, i) => setTimeout(() => {
+    const url = URL.createObjectURL(arq), a = document.createElement('a');
+    a.href = url; a.download = arq.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }, i * 350));
+}
+/** Carrega os meses das pendências (para as faltas aparecerem) e desenha a imagem. */
+async function arquivoDe(fid) {
+  const meses = [...new Set(pendenciasDe(fid, est.pIni, est.pFim, est.pTipo).map(x => x.data.slice(0, 7)))];
+  for (const ym of meses) await garantir(ym + '-01', fimDoMes(ym));
+  const jpg = await imagemIndividual(fid, est.pIni, est.pFim, est.pTipo);
+  return new File([jpg], nomeArquivo(pessoa(fid)), { type: 'image/jpeg' });
+}
+
+/** Botão WhatsApp de uma pessoa: só a imagem do relatório individual. */
 async function enviarZap(fid, botao) {
-  const f = pessoa(fid);
-  const nome = f?.nome || '';
   const rotulo = botao?.innerHTML;
   if (botao) { botao.disabled = true; botao.textContent = 'Preparando...'; }
   try {
-    const meses = [...new Set(pendenciasDe(fid, est.pIni, est.pFim, est.pTipo).map(x => x.data.slice(0, 7)))];
-    for (const ym of meses) await garantir(ym + '-01', fimDoMes(ym));
-    const jpg = await imagemIndividual(fid, est.pIni, est.pFim, est.pTipo);
-    const arquivo = new File([jpg], nomeArquivo(f), { type: 'image/jpeg' });
-    if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-      await navigator.share({ files: [arquivo], text: nome });
+    const arquivo = await arquivoDe(fid);
+    if (podeCompartilhar([arquivo])) {
+      await navigator.share({ files: [arquivo] });
     } else {
-      const url = URL.createObjectURL(jpg), a = document.createElement('a');
-      a.href = url; a.download = arquivo.name; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
-      window.open(linkZap(nome), '_blank', 'noopener');
+      baixarArquivos([arquivo]);
+      window.open(ZAP_WEB, '_blank', 'noopener');
       avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
     }
   } catch (e) {
@@ -490,6 +506,58 @@ async function enviarZap(fid, botao) {
   } finally {
     if (botao) { botao.disabled = false; botao.innerHTML = rotulo; }
   }
+}
+
+/* ---------------- Envio em lote (13/10/2026, pedido dele) ----------------
+   Marca as pessoas na lista e envia de uma vez: uma imagem por pessoa, cada
+   uma sai como mensagem própria no WhatsApp, sem texto à parte. As imagens
+   são preparadas primeiro e o envio sai de um clique novo — o navegador só
+   deixa abrir o compartilhar logo depois de um toque, e preparar várias
+   imagens passa desse tempo. O WhatsApp aceita até 30 por envio; acima disso
+   o lote vem em partes. */
+const POR_ENVIO = 30;
+async function enviarLote(ids, botao) {
+  if (!ids.length) return;
+  const rotulo = botao?.innerHTML;
+  const arqs = [];
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      if (botao) { botao.disabled = true; botao.textContent = `Preparando ${i + 1} de ${ids.length}...`; }
+      arqs.push(await arquivoDe(ids[i]));
+    }
+  } catch (e) {
+    avisar('Não consegui preparar as imagens: ' + (e?.message || e));
+    return;
+  } finally {
+    if (botao) { botao.disabled = false; botao.innerHTML = rotulo; }
+  }
+  const partes = [];
+  for (let i = 0; i < arqs.length; i += POR_ENVIO) partes.push(arqs.slice(i, i + POR_ENVIO));
+  const compartilha = podeCompartilhar(partes[0]);
+  const dlg = $('dlgBd');
+  $('dlgBdCorpo').innerHTML = `<h3>Enviar pelo WhatsApp</h3>
+    <p class="dc-sem">${arqs.length} ${arqs.length === 1 ? 'imagem pronta' : 'imagens prontas'} — uma por pessoa, cada uma sai como mensagem própria,
+      com o nome e o recado escritos na imagem.${partes.length > 1 ? ` O WhatsApp aceita até ${POR_ENVIO} por vez: envie em ${partes.length} partes.` : ''}</p>
+    <ul class="bd-lote-lista">${ids.map(id => `<li>${esc(pessoa(id)?.nome || '')}</li>`).join('')}</ul>
+    ${compartilha ? '' : `<div class="jor-caixa">Este navegador não envia arquivos direto para o WhatsApp. Baixe as imagens e anexe no WhatsApp Web.</div>`}
+    <div class="barra entre" style="margin-top:12px"><button class="btn" type="button" id="bdLoteFechar">Fechar</button>
+      <span>${compartilha ? partes.map((pt, i) => `<button class="btn mini btn-zap" type="button" data-parte="${i}"><img class="ic-zap" src="img/whatsapp.png" alt="">${
+          partes.length > 1 ? `Parte ${i + 1} (${i * POR_ENVIO + 1}–${i * POR_ENVIO + pt.length})` : `Enviar ${pt.length} ${pt.length === 1 ? 'imagem' : 'imagens'}`}</button>`).join(' ') : ''}
+        <button class="btn ${compartilha ? 'mini' : 'principal'}" type="button" id="bdLoteBaixar">Baixar ${arqs.length === 1 ? 'a imagem' : 'as imagens'}</button></span></div>`;
+  if (!dlg.open) dlg.showModal();
+  $('bdLoteFechar').addEventListener('click', () => dlg.close());
+  $('bdLoteBaixar').addEventListener('click', () => {
+    baixarArquivos(arqs);
+    if (!compartilha) window.open(ZAP_WEB, '_blank', 'noopener');
+  });
+  $('dlgBdCorpo').querySelectorAll('[data-parte]').forEach(b => b.addEventListener('click', async () => {
+    try {
+      await navigator.share({ files: partes[+b.dataset.parte] });
+      b.classList.add('bd-enviado'); b.lastChild.textContent = b.lastChild.textContent.replace(/^Enviar/, 'Enviado:');
+    } catch (e) {
+      if (!(e && e.name === 'AbortError')) avisar('O WhatsApp não aceitou o envio: ' + (e?.message || e));
+    }
+  }));
 }
 
 export function csvMes(ym, lista) {
@@ -554,7 +622,7 @@ function ligarBarraDoc(raiz) {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '' };
+const est = { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '', pOrdem: 'qtd', sel: new Set() };
 
 function cabecalho(titulo, sub, direita) {
   return `<header class="jor-cabecalho"><div>
@@ -822,8 +890,11 @@ export const fecharMenuBoletins = fecharMenu;
 /* ---------------- Pendências ---------------- */
 
 function desenharPend() {
-  const l = comPendencia(est.pIni, est.pFim, est.pFaz, est.pTipo);
-  const tot = l.reduce((s, x) => s + x.p.length, 0);
+  const l = comPendencia(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem);
+  // seleção para o envio em lote: só vale para quem está na lista agora
+  const naLista = new Set(l.map(x => x.f.id));
+  [...est.sel].forEach(id => { if (!naLista.has(id)) est.sel.delete(id); });
+  const nSel = est.sel.size, todosSel = l.length > 0 && nSel === l.length;
   const todosPend = comPendencia(est.pIni, est.pFim, est.pFaz).flatMap(x => x.p);
   const nNao = todosPend.filter(x => x.situacao === 'nao_entregou').length;
   const nCor = todosPend.filter(x => x.situacao === 'correcao').length;
@@ -842,6 +913,9 @@ function desenharPend() {
           ${Object.entries(TIPOS_PEND).map(([k, v]) => `<option value="${k}" ${est.pTipo === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
         <div id="bdPFaz" aria-label="Fazenda"></div>
+        <label class="fer-filtro">Ordem <select id="bdPOrdem" class="dc-mini bd-sel" aria-label="Ordem da lista">
+          ${Object.entries(ORDENS).map(([k, v]) => `<option value="${k}" ${est.pOrdem === k ? 'selected' : ''}>${v}</option>`).join('')}
+        </select></label>
         ${est.pIni || est.pFim || est.pFaz.length || est.pTipo ? '<button class="btn mini" type="button" id="bdPLimpa">Limpar filtro</button>' : ''}
       </div>
       <div class="pv-cards bd-cards">
@@ -853,20 +927,24 @@ function desenharPend() {
       ${sm.length ? `<div class="jor-caixa alerta"><b>${sm.length} dia(s) sem marcação</b> nos últimos 30 dias — enquanto não marcar, eles não viram pendência.
         <button class="btn mini" type="button" id="bdIrMes">Abrir o mês</button></div>` : ''}
       <div class="jor-acoes">
-        <button class="btn principal" type="button" id="bdRelGeral" ${l.length ? '' : 'disabled'}>Relatório geral (todos)</button>
+        <button class="btn principal" type="button" id="bdRelGeral" ${l.length ? '' : 'disabled'}>Relatório geral (${nSel ? 'selecionados' : 'todos'})</button>
+        <button class="btn btn-zap" type="button" id="bdLote" ${nSel ? '' : 'disabled'} title="${nSel ? '' : 'Marque as pessoas na lista'}"><img class="ic-zap" src="img/whatsapp.png" alt="">Enviar selecionados${nSel ? ` (${nSel})` : ''}</button>
+        ${nSel ? '<button class="btn mini" type="button" id="bdSelLimpa">Limpar seleção</button>' : ''}
         ${est.pTipo ? `<span class="dc-sem">Mostrando: <b>${TIPOS_PEND[est.pTipo].toLowerCase()}</b> — relatórios e WhatsApp seguem o filtro.</span>` : ''}
       </div>
       ${barraDoc('bdBarraPend')}
-      <div class="fer-rola"><table class="dc-planilha fer-tabela bd-pend"><thead><tr><th>Funcionário</th><th class="ce">Pendentes</th><th>Datas</th><th></th></tr></thead><tbody>
-        ${l.map(x => `<tr class="fer-clica" data-pessoa="${x.f.id}" tabindex="0">
+      <div class="fer-rola"><table class="dc-planilha fer-tabela bd-pend"><thead><tr><th class="bd-sel-c"><input type="checkbox" id="bdSelTodos" aria-label="Selecionar todos" ${todosSel ? 'checked' : ''} ${l.length ? '' : 'disabled'}></th><th>Funcionário</th><th class="ce">Pendentes</th><th>Datas</th><th></th></tr></thead><tbody>
+        ${l.map(x => `<tr class="fer-clica${est.sel.has(x.f.id) ? ' bd-marcado' : ''}" data-pessoa="${x.f.id}" tabindex="0">
+          <td class="bd-sel-c"><input type="checkbox" data-sel="${x.f.id}" aria-label="Selecionar ${esc(x.f.nome)}" ${est.sel.has(x.f.id) ? 'checked' : ''}></td>
           <td><b>${esc(x.f.nome)}</b>${ativa(x.f) ? '' : ' <span class="tag inativo">inativo</span>'}<br><span class="dc-sem">${esc(x.f.fazenda || 'sem fazenda')}</span></td>
           <td class="ce"><span class="pv-num-perigo">${x.p.length}</span></td>
           <td>${x.p.slice(0, 8).map(tagData).join(' ')}${x.p.length > 8 ? ` <span class="dc-sem">+${x.p.length - 8}</span>` : ''}</td>
           <td class="bd-acoes-l"><button class="btn mini" type="button" data-rel="${x.f.id}">Relatório</button>
             <button class="btn mini btn-zap" type="button" data-zap="${x.f.id}"><img class="ic-zap" src="img/whatsapp.png" alt="">WhatsApp</button></td></tr>`).join('')
-          || '<tr><td colspan="4" class="vazio">Ninguém com boletim pendente. 👏</td></tr>'}
+          || '<tr><td colspan="5" class="vazio">Ninguém com boletim pendente. 👏</td></tr>'}
       </tbody></table></div>
       <p class="dc-sem jor-nota">Data em marrom: não entregou · em amarelo: devolvido para correção. Clique nos cartões para cobrar só um tipo.
+        Marque as caixas para enviar em lote: sai uma imagem por pessoa, cada uma como mensagem própria no WhatsApp.
         Clique na pessoa para ver as datas e dar baixa quando o boletim chegar ou voltar corrigido.</p>
     </div>`;
 
@@ -880,7 +958,14 @@ function desenharPend() {
     setP('pTipo', est.pTipo === b.dataset.tipo ? '' : b.dataset.tipo)));
   $('bdPLimpa')?.addEventListener('click', () => { est.pIni = ''; est.pFim = ''; est.pFaz = []; est.pTipo = ''; desenharPend(); });
   $('bdIrMes')?.addEventListener('click', () => { est.mes = sm[0].d.slice(0, 7); irPara('bdMes'); });
-  $('bdRelGeral').addEventListener('click', () => mostrarDoc(relGeral(est.pIni, est.pFim, est.pFaz, est.pTipo), 'bdBarraPend'));
+  $('bdPOrdem').addEventListener('change', ev => setP('pOrdem', ev.target.value));
+  $('bdRelGeral').addEventListener('click', () => mostrarDoc(relGeral(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem, nSel ? est.sel : null), 'bdBarraPend'));
+  $('bdLote').addEventListener('click', ev => enviarLote(l.map(x => x.f.id).filter(id => est.sel.has(id)), ev.currentTarget));
+  $('bdSelLimpa')?.addEventListener('click', () => { est.sel.clear(); desenharPend(); });
+  $('bdSelTodos')?.addEventListener('change', ev => {
+    if (ev.target.checked) l.forEach(x => est.sel.add(x.f.id)); else est.sel.clear();
+    desenharPend();
+  });
   ligarBarraDoc($('telaBdPend'));
   const t = $('telaBdPend');
   t.querySelectorAll('[data-rel]').forEach(b => b.addEventListener('click', ev => {
@@ -888,6 +973,11 @@ function desenharPend() {
   }));
   t.querySelectorAll('[data-zap]').forEach(b => b.addEventListener('click', ev => {
     ev.stopPropagation(); enviarZap(b.dataset.zap, b);
+  }));
+  t.querySelectorAll('.bd-sel-c').forEach(c => c.addEventListener('click', ev => ev.stopPropagation()));
+  t.querySelectorAll('[data-sel]').forEach(c => c.addEventListener('change', () => {
+    if (c.checked) est.sel.add(c.dataset.sel); else est.sel.delete(c.dataset.sel);
+    desenharPend();
   }));
   t.querySelectorAll('tr[data-pessoa]').forEach(r => {
     r.addEventListener('click', () => dlgPessoa(r.dataset.pessoa));
@@ -967,5 +1057,5 @@ export function ligarBoletins(navegar, aviso) {
 
 export function limparBoletins() {
   carregados.clear();
-  Object.assign(est, { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '' });
+  Object.assign(est, { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '', pOrdem: 'qtd', sel: new Set() });
 }

@@ -391,12 +391,12 @@ async function enviarZap(fid, botao) {
     const jpg = await imagemIndividual(fid, est.de, est.ate, est.tipo);
     const arquivo = new File([jpg], nomeArquivo(f), { type: 'image/jpeg' });
     if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
-      await navigator.share({ files: [arquivo], text: nome });
+      await navigator.share({ files: [arquivo] });
     } else {
       const url = URL.createObjectURL(jpg), a = document.createElement('a');
       a.href = url; a.download = arquivo.name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);
-      window.open(linkZap(nome), '_blank', 'noopener');
+      window.open('https://web.whatsapp.com/', '_blank', 'noopener');
       avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
     }
   } catch (e) {

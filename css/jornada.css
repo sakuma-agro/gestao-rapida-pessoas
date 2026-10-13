@@ -256,6 +256,12 @@
 .bd-acoes-l .btn { margin-left: 4px; }
 .bd-acoes-l .btn-zap { padding: 5px 9px; font-size: 12px; }
 .bd-acoes-l .btn-zap .ic-zap { width: 16px; height: 16px; }
+/* Envio em lote (13/10/2026) */
+.bd-pend .bd-sel-c { width: 34px; text-align: center; cursor: default; }
+.bd-pend .bd-sel-c input { width: 18px; height: 18px; accent-color: #84BD00; cursor: pointer; }
+.bd-pend tr.bd-marcado td { background: #E8F3CC; }
+.bd-lote-lista { columns: 2; margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: #51534A; max-height: 240px; overflow: auto; }
+.btn.btn-zap.bd-enviado { background: #6E9E00; border-color: #6E9E00; }
 #dlgBd { max-width: 560px; width: calc(100% - 24px); }
 #dlgBd textarea { width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
 #dlgBd .btn-zap { padding: 5px 9px; font-size: 12px; }
