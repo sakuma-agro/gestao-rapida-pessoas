@@ -1,0 +1,1121 @@
+// certificacao.js — área Certificação do LOP - Gestão Rápida (13/10/2026)
+//
+// Decisão dele (09/10/2026): a Certificação tem "listas para imprimir e um
+// calendário de cronograma". Hoje a fazenda tem GLOBALG.A.P. IFA, GLOBALG.A.P.
+// GRASP, Rainforest Alliance e SMETA. Seguindo o exemplo do AgroCert que ele
+// mandou (Requisitos.jsx / requisitos-consolidados.json), um requisito é
+// escrito UMA vez e aponta para os códigos de cada norma que ele atende
+// (campo referencias = [{norma, versao, codigo}]). Assim a mesma evidência
+// serve às quatro certificações e cada uma imprime o seu check list.
+//
+// Tabelas (supabase/cert.sql), todas trancadas por app_pode('cert'):
+//  · cert_certificacoes — as normas: ativa, versão, certificado, validade e auditorias
+//  · cert_requisitos    — a lista consolidada (87 do AgroCert + 2 do SMETA)
+//  · cert_documentos    — a lista mestra de documentos (anexos, IT, registros, POP, check list)
+//  · cert_eventos       — o que se marca no calendário; pode repetir
+//                         (mensal…anual) e cada ocorrência é dada como feita
+//                         à parte (feitos = datas concluídas)
+//
+// O calendário junta o que foi marcado com o que já tem data em outro lugar:
+// próxima auditoria e validade do certificado, prazo de requisito e próxima
+// revisão de documento. Documento impresso: moldura .rel, marca da SAKUMA no
+// topo e só a LOP no pé, sem nome de pessoa.
+
+import { estado } from './store.js';
+import { mostrar } from './jornada-relatorios.js';
+import { baixarXlsx } from './excel.js';
+import { abrirModulo } from './acesso.js';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+  .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const so = v => String(v == null ? '' : v).trim();
+const quem = () => estado.sessao?.user?.email || null;
+
+/* ---------------- datas ---------------- */
+const doisD = n => String(n).padStart(2, '0');
+const isoD = d => `${d.getUTCFullYear()}-${doisD(d.getUTCMonth() + 1)}-${doisD(d.getUTCDate())}`;
+const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${doisD(d.getMonth() + 1)}-${doisD(d.getDate())}`; };
+const br = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
+const utc = s => new Date(s + 'T12:00:00Z');
+const entre = (a, b) => Math.round((utc(b) - utc(a)) / 86400000);
+const somaDias = (s, n) => { const d = utc(s); d.setUTCDate(d.getUTCDate() + n); return isoD(d); };
+function somaMeses(s, m) {
+  const d = utc(s); const dia = d.getUTCDate();
+  d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + m);
+  const ult = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(dia, ult));
+  return isoD(d);
+}
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MES3 = MESES.map(m => m.slice(0, 3));
+const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+/* ---------------- listas fixas ---------------- */
+export const PRIORIDADES = ['Crítica', 'Maior', 'Menor'];
+export const STATUS = ['Conforme', 'Em andamento', 'Pendente', 'Não conforme', 'Não se aplica'];
+const COR_STATUS = { 'Conforme': 'ativo', 'Em andamento': 'neutra', 'Pendente': 'alerta', 'Não conforme': 'perigo', 'Não se aplica': 'inativo' };
+const COR_PRIOR = { 'Crítica': 'perigo', 'Maior': 'alerta', 'Menor': 'neutra' };
+const SITUACOES_DOC = ['Em dia', 'Revisar', 'Pendente', 'Obsoleto'];
+const COR_SIT = { 'Em dia': 'ativo', 'Revisar': 'alerta', 'Pendente': 'perigo', 'Obsoleto': 'inativo' };
+const CATEGORIAS = ['ANEXO', 'CHECK LIST', 'INST. TRABALHO', 'P.O.Ps', 'REGISTROS'];
+const PERIODOS = ['Diário', 'Semanal', 'Mensal', 'Trimestral', 'Semestral', 'Anual', 'A cada 2 anos', 'A cada 3 anos'];
+/* Quantos meses até a próxima vez (o que é diário ou semanal não vai ao calendário: é rotina). */
+const MESES_PERIODO = { 'Mensal': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12, 'A cada 2 anos': 24, 'A cada 3 anos': 36 };
+const REPETIR = ['', 'Mensal', 'Trimestral', 'Semestral', 'Anual'];
+const TIPOS_EVENTO = ['Auditoria externa', 'Auditoria interna', 'Treinamento', 'Simulado', 'Reunião', 'Atividade'];
+/* cor no calendário (classe ce-ev-*) */
+const COR_TIPO = {
+  'Auditoria externa': 'marrom', 'Auditoria interna': 'verde', 'Treinamento': 'azul', 'Simulado': 'azul',
+  'Reunião': 'cinza', 'Atividade': 'cinza',
+  validade: 'vermelho', prazo: 'amarelo', revisao: 'cinza',
+};
+/* Sigla curta da norma, para as etiquetas dos códigos. */
+const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 'RA', 'SMETA': 'SMETA', 'ATITUDES': 'AT' };
+
+/* ---------------- estado ---------------- */
+const S = {
+  carregado: false, certs: [], reqs: [], docs: [], evs: [],
+  fr: { q: '', cert: '', tema: '', prior: '', status: '' },
+  fd: { q: '', cat: '', per: '', sit: '', resp: '' },
+  cal: { ano: 0, mes: 0, cert: '', auto: true },
+  anual: { ano: 0, cert: '', docs: false },
+};
+
+async function carregar() {
+  const c = estado.cliente;
+  if (!c) throw new Error('Sem conexão com o banco.');
+  const [a, b, d, e] = await Promise.all([
+    c.from('cert_certificacoes').select('*').order('ordem').order('nome'),
+    c.from('cert_requisitos').select('*').order('id'),
+    c.from('cert_documentos').select('*').order('categoria').order('codigo'),
+    c.from('cert_eventos').select('*').order('data'),
+  ]);
+  const erro = a.error || b.error || d.error || e.error;
+  if (erro) {
+    if (/cert_|relation|does not exist|schema cache/i.test(erro.message || ''))
+      throw new Error('As tabelas da Certificação ainda não foram criadas no banco (supabase/cert.sql).');
+    throw erro;
+  }
+  S.certs = a.data || []; S.reqs = b.data || []; S.docs = d.data || []; S.evs = e.data || [];
+  S.carregado = true;
+}
+
+/* ===================================================================
+   AS CONTAS
+   =================================================================== */
+const ativas = () => S.certs.filter(c => c.ativa);
+const certPorId = id => S.certs.find(c => c.id === id);
+const certPorNorma = n => S.certs.find(c => c.norma === n);
+const refsDe = r => Array.isArray(r.referencias) ? r.referencias : [];
+/** O requisito vale para a certificação c? (tem código daquela norma) */
+const atende = (r, c) => refsDe(r).some(x => x.norma === c.norma);
+/** Vale para alguma certificação que a fazenda tem hoje? */
+const emUso = r => ativas().some(c => atende(r, c));
+const codigosDe = (r, c) => refsDe(r).filter(x => x.norma === c.norma).map(x => x.codigo);
+const sigla = n => SIGLA[n] || certPorNorma(n)?.id || n;
+const temas = () => [...new Set(S.reqs.map(r => r.tema).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+const responsaveis = () => [...new Set([...S.reqs, ...S.docs, ...S.evs].map(x => so(x.responsavel)).filter(Boolean))]
+  .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+/** Requisitos de uma certificação, sem os "não se aplica". */
+function placar(c) {
+  const lista = S.reqs.filter(r => atende(r, c) && r.status !== 'Não se aplica');
+  const conf = lista.filter(r => r.status === 'Conforme').length;
+  return {
+    total: lista.length, conf,
+    pct: lista.length ? Math.round(conf * 100 / lista.length) : 0,
+    criticos: lista.filter(r => r.prioridade === 'Crítica' && r.status !== 'Conforme').length,
+    nc: lista.filter(r => r.status === 'Não conforme').length,
+  };
+}
+
+/** Próxima vez do documento: última revisão + periodicidade. */
+function proximaDoc(d) {
+  const m = MESES_PERIODO[d.periodicidade];
+  if (!m || !d.data_revisao) return null;
+  return somaMeses(d.data_revisao, m);
+}
+const docAtrasado = d => { const p = proximaDoc(d); return !!p && p < hoje(); };
+
+/** Ocorrências de um evento entre de e ate (inclusive). */
+function ocorrencias(ev, de, ate) {
+  const passo = MESES_PERIODO[ev.repetir];
+  const r = [];
+  if (!passo) { if (ev.data >= de && ev.data <= ate) r.push(ev.data); return r; }
+  // pula direto para perto do começo do período
+  let i = 0, d = ev.data;
+  if (d < de) {
+    const meses = (utc(de).getUTCFullYear() - utc(d).getUTCFullYear()) * 12 + utc(de).getUTCMonth() - utc(d).getUTCMonth();
+    i = Math.max(0, Math.floor(meses / passo) - 1);
+    d = somaMeses(ev.data, i * passo);
+  }
+  for (let n = 0; n < 500 && d <= ate; n++, i++, d = somaMeses(ev.data, i * passo)) if (d >= de) r.push(d);
+  return r;
+}
+const feito = (ev, data) => (ev.feitos || []).includes(data);
+
+/** Tudo o que cai no calendário entre de e ate. */
+function itensEntre(de, ate, { cert = '', auto = true } = {}) {
+  const r = [];
+  const daCert = lista => !cert || (lista || []).includes(cert);
+  for (const ev of S.evs) {
+    if (!daCert(ev.certificacoes)) continue;
+    for (const d of ocorrencias(ev, de, ate))
+      r.push({ data: d, tipo: ev.tipo, cor: COR_TIPO[ev.tipo] || 'cinza', titulo: ev.titulo, ev, feito: feito(ev, d),
+        certs: ev.certificacoes || [], resp: ev.responsavel });
+  }
+  if (!auto) return r.sort(ordemItem);
+  for (const c of ativas()) {
+    if (cert && c.id !== cert) continue;
+    if (c.proxima_auditoria && c.proxima_auditoria >= de && c.proxima_auditoria <= ate)
+      r.push({ data: c.proxima_auditoria, tipo: 'Auditoria externa', cor: 'marrom', titulo: `Auditoria ${c.nome}`, auto: 'cert', ref: c.id, certs: [c.id] });
+    if (c.validade && c.validade >= de && c.validade <= ate)
+      r.push({ data: c.validade, tipo: 'Validade', cor: 'vermelho', titulo: `Vence o certificado ${c.nome}`, auto: 'cert', ref: c.id, certs: [c.id] });
+  }
+  for (const q of S.reqs) {
+    if (!q.prazo || q.prazo < de || q.prazo > ate || q.status === 'Conforme' || q.status === 'Não se aplica') continue;
+    const cs = ativas().filter(c => atende(q, c)).map(c => c.id);
+    if (!cs.length || (cert && !cs.includes(cert))) continue;
+    r.push({ data: q.prazo, tipo: 'Prazo de requisito', cor: 'amarelo', titulo: q.titulo, auto: 'req', ref: q.id, certs: cs, resp: q.responsavel });
+  }
+  for (const d of S.docs) {
+    const p = proximaDoc(d);
+    if (!p || p < de || p > ate || d.situacao === 'Obsoleto') continue;
+    if (cert && (d.certificacoes || []).length && !d.certificacoes.includes(cert)) continue;
+    r.push({ data: p, tipo: 'Revisão de documento', cor: 'cinza', titulo: `${d.codigo} · ${d.nome}`, auto: 'doc', ref: d.id, certs: d.certificacoes || [], resp: d.responsavel });
+  }
+  return r.sort(ordemItem);
+}
+const ordemItem = (a, b) => a.data.localeCompare(b.data) || (a.auto ? 1 : 0) - (b.auto ? 1 : 0) || a.titulo.localeCompare(b.titulo, 'pt-BR');
+
+/* ===================================================================
+   PEDAÇOS DE TELA
+   =================================================================== */
+const tag = (txt, cor) => `<span class="tag ${cor}">${esc(txt)}</span>`;
+const refTags = (r, soAtivas = true) => refsDe(r)
+  .filter(x => !soAtivas || certPorNorma(x.norma)?.ativa)
+  .map(x => `<span class="ce-ref" title="${esc(x.norma)} ${esc(x.versao || '')}">${esc(sigla(x.norma))} ${esc(x.codigo)}</span>`).join('');
+const opcoes = (lista, val, vazio) => (vazio != null ? `<option value="">${esc(vazio)}</option>` : '')
+  + lista.map(o => { const [v, t] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}" ${String(v) === String(val ?? '') ? 'selected' : ''}>${esc(t)}</option>`; }).join('');
+const barraPct = pct => `<span class="ce-pct"><i style="width:${pct}%"></i></span>`;
+
+function dialogo(html, ligar) {
+  let d = $('dlgCe');
+  if (!d) { d = document.createElement('dialog'); d.id = 'dlgCe'; d.className = 'rs-largo'; document.body.appendChild(d); }
+  d.innerHTML = `<form method="dialog" onsubmit="return false">${html}</form>`;
+  d.querySelectorAll('[data-fechar]').forEach(b => b.addEventListener('click', () => d.close()));
+  if (!d.open) d.showModal();
+  d.scrollTop = 0;
+  ligar?.(d);
+  return d;
+}
+const fechar = () => $('dlgCe')?.open && $('dlgCe').close();
+const erroDlg = t => { const e = $('ceErro'); if (e) { e.textContent = t; e.hidden = false; } $('dlgCe').scrollTop = 0; };
+const datalist = (id, itens) => `<datalist id="${id}">${itens.map(i => `<option value="${esc(i)}">`).join('')}</datalist>`;
+
+/* ===================================================================
+   TELA · PAINEL
+   =================================================================== */
+function desenharPainel() {
+  const tela = $('telaCePainel');
+  const hj = hoje();
+  const prox = itensEntre(hj, somaDias(hj, 60)).filter(i => !i.feito);
+  const atrasados = [
+    ...S.docs.filter(d => d.situacao !== 'Obsoleto' && docAtrasado(d)).map(d => ({ data: proximaDoc(d), titulo: `${d.codigo} · ${d.nome}`, tipo: 'Revisão de documento', resp: d.responsavel })),
+    ...S.reqs.filter(r => r.prazo && r.prazo < hj && emUso(r) && !['Conforme', 'Não se aplica'].includes(r.status)).map(r => ({ data: r.prazo, titulo: r.titulo, tipo: 'Prazo de requisito', resp: r.responsavel })),
+    ...eventosVencidos(),
+  ].sort((a, b) => a.data.localeCompare(b.data));
+  const criticos = S.reqs.filter(r => emUso(r) && r.prioridade === 'Crítica' && !['Conforme', 'Não se aplica'].includes(r.status));
+  const docsPend = S.docs.filter(d => ['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d));
+  const emUsoTodos = S.reqs.filter(r => emUso(r) && r.status !== 'Não se aplica');
+  const conf = emUsoTodos.filter(r => r.status === 'Conforme').length;
+
+  const cartao = (cor, rot, n, dica, alvo) => `<button type="button" class="pv-card pv-${cor}${n ? '' : ' pv-zero'}" ${alvo ? `data-ir="${alvo}"` : ''}>
+    <span>${esc(rot)}</span><strong>${n}</strong><small>${esc(dica)}</small></button>`;
+
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><h2 style="margin:0">Painel da certificação</h2>
+        <p class="dica" style="margin:2px 0 0">${ativas().map(c => esc(c.nome)).join(' · ') || 'Nenhuma certificação ligada'}</p></div>
+      <button class="btn" type="button" id="cePnNovo">Marcar no calendário</button>
+    </div>
+
+    <div class="ce-certs">${ativas().map(c => cartaoCert(c)).join('') || '<div class="vazio">Ligue as certificações da fazenda em Certificações.</div>'}</div>
+
+    <div class="pv-cards" style="margin-top:14px">
+      ${cartao('calma', 'Requisitos conformes', `${conf}/${emUsoTodos.length}`, emUsoTodos.length ? `${Math.round(conf * 100 / emUsoTodos.length)}% das certificações ligadas` : '—', 'req')}
+      ${cartao('perigo', 'Críticos em aberto', criticos.length, 'prioridade crítica sem conformidade', 'criticos')}
+      ${cartao('alerta', 'Documentos a revisar', docsPend.length, 'pendentes, a revisar ou vencidos', 'docs')}
+      ${cartao('atencao', 'Próximos 60 dias', prox.length, 'no calendário', 'cal')}
+      ${cartao(atrasados.length ? 'perigo' : 'ok', 'Atrasados', atrasados.length, 'prazos e revisões que passaram', 'cal')}
+    </div>
+
+    <div class="qp-bloco">
+      <h3>Próximos 60 dias</h3>
+      ${tabelaItens(prox, 'Nada marcado para os próximos 60 dias.')}
+    </div>
+    ${atrasados.length ? `<div class="qp-bloco"><h3>Atrasados</h3>${tabelaItens(atrasados, '')}</div>` : ''}
+    <div class="qp-bloco">
+      <h3>Requisitos críticos em aberto</h3>
+      ${criticos.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr><th>Requisito</th><th>Tema</th><th>Códigos</th><th class="ce">Status</th><th></th></tr></thead><tbody>
+        ${criticos.map(r => `<tr><td><b>${esc(r.titulo)}</b>${r.responsavel ? `<br><span class="dc-sem">${esc(r.responsavel)}${r.prazo ? ' · prazo ' + br(r.prazo) : ''}</span>` : ''}</td>
+          <td>${esc(r.tema)}</td><td><div class="ce-refs">${refTags(r)}</div></td>
+          <td class="ce">${tag(r.status, COR_STATUS[r.status])}</td>
+          <td class="ce"><button class="btn mini" type="button" data-req="${r.id}">Abrir</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="vazio">Nenhum requisito crítico em aberto.</div>'}
+    </div>
+  </div>
+  <div class="rodape-fixo naoimprimir">
+    <button class="btn principal" type="button" id="cePnImprimir">Imprimir o painel</button>
+  </div>`;
+
+  $('cePnNovo').addEventListener('click', () => formEvento(null, hoje()));
+  $('cePnImprimir').addEventListener('click', () => mostrar(docPainel(prox, atrasados, criticos), { barra: true }));
+  tela.querySelectorAll('[data-req]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.req))));
+  tela.querySelectorAll('[data-cert]').forEach(b => b.addEventListener('click', () => {
+    Object.assign(S.fr, { q: '', cert: b.dataset.cert, tema: '', prior: '', status: '' });
+    abrirModulo('cert', 'ceRequisitos');
+  }));
+  tela.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => {
+    const alvo = b.dataset.ir;
+    if (alvo === 'req' || alvo === 'criticos') {
+      Object.assign(S.fr, { q: '', cert: '', tema: '', prior: alvo === 'criticos' ? 'Crítica' : '', status: alvo === 'criticos' ? 'aberto' : '' });
+      abrirModulo('cert', 'ceRequisitos');
+    } else if (alvo === 'docs') {
+      Object.assign(S.fd, { q: '', cat: '', per: '', sit: 'atencao', resp: '' });
+      abrirModulo('cert', 'ceDocumentos');
+    } else abrirModulo('cert', 'ceCalendario');
+  }));
+  ligarItens(tela);
+}
+
+/** Eventos não repetidos cuja data passou sem serem dados como feitos. */
+function eventosVencidos() {
+  const hj = hoje();
+  return S.evs.filter(ev => !ev.repetir && ev.data < hj && !feito(ev, ev.data))
+    .map(ev => ({ data: ev.data, titulo: ev.titulo, tipo: ev.tipo, resp: ev.responsavel, ev }));
+}
+
+function cartaoCert(c) {
+  const p = placar(c);
+  const hj = hoje();
+  const dVal = c.validade ? entre(hj, c.validade) : null;
+  const dAud = c.proxima_auditoria ? entre(hj, c.proxima_auditoria) : null;
+  const val = c.validade == null ? tag('validade não informada', 'neutra')
+    : dVal < 0 ? tag(`vencido em ${br(c.validade)}`, 'perigo')
+    : dVal <= 90 ? tag(`vence em ${dVal} dia(s)`, 'alerta') : `<span class="dc-sem">válido até ${br(c.validade)}</span>`;
+  return `<button type="button" class="ce-cert" data-cert="${esc(c.id)}">
+    <span class="ce-cert-nome"><b>${esc(c.nome)}</b><small>${esc(c.versao || '')}${c.numero ? ' · ' + esc(c.numero) : ''}</small></span>
+    <span class="ce-cert-num"><strong>${p.pct}%</strong><small>${p.conf} de ${p.total} conformes</small></span>
+    ${barraPct(p.pct)}
+    <span class="ce-cert-pe">${p.criticos ? tag(`${p.criticos} crítico(s) em aberto`, 'perigo') : tag('sem crítico em aberto', 'ativo')}
+      ${val}
+      ${c.proxima_auditoria ? `<span class="dc-sem">auditoria ${br(c.proxima_auditoria)}${dAud >= 0 ? ` (em ${dAud} dia(s))` : ''}</span>` : '<span class="dc-sem">auditoria sem data</span>'}</span>
+  </button>`;
+}
+
+function tabelaItens(itens, vazio) {
+  if (!itens.length) return `<div class="vazio">${esc(vazio)}</div>`;
+  const hj = hoje();
+  return `<div class="ac-rola"><table class="dc-planilha"><thead><tr><th class="ce">Data</th><th>O quê</th><th>Tipo</th><th>Certificação</th><th>Responsável</th><th></th></tr></thead><tbody>
+    ${itens.map((i, k) => `<tr><td class="ce">${br(i.data)}${i.data < hj ? '<br>' + tag('atrasado', 'perigo') : ''}</td>
+      <td><b>${esc(i.titulo)}</b></td>
+      <td><span class="ce-bola ce-ev-${i.cor || COR_TIPO[i.tipo] || 'cinza'}"></span>${esc(i.tipo)}</td>
+      <td>${(i.certs || []).map(id => esc(certPorId(id)?.id || id)).join(', ') || '—'}</td>
+      <td>${esc(i.resp || '—')}</td>
+      <td class="ce">${i.ev ? `<button class="btn mini" type="button" data-ev="${i.ev.id}" data-dia="${i.data}">Abrir</button>` : ''}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+const ligarItens = tela => tela.querySelectorAll('[data-ev]').forEach(b =>
+  b.addEventListener('click', () => formEvento(Number(b.dataset.ev), b.dataset.dia)));
+
+/* ===================================================================
+   TELA · REQUISITOS
+   =================================================================== */
+function reqFiltrados() {
+  const f = S.fr;
+  const q = so(f.q).toLowerCase();
+  const cert = f.cert && f.cert !== '*' ? certPorId(f.cert) : null;
+  return S.reqs.filter(r => {
+    if (cert ? !atende(r, cert) : f.cert !== '*' && !emUso(r)) return false;
+    if (f.tema && r.tema !== f.tema) return false;
+    if (f.prior && r.prioridade !== f.prior) return false;
+    if (f.status === 'aberto' ? ['Conforme', 'Não se aplica'].includes(r.status) : f.status && r.status !== f.status) return false;
+    if (q && ![r.titulo, r.descricao, r.evidencia, r.tema, r.responsavel, ...refsDe(r).map(x => x.codigo)]
+      .some(t => so(t).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function desenharRequisitos() {
+  const tela = $('telaCeRequisitos');
+  const f = S.fr;
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><h2 style="margin:0">Requisitos</h2>
+        <p class="dica" style="margin:2px 0 0">Lista consolidada: cada requisito mostra os códigos de cada norma que ele atende.</p></div>
+      <button class="btn principal" type="button" id="ceRqNovo">Novo requisito</button>
+    </div>
+    <div class="grade larga" style="margin-top:14px">
+      <label class="campo">Buscar <input type="text" id="ceRqQ" value="${esc(f.q)}" placeholder="Requisito, evidência ou código (ex.: 4.6.1, FV-GFS 32.01)"></label>
+      <label class="campo">Certificação <select id="ceRqCert">${opcoes([...ativas().map(c => [c.id, c.nome]), ['*', 'Todas, inclusive as desligadas']], f.cert, 'As que a fazenda tem')}</select></label>
+      <label class="campo">Tema <select id="ceRqTema">${opcoes(temas(), f.tema, 'Todos')}</select></label>
+      <label class="campo">Prioridade <select id="ceRqPrior">${opcoes(PRIORIDADES, f.prior, 'Todas')}</select></label>
+      <label class="campo">Status <select id="ceRqStatus">${opcoes([['aberto', 'Em aberto (sem conformidade)'], ...STATUS], f.status, 'Todos')}</select></label>
+    </div>
+    <div class="barra" id="ceRqResumo"></div>
+    <div id="ceRqTabela" style="margin-top:12px"></div>
+  </div>
+  <div class="rodape-fixo naoimprimir">
+    <button class="btn principal" type="button" id="ceRqCheck">Imprimir check list de auditoria</button>
+    <button class="btn" type="button" id="ceRqLista">Imprimir lista</button>
+    <button class="btn" type="button" id="ceRqExcel">Exportar Excel</button>
+  </div>`;
+  const ligarF = (id, campo, ev = 'change') => $(id).addEventListener(ev, e => { f[campo] = e.target.value; tabelaRequisitos(); });
+  ligarF('ceRqQ', 'q', 'input'); ligarF('ceRqCert', 'cert'); ligarF('ceRqTema', 'tema'); ligarF('ceRqPrior', 'prior'); ligarF('ceRqStatus', 'status');
+  $('ceRqNovo').addEventListener('click', () => formRequisito(null));
+  $('ceRqLista').addEventListener('click', () => mostrar(docListaReq(reqFiltrados()), { barra: true }));
+  $('ceRqCheck').addEventListener('click', escolherChecklist);
+  $('ceRqExcel').addEventListener('click', () => exportarReq(reqFiltrados()));
+  tabelaRequisitos();
+}
+
+function tabelaRequisitos() {
+  const lista = reqFiltrados();
+  const conta = s => lista.filter(r => r.status === s).length;
+  $('ceRqResumo').innerHTML = `<span class="contagem"><b>${lista.length}</b> requisito(s)</span>
+    ${STATUS.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_STATUS[s])} <b>${conta(s)}</b></span>` : '').join('')}`;
+  const todas = S.fr.cert === '*';
+  $('ceRqTabela').innerHTML = lista.length ? `<div class="ac-rola"><table class="dc-planilha ce-tab-req"><thead><tr>
+    <th>Requisito</th><th>Tema</th><th>Códigos nas normas</th><th class="ce">Prioridade</th><th class="ce">Status</th><th>Responsável / prazo</th><th></th>
+  </tr></thead><tbody>
+  ${lista.map(r => `<tr>
+    <td><b>${esc(r.titulo)}</b>${r.evidencia ? `<br><span class="dc-sem">${esc(r.evidencia.length > 120 ? r.evidencia.slice(0, 120) + '…' : r.evidencia)}</span>` : ''}</td>
+    <td>${esc(r.tema)}</td>
+    <td><div class="ce-refs">${refTags(r, !todas)}</div></td>
+    <td class="ce">${tag(r.prioridade, COR_PRIOR[r.prioridade])}</td>
+    <td class="ce">${tag(r.status, COR_STATUS[r.status])}</td>
+    <td>${esc(r.responsavel || '—')}${r.prazo ? `<br><span class="dc-sem">${br(r.prazo)}</span>${r.prazo < hoje() && !['Conforme', 'Não se aplica'].includes(r.status) ? ' ' + tag('atrasado', 'perigo') : ''}` : ''}</td>
+    <td class="ce"><button class="btn mini" type="button" data-req="${r.id}">Abrir</button></td>
+  </tr>`).join('')}</tbody></table></div>`
+    : `<div class="vazio">${S.reqs.length ? 'Nada com esses filtros.' : 'Nenhum requisito cadastrado.'}</div>`;
+  $('ceRqTabela').querySelectorAll('[data-req]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.req))));
+}
+
+function formRequisito(id) {
+  const r = id ? S.reqs.find(x => x.id === id) : null;
+  const v = r || { tema: S.fr.tema || '', prioridade: 'Maior', status: 'Pendente', referencias: S.fr.cert && S.fr.cert !== '*'
+    ? [{ norma: certPorId(S.fr.cert).norma, versao: certPorId(S.fr.cert).versao, codigo: '' }] : [] };
+  const val = k => esc(v[k] ?? '');
+  const normas = [...new Set([...S.certs.map(c => c.norma), ...refsDe(v).map(x => x.norma)])];
+  const linhaRef = x => `<div class="ce-reflinha">
+    <select data-rnorma>${opcoes(normas.map(n => [n, `${certPorNorma(n)?.nome || n}`]), x.norma)}</select>
+    <input type="text" data-rcod maxlength="40" value="${esc(x.codigo || '')}" placeholder="Código (ex.: 4.6.1)">
+    <button class="btn mini" type="button" data-rtira title="Tirar este código">✕</button></div>`;
+
+  dialogo(`<h3>${r ? 'Requisito' : 'Novo requisito'}</h3>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">
+      <label class="campo plena">Requisito <input type="text" id="cerTitulo" maxlength="300" value="${val('titulo')}" required></label>
+      <label class="campo">Tema <input type="text" id="cerTema" list="ceListaTemas" maxlength="60" value="${val('tema')}"></label>
+      <label class="campo">Prioridade <select id="cerPrior">${opcoes(PRIORIDADES, v.prioridade)}</select></label>
+      <label class="campo">Status <select id="cerStatus">${opcoes(STATUS, v.status)}</select></label>
+      <label class="campo">Responsável <input type="text" id="cerResp" list="ceListaResp" maxlength="80" value="${val('responsavel')}"></label>
+      <label class="campo">Prazo <input type="date" id="cerPrazo" value="${val('prazo')}"></label>
+      <label class="campo">Última verificação <input type="date" id="cerVerif" value="${val('ultima_verificacao')}"></label>
+      <label class="campo">Periodicidade <input type="text" id="cerPer" list="ceListaPer" maxlength="40" value="${val('periodicidade')}"></label>
+      <label class="campo plena">O que pede <textarea id="cerDesc" rows="3" maxlength="2000">${val('descricao')}</textarea></label>
+      <label class="campo plena">Evidência esperada <textarea id="cerEvid" rows="3" maxlength="2000">${val('evidencia')}</textarea></label>
+      <label class="campo plena">Observação <textarea id="cerObs" rows="2" maxlength="1000" placeholder="O que foi feito, onde está a evidência…">${val('observacao')}</textarea></label>
+    </div>
+    <h4 class="ac-h4">Códigos nas normas</h4>
+    <div id="cerRefs">${refsDe(v).map(linhaRef).join('')}</div>
+    <button class="btn mini" type="button" id="cerRefMais">+ Código</button>
+    ${datalist('ceListaTemas', temas())}${datalist('ceListaResp', responsaveis())}${datalist('ceListaPer', PERIODOS)}
+    ${r?.atualizado_por ? `<p class="dica">Última alteração: ${br(r.atualizado_em)} · ${esc(r.atualizado_por)}</p>` : ''}
+    <div class="barra fim">
+      ${r ? '<button class="btn perigo" type="button" id="cerApagar">Apagar</button><span class="cresce"></span>' : ''}
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="cerGravar">Gravar</button>
+    </div>`, d => {
+    const ligarTira = () => d.querySelectorAll('[data-rtira]').forEach(b => { b.onclick = () => b.parentElement.remove(); });
+    ligarTira();
+    $('cerRefMais').addEventListener('click', () => {
+      const ult = [...d.querySelectorAll('[data-rnorma]')].pop()?.value || ativas()[0]?.norma || normas[0];
+      $('cerRefs').insertAdjacentHTML('beforeend', linhaRef({ norma: ult, codigo: '' }));
+      ligarTira();
+      [...d.querySelectorAll('[data-rcod]')].pop()?.focus();
+    });
+    $('cerGravar').addEventListener('click', () => gravarRequisito(r));
+    $('cerApagar')?.addEventListener('click', () => apagar('cert_requisitos', r.id, r.titulo, () => { S.reqs = S.reqs.filter(x => x.id !== r.id); }));
+  });
+}
+
+async function gravarRequisito(r) {
+  const g = id => so($(id).value) || null;
+  const referencias = [...document.querySelectorAll('#cerRefs .ce-reflinha')].map(l => {
+    const norma = l.querySelector('[data-rnorma]').value;
+    return { norma, versao: certPorNorma(norma)?.versao || refsDe(r || {}).find(x => x.norma === norma)?.versao || '', codigo: so(l.querySelector('[data-rcod]').value) };
+  }).filter(x => x.codigo);
+  const linha = {
+    titulo: g('cerTitulo'), tema: g('cerTema') || 'Gestão', prioridade: $('cerPrior').value, status: $('cerStatus').value,
+    responsavel: g('cerResp'), prazo: g('cerPrazo'), ultima_verificacao: g('cerVerif'), periodicidade: g('cerPer'),
+    descricao: g('cerDesc'), evidencia: g('cerEvid'), observacao: g('cerObs'), referencias,
+    atualizado_em: new Date().toISOString(), atualizado_por: quem(),
+  };
+  if (!linha.titulo) return erroDlg('Escreva o requisito.');
+  if (!referencias.length) return erroDlg('Informe pelo menos um código de norma — é ele que liga o requisito à certificação.');
+  await salvar('cert_requisitos', r, linha, S.reqs, 'cerGravar');
+}
+
+/* ===================================================================
+   TELA · DOCUMENTOS (lista mestra)
+   =================================================================== */
+function docFiltrados() {
+  const f = S.fd;
+  const q = so(f.q).toLowerCase();
+  return S.docs.filter(d => {
+    if (f.cat && d.categoria !== f.cat) return false;
+    if (f.per && d.periodicidade !== f.per) return false;
+    if (f.sit === 'atencao' ? !(['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d)) : f.sit && d.situacao !== f.sit) return false;
+    if (f.resp && so(d.responsavel) !== f.resp) return false;
+    if (q && ![d.codigo, d.nome, d.responsavel, d.observacao].some(t => so(t).toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function desenharDocumentos() {
+  const tela = $('telaCeDocumentos');
+  const f = S.fd;
+  const cats = [...new Set([...CATEGORIAS, ...S.docs.map(d => d.categoria)])].sort();
+  const pers = [...new Set(S.docs.map(d => d.periodicidade).filter(Boolean))].sort((a, b) => PERIODOS.indexOf(a) - PERIODOS.indexOf(b));
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><h2 style="margin:0">Lista mestra de documentos</h2>
+        <p class="dica" style="margin:2px 0 0">Anexos, instruções de trabalho, registros, POPs e check lists, com revisão e responsável.</p></div>
+      <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button>
+    </div>
+    <div class="grade larga" style="margin-top:14px">
+      <label class="campo">Buscar <input type="text" id="ceDcQ" value="${esc(f.q)}" placeholder="Código ou nome"></label>
+      <label class="campo">Categoria <select id="ceDcCat">${opcoes(cats, f.cat, 'Todas')}</select></label>
+      <label class="campo">Periodicidade <select id="ceDcPer">${opcoes(pers, f.per, 'Todas')}</select></label>
+      <label class="campo">Situação <select id="ceDcSit">${opcoes([['atencao', 'Precisa de atenção'], ...SITUACOES_DOC], f.sit, 'Todas')}</select></label>
+      <label class="campo">Responsável <select id="ceDcResp">${opcoes([...new Set(S.docs.map(d => so(d.responsavel)).filter(Boolean))].sort(), f.resp, 'Todos')}</select></label>
+    </div>
+    <div class="barra" id="ceDcResumo"></div>
+    <div id="ceDcTabela" style="margin-top:12px"></div>
+  </div>
+  <div class="rodape-fixo naoimprimir">
+    <button class="btn principal" type="button" id="ceDcImprimir">Imprimir a lista mestra</button>
+    <button class="btn" type="button" id="ceDcExcel">Exportar Excel</button>
+  </div>`;
+  const ligarF = (id, campo, ev = 'change') => $(id).addEventListener(ev, e => { f[campo] = e.target.value; tabelaDocumentos(); });
+  ligarF('ceDcQ', 'q', 'input'); ligarF('ceDcCat', 'cat'); ligarF('ceDcPer', 'per'); ligarF('ceDcSit', 'sit'); ligarF('ceDcResp', 'resp');
+  $('ceDcNovo').addEventListener('click', () => formDocumento(null));
+  $('ceDcImprimir').addEventListener('click', () => mostrar(docListaDocs(docFiltrados()), { barra: true }));
+  $('ceDcExcel').addEventListener('click', () => exportarDocs(docFiltrados()));
+  tabelaDocumentos();
+}
+
+function tabelaDocumentos() {
+  const lista = docFiltrados();
+  const conta = s => lista.filter(d => d.situacao === s).length;
+  $('ceDcResumo').innerHTML = `<span class="contagem"><b>${lista.length}</b> documento(s)</span>
+    ${SITUACOES_DOC.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_SIT[s])} <b>${conta(s)}</b></span>` : '').join('')}
+    ${lista.filter(docAtrasado).length ? `<span class="contagem">${tag('revisão vencida', 'perigo')} <b>${lista.filter(docAtrasado).length}</b></span>` : ''}`;
+  $('ceDcTabela').innerHTML = lista.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr>
+    <th>Código</th><th>Documento</th><th>Categoria</th><th class="ce">Periodicidade</th><th>Responsável</th><th class="ce">Revisão</th><th class="ce">Próxima</th><th class="ce">Situação</th><th></th>
+  </tr></thead><tbody>
+  ${lista.map(d => { const p = proximaDoc(d); return `<tr>
+    <td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}${(d.certificacoes || []).length ? `<br><span class="dc-sem">${esc(d.certificacoes.join(', '))}</span>` : ''}</td>
+    <td>${esc(d.categoria)}</td><td class="ce">${esc(d.periodicidade || '—')}</td><td>${esc(d.responsavel || '—')}</td>
+    <td class="ce">${d.revisao ? 'Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? `<br><span class="dc-sem">${br(d.data_revisao)}</span>` : (d.revisao ? '' : '—')}</td>
+    <td class="ce">${p ? (p < hoje() ? tag(br(p), 'perigo') : br(p)) : '—'}</td>
+    <td class="ce">${tag(d.situacao, COR_SIT[d.situacao])}</td>
+    <td class="ce"><button class="btn mini" type="button" data-doc="${d.id}">Abrir</button></td></tr>`; }).join('')}
+  </tbody></table></div>` : `<div class="vazio">${S.docs.length ? 'Nada com esses filtros.' : 'Nenhum documento cadastrado.'}</div>`;
+  $('ceDcTabela').querySelectorAll('[data-doc]').forEach(b => b.addEventListener('click', () => formDocumento(Number(b.dataset.doc))));
+}
+
+const caixasCert = (marcadas, prefixo) => `<div class="ce-caixas">${S.certs.filter(c => c.ativa || (marcadas || []).includes(c.id)).map(c =>
+  `<label class="rs-check"><input type="checkbox" data-${prefixo}="${esc(c.id)}" ${(marcadas || []).includes(c.id) ? 'checked' : ''}> ${esc(c.nome)}</label>`).join('')}</div>`;
+const lerCaixas = prefixo => [...document.querySelectorAll(`#dlgCe [data-${prefixo}]`)].filter(x => x.checked).map(x => x.dataset[prefixo]);
+
+function formDocumento(id) {
+  const d = id ? S.docs.find(x => x.id === id) : null;
+  const v = d || { categoria: S.fd.cat || 'ANEXO', situacao: 'Em dia', periodicidade: 'Anual', certificacoes: [] };
+  const val = k => esc(v[k] ?? '');
+  dialogo(`<h3>${d ? esc(d.codigo) + ' · documento' : 'Novo documento'}</h3>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Código <input type="text" id="cedCod" maxlength="20" value="${val('codigo')}" placeholder="Ex.: POP 08" required></label>
+      <label class="campo plena">Documento <input type="text" id="cedNome" maxlength="200" value="${val('nome')}" required></label>
+      <label class="campo">Categoria <input type="text" id="cedCat" list="ceListaCat" maxlength="40" value="${val('categoria')}"></label>
+      <label class="campo">Periodicidade <select id="cedPer">${opcoes(PERIODOS, v.periodicidade, '—')}</select></label>
+      <label class="campo">Responsável <input type="text" id="cedResp" list="ceListaResp" maxlength="80" value="${val('responsavel')}"></label>
+      <label class="campo">Situação <select id="cedSit">${opcoes(SITUACOES_DOC, v.situacao)}</select></label>
+      <label class="campo">Revisão nº <input type="text" id="cedRev" maxlength="10" value="${val('revisao')}"></label>
+      <label class="campo">Data da revisão <input type="date" id="cedData" value="${val('data_revisao')}"></label>
+      <p class="dica plena" id="cedProx"></p>
+      <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
+      <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
+    </div>
+    ${datalist('ceListaCat', CATEGORIAS)}${datalist('ceListaResp', responsaveis())}
+    <div class="barra fim">
+      ${d ? '<button class="btn perigo" type="button" id="cedApagar">Apagar</button><span class="cresce"></span>' : ''}
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="cedGravar">Gravar</button>
+    </div>`, () => {
+    const prox = () => {
+      const p = proximaDoc({ periodicidade: $('cedPer').value, data_revisao: $('cedData').value });
+      $('cedProx').textContent = p ? `Próxima revisão: ${br(p)} — vai para o calendário.`
+        : MESES_PERIODO[$('cedPer').value] ? 'Informe a data da revisão para o documento aparecer no calendário.' : '';
+    };
+    $('cedPer').addEventListener('change', prox); $('cedData').addEventListener('change', prox); prox();
+    $('cedGravar').addEventListener('click', () => gravarDocumento(d));
+    $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
+  });
+}
+
+async function gravarDocumento(d) {
+  const g = id => so($(id).value) || null;
+  const linha = {
+    codigo: g('cedCod'), nome: g('cedNome'), categoria: (g('cedCat') || 'ANEXO').toUpperCase(), periodicidade: g('cedPer'),
+    responsavel: g('cedResp'), situacao: $('cedSit').value, revisao: g('cedRev'), data_revisao: g('cedData'),
+    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), atualizado_em: new Date().toISOString(),
+  };
+  if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
+  if (S.docs.some(x => x.id !== d?.id && so(x.codigo).toLowerCase() === linha.codigo.toLowerCase()))
+    return erroDlg(`Já existe um documento com o código ${linha.codigo}.`);
+  await salvar('cert_documentos', d, linha, S.docs, 'cedGravar');
+  S.docs.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
+}
+
+/* ===================================================================
+   TELA · CALENDÁRIO (mês)
+   =================================================================== */
+function desenharCalendario() {
+  const tela = $('telaCeCalendario');
+  const c = S.cal;
+  if (!c.ano) { const d = new Date(); c.ano = d.getFullYear(); c.mes = d.getMonth(); }
+  const de = `${c.ano}-${doisD(c.mes + 1)}-01`;
+  const ult = new Date(Date.UTC(c.ano, c.mes + 1, 0)).getUTCDate();
+  const ate = `${c.ano}-${doisD(c.mes + 1)}-${doisD(ult)}`;
+  const itens = itensEntre(de, ate, { cert: c.cert, auto: c.auto });
+
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div class="barra" style="margin:0">
+        <button class="btn mini" type="button" id="ceClAnt" title="Mês anterior">‹</button>
+        <h2 style="margin:0;min-width:170px;text-align:center">${MESES[c.mes]} ${c.ano}</h2>
+        <button class="btn mini" type="button" id="ceClProx" title="Próximo mês">›</button>
+        <button class="btn mini" type="button" id="ceClHoje">Hoje</button>
+      </div>
+      <span class="barra" style="margin:0">
+        <label class="campo" style="margin:0">Certificação <select id="ceClCert">${opcoes(ativas().map(x => [x.id, x.nome]), c.cert, 'Todas')}</select></label>
+        <label class="rs-check" style="margin:0"><input type="checkbox" id="ceClAuto" ${c.auto ? 'checked' : ''}> Prazos e revisões</label>
+        <button class="btn principal" type="button" id="ceClNovo">Marcar</button>
+      </span>
+    </div>
+    <div class="ce-legenda">${[['marrom', 'Auditoria externa'], ['verde', 'Auditoria interna'], ['azul', 'Treinamento / simulado'], ['cinza', 'Reunião, atividade, revisão de documento'],
+      ['amarelo', 'Prazo de requisito'], ['vermelho', 'Validade do certificado']].map(([k, t]) => `<span><i class="ce-bola ce-ev-${k}"></i>${t}</span>`).join('')}</div>
+    ${gradeMes(c.ano, c.mes, itens, true)}
+    <div class="qp-bloco"><h3>No mês</h3>${tabelaItens(itens, 'Nada neste mês.')}</div>
+  </div>
+  <div class="rodape-fixo naoimprimir">
+    <button class="btn principal" type="button" id="ceClImprimir">Imprimir o mês</button>
+  </div>`;
+  const ir = n => { const d = new Date(Date.UTC(c.ano, c.mes + n, 1)); c.ano = d.getUTCFullYear(); c.mes = d.getUTCMonth(); desenharCalendario(); };
+  $('ceClAnt').addEventListener('click', () => ir(-1));
+  $('ceClProx').addEventListener('click', () => ir(1));
+  $('ceClHoje').addEventListener('click', () => { c.ano = 0; desenharCalendario(); });
+  $('ceClCert').addEventListener('change', e => { c.cert = e.target.value; desenharCalendario(); });
+  $('ceClAuto').addEventListener('change', e => { c.auto = e.target.checked; desenharCalendario(); });
+  $('ceClNovo').addEventListener('click', () => formEvento(null, c.mes === new Date().getMonth() && c.ano === new Date().getFullYear() ? hoje() : de));
+  $('ceClImprimir').addEventListener('click', () => mostrar(docMes(c.ano, c.mes, itens), { barra: true }));
+  tela.querySelectorAll('[data-novo-dia]').forEach(b => b.addEventListener('click', ev => {
+    if (ev.target.closest('[data-ev],[data-auto]')) return;
+    formEvento(null, b.dataset.novoDia);
+  }));
+  tela.querySelectorAll('[data-auto]').forEach(b => b.addEventListener('click', () => {
+    const [k, id] = b.dataset.auto.split(':');
+    if (k === 'req') formRequisito(Number(id));
+    else if (k === 'doc') formDocumento(Number(id));
+    else if (k === 'cert') formCertificacao(id);
+  }));
+  ligarItens(tela);
+}
+
+/** A grade do mês (tela e papel). */
+function gradeMes(ano, mes, itens, tela) {
+  const primeiro = new Date(Date.UTC(ano, mes, 1)).getUTCDay();
+  const ult = new Date(Date.UTC(ano, mes + 1, 0)).getUTCDate();
+  const hj = hoje();
+  const porDia = {};
+  itens.forEach(i => (porDia[i.data] = porDia[i.data] || []).push(i));
+  const cel = [];
+  for (let i = 0; i < primeiro; i++) cel.push('<td class="ce-fora"></td>');
+  for (let d = 1; d <= ult; d++) {
+    const dia = `${ano}-${doisD(mes + 1)}-${doisD(d)}`;
+    const its = porDia[dia] || [];
+    cel.push(`<td class="${dia === hj ? 'ce-hoje' : ''}" ${tela ? `data-novo-dia="${dia}" title="Clique para marcar neste dia"` : ''}>
+      <span class="ce-dia">${d}</span>
+      ${its.map(i => {
+        const attr = !tela ? '' : i.ev ? `data-ev="${i.ev.id}" data-dia="${i.data}"` : i.auto ? `data-auto="${i.auto}:${i.ref}"` : '';
+        return `<${tela ? 'button type="button"' : 'div'} class="ce-ev ce-ev-${i.cor}${i.feito ? ' ce-feito' : ''}" ${attr} title="${esc(i.tipo + ' · ' + i.titulo)}">${i.feito ? '✓ ' : ''}${esc(i.titulo)}</${tela ? 'button' : 'div'}>`;
+      }).join('')}</td>`);
+  }
+  while (cel.length % 7) cel.push('<td class="ce-fora"></td>');
+  const semanas = [];
+  for (let i = 0; i < cel.length; i += 7) semanas.push(`<tr>${cel.slice(i, i + 7).join('')}</tr>`);
+  return `<div class="ac-rola"><table class="ce-mes${tela ? '' : ' ce-mes-papel'}"><thead><tr>${SEMANA.map(s => `<th>${s}</th>`).join('')}</tr></thead>
+    <tbody>${semanas.join('')}</tbody></table></div>`;
+}
+
+function formEvento(id, dia) {
+  const ev = id ? S.evs.find(x => x.id === id) : null;
+  const v = ev || { data: dia || hoje(), tipo: 'Atividade', certificacoes: S.cal.cert ? [S.cal.cert] : ativas().map(c => c.id), repetir: '' };
+  const val = k => esc(v[k] ?? '');
+  const ocorr = ev && dia ? dia : v.data;
+  dialogo(`<h3>${ev ? 'No calendário' : 'Marcar no calendário'}</h3>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    ${ev ? `<div class="aviso ${feito(ev, ocorr) ? 'ok' : ''}" style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+      <span>${ev.repetir ? `Ocorrência de <b>${br(ocorr)}</b>` : `<b>${br(ocorr)}</b>`}: ${feito(ev, ocorr) ? '<b>feito</b>' : 'ainda não feito'}</span>
+      <button class="btn mini ${feito(ev, ocorr) ? '' : 'principal'}" type="button" id="ceeFeito">${feito(ev, ocorr) ? 'Desfazer' : 'Dar como feito'}</button></div>` : ''}
+    <div class="grade">
+      <label class="campo plena">O quê <input type="text" id="ceeTit" maxlength="200" value="${val('titulo')}" placeholder="Ex.: Simulado de derramamento de agroquímico" required></label>
+      <label class="campo">Tipo <select id="ceeTipo">${opcoes(TIPOS_EVENTO, v.tipo)}</select></label>
+      <label class="campo">Data <input type="date" id="ceeData" value="${val('data')}" required></label>
+      <label class="campo">Até <small>se durar mais de um dia</small><input type="date" id="ceeFim" value="${val('data_fim')}"></label>
+      <label class="campo">Repetir <select id="ceeRep">${opcoes(REPETIR.map(r => [r, r || 'Não repete']), v.repetir || '')}</select></label>
+      <label class="campo">Responsável <input type="text" id="ceeResp" list="ceListaResp" maxlength="80" value="${val('responsavel')}"></label>
+      <div class="campo plena"><span>Certificações</span>${caixasCert(v.certificacoes, 'ecert')}</div>
+      <label class="campo plena">Observação <textarea id="ceeObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
+    </div>
+    ${datalist('ceListaResp', responsaveis())}
+    <div class="barra fim">
+      ${ev ? '<button class="btn perigo" type="button" id="ceeApagar">Apagar</button><span class="cresce"></span>' : ''}
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="ceeGravar">Gravar</button>
+    </div>`, () => {
+    $('ceeGravar').addEventListener('click', () => gravarEvento(ev));
+    $('ceeApagar')?.addEventListener('click', () => apagar('cert_eventos', ev.id, ev.titulo + (ev.repetir ? ` (e todas as repetições ${ev.repetir.toLowerCase()}s)` : ''),
+      () => { S.evs = S.evs.filter(x => x.id !== ev.id); }));
+    $('ceeFeito')?.addEventListener('click', async () => {
+      const feitos = new Set(ev.feitos || []);
+      feitos.has(ocorr) ? feitos.delete(ocorr) : feitos.add(ocorr);
+      $('ceeFeito').disabled = true;
+      const { data, error } = await estado.cliente.from('cert_eventos').update({ feitos: [...feitos].sort() }).eq('id', ev.id).select().single();
+      if (error) { $('ceeFeito').disabled = false; return erroDlg('Não consegui gravar: ' + error.message); }
+      S.evs[S.evs.findIndex(x => x.id === ev.id)] = data;
+      fechar(); redesenhar();
+    });
+  });
+}
+
+async function gravarEvento(ev) {
+  const g = id => so($(id).value) || null;
+  const linha = {
+    titulo: g('ceeTit'), tipo: $('ceeTipo').value, data: g('ceeData'), data_fim: g('ceeFim'),
+    repetir: $('ceeRep').value || null, responsavel: g('ceeResp'), certificacoes: lerCaixas('ecert'), observacao: g('ceeObs'),
+  };
+  if (!linha.titulo) return erroDlg('Escreva o que vai acontecer.');
+  if (!linha.data) return erroDlg('Informe a data.');
+  if (linha.data_fim && linha.data_fim < linha.data) return erroDlg('A data final não pode ser antes da inicial.');
+  // mudou a data de algo que não repete: o "feito" acompanha
+  if (ev && !linha.repetir && ev.data !== linha.data && (ev.feitos || []).includes(ev.data)) linha.feitos = [linha.data];
+  if (!ev) linha.criado_por = quem();
+  await salvar('cert_eventos', ev, linha, S.evs, 'ceeGravar');
+  S.evs.sort((a, b) => a.data.localeCompare(b.data));
+}
+
+/* ===================================================================
+   TELA · CRONOGRAMA ANUAL
+   =================================================================== */
+/** Linhas do cronograma: o que acontece em cada mês do ano. */
+function linhasAnual(ano, cert, comDocs) {
+  const de = `${ano}-01-01`, ate = `${ano}-12-31`;
+  const itens = itensEntre(de, ate, { cert, auto: true }).filter(i => comDocs || i.auto !== 'doc');
+  const mapa = new Map();
+  for (const i of itens) {
+    const chave = i.ev ? 'ev' + i.ev.id : `${i.auto}:${i.ref}:${i.tipo}`;
+    if (!mapa.has(chave)) mapa.set(chave, { titulo: i.titulo, tipo: i.tipo, cor: i.cor, resp: i.resp, certs: i.certs, ev: i.ev, meses: Array.from({ length: 12 }, () => []) });
+    mapa.get(chave).meses[Number(i.data.slice(5, 7)) - 1].push(i);
+  }
+  // requisitos periódicos sem data: entram como linha, sem mês marcado, para lembrar
+  for (const r of S.reqs) {
+    if (!r.periodicidade || !emUso(r) || r.prazo) continue;
+    const cs = ativas().filter(c => atende(r, c)).map(c => c.id);
+    if (cert && !cs.includes(cert)) continue;
+    mapa.set('rp' + r.id, { titulo: r.titulo, tipo: `Requisito · ${r.periodicidade.toLowerCase()}`, cor: 'amarelo', resp: r.responsavel, certs: cs, semData: true, meses: Array.from({ length: 12 }, () => []) });
+  }
+  const ordemTipo = t => { const i = TIPOS_EVENTO.indexOf(t); return i < 0 ? 50 : i; };
+  return [...mapa.values()].sort((a, b) => ordemTipo(a.tipo) - ordemTipo(b.tipo) || a.titulo.localeCompare(b.titulo, 'pt-BR'));
+}
+
+function desenharAnual() {
+  const tela = $('telaCeAnual');
+  const a = S.anual;
+  if (!a.ano) a.ano = new Date().getFullYear();
+  const linhas = linhasAnual(a.ano, a.cert, a.docs);
+  const mesHj = new Date().getFullYear() === a.ano ? new Date().getMonth() : -1;
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><h2 style="margin:0">Cronograma anual · ${a.ano}</h2>
+        <p class="dica" style="margin:2px 0 0">Auditorias, treinamentos, simulados e prazos mês a mês. ● previsto · ✓ feito.</p></div>
+      <span class="barra" style="margin:0">
+        <label class="campo" style="margin:0">Ano <select id="ceAnAno">${opcoes([a.ano - 1, a.ano, a.ano + 1].map(String), String(a.ano))}</select></label>
+        <label class="campo" style="margin:0">Certificação <select id="ceAnCert">${opcoes(ativas().map(x => [x.id, x.nome]), a.cert, 'Todas')}</select></label>
+        <label class="rs-check" style="margin:0"><input type="checkbox" id="ceAnDocs" ${a.docs ? 'checked' : ''}> Revisão de documentos</label>
+        <button class="btn" type="button" id="ceAnNovo">Marcar</button>
+      </span>
+    </div>
+    ${linhas.length ? `<div class="ac-rola" style="margin-top:12px"><table class="dc-planilha ce-anual"><thead><tr>
+      <th>Atividade</th><th>Tipo</th><th>Responsável</th>${MES3.map((m, i) => `<th class="ce${i === mesHj ? ' ce-mes-atual' : ''}">${m}</th>`).join('')}
+    </tr></thead><tbody>
+    ${linhas.map(l => `<tr>
+      <td>${l.ev ? `<button class="ce-link" type="button" data-ev="${l.ev.id}" data-dia="${l.ev.data}">${esc(l.titulo)}</button>` : esc(l.titulo)}${l.semData ? '<br><span class="dc-sem">sem data marcada</span>' : ''}</td>
+      <td><span class="ce-bola ce-ev-${l.cor}"></span>${esc(l.tipo)}</td><td>${esc(l.resp || '—')}</td>
+      ${l.meses.map((m, i) => `<td class="ce${i === mesHj ? ' ce-mes-atual' : ''}">${m.map(o => o.feito ? '<b class="ce-ok">✓</b>' : `<b class="ce-prev${o.data < hoje() ? ' ce-atras' : ''}">●</b>`).join('')}</td>`).join('')}
+    </tr>`).join('')}</tbody></table></div>`
+    : '<div class="vazio">Nada no ano. Use “Marcar” para pôr auditorias, treinamentos e simulados no calendário.</div>'}
+  </div>
+  <div class="rodape-fixo naoimprimir">
+    <button class="btn principal" type="button" id="ceAnImprimir">Imprimir o cronograma</button>
+    <button class="btn" type="button" id="ceAnExcel">Exportar Excel</button>
+  </div>`;
+  $('ceAnAno').addEventListener('change', e => { a.ano = Number(e.target.value); desenharAnual(); });
+  $('ceAnCert').addEventListener('change', e => { a.cert = e.target.value; desenharAnual(); });
+  $('ceAnDocs').addEventListener('change', e => { a.docs = e.target.checked; desenharAnual(); });
+  $('ceAnNovo').addEventListener('click', () => formEvento(null, hoje()));
+  $('ceAnImprimir').addEventListener('click', () => mostrar(docAnual(a.ano, a.cert, linhas), { barra: true }));
+  $('ceAnExcel').addEventListener('click', () => exportarAnual(a.ano, linhas));
+  tela.querySelectorAll('[data-ev]').forEach(b => b.addEventListener('click', () => formEvento(Number(b.dataset.ev), null)));
+}
+
+/* ===================================================================
+   TELA · CERTIFICAÇÕES
+   =================================================================== */
+function desenharCertificacoes() {
+  const tela = $('telaCeCertificacoes');
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><h2 style="margin:0">Certificações</h2>
+        <p class="dica" style="margin:2px 0 0">As normas da fazenda: número do certificado, validade e auditorias. Desligada = guardada, fora das listas e do calendário.</p></div>
+      <button class="btn" type="button" id="ceCtNova">Nova certificação</button>
+    </div>
+    <div class="ac-rola" style="margin-top:12px"><table class="dc-planilha"><thead><tr>
+      <th>Certificação</th><th>Versão</th><th>Certificadora / nº</th><th class="ce">Última auditoria</th><th class="ce">Próxima auditoria</th><th class="ce">Validade</th><th class="ce">Requisitos</th><th class="ce">Situação</th><th></th>
+    </tr></thead><tbody>
+    ${S.certs.map(c => { const p = placar(c); return `<tr${c.ativa ? '' : ' class="ce-desligada"'}>
+      <td><b>${esc(c.nome)}</b><br><span class="dc-sem">${esc(c.norma)}</span></td><td>${esc(c.versao || '—')}</td>
+      <td>${esc(c.certificadora || '—')}${c.numero ? `<br><span class="dc-sem">${esc(c.numero)}</span>` : ''}</td>
+      <td class="ce">${br(c.ultima_auditoria)}</td><td class="ce">${br(c.proxima_auditoria)}</td>
+      <td class="ce">${c.validade && c.validade < hoje() ? tag(br(c.validade), 'perigo') : br(c.validade)}</td>
+      <td class="ce">${p.total ? `${p.conf}/${p.total}` : '—'}</td>
+      <td class="ce">${c.ativa ? tag('Ligada', 'ativo') : tag('Desligada', 'inativo')}</td>
+      <td class="ce"><button class="btn mini" type="button" data-cert="${esc(c.id)}">Editar</button></td></tr>`; }).join('')}
+    </tbody></table></div>
+  </div>`;
+  $('ceCtNova').addEventListener('click', () => formCertificacao(null));
+  tela.querySelectorAll('[data-cert]').forEach(b => b.addEventListener('click', () => formCertificacao(b.dataset.cert)));
+}
+
+function formCertificacao(id) {
+  const c = id ? certPorId(id) : null;
+  const v = c || { ativa: true };
+  const val = k => esc(v[k] ?? '');
+  dialogo(`<h3>${c ? esc(c.nome) : 'Nova certificação'}</h3>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Sigla <input type="text" id="cecId" maxlength="12" value="${val('id')}" ${c ? 'disabled' : ''} placeholder="Ex.: FSA"></label>
+      <label class="campo">Nome <input type="text" id="cecNome" maxlength="80" value="${val('nome')}" required></label>
+      <label class="campo">Norma nos requisitos <input type="text" id="cecNorma" maxlength="60" value="${val('norma')}" ${c ? 'disabled' : ''} placeholder="Como aparece nos códigos"></label>
+      <label class="campo">Versão <input type="text" id="cecVersao" maxlength="30" value="${val('versao')}"></label>
+      <label class="campo">Certificadora <input type="text" id="cecCertif" maxlength="80" value="${val('certificadora')}"></label>
+      <label class="campo">Nº do certificado / GGN / Sedex <input type="text" id="cecNum" maxlength="60" value="${val('numero')}"></label>
+      <label class="campo">Última auditoria <input type="date" id="cecUlt" value="${val('ultima_auditoria')}"></label>
+      <label class="campo">Próxima auditoria <input type="date" id="cecProx" value="${val('proxima_auditoria')}"></label>
+      <label class="campo">Validade do certificado <input type="date" id="cecVal" value="${val('validade')}"></label>
+      <label class="campo plena">Escopo <input type="text" id="cecEscopo" maxlength="300" value="${val('escopo')}" placeholder="Culturas, unidades, packing…"></label>
+      <label class="campo plena">Observação <textarea id="cecObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
+      <label class="campo rs-check plena"><input type="checkbox" id="cecAtiva" ${v.ativa ? 'checked' : ''}> A fazenda tem esta certificação hoje (ligada)</label>
+    </div>
+    <div class="barra fim">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="cecGravar">Gravar</button>
+    </div>`, () => $('cecGravar').addEventListener('click', () => gravarCertificacao(c)));
+}
+
+async function gravarCertificacao(c) {
+  const g = id => so($(id).value) || null;
+  const linha = {
+    nome: g('cecNome'), versao: g('cecVersao'), certificadora: g('cecCertif'), numero: g('cecNum'),
+    ultima_auditoria: g('cecUlt'), proxima_auditoria: g('cecProx'), validade: g('cecVal'),
+    escopo: g('cecEscopo'), observacao: g('cecObs'), ativa: $('cecAtiva').checked, atualizado_em: new Date().toISOString(),
+  };
+  if (!linha.nome) return erroDlg('Informe o nome.');
+  if (!c) {
+    linha.id = (g('cecId') || '').toUpperCase().replace(/\s+/g, '');
+    linha.norma = g('cecNorma') || linha.nome;
+    linha.ordem = Math.max(0, ...S.certs.map(x => x.ordem || 0)) + 1;
+    if (!linha.id) return erroDlg('Informe a sigla.');
+    if (certPorId(linha.id)) return erroDlg('Já existe uma certificação com essa sigla.');
+  }
+  $('cecGravar').disabled = true;
+  try {
+    const t = estado.cliente.from('cert_certificacoes');
+    const { data, error } = c ? await t.update(linha).eq('id', c.id).select().single() : await t.insert(linha).select().single();
+    if (error) throw error;
+    if (c) S.certs[S.certs.findIndex(x => x.id === c.id)] = data; else S.certs.push(data);
+    S.certs.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    fechar(); redesenhar();
+  } catch (e) { $('cecGravar').disabled = false; erroDlg('Não consegui gravar: ' + (e.message || e)); }
+}
+
+/* ===================================================================
+   GRAVAR / APAGAR (comum)
+   =================================================================== */
+async function salvar(tabela, atual, linha, lista, botao) {
+  $(botao).disabled = true;
+  try {
+    const t = estado.cliente.from(tabela);
+    const { data, error } = atual ? await t.update(linha).eq('id', atual.id).select().single() : await t.insert(linha).select().single();
+    if (error) throw error;
+    if (atual) lista[lista.findIndex(x => x.id === atual.id)] = data; else lista.push(data);
+    fechar(); redesenhar();
+  } catch (e) { $(botao).disabled = false; erroDlg('Não consegui gravar: ' + (e.message || e)); }
+}
+
+function apagar(tabela, id, nome, depois) {
+  dialogo(`<h3>Apagar</h3>
+    <p>${esc(nome)}</p>
+    <p class="dica">Some das listas e do calendário e não volta.</p>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn perigo" type="button" id="ceApOk">Apagar</button></div>`, () => {
+    $('ceApOk').addEventListener('click', async () => {
+      $('ceApOk').disabled = true;
+      const { error } = await estado.cliente.from(tabela).delete().eq('id', id);
+      if (error) { $('ceApOk').disabled = false; return erroDlg('Não consegui apagar: ' + error.message); }
+      depois(); fechar(); redesenhar();
+    });
+  });
+}
+
+/* ===================================================================
+   DOCUMENTOS IMPRESSOS
+   =================================================================== */
+function documento({ titulo, subtitulo, canto, corpo, paisagem }) {
+  return `<article class="rel${paisagem ? ' rel-paisagem' : ''}">
+    <header class="rel-cabecalho">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-titulo"><h1>${esc(titulo)}</h1><p>${esc(subtitulo)}</p></div>
+      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${esc(canto || '')}</span></div>
+    </header>
+    ${corpo}
+    <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>
+  </article>`;
+}
+const refTexto = (r, cert) => cert ? codigosDe(r, cert).join(', ')
+  : refsDe(r).filter(x => certPorNorma(x.norma)?.ativa).map(x => `${sigla(x.norma)} ${x.codigo}`).join(' · ');
+const clsStatus = s => s === 'Conforme' ? 'rel-ok' : ['Pendente', 'Não conforme', 'Em andamento'].includes(s) ? 'rel-pend' : '';
+
+function docListaReq(lista) {
+  const cert = S.fr.cert && S.fr.cert !== '*' ? certPorId(S.fr.cert) : null;
+  const porTema = agrupar(lista, r => r.tema);
+  const conf = lista.filter(r => r.status === 'Conforme').length;
+  return documento({ titulo: 'Lista mestra de requisitos', paisagem: true,
+    subtitulo: cert ? `${cert.nome} ${cert.versao || ''}` : `Certificações: ${ativas().map(c => c.nome).join(' · ')}`,
+    canto: `${lista.length} requisito(s)`,
+    corpo: `<div class="rel-resumo"><b>${conf}</b> conforme(s) de <b>${lista.length}</b> ·
+        <b>${lista.filter(r => r.prioridade === 'Crítica' && r.status !== 'Conforme').length}</b> crítico(s) em aberto ·
+        <b>${lista.filter(r => r.status === 'Não conforme').length}</b> não conforme(s)</div>
+      <table class="rel-tabela"><thead><tr><th>Requisito</th><th>${cert ? 'Código(s) ' + esc(cert.id) : 'Códigos'}</th><th>Prioridade</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead><tbody>
+      ${porTema.map(([tema, rs]) => `<tr class="rel-grupo"><td colspan="6">${esc(tema)} · ${rs.length}</td></tr>
+        ${rs.map(r => `<tr><td><b>${esc(r.titulo)}</b>${r.evidencia ? `<br><span class="rel-miudo">${esc(r.evidencia)}</span>` : ''}</td>
+          <td>${esc(refTexto(r, cert))}</td><td>${esc(r.prioridade)}</td><td>${esc(r.responsavel || '')}</td><td>${r.prazo ? br(r.prazo) : ''}</td>
+          <td class="${clsStatus(r.status)}">${esc(r.status)}</td></tr>`).join('')}`).join('')
+        || '<tr><td colspan="6" class="rel-vazio">Nenhum requisito.</td></tr>'}
+      </tbody></table>` });
+}
+
+function escolherChecklist() {
+  dialogo(`<h3>Check list de auditoria interna</h3>
+    <p class="dica">Sai uma lista para levar a campo: cada requisito com os códigos da norma, a evidência esperada e os quadros C / NC / NA para marcar à mão.</p>
+    <div class="grade">
+      <label class="campo plena">Certificação <select id="ceckCert">${opcoes(ativas().map(c => [c.id, `${c.nome} ${c.versao || ''}`]), S.fr.cert && S.fr.cert !== '*' ? S.fr.cert : ativas()[0]?.id)}</select></label>
+      <label class="campo plena">Tema <select id="ceckTema">${opcoes(temas(), S.fr.tema, 'Todos')}</select></label>
+      <label class="campo rs-check plena"><input type="checkbox" id="ceckEvid" checked> Mostrar a evidência esperada</label>
+      <label class="campo rs-check plena"><input type="checkbox" id="ceckSit"> Mostrar o status atual de cada requisito</label>
+    </div>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="ceckOk">Gerar</button></div>`, () => {
+    $('ceckOk').addEventListener('click', () => {
+      const c = certPorId($('ceckCert').value);
+      if (!c) return;
+      const tema = $('ceckTema').value;
+      const lista = S.reqs.filter(r => atende(r, c) && r.status !== 'Não se aplica' && (!tema || r.tema === tema));
+      const opc = { evid: $('ceckEvid').checked, sit: $('ceckSit').checked };
+      fechar();
+      mostrar(docChecklist(c, lista, tema, opc), { barra: true });
+    });
+  });
+}
+
+function docChecklist(c, lista, tema, { evid, sit }) {
+  let n = 0;
+  const porTema = agrupar(lista, r => r.tema);
+  return documento({ titulo: 'Check list de auditoria interna', subtitulo: `${c.nome} ${c.versao || ''}${tema ? ' · ' + tema : ''}`,
+    canto: `${lista.length} requisito(s)`,
+    corpo: `<div class="ce-pap-campos">
+        <div><span>Data</span><i></i></div><div><span>Auditor(a) interno(a)</span><i></i></div>
+        <div><span>Unidade / área auditada</span><i></i></div><div><span>Acompanhante</span><i></i></div>
+      </div>
+      <table class="rel-tabela ce-check"><thead><tr><th class="rel-num">Nº</th><th>Requisito</th><th>Código</th>
+        <th class="ce-box">C</th><th class="ce-box">NC</th><th class="ce-box">NA</th><th class="ce-obs">Evidência vista / observação</th></tr></thead><tbody>
+      ${porTema.map(([t, rs]) => `<tr class="rel-grupo"><td colspan="7">${esc(t)}</td></tr>
+        ${rs.map(r => `<tr><td class="rel-num">${++n}</td>
+          <td><b>${esc(r.titulo)}</b>${r.prioridade === 'Crítica' ? ' <span class="ce-crit">crítico</span>' : ''}
+            ${evid && r.evidencia ? `<br><span class="rel-miudo">${esc(r.evidencia)}</span>` : ''}
+            ${sit ? `<br><span class="rel-miudo">Status no sistema: ${esc(r.status)}</span>` : ''}</td>
+          <td>${esc(codigosDe(r, c).join(', '))}</td>
+          <td class="ce-box"><span></span></td><td class="ce-box"><span></span></td><td class="ce-box"><span></span></td><td></td></tr>`).join('')}`).join('')
+        || '<tr><td colspan="7" class="rel-vazio">Nenhum requisito.</td></tr>'}
+      </tbody></table>
+      <p class="rel-nota">C = conforme · NC = não conforme · NA = não se aplica. Requisito crítico não conforme pede ação corretiva imediata.</p>
+      <div class="ce-pap-campos ce-pap-fim"><div><span>Não conformidades encontradas</span><i></i></div><div><span>Prazo das ações corretivas</span><i></i></div></div>` });
+}
+
+function docListaDocs(lista) {
+  const porCat = agrupar(lista, d => d.categoria);
+  return documento({ titulo: 'Lista mestra de documentos', subtitulo: `Controle de documentos e registros · ${ativas().map(c => c.id).join(' · ')}`,
+    canto: `${lista.length} documento(s)`,
+    corpo: `<table class="rel-tabela"><thead><tr><th>Código</th><th>Documento</th><th>Rev.</th><th>Data</th><th>Periodicidade</th><th>Responsável</th><th>Situação</th></tr></thead><tbody>
+      ${porCat.map(([cat, ds]) => `<tr class="rel-grupo"><td colspan="7">${esc(cat)} · ${ds.length}</td></tr>
+        ${ds.map(d => `<tr><td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}</td><td>${esc(d.revisao || '')}</td><td>${d.data_revisao ? br(d.data_revisao) : ''}</td>
+          <td>${esc(d.periodicidade || '')}</td><td>${esc(d.responsavel || '')}</td>
+          <td class="${d.situacao === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : d.situacao === 'Obsoleto' ? '' : 'rel-pend'}">${esc(d.situacao)}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
+        || '<tr><td colspan="7" class="rel-vazio">Nenhum documento.</td></tr>'}
+      </tbody></table>` });
+}
+
+function docMes(ano, mes, itens) {
+  return documento({ titulo: 'Calendário da certificação', subtitulo: `${MESES[mes]} de ${ano}${S.cal.cert ? ' · ' + (certPorId(S.cal.cert)?.nome || '') : ''}`,
+    canto: `${itens.length} item(ns)`, paisagem: true,
+    corpo: `${gradeMes(ano, mes, itens, false)}
+      ${itens.length ? `<div class="rel-secao">No mês</div><table class="rel-tabela"><thead><tr><th>Data</th><th>O quê</th><th>Tipo</th><th>Certificação</th><th>Responsável</th><th>Feito</th></tr></thead><tbody>
+        ${itens.map(i => `<tr><td>${br(i.data)}</td><td>${esc(i.titulo)}</td><td>${esc(i.tipo)}</td><td>${esc((i.certs || []).join(', '))}</td><td>${esc(i.resp || '')}</td>
+          <td class="${i.feito ? 'rel-ok' : ''}">${i.feito ? 'Sim' : ''}</td></tr>`).join('')}</tbody></table>` : ''}` });
+}
+
+function docAnual(ano, cert, linhas) {
+  return documento({ titulo: 'Cronograma anual da certificação', paisagem: true,
+    subtitulo: `${ano} · ${cert ? certPorId(cert)?.nome : ativas().map(c => c.nome).join(' · ')}`, canto: `${linhas.length} atividade(s)`,
+    corpo: `<table class="rel-tabela ce-anual-papel"><thead><tr><th>Atividade</th><th>Tipo</th><th>Responsável</th>${MES3.map(m => `<th class="rel-num">${m}</th>`).join('')}</tr></thead><tbody>
+      ${linhas.map(l => `<tr><td>${esc(l.titulo)}</td><td>${esc(l.tipo)}</td><td>${esc(l.resp || '')}</td>
+        ${l.meses.map(m => `<td class="rel-num">${m.map(o => o.feito ? '<b class="rel-ok">✓</b>' : '<b class="rel-pend">●</b>').join('')}</td>`).join('')}</tr>`).join('')
+        || `<tr><td colspan="15" class="rel-vazio">Nada no ano.</td></tr>`}
+      </tbody></table>
+      <p class="rel-nota">● previsto · ✓ feito. Requisito periódico sem data aparece sem mês marcado, para lembrar de agendar.</p>` });
+}
+
+function docPainel(prox, atrasados, criticos) {
+  return documento({ titulo: 'Painel da certificação', subtitulo: ativas().map(c => c.nome).join(' · '), canto: '',
+    corpo: `<table class="rel-tabela"><thead><tr><th>Certificação</th><th>Versão</th><th class="rel-num">Conformes</th><th class="rel-num">%</th><th class="rel-num">Críticos em aberto</th><th>Próxima auditoria</th><th>Validade</th></tr></thead><tbody>
+        ${ativas().map(c => { const p = placar(c); return `<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.versao || '')}</td><td class="rel-num">${p.conf}/${p.total}</td>
+          <td class="rel-num">${p.pct}%</td><td class="rel-num ${p.criticos ? 'rel-pend' : 'rel-ok'}">${p.criticos}</td><td>${br(c.proxima_auditoria)}</td><td>${br(c.validade)}</td></tr>`; }).join('')}
+      </tbody></table>
+      <div class="rel-secao">Próximos 60 dias</div>
+      <table class="rel-tabela"><thead><tr><th>Data</th><th>O quê</th><th>Tipo</th><th>Responsável</th></tr></thead><tbody>
+        ${prox.map(i => `<tr><td>${br(i.data)}</td><td>${esc(i.titulo)}</td><td>${esc(i.tipo)}</td><td>${esc(i.resp || '')}</td></tr>`).join('') || '<tr><td colspan="4" class="rel-vazio">Nada marcado.</td></tr>'}
+      </tbody></table>
+      ${atrasados.length ? `<div class="rel-secao">Atrasados</div><table class="rel-tabela"><thead><tr><th>Data</th><th>O quê</th><th>Tipo</th><th>Responsável</th></tr></thead><tbody>
+        ${atrasados.map(i => `<tr><td class="rel-pend">${br(i.data)}</td><td>${esc(i.titulo)}</td><td>${esc(i.tipo)}</td><td>${esc(i.resp || '')}</td></tr>`).join('')}</tbody></table>` : ''}
+      <div class="rel-secao">Requisitos críticos em aberto</div>
+      <table class="rel-tabela"><thead><tr><th>Requisito</th><th>Códigos</th><th>Responsável</th><th>Status</th></tr></thead><tbody>
+        ${criticos.map(r => `<tr><td>${esc(r.titulo)}</td><td>${esc(refTexto(r, null))}</td><td>${esc(r.responsavel || '')}</td><td class="rel-pend">${esc(r.status)}</td></tr>`).join('')
+          || '<tr><td colspan="4" class="rel-vazio">Nenhum.</td></tr>'}
+      </tbody></table>` });
+}
+
+function agrupar(lista, fn) {
+  const m = new Map();
+  lista.forEach(x => { const k = fn(x) || '—'; if (!m.has(k)) m.set(k, []); m.get(k).push(x); });
+  return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+}
+
+/* ---------------- Excel ---------------- */
+async function exportarReq(lista) {
+  const cs = ativas();
+  try {
+    await baixarXlsx(`Requisitos_certificacao_${hoje()}`, [{
+      nome: 'Requisitos', titulo: 'Requisitos da certificação · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
+      colunas: [{ rot: 'Tema', larg: 18 }, { rot: 'Requisito', larg: 50 }, ...cs.map(c => ({ rot: c.nome, larg: 18 })),
+        { rot: 'Prioridade', larg: 10 }, { rot: 'Status', larg: 13 }, { rot: 'Responsável', larg: 18 }, { rot: 'Prazo', tipo: 'data', larg: 11 },
+        { rot: 'Periodicidade', larg: 13 }, { rot: 'O que pede', larg: 60 }, { rot: 'Evidência esperada', larg: 60 }, { rot: 'Observação', larg: 40 }],
+      linhas: lista.map(r => [r.tema, r.titulo, ...cs.map(c => codigosDe(r, c).join(', ')), r.prioridade, r.status, r.responsavel || '',
+        r.prazo || '', r.periodicidade || '', r.descricao || '', r.evidencia || '', r.observacao || '']),
+    }]);
+  } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
+}
+
+async function exportarDocs(lista) {
+  try {
+    await baixarXlsx(`Lista_mestra_documentos_${hoje()}`, [{
+      nome: 'Documentos', titulo: 'Lista mestra de documentos · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
+      colunas: [{ rot: 'Código', larg: 10 }, { rot: 'Documento', larg: 55 }, { rot: 'Categoria', larg: 15 }, { rot: 'Periodicidade', larg: 13 },
+        { rot: 'Responsável', larg: 18 }, { rot: 'Revisão', larg: 8 }, { rot: 'Data da revisão', tipo: 'data', larg: 12 },
+        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
+      linhas: lista.map(d => [d.codigo, d.nome, d.categoria, d.periodicidade || '', d.responsavel || '', d.revisao || '', d.data_revisao || '',
+        proximaDoc(d) || '', d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
+    }]);
+  } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
+}
+
+async function exportarAnual(ano, linhas) {
+  try {
+    await baixarXlsx(`Cronograma_certificacao_${ano}`, [{
+      nome: String(ano), titulo: `Cronograma anual da certificação · ${ano}`, subtitulo: `Emitido em ${br(hoje())} · P = previsto, F = feito`,
+      colunas: [{ rot: 'Atividade', larg: 45 }, { rot: 'Tipo', larg: 18 }, { rot: 'Responsável', larg: 16 }, ...MES3.map(m => ({ rot: m, larg: 6 }))],
+      linhas: linhas.map(l => [l.titulo, l.tipo, l.resp || '', ...l.meses.map(m => m.map(o => o.feito ? 'F' : 'P').join(' '))]),
+    }]);
+  } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
+}
+
+/* ===================================================================
+   ENTRADA
+   =================================================================== */
+export const TELAS_CERT = ['cePainel', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
+const DESENHO = {
+  cePainel: desenharPainel, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
+  ceCalendario: desenharCalendario, ceAnual: desenharAnual, ceCertificacoes: desenharCertificacoes,
+};
+const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
+let telaAtual = '';
+function redesenhar() { DESENHO[telaAtual]?.(); }
+
+export async function abrirCertificacao(tela) {
+  const alvo = $(idTela(tela));
+  if (!alvo) return;
+  telaAtual = tela;
+  if (!S.carregado) {
+    alvo.innerHTML = '<div class="cartao"><p class="dica">Carregando a certificação…</p></div>';
+    try { await carregar(); }
+    catch (e) { alvo.innerHTML = `<div class="cartao"><div class="aviso erro">Não consegui abrir a certificação: ${esc(e.message || e)}</div></div>`; return; }
+  }
+  if (telaAtual === tela) redesenhar();
+}
+
+export function limparCertificacao() {
+  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = [];
+  Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '' });
+  Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '' });
+  Object.assign(S.cal, { ano: 0, mes: 0, cert: '', auto: true });
+  Object.assign(S.anual, { ano: 0, cert: '', docs: false });
+  telaAtual = ''; fechar();
+}
+
+/* Para testes. */
+export const _ce = { S, placar, proximaDoc, ocorrencias, itensEntre, linhasAnual, atende, emUso };

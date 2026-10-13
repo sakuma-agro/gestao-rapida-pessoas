@@ -162,6 +162,26 @@ export const MODULOS = [
       ['empSalarios',     'Salário base'],
     ] },
   ] },
+  /* Área Certificação (13/10/2026): o módulo mora na área dela (`area`), não
+     no menu de Pessoas. js/certificacao.js; tabelas cert_*; permissão 'cert'. */
+  { id: 'cert', nome: 'Certificação', area: 'certificacao', subs: [
+    { id: 'cePainelSub', nome: 'Painel', telas: [
+      ['cePainel', 'Painel'],
+    ] },
+    { id: 'ceReqSub', nome: 'Requisitos', telas: [
+      ['ceRequisitos', 'Requisitos'],
+    ] },
+    { id: 'ceDocSub', nome: 'Documentos', telas: [
+      ['ceDocumentos', 'Lista mestra de documentos'],
+    ] },
+    { id: 'ceCrono', nome: 'Cronograma', telas: [
+      ['ceCalendario', 'Calendário'],
+      ['ceAnual', 'Cronograma anual'],
+    ] },
+    { id: 'ceCertSub', nome: 'Certificações', telas: [
+      ['ceCertificacoes', 'Certificações'],
+    ] },
+  ] },
 ];
 
 /* Um módulo sem submódulo se comporta como se tivesse um só, com o nome dele.
@@ -351,8 +371,9 @@ export async function carregarAcesso() {
 let aoTrocar = () => {};
 let moduloAberto = null;
 
+/* Só os módulos da área Pessoas: módulo com `area` (Certificação) tem menu próprio. */
 export const modulosLiberados = () =>
-  MODULOS.filter(m => pode(m.id) && telasLiberadas(m.id).length);
+  MODULOS.filter(m => !m.area && pode(m.id) && telasLiberadas(m.id).length);
 
 /** Monta o menu com o que a pessoa pode ver e abre o primeiro módulo. */
 export function montarMenu(callback) {
@@ -420,6 +441,7 @@ const ICONE_SUB = {
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceCertSub: 'escudo',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

@@ -70,6 +70,7 @@ export const PADRAO = ['funcionarios', 'aniversarios', 'fichas', 'exVenc', 'trVe
 export function catalogo() {
   const r = [];
   for (const m of MODULOS) {
+    if (m.area) continue;   // Certificação tem área própria
     for (const s of subsDe(m)) {
       for (const [t, rot] of s.telas) {
         if (t === 'config') continue;

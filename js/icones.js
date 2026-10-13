@@ -55,8 +55,9 @@ export const ICONE_TELA = {
   empEmissao: 'recibo', empRecibos: 'lista', empHistorico: 'dinheiro',
   ferPainel: 'sol', ferPrev: 'grafico', ferLanc: 'lista', ferAfast: 'calendario', ferRisco: 'risco', ferIni: 'lapis',
   jorRelatorios: 'grafico', jorConfig: 'config', empSalarios: 'dinheiro',
+  cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceCertificacoes: 'escudo',
 };
-export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio' };
+export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check' };
 
 export const svgIcone = (nome, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${ICONES[nome] || ICONES.lista}</svg>`;

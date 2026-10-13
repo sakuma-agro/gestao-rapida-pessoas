@@ -1197,3 +1197,49 @@ body.na-moldura main{max-width:none;padding:0}
 #instalarPassos ol{margin:0 0 12px;padding-left:20px;line-height:1.6;font-size:14px}
 #instalarPassos p{margin:0 0 10px;font-size:14px}
 #dlgInstalar{width:min(420px,94vw)}
+
+/* ===== Área Certificação (13/10/2026) — js/certificacao.js ===== */
+.ce-certs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:14px}
+.ce-cert{display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  background:var(--papel);border:1px solid var(--linha);border-top:4px solid var(--verde);border-radius:10px;padding:12px 14px;box-shadow:var(--sombra)}
+.ce-cert:hover{border-color:var(--verde)}
+.ce-cert:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.ce-cert-nome b{display:block;font-size:14.5px;color:var(--marrom)}
+.ce-cert-nome small,.ce-cert-num small{display:block;font-size:11px;color:var(--suave)}
+.ce-cert-num strong{font-size:26px;line-height:1.1;color:var(--verde-esc)}
+.ce-cert-pe{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11.5px}
+.ce-pct{display:block;height:7px;border-radius:4px;background:var(--tagI-bg);overflow:hidden}
+.ce-pct i{display:block;height:100%;background:var(--verde);border-radius:4px}
+.ce-refs{display:flex;flex-wrap:wrap;gap:3px;max-width:260px}
+.ce-ref{font-size:10.5px;white-space:nowrap;padding:1px 6px;border-radius:4px;border:1px solid var(--linha);background:var(--fundo);color:var(--suave)}
+.ce-tab-req td:first-child{min-width:260px}
+.ce-reflinha{display:grid;grid-template-columns:minmax(150px,1fr) minmax(120px,1fr) auto;gap:6px;margin:0 0 6px}
+.ce-caixas{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px}
+.ce-caixas label{font-weight:400}
+.ce-desligada td{opacity:.6}
+.ce-link{background:none;border:0;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer;text-decoration:underline dotted}
+/* calendário do mês */
+.ce-legenda{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:11.5px;color:var(--suave);margin:12px 0 8px}
+.ce-legenda span{display:inline-flex;align-items:center;gap:5px}
+.ce-bola{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;background:#8a8d86}
+.ce-mes{width:100%;min-width:640px;border-collapse:collapse;table-layout:fixed}
+.ce-mes th{font-size:11px;font-weight:700;color:var(--suave);padding:4px;text-align:left;border-bottom:2px solid var(--verde)}
+.ce-mes td{vertical-align:top;height:92px;border:1px solid var(--linha);padding:3px 4px;background:var(--papel);cursor:pointer}
+.ce-mes td.ce-fora{background:var(--fundo);cursor:default}
+.ce-mes td.ce-hoje{box-shadow:inset 0 0 0 2px var(--verde)}
+.ce-mes td:hover:not(.ce-fora){background:var(--verde-fundo)}
+.ce-dia{display:block;font-size:12px;font-weight:700;color:var(--suave);margin-bottom:2px}
+.ce-ev{display:block;width:100%;text-align:left;font:inherit;font-size:11px;line-height:1.25;margin:0 0 2px;padding:2px 5px;border:0;border-left:3px solid #8a8d86;
+  border-radius:3px;background:var(--fundo);color:var(--texto);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ce-ev.ce-feito{opacity:.6;text-decoration:line-through}
+.ce-ev-marrom{border-left-color:#744F28}.ce-bola.ce-ev-marrom{background:#744F28}
+.ce-ev-verde{border-left-color:#84BD00}.ce-bola.ce-ev-verde{background:#84BD00}
+.ce-ev-azul{border-left-color:#3d7ea6}.ce-bola.ce-ev-azul{background:#3d7ea6}
+.ce-ev-cinza{border-left-color:#8a8d86}.ce-bola.ce-ev-cinza{background:#8a8d86}
+.ce-ev-amarelo{border-left-color:#c98a00}.ce-bola.ce-ev-amarelo{background:#c98a00}
+.ce-ev-vermelho{border-left-color:#c0392b}.ce-bola.ce-ev-vermelho{background:#c0392b}
+/* cronograma anual */
+.ce-anual td:first-child{min-width:220px}
+.ce-anual th.ce-mes-atual,.ce-anual td.ce-mes-atual{box-shadow:inset 0 0 0 2px var(--verde)}
+.ce-prev{color:var(--marrom)} .ce-prev.ce-atras{color:#c0392b} .ce-ok{color:var(--verde-esc)}
+@media (max-width:640px){ .ce-reflinha{grid-template-columns:1fr 1fr auto} .ce-mes td{height:70px} }

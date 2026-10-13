@@ -9,7 +9,7 @@
 //
 // Área nova no futuro: um item em AREAS e a regra dela em liberada().
 import { estado } from './store.js';
-import { acesso, modulosLiberados, mostrarInicio } from './acesso.js';
+import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -24,7 +24,7 @@ export const AREAS = [
   { id: 'manutencoes', nome: 'Manutenções', icone: 'icons/mod-manutencoes.v1.png',
     desc: 'Vencimentos · Ordens de serviço · Check list · Máquinas' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/mod-certificacao.v1.png',
-    desc: 'Listas para imprimir e cronograma', emBreve: true },
+    desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
 ];
 
 /* Quem entra em cada área. Pessoas: quem tem algum módulo de lá. Manutenções:
@@ -33,6 +33,8 @@ export const AREAS = [
 function liberada(id) {
   if (id === 'pessoas') return modulosLiberados().length > 0;
   if (id === 'manutencoes') return acesso.admin || (acesso.modulos || []).includes('manutencoes');
+  /* Certificação (13/10/2026): módulo 'cert' do acesso.js, com menu próprio. */
+  if (id === 'certificacao') return telasLiberadas('cert').length > 0;
   return false;
 }
 export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.id));
@@ -119,6 +121,13 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       mostrarInicio();
     }
+    return;
+  }
+
+  if (id === 'certificacao') {
+    // O menu é a faixa do módulo 'cert'; a barra de módulos de Pessoas some.
+    $('navModulos').hidden = true;
+    abrirModulo('cert', tela && tela !== 'config' ? tela : undefined);
     return;
   }
 

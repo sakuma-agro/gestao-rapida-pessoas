@@ -35,6 +35,7 @@ import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js'
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 import { ligarAreas, abrirPrimeiraTela, limparAreas } from './areas.js';
+import { abrirCertificacao, limparCertificacao, TELAS_CERT } from './certificacao.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -153,6 +154,9 @@ function abrirAba(nome) {
   if (nome === 'exFuncoes') abrirFuncoes();
   for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
+  // Área Certificação (13/10/2026) — js/certificacao.js
+  for (const t of TELAS_CERT) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_CERT.includes(nome)) abrirCertificacao(nome);
   if (nome.startsWith('jor')) abrirJornada(nome);
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
   if (nome.startsWith('fer')) abrirFerias(nome);
@@ -209,7 +213,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
   mostrar('login');
 });
 

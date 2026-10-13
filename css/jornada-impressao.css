@@ -300,3 +300,28 @@
   .fp-linha { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .fp-campo { color: #000 !important; }
 }
+
+/* ---- Certificação (13/10/2026): check list, calendário e cronograma no papel ---- */
+.rel-tabela tr.rel-grupo td { background: #EEF5DC !important; color: #744F28; font-weight: 700; }
+.rel-miudo { font-size: 9px; color: #8A8D86; }
+.ce-crit { font-size: 8.5px; font-weight: 700; color: #744F28; border: 1px solid #744F28; border-radius: 3px; padding: 0 3px; }
+.ce-check .ce-box { width: 24px; text-align: center; }
+.ce-check td.ce-box span { display: inline-block; width: 11px; height: 11px; border: 1px solid #51534A; border-radius: 2px; }
+.ce-check .ce-obs { width: 30%; }
+.ce-check tbody tr { break-inside: avoid; page-break-inside: avoid; }
+.ce-pap-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 0 0 12px; }
+.ce-pap-campos div { display: flex; align-items: flex-end; gap: 8px; font-size: 10px; color: #744F28; font-weight: 700; }
+.ce-pap-campos i { flex: 1; border-bottom: 1px solid #51534A; height: 14px; }
+.ce-pap-fim { margin-top: 14px; grid-template-columns: 1fr; }
+.ce-pap-fim i { height: 34px; }
+.ce-mes-papel { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px; color: #51534A; }
+.ce-mes-papel th { color: #744F28; text-align: left; padding: 3px; border-bottom: 2px solid #84BD00; }
+.ce-mes-papel td { vertical-align: top; height: 62px; border: 1px solid #E1E2DE; padding: 2px 3px; }
+.ce-mes-papel td.ce-fora { background: #F6F7F3; }
+.ce-mes-papel .ce-dia { font-weight: 700; color: #744F28; }
+.ce-mes-papel .ce-ev { font-size: 8.5px; line-height: 1.2; margin: 0 0 1px; padding: 1px 3px; border-left: 3px solid #8A8D86; background: #F6F7F3; white-space: normal; }
+.ce-mes-papel .ce-ev-marrom { border-left-color: #744F28; } .ce-mes-papel .ce-ev-verde { border-left-color: #84BD00; }
+.ce-mes-papel .ce-ev-azul { border-left-color: #3d7ea6; } .ce-mes-papel .ce-ev-amarelo { border-left-color: #c98a00; }
+.ce-mes-papel .ce-ev-vermelho { border-left-color: #a5342a; }
+.ce-mes-papel .ce-feito { text-decoration: line-through; }
+.ce-anual-papel td:nth-child(n+4) { width: 26px; }
