@@ -55,7 +55,7 @@ export const ICONE_TELA = {
   empEmissao: 'recibo', empRecibos: 'lista', empHistorico: 'dinheiro',
   ferPainel: 'sol', ferPrev: 'grafico', ferLanc: 'lista', ferAfast: 'calendario', ferRisco: 'risco', ferIni: 'lapis',
   jorRelatorios: 'grafico', jorConfig: 'config', empSalarios: 'dinheiro',
-  cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceCertificacoes: 'escudo',
+  cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndRh: 'grafico', ceCertificacoes: 'escudo',
 };
 export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check' };
 

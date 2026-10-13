@@ -405,8 +405,10 @@ const oculto = g => g.n < 3;
 
 /* ---------------- Certificação ---------------- */
 
-function desenharCert() {
-  const tela = $('telaRhIndCert'); if (!tela) return;
+/* A mesma tela aparece em RH › Indicadores › Certificação e na área
+   Certificação › Indicadores de RH (13/10/2026, pedido dele). */
+function desenharCert(alvo = 'telaRhIndCert') {
+  const tela = $(alvo); if (!tela) return;
   const meses = tresFechados(), d = porFazenda(meses);
   const lin = (x, tot = false) => `<tr${tot ? ' class="ind-forte"' : ''}><th scope="row">${esc(x.fazenda)}</th><td>${num(x.tot.qm, 1)}</td>
     <td>${comMeta(x.tot.absCom, METAS.absTotal)}</td><td>${comMeta(x.tot.absSem, METAS.absTotal)}</td><td>${comMeta(x.tot.njCom, METAS.absNj)}</td>
@@ -414,7 +416,7 @@ function desenharCert() {
   const sx = (g) => oculto(g) ? '<span class="ind-oculto">grupo pequeno — oculto</span>' : `${comMeta(g.absCom, METAS.absTotal)} · ${comMeta(g.turnover, METAS.turnover, 3)}`;
   const linSx = (x, tot = false) => `<tr${tot ? ' class="ind-forte"' : ''}><th scope="row">${esc(x.fazenda)}</th><td>${sx(x.M)}</td><td>${sx(x.F)}</td></tr>`;
   tela.innerHTML = `<div class="cartao">
-    <div class="barra entre" style="margin:0"><div><h2 style="margin:0">Indicadores · Certificação</h2>
+    <div class="barra entre" style="margin:0"><div><h2 style="margin:0">${alvo === 'telaCeIndRh' ? 'Absenteísmo e turnover' : 'Indicadores · Certificação'}</h2>
       <p class="dica" style="margin:2px 0 0">Sempre os 3 últimos meses fechados: <b>${meses.map(rotMes).join(', ')}</b>. Sem nomes de pessoas.</p></div>
       <span class="acoes"><button class="btn" id="certExcel">Excel</button><button class="btn principal" id="certRel">Relatório</button></span></div>
     <h3 class="ind-h3">Por fazenda</h3>
@@ -606,8 +608,10 @@ function pintarTv() {
   tv.el.querySelector('#tvSair').addEventListener('click', fecharTv);
 }
 
-const DESENHO = { rhIndPainel: desenhar, rhIndCert: desenharCert, rhIndMetas: desenharMetas, rhIndPessoa: () => desenharPessoa() };
-const TELA_ID = { rhIndPainel: 'telaRhIndPainel', rhIndPessoa: 'telaRhIndPessoa', rhIndCert: 'telaRhIndCert', rhIndMetas: 'telaRhIndMetas' };
+const DESENHO = { rhIndPainel: desenhar, rhIndCert: () => desenharCert(), rhIndMetas: desenharMetas, rhIndPessoa: () => desenharPessoa(),
+  ceIndRh: () => desenharCert('telaCeIndRh') };
+const TELA_ID = { rhIndPainel: 'telaRhIndPainel', rhIndPessoa: 'telaRhIndPessoa', rhIndCert: 'telaRhIndCert', rhIndMetas: 'telaRhIndMetas',
+  ceIndRh: 'telaCeIndRh' };
 
 export async function abrirIndicadores(tela = 'rhIndPainel', forcar = false) {
   est.tela = tela;
@@ -619,7 +623,11 @@ export async function abrirIndicadores(tela = 'rhIndPainel', forcar = false) {
     est.erro = ''; est.carregado = false;
     const alvo = $(TELA_ID[tela]); if (alvo) alvo.innerHTML = '<div class="cartao"><p class="dica">Carregando os indicadores…</p></div>';
     try { await carregar(); }
-    catch (e) { est.erro = 'Não consegui carregar os indicadores: ' + (e.message || e); }
+    catch (e) {
+      est.erro = /Sem permiss/i.test(e.message || '')
+        ? 'Os números de absenteísmo e turnover são do RH. Para ver aqui, este login precisa do módulo RH liberado em Configurações.'
+        : 'Não consegui carregar os indicadores: ' + (e.message || e);
+    }
   }
   if (est.erro) { const alvo = $(TELA_ID[tela]); if (alvo) alvo.innerHTML = `<div class="cartao"><div class="aviso erro">${esc(est.erro)}</div></div>`; return; }
   if (tela === 'rhIndPessoa' && estP.periodo !== est.f.de + est.f.ate) estP.carregado = false;

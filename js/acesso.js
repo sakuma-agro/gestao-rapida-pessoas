@@ -178,6 +178,12 @@ export const MODULOS = [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
     ] },
+    /* Absenteísmo e turnover dos 3 últimos meses fechados — a mesma tela de
+       RH › Indicadores › Certificação (js/rh-indicadores.js). Os números vêm
+       do rh_ind_base, que o banco só abre para quem tem o módulo RH. */
+    { id: 'ceIndSub', nome: 'Indicadores de RH', telas: [
+      ['ceIndRh', 'Absenteísmo e turnover'],
+    ] },
     { id: 'ceCertSub', nome: 'Certificações', telas: [
       ['ceCertificacoes', 'Certificações'],
     ] },
@@ -441,7 +447,7 @@ const ICONE_SUB = {
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceCertSub: 'escudo',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
