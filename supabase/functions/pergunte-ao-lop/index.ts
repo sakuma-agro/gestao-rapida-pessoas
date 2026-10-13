@@ -254,7 +254,8 @@ async function vencimentosFrota(db: SupabaseClient, e: any, hoje: string) {
   const erro = pl.error || eq.error || tm.error || lc.error;
   if (erro) throw new Error(erro.message);
   const margemPadrao = Number(pr.data?.[0]?.valor) || 50;
-  const equip = new Map((eq.data || []).map((x) => [x.id, x]));
+  // deno-lint-ignore no-explicit-any
+  const equip = new Map<string, any>((eq.data || []).map((x: any) => [x.id, x]));
   const tipo = new Map((tm.data || []).map((x) => [x.id, x.nome]));
   const local = new Map((lc.data || []).map((x) => [x.id, x.nome]));
   const filtro = String(e.codigo_contem || '').toLowerCase();
