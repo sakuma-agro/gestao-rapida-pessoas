@@ -28,6 +28,8 @@ const json = (dados: unknown, status = 200) =>
 
 const MODELO = Deno.env.get('IA_MODELO') || 'claude-sonnet-5-5';
 const LIMITE_DIA = Number(Deno.env.get('IA_LIMITE_DIA') || 30);
+// Espaço de trabalho "Default" do Claude Console (o ID não é sigiloso).
+const WORKSPACE = Deno.env.get('IA_WORKSPACE_ID') || 'wrkspc_015DEwxkhixtGSziwuZY172v';
 const MAX_VOLTAS = 8;          // consultas encadeadas por pergunta
 const MAX_LINHAS = 200;        // linhas por consulta
 const MAX_TEXTO_TOOL = 40000;  // caracteres devolvidos ao Claude por consulta
@@ -338,7 +340,14 @@ ${mapa}`;
 async function claude(chave: string, system: string, mensagens: any[]) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'x-api-key': chave, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    // A chave é pessoal (ligada ao login do Guilherme no Console) e vale para
+    // todos os espaços de trabalho, então cada chamada diz em qual ela age.
+    headers: {
+      'authorization': `Bearer ${chave}`,
+      'anthropic-workspace-id': WORKSPACE,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
     body: JSON.stringify({
       model: MODELO,
       max_tokens: 1500,
@@ -368,8 +377,13 @@ Deno.serve(async (req) => {
   if (!chave) return json({ erro: 'O assistente ainda não foi ligado: falta a chave da API no Supabase.' }, 503);
 
   const url = Deno.env.get('SUPABASE_URL')!;
-  const anon = Deno.env.get('SUPABASE_ANON_KEY')!;
-  const servico = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  // chaves do próprio Supabase: as novas (JSON) se existirem, senão as antigas
+  const daLista = (nome: string) => {
+    try { const d = JSON.parse(Deno.env.get(nome) || '{}'); return d.default || Object.values(d)[0] || ''; }
+    catch { return ''; }
+  };
+  const anon = (daLista('SUPABASE_PUBLISHABLE_KEYS') || Deno.env.get('SUPABASE_ANON_KEY')) as string;
+  const servico = (daLista('SUPABASE_SECRET_KEYS') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) as string;
   const auth = req.headers.get('Authorization') || '';
 
   // cliente com o login da pessoa: as regras de acesso valem em tudo
