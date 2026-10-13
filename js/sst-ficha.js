@@ -139,10 +139,10 @@ export function documentoFichaSst(d) {
       ${esc(f.cargo || '—')} exige já aparecem no histórico desta pessoa.</p>`;
 
   const nota = ex
-    ? `Documento de uso interno, emitido do Gestão Rápida (Pessoas). Mostra o lançamento mais
+    ? `Documento de uso interno, emitido do LOP - Gestão Rápida. Mostra o lançamento mais
        recente de cada exame; as reciclagens e lançamentos antigos ficam na tela de Vencimentos,
        marcando "mostrar todos os lançamentos". Quem manda no que a função exige é o PCMSO.`
-    : `Documento de uso interno, emitido do Gestão Rápida (Pessoas). Mostra o lançamento mais
+    : `Documento de uso interno, emitido do LOP - Gestão Rápida. Mostra o lançamento mais
        recente de cada treinamento; as reciclagens anteriores ficam na tela de Vencimentos,
        marcando "mostrar todos os lançamentos".`;
 

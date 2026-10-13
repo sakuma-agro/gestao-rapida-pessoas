@@ -217,7 +217,7 @@ function documento({ titulo, subtitulo, canto, corpo, assinatura, classe }) {
 /* O nome do arquivo que o Chrome sugere ao "Salvar como PDF" é o
    document.title. Então cada documento diz como quer se chamar, e o título
    volta ao normal assim que a impressão termina. Sem isso todo PDF saía como
-   "Gestão Rápida (Pessoas) · SAKUMA". */
+   "LOP - Gestão Rápida · SAKUMA". */
 let tituloAtual = '';
 const limparNome = t => String(t || '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
 

@@ -1591,7 +1591,7 @@ function passosInstalar() {
   return `
     <ol><li>No Chrome ou no Edge, procure o ícone de <b>instalar</b> no fim da
       barra de endereço (um monitor com uma seta).</li>
-      <li>Ou abra o menu <b>⋮</b> / <b>…</b> e escolha <b>Instalar Gestão Rápida</b>
+      <li>Ou abra o menu <b>⋮</b> / <b>…</b> e escolha <b>Instalar LOP - Gestão Rápida</b>
       (no Edge: <b>Aplicativos → Instalar este site como aplicativo</b>).</li></ol>`;
 }
 
@@ -1633,7 +1633,7 @@ function ligar(nome, fn) {
   try { fn(); }
   catch (e) {
     falhasAoLigar.push(`${nome}: ${e.message || e}`);
-    console.error('[Gestão Rápida] falhou ao ligar', nome, e);
+    console.error('[LOP - Gestão Rápida] falhou ao ligar', nome, e);
   }
 }
 
@@ -1721,6 +1721,6 @@ function telaDeSocorro(texto) {
     aviso.hidden = false;
   }
 })().catch(e => {
-  console.error('[Gestão Rápida] o arranque parou', e);
+  console.error('[LOP - Gestão Rápida] o arranque parou', e);
   telaDeSocorro(e.message || String(e));
 });

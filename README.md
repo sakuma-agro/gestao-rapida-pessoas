@@ -1,4 +1,4 @@
-# Gestão Rápida (Pessoas) · SAKUMA Agronegócios
+# LOP - Gestão Rápida · SAKUMA Agronegócios
 
 Aplicativo web para cadastrar funcionários e imprimir as fichas de EPI em A4,
 reproduzindo célula por célula a aba **Ficha EPI** da planilha

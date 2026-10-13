@@ -86,7 +86,7 @@ export function documentoFichaCadastral(f) {
       ${campo('Setor', f.setor)}
     </div>
 
-    <p class="rel-nota">Documento de uso interno, emitido do cadastro do Gestão Rápida (Pessoas).
+    <p class="rel-nota">Documento de uso interno, emitido do cadastro do LOP - Gestão Rápida.
       Traz apenas os dados básicos: documentos, endereço e contato de emergência ficam no cadastro,
       na tela de edição do funcionário.</p>`;
 
