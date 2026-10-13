@@ -171,8 +171,8 @@ export const MODULOS = [
     { id: 'ceReqSub', nome: 'Requisitos', telas: [
       ['ceRequisitos', 'Requisitos'],
     ] },
-    { id: 'ceDocSub', nome: 'Documentos', telas: [
-      ['ceDocumentos', 'Lista mestra de documentos'],
+    { id: 'ceDocSub', nome: 'Lista mestra', telas: [
+      ['ceDocumentos', 'Lista mestra'],
     ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],

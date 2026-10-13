@@ -121,6 +121,21 @@ const docsDe = r => (r.documentos || []).map(id => S.docs.find(d => d.id === id)
   .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 const reqsDoDoc = d => S.reqs.filter(r => (r.documentos || []).includes(d.id));
 const rotDoc = d => `${d.codigo} · ${d.nome}`;
+/** Códigos das normas que o documento atende, pelos requisitos ligados a ele
+ *  (só das certificações ligadas, sem repetir, na ordem das certificações). */
+function codigosDoDoc(d) {
+  const ordem = n => { const i = S.certs.findIndex(c => c.norma === n); return i < 0 ? 99 : i; };
+  const vistos = new Map();
+  reqsDoDoc(d).forEach(r => refsDe(r).forEach(x => {
+    if (!certPorNorma(x.norma)?.ativa) return;
+    const k = x.norma + '|' + x.codigo;
+    if (!vistos.has(k)) vistos.set(k, x);
+  }));
+  return [...vistos.values()].sort((a, b) => ordem(a.norma) - ordem(b.norma)
+    || String(a.codigo).localeCompare(String(b.codigo), 'pt-BR', { numeric: true }));
+}
+const codTags = lista => lista.map(x => `<span class="ce-ref" title="${esc(x.norma)} ${esc(x.versao || '')}">${esc(sigla(x.norma))} ${esc(x.codigo)}</span>`).join('');
+const codTexto = lista => lista.map(x => `${sigla(x.norma)} ${x.codigo}`).join(' · ');
 const docTags = (r, clicavel = true) => docsDe(r).map(d => clicavel
   ? `<button type="button" class="ce-doc" data-vdoc="${d.id}" title="${esc(d.nome)}">${esc(d.codigo)}</button>`
   : `<span class="ce-doc" title="${esc(d.nome)}">${esc(d.codigo)}</span>`).join('');
@@ -533,7 +548,7 @@ function docFiltrados() {
     if (f.per && d.periodicidade !== f.per) return false;
     if (f.sit === 'atencao' ? !(['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d)) : f.sit && d.situacao !== f.sit) return false;
     if (f.resp && so(d.responsavel) !== f.resp) return false;
-    if (q && ![d.codigo, d.nome, d.responsavel, d.observacao].some(t => so(t).toLowerCase().includes(q))) return false;
+    if (q && ![d.codigo, d.nome, d.responsavel, d.observacao, codTexto(codigosDoDoc(d))].some(t => so(t).toLowerCase().includes(q))) return false;
     return true;
   });
 }
@@ -545,12 +560,12 @@ function desenharDocumentos() {
   const pers = [...new Set(S.docs.map(d => d.periodicidade).filter(Boolean))].sort((a, b) => PERIODOS.indexOf(a) - PERIODOS.indexOf(b));
   tela.innerHTML = `<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
-      <div><h2 style="margin:0">Lista mestra de documentos</h2>
-        <p class="dica" style="margin:2px 0 0">Anexos, instruções de trabalho, registros, POPs e check lists, com revisão e responsável.</p></div>
+      <div><h2 style="margin:0">Lista mestra</h2>
+        <p class="dica" style="margin:2px 0 0">Anexos, instruções de trabalho, registros, POPs e check lists, com revisão, responsável e os códigos das normas que cada um atende.</p></div>
       <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button>
     </div>
     <div class="grade larga" style="margin-top:14px">
-      <label class="campo">Buscar <input type="text" id="ceDcQ" value="${esc(f.q)}" placeholder="Código ou nome"></label>
+      <label class="campo">Buscar <input type="text" id="ceDcQ" value="${esc(f.q)}" placeholder="Código, nome ou código da norma (ex.: 4.6.1)"></label>
       <label class="campo">Categoria <select id="ceDcCat">${opcoes(cats, f.cat, 'Todas')}</select></label>
       <label class="campo">Periodicidade <select id="ceDcPer">${opcoes(pers, f.per, 'Todas')}</select></label>
       <label class="campo">Situação <select id="ceDcSit">${opcoes([['atencao', 'Precisa de atenção'], ...SITUACOES_DOC], f.sit, 'Todas')}</select></label>
@@ -578,14 +593,15 @@ function tabelaDocumentos() {
     ${SITUACOES_DOC.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_SIT[s])} <b>${conta(s)}</b></span>` : '').join('')}
     ${lista.filter(docAtrasado).length ? `<span class="contagem">${tag('revisão vencida', 'perigo')} <b>${lista.filter(docAtrasado).length}</b></span>` : ''}`;
   $('ceDcTabela').innerHTML = lista.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr>
-    <th>Código</th><th>Documento</th><th>Categoria</th><th class="ce">Periodicidade</th><th>Responsável</th><th class="ce">Revisão</th><th class="ce">Próxima</th><th class="ce">Requisitos</th><th class="ce">Situação</th><th></th>
+    <th>Código</th><th>Documento</th><th>Categoria</th><th class="ce">Periodicidade</th><th>Responsável</th><th class="ce">Revisão</th><th class="ce">Próxima</th><th>Códigos nas normas</th><th class="ce">Situação</th><th></th>
   </tr></thead><tbody>
   ${lista.map(d => { const p = proximaDoc(d); return `<tr>
     <td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}${(d.certificacoes || []).length ? `<br><span class="dc-sem">${esc(d.certificacoes.join(', '))}</span>` : ''}</td>
     <td>${esc(d.categoria)}</td><td class="ce">${esc(d.periodicidade || '—')}</td><td>${esc(d.responsavel || '—')}</td>
     <td class="ce">${d.revisao ? 'Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? `<br><span class="dc-sem">${br(d.data_revisao)}</span>` : (d.revisao ? '' : '—')}</td>
     <td class="ce">${p ? (p < hoje() ? tag(br(p), 'perigo') : br(p)) : '—'}</td>
-    <td class="ce">${reqsDoDoc(d).length ? `<button class="ce-link" type="button" data-dreq="${d.id}" title="Ver os requisitos ligados">${reqsDoDoc(d).length}</button>` : '—'}</td>
+    <td>${reqsDoDoc(d).length ? `<div class="ce-refs">${codTags(codigosDoDoc(d))}</div>
+      <button class="ce-link dc-sem" type="button" data-dreq="${d.id}" title="Ver os requisitos ligados">${reqsDoDoc(d).length} requisito(s)</button>` : '<span class="dc-sem">—</span>'}</td>
     <td class="ce">${tag(d.situacao, COR_SIT[d.situacao])}</td>
     <td class="ce"><button class="btn mini" type="button" data-doc="${d.id}">Abrir</button></td></tr>`; }).join('')}
   </tbody></table></div>` : `<div class="vazio">${S.docs.length ? 'Nada com esses filtros.' : 'Nenhum documento cadastrado.'}</div>`;
@@ -616,6 +632,7 @@ function formDocumento(id) {
       <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
       <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
     </div>
+    ${d && codigosDoDoc(d).length ? `<h4 class="ac-h4">Códigos nas normas</h4><div class="ce-refs" style="max-width:none">${codTags(codigosDoDoc(d))}</div>` : ''}
     ${d ? `<h4 class="ac-h4">Requisitos que este documento comprova</h4>
       ${reqsDoDoc(d).length ? `<ul class="ce-lista-req">${reqsDoDoc(d).map(r => `<li><button class="ce-link" type="button" data-lreq="${r.id}">${esc(r.titulo)}</button>
         <span class="dc-sem">${esc(refTexto(r, null))}</span></li>`).join('')}</ul>`
@@ -1057,14 +1074,15 @@ function docChecklist(c, lista, tema, { evid, sit }) {
 
 function docListaDocs(lista) {
   const porCat = agrupar(lista, d => d.categoria);
-  return documento({ titulo: 'Lista mestra de documentos', subtitulo: `Controle de documentos e registros · ${ativas().map(c => c.id).join(' · ')}`,
+  return documento({ titulo: 'Lista mestra', paisagem: true, subtitulo: `Controle de documentos e registros · ${ativas().map(c => c.id).join(' · ')}`,
     canto: `${lista.length} documento(s)`,
-    corpo: `<table class="rel-tabela"><thead><tr><th>Código</th><th>Documento</th><th>Rev.</th><th>Data</th><th>Periodicidade</th><th>Responsável</th><th>Situação</th></tr></thead><tbody>
-      ${porCat.map(([cat, ds]) => `<tr class="rel-grupo"><td colspan="7">${esc(cat)} · ${ds.length}</td></tr>
+    corpo: `<table class="rel-tabela"><thead><tr><th>Código</th><th>Documento</th><th>Rev.</th><th>Data</th><th>Periodicidade</th><th>Responsável</th><th>Códigos nas normas</th><th>Situação</th></tr></thead><tbody>
+      ${porCat.map(([cat, ds]) => `<tr class="rel-grupo"><td colspan="8">${esc(cat)} · ${ds.length}</td></tr>
         ${ds.map(d => `<tr><td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}</td><td>${esc(d.revisao || '')}</td><td>${d.data_revisao ? br(d.data_revisao) : ''}</td>
           <td>${esc(d.periodicidade || '')}</td><td>${esc(d.responsavel || '')}</td>
+          <td class="rel-miudo">${esc(codTexto(codigosDoDoc(d)))}</td>
           <td class="${d.situacao === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : d.situacao === 'Obsoleto' ? '' : 'rel-pend'}">${esc(d.situacao)}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
-        || '<tr><td colspan="7" class="rel-vazio">Nenhum documento.</td></tr>'}
+        || '<tr><td colspan="8" class="rel-vazio">Nenhum documento.</td></tr>'}
       </tbody></table>` });
 }
 
@@ -1130,13 +1148,13 @@ async function exportarReq(lista) {
 
 async function exportarDocs(lista) {
   try {
-    await baixarXlsx(`Lista_mestra_documentos_${hoje()}`, [{
-      nome: 'Documentos', titulo: 'Lista mestra de documentos · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
+    await baixarXlsx(`Lista_mestra_${hoje()}`, [{
+      nome: 'Lista mestra', titulo: 'Lista mestra · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Código', larg: 10 }, { rot: 'Documento', larg: 55 }, { rot: 'Categoria', larg: 15 }, { rot: 'Periodicidade', larg: 13 },
         { rot: 'Responsável', larg: 18 }, { rot: 'Revisão', larg: 8 }, { rot: 'Data da revisão', tipo: 'data', larg: 12 },
-        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Requisitos ligados', tipo: 'num', casas: 0, larg: 10 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
+        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Códigos nas normas', larg: 40 }, { rot: 'Requisitos ligados', tipo: 'num', casas: 0, larg: 10 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
       linhas: lista.map(d => [d.codigo, d.nome, d.categoria, d.periodicidade || '', d.responsavel || '', d.revisao || '', d.data_revisao || '',
-        proximaDoc(d) || '', reqsDoDoc(d).length, d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
+        proximaDoc(d) || '', codTexto(codigosDoDoc(d)), reqsDoDoc(d).length, d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
     }]);
   } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
 }
