@@ -76,7 +76,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 /* ---------------- estado ---------------- */
 const S = {
   carregado: false, certs: [], reqs: [], docs: [], evs: [],
-  fr: { q: '', cert: '', tema: '', prior: '', status: '' },
+  fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
   fd: { q: '', cat: '', per: '', sit: '', resp: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
   anual: { ano: 0, cert: '', docs: false },
@@ -93,6 +93,8 @@ async function carregar() {
   ]);
   const erro = a.error || b.error || d.error || e.error;
   if (erro) {
+    if (/documentos/i.test(erro.message || '') && /column/i.test(erro.message || ''))
+      throw new Error('Falta a coluna "documentos" em cert_requisitos no banco (supabase/cert.sql).');
     if (/cert_|relation|does not exist|schema cache/i.test(erro.message || ''))
       throw new Error('As tabelas da Certificação ainda não foram criadas no banco (supabase/cert.sql).');
     throw erro;
@@ -114,6 +116,14 @@ const atende = (r, c) => refsDe(r).some(x => x.norma === c.norma);
 const emUso = r => ativas().some(c => atende(r, c));
 const codigosDe = (r, c) => refsDe(r).filter(x => x.norma === c.norma).map(x => x.codigo);
 const sigla = n => SIGLA[n] || certPorNorma(n)?.id || n;
+/* Documentos da lista mestra ligados ao requisito (evidência) — 13/10/2026. */
+const docsDe = r => (r.documentos || []).map(id => S.docs.find(d => d.id === id)).filter(Boolean)
+  .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
+const reqsDoDoc = d => S.reqs.filter(r => (r.documentos || []).includes(d.id));
+const rotDoc = d => `${d.codigo} · ${d.nome}`;
+const docTags = (r, clicavel = true) => docsDe(r).map(d => clicavel
+  ? `<button type="button" class="ce-doc" data-vdoc="${d.id}" title="${esc(d.nome)}">${esc(d.codigo)}</button>`
+  : `<span class="ce-doc" title="${esc(d.nome)}">${esc(d.codigo)}</span>`).join('');
 const temas = () => [...new Set(S.reqs.map(r => r.tema).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 const responsaveis = () => [...new Set([...S.reqs, ...S.docs, ...S.evs].map(x => so(x.responsavel)).filter(Boolean))]
   .sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -274,13 +284,13 @@ function desenharPainel() {
   $('cePnImprimir').addEventListener('click', () => mostrar(docPainel(prox, atrasados, criticos), { barra: true }));
   tela.querySelectorAll('[data-req]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.req))));
   tela.querySelectorAll('[data-cert]').forEach(b => b.addEventListener('click', () => {
-    Object.assign(S.fr, { q: '', cert: b.dataset.cert, tema: '', prior: '', status: '' });
+    Object.assign(S.fr, { q: '', cert: b.dataset.cert, tema: '', prior: '', status: '', doc: '' });
     abrirModulo('cert', 'ceRequisitos');
   }));
   tela.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => {
     const alvo = b.dataset.ir;
     if (alvo === 'req' || alvo === 'criticos') {
-      Object.assign(S.fr, { q: '', cert: '', tema: '', prior: alvo === 'criticos' ? 'Crítica' : '', status: alvo === 'criticos' ? 'aberto' : '' });
+      Object.assign(S.fr, { q: '', cert: '', tema: '', prior: alvo === 'criticos' ? 'Crítica' : '', status: alvo === 'criticos' ? 'aberto' : '', doc: '' });
       abrirModulo('cert', 'ceRequisitos');
     } else if (alvo === 'docs') {
       Object.assign(S.fd, { q: '', cat: '', per: '', sit: 'atencao', resp: '' });
@@ -342,7 +352,10 @@ function reqFiltrados() {
     if (f.tema && r.tema !== f.tema) return false;
     if (f.prior && r.prioridade !== f.prior) return false;
     if (f.status === 'aberto' ? ['Conforme', 'Não se aplica'].includes(r.status) : f.status && r.status !== f.status) return false;
-    if (q && ![r.titulo, r.descricao, r.evidencia, r.tema, r.responsavel, ...refsDe(r).map(x => x.codigo)]
+    if (f.doc === 'sem' && docsDe(r).length) return false;
+    if (f.doc === 'com' && !docsDe(r).length) return false;
+    if (f.doc && !['sem', 'com'].includes(f.doc) && !(r.documentos || []).includes(Number(f.doc))) return false;
+    if (q && ![r.titulo, r.descricao, r.evidencia, r.tema, r.responsavel, ...refsDe(r).map(x => x.codigo), ...docsDe(r).map(d => d.codigo)]
       .some(t => so(t).toLowerCase().includes(q))) return false;
     return true;
   });
@@ -363,6 +376,8 @@ function desenharRequisitos() {
       <label class="campo">Tema <select id="ceRqTema">${opcoes(temas(), f.tema, 'Todos')}</select></label>
       <label class="campo">Prioridade <select id="ceRqPrior">${opcoes(PRIORIDADES, f.prior, 'Todas')}</select></label>
       <label class="campo">Status <select id="ceRqStatus">${opcoes([['aberto', 'Em aberto (sem conformidade)'], ...STATUS], f.status, 'Todos')}</select></label>
+      <label class="campo">Documento <select id="ceRqDoc">${opcoes([['com', 'Com documento ligado'], ['sem', 'Sem documento ligado'],
+        ...S.docs.filter(d => reqsDoDoc(d).length || String(d.id) === f.doc).map(d => [String(d.id), rotDoc(d)])], f.doc, 'Todos')}</select></label>
     </div>
     <div class="barra" id="ceRqResumo"></div>
     <div id="ceRqTabela" style="margin-top:12px"></div>
@@ -373,7 +388,7 @@ function desenharRequisitos() {
     <button class="btn" type="button" id="ceRqExcel">Exportar Excel</button>
   </div>`;
   const ligarF = (id, campo, ev = 'change') => $(id).addEventListener(ev, e => { f[campo] = e.target.value; tabelaRequisitos(); });
-  ligarF('ceRqQ', 'q', 'input'); ligarF('ceRqCert', 'cert'); ligarF('ceRqTema', 'tema'); ligarF('ceRqPrior', 'prior'); ligarF('ceRqStatus', 'status');
+  ligarF('ceRqQ', 'q', 'input'); ligarF('ceRqCert', 'cert'); ligarF('ceRqTema', 'tema'); ligarF('ceRqPrior', 'prior'); ligarF('ceRqStatus', 'status'); ligarF('ceRqDoc', 'doc');
   $('ceRqNovo').addEventListener('click', () => formRequisito(null));
   $('ceRqLista').addEventListener('click', () => mostrar(docListaReq(reqFiltrados()), { barra: true }));
   $('ceRqCheck').addEventListener('click', escolherChecklist);
@@ -385,15 +400,17 @@ function tabelaRequisitos() {
   const lista = reqFiltrados();
   const conta = s => lista.filter(r => r.status === s).length;
   $('ceRqResumo').innerHTML = `<span class="contagem"><b>${lista.length}</b> requisito(s)</span>
+    <span class="contagem"><b>${lista.filter(r => !docsDe(r).length).length}</b> sem documento ligado</span>
     ${STATUS.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_STATUS[s])} <b>${conta(s)}</b></span>` : '').join('')}`;
   const todas = S.fr.cert === '*';
   $('ceRqTabela').innerHTML = lista.length ? `<div class="ac-rola"><table class="dc-planilha ce-tab-req"><thead><tr>
-    <th>Requisito</th><th>Tema</th><th>Códigos nas normas</th><th class="ce">Prioridade</th><th class="ce">Status</th><th>Responsável / prazo</th><th></th>
+    <th>Requisito</th><th>Tema</th><th>Códigos nas normas</th><th>Documentos</th><th class="ce">Prioridade</th><th class="ce">Status</th><th>Responsável / prazo</th><th></th>
   </tr></thead><tbody>
   ${lista.map(r => `<tr>
     <td><b>${esc(r.titulo)}</b>${r.evidencia ? `<br><span class="dc-sem">${esc(r.evidencia.length > 120 ? r.evidencia.slice(0, 120) + '…' : r.evidencia)}</span>` : ''}</td>
     <td>${esc(r.tema)}</td>
     <td><div class="ce-refs">${refTags(r, !todas)}</div></td>
+    <td><div class="ce-refs">${docTags(r) || '<span class="dc-sem">—</span>'}</div></td>
     <td class="ce">${tag(r.prioridade, COR_PRIOR[r.prioridade])}</td>
     <td class="ce">${tag(r.status, COR_STATUS[r.status])}</td>
     <td>${esc(r.responsavel || '—')}${r.prazo ? `<br><span class="dc-sem">${br(r.prazo)}</span>${r.prazo < hoje() && !['Conforme', 'Não se aplica'].includes(r.status) ? ' ' + tag('atrasado', 'perigo') : ''}` : ''}</td>
@@ -401,7 +418,11 @@ function tabelaRequisitos() {
   </tr>`).join('')}</tbody></table></div>`
     : `<div class="vazio">${S.reqs.length ? 'Nada com esses filtros.' : 'Nenhum requisito cadastrado.'}</div>`;
   $('ceRqTabela').querySelectorAll('[data-req]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.req))));
+  $('ceRqTabela').querySelectorAll('[data-vdoc]').forEach(b => b.addEventListener('click', () => formDocumento(Number(b.dataset.vdoc))));
 }
+
+const chipDoc = d => `<span class="ce-chip" data-did="${d.id}" title="${esc(d.nome)}"><b>${esc(d.codigo)}</b> ${esc(d.nome)}
+  <button type="button" data-tirad title="Desligar este documento">✕</button></span>`;
 
 function formRequisito(id) {
   const r = id ? S.reqs.find(x => x.id === id) : null;
@@ -432,6 +453,14 @@ function formRequisito(id) {
     <h4 class="ac-h4">Códigos nas normas</h4>
     <div id="cerRefs">${refsDe(v).map(linhaRef).join('')}</div>
     <button class="btn mini" type="button" id="cerRefMais">+ Código</button>
+    <h4 class="ac-h4">Documentos que comprovam <small class="dc-sem">da lista mestra</small></h4>
+    <div class="ce-docs-lig" id="cerDocs">${docsDe(v).map(chipDoc).join('')}</div>
+    <div class="ce-docbusca">
+      <input type="text" id="cerDocQ" list="ceListaDocs" placeholder="Digite o código ou o nome (ex.: POP 08, irrigação)">
+      <button class="btn mini" type="button" id="cerDocMais">Ligar</button>
+    </div>
+    <p class="dica" id="cerDocAviso" hidden></p>
+    ${datalist('ceListaDocs', S.docs.filter(d => d.situacao !== 'Obsoleto').map(rotDoc))}
     ${datalist('ceListaTemas', temas())}${datalist('ceListaResp', responsaveis())}${datalist('ceListaPer', PERIODOS)}
     ${r?.atualizado_por ? `<p class="dica">Última alteração: ${br(r.atualizado_em)} · ${esc(r.atualizado_por)}</p>` : ''}
     <div class="barra fim">
@@ -447,6 +476,29 @@ function formRequisito(id) {
       ligarTira();
       [...d.querySelectorAll('[data-rcod]')].pop()?.focus();
     });
+    const ligarChips = () => d.querySelectorAll('[data-tirad]').forEach(b => { b.onclick = () => b.parentElement.remove(); });
+    ligarChips();
+    const ligarDoc = () => {
+      const txt = so($('cerDocQ').value);
+      if (!txt) return;
+      const t = txt.toLowerCase();
+      const cod = t.split(' · ')[0];
+      const parecidos = S.docs.filter(x => rotDoc(x).toLowerCase().includes(t));
+      const achado = S.docs.find(x => rotDoc(x).toLowerCase() === t) || S.docs.find(x => x.codigo.toLowerCase() === cod)
+        || (parecidos.length === 1 ? parecidos[0] : null);
+      const aviso = $('cerDocAviso');
+      if (!achado) {
+        aviso.textContent = parecidos.length ? `${parecidos.length} documentos têm esse texto. Escolha um na lista que aparece ao digitar.` : 'Nenhum documento com esse código ou nome.';
+        aviso.hidden = false; return;
+      }
+      aviso.hidden = true;
+      if (!d.querySelector(`#cerDocs [data-did="${achado.id}"]`)) $('cerDocs').insertAdjacentHTML('beforeend', chipDoc(achado));
+      ligarChips();
+      $('cerDocQ').value = ''; $('cerDocQ').focus();
+    };
+    $('cerDocMais').addEventListener('click', ligarDoc);
+    $('cerDocQ').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ligarDoc(); } });
+    $('cerDocQ').addEventListener('change', () => { if (S.docs.some(x => rotDoc(x) === $('cerDocQ').value)) ligarDoc(); });
     $('cerGravar').addEventListener('click', () => gravarRequisito(r));
     $('cerApagar')?.addEventListener('click', () => apagar('cert_requisitos', r.id, r.titulo, () => { S.reqs = S.reqs.filter(x => x.id !== r.id); }));
   });
@@ -462,6 +514,7 @@ async function gravarRequisito(r) {
     titulo: g('cerTitulo'), tema: g('cerTema') || 'Gestão', prioridade: $('cerPrior').value, status: $('cerStatus').value,
     responsavel: g('cerResp'), prazo: g('cerPrazo'), ultima_verificacao: g('cerVerif'), periodicidade: g('cerPer'),
     descricao: g('cerDesc'), evidencia: g('cerEvid'), observacao: g('cerObs'), referencias,
+    documentos: [...document.querySelectorAll('#cerDocs [data-did]')].map(x => Number(x.dataset.did)),
     atualizado_em: new Date().toISOString(), atualizado_por: quem(),
   };
   if (!linha.titulo) return erroDlg('Escreva o requisito.');
@@ -525,17 +578,19 @@ function tabelaDocumentos() {
     ${SITUACOES_DOC.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_SIT[s])} <b>${conta(s)}</b></span>` : '').join('')}
     ${lista.filter(docAtrasado).length ? `<span class="contagem">${tag('revisão vencida', 'perigo')} <b>${lista.filter(docAtrasado).length}</b></span>` : ''}`;
   $('ceDcTabela').innerHTML = lista.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr>
-    <th>Código</th><th>Documento</th><th>Categoria</th><th class="ce">Periodicidade</th><th>Responsável</th><th class="ce">Revisão</th><th class="ce">Próxima</th><th class="ce">Situação</th><th></th>
+    <th>Código</th><th>Documento</th><th>Categoria</th><th class="ce">Periodicidade</th><th>Responsável</th><th class="ce">Revisão</th><th class="ce">Próxima</th><th class="ce">Requisitos</th><th class="ce">Situação</th><th></th>
   </tr></thead><tbody>
   ${lista.map(d => { const p = proximaDoc(d); return `<tr>
     <td><b>${esc(d.codigo)}</b></td><td>${esc(d.nome)}${(d.certificacoes || []).length ? `<br><span class="dc-sem">${esc(d.certificacoes.join(', '))}</span>` : ''}</td>
     <td>${esc(d.categoria)}</td><td class="ce">${esc(d.periodicidade || '—')}</td><td>${esc(d.responsavel || '—')}</td>
     <td class="ce">${d.revisao ? 'Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? `<br><span class="dc-sem">${br(d.data_revisao)}</span>` : (d.revisao ? '' : '—')}</td>
     <td class="ce">${p ? (p < hoje() ? tag(br(p), 'perigo') : br(p)) : '—'}</td>
+    <td class="ce">${reqsDoDoc(d).length ? `<button class="ce-link" type="button" data-dreq="${d.id}" title="Ver os requisitos ligados">${reqsDoDoc(d).length}</button>` : '—'}</td>
     <td class="ce">${tag(d.situacao, COR_SIT[d.situacao])}</td>
     <td class="ce"><button class="btn mini" type="button" data-doc="${d.id}">Abrir</button></td></tr>`; }).join('')}
   </tbody></table></div>` : `<div class="vazio">${S.docs.length ? 'Nada com esses filtros.' : 'Nenhum documento cadastrado.'}</div>`;
   $('ceDcTabela').querySelectorAll('[data-doc]').forEach(b => b.addEventListener('click', () => formDocumento(Number(b.dataset.doc))));
+  $('ceDcTabela').querySelectorAll('[data-dreq]').forEach(b => b.addEventListener('click', () => verReqsDoDoc(Number(b.dataset.dreq))));
 }
 
 const caixasCert = (marcadas, prefixo) => `<div class="ce-caixas">${S.certs.filter(c => c.ativa || (marcadas || []).includes(c.id)).map(c =>
@@ -561,6 +616,10 @@ function formDocumento(id) {
       <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
       <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
     </div>
+    ${d ? `<h4 class="ac-h4">Requisitos que este documento comprova</h4>
+      ${reqsDoDoc(d).length ? `<ul class="ce-lista-req">${reqsDoDoc(d).map(r => `<li><button class="ce-link" type="button" data-lreq="${r.id}">${esc(r.titulo)}</button>
+        <span class="dc-sem">${esc(refTexto(r, null))}</span></li>`).join('')}</ul>`
+        : '<p class="dica">Nenhum ainda. A ligação se faz no requisito, em “Documentos que comprovam”.</p>'}` : ''}
     ${datalist('ceListaCat', CATEGORIAS)}${datalist('ceListaResp', responsaveis())}
     <div class="barra fim">
       ${d ? '<button class="btn perigo" type="button" id="cedApagar">Apagar</button><span class="cresce"></span>' : ''}
@@ -573,9 +632,16 @@ function formDocumento(id) {
         : MESES_PERIODO[$('cedPer').value] ? 'Informe a data da revisão para o documento aparecer no calendário.' : '';
     };
     $('cedPer').addEventListener('change', prox); $('cedData').addEventListener('change', prox); prox();
+    document.querySelectorAll('#dlgCe [data-lreq]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.lreq))));
     $('cedGravar').addEventListener('click', () => gravarDocumento(d));
     $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
   });
+}
+
+/** Leva à lista de requisitos filtrada por um documento. */
+function verReqsDoDoc(id) {
+  Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: String(id) });
+  abrirModulo('cert', 'ceRequisitos');
 }
 
 async function gravarDocumento(d) {
@@ -932,12 +998,12 @@ function docListaReq(lista) {
     corpo: `<div class="rel-resumo"><b>${conf}</b> conforme(s) de <b>${lista.length}</b> ·
         <b>${lista.filter(r => r.prioridade === 'Crítica' && r.status !== 'Conforme').length}</b> crítico(s) em aberto ·
         <b>${lista.filter(r => r.status === 'Não conforme').length}</b> não conforme(s)</div>
-      <table class="rel-tabela"><thead><tr><th>Requisito</th><th>${cert ? 'Código(s) ' + esc(cert.id) : 'Códigos'}</th><th>Prioridade</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead><tbody>
-      ${porTema.map(([tema, rs]) => `<tr class="rel-grupo"><td colspan="6">${esc(tema)} · ${rs.length}</td></tr>
+      <table class="rel-tabela"><thead><tr><th>Requisito</th><th>${cert ? 'Código(s) ' + esc(cert.id) : 'Códigos'}</th><th>Documentos</th><th>Prioridade</th><th>Responsável</th><th>Prazo</th><th>Status</th></tr></thead><tbody>
+      ${porTema.map(([tema, rs]) => `<tr class="rel-grupo"><td colspan="7">${esc(tema)} · ${rs.length}</td></tr>
         ${rs.map(r => `<tr><td><b>${esc(r.titulo)}</b>${r.evidencia ? `<br><span class="rel-miudo">${esc(r.evidencia)}</span>` : ''}</td>
-          <td>${esc(refTexto(r, cert))}</td><td>${esc(r.prioridade)}</td><td>${esc(r.responsavel || '')}</td><td>${r.prazo ? br(r.prazo) : ''}</td>
+          <td>${esc(refTexto(r, cert))}</td><td>${esc(docsDe(r).map(d => d.codigo).join(', '))}</td><td>${esc(r.prioridade)}</td><td>${esc(r.responsavel || '')}</td><td>${r.prazo ? br(r.prazo) : ''}</td>
           <td class="${clsStatus(r.status)}">${esc(r.status)}</td></tr>`).join('')}`).join('')
-        || '<tr><td colspan="6" class="rel-vazio">Nenhum requisito.</td></tr>'}
+        || '<tr><td colspan="7" class="rel-vazio">Nenhum requisito.</td></tr>'}
       </tbody></table>` });
 }
 
@@ -979,6 +1045,7 @@ function docChecklist(c, lista, tema, { evid, sit }) {
         ${rs.map(r => `<tr><td class="rel-num">${++n}</td>
           <td><b>${esc(r.titulo)}</b>${r.prioridade === 'Crítica' ? ' <span class="ce-crit">crítico</span>' : ''}
             ${evid && r.evidencia ? `<br><span class="rel-miudo">${esc(r.evidencia)}</span>` : ''}
+            ${docsDe(r).length ? `<br><span class="rel-miudo"><b>Documentos:</b> ${esc(docsDe(r).map(rotDoc).join(' · '))}</span>` : ''}
             ${sit ? `<br><span class="rel-miudo">Status no sistema: ${esc(r.status)}</span>` : ''}</td>
           <td>${esc(codigosDe(r, c).join(', '))}</td>
           <td class="ce-box"><span></span></td><td class="ce-box"><span></span></td><td class="ce-box"><span></span></td><td></td></tr>`).join('')}`).join('')
@@ -1053,9 +1120,9 @@ async function exportarReq(lista) {
     await baixarXlsx(`Requisitos_certificacao_${hoje()}`, [{
       nome: 'Requisitos', titulo: 'Requisitos da certificação · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Tema', larg: 18 }, { rot: 'Requisito', larg: 50 }, ...cs.map(c => ({ rot: c.nome, larg: 18 })),
-        { rot: 'Prioridade', larg: 10 }, { rot: 'Status', larg: 13 }, { rot: 'Responsável', larg: 18 }, { rot: 'Prazo', tipo: 'data', larg: 11 },
+        { rot: 'Documentos', larg: 22 }, { rot: 'Prioridade', larg: 10 }, { rot: 'Status', larg: 13 }, { rot: 'Responsável', larg: 18 }, { rot: 'Prazo', tipo: 'data', larg: 11 },
         { rot: 'Periodicidade', larg: 13 }, { rot: 'O que pede', larg: 60 }, { rot: 'Evidência esperada', larg: 60 }, { rot: 'Observação', larg: 40 }],
-      linhas: lista.map(r => [r.tema, r.titulo, ...cs.map(c => codigosDe(r, c).join(', ')), r.prioridade, r.status, r.responsavel || '',
+      linhas: lista.map(r => [r.tema, r.titulo, ...cs.map(c => codigosDe(r, c).join(', ')), docsDe(r).map(d => d.codigo).join(', '), r.prioridade, r.status, r.responsavel || '',
         r.prazo || '', r.periodicidade || '', r.descricao || '', r.evidencia || '', r.observacao || '']),
     }]);
   } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
@@ -1067,9 +1134,9 @@ async function exportarDocs(lista) {
       nome: 'Documentos', titulo: 'Lista mestra de documentos · SAKUMA', subtitulo: `Emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Código', larg: 10 }, { rot: 'Documento', larg: 55 }, { rot: 'Categoria', larg: 15 }, { rot: 'Periodicidade', larg: 13 },
         { rot: 'Responsável', larg: 18 }, { rot: 'Revisão', larg: 8 }, { rot: 'Data da revisão', tipo: 'data', larg: 12 },
-        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
+        { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Requisitos ligados', tipo: 'num', casas: 0, larg: 10 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
       linhas: lista.map(d => [d.codigo, d.nome, d.categoria, d.periodicidade || '', d.responsavel || '', d.revisao || '', d.data_revisao || '',
-        proximaDoc(d) || '', d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
+        proximaDoc(d) || '', reqsDoDoc(d).length, d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
     }]);
   } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
 }
@@ -1110,7 +1177,7 @@ export async function abrirCertificacao(tela) {
 
 export function limparCertificacao() {
   S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = [];
-  Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '' });
+  Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '' });
   Object.assign(S.cal, { ano: 0, mes: 0, cert: '', auto: true });
   Object.assign(S.anual, { ano: 0, cert: '', docs: false });
