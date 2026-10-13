@@ -35,6 +35,14 @@ const selo = f => f ? `<span class="tag ${SELO[f][0]} ind-selo">${SELO[f][1]}</s
 
 const est = { linhas: [], lacunas: new Set(), carregado: false, erro: '', carregadoEm: null, f: null, tela: 'rhIndPainel' };
 
+/* O submódulo Indicadores inteiro aparece também na área Certificação
+   (13/10/2026, pedido dele). Cada tela de lá é o espelho de uma daqui e
+   desenha no próprio <section>; as contas, filtros e o banco são os mesmos. */
+const ESPELHO = { ceIndPainel: 'rhIndPainel', ceIndPessoa: 'rhIndPessoa', ceIndRh: 'rhIndCert', ceIndMetas: 'rhIndMetas' };
+const base = t => ESPELHO[t] || t;
+/** O <section> da tela aberta, se ela for (o espelho de) `b`. */
+const telaDe = b => base(est.tela) === b ? $(TELA_ID[est.tela]) : $(TELA_ID[b]);
+
 async function carregar() {
   const c = estado.cliente;
   if (!c) throw new Error('Sem conexão com o banco.');
@@ -224,7 +232,7 @@ function grafico(titulo, meses, valores, meta, rotulos) {
 }
 
 function desenhar() {
-  const tela = $('telaRhIndPainel');
+  const tela = telaDe('rhIndPainel');
   if (!tela) return;
   if (est.erro) { tela.innerHTML = `<div class="cartao"><div class="aviso erro">${esc(est.erro)}</div></div>`; return; }
   if (!est.carregado) { tela.innerHTML = '<div class="cartao"><p class="dica">Carregando os indicadores…</p></div>'; return; }
@@ -285,13 +293,13 @@ function desenhar() {
 
   ['indDe', 'indAte', 'indEmp', 'indFaz', 'indSexo', 'indContrato', 'indSetor', 'indFuncao'].forEach(id =>
     $(id).addEventListener('change', () => { lerFiltros(); desenhar(); }));
-  $('indRecarregar').addEventListener('click', () => abrirIndicadores('rhIndPainel', true));
+  $('indRecarregar').addEventListener('click', () => abrirIndicadores(est.tela, true));
   $('indRelatorio').addEventListener('click', () => mostrar(relatorioPainel(), { barra: true }));
   $('indExcel').addEventListener('click', () => excelPainel().catch(e => alertaTela(e.message)));
   $('indTv').addEventListener('click', () => abrirTv());
 }
 
-const alertaTela = msg => { const a = document.querySelector('#telaRhIndPainel .cartao'); if (a) a.insertAdjacentHTML('afterbegin', `<div class="aviso erro">${esc(msg)}</div>`); };
+const alertaTela = msg => { const a = telaDe('rhIndPainel')?.querySelector('.cartao'); if (a) a.insertAdjacentHTML('afterbegin', `<div class="aviso erro">${esc(msg)}</div>`); };
 
 /* ---------------- relatório A4 e Excel do Painel ---------------- */
 
@@ -407,8 +415,9 @@ const oculto = g => g.n < 3;
 
 /* A mesma tela aparece em RH › Indicadores › Certificação e na área
    Certificação › Indicadores de RH (13/10/2026, pedido dele). */
-function desenharCert(alvo = 'telaRhIndCert') {
-  const tela = $(alvo); if (!tela) return;
+function desenharCert() {
+  const tela = telaDe('rhIndCert'); if (!tela) return;
+  const alvo = tela.id;
   const meses = tresFechados(), d = porFazenda(meses);
   const lin = (x, tot = false) => `<tr${tot ? ' class="ind-forte"' : ''}><th scope="row">${esc(x.fazenda)}</th><td>${num(x.tot.qm, 1)}</td>
     <td>${comMeta(x.tot.absCom, METAS.absTotal)}</td><td>${comMeta(x.tot.absSem, METAS.absTotal)}</td><td>${comMeta(x.tot.njCom, METAS.absNj)}</td>
@@ -477,7 +486,7 @@ async function excelCert(d) {
 const estP = { linhas: [], erro: '', todos: false };
 
 async function desenharPessoa(recarregar = false) {
-  const tela = $('telaRhIndPessoa'); if (!tela) return;
+  const tela = telaDe('rhIndPessoa'); if (!tela) return;
   const f = est.f;
   if (recarregar || !estP.carregado) {
     tela.innerHTML = '<div class="cartao"><p class="dica">Carregando…</p></div>';
@@ -534,7 +543,7 @@ function lerFiltrosPessoa() {
 const NOMES_META = { absTotal: 'Absenteísmo total', absNj: 'Absenteísmo não justificado', turnover: 'Turnover (média mensal)' };
 
 function desenharMetas() {
-  const tela = $('telaRhIndMetas'); if (!tela) return;
+  const tela = telaDe('rhIndMetas'); if (!tela) return;
   const adm = acesso.admin;
   const n = v => (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   tela.innerHTML = `<div class="cartao"><h2>Indicadores · Metas</h2>
@@ -608,10 +617,9 @@ function pintarTv() {
   tv.el.querySelector('#tvSair').addEventListener('click', fecharTv);
 }
 
-const DESENHO = { rhIndPainel: desenhar, rhIndCert: () => desenharCert(), rhIndMetas: desenharMetas, rhIndPessoa: () => desenharPessoa(),
-  ceIndRh: () => desenharCert('telaCeIndRh') };
+const DESENHO = { rhIndPainel: desenhar, rhIndCert: () => desenharCert(), rhIndMetas: desenharMetas, rhIndPessoa: () => desenharPessoa() };
 const TELA_ID = { rhIndPainel: 'telaRhIndPainel', rhIndPessoa: 'telaRhIndPessoa', rhIndCert: 'telaRhIndCert', rhIndMetas: 'telaRhIndMetas',
-  ceIndRh: 'telaCeIndRh' };
+  ceIndPainel: 'telaCeIndPainel', ceIndPessoa: 'telaCeIndPessoa', ceIndRh: 'telaCeIndRh', ceIndMetas: 'telaCeIndMetas' };
 
 export async function abrirIndicadores(tela = 'rhIndPainel', forcar = false) {
   est.tela = tela;
@@ -630,8 +638,8 @@ export async function abrirIndicadores(tela = 'rhIndPainel', forcar = false) {
     }
   }
   if (est.erro) { const alvo = $(TELA_ID[tela]); if (alvo) alvo.innerHTML = `<div class="cartao"><div class="aviso erro">${esc(est.erro)}</div></div>`; return; }
-  if (tela === 'rhIndPessoa' && estP.periodo !== est.f.de + est.f.ate) estP.carregado = false;
-  await DESENHO[tela]?.();
+  if (base(tela) === 'rhIndPessoa' && estP.periodo !== est.f.de + est.f.ate) estP.carregado = false;
+  await DESENHO[base(tela)]?.();
 }
 
 export const TELAS_INDICADORES = Object.keys(TELA_ID);

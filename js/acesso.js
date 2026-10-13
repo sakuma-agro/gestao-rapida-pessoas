@@ -181,8 +181,11 @@ export const MODULOS = [
     /* Absenteísmo e turnover dos 3 últimos meses fechados — a mesma tela de
        RH › Indicadores › Certificação (js/rh-indicadores.js). Os números vêm
        do rh_ind_base, que o banco só abre para quem tem o módulo RH. */
-    { id: 'ceIndSub', nome: 'Indicadores de RH', telas: [
-      ['ceIndRh', 'Absenteísmo e turnover'],
+    { id: 'ceIndSub', nome: 'Indicadores', telas: [
+      ['ceIndPainel', 'Painel'],
+      ['ceIndPessoa', 'Por pessoa'],
+      ['ceIndRh', 'Certificação'],
+      ['ceIndMetas', 'Metas'],
     ] },
     { id: 'ceCertSub', nome: 'Certificações', telas: [
       ['ceCertificacoes', 'Certificações'],
