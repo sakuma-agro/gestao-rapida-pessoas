@@ -169,6 +169,7 @@ const FERRAMENTAS = [
         situacao: { type: 'string', enum: ['pendentes', 'VENCIDO', 'ATENCAO', 'OK', 'SEM_DADO', 'todos'],
           description: 'pendentes = VENCIDO + ATENCAO (padrão)' },
         codigo_contem: { type: 'string', description: 'Filtra pelo código ou descrição da máquina (opcional).' },
+        item_contem: { type: 'string', description: 'Filtra pelo item de manutenção, ex.: "óleo", "motor", "transmissão", "filtro" (opcional).' },
       },
     },
   },
@@ -261,13 +262,17 @@ async function vencimentosFrota(db: SupabaseClient, e: any, hoje: string) {
   const tipo = new Map((tm.data || []).map((x) => [x.id, x.nome]));
   const local = new Map((lc.data || []).map((x) => [x.id, x.nome]));
   const filtro = String(e.codigo_contem || '').toLowerCase();
+  const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const filtroItem = semAcento(String(e.item_contem || ''));
   const quer = String(e.situacao || 'pendentes');
 
   const saida = [];
+  const contagem: Record<string, number> = {};
   for (const p of pl.data || []) {
     const q = equip.get(p.equipamento_id);
     if (!q || q.ativo === false || ['VENDIDO', 'BAIXADO'].includes(q.status)) continue;
     if (filtro && !`${q.codigo} ${q.descricao} ${q.apelido ?? ''}`.toLowerCase().includes(filtro)) continue;
+    if (filtroItem && !semAcento(String(tipo.get(p.tipo_manutencao_id) ?? '')).includes(filtroItem)) continue;
     const leitura = leituraDe(q);
     const u = unidadeDe(q);
     const margem = p.margem_horas != null ? Number(p.margem_horas) : margemPadrao;
@@ -287,15 +292,19 @@ async function vencimentosFrota(db: SupabaseClient, e: any, hoje: string) {
     else if (proxima && diasEntre(hoje, proxima) <= 7) { status = 'ATENCAO'; motivo = `vence em ${diasEntre(hoje, proxima)} dia(s)`; }
     else if (restantes != null || dias != null) { status = 'OK'; motivo = restantes != null ? `faltam ${restantes} ${u}` : `vence em ${proxima}`; }
 
+    contagem[status] = (contagem[status] || 0) + 1;
     if (quer === 'pendentes' ? !['VENCIDO', 'ATENCAO'].includes(status) : quer !== 'todos' && status !== quer) continue;
+    // compacto: a lista da frota inteira passaria do tamanho que cabe numa resposta
     saida.push({ codigo: q.codigo, maquina: q.apelido || q.descricao, local: local.get(q.local_id) ?? null,
-      item: tipo.get(p.tipo_manutencao_id) ?? null, status, motivo, leitura_atual: leitura, unidade: u,
-      leitura_data: q.leitura_data, ultima_troca_data: p.ultima_troca_data, ultima_troca_leitura: p.ultima_troca_leitura,
-      proxima_troca_leitura: prox_leit, proxima_troca_data: proxima });
+      item: tipo.get(p.tipo_manutencao_id) ?? null, status, motivo,
+      ultima_troca: p.ultima_troca_data, leitura: leitura != null ? `${leitura} ${u}` : null });
   }
   const peso: Record<string, number> = { VENCIDO: 0, ATENCAO: 1, SEM_DADO: 2, OK: 3 };
   saida.sort((a, b) => (peso[a.status] - peso[b.status]) || String(a.codigo).localeCompare(String(b.codigo), 'pt-BR'));
-  return { total: saida.length, itens: saida.slice(0, 300) };
+  const maquinas = new Set(saida.map((x) => x.codigo)).size;
+  return { contagem_por_situacao: contagem, itens_no_filtro: saida.length, maquinas_no_filtro: maquinas,
+    itens_de_manutencao: [...new Set((tm.data || []).map((x) => x.nome))],
+    itens: saida.slice(0, 80), observacao: saida.length > 80 ? `mostrando 80 de ${saida.length}; use codigo_contem para filtrar` : undefined };
 }
 
 // deno-lint-ignore no-explicit-any
@@ -318,9 +327,10 @@ Você responde perguntas sobre os dados do sistema: pessoas, EPIs, segurança do
 Regras:
 - Responda sempre em português do Brasil, curto e direto, como um colega do escritório. Comece pela resposta; detalhe só o necessário.
 - Use as ferramentas para buscar os dados antes de responder. Nunca invente números, nomes ou datas.
+- Seja econômico: em geral 1 a 3 consultas bastam. Peça só as colunas necessárias e use filtros.
 - Se a consulta voltar vazia ou com erro de permissão, diga que não encontrou ou que o login da pessoa não tem acesso àquela área — não adivinhe.
 - Você só lê. Se pedirem para cadastrar, alterar ou apagar algo, explique que isso se faz na tela do sistema e diga qual.
-- Para troca de óleo, preventiva vencida ou a vencer, use vencimentos_frota.
+- Para troca de óleo, preventiva vencida ou a vencer, use vencimentos_frota (uma chamada costuma bastar; use item_contem para separar itens, ex.: "motor" ou "transmissão"). Se a pergunta for ampla, responda com o total e os casos mais atrasados.
 - Datas no formato dd/mm/aaaa. Horas com "h", quilômetros com "km". Valores em R$.
 - Listas com até ~15 itens; se houver mais, diga o total e mostre os mais importantes.
 - Pode usar **negrito**, listas com "- " e tabelas simples em markdown. Nada de títulos (#).
@@ -337,7 +347,7 @@ ${mapa}`;
 /*  Chamada à API da Anthropic                                         */
 /* ------------------------------------------------------------------ */
 // deno-lint-ignore no-explicit-any
-async function claude(chave: string, system: string, mensagens: any[]) {
+async function claude(chave: string, system: string, mensagens: any[], fechar = false) {
   // A chave é pessoal (ligada ao login do Guilherme no Console) e vale para
   // todos os espaços de trabalho, então cada chamada diz em qual ela age.
   // Vai como "Bearer"; se a API recusar, tenta o cabeçalho clássico x-api-key.
@@ -353,11 +363,13 @@ async function claude(chave: string, system: string, mensagens: any[]) {
   });
   const corpoReq = JSON.stringify({
       model: MODELO,
-      max_tokens: 1500,
+      max_tokens: 4000,
       // As instruções e o mapa das tabelas são iguais em toda pergunta:
       // ficam em cache e custam bem menos a partir da segunda chamada.
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       tools: FERRAMENTAS,
+      // última volta: sem mais consultas, responde com o que já tem
+      ...(fechar ? { tool_choice: { type: 'none' } } : {}),
       messages: mensagens,
   });
   let r = await enviar('bearer');
@@ -428,14 +440,22 @@ Deno.serve(async (req) => {
 
   const system = instrucoes(hoje.split('-').reverse().join('/'), `${perfil.nome || email}${perfil.admin ? ' (administrador)' : ''}`);
   let entrada = 0, saida = 0, cache = 0, resposta = '';
+  // diagnóstico (só administrador): o passo a passo de cada volta
+  const depurar = !!corpo?.depurar && perfil.admin;
+  // deno-lint-ignore no-explicit-any
+  const rastro: any[] = [];
 
   try {
     for (let volta = 0; volta < MAX_VOLTAS; volta++) {
-      const r = await claude(chave, system, mensagens);
+      const r = await claude(chave, system, mensagens, volta === MAX_VOLTAS - 1);
       entrada += r.usage?.input_tokens ?? 0;
       saida += r.usage?.output_tokens ?? 0;
       cache += r.usage?.cache_read_input_tokens ?? 0;
       mensagens.push({ role: 'assistant', content: r.content });
+      if (depurar) rastro.push({ volta, stop: r.stop_reason,
+        // deno-lint-ignore no-explicit-any
+        blocos: (r.content || []).map((b: any) => b.type === 'text' ? { texto: String(b.text).slice(0, 300) }
+          : b.type === 'tool_use' ? { ferramenta: b.name, entrada: b.input } : { tipo: b.type }) });
 
       if (r.stop_reason !== 'tool_use') {
         // deno-lint-ignore no-explicit-any
@@ -447,12 +467,16 @@ Deno.serve(async (req) => {
         try {
           const dados = JSON.stringify(await executar(db, b.name, b.input, hoje));
           return { type: 'tool_result', tool_use_id: b.id,
-            content: dados.length > MAX_TEXTO_TOOL ? dados.slice(0, MAX_TEXTO_TOOL) + '…(cortado: refine o filtro)' : dados };
+            content: dados.length > MAX_TEXTO_TOOL
+              ? dados.slice(0, MAX_TEXTO_TOOL) + '…(resultado cortado por tamanho: responda com o que já veio ou faça UMA consulta mais filtrada)'
+              : dados };
         } catch (e) {
           return { type: 'tool_result', tool_use_id: b.id, is_error: true, content: String((e as Error).message || e) };
         }
       }));
       mensagens.push({ role: 'user', content: resultados });
+      // deno-lint-ignore no-explicit-any
+      if (depurar) rastro.push({ resultados: resultados.map((x: any) => ({ erro: !!x.is_error, inicio: String(x.content).slice(0, 400), tamanho: String(x.content).length })) });
     }
     if (!resposta) resposta = 'Não consegui fechar a resposta com as consultas que fiz. Tente perguntar de um jeito mais específico.';
   } catch (e) {
@@ -464,5 +488,5 @@ Deno.serve(async (req) => {
     tokens_entrada: entrada, tokens_saida: saida, tokens_cache: cache,
   });
 
-  return json({ resposta, usadas_hoje: (usadas ?? 0) + 1, limite });
+  return json({ resposta, usadas_hoje: (usadas ?? 0) + 1, limite, ...(depurar ? { rastro } : {}) });
 });
