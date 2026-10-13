@@ -338,17 +338,20 @@ ${mapa}`;
 /* ------------------------------------------------------------------ */
 // deno-lint-ignore no-explicit-any
 async function claude(chave: string, system: string, mensagens: any[]) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
+  // A chave é pessoal (ligada ao login do Guilherme no Console) e vale para
+  // todos os espaços de trabalho, então cada chamada diz em qual ela age.
+  // Vai como "Bearer"; se a API recusar, tenta o cabeçalho clássico x-api-key.
+  const enviar = (modo: 'bearer' | 'x-api-key') => fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    // A chave é pessoal (ligada ao login do Guilherme no Console) e vale para
-    // todos os espaços de trabalho, então cada chamada diz em qual ela age.
     headers: {
-      'authorization': `Bearer ${chave}`,
+      ...(modo === 'bearer' ? { 'authorization': `Bearer ${chave}` } : { 'x-api-key': chave }),
       'anthropic-workspace-id': WORKSPACE,
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
+    body: corpoReq,
+  });
+  const corpoReq = JSON.stringify({
       model: MODELO,
       max_tokens: 1500,
       // As instruções e o mapa das tabelas são iguais em toda pergunta:
@@ -356,12 +359,13 @@ async function claude(chave: string, system: string, mensagens: any[]) {
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       tools: FERRAMENTAS,
       messages: mensagens,
-    }),
   });
+  let r = await enviar('bearer');
+  if (r.status === 401) r = await enviar('x-api-key');
   const corpo = await r.json().catch(() => ({}));
   if (!r.ok) {
     const msg = corpo?.error?.message || `status ${r.status}`;
-    throw new Error(r.status === 401 ? 'chave da API inválida (confira o segredo ANTHROPIC_API_KEY)'
+    throw new Error(r.status === 401 ? 'a API do Claude recusou a chave salva no Supabase (' + msg + ')'
       : /credit|balance/i.test(msg) ? 'os créditos da API acabaram — recarregue no Claude Console'
       : 'a API do Claude respondeu: ' + msg);
   }
@@ -373,8 +377,12 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ erro: 'use POST' }, 405);
 
-  const chave = Deno.env.get('ANTHROPIC_API_KEY');
+  // tira espaço, quebra de linha ou aspas que venham junto ao colar
+  const chave = (Deno.env.get('ANTHROPIC_API_KEY') || '').trim().replace(/^["']|["']$/g, '');
   if (!chave) return json({ erro: 'O assistente ainda não foi ligado: falta a chave da API no Supabase.' }, 503);
+  if (!chave.startsWith('sk-ant-')) {
+    return json({ erro: 'O valor salvo em ANTHROPIC_API_KEY não parece uma chave do Claude (deve começar com sk-ant-). Cole a chave de novo no Supabase.' }, 503);
+  }
 
   const url = Deno.env.get('SUPABASE_URL')!;
   // chaves do próprio Supabase: as novas (JSON) se existirem, senão as antigas
