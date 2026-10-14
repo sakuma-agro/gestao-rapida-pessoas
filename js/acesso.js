@@ -369,6 +369,22 @@ export const subsLiberados = m => {
     .filter(s => s.telas.length);
 };
 
+const CHAVE_ACESSO = 'gr.acesso';
+function guardarAcesso() {
+  try {
+    localStorage.setItem(CHAVE_ACESSO, JSON.stringify({
+      email: acesso.email, admin: acesso.admin, nome: acesso.nome,
+      modulos: acesso.modulos, telas: acesso.telas, destinos: acesso.destinos,
+    }));
+  } catch {}
+}
+function acessoGuardado() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAVE_ACESSO) || 'null');
+    return v && v.email && v.email === acesso.email ? v : null;
+  } catch { return null; }
+}
+
 export async function carregarAcesso() {
   acesso.email = (estado.sessao?.user?.email || '').toLowerCase();
   try {
@@ -391,11 +407,17 @@ export async function carregarAcesso() {
       acesso.modulos = [...acesso.modulos, 'pessoas'];
       acesso.telas = [...acesso.telas, 'pessoas:lista'];
     }
+    guardarAcesso();
   } catch {
-    acesso.admin = false;
-    acesso.modulos = [...PADRAO];
-    acesso.telas = [];
-    acesso.destinos = [];
+    /* Sem internet (14/10/2026): usa o último acesso que esta pessoa teve
+       neste aparelho, em vez de cair no padrão e sumir com DP, RH e
+       Usuários - Acessos. É só o menu: quem protege os dados é o RLS. */
+    const salvo = acessoGuardado();
+    acesso.admin = !!salvo?.admin;
+    acesso.nome = salvo?.nome || '';
+    acesso.modulos = salvo?.modulos || [...PADRAO];
+    acesso.telas = salvo?.telas || [];
+    acesso.destinos = salvo?.destinos || [];
   }
   acesso.carregado = true;
   return acesso;
