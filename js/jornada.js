@@ -14,6 +14,7 @@ import * as emp from './jornada-emprestimos.js';
 import * as fer from './jornada-ferias.js';
 import * as bol from './jornada-boletins.js';
 import * as docm from './jornada-documentos.js';
+import * as tk from './jornada-ticket.js';
 import { podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
@@ -109,6 +110,7 @@ export function limparJornada() {
   fer.limparFerias();
   bol.limparBoletins();
   docm.limparDocumentos();
+  tk.limparTicket();
   estadoTela.competencia = jd.competenciaAtual();
   competenciaDecidida = false;
   estadoTela.editando = null;
@@ -1949,6 +1951,7 @@ export function ligarJornada(navegar) {
   fer.ligarFerias(irPara, aviso);
   bol.ligarBoletins(irPara, aviso);
   docm.ligarDocumentos(irPara, aviso);
+  tk.ligarTicket(irPara, aviso);
 
   /* Seletor de competência no cabeçalho de toda tela do DP (28/09/2026). O
      cabeçalho é redesenhado a cada tela, então o ouvinte fica no documento. */

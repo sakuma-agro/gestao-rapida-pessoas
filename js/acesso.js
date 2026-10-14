@@ -139,6 +139,13 @@ export const MODULOS = [
       ['dmMes',           'Mês'],
       ['dmScan',          'Escanear'],
     ] },
+    /* Ticket alimentação (14/10/2026): relatório mensal "Ticket início" por
+       empregador e fazenda; valor no Cadastro Nível 2, abatimento só do mês.
+       js/jornada-ticket.js. */
+    { id: 'ticket', nome: 'Ticket alimentação', telas: [
+      ['tkMes',           'Mês'],
+      ['tkHist',          'Histórico'],
+    ] },
     { id: 'emprestimo', nome: 'Empréstimo Funcionário', telas: [
       ['empEmissao',      'Emissão recibo'],
       ['empRecibos',      'Recibos emitidos'],
@@ -486,7 +493,7 @@ const ICONE_SUB = {
   gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
   epis: 'escudo', exames: 'exame', treinamentos: 'treino',
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
-  dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
+  dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo', ticket: 'cartao',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
   vsSubVistoria: 'escudo', vsSubChecklists: 'boletim', vsSubAberto: 'relogio',
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',

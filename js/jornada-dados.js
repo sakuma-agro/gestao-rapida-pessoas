@@ -59,6 +59,12 @@ export const TABELAS = {
      chave começando por "bh|" e o movimento inteiro em `valor`. A folha de
      ponto só lê a chave 'ajuste', então as duas não se misturam. */
   banco:         'jor_folha_ponto_config',
+  /* Ticket alimentação (14/10/2026): o valor de cada pessoa mora no vínculo
+     (Cadastro Nível 2, ticket_valor/ticket_obs). Aqui ficam o abatimento e a
+     observação de UM mês (chave = funcionario_id|AAAA-MM) e o retrato de cada
+     relatório emitido (chave = AAAA-MM). */
+  ticketMes:      'jor_ticket_mes',
+  ticketEmissoes: 'jor_ticket_emissoes',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
@@ -68,7 +74,7 @@ const APOIO = ['faltas', 'bolFerias', 'bolJornada'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave', ticketMes: 'chave', ticketEmissoes: 'competencia' };
 const chaveDe = c => CHAVE[c] || 'id';
 
 export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
@@ -101,7 +107,7 @@ function carregarCache() {
    ficam inteiros: a aba Cadastros continua mostrando todo mundo. */
 const POR_PESSOA = ['boletins', 'ocorrencias', 'emprestimos', 'abatimentos', 'salarios',
   'afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas', 'bolEntregas',
-  'docEntregas', 'banco', 'faltas', 'bolFerias', 'bolJornada'];
+  'docEntregas', 'banco', 'ticketMes', 'faltas', 'bolFerias', 'bolJornada'];
 
 /** Destino de DP da pessoa, pelo vínculo → unidade. */
 export const destinoIdDoFuncionario = fid => unidadeDe(vinculoDe(fid))?.destino_id || null;
@@ -206,6 +212,10 @@ export async function carregar(competencia = competenciaAtual()) {
   // Horas guardadas: tabela pequena, vem inteira — o saldo é de todo o histórico.
   const bh = await c.from(TABELAS.banco).select('*').like('chave', 'bh|%');
   dados.banco = bh.error ? (dados.banco || []) : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave }));
+  // Ticket: tabelas pequenas, vêm inteiras. Sem tabela ou sem rede, o DP abre igual.
+  const TK = ['ticketMes', 'ticketEmissoes'];
+  const tk = await Promise.all(TK.map(k => c.from(TABELAS[k]).select('*')));
+  TK.forEach((k, i) => { dados[k] = tk[i].error ? (dados[k] || []) : (tk[i].data || []); });
   const IND = ['indVinculos', 'tiposDeslig'];
   const ind = await Promise.all(IND.map(k => c.from(TABELAS[k]).select('*')));
   IND.forEach((k, i) => { dados[k] = ind[i].error ? (dados[k] || []) : (ind[i].data || []); });

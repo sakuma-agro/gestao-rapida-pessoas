@@ -1349,6 +1349,8 @@ addEventListener('beforeinstallprompt', function (ev) {
     <section class="tela" id="telaDmPainel" hidden></section>
     <section class="tela" id="telaDmMes" hidden></section>
     <section class="tela" id="telaDmScan" hidden></section>
+    <section class="tela" id="telaTkMes" hidden></section>
+    <section class="tela" id="telaTkHist" hidden></section>
   </main>
 </div>
 
@@ -1745,6 +1747,13 @@ addEventListener('beforeinstallprompt', function (ev) {
           <option value="safra">Safra</option>
         </select>
       </label>
+      <!-- Ticket alimentação (14/10/2026): valor do mês e observação fixa
+           ("Pedir cartão"). O abatimento de um mês é feito em DP › Ticket. -->
+      <label class="campo">Ticket alimentação (R$/mês)
+        <input type="text" id="n2Ticket" inputmode="decimal" placeholder="0,00">
+        <small class="dc-sem">Em branco = não recebe ticket.</small>
+      </label>
+      <label class="campo">Observação do ticket <input type="text" id="n2TicketObs" maxlength="60" placeholder="Ex.: Pedir cartão"></label>
     </div>
     <div class="barra entre">
       <span></span>

@@ -16,6 +16,7 @@ import { abrirEmprestimo, fecharDocEmprestimo } from './jornada-emprestimos.js';
 import { abrirFerias, etiquetaFicha } from './jornada-ferias.js';
 import { abrirBoletins, fecharDocBoletins, fecharMenuBoletins } from './jornada-boletins.js';
 import { abrirDocumentos, fecharDocDocumentos, fecharMenuDocumentos } from './jornada-documentos.js';
+import { abrirTicket } from './jornada-ticket.js';
 import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from './atalhos.js';
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
@@ -123,7 +124,7 @@ function abrirAba(nome) {
   $('telaEmpSalarios').hidden     = nome !== 'empSalarios';
   ['ferPainel', 'ferPrev', 'ferLanc', 'ferAfast', 'ferRisco', 'ferIni'].forEach(t =>
     { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
-  ['bdDia', 'bdMes', 'bdPend', 'dmPainel', 'dmMes', 'dmScan'].forEach(t =>
+  ['bdDia', 'bdMes', 'bdPend', 'dmPainel', 'dmMes', 'dmScan', 'tkMes', 'tkHist'].forEach(t =>
     { $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t; });
   if (nome === 'lista') { preencherLista(); desenharSelecaoLista(); }
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
@@ -166,6 +167,7 @@ function abrirAba(nome) {
   if (nome.startsWith('fer')) abrirFerias(nome);
   if (nome.startsWith('bd')) abrirBoletins(nome);
   if (nome.startsWith('dm')) abrirDocumentos(nome);
+  if (nome.startsWith('tk')) abrirTicket(nome);
 }
 
 /* =============== login =============== */
@@ -1015,7 +1017,7 @@ function desenharFuncN2() {
         <span class="sub">${esc(!jornada ? 'sem jornada definida'
           : origem === 'funcao' ? `${jornada.nome} (da função ${funcao?.nome || ''})`
           : origem === 'setor' ? `${jornada.nome} (do setor ${setor?.nome || ''})`
-          : `${jornada.nome} (própria)`)}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}</span>
+          : `${jornada.nome} (própria)`)}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}${v?.ticket_valor != null ? ' · ticket ' + Number(v.ticket_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</span>
       </span>
       <span class="tag ${riscos ? 'inativo' : 'ativo'}">${riscos ? 'com adicional' : 'sem adicional'}</span>
       <span class="acoes"><button class="btn mini" data-n2="${f.id}">Editar</button></span>
@@ -1024,6 +1026,15 @@ function desenharFuncN2() {
 
   $('listaFuncN2').querySelectorAll('[data-n2]').forEach(b =>
     b.addEventListener('click', () => abrirFuncN2(b.dataset.n2)));
+}
+
+/* "1.035,86" / "1035,86" / "1035.86" → 1035.86; vazio → null (sem ticket). */
+function lerTicket(t) {
+  t = String(t || '').trim().replace(/[R$\s]/g, '');
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
 }
 
 function abrirFuncN2(id) {
@@ -1051,6 +1062,8 @@ function abrirFuncN2(id) {
   $('n2Insal').value = v.insalubridade || 'nao';
   $('n2Peric').checked = !!v.periculosidade;
   $('n2Contrato').value = v.tipo_contrato || 'fixo';
+  $('n2Ticket').value = v.ticket_valor != null ? Number(v.ticket_valor).toFixed(2).replace('.', ',') : '';
+  $('n2TicketObs').value = v.ticket_obs || '';
   $('dlgFuncN2').showModal();
 }
 
@@ -1065,6 +1078,8 @@ $('formFuncN2').addEventListener('submit', async ev => {
     periculosidade: $('n2Peric').checked,
     insalubridade: $('n2Insal').value,
     tipo_contrato: $('n2Contrato').value,
+    ticket_valor: lerTicket($('n2Ticket').value),
+    ticket_obs: $('n2TicketObs').value.trim() || null,
   });
   // O tipo de contrato também vai para o vínculo dos indicadores (D-24).
   const fN2 = estado.funcionarios.find(x => x.id === editandoN2.id);

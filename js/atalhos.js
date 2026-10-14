@@ -49,6 +49,7 @@ const PROPRIOS = {
   dmPainel:      ['recibo', 'Folha, holerite e recibo'],
   dmMes:         ['recibo', 'Documentos do mês'],
   dmScan:        ['check', 'Escanear documentos'],
+  tkMes:         ['cartao', 'Ticket alimentação'],
   empEmissao:    ['dinheiro', 'Emitir empréstimo'],
   empRecibos:    ['dinheiro', 'Recibos emitidos'],
   empHistorico:  ['dinheiro', 'Conta corrente'],
