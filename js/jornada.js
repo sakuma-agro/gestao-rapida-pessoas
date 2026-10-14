@@ -1069,6 +1069,9 @@ function desenharBoletins() {
   if (estadoTela.filtroFunc && !porFunc.has(estadoTela.filtroFunc)) estadoTela.filtroFunc = '';
 
   const soma = c => linhas.reduce((s, l) => s + (l.a?.[c] || 0), 0);
+  // Lançados (14/10/2026, pedido dele): uma coluna com o total de extras
+  // (50% + 100%) e outra com a insalubridade do dia, no lugar de 50% e 100%.
+  const nInsal = linhas.filter(l => l.b.insalubridade_dia).length;
 
   $('telaJorBoletins').innerHTML = cabecalho('Jornadas lançadas', 'Conferência e correção da competência') + `
     <div class="jor-corpo">
@@ -1087,7 +1090,7 @@ function desenharBoletins() {
       </div>
       ${linhas.length ? `<table class="dc-planilha"><thead><tr>
         <th>Data</th><th>Nº</th><th>Funcionário</th><th>Horário</th>
-        <th class="ce">Extra 50%</th><th class="ce">Extra 100%</th>
+        <th class="ce">Total horas extras</th><th class="ce">Insalubridade</th>
         <th class="ce">Déficit</th><th class="ce">Interv.</th><th>Situação</th><th class="ce"></th>
       </tr></thead><tbody>
         ${linhas.map(({ b, f, a, s }) => `<tr>
@@ -1097,8 +1100,8 @@ function desenharBoletins() {
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
             : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
               ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · marcou diferente</span>` : ''}</td>
-          <td class="ce">${horas(a?.min_extra_50)}</td>
-          <td class="ce">${horas(a?.min_extra_100)}</td>
+          <td class="ce">${horas((a?.min_extra_50 || 0) + (a?.min_extra_100 || 0))}</td>
+          <td class="ce">${b.insalubridade_dia ? 'Sim' : '—'}</td>
           <td class="ce">${horas(a?.min_deficit)}</td>
           <td class="ce">${a?.min_intervalo_suprimido || 0}</td>
           <td>${s.fechado
@@ -1109,8 +1112,8 @@ function desenharBoletins() {
         </tr>`).join('')}
       </tbody><tfoot><tr class="jor-total">
         <td colspan="4">${estadoTela.filtroFunc ? `Total de ${esc(porFunc.get(estadoTela.filtroFunc)?.nome || '—')}` : 'Total da competência'}</td>
-        <td class="ce">${horas(soma('min_extra_50'))}</td>
-        <td class="ce">${horas(soma('min_extra_100'))}</td>
+        <td class="ce">${horas(soma('min_extra_50') + soma('min_extra_100'))}</td>
+        <td class="ce">${nInsal ? `${nInsal} dia(s)` : '—'}</td>
         <td class="ce">${horas(soma('min_deficit'))}</td>
         <td class="ce">${soma('min_intervalo_suprimido')}</td><td></td><td></td>
       </tr></tfoot></table>` : '<div class="vazio">Nenhum boletim nesta competência com esse filtro.</div>'}
