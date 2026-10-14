@@ -218,7 +218,8 @@ function desenharMes() {
             <td class="ce">${brl(l.valor)}</td>
             <td class="ce">${l.abat ? `<span class="jor-pend">− ${brl(l.abat)}</span>${l.motivo ? `<br><span class="dc-sem">${esc(l.motivo)}</span>` : ''}` : '—'}</td>
             <td class="ce"><b>${brl(l.pagar)}</b></td>
-            <td>${esc(l.obs) || '<span class="dc-sem">—</span>'}</td>
+            <td>${podeEditar ? `<input type="text" class="tk-obs" data-tk-obs="${l.fid}" maxlength="60" value="${esc(l.obs)}"
+              placeholder="—" title="Observação deste mês — Enter ou sair do campo grava">` : (esc(l.obs) || '<span class="dc-sem">—</span>')}</td>
             <td class="ce">${podeEditar ? `<button class="btn mini" data-tk-abater="${l.fid}">${l.abat || ajusteDe(l.fid, ym) ? 'Alterar' : 'Abater'}</button>` : ''}</td>
           </tr>`).join('')}
           <tr class="jor-total"><td>Subtotal</td><td class="ce">${brl(soma(g.linhas, 'valor'))}</td>
@@ -266,9 +267,34 @@ function desenharMes() {
     mostrarDoc(relatorioHTML(ym, ls, null), () => registrarEmissao(ym, ls));
   });
   $('tkCsv').addEventListener('click', () => csvMes(ym, linhasDoMes(ym)));
+  /* Observação direto na linha (14/10/2026, pedido dele): grava só para este
+     mês; igual à do cadastro não fica guardada no mês. */
+  document.querySelectorAll('#telaTkMes [data-tk-obs]').forEach(inp => {
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); } });
+    inp.addEventListener('change', () => gravarObs(inp.dataset.tkObs, inp.value));
+  });
   document.querySelectorAll('#telaTkMes [data-tk-abater]').forEach(bt =>
     bt.addEventListener('click', () => abrirAbater(bt.dataset.tkAbater)));
   $('dlgTkAbater').querySelector('[data-fechar]').addEventListener('click', () => $('dlgTkAbater').close());
+}
+
+async function gravarObs(fid, texto) {
+  const ym = est.mes;
+  const v = jd.vinculoDe(fid);
+  const a = ajusteDe(fid, ym);
+  const obs = String(texto || '').trim();
+  const doMes = obs === (v?.ticket_obs || '') ? null : obs;
+  if (!a && doMes == null) return;
+  if (a && doMes == null && !num(a.abatimento) && !a.motivo) {
+    await jd.apagar('ticketMes', chave(fid, ym));
+  } else {
+    await jd.salvar('ticketMes', {
+      chave: chave(fid, ym), funcionario_id: fid, competencia: ym,
+      abatimento: num(a?.abatimento), motivo: a?.motivo || null,
+      observacao: doMes, atualizado_por: usuario(), atualizado_em: agora(),
+    });
+  }
+  avisar('Observação salva para ' + rotMes(ym) + '.', true);
 }
 
 function abrirAbater(fid) {

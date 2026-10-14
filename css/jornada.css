@@ -644,3 +644,8 @@
    classe própria para não disparar a troca de competência do DP. */
 .tk-mes-sel { display: block; margin: 3px 0 2px auto; font: 700 14px Arial, Helvetica, sans-serif; color: #744F28;
   border: 1px solid #D9DCD2; border-radius: 6px; padding: 3px 6px; background: #fff; }
+/* Observação do ticket editável na linha (14/10/2026). */
+.dc-planilha .tk-obs { width: 100%; min-width: 120px; border: 1px solid transparent; background: transparent;
+  padding: 4px 6px; border-radius: 6px; font: inherit; color: inherit; }
+.dc-planilha .tk-obs:hover { border-color: #D9DCD2; background: #fff; }
+.dc-planilha .tk-obs:focus { border-color: #84BD00; background: #fff; outline: none; }
