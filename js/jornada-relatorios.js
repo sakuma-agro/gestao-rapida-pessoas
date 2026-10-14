@@ -186,11 +186,10 @@ export function relatorioDP(competencia, destinoId) {
   const nota = linhas => {
     const atrasadas = linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
       .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
-    const supr = linhas.reduce((s, l) => s + (l.minIntervaloSuprimido || 0), 0);
     return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas de competência anterior</b>, lançadas depois do envio
       daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
       Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
-    ${supr ? `<div class="rel-resumo"><b>Intervalo não feito:</b> ${minParaHHMM(supr)} nesta folha — já somado às horas extras.</div>` : ''}
+    ${''/* nota do intervalo não feito retirada a pedido dele (14/10/2026) — segue no Relatório detalhado */}
 `;   // a frase de explicação das colunas saiu a pedido dele (28/09/2026)
   };
 
