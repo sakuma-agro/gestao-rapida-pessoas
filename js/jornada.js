@@ -340,42 +340,57 @@ function desenharLancar() {
   const ativos = jd.pessoasDp()
     .filter(f => (f.situacao || 'ATIVO') === 'ATIVO' && jd.vinculoDe(f.id));
 
-  $('telaJorLancar').innerHTML = cabecalho('Lançar jornada', 'O número vem do talão; o cálculo é do sistema') + `
-    <div class="jor-corpo jor-duas">
-      <form id="jorFormBoletim" class="jor-form">
-        <div class="jor-linha jor-linha-cad">
-          <label>Nº do cadastro <input type="text" id="bCadastro" inputmode="numeric" autocomplete="off"></label>
+  /* Formulário compacto (14/10/2026, pedido dele): cabe num notebook sem
+     rolar. Cabeçalho de uma linha, sem a competência — o boletim vai para o
+     mês pela data do fato; quem escolhe mês é Lançados e Fechamento. Quatro
+     linhas de campos; Enter percorre o caminho comum e Ctrl+Enter lança. */
+  $('telaJorLancar').innerHTML = `
+    <header class="jor-cab-lancar"><b>Lançar jornada</b>
+      <span>digite o nº do cadastro · <kbd>Enter</kbd> passa de campo · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> lança</span></header>
+    <div class="jor-corpo jor-duas jor-lancar">
+      <form id="jorFormBoletim" class="jor-form jor-compacta" data-dia="">
+        <div class="jor-prox" id="bProximo" hidden></div>
+        <div class="jl-linha jl-1">
+          <label>Nº cadastro <input type="text" id="bCadastro" inputmode="numeric" autocomplete="off"></label>
           <label>Funcionário
             <select id="bFunc" required>
               <option value=""></option>
               ${ativos.map(f => `<option value="${f.id}">${esc(f.nome)}${f.cadastro ? ' · nº ' + esc(f.cadastro) : ''}</option>`).join('')}
             </select>
           </label>
+          <label>Nº boletim <b class="jor-obrig" title="obrigatório">*</b> <input type="text" id="bNumero" inputmode="numeric" autocomplete="off"></label>
+          <label><span class="jl-cap">Data do fato <span class="jor-dia-tag" id="bDiaTag"></span></span>
+            <input type="date" id="bData" value="${hoje()}" required></label>
         </div>
         <small class="jor-dica" id="bCadAviso">${ativos.length ? '' : '<span class="jor-pend">Ninguém tem vínculo de jornada ainda.</span>'}</small>
-        <div class="jor-linha">
-          <label>Nº do boletim <b class="jor-obrig" title="obrigatório">*</b> <input type="text" id="bNumero" inputmode="numeric"></label>
-          <label>Data do fato <input type="date" id="bData" value="${hoje()}" required></label>
-        </div>
         <div class="jor-dia-auto" id="bDiaAuto"></div>
         <div class="jor-dia-ja" id="bDiaJa" hidden></div>
-        <label>Tipo do dia
-          <select id="bTipo">
-            ${jd.dados.tipos.filter(t => t.ativo !== false && !PELA_DATA.includes(t.codigo))
-              .sort((a, b) => a.ordem - b.ordem)
-              .map(t => `<option value="${t.id}" ${t.codigo === 'NORMAL' ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}
-          </select>
-        </label>
-        <label id="bMotivoRot" hidden>Motivo
-          <input type="text" id="bMotivo" maxlength="200" placeholder="Ex.: consulta médica, doença na família, não justificou…">
-        </label>
-        <div class="jor-linha">
+        <div class="jl-linha jl-2">
+          <label>Tipo do dia
+            <select id="bTipo">
+              ${jd.dados.tipos.filter(t => t.ativo !== false && !PELA_DATA.includes(t.codigo))
+                .sort((a, b) => a.ordem - b.ordem)
+                .map(t => `<option value="${t.id}" ${t.codigo === 'NORMAL' ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}
+            </select>
+          </label>
           <label>Entrada <input type="time" id="bIni"></label>
           <label>Saída <input type="time" id="bFim"></label>
           <label>Intervalo (min) <input type="number" id="bInterv" min="0" step="5" value="60"></label>
         </div>
+        <label id="bMotivoRot" hidden>Motivo
+          <input type="text" id="bMotivo" maxlength="200" placeholder="Ex.: consulta médica, doença na família, não justificou…">
+        </label>
         <small class="jor-dica" id="bJorPadrao"></small>
-        <label class="jor-inline" id="bDifRot"><input type="checkbox" id="bDif"> O funcionário marcou diferente do correto</label>
+        <div class="jl-linha jl-3">
+          <label>Hora extra especial
+            <select id="bEspecial">
+              <option value="">Nenhuma</option>
+              ${tiposHeAtivos().map(t => `<option value="${t.id}">${esc(t.nome)} (${minParaHHMM(t.minutos)})</option>`).join('')}
+            </select>
+          </label>
+          <label class="jor-inline"><input type="checkbox" id="bInsal"> Insalubridade no dia</label>
+          <label class="jor-inline" id="bDifRot"><input type="checkbox" id="bDif"> Marcou diferente do correto</label>
+        </div>
         <div class="jor-caixa jor-marcado" id="bMarcadoBox" hidden>
           <p class="dc-sem" style="margin:0 0 6px">Em cima fica o <b>correto</b> — é o que vai para a folha.
             Aqui fica o que o funcionário <b>marcou</b> no boletim.</p>
@@ -387,23 +402,17 @@ function desenharLancar() {
           <label>Por que é diferente? ${selOrigem('bMOrigem')}</label>
           <label>Motivo <input type="text" id="bMMotivo" maxlength="200" placeholder="Ex.: gerente de campo confirmou saída às 16h"></label>
         </div>
-        <div class="jor-linha">
-          <label>Hora extra especial
-            <select id="bEspecial">
-              <option value="">Nenhuma</option>
-              ${tiposHeAtivos().map(t => `<option value="${t.id}">${esc(t.nome)} (${minParaHHMM(t.minutos)})</option>`).join('')}
-            </select>
-          </label>
-          <label class="jor-inline"><input type="checkbox" id="bInsal"> Insalubridade no dia</label>
+        <div class="jl-linha jl-4">
+          <div class="jor-nivel" id="bNivelBox" role="radiogroup" aria-label="Nível do boletim">
+            <span>Nível do boletim <b class="jor-obrig" title="obrigatório">*</b></span>
+            ${NIVEIS.map(([k, t]) => `<label class="jor-nivel__op jor-nivel--${k}"><input type="radio" name="bNivel" value="${k}"> ${t}</label>`).join('')}
+          </div>
+          <label>Observação <input type="text" id="bObs" maxlength="200"></label>
         </div>
-        <div class="jor-nivel" id="bNivelBox" role="radiogroup" aria-label="Nível do boletim">
-          <span>Nível do boletim <b class="jor-obrig" title="obrigatório">*</b></span>
-          ${NIVEIS.map(([k, t]) => `<label class="jor-nivel__op jor-nivel--${k}"><input type="radio" name="bNivel" value="${k}"> ${t}</label>`).join('')}
-        </div>
-        <label>Observação <input type="text" id="bObs" maxlength="200"></label>
         <div class="jor-acoes">
           <button type="submit" class="btn principal">Lançar</button>
           <button type="button" class="btn mini" id="bLimpar">Limpar</button>
+          <small class="dc-sem">o mês de pagamento sai sozinho pela data do fato</small>
         </div>
       </form>
 
@@ -434,11 +443,15 @@ function desenharLancar() {
   });
   $('bLimpar').addEventListener('click', () => {
     rascunho = null;
+    esconderProximo();
     $('jorFormBoletim').reset(); $('bCadAviso').innerHTML = ''; $('bJorPadrao').textContent = '';
     mostrarDiaAuto(); mostrarMotivo(); mostrarMarcado(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
   $('bNumero').addEventListener('input', () => $('bNumero').classList.remove('jor-falta'));
+  ['bNumero', 'bData'].forEach(id => $(id).addEventListener('input', () => $(id).classList.remove('jor-sugerido')));
+  $('bCadastro').addEventListener('input', esconderProximo);
+  $('jorFormBoletim').addEventListener('keydown', teclaNoFormulario);
   document.querySelectorAll('input[name="bNivel"]').forEach(r =>
     r.addEventListener('change', () => $('bNivelBox').classList.remove('jor-falta')));
   prepararEdicao();
@@ -446,6 +459,58 @@ function desenharLancar() {
   mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
   if (voltou && !$('bMotivoRot').hidden) $('bMotivo').value = rascunho.valores.bMotivo || '';
   carregarDia(voltou);   // voltou do rascunho: o horário digitado fica como estava
+  if (!estadoTela.editando && !$('bFunc').value) setTimeout(() => $('bCadastro')?.focus(), 0);
+}
+
+/* Teclado (14/10/2026): Enter segue o caminho comum do talão — cadastro →
+   boletim → data → entrada → saída → nível → lançar. O funcionário é pulado
+   (vem pelo número); tipo do dia, hora extra especial e as caixas ficam fora
+   do caminho e se usam só quando precisa. Ctrl+Enter lança de qualquer campo. */
+const CAMINHO = ['bCadastro', 'bNumero', 'bData', 'bIni', 'bFim'];
+function teclaNoFormulario(ev) {
+  if (ev.key !== 'Enter' || ev.isComposing) return;
+  const form = $('jorFormBoletim');
+  if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); form.requestSubmit(); return; }
+  const t = ev.target;
+  if (t.tagName === 'BUTTON' || t.tagName === 'TEXTAREA') return;
+  const i = CAMINHO.indexOf(t.id);
+  if (i < 0) {
+    if (t.name === 'bNivel') { ev.preventDefault(); form.requestSubmit(); }
+    else if (t.tagName === 'SELECT') ev.preventDefault();   // Enter em lista não lança sem querer
+    return;
+  }
+  ev.preventDefault();
+  if (t.id === 'bCadastro' && !$('bFunc').value) { $('bFunc').focus(); return; }
+  // Falta/atestado não têm horário: da data vai direto para o nível.
+  const semHora = t.id === 'bData' && jd.dados.tipos.find(x => x.id === $('bTipo').value)?.apura === false;
+  if (i < CAMINHO.length - 1 && !semHora) {
+    const prox = $(CAMINHO[i + 1]);
+    prox.focus();
+    if (prox.type === 'text') prox.select();
+    return;
+  }
+  const nivel = document.querySelector('input[name="bNivel"]:checked') || document.querySelector('input[name="bNivel"]');
+  nivel?.focus();
+}
+
+/* Próximo boletim já preparado (14/10/2026): depois de lançar, o mesmo
+   funcionário fica, o nº do boletim sobe 1 e a data anda 1 dia (sem passar de
+   hoje), com a jornada daquele dia. O que o app sugeriu fica amarelo até ser
+   mexido. Outro funcionário: é só digitar outro cadastro. */
+function esconderProximo() {
+  const b = $('bProximo');
+  if (b) { b.hidden = true; b.innerHTML = ''; }
+  ['bNumero', 'bData'].forEach(id => $(id)?.classList.remove('jor-sugerido'));
+}
+function proximoNumero(n) {
+  const t = String(n || '').trim();
+  if (!/^\d+$/.test(t)) return '';
+  return String(Number(t) + 1).padStart(t.length, '0');
+}
+function proximaData(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const x = new Date(Date.UTC(a, m - 1, d + 1)).toISOString().slice(0, 10);
+  return x > hoje() ? iso : x;
 }
 
 /* ---------- Complemento do dia (28/09/2026) ----------
@@ -562,7 +627,7 @@ function prepararEdicao() {
   form.insertAdjacentHTML('afterbegin', `<div class="jor-caixa alerta" id="bEditando">
     <b>Editando</b> o lançamento de ${esc(f?.nome || '—')} de ${dataBR(b.data_fato)}${b.numero ? ` (boletim nº ${esc(b.numero)})` : ''}.
     <button class="btn mini" type="button" id="bCancelarEdicao">Cancelar edição</button></div>`);
-  $('bObs').closest('label').insertAdjacentHTML('afterend',
+  $('bObs').closest('.jl-linha').insertAdjacentHTML('afterend',
     `<label>Motivo da alteração (obrigatório) <input type="text" id="bMotivoAlt" maxlength="200" required></label>`);
   if (![...$('bFunc').options].some(o => o.value === b.funcionario_id))
     $('bFunc').insertAdjacentHTML('beforeend', `<option value="${b.funcionario_id}">${esc(f?.nome || '—')}</option>`);
@@ -602,7 +667,8 @@ const SEMANA = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-
 function mostrarDiaAuto() {
   const alvo = $('bDiaAuto');
   const data = $('bData').value;
-  if (!data) { alvo.innerHTML = ''; return; }
+  const tag = $('bDiaTag'), form = $('jorFormBoletim');
+  if (!data) { alvo.innerHTML = ''; if (tag) tag.textContent = ''; if (form) form.dataset.dia = ''; return; }
   const [a, m, d] = data.split('-').map(Number);
   const dow = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
   const v = jd.vinculoDe($('bFunc').value);
@@ -622,7 +688,24 @@ function mostrarDiaAuto() {
     txt += `<br><b>${rotuloCompetencia(jd.competenciaDe(data))} já foi enviado ao ${esc(jd.destinoDe(jd.unidadeDe(v))?.nome || 'DP')}.</b>
       Este boletim entra no pagamento de <b>${rotuloCompetencia(pag)}</b>, marcado como competência anterior. O mês do fato não é reaberto.`;
   }
-  alvo.className = 'jor-dia-auto ' + cls;
+  /* Cor do horário pela data (14/10/2026, escolha dele): dia normal cinza,
+     sábado azul claro, domingo e feriado vermelho claro. A etiqueta ao lado da
+     data diz o dia em poucas palavras; a faixa embaixo só aparece quando há
+     algo a dizer (feriado com nome, boletim de mês já enviado). */
+  const tipoDia = fer ? 'feriado' : dow === 0 ? 'domingo' : dow === 6 ? 'sabado' : '';
+  if (form) form.dataset.dia = tipoDia;
+  if (tag) {
+    tag.className = 'jor-dia-tag' + (tipoDia ? ' ' + tipoDia : '');
+    tag.textContent = fer ? `Feriado · ${perc('perc_extra_feriado', 100)}%`
+      : dow === 0 ? `Domingo · ${perc('perc_extra_domingo', 100)}%`
+      : dow === 6 ? `Sábado · ${perc('perc_extra_sabado', 50)}%`
+      : `${SEMANA[dow].split('-')[0].replace(/^./, c => c.toUpperCase())} · dia útil`;
+    tag.title = fer ? fer.nome : '';
+  }
+  const atrasado = txt.includes('<br>');
+  if (fer) txt = `<b>Feriado — ${esc(fer.nome)}</b>: sem jornada prevista; as horas trabalhadas são extra a ${perc('perc_extra_feriado', 100)}%.` + (atrasado ? txt.slice(txt.indexOf('<br>')) : '');
+  else txt = atrasado ? txt.slice(txt.indexOf('<br>') + 4) : '';
+  alvo.className = 'jor-dia-auto ' + (txt ? cls : '');
   alvo.innerHTML = txt;
 }
 
@@ -917,12 +1000,27 @@ async function gravarBoletim(ev) {
   $('bDif').checked = false; ['bMIni','bMFim','bMInterv','bMOrigem','bMMotivo'].forEach(id => { $(id).value = ''; });
   document.querySelectorAll('input[name="bNivel"]').forEach(r => { r.checked = false; });
   mostrarMarcado();
+  $('bNivelBox').classList.remove('jor-falta');
+  const numProx = proximoNumero(b.numero);
+  const dataProx = proximaData(entrada.data);
+  if (numProx) { $('bNumero').value = numProx; $('bNumero').classList.add('jor-sugerido'); }
+  if (dataProx !== entrada.data) { $('bData').value = dataProx; $('bData').classList.add('jor-sugerido'); }
+  const nomeF = jd.pessoasDp().find(x => x.id === funcionarioId)?.nome || '';
+  $('bProximo').hidden = false;
+  $('bProximo').innerHTML = `<b>Lançado.</b> Próximo de ${esc(nomeF.split(' ')[0] || 'ninguém')} já preparado:
+    ${numProx ? `nº <b>${esc(numProx)}</b>, ` : ''}<b>${dataBR($('bData').value)}</b> — confira e lance. Outro funcionário? Digite o cadastro.`;
+  mostrarDiaAuto(); mostrarMotivo();
   dia.chave = '';
   preencherJornadaPadrao();   // mesmo funcionário, próximo boletim já vem com a jornada
   carregarDia();
-  aviso(`Boletim de ${dataBR(entrada.data)} lançado`
-    + (atrasado ? ` — entra no pagamento de ${rotuloCompetencia(competencia)} como competência anterior.` : '.')
-    + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
+  setTimeout(() => { $('bNumero').focus(); $('bNumero').select(); }, 0);
+  // A faixa "Próximo já preparado" já diz que lançou; o aviso do alto só
+  // aparece quando há algo a mais (mês anterior, sem rede) — senão empurra a tela.
+  if (atrasado || !estado.online)
+    aviso(`Boletim de ${dataBR(entrada.data)} lançado`
+      + (atrasado ? ` — entra no pagamento de ${rotuloCompetencia(competencia)} como competência anterior.` : '.')
+      + (estado.online ? '' : ' Sem rede — vai subir sozinho.'), true);
+  else aviso('');
   mostrarApurado();
 }
 
