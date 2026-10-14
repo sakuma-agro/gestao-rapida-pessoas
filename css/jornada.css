@@ -625,3 +625,8 @@
   .jor-compacta .jl-3, .jor-compacta .jl-4 { grid-template-columns: 1fr; }
   .jor-cab-lancar span { display: none; }
 }
+
+/* Painel de lançamento em cartão branco (14/10/2026, escolha dele — opção A):
+   separa a área de lançamento do fundo cinza da página. */
+.jor-lancar { background: #fff; border: 1px solid #E3E5DE; border-top: 0; border-radius: 0 0 12px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .05); }
