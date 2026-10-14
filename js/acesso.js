@@ -234,6 +234,14 @@ const nomesDp = ids => ids.map(id => destinosDp.find(d => d.id === id)).filter(B
 
 export const pode = m => acesso.admin || acesso.modulos.includes(m);
 
+/* Ver salários (14/10/2026, pedido dele): quem pode abrir o olho do salário
+   na Emissão de recibo do Adiantamento. Marcado em Usuários - Acessos; guarda
+   'ver_salarios' na lista de módulos de app_usuarios (não é módulo do menu).
+   Administrador sempre pode. Quem pode abre o olho sem senha; quem não pode
+   não vê o botão. */
+export const PERM_SALARIOS = 'ver_salarios';
+export const veSalario = () => acesso.admin || (acesso.modulos || []).includes(PERM_SALARIOS);
+
 /* ---------- área Manutenções (LOP - Gestão Rápida, 09/10/2026) ----------
    Quem entra na área é quem tem 'manutencoes' em app_usuarios.modulos (ou é
    administrador). Além disso, cada pessoa vê as máquinas das FAZENDAS marcadas
@@ -659,6 +667,8 @@ export function desenharConfig() {
             return r ? `<button type="button" class="cf-chip ${dp ? 'cf-parte' : r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${esc(dp || r.txt)}</button>` : ''; })
             .concat([resumoManut(u)].filter(Boolean).map(t =>
               `<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="manutencoes">Manutenções · ${esc(t)}</button>`))
+            .concat((u.modulos || []).includes(PERM_SALARIOS)
+              ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="salarios">Vê salários</button>`] : [])
             .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';
       return `<tr>
         <td><b>${esc(u.nome || u.email)}</b>${eu ? ' <span class="tag ativo">você</span>' : ''}
@@ -865,7 +875,8 @@ function desenharPermissoes() {
       </div>`;
     }).join('')}
     ${blocoManut(e)}
-    ${blocoVist(e)}`}`;
+    ${blocoVist(e)}
+    ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
   raiz.querySelectorAll('[data-meio]').forEach(cx => { cx.indeterminate = true; });
@@ -878,6 +889,12 @@ function desenharPermissoes() {
     desenharPermissoes();
   });
   $('usManutAdmin')?.addEventListener('change', ev => { e.manut.admin = ev.target.checked; desenharPermissoes(); });
+  $('usSal')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add(PERM_SALARIOS); else mods.delete(PERM_SALARIOS);
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
   $('usVist')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('vistorias'); else mods.delete('vistorias');
@@ -927,6 +944,20 @@ function blocoVist(e) {
       <b>Área Vistorias e Segurança</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · quem administra a área é marcado lá dentro'}</span>
     </label>
+  </div>`;
+}
+
+/* Bloco "Ver salários" (14/10/2026). */
+function blocoSal(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes(PERM_SALARIOS));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="salarios">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usSal" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Ver salários</b>
+      <span class="dc-sem">${!tem ? 'não vê — salário e teto ficam escondidos, sem o botão do olho'
+        : e.admin ? 'administrador · sempre vê' : 'vê — abre o olho sem senha'}</span>
+    </label>
+    <p class="dc-sem" style="margin:4px 0 0 28px">Vale para a caixa do teto na Emissão de recibo (Adiantamentos).</p>
   </div>`;
 }
 

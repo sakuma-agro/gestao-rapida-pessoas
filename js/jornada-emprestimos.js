@@ -20,7 +20,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
-import { acesso, podeTela } from './acesso.js';
+import { acesso, podeTela, veSalario } from './acesso.js';
 import { bloqueioInss } from './jornada-ferias.js';
 
 const $ = id => document.getElementById(id);
@@ -658,41 +658,22 @@ export async function abrirEmprestimo(tela) {
 /* ---------------- Emissão recibo ---------------- */
 
 /* Olho do salário (14/10/2026, pedido dele): na caixa do teto, o salário base
-   e o teto abrem escondidos, como no Plano de cargos — mesma senha (sk123).
+   e o teto abrem escondidos, como no Plano de cargos. Quem pode ver é marcado
+   em Usuários - Acessos (veSalario): abre sem senha. Quem não pode não vê o
+   botão.
    O teto entrega o salário (teto = 40%), por isso esconde os dois e também o
    "passa do teto em R$". Cortina contra quem olha por cima do ombro, não
    segurança. Fecha ao entrar na tela e no logout. */
-const SENHA_SALARIO = 'sk123';
 let salVisivel = false;
 const OCULTO_SAL = '<span class="rh-oculto">••••••</span>';
-const salV = v => salVisivel ? brl(v) : OCULTO_SAL;
+const salV = v => salVisivel && veSalario() ? brl(v) : OCULTO_SAL;
 const svgOlho = corpo => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${corpo}</svg>`;
 const OLHO_ABERTO = svgOlho('<path d="M1.5 12S5 5.5 12 5.5 22.5 12 22.5 12 19 18.5 12 18.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3.2"/>');
 const OLHO_FECHADO = svgOlho('<path d="M3 3l18 18"/><path d="M10.2 6.1A10.6 10.6 0 0 1 12 6c7 0 10.5 6 10.5 6a18 18 0 0 1-3.8 4.3"/>'
   + '<path d="M6.5 7.7A17.7 17.7 0 0 0 1.5 12S5 18 12 18c1.5 0 2.9-.3 4.1-.7"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>');
-const botaoOlhoSal = () => `<button class="btn mini olho" type="button" id="empOlhoSal" aria-pressed="${salVisivel}"
-  title="${salVisivel ? 'Esconder o salário' : 'Mostrar o salário (pede senha)'}">${salVisivel ? OLHO_ABERTO : OLHO_FECHADO}<span>${salVisivel ? 'Esconder valores' : 'Mostrar valores'}</span></button>`;
-function pedirSenhaSal(depois) {
-  let d = $('dlgEmpSenhaSal');
-  if (!d) { d = document.createElement('dialog'); d.id = 'dlgEmpSenhaSal'; document.body.appendChild(d); }
-  d.innerHTML = `<form method="dialog" onsubmit="return false"><h3>Mostrar o salário</h3>
-    <p class="dica">O salário fica escondido. Digite a senha para abrir (a mesma do Plano de cargos).</p>
-    <div class="aviso erro" id="empSenhaSalErro" hidden></div>
-    <label class="campo plena">Senha<input type="password" id="empSenhaSal" autocomplete="off"></label>
-    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button>
-      <button class="btn principal" type="button" id="empSenhaSalOk">Mostrar</button></div></form>`;
-  d.querySelector('[data-fechar]').addEventListener('click', () => d.close());
-  const ok = () => {
-    if ($('empSenhaSal').value.trim() !== SENHA_SALARIO) {
-      $('empSenhaSalErro').textContent = 'Senha incorreta.'; $('empSenhaSalErro').hidden = false; $('empSenhaSal').focus(); return;
-    }
-    salVisivel = true; d.close(); depois();
-  };
-  $('empSenhaSalOk').addEventListener('click', ok);
-  $('empSenhaSal').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } });
-  d.showModal(); $('empSenhaSal').focus();
-}
+const botaoOlhoSal = () => !veSalario() ? '' : `<button class="btn mini olho" type="button" id="empOlhoSal" aria-pressed="${salVisivel}"
+  title="${salVisivel ? 'Esconder o salário' : 'Mostrar o salário'}">${salVisivel ? OLHO_ABERTO : OLHO_FECHADO}<span>${salVisivel ? 'Esconder valores' : 'Mostrar valores'}</span></button>`;
 
 const tetoCache = new Map();
 async function tetoDe(fid, data) {
@@ -790,7 +771,7 @@ async function calcular() {
         <dt>Este empréstimo</dt><dd>${brl(v)}</dd>
         <dt>Soma</dt><dd class="${estoura ? 'jor-pend' : ''}">${brl(soma)}</dd>
       </dl>
-      ${estoura ? `<p class="jor-avisos" style="list-style:none;padding:0">${salVisivel ? `Passa do teto em ${brl(soma - t.teto)}.` : 'Passa do teto.'}</p>` : ''}`;
+      ${estoura ? `<p class="jor-avisos" style="list-style:none;padding:0">${salVisivel && veSalario() ? `Passa do teto em ${brl(soma - t.teto)}.` : 'Passa do teto.'}</p>` : ''}`;
 
   alvo.innerHTML = tetoHtml + (pl.length ? `
     <h4 style="margin-top:14px">Parcelas</h4>
@@ -805,7 +786,8 @@ async function calcular() {
     </ul>`;
   $('empIrSal')?.addEventListener('click', () => irPara('empSalarios'));
   $('empOlhoSal')?.addEventListener('click', () => {
-    if (salVisivel) { salVisivel = false; calcular(); } else pedirSenhaSal(() => calcular());
+    if (!veSalario()) return;
+    salVisivel = !salVisivel; calcular();
   });
 
   const precisaJust = estoura && acesso.admin;
