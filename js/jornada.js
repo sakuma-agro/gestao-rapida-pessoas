@@ -463,10 +463,10 @@ function desenharLancar() {
 }
 
 /* Teclado (14/10/2026): Enter segue o caminho comum do talão — cadastro →
-   boletim → data → entrada → saída → nível → lançar. O funcionário é pulado
+   boletim → data → entrada → saída → intervalo → nível → lançar. O funcionário é pulado
    (vem pelo número); tipo do dia, hora extra especial e as caixas ficam fora
    do caminho e se usam só quando precisa. Ctrl+Enter lança de qualquer campo. */
-const CAMINHO = ['bCadastro', 'bNumero', 'bData', 'bIni', 'bFim'];
+const CAMINHO = ['bCadastro', 'bNumero', 'bData', 'bIni', 'bFim', 'bInterv'];
 function teclaNoFormulario(ev) {
   if (ev.key !== 'Enter' || ev.isComposing) return;
   const form = $('jorFormBoletim');
@@ -486,7 +486,7 @@ function teclaNoFormulario(ev) {
   if (i < CAMINHO.length - 1 && !semHora) {
     const prox = $(CAMINHO[i + 1]);
     prox.focus();
-    if (prox.type === 'text') prox.select();
+    if (prox.type === 'text' || prox.type === 'number') prox.select();
     return;
   }
   const nivel = document.querySelector('input[name="bNivel"]:checked') || document.querySelector('input[name="bNivel"]');

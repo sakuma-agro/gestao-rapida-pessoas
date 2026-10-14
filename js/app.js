@@ -76,14 +76,6 @@ function limparPrevias() {
 /* Acesso rápido na lateral da tela inicial: mora em js/atalhos.js desde
    24/09/2026 — cada login escolhe os seus (tabela app_preferencias). */
 
-/* Altura do topo para a coluna do menu lateral (DP › Lançar jornada) começar
-   logo abaixo dele. Com a faixa de ícones fora do fluxo, o topo encolhe. */
-function medirTopo() {
-  const t = document.querySelector('#app .topo');
-  if (t) document.body.style.setProperty('--topo-h', t.getBoundingClientRect().height + 'px');
-}
-addEventListener('resize', medirTopo);
-
 function abrirAba(nome) {
   // telas do menu do Vistorias: moram na moldura (js/areas.js)
   if (ehTelaVist(nome)) return abrirTelaVist(nome);
@@ -93,8 +85,6 @@ function abrirAba(nome) {
   $('telaManut').hidden = nome !== 'manutencoes';
   $('telaVist').hidden = nome !== 'vistorias';
   document.body.classList.toggle('na-moldura', nome === 'manutencoes' || nome === 'vistorias');
-  document.body.classList.toggle('menu-lateral', nome === 'jorLancar');
-  medirTopo();
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
