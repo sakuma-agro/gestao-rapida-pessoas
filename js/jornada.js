@@ -1244,8 +1244,11 @@ function desenharBoletins() {
   });
 
   $('jorBuscaBol').addEventListener('input', ev => {
+    // A tela é redesenhada a cada letra: devolve o cursor à busca (14/10/2026).
     estadoTela.busca = ev.target.value;
+    const pos = ev.target.selectionStart;
     desenharBoletins();
+    const el = $('jorBuscaBol'); el.focus(); try { el.setSelectionRange(pos, pos); } catch {}
   });
   document.querySelectorAll('[data-memoria]').forEach(btn =>
     btn.addEventListener('click', () => {
