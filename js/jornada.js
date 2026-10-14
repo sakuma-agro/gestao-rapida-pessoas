@@ -27,6 +27,7 @@ const estadoTela = {
   competencia: jd.competenciaAtual(),
   busca: '',
   filtroSit: '',        // Lançados: '' todos · 'aberto' · 'fechado'
+  filtroFunc: '',       // Lançados: id do funcionário ('' = todos) — 14/10/2026
   editando: null,       // id do boletim em edição na tela Lançar jornada
   reabrindo: null,
 };
@@ -939,8 +940,19 @@ function desenharBoletins() {
       (l.f?.nome || '').toLowerCase().includes(busca) ||
       (l.b.numero || '').includes(busca))
     .filter(l => !estadoTela.filtroSit || (estadoTela.filtroSit === 'fechado') === l.s.fechado)
+    .filter(l => !estadoTela.filtroFunc || l.b.funcionario_id === estadoTela.filtroFunc)
     .sort((x, y) => y.b.data_fato.localeCompare(x.b.data_fato));
   const nAberto = todas.filter(l => !l.s.fechado).length;
+  /* Filtro por funcionário (14/10/2026, pedido dele): só quem tem boletim na
+     competência, em ordem alfabética, com quantos boletins tem. */
+  const porFunc = new Map();
+  todas.forEach(l => {
+    const id = l.b.funcionario_id;
+    const x = porFunc.get(id) || { id, nome: l.f?.nome || '—', n: 0 };
+    x.n++; porFunc.set(id, x);
+  });
+  const funcs = [...porFunc.values()].sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
+  if (estadoTela.filtroFunc && !porFunc.has(estadoTela.filtroFunc)) estadoTela.filtroFunc = '';
 
   const soma = c => linhas.reduce((s, l) => s + (l.a?.[c] || 0), 0);
 
@@ -952,6 +964,10 @@ function desenharBoletins() {
           <option value="">Todas as situações</option>
           <option value="aberto" ${estadoTela.filtroSit === 'aberto' ? 'selected' : ''}>Em aberto (a pagar) · ${nAberto}</option>
           <option value="fechado" ${estadoTela.filtroSit === 'fechado' ? 'selected' : ''}>Fechado (já pago) · ${todas.length - nAberto}</option>
+        </select>
+        <select id="jorFiltroFunc" aria-label="Funcionário">
+          <option value="">Todos os funcionários · ${funcs.length}</option>
+          ${funcs.map(x => `<option value="${x.id}" ${estadoTela.filtroFunc === x.id ? 'selected' : ''}>${esc(x.nome)} · ${x.n}</option>`).join('')}
         </select>
         <span class="dc-sem">${linhas.length} boletim(ns)</span>
       </div>
@@ -978,7 +994,7 @@ function desenharBoletins() {
             : `<button class="btn mini" data-editar-bol="${b.id}">Editar</button><button class="btn mini perigo" data-excluir-bol="${b.id}">Excluir</button>`}</td>
         </tr>`).join('')}
       </tbody><tfoot><tr class="jor-total">
-        <td colspan="4">Total da competência</td>
+        <td colspan="4">${estadoTela.filtroFunc ? `Total de ${esc(porFunc.get(estadoTela.filtroFunc)?.nome || '—')}` : 'Total da competência'}</td>
         <td class="ce">${horas(soma('min_extra_50'))}</td>
         <td class="ce">${horas(soma('min_extra_100'))}</td>
         <td class="ce">${horas(soma('min_deficit'))}</td>
@@ -997,6 +1013,7 @@ function desenharBoletins() {
     </form></dialog>` + assinatura();
 
   $('jorFiltroSit').addEventListener('change', ev => { estadoTela.filtroSit = ev.target.value; desenharBoletins(); });
+  $('jorFiltroFunc').addEventListener('change', ev => { estadoTela.filtroFunc = ev.target.value; desenharBoletins(); });
   document.querySelectorAll('#telaJorBoletins [data-editar-bol]').forEach(btn => btn.addEventListener('click', () => {
     estadoTela.editando = btn.dataset.editarBol;
     irPara('jorLancar');

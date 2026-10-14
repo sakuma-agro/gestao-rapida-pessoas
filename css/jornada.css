@@ -48,6 +48,9 @@
   margin-bottom: 12px;
 }
 .jor-barra input[type="search"] { flex: 1; max-width: 360px; }
+/* Lançados: filtro por funcionário (14/10/2026); a barra quebra linha no celular. */
+.jor-barra { flex-wrap: wrap; }
+#jorFiltroFunc { min-width: 0; max-width: 340px; flex: 0 1 300px; }
 
 .jor-lista { margin: 0; padding-left: 18px; font-size: 13px; color: #51534A; }
 .jor-lista li { margin-bottom: 4px; }
