@@ -32,7 +32,7 @@ export const AREAS = [
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '4';
+const VERSAO_VIST = '5';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
@@ -40,14 +40,23 @@ const VERSAO_VIST = '4';
    aperta a aba correspondente lá dentro — o `aba` é o nome da aba na moldura.
    O topo próprio da moldura some dentro do LOP (vistorias/lop-antes.js). */
 const VIST_MODULOS = [
+  /* 14/10/2026, ajuste dele: "Em aberto" é das inspeções e fica aqui;
+     Anomalias e Antes e Depois são módulos, cada um com o seu em aberto. */
   { id: 'vsInsp', nome: 'Inspeções', icone: 'capacete', subs: [
     { id: 'vsSubVistoria', nome: 'Vistoria', telas: [['vsVistoria', 'Vistoria']] },
     { id: 'vsSubChecklists', nome: 'Checklists prontos', telas: [['vsChecklists', 'Checklists prontos']] },
-  ] },
-  { id: 'vsPend', nome: 'Pendências', icone: 'alerta', subs: [
     { id: 'vsSubAberto', nome: 'Em aberto', telas: [['vsAberto', 'Em aberto']] },
-    { id: 'vsSubAn', nome: 'Anomalias', telas: [['vsAn', 'Anomalias']] },
-    { id: 'vsSubAd', nome: 'Antes e Depois', telas: [['vsAd', 'Antes e Depois']] },
+  ] },
+  { id: 'vsAnom', nome: 'Anomalias', icone: 'alerta', inicial: 'vsAnAberto', subs: [
+    { id: 'vsSubAnNovo', nome: 'Novo apontamento', telas: [['vsAnNovo', 'Novo apontamento']] },
+    { id: 'vsSubAnAberto', nome: 'Em aberto', telas: [['vsAnAberto', 'Em aberto']] },
+    { id: 'vsSubAnHist', nome: 'Histórico', telas: [['vsAnHist', 'Histórico']] },
+  ] },
+  { id: 'vsAntDep', nome: 'Antes e Depois', icone: 'antesDepois', inicial: 'vsAdAberto', subs: [
+    { id: 'vsSubAdNovo', nome: 'Novo registro', telas: [['vsAdNovo', 'Novo registro']] },
+    { id: 'vsSubAdAberto', nome: 'Em aberto', telas: [['vsAdAberto', 'Em aberto']] },
+    { id: 'vsSubAdFechados', nome: 'Fechados', telas: [['vsAdFechados', 'Fechados']] },
+    { id: 'vsSubAdHist', nome: 'Histórico', telas: [['vsAdHist', 'Histórico']] },
   ] },
   { id: 'vsEquip', nome: 'Equipamentos', icone: 'extintor', subs: [
     { id: 'vsSubEx', nome: 'Extintores', telas: [['vsEx', 'Extintores']] },
@@ -61,9 +70,14 @@ const VIST_MODULOS = [
   ] },
 ];
 registrarMenuArea(VIST_MODULOS);
-const ABA_VIST = { vsVistoria: 'vistoria', vsChecklists: 'checklists', vsAberto: 'aberto', vsAn: 'an',
-  vsAd: 'ad', vsEx: 'ex', vsPainel: 'pg', vsRelatorio: 'relatorio', vsConfig: 'config' };
-const TELA_DA_ABA = Object.fromEntries(Object.entries(ABA_VIST).map(([t, a]) => [a, t]));
+/* Tela do topo → aba da moldura. As de Anomalias e Antes e Depois a moldura
+   abre sozinha (window.vsIr no lop-depois.js), porque escolhem a vista lá dentro. */
+const ABA_VIST = { vsVistoria: 'vistoria', vsChecklists: 'checklists', vsAberto: 'aberto',
+  vsAnNovo: 'an', vsAnAberto: 'an', vsAnHist: 'an',
+  vsAdNovo: 'ad', vsAdAberto: 'ad', vsAdFechados: 'ad', vsAdHist: 'ad',
+  vsEx: 'ex', vsPainel: 'pg', vsRelatorio: 'relatorio', vsConfig: 'config' };
+const TELA_DA_ABA = { vistoria: 'vsVistoria', checklists: 'vsChecklists', aberto: 'vsAberto', an: 'vsAnAberto',
+  ad: 'vsAdAberto', ex: 'vsEx', pg: 'vsPainel', relatorio: 'vsRelatorio', config: 'vsConfig' };
 /* A barra de módulos pintada agora é a do Vistorias? (cada área pinta a sua) */
 const barraVist = () => !!$('navModulos').querySelector('[data-modulo="vsInsp"]');
 const moduloDaTelaVist = t => VIST_MODULOS.find(m => m.subs.some(s => s.telas.some(([x]) => x === t)))?.id;
@@ -88,7 +102,7 @@ let aoTrocar = () => {};
 let areaAtual = null;
 let vistPronta = false;           // a moldura do Vistorias já abriu o app lá dentro
 let vistPendente = null;          // tela pedida antes da moldura ficar pronta
-let vistAba = null;               // aba aberta na moldura agora
+let vistTela = null;              // tela do topo aberta na moldura agora
 let vistNums = {};                // números das abas (pendências) para a faixa
 let molduraCarregada = false;
 let molduraVistCarregada = false;
@@ -240,7 +254,7 @@ export function limparAreas() {
   areaAtual = null;
   molduraCarregada = false;
   molduraVistCarregada = false;
-  vistPronta = false; vistPendente = null; vistAba = null; vistNums = {};
+  vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
   const mv = $('molduraVist');
@@ -261,31 +275,38 @@ export function abrirTelaVist(tela) {
     $('molduraVist').src = 'vistorias/?v=' + VERSAO_VIST;
   }
   if (!vistPronta) { vistPendente = tela; return; }
-  if (vistAba === qual) return;     // já está nela (o aviso veio da própria moldura)
-  apertarAbaVist(qual);
+  if (vistTela === tela) return;    // já está nela (o aviso veio da própria moldura)
+  irNaMoldura(tela);
 }
 
-function apertarAbaVist(qual) {
+function irNaMoldura(tela) {
+  const qual = ABA_VIST[tela];
   try {
     const w = $('molduraVist').contentWindow;
+    if (w.vsIr && w.vsIr(tela)) return;
     const b = w.document.getElementById('t-' + qual);
     if (b) b.click(); else w.aba?.(qual);
-  } catch (e) { console.warn('vistorias: aba', qual, e); }
+  } catch (e) { console.warn('vistorias: tela', tela, e); }
 }
 
 /* A moldura chama isto quando o app lá dentro terminou de abrir. */
 window.vistMolduraPronta = () => {
   vistPronta = true;
-  if (vistPendente) { const t = vistPendente; vistPendente = null; vistAba = null; apertarAbaVist(ABA_VIST[t]); }
+  if (vistPendente) { const t = vistPendente; vistPendente = null; vistTela = null; irNaMoldura(t); }
 };
 
 /* A moldura chama isto a cada troca de aba — inclusive pelos atalhos da tela
    inicial dela —, e o menu do topo acompanha. */
-window.vistAbaMudou = qual => {
-  vistAba = qual;
-  if (areaAtual !== 'vistorias') return;
+window.vistAbaMudou = (qual, telaDeLa) => {
   if (vistPendente && qual === 'inicio') return;   // ainda abrindo: a tela pedida vem em seguida
-  const tela = TELA_DA_ABA[qual];
+  let tela = telaDeLa === undefined ? TELA_DA_ABA[qual] : telaDeLa;
+  // null: a moldura não sabe dizer (ex.: editando um registro) — fica no submódulo do topo, se for do mesmo módulo
+  if (tela === null) {
+    const atual = telaNaFaixa();
+    tela = atual && ABA_VIST[atual] === qual ? atual : TELA_DA_ABA[qual];
+  }
+  vistTela = tela || null;
+  if (areaAtual !== 'vistorias') return;
   if (!tela) { desmarcarModulos(); return; }        // início da área
   if (telaNaFaixa() === tela) return;
   abrirModulo(moduloDaTelaVist(tela), tela);        // pinta a faixa; abrirTelaVist vê que já está nela

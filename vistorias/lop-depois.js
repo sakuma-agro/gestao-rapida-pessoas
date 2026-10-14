@@ -95,10 +95,42 @@
      troca de aba aqui — inclusive pelos atalhos da tela inicial — avisa o
      topo, que acompanha. */
   const pai = () => { try { return window.parent !== window ? window.parent : null; } catch (e) { return null; } };
+  /* Qual tela do topo corresponde ao que está aberto aqui (null = o topo
+     decide: ex. editando um antes e depois que já existia). */
+  function telaAtual(qual){
+    try {
+      if (qual === "an") {
+        const v = anVista === "previa" ? anVoltar : anVista;
+        return { apontamento: "vsAnNovo", painel: "vsAnAberto", historico: "vsAnHist" }[v] || null;
+      }
+      if (qual === "ad") {
+        if (!document.getElementById("ad-form").hidden) return adAtual && adAtual._novo ? "vsAdNovo" : null;
+        if (adFiltro.vista === "historico") return "vsAdHist";
+        return adFiltro.sit === "concluidos" ? "vsAdFechados" : "vsAdAberto";
+      }
+    } catch (e) {}
+    return undefined;   // as outras abas: o topo acha pela aba
+  }
   const _abaLop = aba;
   aba = function(qual){
     _abaLop.apply(this, arguments);
-    try { const p = pai(); if (p && p.vistAbaMudou) p.vistAbaMudou(qual); } catch (e) {}
+    try { const p = pai(); if (p && p.vistAbaMudou) p.vistAbaMudou(qual, telaAtual(qual)); } catch (e) {}
+  };
+
+  /* O topo pede uma tela de Anomalias ou de Antes e Depois. Devolve false
+     para as outras (o topo aperta a aba). */
+  window.vsIr = function(tela){
+    const an = { vsAnNovo: "apontamento", vsAnAberto: "painel", vsAnHist: "historico" }[tela];
+    if (an) {
+      anVista = an;
+      if (an === "painel") anFiltro.sit = "abertas";
+      document.getElementById("t-an").click();
+      return true;
+    }
+    if (tela === "vsAdNovo") { adAtual = adNovo(); adMostrar("form"); return true; }
+    const ad = { vsAdAberto: ["aguardando", "grade"], vsAdFechados: ["concluidos", "grade"], vsAdHist: ["todos", "historico"] }[tela];
+    if (ad) { adFiltro.sit = ad[0]; adFiltro.vista = ad[1]; adMostrar("lista"); return true; }
+    return false;
   };
 
   /* Números das abas (Em aberto, Anomalias, Extintores) para a faixa do topo. */
@@ -106,7 +138,7 @@
     const p = pai(); if (!p || !p.vistNumeros) return;
     const n = id => { const el = document.getElementById(id);
       return el && !el.hidden ? (parseInt(el.textContent, 10) || 0) : 0; };
-    try { p.vistNumeros({ vsAberto: n("cont-aberto"), vsAn: n("cont-an"), vsAd: n("cont-ad"), vsEx: n("cont-ex") }); } catch (e) {}
+    try { p.vistNumeros({ vsAberto: n("cont-aberto"), vsAnAberto: n("cont-an"), vsAdAberto: n("cont-ad"), vsEx: n("cont-ex") }); } catch (e) {}
   }
   let esperaNum = null;
   const observar = () => {

@@ -454,7 +454,8 @@ export function abrirModulo(id, tela) {
 
   const subs = subsLiberados(id);
   if (!subs.length) return;
-  desenharFaixa(id, subs, tela);
+  // módulo pode dizer por qual tela começa (ex.: Anomalias abre no Em aberto, não no formulário de novo)
+  desenharFaixa(id, subs, tela || MENUS_AREA[id]?.inicial);
 }
 
 /* Faixa de ícones (29/09/2026, pedido dele a partir de um protótipo): no lugar
@@ -476,8 +477,9 @@ const ICONE_SUB = {
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
-  vsSubVistoria: 'escudo', vsSubChecklists: 'boletim', vsSubAberto: 'relogio', vsSubAn: 'alerta',
-  vsSubAd: 'antesDepois', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
+  vsSubVistoria: 'escudo', vsSubChecklists: 'boletim', vsSubAberto: 'relogio',
+  vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
+  vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';

@@ -59,7 +59,9 @@ export const ICONE_TELA = {
   empEmissao: 'recibo', empRecibos: 'lista', empHistorico: 'dinheiro',
   ferPainel: 'sol', ferPrev: 'grafico', ferLanc: 'lista', ferAfast: 'calendario', ferRisco: 'risco', ferIni: 'lapis',
   jorRelatorios: 'grafico', jorConfig: 'config', empSalarios: 'dinheiro',
-  vsVistoria: 'escudo', vsChecklists: 'boletim', vsAberto: 'relogio', vsAn: 'alerta', vsAd: 'antesDepois',
+  vsVistoria: 'escudo', vsChecklists: 'boletim', vsAberto: 'relogio',
+  vsAnNovo: 'mais', vsAnAberto: 'relogio', vsAnHist: 'historico',
+  vsAdNovo: 'mais', vsAdAberto: 'relogio', vsAdFechados: 'check', vsAdHist: 'historico',
   vsEx: 'extintor', vsPainel: 'painel', vsRelatorio: 'documento', vsConfig: 'config',
   cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
 };

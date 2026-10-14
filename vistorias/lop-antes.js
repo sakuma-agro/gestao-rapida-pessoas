@@ -44,6 +44,9 @@ window.SAKUMA_BASE = {
        Pessoas. Aqui some o topo próprio (ícone, abas, conta); Abrir, Salvar e
        Imprimir passam para o alto da tela Vistoria (lop-depois.js). */
     + "header.topo{display:none!important}.palco{padding-top:18px}"
+    /* Anomalias e Antes e Depois: o que era botão aqui dentro (Apontamento,
+       Painel, Histórico; Todos, Em aberto, Fechados) virou submódulo no topo */
+    + ".an-sub,.ad-chips{display:none!important}"
     + ".lop-acoes{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin:0 0 16px}"
     + ".lop-acoes .bt{margin:0}"
     + "@media print{.lop-acoes{display:none!important}}";

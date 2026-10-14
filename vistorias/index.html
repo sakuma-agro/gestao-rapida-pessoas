@@ -1148,6 +1148,15 @@ body[data-aba="ad"] #bt-salvar,body[data-aba="ad"] #bt-pdf,body[data-aba="ad"] .
   body.ad-imprimindo .adr-folha:last-child{break-after:auto;page-break-after:auto}
   .adr-folha,.adr-folha *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+/* histórico (14/10/2026): todos os registros numa tabela */
+.ad-grade.ad-grade-hist{display:block}
+.ad-hist-resumo{margin:0 0 10px;font-size:13px;color:var(--cinza)}
+.ad-tag{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+.ad-tag.ok{background:var(--verde-claro);color:#4E7D00}
+.ad-tag.aberto{background:#FBEBC8;color:#8A5A00}
+.ad-hist tr.ad-h-aberto td:first-child{box-shadow:inset 4px 0 0 #c98a00}
+.ad-hist tr.ad-h-ok td:first-child{box-shadow:inset 4px 0 0 var(--verde)}
+.ad-hist td .anp-btn.mini{white-space:nowrap;margin:2px 0}
 
 /* ═══════════════════════════ Extintores ═══════════════════════════ */
 body[data-aba="ex"] #bt-salvar,body[data-aba="ex"] #bt-pdf,body[data-aba="ex"] .status{display:none}
@@ -6482,7 +6491,7 @@ try{
 
 const AD_RASC="sakuma-ad-rascunho", AD_CACHE="sakuma-ad-lista", AD_NOME="sakuma-ad-nome";
 let adRegs=[], adCarregou=false, adOffline=false, adAtual=null, adSalvando=false;
-let adFiltro={sit:"todos",busca:"",unidade:""};
+let adFiltro={sit:"todos",busca:"",unidade:"",vista:"grade"};   /* vista: "grade" (cartões) ou "historico" (tabela) */
 const AD_POR_INDICE=8;
 let adPreviaRegs=[], adPreviaGaleria=false, adVoltarPara="lista";
 const adDados=new Map();   /* caminho no bucket → foto em data URL (para imprimir e montar a imagem) */
@@ -6646,8 +6655,9 @@ function adUnidades(){
 function adFiltrados(){
   const b=adFiltro.busca.trim().toLowerCase();
   return adRegs.filter(r=>{
-    if(adFiltro.sit==="aguardando"&&adTemDepois(r))return false;
-    if(adFiltro.sit==="concluidos"&&!adTemDepois(r))return false;
+    /* o histórico mostra todos, abertos e fechados */
+    if(adFiltro.vista!=="historico"&&adFiltro.sit==="aguardando"&&adTemDepois(r))return false;
+    if(adFiltro.vista!=="historico"&&adFiltro.sit==="concluidos"&&!adTemDepois(r))return false;
     if(adFiltro.unidade&&(r.unidade||"").trim()!==adFiltro.unidade)return false;
     if(b&&![r.codigo,r.titulo,r.local,r.unidade,r.descricao,r.responsavel,r.autor].join(" ").toLowerCase().includes(b))return false;
     return true;
@@ -6661,7 +6671,7 @@ function adRenderLista(){
   const unids=adUnidades();
   alvo.innerHTML=`
     <div class="secao-topo">
-      <h2>Antes e Depois</h2>
+      <h2>Antes e Depois${adFiltro.vista==="historico"?" · Histórico":adFiltro.sit==="aguardando"?" · Em aberto":adFiltro.sit==="concluidos"?" · Fechados":""}</h2>
       <span class="dica">Foto do problema agora; a do depois quando estiver resolvido. Sai em folha deitada, pronta para mostrar à equipe e mandar no WhatsApp.</span>
       <button class="btn" type="button" data-ad-novo style="margin-left:auto">＋ Novo antes e depois</button>
     </div>
@@ -6670,9 +6680,10 @@ function adRenderLista(){
     ${adOffline?`<p class="ad-aviso">Sem conexão com a base: mostrando o que estava guardado neste aparelho. Dá para registrar e gerar o relatório; para salvar, precisa de rede.</p>`:""}
     <div class="ad-filtros">
       <div class="ad-chips" role="group" aria-label="Situação">
-        <button type="button" data-ad-sit="todos" aria-pressed="${adFiltro.sit==="todos"}">Todos <b>${tot}</b></button>
-        <button type="button" data-ad-sit="aguardando" aria-pressed="${adFiltro.sit==="aguardando"}">Aguardando o depois <b>${ag}</b></button>
-        <button type="button" data-ad-sit="concluidos" aria-pressed="${adFiltro.sit==="concluidos"}">Concluídos <b>${ok}</b></button>
+        <button type="button" data-ad-sit="todos" aria-pressed="${adFiltro.vista!=="historico"&&adFiltro.sit==="todos"}">Todos <b>${tot}</b></button>
+        <button type="button" data-ad-sit="aguardando" aria-pressed="${adFiltro.vista!=="historico"&&adFiltro.sit==="aguardando"}">Em aberto <b>${ag}</b></button>
+        <button type="button" data-ad-sit="concluidos" aria-pressed="${adFiltro.vista!=="historico"&&adFiltro.sit==="concluidos"}">Fechados <b>${ok}</b></button>
+        <button type="button" data-ad-vista="historico" aria-pressed="${adFiltro.vista==="historico"}">Histórico</button>
       </div>
       ${unids.length>1?`<select id="ad-f-unidade" aria-label="Unidade"><option value="">Todas as unidades</option>${unids.map(u=>`<option ${u===adFiltro.unidade?"selected":""}>${esc(u)}</option>`).join("")}</select>`:""}
       <input type="search" id="ad-f-busca" placeholder="Buscar título, local, número…" value="${esc(adFiltro.busca)}">
@@ -6688,6 +6699,7 @@ function adRenderGrade(){
   if(bar)bar.innerHTML=lista.length?`<span>${lista.length} registro${lista.length>1?"s":""} na tela</span>
     <button class="bt bt-marrom" type="button" data-ad-galeria>Relatório da galeria</button>`:"";
   if(!adCarregou){ g.innerHTML=`<div class="vazio"><p>Carregando…</p></div>`; return; }
+  if(adFiltro.vista==="historico"){ adRenderHistorico(g,lista); return; }
   if(!lista.length){
     g.innerHTML=`<div class="vazio"><p>${adRegs.length?"Nenhum registro com esse filtro.":"Nenhum antes e depois registrado ainda. Toque em <b>＋ Novo antes e depois</b> e tire a primeira foto."}</p></div>`;
     return;
@@ -6711,6 +6723,42 @@ function adRenderGrade(){
     </article>`;
   }).join("");
   adPreencherFotos(g);
+}
+
+/* Histórico (14/10/2026, pedido dele): todos os registros, abertos e fechados,
+   numa tabela só — do mais novo para o mais antigo, com quanto tempo levou
+   para fechar (ou há quanto tempo está aberto). */
+function adDias(de,ate){
+  if(!de)return null;
+  const a=new Date(String(de).slice(0,10)+"T12:00:00"), b=ate?new Date(String(ate).slice(0,10)+"T12:00:00"):new Date();
+  return Math.max(0,Math.round((b-a)/864e5));
+}
+function adRenderHistorico(g,lista){
+  g.classList.add("ad-grade-hist");
+  if(!lista.length){
+    g.innerHTML=`<div class="vazio"><p>${adRegs.length?"Nenhum registro com esse filtro.":"Nenhum antes e depois registrado ainda."}</p></div>`;
+    return;
+  }
+  const fech=lista.filter(adTemDepois), abertos=lista.length-fech.length;
+  const tempos=fech.map(r=>adDias(r.data_antes,r.data_depois)).filter(n=>n!=null);
+  const media=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):null;
+  const ordem=[...lista].sort((a,b)=>String(b.data_antes||"").localeCompare(String(a.data_antes||""))||String(b.codigo||"").localeCompare(String(a.codigo||"")));
+  g.innerHTML=`<p class="ad-hist-resumo"><b>${lista.length}</b> registro${lista.length>1?"s":""} ·
+      <span class="ad-tag aberto">${abertos} em aberto</span> <span class="ad-tag ok">${fech.length} fechado${fech.length===1?"":"s"}</span>
+      ${media!=null?` · tempo médio para fechar: <b>${media} dia${media===1?"":"s"}</b>`:""}</p>
+    <div class="anp-rola"><table class="anp-tab ad-hist"><thead><tr>
+      <th>Nº</th><th>O quê</th><th>Unidade · local</th><th class="ce">Antes</th><th class="ce">Depois</th><th class="ce">Situação</th><th></th>
+    </tr></thead><tbody>${ordem.map(r=>{
+      const ok=adTemDepois(r), d=ok?adDias(r.data_antes,r.data_depois):adDias(r.data_antes);
+      return `<tr class="${ok?"ad-h-ok":"ad-h-aberto"}">
+        <td class="ce">${esc(r.codigo||"—")}</td>
+        <td><b>${esc(r.titulo||"Sem título")}</b>${r.responsavel?`<br><span class="anp-sem">Responsável: ${esc(r.responsavel)}</span>`:""}</td>
+        <td>${esc([r.unidade,r.local].filter(Boolean).join(" · ")||"—")}</td>
+        <td class="ce">${esc(adData(r.data_antes)||"—")}</td>
+        <td class="ce">${ok?esc(adData(r.data_depois)||"—"):"—"}</td>
+        <td class="ce">${ok?`<span class="ad-tag ok">Fechado${d!=null?` em ${d} d`:""}</span>`:`<span class="ad-tag aberto">Aberto${d!=null?` há ${d} d`:""}</span>`}</td>
+        <td class="ce"><button type="button" class="anp-btn mini" data-ad-abrir="${esc(r.id)}">Abrir</button>${ok?"":` <button type="button" class="anp-btn mini" data-ad-depois="${esc(r.id)}">Tirar o depois</button>`}</td>
+      </tr>`; }).join("")}</tbody></table></div>`;
 }
 
 async function adPreencherFotos(raiz){
@@ -6969,7 +7017,8 @@ $("#painel-ad").addEventListener("click",ev=>{
   let el;
   if(q("[data-ad-novo]")){ adAtual=adNovo(); adMostrar("form"); return; }
   if(q("[data-ad-rascunho]")){ adAtual=adLerRascunho(); if(adAtual)adMostrar("form"); return; }
-  if(el=q("[data-ad-sit]")){ adFiltro.sit=el.dataset.adSit; adRenderLista(); return; }
+  if(el=q("[data-ad-sit]")){ adFiltro.sit=el.dataset.adSit; adFiltro.vista="grade"; adRenderLista(); return; }
+  if(el=q("[data-ad-vista]")){ adFiltro.vista=el.dataset.adVista; adRenderLista(); return; }
   if(q("[data-ad-galeria]")){ adPrevia(adFiltrados(),true,"lista"); return; }
   if(el=q("[data-ad-depois]")){ adAbrir(el.dataset.adDepois); adTirarFoto("depois"); return; }
   if(el=q("[data-ad-rel]")){ const r=adRegs.find(x=>x.id===el.dataset.adRel); if(r)adPrevia([r],false,"lista"); return; }
