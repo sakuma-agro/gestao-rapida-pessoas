@@ -16,6 +16,9 @@ window.SAKUMA_BASE = {
 
 (function(){
   var real = window.localStorage, P = "lopvs:";
+  /* a guarda de verdade, sem prefixo: o lop-depois.js lê dela os rascunhos
+     que ficaram do app antigo neste aparelho (mesmo endereço) */
+  window.VS_LS_REAL = real;
   var guarda = {
     getItem: function(k){ return real.getItem(P + k); },
     setItem: function(k, v){ return real.setItem(P + k, v); },
@@ -49,6 +52,9 @@ window.SAKUMA_BASE = {
     + ".an-sub,.ad-chips{display:none!important}"
     + ".lop-acoes{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin:0 0 16px}"
     + ".lop-acoes .bt{margin:0}"
-    + "@media print{.lop-acoes{display:none!important}}";
+    + ".lop-trazer{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;background:#FBEBC8;border:1px solid #E3B95C;"
+    + "border-radius:10px;padding:12px 14px;margin:0 0 16px;font-size:14px;color:#5A3A1A}"
+    + ".lop-trazer b{color:#5A3A1A}.lop-trazer .bt{margin-left:auto}"
+    + "@media print{.lop-acoes,.lop-trazer{display:none!important}}";
   document.head.appendChild(s);
 })();

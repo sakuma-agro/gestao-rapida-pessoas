@@ -162,7 +162,56 @@
     });
     painel.insertBefore(barra, painel.firstChild);
   }
-  const depoisDoCarregar = () => { setTimeout(() => { moverAcoes(); observar(); avisarNumeros(); }, 0); };
+  /* ─── rascunho que ficou no app antigo (14/10/2026) ───
+     Um relatório de anomalias foi feito no app antigo na hora da mudança e
+     não chegou a ser salvo: ficou só no aparelho, como rascunho (com as fotos
+     dentro). O app antigo e o LOP moram no mesmo endereço, então daqui dá para
+     ler esse rascunho e trazê-lo para o LOP — aí é só conferir e Salvar. */
+  const TIPOS_ANTIGOS = [
+    { chave: "sakuma-an-rascunho", nome: "relatório de anomalias",
+      tem: r => !!r && (!!String(r.local || "").trim() || (r.itens || []).some(i => String(i.problema || "").trim() || i._fotoSrc || i.foto)),
+      resumo: r => [r.local || "sem local", (r.itens || []).length + " anomalia" + ((r.itens || []).length === 1 ? "" : "s"),
+                    r.data ? String(r.data).split("-").reverse().join("/") : ""].filter(Boolean).join(" · "),
+      abrir: r => { anAtual = r; anVista = "apontamento"; document.getElementById("t-an").click(); } },
+    { chave: "sakuma-ad-rascunho", nome: "antes e depois",
+      tem: r => !!r && (!!String(r.titulo || "").trim() || !!r._antesSrc || !!r._depoisSrc),
+      resumo: r => [r.titulo || "sem título", r.unidade, r.data_antes ? String(r.data_antes).split("-").reverse().join("/") : ""].filter(Boolean).join(" · "),
+      abrir: r => { adAtual = r; adMostrar("form"); } },
+  ];
+  function rascunhosAntigos(){
+    const real = window.VS_LS_REAL; if (!real) return [];
+    const ler = k => { try { const t = real.getItem(k); return t ? JSON.parse(t) : null; } catch (e) { return null; } };
+    return TIPOS_ANTIGOS.map(t => {
+      const velho = ler(t.chave);
+      if (!t.tem(velho)) return null;
+      if (real.getItem(t.chave + ":levado-lop") === String(velho.id)) return null;   // já trazido
+      const aqui = ler("lopvs:" + t.chave);
+      return { t, velho, ocupado: t.tem(aqui) && String(aqui.id) !== String(velho.id) };
+    }).filter(Boolean);
+  }
+  function mostrarTrazer(){
+    document.querySelectorAll(".lop-trazer").forEach(x => x.remove());
+    const palco = document.querySelector("main.palco"); if (!palco) return;
+    rascunhosAntigos().forEach(({ t, velho, ocupado }) => {
+      const d = document.createElement("div");
+      d.className = "lop-trazer";
+      d.innerHTML = `<span>Neste aparelho ficou um <b>${t.nome}</b> feito no app antigo e ainda não salvo: <b>${esc(t.resumo(velho))}</b>.`
+        + (ocupado ? ` Salve ou descarte antes o ${t.nome} que está aberto aqui no LOP.` : "") + `</span>`
+        + `<button class="bt bt-forte" type="button"${ocupado ? " disabled" : ""}>Trazer para o LOP</button>`;
+      d.querySelector("button").onclick = () => {
+        const real = window.VS_LS_REAL;
+        const r = JSON.parse(JSON.stringify(velho));
+        r._novo = true; r.codigo = "";      // entra como novo no LOP, com o número do LOP
+        try { real.setItem("lopvs:" + t.chave, JSON.stringify(r)); real.setItem(t.chave + ":levado-lop", String(velho.id)); } catch (e) {}
+        d.remove();
+        t.abrir(r);
+        toast("Trouxe o rascunho do app antigo. Confira e toque em Salvar.");
+      };
+      palco.insertBefore(d, palco.firstChild);
+    });
+  }
+
+  const depoisDoCarregar = () => { setTimeout(() => { moverAcoes(); observar(); avisarNumeros(); mostrarTrazer(); }, 0); };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", depoisDoCarregar);
   else depoisDoCarregar();
 })();
