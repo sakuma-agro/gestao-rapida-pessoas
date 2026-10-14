@@ -28,11 +28,16 @@ export const AREAS = [
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
   { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
     desc: 'Vistorias · Checklists · Anomalias · Extintores' },
+  /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
+     quem entra e o que vê" virou um cartão da tela principal. É a tela
+     telaConfig (quem acessa o quê + backup), só para administrador. */
+  { id: 'usuarios', nome: 'Usuários - Acessos', icone: 'icons/area-usuarios.v1.svg',
+    desc: 'Quem acessa o quê · Senhas · Backup dos dados' },
 ];
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '6';
+const VERSAO_VIST = '7';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
@@ -65,8 +70,8 @@ const VIST_MODULOS = [
     { id: 'vsSubPainel', nome: 'Painel geral', telas: [['vsPainel', 'Painel geral']] },
     { id: 'vsSubRelatorio', nome: 'Relatório da vistoria', telas: [['vsRelatorio', 'Relatório da vistoria']] },
   ] },
-  /* Configurações: fora da barra de módulos (pedido dele) — entra pela tela principal. */
-  { id: 'vsCfg', nome: 'Vistorias e Segurança', icone: 'config', foraDaBarra: true, subs: [
+  /* Configurações do Vistorias (prazos, normas, anomalias, checklists): à direita da barra */
+  { id: 'vsCfg', nome: 'Configurações', icone: 'config', direita: true, subs: [
     { id: 'vsSubConfig', nome: 'Configurações', telas: [['vsConfig', 'Configurações']] },
   ] },
 ];
@@ -95,6 +100,7 @@ function liberada(id) {
   /* Vistorias e Segurança (14/10/2026): administrador ou módulo 'vistorias' —
      a mesma regra do banco (vistorias.pode_usar). */
   if (id === 'vistorias') return acesso.admin || (acesso.modulos || []).includes('vistorias');
+  if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
 export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.id));
@@ -164,15 +170,8 @@ export function mostrarAreas({ direto = false } = {}) {
   $('arGrade').querySelectorAll('[data-area]:not([disabled])').forEach(b =>
     b.addEventListener('click', () => entrarNaArea(b.dataset.area)));
 
-  /* Configurações moram só aqui, na tela principal (14/10/2026, pedido dele).
-     Quem entra e o que vê (todas as áreas) é do administrador; as do
-     Vistorias (normas, anomalias, checklists) são de quem entra na área. */
-  $('arPe').innerHTML = (acesso.admin
-    ? '<button type="button" class="btn mini" id="arConfig">Configurações · quem entra e o que vê</button>' : '')
-    + (liberada('vistorias')
-      ? '<button type="button" class="btn mini" id="arConfigVist">Configurações · Vistorias e Segurança</button>' : '');
-  $('arConfig')?.addEventListener('click', () => entrarNaArea('pessoas', 'config'));
-  $('arConfigVist')?.addEventListener('click', () => entrarNaArea('vistorias', 'config'));
+  // "Configurações · quem entra e o que vê" virou o cartão Usuários - Acessos.
+  $('arPe').innerHTML = '';
 
   aoTrocar('areas');
 }
@@ -196,6 +195,14 @@ export function entrarNaArea(id, tela, extra) {
     return;
   }
 
+  if (id === 'usuarios') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('config');
+    return;
+  }
+
   if (id === 'certificacao') {
     // O menu é a faixa do módulo 'cert'; a barra de módulos de Pessoas some.
     $('navModulos').hidden = true;
@@ -205,7 +212,7 @@ export function entrarNaArea(id, tela, extra) {
 
   if (id === 'vistorias') {
     if (!barraVist())
-      pintarModulos(VIST_MODULOS.filter(m => !m.foraDaBarra).map(m => ({ id: m.id, nome: m.nome, icone: m.icone })));
+      pintarModulos(VIST_MODULOS.map(m => ({ id: m.id, nome: m.nome, icone: m.icone, direita: m.direita })));
     $('navModulos').hidden = false;
     desmarcarModulos();
     vistPendente = null;

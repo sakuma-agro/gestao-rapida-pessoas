@@ -47,8 +47,6 @@ window.SAKUMA_BASE = {
     /* Anomalias e Antes e Depois: o que era botão aqui dentro (Apontamento,
        Painel, Histórico; Todos, Em aberto, Fechados) virou submódulo no topo */
     + ".an-sub,.ad-chips{display:none!important}"
-    /* Configurações só na tela principal do LOP (14/10/2026): sai o atalho daqui */
-    + ".ql-item[data-ir=\"config\"]{display:none!important}"
     + ".lop-acoes{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;margin:0 0 16px}"
     + ".lop-acoes .bt{margin:0}"
     + "@media print{.lop-acoes{display:none!important}}";
