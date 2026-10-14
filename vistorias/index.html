@@ -7532,6 +7532,7 @@ async function anSalvar(){
     }
     try{ localStorage.setItem(AN_NOME,String(r.responsavel).trim()); }catch(e){}
     const corpo={local:String(r.local).trim(),responsavel:String(r.responsavel).trim(),data:r.data||null,
+      observacoes:String(r.observacoes||"").trim()||null,
       itens:r.itens.map(anLimparItem),assinatura:r.assinatura||null,assinado_em:r.assinado_em||null};
     let salvo;
     if(r._novo){
@@ -7632,6 +7633,7 @@ function anRenderApontamento(){
       <div class="campo"><label for="an-resp">Quem está fazendo o relatório *</label><input type="text" id="an-resp" data-an-rel="responsavel" value="${esc(r.responsavel)}" placeholder="Seu nome"></div>
       <div class="campo"><label for="an-data">Data</label><input type="date" id="an-data" data-an-rel="data" value="${esc(r.data||"")}"></div>
       ${r._novo?"":`<div class="campo"><label for="an-cod">Número</label><input type="text" id="an-cod" data-an-rel="codigo" value="${esc(r.codigo||"")}"></div>`}
+      <div class="campo" style="grid-column:1/-1"><label for="an-obs">Observação</label><textarea id="an-obs" data-an-rel="observacoes" rows="2" placeholder="Algo que vale para o relatório todo (opcional)">${esc(r.observacoes||"")}</textarea></div>
     </div></div>
     <datalist id="an-locais">${anLocais().map(u=>`<option value="${esc(u)}">`).join("")}</datalist>
     <datalist id="an-resps">${anResponsaveis().map(u=>`<option value="${esc(u)}">`).join("")}</datalist>
@@ -8086,6 +8088,7 @@ async function anMontarDoc(r){
     <table class="anr-quadro"><tbody>
       <tr><th>Local</th><td>${esc(r.local||"—")}</td><th>Data</th><td>${esc(anData(r.data)||"—")}</td></tr>
       <tr><th>Responsável pelos apontamentos</th><td colspan="3">${esc(r.responsavel||"—")}</td></tr>
+      ${String(r.observacoes||"").trim()?`<tr><th>Observação</th><td colspan="3">${anNl(r.observacoes)}</td></tr>`:""}
     </tbody></table>
     <div class="anr-kpis">
       <div><b>${its.length}</b><span>anomalia${its.length===1?"":"s"}</span></div>

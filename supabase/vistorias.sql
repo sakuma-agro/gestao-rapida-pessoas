@@ -123,6 +123,8 @@ create table if not exists vistorias.anomalias_relatorios (
   criado_em timestamptz not null default now(), atualizado_em timestamptz not null default now()
 );
 create index if not exists anomalias_relatorios_data_idx on vistorias.anomalias_relatorios (data desc);
+-- Observação do relatório (14/10/2026)
+alter table vistorias.anomalias_relatorios add column if not exists observacoes text;
 
 -- Fotos no Google Drive (conta escritoriosakuma1): caminho → arquivo no Drive.
 create table if not exists vistorias.fotos_drive (
