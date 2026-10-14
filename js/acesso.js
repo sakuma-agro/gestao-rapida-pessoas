@@ -118,6 +118,7 @@ export const MODULOS = [
     { id: 'gestaoJornada', nome: 'Gestão de jornada', telas: [
       ['jorLancar',       'Lançar jornada'],
       ['jorBoletins',     'Lançados'],
+      ['jorExtras',       'Horas 50% e 100%'],
       ['jorAbatimento',   'Abatimento de horas'],
       ['jorFechamento',   'Fechamento'],
       ['jorHistorico',    'Histórico de fechamentos'],

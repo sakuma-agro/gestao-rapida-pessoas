@@ -39,6 +39,7 @@ const PROPRIOS = {
   jorPainel:     ['painel', 'Painel DP'],
   jorLancar:     ['relogio', 'Lançar jornada'],
   jorBoletins:   ['relogio', 'Jornadas lançadas'],
+  jorExtras:     ['relogio', 'Horas 50% e 100%'],
   jorFechamento: ['calendario', 'Fechamento DP'],
   jorHistorico: ['calendario', 'Histórico de fechamentos'],
   jorRelatorios: ['documento', 'Relatórios DP'],

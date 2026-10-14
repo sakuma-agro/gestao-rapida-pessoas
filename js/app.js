@@ -111,6 +111,7 @@ function abrirAba(nome) {
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
+  $('telaJorExtras').hidden       = nome !== 'jorExtras';
   $('telaJorFechamento').hidden   = nome !== 'jorFechamento';
   $('telaJorAbatimento').hidden   = nome !== 'jorAbatimento';
   $('telaJorHistorico').hidden    = nome !== 'jorHistorico';
