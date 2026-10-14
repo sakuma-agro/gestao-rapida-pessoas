@@ -9,6 +9,7 @@
 //
 // Área nova no futuro: um item em AREAS e a regra dela em liberada().
 import { estado } from './store.js';
+import { desenharBackupInicio } from './backup.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -142,6 +143,16 @@ function pintarEtiqueta() {
   $('areaIcone').src = a.icone;
 }
 
+/* Recado do backup: o mesmo #avisoGlobal do resto do app, um pouco mais
+   demorado porque a frase diz onde os arquivos foram parar. */
+function avisarInicio(texto) {
+  const a = $('avisoGlobal');
+  if (!a) return;
+  a.textContent = texto; a.className = 'aviso ok'; a.hidden = false;
+  clearTimeout(avisarInicio.t);
+  avisarInicio.t = setTimeout(() => { a.hidden = true; a.className = 'aviso info'; }, 9000);
+}
+
 /** A tela das áreas. Com uma área só, nem aparece: entra direto nela. */
 export function mostrarAreas({ direto = false } = {}) {
   window.grCliente = estado.cliente;
@@ -171,7 +182,14 @@ export function mostrarAreas({ direto = false } = {}) {
     b.addEventListener('click', () => entrarNaArea(b.dataset.area)));
 
   // "Configurações · quem entra e o que vê" virou o cartão Usuários - Acessos.
+  /* Backup de todo o app (14/10/2026, pedido dele): faixa na tela inicial,
+     só para administrador. Salva direto na pasta escolhida (js/backup.js). */
   $('arPe').innerHTML = '';
+  if (acesso.admin) {
+    desenharBackupInicio($('arPe'), avisarInicio).catch(e => {
+      $('arPe').innerHTML = `<p class="dica">Backup indisponível: ${esc(e.message || e)}</p>`;
+    });
+  }
 
   aoTrocar('areas');
 }

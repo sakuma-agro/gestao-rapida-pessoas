@@ -1174,6 +1174,16 @@ dialog.rs-largo form{max-height:88vh;overflow:auto}
 .ar-cartao.ar-embreve img{filter:grayscale(1);opacity:.55}
 .ar-cartao.ar-embreve .ar-ir{color:var(--suave);font-weight:600}
 .ar-pe{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
+/* Backup de todo o app — faixa da tela inicial, só administrador (14/10/2026) */
+.ar-backup{flex:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;
+  border:1px dashed var(--linha);border-left:4px solid var(--marrom);border-radius:12px;background:var(--papel)}
+.arb-icone{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;
+  color:var(--marrom);background:rgba(116,79,40,.10)}
+.arb-txt{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px}
+.arb-txt b{font-size:15px}
+.arb-txt small{color:var(--suave);font-size:12.5px}
+.arb-botoes{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:560px){.arb-botoes{width:100%}.arb-botoes .btn{flex:1}}
 
 /* ---- área Manutenções: a moldura ocupa a tela abaixo do topo ---- */
 body.na-moldura main{max-width:none;padding:0}
