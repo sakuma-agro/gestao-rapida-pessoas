@@ -298,7 +298,44 @@ function tabelaDestinos() {
    J.2 — LANÇAR BOLETIM (com o painel "Apurado" ao vivo)
    =================================================================== */
 
+/* Rascunho do Lançar jornada (14/10/2026, pedido dele): ir a Lançados ou
+   Fechamento para conferir algo e voltar não pode apagar o que já estava
+   digitado. Toda vez que a tela é redesenhada, o formulário que estava ali é
+   lido antes (guardarRascunho) e devolvido depois (restaurarRascunho). O
+   formulário em modo Editar não vira rascunho nem recebe o rascunho — ao
+   terminar a edição, o lançamento que estava pela metade volta. "Limpar"
+   apaga o rascunho junto. Fica só na memória da aba: fechar o app zera. */
+const CAMPOS_RASCUNHO = ['bCadastro','bFunc','bNumero','bData','bTipo','bMotivo','bIni','bFim','bInterv',
+  'bMIni','bMFim','bMInterv','bMOrigem','bMMotivo','bEspecial','bObs'];
+let rascunho = null;
+
+function guardarRascunho() {
+  const form = $('jorFormBoletim');
+  if (!form || $('bEditando')) return;   // sem formulário ou em edição: o rascunho guardado continua
+  const r = { valores: {}, dif: $('bDif').checked, insal: $('bInsal').checked, nivel: nivelMarcado(),
+    dica: $('bJorPadrao').textContent, cadAviso: $('bCadAviso').innerHTML };
+  CAMPOS_RASCUNHO.forEach(id => { r.valores[id] = $(id)?.value ?? ''; });
+  rascunho = r;
+}
+
+function restaurarRascunho() {
+  const r = rascunho;
+  if (!r || estadoTela.editando) return false;
+  const opcao = (id, v) => !$(id) || $(id).tagName !== 'SELECT' || !v || [...$(id).options].some(o => o.value === v);
+  CAMPOS_RASCUNHO.forEach(id => { if ($(id) && opcao(id, r.valores[id])) $(id).value = r.valores[id]; });
+  $('bDif').checked = !!r.dif;
+  $('bInsal').checked = !!r.insal;
+  document.querySelectorAll('input[name="bNivel"]').forEach(x => { x.checked = x.value === r.nivel; });
+  $('bJorPadrao').textContent = r.dica || '';
+  if (r.cadAviso) $('bCadAviso').innerHTML = r.cadAviso;
+  mostrarDiaAuto(); mostrarMotivo();
+  if (!$('bMotivoRot').hidden) $('bMotivo').value = r.valores.bMotivo || '';
+  mostrarMarcado();
+  return true;
+}
+
 function desenharLancar() {
+  guardarRascunho();
   const ativos = jd.pessoasDp()
     .filter(f => (f.situacao || 'ATIVO') === 'ATIVO' && jd.vinculoDe(f.id));
 
@@ -395,13 +432,16 @@ function desenharLancar() {
     buscarPorCadastro(); preencherJornadaPadrao(); mostrarApurado(); carregarDia();
   });
   $('bLimpar').addEventListener('click', () => {
+    rascunho = null;
     $('jorFormBoletim').reset(); $('bCadAviso').innerHTML = ''; $('bJorPadrao').textContent = '';
     mostrarDiaAuto(); mostrarMotivo(); mostrarMarcado(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
   prepararEdicao();
+  const voltou = restaurarRascunho();
   mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
-  carregarDia();
+  if (voltou && !$('bMotivoRot').hidden) $('bMotivo').value = rascunho.valores.bMotivo || '';
+  carregarDia(voltou);   // voltou do rascunho: o horário digitado fica como estava
 }
 
 /* ---------- Complemento do dia (28/09/2026) ----------
@@ -415,7 +455,7 @@ const dia = { chave: '', boletins: [], apuracoes: [] };
 const outrosDoDia = (fid, data) => (fid + '|' + data) !== dia.chave ? []
   : dia.boletins.filter(b => b.id !== estadoTela.editando && b.situacao !== 'cancelado' && b.hora_ini && b.hora_fim);
 
-async function carregarDia() {
+async function carregarDia(manterHorario = false) {
   const fid = $('bFunc')?.value, data = $('bData')?.value;
   const chave = fid && data ? fid + '|' + data : '';
   if (!chave) { dia.chave = ''; dia.boletins = []; dia.apuracoes = []; mostrarDiaJa(); return; }
@@ -423,7 +463,7 @@ async function carregarDia() {
   const r = await jd.boletinsDoDia(fid, data);
   if ((($('bFunc')?.value || '') + '|' + ($('bData')?.value || '')) !== chave) return;   // trocou no meio
   Object.assign(dia, { chave, boletins: r.boletins, apuracoes: r.apuracoes });
-  if (!estadoTela.editando) preencherJornadaPadrao();
+  if (!estadoTela.editando && !manterHorario) preencherJornadaPadrao();
   mostrarDiaJa(); mostrarApurado();
 }
 
