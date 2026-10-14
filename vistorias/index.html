@@ -8171,6 +8171,34 @@ abrirApp=async function(){ const r=await _abrirAppAN.apply(this,arguments); anCa
 if(new URLSearchParams(location.search).get("aba")==="an")anMostrar("apontamento");
 if(conectado())anCarregar();
 
+/* ─────────── a área mudou para o LOP (14/10/2026) ───────────
+   Só no app avulso. Se neste aparelho tiver um relatório de anomalias (ou um
+   antes e depois) começado e não salvo, uma faixa leva para o LOP - Gestão
+   Rápida no MESMO navegador — é nele que o LOP consegue ler este rascunho e
+   oferece "Trazer para o LOP". */
+(function(){
+  if(window.VS_LOP)return;
+  const LOP="https://sakuma-agro.github.io/gestao-rapida-pessoas/?area=vistorias";
+  const ler=k=>{ try{ const t=localStorage.getItem(k); return t?JSON.parse(t):null; }catch(e){ return null; } };
+  function faixaLop(){
+    document.querySelectorAll(".vs-ir-lop").forEach(x=>x.remove());
+    const an=ler("sakuma-an-rascunho"), ad=ler("sakuma-ad-rascunho");
+    const temAn=!!an&&(String(an.local||"").trim()||(an.itens||[]).some(i=>String(i.problema||"").trim()||i._fotoSrc||i.foto));
+    const temAd=!!ad&&(String(ad.titulo||"").trim()||ad._antesSrc||ad._depoisSrc);
+    if(!temAn&&!temAd)return;
+    const o=[temAn?`relatório de anomalias (${esc(an.local||"sem local")} · ${(an.itens||[]).length} anomalia${(an.itens||[]).length===1?"":"s"})`:"",
+             temAd?`antes e depois (${esc(ad.titulo||"sem título")})`:""].filter(Boolean).join(" e ");
+    const d=document.createElement("div");
+    d.className="vs-ir-lop";
+    d.style.cssText="display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;background:#FBEBC8;border:1px solid #E3B95C;border-radius:10px;padding:12px 14px;margin:0 0 16px;font-size:14px;color:#5A3A1A";
+    d.innerHTML=`<span>Este app passou para o <b>LOP - Gestão Rápida</b>. Neste aparelho tem um <b>${o}</b> ainda não salvo. Leve para o LOP e salve lá.</span>
+      <a class="bt bt-forte" href="${LOP}" style="margin-left:auto;text-decoration:none">Levar para o LOP</a>`;
+    const palco=document.querySelector("main.palco"); if(palco)palco.insertBefore(d,palco.firstChild);
+  }
+  faixaLop();
+  setInterval(faixaLop,15000);
+})();
+
 </script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
