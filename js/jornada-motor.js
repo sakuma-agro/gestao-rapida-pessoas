@@ -171,9 +171,11 @@ export function apurarDia(e) {
   const minTrabalhados = Math.max(0, somaUnidas - intervaloReal);
   linhas.push(`Trabalhado: ${minParaHHMM(minTrabalhados)} (${(e.boletins || []).length} boletim(ns), intervalo ${intervaloReal} min)`);
 
-  // 4. Intervalo suprimido (RN-143 · art. 71 §4º, Lei 13.467/2017).
-  //    Apenas o período suprimido, 50%, INDENIZATÓRIO, em coluna própria.
-  //    Sai do cálculo da hora extra para não pagar duas vezes.
+  // 4. Intervalo suprimido (art. 71 §4º).
+  //    14/10/2026, decisão dele: o funcionário que não faz intervalo tem esses
+  //    minutos SOMADOS às horas extras do dia (antes, RN-143, iam para uma
+  //    coluna própria e saíam da hora extra). O valor continua sendo apurado
+  //    e mostrado, só para conferência — não é pago à parte.
   //    O descanso real é o intervalo declarado MAIS os vãos entre boletins
   //    do mesmo dia (quem sai 13:00 e volta 14:00 descansou uma hora).
   const intervaloPrevisto = jd && jd.int ? jd.int : 0;
@@ -185,7 +187,7 @@ export function apurarDia(e) {
     ? Math.max(0, intervaloPrevisto - descansoReal)
     : 0;
   if (minIntervaloSuprimido > 0) {
-    linhas.push(`Intervalo suprimido: ${minIntervaloSuprimido} min → coluna própria, 50%, indenizatório`);
+    linhas.push(`Intervalo não feito: ${minIntervaloSuprimido} min → já somado às horas extras`);
   }
 
   let minExtra50 = 0, minExtra100 = 0, minDeficit = 0, contaDias = 0;
@@ -204,12 +206,12 @@ export function apurarDia(e) {
     }
   } else if (situacao === 'DOMINGO' || situacao === 'FERIADO') {
     // 5b. Domingo e feriado: TODO o tempo trabalhado é extra (RN-15/RN-16).
-    const extra = Math.max(0, minTrabalhados - minIntervaloSuprimido) + heEspecial;
+    const extra = minTrabalhados + heEspecial;
     if (percentual >= 100) minExtra100 = extra; else minExtra50 = extra;
     linhas.push(`Todo o tempo do dia é extra a ${percentual}%: ${minParaHHMM(extra)}`);
   } else {
     // 5c. Dia útil e sábado.
-    const bruto = minTrabalhados - minPrevistos - minIntervaloSuprimido;
+    const bruto = minTrabalhados - minPrevistos;
     const marcacoes = Math.max(2, faixas.length * 2);
     const limite = Math.min(
       num(p, 'tolerancia_dia_min', 10),

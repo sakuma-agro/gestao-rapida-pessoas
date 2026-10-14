@@ -630,3 +630,7 @@
    separa a área de lançamento do fundo cinza da página. */
 .jor-lancar { background: var(--papel, #fff); border: 1px solid var(--linha, #E3E5DE); border-top: 0; border-radius: 0 0 12px 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .05); }
+
+/* Total de extras do lançamento no quadro Apurado (14/10/2026) */
+.jor-apurado__grade .jor-apurado__tot { border-top: 1px solid #DCE3CF; padding-top: 4px; margin-top: 2px; color: #4E7D00; font-weight: 700; }
+.jor-apurado__grade dd.jor-apurado__tot { color: #4E7D00; }

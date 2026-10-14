@@ -190,7 +190,7 @@ export function relatorioDP(competencia, destinoId) {
     return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas de competência anterior</b>, lançadas depois do envio
       daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
       Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
-    ${supr ? `<div class="rel-resumo"><b>Intervalo suprimido:</b> ${minParaHHMM(supr)} nesta folha — verba indenizatória, art. 71 §4º da CLT, paga à parte das horas extras (ver Relatório Detalhado).</div>` : ''}
+    ${supr ? `<div class="rel-resumo"><b>Intervalo não feito:</b> ${minParaHHMM(supr)} nesta folha — já somado às horas extras.</div>` : ''}
 `;   // a frase de explicação das colunas saiu a pedido dele (28/09/2026)
   };
 
@@ -564,7 +564,7 @@ export function relatorioDetalhado(competencia, destinoId) {
         <th class="rel-num">Matr.</th><th>Funcionário</th><th>Unidade</th>
         <th class="rel-num">50%</th><th class="rel-num">100%</th>
         ${c.totais.atrasados ? '<th class="rel-num">Comp. ant.</th>' : ''}
-        <th class="rel-num">Interv. supr.</th><th class="rel-num">Déficit</th>
+        <th class="rel-num">Interv. não feito*</th><th class="rel-num">Déficit</th>
         <th class="rel-num">Noturnas</th><th class="rel-num">Faltas</th>
       </tr></thead>
       <tbody>${c.linhas.map(l => `<tr>
@@ -593,9 +593,8 @@ export function relatorioDetalhado(competencia, destinoId) {
     ${secaoRelatorioDP(competencia, destinoId)}
     <div class="rel-resumo">
       <b>Como ler esta abertura.</b>
-      O <b>intervalo suprimido</b> não está somado às horas extras: é o período efetivamente
-      suprimido, pago com 50% e de natureza <b>indenizatória</b> (art. 71 §4º da CLT, redação
-      da Lei 13.467/2017). As <b>noturnas</b> são registradas para conferência; o adicional
+      O <b>intervalo não feito</b> (suprimido) já está somado às horas extras do dia, no
+      percentual do dia; a coluna própria é só para conferência. As <b>noturnas</b> são registradas para conferência; o adicional
       noturno está desligado por parâmetro. Faltas já consideram a compensação por horas
       extras: só é informada a falta que as extras do próprio mês não cobriram.
       ${c.totais.atrasados ? `<br><b>Comp. ant.</b> são horas de um mês já enviado, lançadas depois e pagas neste; não entram nos 50% e 100% do mês nem abatem falta dele.` : ''}
@@ -713,7 +712,7 @@ export function planilhaDP(competencia, destinoId) {
   const h = m => formatarHoras(m, fmt);
 
   const colunas = ['Codigo da empresa', 'Matricula', 'CPF', 'Nome', 'Unidade', 'CAEPF',
-                   'Horas extras', 'Horas extras de competencia anterior (ja somadas)', 'Deficit', 'Intervalo suprimido (min)',
+                   'Horas extras', 'Horas extras de competencia anterior (ja somadas)', 'Deficit', 'Intervalo nao feito (min, ja somado as extras)',
                    'Faltas (dias)', 'Faltas justificadas a descontar (dias)', 'Atestado (dias)', 'Emprestimo a descontar'];
 
   const linhas = c.linhas.map(l => [

@@ -243,7 +243,7 @@ export function podeEnviar(consolidado) {
 
   const comSuprimido = linhas.filter(l => l.minIntervaloSuprimido > 0);
   if (comSuprimido.length) {
-    informativos.push(`${comSuprimido.length} pessoa(s) com intervalo suprimido — verba indenizatória, em coluna própria.`);
+    informativos.push(`${comSuprimido.length} pessoa(s) com intervalo não feito — já somado às horas extras.`);
   }
 
   return { bloqueios, informativos, pode: bloqueios.length === 0 };

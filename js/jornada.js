@@ -855,8 +855,9 @@ function mostrarApurado() {
       <dt>Trabalhado</dt><dd>${minParaHHMM(r.minTrabalhados)}</dd>
       <dt>Extra 50%</dt><dd>${horas(r.minExtra50)}</dd>
       <dt>Extra 100%</dt><dd>${horas(r.minExtra100)}</dd>
+      <dt class="jor-apurado__tot">Total de extras</dt><dd class="jor-apurado__tot">${horas(r.minExtra50 + r.minExtra100)}</dd>
       <dt>Déficit</dt><dd>${horas(r.minDeficit)}</dd>
-      <dt>Interv. suprimido</dt><dd>${r.minIntervaloSuprimido} min</dd>
+      <dt>Interv. não feito</dt><dd>${r.minIntervaloSuprimido} min${r.minIntervaloSuprimido ? ' <span class="dc-sem">(nas extras)</span>' : ''}</dd>
       <dt>Noturnas</dt><dd>${minParaHHMM(r.minNoturnos)}</dd>
     </dl>
     ${r.avisos.length ? `<ul class="jor-avisos">${r.avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
