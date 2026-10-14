@@ -32,7 +32,7 @@ export const AREAS = [
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '5';
+const VERSAO_VIST = '6';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
@@ -65,7 +65,8 @@ const VIST_MODULOS = [
     { id: 'vsSubPainel', nome: 'Painel geral', telas: [['vsPainel', 'Painel geral']] },
     { id: 'vsSubRelatorio', nome: 'Relatório da vistoria', telas: [['vsRelatorio', 'Relatório da vistoria']] },
   ] },
-  { id: 'vsCfg', nome: 'Configurações', icone: 'config', direita: true, subs: [
+  /* Configurações: fora da barra de módulos (pedido dele) — entra pela tela principal. */
+  { id: 'vsCfg', nome: 'Vistorias e Segurança', icone: 'config', foraDaBarra: true, subs: [
     { id: 'vsSubConfig', nome: 'Configurações', telas: [['vsConfig', 'Configurações']] },
   ] },
 ];
@@ -163,10 +164,15 @@ export function mostrarAreas({ direto = false } = {}) {
   $('arGrade').querySelectorAll('[data-area]:not([disabled])').forEach(b =>
     b.addEventListener('click', () => entrarNaArea(b.dataset.area)));
 
-  // Configurações (quem entra e o que vê, em todas as áreas) é do administrador.
-  $('arPe').innerHTML = acesso.admin
-    ? '<button type="button" class="btn mini" id="arConfig">Configurações · quem entra e o que vê</button>' : '';
+  /* Configurações moram só aqui, na tela principal (14/10/2026, pedido dele).
+     Quem entra e o que vê (todas as áreas) é do administrador; as do
+     Vistorias (normas, anomalias, checklists) são de quem entra na área. */
+  $('arPe').innerHTML = (acesso.admin
+    ? '<button type="button" class="btn mini" id="arConfig">Configurações · quem entra e o que vê</button>' : '')
+    + (liberada('vistorias')
+      ? '<button type="button" class="btn mini" id="arConfigVist">Configurações · Vistorias e Segurança</button>' : '');
   $('arConfig')?.addEventListener('click', () => entrarNaArea('pessoas', 'config'));
+  $('arConfigVist')?.addEventListener('click', () => entrarNaArea('vistorias', 'config'));
 
   aoTrocar('areas');
 }
@@ -183,7 +189,7 @@ export function entrarNaArea(id, tela, extra) {
     if (barraVist()) montarMenu();
     $('navModulos').hidden = false;
     if (tela === 'config') {
-      $('navModulos').querySelector('[data-modulo="config"]')?.click();
+      abrirModulo('config');
     } else {
       mostrarInicio();
     }
@@ -199,7 +205,7 @@ export function entrarNaArea(id, tela, extra) {
 
   if (id === 'vistorias') {
     if (!barraVist())
-      pintarModulos(VIST_MODULOS.map(m => ({ id: m.id, nome: m.nome, icone: m.icone, direita: m.direita })));
+      pintarModulos(VIST_MODULOS.filter(m => !m.foraDaBarra).map(m => ({ id: m.id, nome: m.nome, icone: m.icone })));
     $('navModulos').hidden = false;
     desmarcarModulos();
     vistPendente = null;
@@ -210,9 +216,11 @@ export function entrarNaArea(id, tela, extra) {
       molduraVistCarregada = true;
       vistPronta = false;
       moldura.src = 'vistorias/?v=' + VERSAO_VIST + (extra ? '&' + extra : '');
-    } else {
+    } else if (tela !== 'config') {
       try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
+    // vindo da tela principal: abre direto nas Configurações do Vistorias
+    if (tela === 'config') abrirModulo('vsCfg', 'vsConfig');
     return;
   }
 

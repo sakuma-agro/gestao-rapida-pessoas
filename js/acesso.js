@@ -398,8 +398,9 @@ export function montarMenu(callback) {
   if (callback) aoTrocar = callback;
   /* Módulos como botões com ícone (30/09/2026, pedido dele: "dar mais
      destaque"). O aberto fica verde cheio; Configurações vai para a direita. */
-  pintarModulos(modulosLiberados().map(m => ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista' }))
-    .concat(acesso.admin ? [{ id: 'config', nome: 'Configurações', icone: 'config', direita: true }] : []));
+  /* Configurações saiu da barra (14/10/2026, pedido dele): fica só na tela
+     principal (a das áreas). abrirModulo('config') continua abrindo a tela. */
+  pintarModulos(modulosLiberados().map(m => ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista' })));
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   mostrarInicio();

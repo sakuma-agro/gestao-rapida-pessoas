@@ -1173,7 +1173,7 @@ dialog.rs-largo form{max-height:88vh;overflow:auto}
 .ar-cartao.ar-embreve{cursor:default;background:transparent;border-style:dashed;box-shadow:none;color:var(--suave)}
 .ar-cartao.ar-embreve img{filter:grayscale(1);opacity:.55}
 .ar-cartao.ar-embreve .ar-ir{color:var(--suave);font-weight:600}
-.ar-pe{margin-top:22px}
+.ar-pe{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
 
 /* ---- área Manutenções: a moldura ocupa a tela abaixo do topo ---- */
 body.na-moldura main{max-width:none;padding:0}
