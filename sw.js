@@ -15,7 +15,7 @@ const ARQUIVOS = [
   './img/sakuma-logo.png', './img/sakuma-marca-vertical.png',
   './img/lop-assinatura-laser-claro.png', './img/lop-assinatura-laser-escuro.png',
   './img/lop-marca.png', './img/whatsapp.png', './img/folha-ponto.png',
-  './vendor/supabase.js', './manifest.webmanifest',
+  './vendor/supabase.js', './vendor/xlsx-js-style.min.js', './manifest.webmanifest',
   // Os ícones levam o número da versão no nome. Quando a arte mudar, suba
   // para .v3 aqui, no manifest e no index.html — assim o navegador é obrigado
   // a baixar o arquivo novo em vez de reaproveitar o que ficou guardado.
@@ -43,6 +43,8 @@ const ARQUIVOS = [
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
   './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v1.svg',
+  // Excel sem internet (14/10/2026): o modelo NR-24 que a Vistorias oferece para baixar.
+  './vistorias/arquivos/Checklist_NR24_Portaria_MTE_1590_2026.xlsx',
 ];
 
 self.addEventListener('install', ev => {

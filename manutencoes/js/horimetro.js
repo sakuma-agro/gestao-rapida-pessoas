@@ -441,13 +441,13 @@ async function lerArquivoRealtec(arquivo, alvo) {
   passoMapear(alvo, { arquivo, hash, cabecalho, dados });
 }
 
-/* Excel só quando for preciso: a biblioteca desce na hora, e a
-   importação já exige internet de qualquer forma. */
+/* Excel só quando for preciso. A biblioteca é a cópia do app em vendor/
+   (14/10/2026) — fica guardada no aparelho e funciona sem internet. */
 async function lerExcel(arquivo) {
   if (!window.XLSX) {
     await new Promise((ok, erro) => {
       const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s.src = '../vendor/xlsx-js-style.min.js';
       s.onload = ok; s.onerror = () => erro(new Error('não consegui baixar o leitor de Excel'));
       document.head.appendChild(s);
     });

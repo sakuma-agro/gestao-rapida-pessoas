@@ -6289,12 +6289,12 @@ $("#md-novo").onclick=()=>{
 /* Importar planilha: lê a planilha no formato do checklist NR-24 — título na
    primeira linha, campos "Rótulo:" no cabeçalho, depois a tabela Nº /
    Categoria / Item de verificação / C / NC / NA. A leitura do Excel usa a
-   biblioteca SheetJS, baixada só na hora de importar (precisa de internet). */
+   cópia do SheetJS em ../vendor/ (14/10/2026): fica no aparelho, funciona sem internet. */
 function ckCarregarSheetJS(){
   if(window.XLSX)return Promise.resolve(window.XLSX);
   return new Promise((ok,erro)=>{
     const s=document.createElement("script");
-    s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+    s.src="../vendor/xlsx-js-style.min.js";
     s.onload=()=>ok(window.XLSX); s.onerror=()=>erro(new Error("sem-internet"));
     document.head.appendChild(s);
   });
@@ -6358,7 +6358,7 @@ $("#md-importar").onclick=()=>{
       $("#md-titulo").scrollIntoView({block:"center"});
     }catch(e){
       aviso.textContent=e.message==="sem-internet"
-        ?"Para importar planilha é preciso internet (o leitor de Excel é baixado na hora)."
+        ?"Não consegui abrir o leitor de Excel. Abra o app uma vez com internet para ele ficar guardado no aparelho."
         :e.message;
     }
   };
