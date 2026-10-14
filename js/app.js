@@ -34,7 +34,7 @@ import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-ind
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
-import { ligarAreas, abrirPrimeiraTela, limparAreas } from './areas.js';
+import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist } from './areas.js';
 import { abrirCertificacao, limparCertificacao, TELAS_CERT } from './certificacao.js';
 
 const $ = id => document.getElementById(id);
@@ -85,6 +85,8 @@ function medirTopo() {
 addEventListener('resize', medirTopo);
 
 function abrirAba(nome) {
+  // telas do menu do Vistorias: moram na moldura (js/areas.js)
+  if (ehTelaVist(nome)) return abrirTelaVist(nome);
   limparPrevias();
   $('telaInicio').hidden = nome !== 'inicio';
   $('telaAreas').hidden = nome !== 'areas';

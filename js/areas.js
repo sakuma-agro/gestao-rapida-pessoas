@@ -9,7 +9,8 @@
 //
 // Área nova no futuro: um item em AREAS e a regra dela em liberada().
 import { estado } from './store.js';
-import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas } from './acesso.js';
+import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
+  registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -31,7 +32,42 @@ export const AREAS = [
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '3';
+const VERSAO_VIST = '4';
+
+/* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
+   referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
+   do trabalho. As telas continuam as da moldura (vistorias/): cada tela daqui
+   aperta a aba correspondente lá dentro — o `aba` é o nome da aba na moldura.
+   O topo próprio da moldura some dentro do LOP (vistorias/lop-antes.js). */
+const VIST_MODULOS = [
+  { id: 'vsInsp', nome: 'Inspeções', icone: 'capacete', subs: [
+    { id: 'vsSubVistoria', nome: 'Vistoria', telas: [['vsVistoria', 'Vistoria']] },
+    { id: 'vsSubChecklists', nome: 'Checklists prontos', telas: [['vsChecklists', 'Checklists prontos']] },
+  ] },
+  { id: 'vsPend', nome: 'Pendências', icone: 'alerta', subs: [
+    { id: 'vsSubAberto', nome: 'Em aberto', telas: [['vsAberto', 'Em aberto']] },
+    { id: 'vsSubAn', nome: 'Anomalias', telas: [['vsAn', 'Anomalias']] },
+    { id: 'vsSubAd', nome: 'Antes e Depois', telas: [['vsAd', 'Antes e Depois']] },
+  ] },
+  { id: 'vsEquip', nome: 'Equipamentos', icone: 'extintor', subs: [
+    { id: 'vsSubEx', nome: 'Extintores', telas: [['vsEx', 'Extintores']] },
+  ] },
+  { id: 'vsRel', nome: 'Relatórios', icone: 'grafico', subs: [
+    { id: 'vsSubPainel', nome: 'Painel geral', telas: [['vsPainel', 'Painel geral']] },
+    { id: 'vsSubRelatorio', nome: 'Relatório da vistoria', telas: [['vsRelatorio', 'Relatório da vistoria']] },
+  ] },
+  { id: 'vsCfg', nome: 'Configurações', icone: 'config', direita: true, subs: [
+    { id: 'vsSubConfig', nome: 'Configurações', telas: [['vsConfig', 'Configurações']] },
+  ] },
+];
+registrarMenuArea(VIST_MODULOS);
+const ABA_VIST = { vsVistoria: 'vistoria', vsChecklists: 'checklists', vsAberto: 'aberto', vsAn: 'an',
+  vsAd: 'ad', vsEx: 'ex', vsPainel: 'pg', vsRelatorio: 'relatorio', vsConfig: 'config' };
+const TELA_DA_ABA = Object.fromEntries(Object.entries(ABA_VIST).map(([t, a]) => [a, t]));
+/* A barra de módulos pintada agora é a do Vistorias? (cada área pinta a sua) */
+const barraVist = () => !!$('navModulos').querySelector('[data-modulo="vsInsp"]');
+const moduloDaTelaVist = t => VIST_MODULOS.find(m => m.subs.some(s => s.telas.some(([x]) => x === t)))?.id;
+export const ehTelaVist = nome => nome in ABA_VIST;
 
 /* Quem entra em cada área. Pessoas: quem tem algum módulo de lá. Manutenções:
    administrador ou quem tem 'manutencoes' na lista de módulos (app_usuarios) —
@@ -50,6 +86,10 @@ export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.i
 
 let aoTrocar = () => {};
 let areaAtual = null;
+let vistPronta = false;           // a moldura do Vistorias já abriu o app lá dentro
+let vistPendente = null;          // tela pedida antes da moldura ficar pronta
+let vistAba = null;               // aba aberta na moldura agora
+let vistNums = {};                // números das abas (pendências) para a faixa
 let molduraCarregada = false;
 let molduraVistCarregada = false;
 
@@ -125,6 +165,8 @@ export function entrarNaArea(id, tela, extra) {
   pintarEtiqueta();
 
   if (id === 'pessoas') {
+    // a barra de módulos é de quem entrou por último: volta a ser a do Pessoas
+    if (barraVist()) montarMenu();
     $('navModulos').hidden = false;
     if (tela === 'config') {
       $('navModulos').querySelector('[data-modulo="config"]')?.click();
@@ -142,14 +184,17 @@ export function entrarNaArea(id, tela, extra) {
   }
 
   if (id === 'vistorias') {
-    $('navModulos').hidden = true;
-    $('navTelas').hidden = true;
-    $('navSub').hidden = true;
+    if (!barraVist())
+      pintarModulos(VIST_MODULOS.map(m => ({ id: m.id, nome: m.nome, icone: m.icone, direita: m.direita })));
+    $('navModulos').hidden = false;
+    desmarcarModulos();
+    vistPendente = null;
     aoTrocar('vistorias');
     medirTopo();
     const moldura = $('molduraVist');
     if (!molduraVistCarregada || extra) {
       molduraVistCarregada = true;
+      vistPronta = false;
       moldura.src = 'vistorias/?v=' + VERSAO_VIST + (extra ? '&' + extra : '');
     } else {
       try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
@@ -195,9 +240,72 @@ export function limparAreas() {
   areaAtual = null;
   molduraCarregada = false;
   molduraVistCarregada = false;
+  vistPronta = false; vistPendente = null; vistAba = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
   const mv = $('molduraVist');
   if (mv) mv.src = 'about:blank';
   pintarEtiqueta();
 }
+
+/* ─── Vistorias: o menu do topo manda na moldura e a moldura avisa o menu ─── */
+
+/** Uma tela do menu do Vistorias: mostra a moldura e aperta a aba lá dentro. */
+export function abrirTelaVist(tela) {
+  aoTrocar('vistorias');
+  medirTopo();
+  const qual = ABA_VIST[tela];
+  if (!molduraVistCarregada) {
+    molduraVistCarregada = true;
+    vistPronta = false;
+    $('molduraVist').src = 'vistorias/?v=' + VERSAO_VIST;
+  }
+  if (!vistPronta) { vistPendente = tela; return; }
+  if (vistAba === qual) return;     // já está nela (o aviso veio da própria moldura)
+  apertarAbaVist(qual);
+}
+
+function apertarAbaVist(qual) {
+  try {
+    const w = $('molduraVist').contentWindow;
+    const b = w.document.getElementById('t-' + qual);
+    if (b) b.click(); else w.aba?.(qual);
+  } catch (e) { console.warn('vistorias: aba', qual, e); }
+}
+
+/* A moldura chama isto quando o app lá dentro terminou de abrir. */
+window.vistMolduraPronta = () => {
+  vistPronta = true;
+  if (vistPendente) { const t = vistPendente; vistPendente = null; vistAba = null; apertarAbaVist(ABA_VIST[t]); }
+};
+
+/* A moldura chama isto a cada troca de aba — inclusive pelos atalhos da tela
+   inicial dela —, e o menu do topo acompanha. */
+window.vistAbaMudou = qual => {
+  vistAba = qual;
+  if (areaAtual !== 'vistorias') return;
+  if (vistPendente && qual === 'inicio') return;   // ainda abrindo: a tela pedida vem em seguida
+  const tela = TELA_DA_ABA[qual];
+  if (!tela) { desmarcarModulos(); return; }        // início da área
+  if (telaNaFaixa() === tela) return;
+  abrirModulo(moduloDaTelaVist(tela), tela);        // pinta a faixa; abrirTelaVist vê que já está nela
+};
+
+/* Números das abas (em aberto, anomalias, extintores vencendo) na faixa. */
+window.vistNumeros = nums => { vistNums = nums || {}; pintarNumerosVist(); };
+function pintarNumerosVist() {
+  const faixa = $('navTelas');
+  if (!faixa || !barraVist()) return;
+  const porSub = {};
+  VIST_MODULOS.forEach(m => m.subs.forEach(s => s.telas.forEach(([t]) => { porSub[s.id] = t; })));
+  faixa.querySelectorAll('[data-tela],[data-sub]').forEach(b => {
+    const t = b.dataset.tela || porSub[b.dataset.sub];
+    const n = vistNums[t];
+    let el = b.querySelector('.rb-num');
+    if (!n) { el?.remove(); return; }
+    if (!el) { el = document.createElement('b'); el.className = 'rb-num'; b.appendChild(el); }
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.classList.toggle('rb-num-alerta', t === 'vsEx');
+  });
+}
+aoPintarFaixa(pintarNumerosVist);

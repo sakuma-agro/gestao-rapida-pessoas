@@ -82,8 +82,55 @@
     sessao = { token: s.access_token, refresh: "", expira: Infinity,
                email: (s.user && s.user.email) || "", uid: s.user && s.user.id };
     try { await abrirApp(); } catch (e) { console.error("abrir a área:", e); }
+    try { window.parent.vistMolduraPronta && window.parent.vistMolduraPronta(); } catch (e) {}
+    avisarNumeros();
   })();
 
-  /* o LOP chama isto ao tocar de novo em "Vistorias e Segurança" */
-  window.voltarAoInicioDaArea = () => { try { aba("vistoria"); } catch (e) {} window.scrollTo(0, 0); };
+  /* o LOP chama isto ao tocar de novo em "Vistorias e Segurança": volta à
+     tela inicial da área, como o Pessoas */
+  window.voltarAoInicioDaArea = () => { try { aba("inicio"); } catch (e) {} window.scrollTo(0, 0); };
+
+  /* ─── menu no topo do LOP (14/10/2026) ───
+     Os módulos e submódulos ficam no topo do LOP (js/areas.js de lá). Cada
+     troca de aba aqui — inclusive pelos atalhos da tela inicial — avisa o
+     topo, que acompanha. */
+  const pai = () => { try { return window.parent !== window ? window.parent : null; } catch (e) { return null; } };
+  const _abaLop = aba;
+  aba = function(qual){
+    _abaLop.apply(this, arguments);
+    try { const p = pai(); if (p && p.vistAbaMudou) p.vistAbaMudou(qual); } catch (e) {}
+  };
+
+  /* Números das abas (Em aberto, Anomalias, Extintores) para a faixa do topo. */
+  function avisarNumeros(){
+    const p = pai(); if (!p || !p.vistNumeros) return;
+    const n = id => { const el = document.getElementById(id);
+      return el && !el.hidden ? (parseInt(el.textContent, 10) || 0) : 0; };
+    try { p.vistNumeros({ vsAberto: n("cont-aberto"), vsAn: n("cont-an"), vsAd: n("cont-ad"), vsEx: n("cont-ex") }); } catch (e) {}
+  }
+  let esperaNum = null;
+  const observar = () => {
+    const ob = new MutationObserver(() => { clearTimeout(esperaNum); esperaNum = setTimeout(avisarNumeros, 150); });
+    ["cont-aberto", "cont-an", "cont-ad", "cont-ex"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) ob.observe(el, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    });
+  };
+
+  /* Abrir, Salvar e Imprimir: do topo (que some aqui) para o alto da tela
+     Vistoria. São os mesmos botões, com as mesmas funções. O "Abrir vistoria"
+     é criado pelo vistorias.js no DOMContentLoaded, por isso a espera. */
+  function moverAcoes(){
+    const painel = document.getElementById("painel-vistoria");
+    if (!painel || document.querySelector(".lop-acoes")) return;
+    const barra = document.createElement("div");
+    barra.className = "lop-acoes";
+    ["bt-abrir-vistoria", "bt-salvar", "bt-pdf"].forEach(id => {
+      const b = document.getElementById(id); if (b) barra.appendChild(b);
+    });
+    painel.insertBefore(barra, painel.firstChild);
+  }
+  const depoisDoCarregar = () => { setTimeout(() => { moverAcoes(); observar(); avisarNumeros(); }, 0); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", depoisDoCarregar);
+  else depoisDoCarregar();
 })();

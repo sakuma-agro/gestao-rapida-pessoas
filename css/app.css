@@ -1284,3 +1284,11 @@ span.ce-doc{cursor:default}
   body.menu-lateral main{max-width:1180px;padding-top:12px;
     margin-left:max(calc(var(--lat-w) + 8px), calc((100% - 1180px) / 2));margin-right:auto}
 }
+
+/* Vistorias e Segurança no topo do LOP (14/10/2026): números de pendências nos
+   botões da faixa (Em aberto, Anomalias, Antes e Depois, Extintores). */
+.rb-btn{position:relative}
+.rb-num{position:absolute;top:3px;right:6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+  background:#E7F2CF;color:#4E7D00;font-size:10.5px;line-height:18px;font-weight:700;text-align:center}
+.rb-btn[aria-selected="true"] .rb-num{background:#fff}
+.rb-num-alerta{background:#F6DDD7;color:#A23B26}

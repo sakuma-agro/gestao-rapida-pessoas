@@ -335,8 +335,17 @@ export const telasLiberadas = m => {
   return mod ? telasDe(mod).filter(([t]) => podeTela(t)) : [];
 };
 
+/* Menus das áreas que moram numa moldura (Vistorias e Segurança, 14/10/2026).
+   Usam a mesma barra de módulos e a mesma faixa de submódulos do Pessoas, mas
+   ficam fora do MODULOS: quem entra na área vê o menu inteiro (a permissão é
+   a da área), e eles não aparecem na lista de permissões das Configurações. */
+const MENUS_AREA = {};
+export function registrarMenuArea(mods) { mods.forEach(m => { MENUS_AREA[m.id] = m; }); }
+const modPorId = id => MODULOS.find(m => m.id === id) || MENUS_AREA[id];
+
 /** Submódulos com pelo menos uma tela liberada. */
 export const subsLiberados = m => {
+  if (MENUS_AREA[m]) return subsDe(MENUS_AREA[m]);
   const mod = MODULOS.find(x => x.id === m);
   if (!mod) return [];
   return subsDe(mod)
@@ -387,22 +396,39 @@ export const modulosLiberados = () =>
 /** Monta o menu com o que a pessoa pode ver e abre o primeiro módulo. */
 export function montarMenu(callback) {
   if (callback) aoTrocar = callback;
-  const libs = modulosLiberados();
-
   /* Módulos como botões com ícone (30/09/2026, pedido dele: "dar mais
      destaque"). O aberto fica verde cheio; Configurações vai para a direita. */
-  $('navModulos').innerHTML = libs.map(m =>
-    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(ICONE_MODULO[m.id] || 'lista')}<span>${esc(m.nome)}</span></button>`).join('')
-    + (acesso.admin
-      ? `<button class="aba aba-config" role="tab" data-modulo="config" aria-selected="false">${svgIcone('config')}<span>Configurações</span></button>`
-      : '');
-
-  $('navModulos').querySelectorAll('.aba').forEach(b =>
-    b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
+  pintarModulos(modulosLiberados().map(m => ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista' }))
+    .concat(acesso.admin ? [{ id: 'config', nome: 'Configurações', icone: 'config', direita: true }] : []));
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   mostrarInicio();
 }
+
+/** A barra de módulos do topo. Cada área pinta a sua (Pessoas, Vistorias). */
+export function pintarModulos(itens) {
+  moduloAberto = null;
+  $('navModulos').innerHTML = itens.map(m =>
+    `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`).join('');
+  $('navModulos').querySelectorAll('.aba').forEach(b =>
+    b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
+}
+
+/** Nenhum módulo marcado e sem faixa: o início de uma área. */
+export function desmarcarModulos() {
+  moduloAberto = null;
+  faixaEstado.modulo = null; faixaEstado.sub = null; faixaEstado.tela = null;
+  $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
+  $('navTelas').hidden = true;
+  $('navSub').hidden = true;
+}
+
+/** A tela aberta na faixa agora (null no início da área). */
+export const telaNaFaixa = () => faixaEstado.tela;
+
+/* Depois de pintar a faixa (ex.: Vistorias põe os números de pendências). */
+let aposFaixa = () => {};
+export function aoPintarFaixa(fn) { aposFaixa = fn || (() => {}); }
 
 /** A tela de entrada: nenhum módulo aberto, só SAKUMA e LOP. */
 export function mostrarInicio() {
@@ -450,6 +476,8 @@ const ICONE_SUB = {
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
+  vsSubVistoria: 'escudo', vsSubChecklists: 'boletim', vsSubAberto: 'relogio', vsSubAn: 'alerta',
+  vsSubAd: 'antesDepois', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
@@ -473,7 +501,7 @@ function pintarFaixa(id, subs) {
   const faixa = $('navTelas');
   faixa.hidden = false;
   faixa.classList.add('rb');
-  const mod = MODULOS.find(m => m.id === id);
+  const mod = modPorId(id);
   const atual = subs.find(s => s.telas.some(([t]) => t === faixaEstado.tela));
   const botaoTela = (t, rot) => `<button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}" title="${esc(rot)}">
           ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`;
@@ -518,6 +546,7 @@ function pintarFaixa(id, subs) {
     faixaEstado.sub = null;
     pintarFaixa(id, subs);   // só a faixa: a tela aberta continua a mesma
   });
+  aposFaixa(id);
   faixa.scrollLeft = 0;
   faixa.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   sombraFaixa();
@@ -541,7 +570,7 @@ function marcarTela(id, subs, tela, abrir) {
   const subDaTela = subs.find(s => s.telas.some(([t]) => t === tela));
   $('navTelas').querySelectorAll('[data-sub]').forEach(x =>
     x.setAttribute('aria-selected', String(x.dataset.sub === subDaTela?.id)));
-  const mod = MODULOS.find(m => m.id === id);
+  const mod = modPorId(id);
   const sub = subs.find(s => s.telas.some(([t]) => t === tela));
   const rot = sub?.telas.find(([t]) => t === tela)?.[1] || '';
   const partes = [mod?.nome, subs.length > 1 && sub && sub.nome !== rot ? sub.nome : null, rot].filter(Boolean);

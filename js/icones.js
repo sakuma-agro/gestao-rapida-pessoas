@@ -36,6 +36,10 @@ export const ICONES = {
   mais: '<path d="M12 5v14M5 12h14"/>',
   'seta-esq': '<path d="M15 5l-7 7 7 7"/>',
   balanca: '<path d="M12 4v16M7 20h10M5 7h14"/><path d="M5 7l-3 6a3 3 0 006 0zM19 7l-3 6a3 3 0 006 0z"/>',
+  /* área Vistorias e Segurança (14/10/2026) — mesmos desenhos das abas de lá */
+  antesDepois: '<rect x="2.5" y="6" width="8" height="12" rx="1.5"/><rect x="13.5" y="6" width="8" height="12" rx="1.5"/><path d="M5 14l2-2 2 2M16 12l1.5 1.5L20 11"/>',
+  extintor: '<rect x="8" y="7" width="8" height="14" rx="3"/><path d="M10 7V4h4v3M14 4h3l2 2M12 11v4"/>',
+  capacete: '<path d="M4 17a8 8 0 0116 0"/><path d="M2.5 17h19v2.5h-19z"/><path d="M12 9V6M8.5 10.5L8 8M15.5 10.5L16 8"/>',
   lapis: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
 };
 
@@ -55,6 +59,8 @@ export const ICONE_TELA = {
   empEmissao: 'recibo', empRecibos: 'lista', empHistorico: 'dinheiro',
   ferPainel: 'sol', ferPrev: 'grafico', ferLanc: 'lista', ferAfast: 'calendario', ferRisco: 'risco', ferIni: 'lapis',
   jorRelatorios: 'grafico', jorConfig: 'config', empSalarios: 'dinheiro',
+  vsVistoria: 'escudo', vsChecklists: 'boletim', vsAberto: 'relogio', vsAn: 'alerta', vsAd: 'antesDepois',
+  vsEx: 'extintor', vsPainel: 'painel', vsRelatorio: 'documento', vsConfig: 'config',
   cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
 };
 export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check' };
