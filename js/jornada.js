@@ -1057,45 +1057,48 @@ function desenharExtras() {
     .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
   if (estadoTela.extrasFunc && !funcs.some(f => f.id === estadoTela.extrasFunc)) estadoTela.extrasFunc = '';
   const linhas = todas.filter(l => !estadoTela.extrasFunc || l.f.id === estadoTela.extrasFunc);
-  const e50 = l => l.a?.min_extra_50 || 0, e100 = l => l.a?.min_extra_100 || 0;
+  const e50 = l => l.a?.min_extra_50 || 0, e100 = l => l.a?.min_extra_100 || 0, eNot = l => l.a?.min_noturnos || 0;
   const t50 = linhas.reduce((s, l) => s + e50(l), 0), t100 = linhas.reduce((s, l) => s + e100(l), 0);
+  const tNot = linhas.reduce((s, l) => s + eNot(l), 0);   // adicional noturno (14/10/2026)
 
   let tabela;
   if (vis === 'func') {
     const grupos = new Map();
     linhas.forEach(l => {
-      const g = grupos.get(l.f.id) || { f: l.f, n: 0, m50: 0, m100: 0, insal: 0 };
-      g.n++; g.m50 += e50(l); g.m100 += e100(l); if (l.b.insalubridade_dia) g.insal++;
+      const g = grupos.get(l.f.id) || { f: l.f, n: 0, m50: 0, m100: 0, mNot: 0, insal: 0 };
+      g.n++; g.m50 += e50(l); g.m100 += e100(l); g.mNot += eNot(l); if (l.b.insalubridade_dia) g.insal++;
       grupos.set(l.f.id, g);
     });
     const gs = [...grupos.values()].sort((x, y) => x.f.nome.localeCompare(y.f.nome, 'pt-BR'));
     tabela = `<table class="dc-planilha"><thead><tr>
         <th>Funcionário</th><th class="ce">Boletins</th><th class="ce">Extra 50%</th>
-        <th class="ce">Extra 100%</th><th class="ce">Total horas extras</th><th class="ce">Insalubridade</th>
+        <th class="ce">Extra 100%</th><th class="ce">Total horas extras</th><th class="ce">Adicional noturno</th><th class="ce">Insalubridade</th>
       </tr></thead><tbody>
         ${gs.map(g => `<tr><td>${esc(g.f.nome)}</td><td class="ce">${g.n}</td>
           <td class="ce">${horas(g.m50)}</td><td class="ce">${horas(g.m100)}</td>
           <td class="ce"><b>${horas(g.m50 + g.m100)}</b></td>
+          <td class="ce">${horas(g.mNot)}</td>
           <td class="ce">${g.insal ? `${g.insal} dia(s)` : '—'}</td></tr>`).join('')}
       </tbody><tfoot><tr class="jor-total"><td>Total da competência</td>
         <td class="ce">${linhas.length}</td><td class="ce">${horas(t50)}</td><td class="ce">${horas(t100)}</td>
-        <td class="ce">${horas(t50 + t100)}</td><td class="ce">${linhas.filter(l => l.b.insalubridade_dia).length || '—'}</td>
+        <td class="ce">${horas(t50 + t100)}</td><td class="ce">${horas(tNot)}</td><td class="ce">${linhas.filter(l => l.b.insalubridade_dia).length || '—'}</td>
       </tr></tfoot></table>`;
   } else {
     const ord = [...linhas].sort((x, y) => x.b.data_fato.localeCompare(y.b.data_fato)
       || x.f.nome.localeCompare(y.f.nome, 'pt-BR'));
     tabela = `<table class="dc-planilha"><thead><tr>
         <th>Data</th><th>Nº</th><th>Funcionário</th><th>Horário</th>
-        <th class="ce">Extra 50%</th><th class="ce">Extra 100%</th><th class="ce">Total horas extras</th>
+        <th class="ce">Extra 50%</th><th class="ce">Extra 100%</th><th class="ce">Total horas extras</th><th class="ce">Adicional noturno</th>
       </tr></thead><tbody>
         ${ord.map(({ b, f, a }) => `<tr><td>${dataBR(b.data_fato)}</td><td>${esc(b.numero || '—')}</td>
           <td>${esc(f.nome)}</td>
           <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
             : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}</td>
           <td class="ce">${horas(a?.min_extra_50)}</td><td class="ce">${horas(a?.min_extra_100)}</td>
-          <td class="ce"><b>${horas((a?.min_extra_50 || 0) + (a?.min_extra_100 || 0))}</b></td></tr>`).join('')}
+          <td class="ce"><b>${horas((a?.min_extra_50 || 0) + (a?.min_extra_100 || 0))}</b></td>
+          <td class="ce">${horas(a?.min_noturnos)}</td></tr>`).join('')}
       </tbody><tfoot><tr class="jor-total"><td colspan="4">Total</td>
-        <td class="ce">${horas(t50)}</td><td class="ce">${horas(t100)}</td><td class="ce">${horas(t50 + t100)}</td>
+        <td class="ce">${horas(t50)}</td><td class="ce">${horas(t100)}</td><td class="ce">${horas(t50 + t100)}</td><td class="ce">${horas(tNot)}</td>
       </tr></tfoot></table>`;
   }
 
@@ -1110,7 +1113,7 @@ function desenharExtras() {
           <option value="">Todos os funcionários · ${funcs.length}</option>
           ${funcs.map(f => `<option value="${f.id}" ${estadoTela.extrasFunc === f.id ? 'selected' : ''}>${esc(f.nome)}</option>`).join('')}
         </select>
-        <span class="dc-sem">50%: <b>${horas(t50)}</b> · 100%: <b>${horas(t100)}</b> · total: <b>${horas(t50 + t100)}</b></span>
+        <span class="dc-sem">50%: <b>${horas(t50)}</b> · 100%: <b>${horas(t100)}</b> · total: <b>${horas(t50 + t100)}</b> · noturno: <b>${horas(tNot)}</b></span>
       </div>
       ${linhas.length ? tabela : '<div class="vazio">Nenhum boletim nesta competência.</div>'}
       <p class="dc-sem jor-nota">Os percentuais vêm da apuração de cada boletim. Inclui boletins em aberto e fechados da competência.</p>
