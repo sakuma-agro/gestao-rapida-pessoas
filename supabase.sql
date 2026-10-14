@@ -288,3 +288,34 @@ create policy jornada_modulo on public.jor_banco_horas for all to authenticated
 alter table public.jor_boletins drop constraint if exists jor_boletins_compensacao_check;
 alter table public.jor_boletins add constraint jor_boletins_compensacao_check
   check (compensacao is null or compensacao in ('compensar','descontar','banco'));
+
+-- =====================================================================
+-- Ticket alimentação (14/10/2026, gr-v200) — migração jor_ticket_alimentacao
+-- Valor de cada pessoa no vínculo (Cadastro Nível 2); abatimento só do mês;
+-- retrato de cada relatório emitido.
+-- =====================================================================
+alter table public.jor_vinculos add column if not exists ticket_valor numeric(10,2), add column if not exists ticket_obs text;
+
+create table if not exists public.jor_ticket_mes (
+  chave text primary key,                 -- funcionario_id|AAAA-MM
+  funcionario_id uuid not null,
+  competencia text not null,              -- AAAA-MM (mês do pagamento)
+  abatimento numeric(10,2) not null default 0 check (abatimento >= 0),
+  motivo text,
+  observacao text,                        -- substitui a do cadastro só neste mês
+  atualizado_por text,
+  atualizado_em timestamptz default now()
+);
+alter table public.jor_ticket_mes enable row level security;
+create policy jornada_modulo on public.jor_ticket_mes for all using (app_pode('jornada')) with check (app_pode('jornada'));
+
+create table if not exists public.jor_ticket_emissoes (
+  competencia text primary key,           -- AAAA-MM
+  versao int not null default 1,
+  total numeric(12,2),
+  linhas jsonb,                           -- o relatório como saiu
+  emitido_por text,
+  emitido_em timestamptz default now()
+);
+alter table public.jor_ticket_emissoes enable row level security;
+create policy jornada_modulo on public.jor_ticket_emissoes for all using (app_pode('jornada')) with check (app_pode('jornada'));
