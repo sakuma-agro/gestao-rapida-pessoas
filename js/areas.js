@@ -25,7 +25,13 @@ export const AREAS = [
     desc: 'Vencimentos · Ordens de serviço · Check list · Máquinas' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/mod-certificacao.v1.png',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
+  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/mod-vistorias.v1.png',
+    desc: 'Vistorias · Checklists · Anomalias · Extintores' },
 ];
+
+/* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
+   montar.py do repositório sakuma-vistorias). */
+const VERSAO_VIST = '1';
 
 /* Quem entra em cada área. Pessoas: quem tem algum módulo de lá. Manutenções:
    administrador ou quem tem 'manutencoes' na lista de módulos (app_usuarios) —
@@ -35,6 +41,9 @@ function liberada(id) {
   if (id === 'manutencoes') return acesso.admin || (acesso.modulos || []).includes('manutencoes');
   /* Certificação (13/10/2026): módulo 'cert' do acesso.js, com menu próprio. */
   if (id === 'certificacao') return telasLiberadas('cert').length > 0;
+  /* Vistorias e Segurança (14/10/2026): administrador ou módulo 'vistorias' —
+     a mesma regra do banco (vistorias.pode_usar). */
+  if (id === 'vistorias') return acesso.admin || (acesso.modulos || []).includes('vistorias');
   return false;
 }
 export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.id));
@@ -42,6 +51,7 @@ export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.i
 let aoTrocar = () => {};
 let areaAtual = null;
 let molduraCarregada = false;
+let molduraVistCarregada = false;
 
 export const areaAberta = () => areaAtual;
 
@@ -131,6 +141,22 @@ export function entrarNaArea(id, tela, extra) {
     return;
   }
 
+  if (id === 'vistorias') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('vistorias');
+    medirTopo();
+    const moldura = $('molduraVist');
+    if (!molduraVistCarregada || extra) {
+      molduraVistCarregada = true;
+      moldura.src = 'vistorias/?v=' + VERSAO_VIST + (extra ? '&' + extra : '');
+    } else {
+      try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
+
   if (id === 'manutencoes') {
     $('navModulos').hidden = true;
     $('navTelas').hidden = true;
@@ -168,7 +194,10 @@ export function abrirPrimeiraTela() {
 export function limparAreas() {
   areaAtual = null;
   molduraCarregada = false;
+  molduraVistCarregada = false;
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
+  const mv = $('molduraVist');
+  if (mv) mv.src = 'about:blank';
   pintarEtiqueta();
 }

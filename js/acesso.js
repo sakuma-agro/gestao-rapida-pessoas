@@ -830,7 +830,8 @@ function desenharPermissoes() {
         }).join('')}
       </div>`;
     }).join('')}
-    ${blocoManut(e)}`}`;
+    ${blocoManut(e)}
+    ${blocoVist(e)}`}`;
 
   const raiz = $('usPermissoes');
   raiz.querySelectorAll('[data-meio]').forEach(cx => { cx.indeterminate = true; });
@@ -843,6 +844,12 @@ function desenharPermissoes() {
     desenharPermissoes();
   });
   $('usManutAdmin')?.addEventListener('change', ev => { e.manut.admin = ev.target.checked; desenharPermissoes(); });
+  $('usVist')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('vistorias'); else mods.delete('vistorias');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
   raiz.querySelectorAll('input[data-fazenda]').forEach(cx => cx.addEventListener('change', () => {
     const id = cx.dataset.fazenda;
     e.manut.fazendas = cx.checked ? [...new Set([...e.manut.fazendas, id])] : e.manut.fazendas.filter(x => x !== id);
@@ -873,6 +880,20 @@ function desenharPermissoes() {
     definirTelas(e, m, vistas);
     desenharPermissoes();
   }));
+}
+
+/* Bloco "Área Vistorias e Segurança" (14/10/2026): entra ou não. Quem
+   administra a área e quem vê as vistorias de todos é marcado lá dentro, em
+   Configurações · Quem pode editar (vistorias.administradores). */
+function blocoVist(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('vistorias'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="vistorias">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usVist" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Vistorias e Segurança</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · quem administra a área é marcado lá dentro'}</span>
+    </label>
+  </div>`;
 }
 
 /* Bloco "Área Manutenções" na ficha da pessoa: entra ou não, é administradora
