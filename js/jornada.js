@@ -354,7 +354,7 @@ function desenharLancar() {
         </div>
         <small class="jor-dica" id="bCadAviso">${ativos.length ? '' : '<span class="jor-pend">Ninguém tem vínculo de jornada ainda.</span>'}</small>
         <div class="jor-linha">
-          <label>Nº do boletim <input type="text" id="bNumero" inputmode="numeric"></label>
+          <label>Nº do boletim <b class="jor-obrig" title="obrigatório">*</b> <input type="text" id="bNumero" inputmode="numeric"></label>
           <label>Data do fato <input type="date" id="bData" value="${hoje()}" required></label>
         </div>
         <div class="jor-dia-auto" id="bDiaAuto"></div>
@@ -396,8 +396,8 @@ function desenharLancar() {
           </label>
           <label class="jor-inline"><input type="checkbox" id="bInsal"> Insalubridade no dia</label>
         </div>
-        <div class="jor-nivel" role="radiogroup" aria-label="Nível do boletim">
-          <span>Nível do boletim</span>
+        <div class="jor-nivel" id="bNivelBox" role="radiogroup" aria-label="Nível do boletim">
+          <span>Nível do boletim <b class="jor-obrig" title="obrigatório">*</b></span>
           ${NIVEIS.map(([k, t]) => `<label class="jor-nivel__op jor-nivel--${k}"><input type="radio" name="bNivel" value="${k}"> ${t}</label>`).join('')}
         </div>
         <label>Observação <input type="text" id="bObs" maxlength="200"></label>
@@ -438,6 +438,9 @@ function desenharLancar() {
     mostrarDiaAuto(); mostrarMotivo(); mostrarMarcado(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
+  $('bNumero').addEventListener('input', () => $('bNumero').classList.remove('jor-falta'));
+  document.querySelectorAll('input[name="bNivel"]').forEach(r =>
+    r.addEventListener('change', () => $('bNivelBox').classList.remove('jor-falta')));
   prepararEdicao();
   const voltou = restaurarRascunho();
   mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
@@ -796,6 +799,18 @@ async function gravarBoletim(ev) {
   ev.preventDefault();
   const entrada = entradaDoFormulario();
   if (!entrada) return;
+
+  /* Nº do boletim e nível obrigatórios (14/10/2026, pedido dele) — no lançar
+     e no editar. O campo que falta fica marcado até ser preenchido. */
+  if (!$('bNumero').value.trim()) {
+    $('bNumero').classList.add('jor-falta');
+    aviso('Preencha o nº do boletim.'); $('bNumero').focus(); return;
+  }
+  if (!nivelMarcado()) {
+    $('bNivelBox').classList.add('jor-falta');
+    aviso('Marque o nível do boletim: Ruim, Bom ou Ótimo.');
+    document.querySelector('input[name="bNivel"]')?.focus(); return;
+  }
 
   const { v, unidade, funcionarioId } = entrada._contexto;
   // RN-18 (28/09/2026): mês do fato já enviado → o boletim é pago no primeiro

@@ -559,3 +559,8 @@
 .jor-banco th { white-space: nowrap; }
 .jor-banco td { white-space: nowrap; }
 .jor-banco__h { width: 72px; text-align: center; padding: 4px 6px; }
+
+/* Lançar jornada: campos obrigatórios (14/10/2026) — nº do boletim e nível. */
+.jor-obrig { color: #B71C1C; font-weight: 700; }
+#bNumero.jor-falta { border-color: #D32F2F; background: #FDECEC; }
+.jor-nivel.jor-falta { outline: 2px solid #D32F2F; outline-offset: 4px; border-radius: 8px; }
