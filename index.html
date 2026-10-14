@@ -428,7 +428,8 @@ addEventListener('beforeinstallprompt', function (ev) {
             <p class="dica" style="margin:2px 0 0"><span id="cntFunc">0</span> cadastrados</p>
           </div>
           <span>
-            <button class="btn" id="bImportar">Importar planilha</button>
+            <!-- 14/10/2026: importação era só para a carga inicial; agora tudo é lançado no app. Para voltar, tirar o hidden. -->
+            <button class="btn" id="bImportar" hidden style="display:none">Importar planilha</button>
             <button class="btn principal" id="bNovoFunc">Novo funcionário</button>
           </span>
         </div>

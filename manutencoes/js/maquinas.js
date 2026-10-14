@@ -46,7 +46,7 @@ TELAS.maquinas = el => {
        horas ou dias, e qual óleo e filtro ela usa.</p>
     <div class="acoes">
       ${ehAdmin() ? '<button type="button" class="btn" id="mq-nova">Cadastrar máquina</button>' : ''}
-      ${ehAdmin() ? '<button type="button" class="btn neutro" id="mq-importar">Importar horímetros (Realtec)</button>' : ''}
+      ${'' /* 14/10/2026: importação Realtec foi só a carga inicial; horímetro agora é lançado no app. Para voltar: botão #mq-importar (ver git). */}
       ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de itens de manutenção</button>' : ''}
       ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
     </div>

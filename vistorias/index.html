@@ -1845,7 +1845,7 @@ body[data-aba="an"] #bt-salvar,body[data-aba="an"] #bt-pdf,body[data-aba="an"] .
 
     <div class="cfg-secao" id="sec-modelos">
       <h3>Checklists prontos <span class="cfg-trava" id="trava-modelos" hidden>somente administradores</span></h3>
-      <p>Os checklists que aparecem prontos para preencher. <b>editar</b> muda título, campos e itens; <b>duplicar</b> cria uma cópia para você ajustar (por exemplo, o mesmo checklist para outro local); <b>＋ Novo checklist</b> começa do zero; e <b>Importar planilha</b> lê uma planilha no formato do Checklist NR-24 (colunas Nº, Categoria, Item de verificação, C, NC, NA). Ao guardar, a mudança já vai para a base e vale para toda a equipe. Checklist já preenchido não muda quando o modelo muda: o enunciado fica gravado junto da resposta.</p>
+      <p>Os checklists que aparecem prontos para preencher. <b>editar</b> muda título, campos e itens; <b>duplicar</b> cria uma cópia para você ajustar (por exemplo, o mesmo checklist para outro local); <b>＋ Novo checklist</b> começa do zero. Ao guardar, a mudança já vai para a base e vale para toda a equipe. Checklist já preenchido não muda quando o modelo muda: o enunciado fica gravado junto da resposta.</p>
       <div class="cfg-tabela-env" style="max-height:460px">
         <table class="cfg-anomalias">
           <thead><tr><th>Checklist</th><th style="width:52px">Itens</th><th style="width:170px"></th></tr></thead>
@@ -1854,7 +1854,8 @@ body[data-aba="an"] #bt-salvar,body[data-aba="an"] #bt-pdf,body[data-aba="an"] .
       </div>
       <div id="md-editor"></div>
       <div class="rodape-item" style="margin-top:12px">
-        <button class="bt" type="button" id="md-importar">Importar planilha (.xlsx)</button>
+        <!-- 14/10/2026: importação só serviu à carga inicial; tudo agora é pelo app. Para voltar, tirar o hidden. -->
+        <button class="bt" type="button" id="md-importar" hidden>Importar planilha (.xlsx)</button>
         <button class="bt bt-fantasma" type="button" id="md-novo">＋ Novo checklist</button>
         <span class="cfg-salvo" id="md-aviso"></span>
       </div>
