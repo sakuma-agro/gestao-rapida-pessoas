@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v181';
+const VERSAO = 'gr-v182';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -37,6 +37,9 @@ const ARQUIVOS = [
   './manutencoes/js/horimetro.js', './manutencoes/js/checklist.js', './manutencoes/js/painel.js', './manutencoes/js/vencimentos.js', './manutencoes/js/grupos.js', './manutencoes/js/modelos_ck.js',
   // Vistorias e Segurança (14/10/2026): abre sem sinal no campo, como o app avulso abria.
   './icons/mod-vistorias.v1.png',
+  /* ícones das áreas (14/10/2026): uma família, cor e símbolo por área */
+  './icons/area-pessoas.v1.svg', './icons/area-manutencoes.v1.svg',
+  './icons/area-certificacao.v1.svg', './icons/area-vistorias.v1.svg',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
   './vistorias/icons/gr-vs-192.v1.png',

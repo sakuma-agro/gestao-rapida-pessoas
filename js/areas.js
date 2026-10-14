@@ -19,13 +19,13 @@ const esc = s => String(s == null ? '' : s)
 const VERSAO_AREA = '13';
 
 export const AREAS = [
-  { id: 'pessoas', nome: 'Pessoas', icone: 'icons/gr-192.v2.png',
+  { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
     desc: 'Cadastros · SST · RH · DP' },
-  { id: 'manutencoes', nome: 'Manutenções', icone: 'icons/mod-manutencoes.v1.png',
+  { id: 'manutencoes', nome: 'Manutenções', icone: 'icons/area-manutencoes.v1.svg',
     desc: 'Vencimentos · Ordens de serviço · Check list · Máquinas' },
-  { id: 'certificacao', nome: 'Certificação', icone: 'icons/mod-certificacao.v1.png',
+  { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
-  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/mod-vistorias.v1.png',
+  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
     desc: 'Vistorias · Checklists · Anomalias · Extintores' },
 ];
 
