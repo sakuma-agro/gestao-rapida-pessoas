@@ -31,7 +31,7 @@ export const AREAS = [
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '2';
+const VERSAO_VIST = '3';
 
 /* Quem entra em cada área. Pessoas: quem tem algum módulo de lá. Manutenções:
    administrador ou quem tem 'manutencoes' na lista de módulos (app_usuarios) —
