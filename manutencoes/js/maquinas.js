@@ -51,7 +51,7 @@ TELAS.maquinas = el => {
       ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
     </div>
     <div class="filtros">
-      <input type="search" id="mq-busca" placeholder="Buscar por código ou descrição" value="${esc(filtroMaq.busca)}">
+      <input type="search" id="mq-busca" placeholder="Buscar por código, descrição ou patrimônio" value="${esc(filtroMaq.busca)}">
       <select id="mq-local"><option value="">Todos os locais</option>
         ${q.ordenado('locais').map(l => `<option value="${esc(l.id)}"${l.id === filtroMaq.local ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}
       </select>
@@ -68,7 +68,7 @@ TELAS.maquinas = el => {
     const lista = q.ativos('equipamentos').filter(e => noGrupo(e) &&
       (!filtroMaq.local || e.local_id === filtroMaq.local) &&
       (!filtroMaq.tipo || e.tipo_equipamento_id === filtroMaq.tipo) &&
-      (!b || (e.codigo + ' ' + e.descricao).toLowerCase().includes(b))
+      (!b || (e.codigo + ' ' + e.descricao + ' ' + (e.patrimonio || '')).toLowerCase().includes(b))
     ).sort(porCodigo);
 
     $('#mq-lista').innerHTML = lista.length === 0
@@ -122,13 +122,17 @@ function fichaMaquina(id) {
   const dataLeitura = e.unidade_controle === 'ACUMULADO' ? e.ultimo_uso_data : e.leitura_data;
 
   abrirModal(e.codigo + ' — ' + e.descricao, `
-    <div class="mq-cab">
+    <div class="pt-ficha">
+    ${fotoPrincipalHtml(e.foto_url, ehAdmin())}
+    <div class="mq-cab pt-dados">
+      <div><span>Patrimônio</span><b>${esc(e.patrimonio || '—')}</b></div>
       <div><span>Local</span><b>${esc(q.nome('locais', e.local_id))}</b></div>
       <div><span>Tipo</span><b>${esc(q.nome('tipos_equipamento', e.tipo_equipamento_id))}</b></div>
       <div><span>Marca / modelo</span><b>${esc([q.nome('marcas', e.marca_id), e.modelo].filter(Boolean).join(' ') || '—')}</b></div>
       <div><span>${esc(rotuloUnidade(e.unidade_controle))}</span>
         <b>${medido ? nHoras(leituraDe(e)) + ' ' + u : '—'}</b>
         ${dataLeitura ? `<small>em ${formatarData(dataLeitura)}</small>` : ''}</div>
+    </div>
     </div>
     <div class="acoes">
       ${medido ? `<button type="button" class="btn" id="fm-leitura">${e.unidade_controle === 'ACUMULADO' ? 'Ajustar contador' : 'Lançar horímetro'}</button>` : ''}
@@ -171,6 +175,12 @@ function fichaMaquina(id) {
           <small>${formatarData(o.data_execucao)}${o.observacao ? ' · ' + esc(o.observacao) : ''}</small></div>
           <span class="etq vencido">corretiva</span></li>`).join('') + '</ul>'}
   `, corpo => {
+    // Foto principal da máquina (15/10/2026): vai para o Drive.
+    ligarFoto(corpo, 'maquina', e.id, async caminho => {
+      e.foto_url = caminho;
+      await gravar('equipamentos', limparBem(Object.assign({}, e, { atualizado_em: new Date().toISOString() })));
+      Object.assign(q.por_id('equipamentos', e.id) || {}, { horas_acumuladas: e.horas_acumuladas, km_acumulados: e.km_acumulados });
+    });
     const bl = corpo.querySelector('#fm-leitura');
     if (bl) bl.onclick = () => {
       const voltar = () => { irPara('maquinas'); fichaMaquina(id); };
@@ -193,8 +203,9 @@ function fichaMaquina(id) {
    a frota tem vários modelos repetidos. */
 function formMaquina(e, modelo) {
   const novo = !e;
-  const base = e || (modelo ? Object.assign({}, modelo, { id: null, codigo: '', leitura_atual: null, leitura_data: null })
-                            : { unidade_controle: 'HORIMETRO', rege_preventiva: 'HORAS' });
+  const base = e || (modelo ? Object.assign({}, modelo, { id: null, codigo: '', leitura_atual: null, leitura_data: null,
+                                                           patrimonio: proximoPatrimonio(), numero_serie: null, foto_url: null })
+                            : { unidade_controle: 'HORIMETRO', rege_preventiva: 'HORAS', patrimonio: proximoPatrimonio() });
   const titulo = novo ? (modelo ? 'Duplicar ' + modelo.codigo : 'Cadastrar máquina') : 'Editar ' + e.codigo;
 
   abrirModal(titulo, `
@@ -203,6 +214,8 @@ function formMaquina(e, modelo) {
     <div class="colunas">
       ${campoTexto('Código', 'codigo', base.codigo, 'text', 'Ex.: T.01, P.28, V.04, C.06')}
       ${campoTexto('Descrição', 'descricao', base.descricao)}
+      ${campoTexto('Código de patrimônio', 'patrimonio', base.patrimonio, 'text',
+        novo ? 'Próximo número livre já preenchido. Único entre máquinas e bens.' : 'Único entre máquinas e bens.')}
       ${campoLista('Tipo', 'tipo_equipamento_id',
           q.ordenado('tipos_equipamento').map(t => ({ id: t.id, nome: t.nome + ' — ' + nomeGrupo(t.grupo || 'outros') })),
           base.tipo_equipamento_id || (grupoAtual ? (q.ordenado('tipos_equipamento').find(t => (t.grupo || 'outros') === grupoAtual) || {}).id : ''))}
@@ -231,6 +244,9 @@ function formMaquina(e, modelo) {
       if (!d.local_id) return aviso('Escolha o local.', true);
       const dup = q.todos('equipamentos').find(x => x.codigo === d.codigo && x.id !== (e && e.id));
       if (dup) return aviso('Já existe uma máquina com o código ' + d.codigo + '.', true);
+      d.patrimonio = normalizarPatrimonio(d.patrimonio) || null;
+      const donoPat = donoDoPatrimonio(d.patrimonio, e && e.id);
+      if (donoPat) return aviso('O patrimônio ' + d.patrimonio + ' já é ' + donoPat + '.', true);
 
       const reg = limparBem(Object.assign({}, novo ? {} : e, d, { ativo: true, atualizado_em: new Date().toISOString() }));
       if (novo) {

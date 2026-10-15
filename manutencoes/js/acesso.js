@@ -18,6 +18,8 @@ const MODULOS = [
   // Painel (09/10/2026): o retrato do dia, no modelo dos painéis da área Pessoas.
   { id: 'painel',      nome: 'Painel',            telas: [['painel', 'Painel']] },
   { id: 'maquinas',    nome: 'Máquinas',          telas: [['maquinas', 'Máquinas']] },
+  // Patrimônio (15/10/2026): bens fora da frota — furadeira, gerador, móveis…
+  { id: 'patrimonio',  nome: 'Patrimônio',        telas: [['patrimonio', 'Patrimônio']] },
   { id: 'vencimentos', nome: 'Vencimentos',       telas: [['vencimentos', 'Vencimentos'], ['calendario', 'Calendário']] },
   { id: 'ordens',      nome: 'Ordens de serviço', telas: [['ordens', 'Ordens de serviço']] },
   { id: 'checklist',   nome: 'Check list',        telas: [['checklist', 'Check list']] },
@@ -25,7 +27,7 @@ const MODULOS = [
 
 /* Quem ainda não tiver módulo marcado entra com estes — assim ninguém fica
    trancado do lado de fora por esquecimento. */
-const MODULOS_PADRAO = ['painel', 'maquinas', 'vencimentos', 'ordens', 'checklist'];
+const MODULOS_PADRAO = ['painel', 'maquinas', 'patrimonio', 'vencimentos', 'ordens', 'checklist'];
 
 const Acesso = {
   admin: false,
@@ -159,14 +161,16 @@ const ICONE_ATALHO = {
   anomalia: '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>',
   horimetro: '<circle cx="12" cy="13" r="8"/><path d="M12 13l4-3M9 2h6"/>',
   bens: '<rect x="3" y="11" width="18" height="6" rx="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M6 11l2-5h8l2 5"/>',
+  patrimonio: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
 };
-const ICONE_MODULO_M = { painel: 'painel', maquinas: 'bens', vencimentos: 'venc', ordens: 'os', checklist: 'check' };
+const ICONE_MODULO_M = { painel: 'painel', maquinas: 'bens', patrimonio: 'patrimonio', vencimentos: 'venc', ordens: 'os', checklist: 'check' };
 const ATALHOS_INICIO = [
   ['painel', 'painel', 'Painel', 'prim'],
   ['vencimentos', 'venc', 'Vencimentos'],
   ['calendario', 'venc', 'Calendário'],
   ['ordens', 'os', 'Ordens de serviço'],
   ['maquinas', 'bens', 'Máquinas'],
+  ['patrimonio', 'patrimonio', 'Patrimônio'],
   ['checklist', 'check', 'Check list'],
 ];
 
@@ -184,7 +188,7 @@ TELAS.marca = el => {
       </nav>
       <section class="marca-inicio">
         <img class="mi-sakuma" src="../img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
-        <h2>Gestão Rápida <span>Manutenções</span></h2>
+        <h2>Gestão Rápida <span>Máquinas e Patrimônio</span></h2>
         <p class="mi-dica">Escolha um atalho ao lado ou um módulo no menu acima.</p>
         <div class="lop-ass mi-lop" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
           <img src="../img/lop-marca.png" alt=""><span class="lop-div"></span>
@@ -201,7 +205,7 @@ TELAS.marca = el => {
    ficam em Configurações do LOP - Gestão Rápida (o app principal). */
 TELAS.config = el => {
   el.innerHTML = `<h1>Configurações</h1>
-    <p class="sub">O acesso à área Manutenções e as fazendas de cada pessoa ficam em
+    <p class="sub">O acesso à área Máquinas e Patrimônio e as fazendas de cada pessoa ficam em
     <strong>Configurações</strong>, no topo do LOP - Gestão Rápida.</p>`;
 };
 

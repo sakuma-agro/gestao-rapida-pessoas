@@ -23,7 +23,9 @@ const TABELAS_BASE = [
   'checklist_equipamento', 'checklists', 'checklist_respostas', 'checklist_fotos',
   'responsaveis_manutencao',
   // O mecânico abre a OS no pátio, sem sinal.
-  'ordens_servico', 'os_itens', 'manutencoes'
+  'ordens_servico', 'os_itens', 'manutencoes',
+  // Patrimônio (15/10/2026): bens fora da frota e o histórico de cada um.
+  'bens_patrimonio', 'patrimonio_movimentos'
 ];
 
 /* Colunas que o BANCO gera (identity ALWAYS). Nunca vão no envio: o Postgres
@@ -197,6 +199,10 @@ async function sincronizar() {
     sincronizando = false;
     await contarFila();
   }
+  /* 15/10/2026: o que foi gravado enquanto a fila subia (ex.: a movimentação e
+     o bem, um logo depois do outro) sobe agora, sem esperar a próxima gravação.
+     Só o que nunca foi tentado — item com erro espera a próxima vez. */
+  if (App.online && (await itensDaFila()).some(i => i.status === 'pendente')) sincronizar();
 }
 
 /* ---------------------------------------------------------------- fotos
@@ -527,7 +533,7 @@ async function quemSou(sessao) {
 async function iniciarSessao() {
   const sessao = await sessaoDoPrincipal();
   if (!sessao) {
-    telaSemAcesso('Entre pelo LOP - Gestão Rápida para abrir as Manutenções.');
+    telaSemAcesso('Entre pelo LOP - Gestão Rápida para abrir Máquinas e Patrimônio.');
     return;
   }
   App.usuario = await quemSou(sessao);
@@ -536,7 +542,7 @@ async function iniciarSessao() {
     return;
   }
   if (!App.usuario.pode && !App.usuario.admin) {
-    telaSemAcesso('Seu login não tem a área Manutenções liberada. Peça ao administrador em Configurações.');
+    telaSemAcesso('Seu login não tem a área Máquinas e Patrimônio liberada. Peça ao administrador em Configurações.');
     return;
   }
   await meta('usuario', App.usuario);
@@ -581,7 +587,7 @@ async function abrirArea() {
     await iniciarSessao();
   } catch (e) {
     console.error('abertura da área', e);
-    telaSemAcesso('Não consegui abrir as Manutenções agora (' + (e && e.message || e) + ').');
+    telaSemAcesso('Não consegui abrir Máquinas e Patrimônio agora (' + (e && e.message || e) + ').');
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'btn'; b.textContent = 'Tentar de novo';
     b.onclick = () => location.reload();
