@@ -112,10 +112,12 @@ function colarLista() {
   window.abrirModal('Colar uma lista de itens', `
     <p class="dica">Um item por linha. Se quiser, depois do nome ponha a unidade e o grupo separados por
       ponto e vírgula (ou cole direto as colunas de uma planilha):</p>
-    <pre class="cad-exemplo">Glifosato 480 ; L ; Insumos
+    <pre class="cad-exemplo">Afalon ; L ; Defensivos
 MAP 11-52-00 ; kg ; Fertilizantes
 Luva nitrílica ; par ; EPIs
-Óleo mineral</pre>
+Óleo 15W40 ; L ; Lubrificantes
+Detergente ; L ; Material de limpeza
+Papel A4 ; pct ; Papelaria</pre>
     <div class="grade">
       <label class="campo">Unidade padrão <select id="colUni">${UNIDADES.map(u => `<option>${u}</option>`).join('')}</select></label>
       <label class="campo">Grupo padrão <select id="colGrupo">${GRUPOS.map(g => `<option>${g}</option>`).join('')}</select></label>

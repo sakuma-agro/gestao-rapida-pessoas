@@ -145,6 +145,10 @@ export async function importarPlanilha(arquivo, mesApp = null) {
       if (!dep) { dep = d.nome; depositos.push(dep); }      // almoxarifado sem aba de sistema
       for (const it of d.itens) {
         const kp = chaveProduto(it.nome);
+        // A planilha do acerto é dos defensivos/insumos. EPI, papelaria e o
+        // resto da contagem não entram: só o que a planilha conhece (aba
+        // Cadastro ou alguma aba Sistema).
+        if (!porProduto.has(kp) && !cadastro.has(kp)) continue;
         nomesApp.add(kp);
         if (!porProduto.has(kp)) porProduto.set(kp, { produto: it.nome, dep: {} });
         const item = porProduto.get(kp);

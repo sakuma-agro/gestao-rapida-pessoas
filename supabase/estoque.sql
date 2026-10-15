@@ -15,7 +15,7 @@ create table if not exists public.est_itens (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   unidade text,
-  grupo text not null default 'Insumos',
+  grupo text not null default 'Defensivos',  -- Defensivos, Fertilizantes, EPIs, Lubrificantes, Material de limpeza, Papelaria
   ativo boolean not null default true,
   atualizado_em timestamptz not null default now()
 );

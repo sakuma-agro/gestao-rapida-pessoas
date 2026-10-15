@@ -29,6 +29,7 @@ try { sel.localId = localStorage.getItem(CHAVE_LOCAL); } catch { /* sem localSto
 let telaAberta = null;
 const abertos = new Set();   // itens com a lista de lotes aberta (sobrevive ao redesenho)
 let soFalta = false;
+let grupoFiltro = '';   // '' = todos os grupos
 let busca = '';
 
 /* ===================================================================
@@ -97,10 +98,10 @@ function desenharContar() {
     let cab = '';
     if (i.grupo !== grupoAtual) {
       grupoAtual = i.grupo;
-      cab = `<h3 class="ct-grupo">${esc(i.grupo || 'Outros')}${i.grupo === 'Fertilizantes'
+      cab = `<h3 class="ct-grupo" data-grupo="${esc(i.grupo || 'Outros')}">${esc(i.grupo || 'Outros')}${i.grupo === 'Fertilizantes'
         ? ' <small>sempre em quilos — o peso total, não o número de sacas</small>' : ''}</h3>`;
     }
-    return cab + `<div class="ct-item" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}">
+    return cab + `<div class="ct-item" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}" data-grupo="${esc(i.grupo || 'Outros')}">
       <div class="ct-linha${valor !== '' ? ' feito' : ''}">
         <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${esc(i.unidade || '')}${lotes.length
           ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}</small></label>
@@ -122,6 +123,7 @@ function desenharContar() {
       <div class="ct-conta"><strong>${p.feitos}</strong> de ${p.total} contados</div>
     </div>
     <div class="ct-barra"><span style="width:${pct}%"></span></div>
+    ${chipsGrupos(itens, linhas)}
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Procurar item
         <input type="text" id="ctBusca" placeholder="Digite parte do nome..." value="${esc(busca)}"></label>
@@ -141,6 +143,11 @@ function desenharContar() {
   ligarEscolha();
   filtrar();
   $('ctBusca').addEventListener('input', e => { busca = e.target.value; filtrar(); });
+  alvo.querySelectorAll('[data-chip]').forEach(b => b.addEventListener('click', () => {
+    grupoFiltro = b.dataset.chip;
+    alvo.querySelectorAll('[data-chip]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    filtrar();
+  }));
   $('ctSoFalta').addEventListener('change', e => {
     soFalta = e.target.checked;
     $('ctLista').classList.toggle('so-falta', soFalta);
@@ -166,10 +173,32 @@ function desenharContar() {
 
 const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 
+/* Chips dos grupos (15/10/2026): cada um com quantos já foram contados.
+   Quem conta só os EPIs, por exemplo, escolhe o grupo e vê só ele. */
+function chipsGrupos(itens, linhas) {
+  const grupos = [];
+  for (const i of itens) {
+    const g = i.grupo || 'Outros';
+    let r = grupos.find(x => x.nome === g);
+    if (!r) grupos.push(r = { nome: g, feitos: 0, total: 0 });
+    r.total++;
+    const l = linhas.get(i.id);
+    if (l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '') r.feitos++;
+  }
+  if (grupos.length < 2) return '';
+  if (grupoFiltro && !grupos.some(g => g.nome === grupoFiltro)) grupoFiltro = '';
+  const chip = (id, rot, f, t) => `<button type="button" class="ct-chip${t && f === t ? ' completo' : ''}" data-chip="${esc(id)}"
+    aria-pressed="${grupoFiltro === id}">${esc(rot)}${t ? ` <small>${f}/${t}</small>` : ''}</button>`;
+  return `<div class="ct-chips">${chip('', 'Todos', 0, 0)}${grupos.map(g => chip(g.nome, g.nome, g.feitos, g.total)).join('')}</div>`;
+}
+
 function filtrar() {
   const b = semAcento(busca).trim();
   document.querySelectorAll('#ctLista .ct-item').forEach(l => {
-    l.hidden = !!b && !l.dataset.nome.includes(b);
+    l.hidden = (!!b && !l.dataset.nome.includes(b)) || (!!grupoFiltro && l.dataset.grupo !== grupoFiltro);
+  });
+  document.querySelectorAll('#ctLista .ct-grupo').forEach(h => {
+    h.hidden = !!grupoFiltro && h.dataset.grupo !== grupoFiltro;
   });
 }
 
@@ -259,7 +288,8 @@ function novoLote(itemId) {
 async function salvarLote(div) {
   const itemId = div.closest('.ct-item').dataset.item;
   const qtdInp = div.querySelector('.cl-qtd');
-  const n = lerNumero(qtdInp.value);
+  const digitado = qtdInp.value;
+  const n = lerNumero(digitado);
   if (Number.isNaN(n)) {
     div.classList.add('erro');
     aviso('Essa quantidade não deu para entender. Use só algarismos e vírgula, ex.: 1250,5', true);
@@ -275,7 +305,8 @@ async function salvarLote(div) {
       lote: div.querySelector('.cl-lote').value.trim() || null,
       validade, quantidade: n, contado_por: meuNome(), ativo: true,
     });
-    qtdInp.value = mostrarNumero(n);
+    // só arruma o número se a pessoa não digitou outro enquanto gravava
+    if (qtdInp.value === digitado) qtdInp.value = mostrarNumero(n);
     div.classList.toggle('vencido', !!validade && validade < hojeISO());
     await somarLotes(c, itemId);
   } catch (e) {
@@ -331,7 +362,8 @@ async function garantirContagem() {
 }
 
 async function salvarCampo(inp) {
-  const n = lerNumero(inp.value);
+  const digitado = inp.value;
+  const n = lerNumero(digitado);
   const linha = inp.closest('.ct-linha');
   if (Number.isNaN(n)) {
     linha.classList.add('erro');
@@ -346,7 +378,7 @@ async function salvarCampo(inp) {
       id: idLinha(c.id, inp.dataset.item), contagem_id: c.id, item_id: inp.dataset.item,
       quantidade: n, contado_por: meuNome(),
     });
-    inp.value = mostrarNumero(n);
+    if (inp.value === digitado) inp.value = mostrarNumero(n);
     linha.classList.toggle('feito', n !== null);
     atualizarConta();
   } catch (e) {
@@ -358,6 +390,19 @@ async function salvarCampo(inp) {
 function atualizarConta() {
   const c = contagem(sel.localId, sel.mes);
   if (!c) return;
+  const chips = document.querySelector('.ct-chips');
+  if (chips) {
+    const linhas = new Map(linhasDe(c.id).map(l => [l.item_id, l]));
+    const novo = document.createElement('div');
+    novo.innerHTML = chipsGrupos(itensOrdenados(), linhas);
+    const n = novo.firstElementChild;
+    if (n) {
+      chips.querySelectorAll('[data-chip]').forEach(b => {
+        const igual = n.querySelector(`[data-chip="${CSS.escape(b.dataset.chip)}"]`);
+        if (igual) { b.innerHTML = igual.innerHTML; b.classList.toggle('completo', igual.classList.contains('completo')); }
+      });
+    }
+  }
   const p = progresso(c.id);
   const el = document.querySelector('.ct-conta');
   if (el) el.innerHTML = `<strong>${p.feitos}</strong> de ${p.total} contados`;

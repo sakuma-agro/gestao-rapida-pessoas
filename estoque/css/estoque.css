@@ -174,3 +174,14 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
   .ct-lote .cl-tirar{grid-column:3;grid-row:2}
 }
 .rel-tab tr.rel-sub td{font-size:7.8pt;color:#6b6d63;padding-left:6mm}
+
+/* ---- chips dos grupos na tela Contar ---- */
+.ct-chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.ct-chips::-webkit-scrollbar{display:none}
+.ct-chip{flex:none;border:1px solid var(--linha);background:var(--papel);color:var(--texto);border-radius:999px;
+  padding:7px 12px;font:600 13px/1 inherit;cursor:pointer;white-space:nowrap}
+.ct-chip small{font-weight:600;color:var(--suave);margin-left:3px}
+.ct-chip.completo small{color:var(--verde-esc)}
+.ct-chip[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:#fff}
+.ct-chip[aria-pressed="true"] small{color:#fff}
+.ct-grupo[hidden]{display:none}
