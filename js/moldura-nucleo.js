@@ -377,16 +377,19 @@ async function inativar(tabela, id) {
    no sinal fraco deixava a tela em "Baixando os cadastros…" para sempre. */
 const PRAZO_CONSULTA_MS = 20000;
 
-async function baixarTabela(t) {
+async function baixarTabela(t, desde = null) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), PRAZO_CONSULTA_MS);
   try {
     // Em páginas de 1.000 (rodada A, 15/10/2026): o servidor devolve no máximo
     // 1.000 linhas por resposta e antes a tabela vinha cortada — e a cópia
     // local era apagada antes de receber o resultado cortado.
+    // `desde` (rodada C): só o que mudou depois desse carimbo (leitura incremental).
     let data = [];
     for (let de = 0; ; de += 1000) {
-      const r = await App.sb.from(t).select('*').range(de, de + 999).abortSignal(ctl.signal);
+      let q = App.sb.from(t).select('*');
+      if (desde) q = q.gt('atualizado_em', desde);
+      const r = await q.order('atualizado_em').range(de, de + 999).abortSignal(ctl.signal);
       if (r.error) throw r.error;
       data = data.concat(r.data || []);
       if (!r.data || r.data.length < 1000) break;
@@ -395,19 +398,46 @@ async function baixarTabela(t) {
   } finally { clearTimeout(timer); }
 }
 
+/* Leitura incremental (rodada C, 15/10/2026). Toda tabela tem atualizado_em
+   carimbado pelo servidor: depois da primeira carga completa, cada abertura
+   pede só o que mudou desde o maior carimbo guardado por tabela. Uma carga
+   completa volta a cada 24 h (ou quando a versão da base muda), para o que
+   foi apagado no servidor sumir daqui também. */
+const COMPLETA_A_CADA_MS = 24 * 3600 * 1000;
 async function baixarBase(forcar = false) {
   if (!App.online) return false;
   const falhas = [];
+  const completaEm = await meta('completa_em');
+  const versao = await meta('versao_base');
+  const incremental = !!completaEm && versao === CONFIG.VERSAO_BASE
+    && (Date.now() - new Date(completaEm).getTime() < COMPLETA_A_CADA_MS);
+  const marcas = (await meta('marcas')) || {};
   // As consultas vão todas juntas; a gravação no aparelho é uma por vez.
+  // Tabela sem marca (visão sem atualizado_em, ou nunca lida) vem sempre inteira.
+  const parcial = t => incremental && !!marcas[t];
   const resultados = await Promise.all(TABELAS_BASE.map(t =>
-    baixarTabela(t).then(data => ({ t, data }), e => ({ t, erro: e }))));
+    baixarTabela(t, parcial(t) ? marcas[t] : null).then(data => ({ t, data }), e => ({ t, erro: e }))));
   for (const r of resultados) {
     if (r.erro) { console.warn('não baixou', r.t, r.erro.message || r.erro); falhas.push(r.t); continue; }
     r.data.forEach(x => { x._base = x.atualizado_em ?? null; });   // carimbo lido → base do conflito
-    await limparLocal(r.t);
-    await gravarLocal(r.t, r.data);
-    App.dados[r.t] = r.data;
+    if (parcial(r.t)) {
+      if (!r.data.length) continue;
+      await gravarLocal(r.t, r.data);
+      const lista = App.dados[r.t] || (App.dados[r.t] = []);
+      for (const x of r.data) {
+        const id = idDe(r.t, x), i = lista.findIndex(y => idDe(r.t, y) === id);
+        if (i >= 0) lista[i] = x; else lista.push(x);
+      }
+    } else {
+      await limparLocal(r.t);
+      await gravarLocal(r.t, r.data);
+      App.dados[r.t] = r.data;
+    }
+    const maior = r.data.reduce((m, x) => (x.atualizado_em && x.atualizado_em > m ? x.atualizado_em : m), marcas[r.t] || '');
+    if (maior) marcas[r.t] = maior;
   }
+  await meta('marcas', marcas);
+  if (!incremental && !falhas.length) await meta('completa_em', new Date().toISOString());
   // O que foi feito neste aparelho e ainda não subiu continua aparecendo.
   for (const item of await itensDaFila()) {
     if (item.operacao !== 'upsert' || item.status === 'enviado') continue;

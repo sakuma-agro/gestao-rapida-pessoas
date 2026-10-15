@@ -19,9 +19,9 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '25';
+const VERSAO_AREA = '26';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '6';
+const VERSAO_PROG = '7';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
 const VERSAO_EST = '1';
 
