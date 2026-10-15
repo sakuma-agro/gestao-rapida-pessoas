@@ -1650,7 +1650,26 @@ matchMedia('(display-mode: standalone)').addEventListener?.('change', atualizarI
 atualizarInstalar();
 
 if ('serviceWorker' in navigator) {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  /* Atualização com o app aberto (15/10/2026). O app instalado no tablet
+     fica dias aberto e não pegava a versão nova sem ser fechado. Agora ele
+     confere ao voltar para a tela e a cada 30 min; quando a versão nova
+     assume, aparece uma faixa "Nova versão — atualizar". */
+  const jaTinhaControle = !!navigator.serviceWorker.controller;
+  let faixaMostrada = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!jaTinhaControle || faixaMostrada) return;
+    faixaMostrada = true;
+    const f = document.createElement('div');
+    f.className = 'faixa-versao';
+    f.innerHTML = '<span>Nova versão do app publicada.</span><button type="button">Atualizar agora</button>';
+    f.querySelector('button').onclick = () => location.reload();
+    document.body.appendChild(f);
+  });
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
+    const conferir = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') conferir(); });
+    setInterval(conferir, 30 * 60 * 1000);
+  }).catch(() => {}));
 }
 
 /* arranque
