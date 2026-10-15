@@ -9,10 +9,15 @@
    ===================================================================== */
 
 /* Tudo o que a contagem precisa para funcionar sem sinal no almoxarifado. */
-const TABELAS_BASE = ['est_locais', 'est_itens', 'est_contagens', 'est_contagem_itens'];
+const TABELAS_BASE = ['est_locais', 'est_itens', 'est_contagens', 'est_contagem_itens', 'est_contagem_lotes'];
 const GERADAS_NO_BANCO = {};
 const CHAVE_PK = {};
-const CHAVE_COMPOSTA = {};
+/* Na contagem vale a última gravação (15/10/2026). Com a conferência de
+   conflito ligada, digitar lote, validade e quantidade em sequência fazia o
+   segundo envio sair com o carimbo velho e parar como "conflito". Marcar a
+   chave como "composta" (de uma parte só, o próprio id) faz o núcleo gravar por
+   upsert direto, sem o carimbo. Itens e almoxarifados continuam conferindo. */
+const CHAVE_COMPOSTA = { est_contagens: ['id'], est_contagem_itens: ['id'], est_contagem_lotes: ['id'] };
 function chaveDrive(caminho) { return 'estoque/' + String(caminho).toLowerCase(); }
 
 /* Avisa as telas (módulos) que a base local mudou. */

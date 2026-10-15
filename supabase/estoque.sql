@@ -47,9 +47,25 @@ create table if not exists public.est_contagem_itens (
 );
 create index if not exists est_ci_contagem on public.est_contagem_itens(contagem_id);
 
+-- Lotes de um item na contagem (pedido dele, 15/10/2026): quando o produto tem
+-- lotes e vencimentos diferentes, cada lote é uma linha; o total do item em
+-- est_contagem_itens é a soma dos lotes ativos. Lote tirado = ativo false.
+create table if not exists public.est_contagem_lotes (
+  id uuid primary key default gen_random_uuid(),
+  contagem_id text not null references public.est_contagens(id) on delete cascade,
+  item_id uuid not null references public.est_itens(id),
+  lote text,
+  validade date,
+  quantidade numeric,
+  contado_por text,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists est_cl_contagem on public.est_contagem_lotes(contagem_id);
+
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.
 do $$ declare t text; begin
-  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens'] loop
+  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes'] loop
     execute format('drop trigger if exists marcar_atualizacao on public.%I', t);
     execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
     execute format('alter table public.%I enable row level security', t);

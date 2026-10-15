@@ -73,3 +73,14 @@ export const dataHora = iso => {
   const d = new Date(iso);
   return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR').slice(0, 5);
 };
+
+/** Lotes ativos de um item numa contagem, do que vence primeiro ao último. */
+export const lotesDe = (contagemId, itemId) => [...new Map(todos('est_contagem_lotes')
+  .filter(l => l.contagem_id === contagemId && l.item_id === itemId)
+  .map(l => [l.id, l])).values()]          // um por id, o mais recente vale
+  .filter(l => l.ativo !== false)
+  .sort((a, b) => String(a.validade || '9999').localeCompare(String(b.validade || '9999'))
+    || String(a.lote || '').localeCompare(String(b.lote || ''), 'pt-BR'));
+
+export const dataBR = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '';
+export const hojeISO = () => new Date().toISOString().slice(0, 10);

@@ -6,10 +6,20 @@
 // número é guardado no aparelho na hora e sobe quando há sinal. Fechada a
 // contagem, ela entra sozinha no Acerto, no lugar das abas "Físico".
 import {
-  $, esc, pronto, todos, gravar, aviso, souAdmin, meuNome, locais, itensOrdenados,
+  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais, itensOrdenados,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
-  lerNumero, mostrarNumero, dataHora,
+  lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
 } from './dados.js';
+import { gravar as gravarDireto } from './dados.js';
+
+/* Gravações uma de cada vez (15/10/2026): dois campos do mesmo lote salvos
+   quase juntos (lote e validade) entravam em dobro na lista do aparelho. */
+let corrente = Promise.resolve();
+const gravar = (t, r) => {
+  const p = corrente.then(() => gravarDireto(t, r));
+  corrente = p.catch(() => {});
+  return p;
+};
 
 /* O que está escolhido na tela Contar. */
 const CHAVE_LOCAL = 'estoque.contarLocal';
@@ -17,6 +27,7 @@ const sel = { localId: null, mes: mesAtual() };
 try { sel.localId = localStorage.getItem(CHAVE_LOCAL); } catch { /* sem localStorage */ }
 
 let telaAberta = null;
+const abertos = new Set();   // itens com a lista de lotes aberta (sobrevive ao redesenho)
 let soFalta = false;
 let busca = '';
 
@@ -82,18 +93,25 @@ function desenharContar() {
   const corpo = itens.map(i => {
     const l = linhas.get(i.id);
     const valor = l ? mostrarNumero(l.quantidade) : '';
+    const lotes = c ? lotesDe(c.id, i.id) : [];
     let cab = '';
     if (i.grupo !== grupoAtual) {
       grupoAtual = i.grupo;
       cab = `<h3 class="ct-grupo">${esc(i.grupo || 'Outros')}${i.grupo === 'Fertilizantes'
         ? ' <small>sempre em quilos — o peso total, não o número de sacas</small>' : ''}</h3>`;
     }
-    return cab + `<label class="ct-linha${valor !== '' ? ' feito' : ''}" data-nome="${esc(semAcento(i.nome))}">
-      <span class="ct-nome">${esc(i.nome)}<small>${esc(i.unidade || '')}</small></span>
-      <input class="ct-qtd" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next"
-        data-item="${esc(i.id)}" value="${esc(valor)}" placeholder="—"${fechada ? ' disabled' : ''}
-        aria-label="Total de ${esc(i.nome)}">
-    </label>`;
+    return cab + `<div class="ct-item" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}">
+      <div class="ct-linha${valor !== '' ? ' feito' : ''}">
+        <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${esc(i.unidade || '')}${lotes.length
+          ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}</small></label>
+        <input class="ct-qtd" id="q-${esc(i.id)}" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next"
+          data-item="${esc(i.id)}" value="${esc(valor)}" placeholder="—"${fechada || lotes.length ? ' disabled' : ''}
+          title="${lotes.length ? 'Soma dos lotes' : ''}" aria-label="Total de ${esc(i.nome)}">
+        <button class="ct-mais${abertos.has(i.id) ? ' aberto' : ''}" type="button" data-mais="${esc(i.id)}"
+          aria-expanded="${abertos.has(i.id)}" title="Lotes e vencimentos">${abertos.has(i.id) ? '−' : '+'}</button>
+      </div>
+      <div class="ct-lotes"${abertos.has(i.id) ? '' : ' hidden'}>${desenharLotes(i, lotes, fechada)}</div>
+    </div>`;
   }).join('');
 
   alvo.innerHTML = cabecalhoEscolha() + `
@@ -130,6 +148,9 @@ function desenharContar() {
   $('ctFechar')?.addEventListener('click', confirmarFechar);
   $('ctReabrir')?.addEventListener('click', reabrir);
 
+  alvo.querySelectorAll('[data-mais]').forEach(b => b.addEventListener('click', () => alternarLotes(b.dataset.mais)));
+  ligarLotes(alvo);
+
   const campos = [...alvo.querySelectorAll('.ct-qtd')];
   campos.forEach((inp, k) => {
     inp.addEventListener('change', () => salvarCampo(inp));
@@ -137,7 +158,7 @@ function desenharContar() {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       // vai para o próximo campo visível
-      const prox = campos.slice(k + 1).find(x => x.closest('.ct-linha').offsetParent !== null);
+      const prox = campos.slice(k + 1).find(x => !x.disabled && x.closest('.ct-item').offsetParent !== null);
       if (prox) { prox.focus(); prox.select(); } else inp.blur();
     });
   });
@@ -147,7 +168,7 @@ const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').
 
 function filtrar() {
   const b = semAcento(busca).trim();
-  document.querySelectorAll('#ctLista .ct-linha').forEach(l => {
+  document.querySelectorAll('#ctLista .ct-item').forEach(l => {
     l.hidden = !!b && !l.dataset.nome.includes(b);
   });
 }
@@ -161,6 +182,141 @@ function ligarEscolha() {
   $('ctMes')?.addEventListener('change', e => {
     if (/^\d{4}-\d{2}$/.test(e.target.value)) { sel.mes = e.target.value; desenharContar(); }
   });
+}
+
+/* ===================================================================
+   Lotes — "+" na frente do item (pedido dele, 15/10/2026): quando o produto
+   tem lotes e vencimentos diferentes, cada lote vira uma linha. O total do
+   item passa a ser a soma dos lotes e é ele que vai para o Acerto.
+   =================================================================== */
+const vencido = lotes => lotes.some(l => l.validade && String(l.validade).slice(0, 10) < hojeISO());
+
+function linhaLote(l, fechada) {
+  const venc = l.validade && String(l.validade).slice(0, 10) < hojeISO();
+  if (fechada) return `<div class="ct-lote fixo">
+      <span>${esc(l.lote || 'sem nº')}</span>
+      <span class="${venc ? 'ct-venc' : ''}">${l.validade ? 'val. ' + esc(dataBR(l.validade)) : 'sem validade'}${venc ? ' · vencido' : ''}</span>
+      <strong>${esc(mostrarNumero(l.quantidade))}</strong></div>`;
+  return `<div class="ct-lote${venc ? ' vencido' : ''}" data-lote="${esc(l.id)}">
+      <label>Lote <input type="text" class="cl-lote" value="${esc(l.lote || '')}" placeholder="nº do lote" autocomplete="off"></label>
+      <label>Validade <input type="date" class="cl-val" value="${esc(l.validade ? String(l.validade).slice(0, 10) : '')}"></label>
+      <label>Quantidade <input type="text" class="cl-qtd" inputmode="decimal" value="${esc(mostrarNumero(l.quantidade))}" placeholder="—" autocomplete="off"></label>
+      <button type="button" class="cl-tirar" title="Tirar este lote" aria-label="Tirar este lote">×</button>
+    </div>`;
+}
+
+function desenharLotes(item, lotes, fechada) {
+  return `${lotes.map(l => linhaLote(l, fechada)).join('') || (fechada ? '<p class="dc-sem">Sem lotes separados.</p>' : '')}
+    ${fechada ? '' : `<div class="ct-lotes-pe">
+      <button type="button" class="btn mini" data-novo-lote="${esc(item.id)}">+ Adicionar lote</button>
+      <span class="dc-sem">${lotes.length ? 'O total do item é a soma dos lotes.' : 'Use quando o produto tiver lotes ou vencimentos diferentes.'}</span>
+    </div>`}`;
+}
+
+function alternarLotes(itemId) {
+  const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
+  if (!bloco) return;
+  const abrir = !abertos.has(itemId);
+  if (abrir) abertos.add(itemId); else abertos.delete(itemId);
+  bloco.querySelector('.ct-lotes').hidden = !abrir;
+  const b = bloco.querySelector('[data-mais]');
+  b.textContent = abrir ? '−' : '+';
+  b.classList.toggle('aberto', abrir);
+  b.setAttribute('aria-expanded', String(abrir));
+  // sem lote nenhum ainda: já abre o primeiro para preencher
+  if (abrir && !bloco.querySelector('.ct-lote') && bloco.querySelector('[data-novo-lote]')) novoLote(itemId);
+}
+
+function ligarLotes(raiz) {
+  raiz.querySelectorAll('[data-novo-lote]').forEach(b => b.onclick = () => novoLote(b.dataset.novoLote));
+  raiz.querySelectorAll('.ct-lote[data-lote]').forEach(ligarLinhaLote);
+}
+
+function ligarLinhaLote(div) {
+  div.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => salvarLote(div)));
+  div.querySelector('.cl-qtd').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  });
+  div.querySelector('.cl-tirar').addEventListener('click', () => tirarLote(div));
+}
+
+/** Linha nova de lote. O primeiro lote herda o total já digitado, para nada se perder. */
+function novoLote(itemId) {
+  const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
+  if (!bloco) return;
+  const pe = bloco.querySelector('.ct-lotes-pe');
+  const primeiro = !bloco.querySelector('.ct-lote');
+  const totalAtual = primeiro ? lerNumero(bloco.querySelector('.ct-qtd').value) : null;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = linhaLote({ id: crypto.randomUUID(), quantidade: Number.isNaN(totalAtual) ? null : totalAtual }, false);
+  const div = tmp.firstElementChild;
+  pe.before(div);
+  ligarLinhaLote(div);
+  div.querySelector('.cl-lote').focus();
+  if (primeiro && totalAtual !== null && !Number.isNaN(totalAtual)) salvarLote(div);
+}
+
+async function salvarLote(div) {
+  const itemId = div.closest('.ct-item').dataset.item;
+  const qtdInp = div.querySelector('.cl-qtd');
+  const n = lerNumero(qtdInp.value);
+  if (Number.isNaN(n)) {
+    div.classList.add('erro');
+    aviso('Essa quantidade não deu para entender. Use só algarismos e vírgula, ex.: 1250,5', true);
+    return;
+  }
+  div.classList.remove('erro');
+  try {
+    const c = await garantirContagem();
+    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
+    const validade = div.querySelector('.cl-val').value || null;
+    await gravar('est_contagem_lotes', {
+      id: div.dataset.lote, contagem_id: c.id, item_id: itemId,
+      lote: div.querySelector('.cl-lote').value.trim() || null,
+      validade, quantidade: n, contado_por: meuNome(), ativo: true,
+    });
+    qtdInp.value = mostrarNumero(n);
+    div.classList.toggle('vencido', !!validade && validade < hojeISO());
+    await somarLotes(c, itemId);
+  } catch (e) {
+    console.error(e);
+    aviso('Não consegui guardar esse lote (' + (e.message || e) + ').', true);
+  }
+}
+
+async function tirarLote(div) {
+  const itemId = div.closest('.ct-item').dataset.item;
+  const salvo = todos('est_contagem_lotes').find(l => l.id === div.dataset.lote);
+  div.remove();
+  if (!salvo) return;
+  await gravar('est_contagem_lotes', Object.assign({}, salvo, { ativo: false }));
+  const c = contagem(sel.localId, sel.mes);
+  if (c) await somarLotes(c, itemId);
+}
+
+/** Total do item = soma dos lotes ativos. Sem lote nenhum, o total volta a ser digitado. */
+async function somarLotes(c, itemId) {
+  const lotes = lotesDe(c.id, itemId);
+  const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
+  const inp = bloco && bloco.querySelector('.ct-qtd');
+  if (lotes.length) {
+    const comQtd = lotes.filter(l => l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '');
+    const total = comQtd.length ? comQtd.reduce((t, l) => t + Number(l.quantidade), 0) : null;
+    await gravar('est_contagem_itens', {
+      id: idLinha(c.id, itemId), contagem_id: c.id, item_id: itemId, quantidade: total, contado_por: meuNome(),
+    });
+    if (inp) { inp.value = mostrarNumero(total); inp.disabled = true; inp.title = 'Soma dos lotes'; }
+    if (bloco) bloco.querySelector('.ct-linha').classList.toggle('feito', total !== null);
+  } else if (inp) { inp.disabled = false; inp.title = ''; }
+  if (bloco) {
+    const small = bloco.querySelector('.ct-nome small');
+    const item = todos('est_itens').find(i => i.id === itemId);
+    small.innerHTML = esc(item && item.unidade || '') + (lotes.length
+      ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : '');
+    const msg = bloco.querySelector('.ct-lotes-pe .dc-sem');
+    if (msg) msg.textContent = lotes.length ? 'O total do item é a soma dos lotes.' : 'Use quando o produto tiver lotes ou vencimentos diferentes.';
+  }
+  atualizarConta();
 }
 
 /** A contagem do mês nasce no primeiro número digitado. */
@@ -368,6 +524,9 @@ function montarFolha(contagemId) {
     let g = grupos[grupos.length - 1];
     if (!g || g.nome !== (i.grupo || 'Outros')) grupos.push(g = { nome: i.grupo || 'Outros', linhas: [] });
     g.linhas.push([i.nome, i.unidade || '', mostrarNumero(porItem.get(i))]);
+    for (const l of (i.id ? lotesDe(c.id, i.id) : [])) {
+      g.linhas.push(['   Lote ' + (l.lote || 's/ nº') + (l.validade ? ' · val. ' + dataBR(l.validade) : ''), '', mostrarNumero(l.quantidade), 'sub']);
+    }
   }
   $('ctFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo">
@@ -379,7 +538,7 @@ function montarFolha(contagemId) {
     </div>
     ${grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
       <table class="rel-tab"><thead><tr><th>Item</th><th class="ce">Unidade</th><th class="ce">Quantidade</th></tr></thead>
-      <tbody>${g.linhas.map(l => `<tr><td>${esc(l[0])}</td><td class="ce">${esc(l[1])}</td><td class="ce">${esc(l[2])}</td></tr>`).join('')}</tbody></table>`).join('')}
+      <tbody>${g.linhas.map(l => `<tr${l[3] ? ' class="rel-sub"' : ''}><td>${esc(l[0])}</td><td class="ce">${esc(l[1])}</td><td class="ce">${esc(l[2])}</td></tr>`).join('')}</tbody></table>`).join('')}
     <div class="rel-pe">
       <div class="rel-assina"><span></span><small>Responsável pela contagem</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
@@ -402,7 +561,7 @@ export function abrirContagem(tela) {
 window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;
-  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca')) return;
+  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca' || foco.closest && foco.closest('.ct-lote'))) return;
   if (!document.querySelector('#modal.oculto') && document.querySelector('#modal')) return;
   DESENHOS[telaAberta]();
 });
