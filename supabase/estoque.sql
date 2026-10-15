@@ -150,10 +150,12 @@ create table if not exists public.est_movimentos (
   outra_fazenda text,                 -- origem (entrada por transferência) ou destino (saída por transferência)
   fornecedor text,
   obs text,
+  lancamento_id uuid,                 -- agrupa os itens lançados juntos (uma NF, uma requisição)
   criado_por text,
   ativo boolean not null default true,
   atualizado_em timestamptz not null default now()
 );
+alter table public.est_movimentos add column if not exists lancamento_id uuid;
 create index if not exists est_mov_local on public.est_movimentos(local_id, data);
 
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.

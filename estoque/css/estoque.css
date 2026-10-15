@@ -275,3 +275,22 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .qc-saldo.neg{color:#a5342a}
 .qc-ent{color:var(--verde-esc)}
 .qc-sai{color:var(--marrom)}
+/* vários produtos por lançamento (15/10/2026) */
+.qc-prod-cab{margin-top:6px}
+.qc-lins{display:flex;flex-direction:column;gap:6px;margin:6px 0 10px}
+.qc-lin{display:grid;grid-template-columns:1fr 96px 36px;gap:6px;align-items:center}
+.qc-lin input{min-height:44px;font-size:15px}
+.qc-lin .qc-qtd{text-align:right;font-weight:700}
+.qc-lin .qc-x{height:44px}
+.qc-info{grid-column:1 / -1;font-size:12px;color:var(--suave);margin:-2px 0 2px 2px}
+.qc-info:empty{display:none}
+.qc-lin.desconhecido .qc-info{color:#a5342a;font-weight:600}
+.qc-lin.erro input{border-color:#c0392b}
+.qc-lanc{border:1px solid var(--linha);border-radius:10px;margin-bottom:6px;background:var(--papel)}
+.qc-lanc-cab{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;
+  border:0;background:none;text-align:left;font:inherit;color:var(--texto);cursor:pointer}
+.qc-lanc-cab small{display:block;color:var(--suave);font-size:12px;margin-top:2px}
+.qc-seta{color:var(--suave);font-size:14px}
+.qc-lanc-itens{border-top:1px solid var(--linha);padding:6px 12px 10px}
+.qc-lanc-item{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--linha)}
+.qc-lanc-item:last-of-type{border-bottom:0}

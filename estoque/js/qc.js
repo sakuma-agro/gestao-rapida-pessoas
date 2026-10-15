@@ -160,12 +160,26 @@ function montarPosicao(itens, sd) {
 }
 
 /* ===================================================================
-   Entradas e saídas — formulário no alto, lançamentos do mês embaixo
+   Entradas e saídas — vários produtos num lançamento só (15/10/2026)
+   Pedido dele: entradas e saídas com mais de 10 produtos. O cabeçalho (tipo,
+   data, documento, plantio, operador, fazenda) é preenchido UMA vez e os
+   produtos vão em linhas: produto + quantidade, Enter pula para a próxima,
+   uma linha nova aparece sozinha. Dá também para colar a lista da NF.
+   Cada linha vira um movimento; todos levam o mesmo lancamento_id.
    =================================================================== */
-function opcoesItens() {
-  return itensOrdenados().map(i => `<option value="${esc(i.nome)}">${esc(i.unidade || '')} · ${esc(i.grupo || '')}</option>`).join('');
-}
 const outrasFazendas = () => locais().filter(l => !semAcento(l.nome).includes('QUEBRA COCAO')).map(l => l.nome);
+const itemPorNome = nome => itensOrdenados().find(i => semAcento(i.nome) === semAcento(nome));
+const LINHAS_INICIAIS = 6;
+let abertos = new Set();     // lançamentos expandidos na lista do mês
+
+function linhaProduto() {
+  return `<div class="qc-lin">
+    <input type="text" class="qc-prod" list="qcProdutos" placeholder="produto" autocomplete="off" enterkeyhint="next">
+    <input type="text" class="qc-qtd" inputmode="decimal" placeholder="qtd" autocomplete="off" enterkeyhint="next">
+    <button type="button" class="cl-tirar qc-x" title="Tirar a linha" aria-label="Tirar a linha">×</button>
+    <small class="qc-info"></small>
+  </div>`;
+}
 
 function desenharMov(sentido) {
   const alvo = $(sentido === 'entrada' ? 'qcEntradaCorpo' : 'qcSaidaCorpo');
@@ -175,9 +189,6 @@ function desenharMov(sentido) {
   if (!localQc()) return semLocal(alvo);
   const ent = sentido === 'entrada';
   const tipos = ent ? TIPOS_ENTRADA : TIPOS_SAIDA;
-  const sd = saldos();
-  const doMes = movimentos().filter(m => m.sentido === sentido && String(m.data).slice(0, 7) === mesLista)
-    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(b.atualizado_em).localeCompare(String(a.atualizado_em)));
   alvo.innerHTML = `
   <div class="cartao">
     <h2>${ent ? 'Entrada' : 'Saída'} · Faz. Quebra Cocão</h2>
@@ -186,43 +197,34 @@ function desenharMov(sentido) {
         <input type="radio" name="tipo" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>
       <div class="grade">
         <label class="campo">Data <input type="date" name="data" value="${hojeISO()}" max="${hojeISO()}" required></label>
-        <label class="campo">Produto <input type="text" name="produto" list="qcProdutos" required placeholder="digite o nome"></label>
-        <label class="campo">Quantidade <input type="text" name="qtd" inputmode="decimal" required placeholder="0">
-          <small class="qc-saldo-hint" id="qcHint"></small></label>
-        <label class="campo">Nº do documento${ent ? ' / NF' : ' *'} <input type="text" name="documento"${ent ? '' : ' required'}></label>
+        <label class="campo">Nº do documento${ent ? ' / NF' : ' *'} <input type="text" name="documento"></label>
         ${ent ? `
         <label class="campo qc-so" data-so="compra">Fornecedor <input type="text" name="fornecedor" list="qcFornec"></label>
         <label class="campo qc-so" data-so="transferencia">Fazenda de origem *
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`
         : `
         <label class="campo qc-so" data-so="uso">Plantio * <input type="text" name="plantio" list="qcPlantios" placeholder="ex.: Batata PL 21"></label>
-        <label class="campo">Operador * <input type="text" name="operador" list="qcOperadores" required></label>
+        <label class="campo">Operador * <input type="text" name="operador" list="qcOperadores"></label>
         <label class="campo qc-so" data-so="transferencia">Fazenda de destino *
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`}
         <label class="campo plena">Observação <input type="text" name="obs"></label>
       </div>
-      <datalist id="qcProdutos">${opcoesItens()}</datalist>
+      <div class="barra entre qc-prod-cab">
+        <h3 class="es-secao" style="margin:0">Produtos <small id="qcConta">0</small></h3>
+        <button type="button" class="btn mini" id="qcColar">Colar lista</button>
+      </div>
+      <div class="qc-lins" id="qcLins">${Array.from({ length: LINHAS_INICIAIS }, linhaProduto).join('')}</div>
+      <div class="barra entre">
+        <button type="button" class="btn mini" id="qcMais">+ linha</button>
+        <button class="btn principal" type="submit" id="qcEnviar">Lançar ${ent ? 'entrada' : 'saída'}</button>
+      </div>
+      <datalist id="qcProdutos">${itensOrdenados().map(i => `<option value="${esc(i.nome)}">${esc(i.unidade || '')} · ${esc(i.grupo || '')}</option>`).join('')}</datalist>
       <datalist id="qcFornec">${unicos('fornecedor').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcPlantios">${unicos('plantio').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcOperadores">${unicos('operador').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
-      <div class="barra fim"><button class="btn principal" type="submit">Lançar ${ent ? 'entrada' : 'saída'}</button></div>
     </form>
   </div>
-  <div class="cartao">
-    <div class="barra entre">
-      <h2 style="margin:0">${ent ? 'Entradas' : 'Saídas'} do mês</h2>
-      <label class="campo" style="margin:0"><input type="month" id="qcMes" value="${esc(mesLista)}" max="${hojeISO().slice(0, 7)}"></label>
-    </div>
-    <div class="lista">${doMes.map(m => {
-      const i = itemDe(m.item_id);
-      return `<div class="item"><span></span>
-        <div><div class="nome">${esc(i.nome)} <span class="tag ${ent ? 'ativo' : 'alerta'}">${esc(tipos[m.tipo] || m.tipo)}</span></div>
-          <div class="sub">${dataBR(m.data)} · ${detalhe(m)}${m.criado_por ? ' · lançado por ' + esc(m.criado_por) : ''}</div></div>
-        <div class="acoes"><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${ent ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</strong>
-          <button class="btn mini" type="button" data-tirar="${esc(m.id)}" title="Tirar este lançamento">Tirar</button></div>
-      </div>`;
-    }).join('') || '<div class="vazio">Nada lançado neste mês.</div>'}</div>
-  </div>`;
+  <div class="cartao" id="qcListaCartao"></div>`;
 
   const form = $('qcForm');
   const mostrarTipo = () => {
@@ -231,69 +233,227 @@ function desenharMov(sentido) {
   };
   form.querySelectorAll('[name=tipo]').forEach(r => r.addEventListener('change', mostrarTipo));
   mostrarTipo();
-  form.querySelector('[name=produto]').addEventListener('input', e => {
-    const it = itensOrdenados().find(i => semAcento(i.nome) === semAcento(e.target.value));
-    $('qcHint').textContent = it ? `saldo atual: ${mostrarNumero(Math.round((sd.get(it.id) || 0) * 1000) / 1000)} ${it.unidade || ''}` : '';
-  });
+  ligarLinhas(sentido);
+  $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto()); ligarLinhas(sentido); };
+  $('qcColar').onclick = () => colarLista(sentido);
   form.addEventListener('submit', e => { e.preventDefault(); lancar(sentido, form); });
-  $('qcMes').addEventListener('change', e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesLista = e.target.value; desenharMov(sentido); } });
-  alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', async () => {
-    const m = movimentos().find(x => x.id === b.dataset.tirar);
-    if (!m || !confirm('Tirar este lançamento? O saldo do item volta como estava.')) return;
-    await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
-    desenharMov(sentido);
-  }));
+  desenharListaMes(sentido);
+}
+
+/** Liga as linhas de produto (as novas também): Enter pula, saldo aparece, linha nova sozinha. */
+function ligarLinhas(sentido) {
+  const sd = saldos();
+  document.querySelectorAll('#qcLins .qc-lin:not([data-ok])').forEach(lin => {
+    lin.dataset.ok = '1';
+    const prod = lin.querySelector('.qc-prod'), qtd = lin.querySelector('.qc-qtd'), info = lin.querySelector('.qc-info');
+    const atualizar = () => {
+      const it = itemPorNome(prod.value);
+      lin.classList.toggle('desconhecido', !!prod.value.trim() && !it);
+      info.textContent = !prod.value.trim() ? '' : it
+        ? `${it.unidade || ''} · saldo ${mostrarNumero(Math.round((sd.get(it.id) || 0) * 1000) / 1000)}`
+        : 'não está no cadastro';
+      contar();
+      // a última linha preenchida abre uma nova
+      const todas = [...document.querySelectorAll('#qcLins .qc-lin')];
+      if (todas[todas.length - 1] === lin && prod.value.trim()) {
+        $('qcLins').insertAdjacentHTML('beforeend', linhaProduto()); ligarLinhas(sentido);
+      }
+    };
+    prod.addEventListener('input', atualizar);
+    prod.addEventListener('change', atualizar);
+    qtd.addEventListener('input', contar);
+    prod.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); qtd.focus(); } });
+    qtd.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const prox = lin.nextElementSibling;
+      if (prox) prox.querySelector('.qc-prod').focus();
+    });
+    lin.querySelector('.qc-x').onclick = () => {
+      if (document.querySelectorAll('#qcLins .qc-lin').length > 1) lin.remove();
+      else { prod.value = ''; qtd.value = ''; info.textContent = ''; }
+      contar();
+    };
+  });
+  contar();
+}
+
+function linhasPreenchidas() {
+  return [...document.querySelectorAll('#qcLins .qc-lin')]
+    .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim() }))
+    .filter(x => x.nome || x.txt);
+}
+function contar() {
+  const n = linhasPreenchidas().filter(x => x.nome).length;
+  const el = $('qcConta');
+  if (el) el.textContent = n;
+  const b = $('qcEnviar');
+  if (b) b.textContent = b.textContent.replace(/ \(\d+\)$/, '') + (n ? ` (${n})` : '');
+}
+
+/** Cola a lista (da NF, de uma planilha): "produto ; quantidade" ou produto[tab]quantidade, uma por linha. */
+function colarLista(sentido) {
+  window.abrirModal('Colar lista de produtos', `
+    <p class="dica">Uma linha por produto: o nome e a quantidade, separados por ponto e vírgula ou colados de duas colunas
+      da planilha.</p>
+    <pre class="cad-exemplo">Afalon ; 20
+Atrazina ; 15,5
+Luva nitrílica ; 30</pre>
+    <label class="campo plena">Lista <textarea id="clTexto" rows="10" placeholder="Cole aqui..."></textarea></label>
+    <div class="barra fim"><button class="btn principal" type="button" id="clOk">Pôr na lista</button></div>`, corpo => {
+    corpo.querySelector('#clOk').onclick = () => {
+      const linhas = corpo.querySelector('#clTexto').value.split(/\r?\n/)
+        .map(l => l.split(/\s*[;\t]\s*/)).filter(p => (p[0] || '').trim());
+      // tira as linhas vazias do formulário e põe as coladas
+      document.querySelectorAll('#qcLins .qc-lin').forEach(lin => {
+        if (!lin.querySelector('.qc-prod').value.trim() && !lin.querySelector('.qc-qtd').value.trim()) lin.remove();
+      });
+      for (const p of linhas) {
+        $('qcLins').insertAdjacentHTML('beforeend', linhaProduto());
+        const lin = $('qcLins').lastElementChild;
+        lin.querySelector('.qc-prod').value = p[0].trim().replace(/\s+/g, ' ');
+        lin.querySelector('.qc-qtd').value = (p[1] || '').trim();
+      }
+      $('qcLins').insertAdjacentHTML('beforeend', linhaProduto());
+      window.fecharModal();
+      ligarLinhas(sentido);
+      document.querySelectorAll('#qcLins .qc-prod').forEach(i => i.dispatchEvent(new Event('change')));
+      aviso(`${linhas.length} produto(s) na lista. Confira e lance.`);
+    };
+  });
 }
 
 async function lancar(sentido, form) {
   const f = new FormData(form);
   const tipo = f.get('tipo');
-  const nome = String(f.get('produto') || '').trim();
-  const qtd = lerNumero(f.get('qtd'));
-  const item = itensOrdenados().find(i => semAcento(i.nome) === semAcento(nome));
   const txt = k => String(f.get(k) || '').trim() || null;
-  if (!item) return cadastrarNaHora(nome, sentido, form);
-  if (Number.isNaN(qtd) || !qtd || qtd <= 0) { aviso('Quantidade: use um número maior que zero (ex.: 20 ou 2,5).', true); return; }
+  const preenchidas = linhasPreenchidas();
+  if (!preenchidas.length) { aviso('Ponha pelo menos um produto.', true); return; }
+
+  // confere as linhas: produto cadastrado e quantidade válida
+  const erros = [];
+  const desconhecidos = new Map();
+  const linhas = [];
+  for (const x of preenchidas) {
+    x.lin.classList.remove('erro');
+    const item = itemPorNome(x.nome);
+    const qtd = lerNumero(x.txt);
+    if (!x.nome) { x.lin.classList.add('erro'); erros.push('linha sem produto'); continue; }
+    if (!item) { desconhecidos.set(semAcento(x.nome), x.nome); continue; }
+    if (Number.isNaN(qtd) || !qtd || qtd <= 0) { x.lin.classList.add('erro'); erros.push(`${item.nome}: quantidade`); continue; }
+    linhas.push({ item, qtd });
+  }
+  if (desconhecidos.size) return cadastrarNaHora([...desconhecidos.values()], sentido, form);
+  if (erros.length) { aviso(`Confira as linhas em vermelho (${erros.length}): quantidade maior que zero.`, true); return; }
   if (sentido === 'saida') {
     if (!txt('documento')) { aviso('Informe o nº do documento.', true); return; }
     if (!txt('operador')) { aviso('Informe o operador.', true); return; }
     if (tipo === 'uso' && !txt('plantio')) { aviso('Informe o plantio.', true); return; }
   }
   if (tipo === 'transferencia' && !txt('outra')) { aviso(sentido === 'saida' ? 'Escolha a fazenda de destino.' : 'Escolha a fazenda de origem.', true); return; }
-  const saldo = saldos().get(item.id) || 0;
-  if (sentido === 'saida' && qtd > saldo + 0.0001
-    && !confirm(`O saldo de ${item.nome} é ${mostrarNumero(saldo)}. Lançar a saída de ${mostrarNumero(qtd)} mesmo assim? O saldo fica negativo.`)) return;
-  await gravar('est_movimentos', {
-    local_id: localQc().id, data: f.get('data') || hojeISO(), sentido, tipo, item_id: item.id, quantidade: qtd,
+
+  if (sentido === 'saida') {
+    const sd = saldos();
+    const soma = new Map();
+    for (const l of linhas) soma.set(l.item.id, (soma.get(l.item.id) || 0) + l.qtd);
+    const falta = [...soma.entries()].filter(([id, q]) => q > (sd.get(id) || 0) + 0.0001)
+      .map(([id, q]) => `${itemDe(id).nome}: sai ${mostrarNumero(q)}, saldo ${mostrarNumero(sd.get(id) || 0)}`);
+    if (falta.length && !confirm(`Estes itens ficam com saldo negativo:\n\n${falta.join('\n')}\n\nLançar mesmo assim?`)) return;
+  }
+
+  $('qcEnviar').disabled = true;
+  const lancamento = crypto.randomUUID();
+  const base = {
+    local_id: localQc().id, data: f.get('data') || hojeISO(), sentido, tipo,
     documento: txt('documento'), plantio: sentido === 'saida' && tipo === 'uso' ? txt('plantio') : null,
     operador: sentido === 'saida' ? txt('operador') : null,
     outra_fazenda: tipo === 'transferencia' ? txt('outra') : null,
     fornecedor: sentido === 'entrada' && tipo === 'compra' ? txt('fornecedor') : null,
-    obs: txt('obs'), criado_por: meuNome(), ativo: true,
-  });
-  aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${item.nome} ${mostrarNumero(qtd)} ${item.unidade || ''}.`);
-  mesLista = String(f.get('data') || hojeISO()).slice(0, 7);
+    obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
+  };
+  for (const l of linhas) await gravar('est_movimentos', Object.assign({}, base, { item_id: l.item.id, quantidade: l.qtd }));
+  aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.length} produto(s).`);
+  mesLista = String(base.data).slice(0, 7);
+  abertos.add(lancamento);
   desenharMov(sentido);
 }
 
-function cadastrarNaHora(nome, sentido, form) {
-  if (!nome) return;
-  window.abrirModal('Produto novo', `
-    <p><strong>${esc(nome)}</strong> ainda não está no cadastro de itens. Cadastrar agora?</p>
+/** Produtos que não estão no cadastro: cadastra todos de uma vez e segue. */
+function cadastrarNaHora(nomes, sentido, form) {
+  window.abrirModal('Produtos novos', `
+    <p>${nomes.length === 1 ? 'Este produto ainda não está' : `Estes ${nomes.length} produtos ainda não estão`} no cadastro de itens:</p>
+    <ul class="ct-branco">${nomes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
     <div class="grade">
       <label class="campo">Unidade <select id="qnUni">${UNIDADES.map(u => `<option>${u}</option>`).join('')}</select></label>
       <label class="campo">Categoria <select id="qnGrupo">${GRUPOS.map(g => `<option>${g}</option>`).join('')}</select></label>
     </div>
-    <div class="barra fim"><button class="btn" type="button" id="qnNao">Corrigir o nome</button>
+    <p class="dc-sem">Se for erro de digitação, volte e corrija o nome na linha.</p>
+    <div class="barra fim"><button class="btn" type="button" id="qnNao">Corrigir os nomes</button>
       <button class="btn principal" type="button" id="qnSim">Cadastrar e lançar</button></div>`, corpo => {
     corpo.querySelector('#qnNao').onclick = window.fecharModal;
     corpo.querySelector('#qnSim').onclick = async () => {
-      await gravar('est_itens', { nome: nome.replace(/\s+/g, ' '), unidade: corpo.querySelector('#qnUni').value,
+      for (const nome of nomes) await gravar('est_itens', { nome: nome.replace(/\s+/g, ' '), unidade: corpo.querySelector('#qnUni').value,
         grupo: corpo.querySelector('#qnGrupo').value, ativo: true });
       window.fecharModal();
       lancar(sentido, form);
     };
   });
+}
+
+/** Lançamentos do mês, agrupados: um cartão por lançamento (NF/requisição), com os itens dentro. */
+function desenharListaMes(sentido) {
+  const alvo = $('qcListaCartao');
+  if (!alvo) return;
+  const ent = sentido === 'entrada';
+  const tipos = ent ? TIPOS_ENTRADA : TIPOS_SAIDA;
+  const doMes = movimentos().filter(m => m.sentido === sentido && String(m.data).slice(0, 7) === mesLista);
+  const grupos = new Map();
+  for (const m of doMes) {
+    const k = m.lancamento_id || m.id;
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(m);
+  }
+  const lista = [...grupos.entries()].sort((a, b) => String(b[1][0].data).localeCompare(String(a[1][0].data))
+    || String(b[1][0].atualizado_em).localeCompare(String(a[1][0].atualizado_em)));
+  alvo.innerHTML = `
+    <div class="barra entre">
+      <h2 style="margin:0">${ent ? 'Entradas' : 'Saídas'} do mês</h2>
+      <label class="campo" style="margin:0"><input type="month" id="qcMes" value="${esc(mesLista)}" max="${hojeISO().slice(0, 7)}"></label>
+    </div>
+    <div class="lista">${lista.map(([k, ms]) => {
+      const m = ms[0];
+      const aberto = abertos.has(k);
+      return `<div class="qc-lanc">
+        <button type="button" class="qc-lanc-cab" data-abre="${esc(k)}" aria-expanded="${aberto}">
+          <span><b>${dataBR(m.data)} · ${esc(tipos[m.tipo] || m.tipo)}</b> · ${ms.length} produto(s)
+            <small>${detalhe(m)}${m.criado_por ? ' · lançado por ' + esc(m.criado_por) : ''}</small></span>
+          <span class="qc-seta">${aberto ? '▾' : '▸'}</span>
+        </button>
+        <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); return `<div class="qc-lanc-item">
+          <span>${esc(i.nome)}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
+          <button class="btn mini" type="button" data-tirar="${esc(x.id)}">Tirar</button></div>`; }).join('')}
+          ${ms.length > 1 ? `<div class="barra fim"><button class="btn mini" type="button" data-tirar-tudo="${esc(k)}">Tirar o lançamento inteiro</button></div>` : ''}
+        </div>
+      </div>`;
+    }).join('') || '<div class="vazio">Nada lançado neste mês.</div>'}</div>`;
+  $('qcMes').addEventListener('change', e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesLista = e.target.value; desenharListaMes(sentido); } });
+  alvo.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.abre;
+    if (abertos.has(k)) abertos.delete(k); else abertos.add(k);
+    desenharListaMes(sentido);
+  }));
+  alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', async () => {
+    const m = movimentos().find(x => x.id === b.dataset.tirar);
+    if (!m || !confirm(`Tirar ${itemDe(m.item_id).nome} deste lançamento? O saldo volta como estava.`)) return;
+    await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
+    desenharListaMes(sentido);
+  }));
+  alvo.querySelectorAll('[data-tirar-tudo]').forEach(b => b.addEventListener('click', async () => {
+    const ms = movimentos().filter(x => (x.lancamento_id || x.id) === b.dataset.tirarTudo);
+    if (!confirm(`Tirar o lançamento inteiro (${ms.length} produtos)? Os saldos voltam como estavam.`)) return;
+    for (const m of ms) await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
+    desenharListaMes(sentido);
+  }));
 }
 
 /* ===================================================================
@@ -312,7 +472,7 @@ window.addEventListener('estoque-dados', () => {
   // nunca redesenha com um formulário sendo preenchido
   if (foco && foco.closest && foco.closest('#qcForm, #qcVisaoCorpo') && /INPUT|SELECT|TEXTAREA/.test(foco.tagName)) return;
   const form = $('qcForm');
-  if (form && [...form.querySelectorAll('input[type=text]')].some(i => i.value)) return;
+  if (form && [...form.querySelectorAll('input[type=text]')].some(i => i.value)) { desenharListaMes(telaAberta === 'qcEntrada' ? 'entrada' : 'saida'); return; }
   if (document.querySelector('#modal') && !document.querySelector('#modal.oculto')) return;
   DESENHOS[telaAberta]();
 });
