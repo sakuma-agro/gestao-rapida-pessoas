@@ -25,6 +25,11 @@ export const MODULOS = [
   { id: 'compra', nome: 'Compra inteligente', telas: [
     ['ciLista',      'Levantamentos'],
   ] },
+  { id: 'qc', nome: 'Estoque Quebra Cocão', telas: [
+    ['qcVisao',    'Estoque'],
+    ['qcEntrada',  'Entradas'],
+    ['qcSaida',    'Saídas'],
+  ] },
   { id: 'acerto', nome: 'Acerto', telas: [
     ['acSaldo',           'Saldo do sistema'],
     ['acPainel',          'Painel'],

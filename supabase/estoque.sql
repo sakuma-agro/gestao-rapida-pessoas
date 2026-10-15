@@ -131,9 +131,34 @@ create table if not exists public.est_saldos_sistema (
 );
 create index if not exists est_ss_mes on public.est_saldos_sistema(mes);
 
+-- Estoque Faz. Quebra Cocão (pedido dele, 15/10/2026): controle de entradas e
+-- saídas, sem ligação com contagem nem acerto. Saldo = entradas − saídas.
+-- Entrada: compra, transferência (ou saldo inicial, na implantação).
+-- Saída: uso ou transferência — nº do documento, plantio, operador e, na
+-- transferência, a fazenda de destino. Lançamento tirado = ativo false.
+create table if not exists public.est_movimentos (
+  id uuid primary key default gen_random_uuid(),
+  local_id uuid not null references public.est_locais(id),
+  data date not null,
+  sentido text not null check (sentido in ('entrada','saida')),
+  tipo text not null,                 -- compra | transferencia | saldo_inicial | uso
+  item_id uuid not null references public.est_itens(id),
+  quantidade numeric not null,
+  documento text,                     -- nº do documento / NF
+  plantio text,
+  operador text,
+  outra_fazenda text,                 -- origem (entrada por transferência) ou destino (saída por transferência)
+  fornecedor text,
+  obs text,
+  criado_por text,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists est_mov_local on public.est_movimentos(local_id, data);
+
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.
 do $$ declare t text; begin
-  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens','est_compra_estoques','est_saldos_sistema'] loop
+  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens','est_compra_estoques','est_saldos_sistema','est_movimentos'] loop
     execute format('drop trigger if exists marcar_atualizacao on public.%I', t);
     execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
     execute format('alter table public.%I enable row level security', t);
