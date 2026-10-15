@@ -31,6 +31,7 @@ const GRUPOS: [string, string, string[]][] = [
   ['Manutenções · Check list', 'manutencao', ['checklist_modelos', 'checklist_versoes', 'checklist_grupos', 'checklist_itens', 'checklist_equipamento', 'checklists', 'checklist_respostas', 'checklist_fotos']],
   ['Manutenções · Acesso', 'manutencao', ['administradores', 'usuario_fazendas', 'usuario_locais', 'auditoria']],
   ['Vistorias e Segurança', 'vistorias', ['vistorias', 'itens', 'antes_depois', 'anomalias_relatorios', 'extintores', 'fotos_drive', 'configuracoes', 'administradores']],
+  ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],
 ];
 const PREFIXO: Record<string, string> = { public: '', manutencao: 'man_', vistorias: 'vis_' };
