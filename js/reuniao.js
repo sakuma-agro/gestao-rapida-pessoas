@@ -22,7 +22,7 @@
 // 'reuniao' (RLS app_pode('reuniao')).
 
 import { estado, novoId } from './store.js';
-import { podeTela } from './acesso.js';
+import { acesso, podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -104,6 +104,7 @@ const avisar = () => ouvintes.forEach(fn => { try { fn(); } catch {} });
 export async function carregarReuniao() {
   if (!estado.cliente || !estado.sessao) return dados;
   await enviarFila();
+  await enviarMarcas().catch(() => {});
   const c = estado.cliente;
   const rs = await Promise.all(Object.values(TABELAS).map(t => c.from(t).select('*')));
   if (rs.some(r => r.error)) return dados;  // sem rede: fica o cache
@@ -199,11 +200,85 @@ export function desenharFraseInicio(alvo, { abrir } = {}) {
   carregarReuniao().catch(() => {});
 }
 
+/* Alerta da atividade da semana (15/10/2026, pedido dele): na tela principal
+   a atividade NÃO fica no cartão da frase — vira uma mensagem de alerta só
+   para quem está com ela, com "Marcar como concluído" na própria mensagem.
+   Marca pela função reu_marcar_feito (qualquer login pode marcar a própria
+   atividade, mesmo sem o módulo). Sem rede, fica guardado e sobe depois. */
+const MARCAS = 'gr.reuniao.marcas';
+let pintarAlerta = null;
+
+function meuNome() {
+  const n = limpo(acesso.nome) || limpo(acesso.email).split('@')[0];
+  return semAcento(n.split(/[\s._-]+/)[0]);
+}
+
+async function marcarFeito(s, atividadeId, feito) {
+  const reg = semanaReg(s) || { semana: s, ajustes: {}, feitos: {} };
+  const feitos = { ...(reg.feitos || {}) };
+  if (feito) feitos[atividadeId] = true; else delete feitos[atividadeId];
+  const i = dados.semanas.findIndex(x => x.semana === s);
+  if (i >= 0) dados.semanas[i] = { ...reg, feitos }; else dados.semanas.push({ ...reg, feitos });
+  salvarCache(); avisar();
+  const marca = { semana: s, atividade: atividadeId, feito };
+  const guardar = () => { const m = ler(MARCAS, []); m.push(marca); gravar(MARCAS, m); };
+  if (!estado.cliente || !estado.sessao || !navigator.onLine) { guardar(); return 'fila'; }
+  const { error } = await estado.cliente.rpc('reu_marcar_feito', { p_semana: s, p_atividade: atividadeId, p_feito: feito })
+    .then(r => r, e => ({ error: e }));
+  if (error) { guardar(); return 'fila'; }
+  return 'ok';
+}
+async function enviarMarcas() {
+  const m = ler(MARCAS, []);
+  if (!m.length || !estado.cliente || !estado.sessao) return;
+  const resto = [];
+  for (const x of m) {
+    const { error } = await estado.cliente.rpc('reu_marcar_feito', { p_semana: x.semana, p_atividade: x.atividade, p_feito: x.feito })
+      .then(r => r, e => ({ error: e }));
+    if (error) resto.push(x);
+  }
+  gravar(MARCAS, [...resto, ...ler(MARCAS, []).slice(m.length)]);
+}
+
+/** Mensagem de alerta com a atividade da semana de quem está logado. */
+export function desenharAlertaAtividade(alvo) {
+  if (!alvo) return;
+  const pintar = () => {
+    const s = segundaDe();
+    const eu = meuNome();
+    const minhas = eu ? escalaDaSemana(s).filter(e => e.pessoa && e.pessoa.tarefas !== false &&
+      semAcento(e.pessoa.nome.split(' ')[0]) === eu && !e.feito) : [];
+    if (!minhas.length) { alvo.hidden = true; alvo.innerHTML = ''; return; }
+    alvo.hidden = false;
+    alvo.innerHTML = minhas.map(e => `
+      <div class="reu-alerta" role="alert">
+        <span class="reu-alerta-ic">${icone('alerta')}</span>
+        <div class="reu-alerta-txt">
+          <b>Sua atividade desta semana</b>
+          <span>${esc(e.atividade.nome)}</span>
+        </div>
+        <button type="button" class="btn mini reu-alerta-ok" data-ok="${e.atividade.id}">${icone('check')} Marcar como concluído</button>
+      </div>`).join('');
+    alvo.querySelectorAll('[data-ok]').forEach(b => b.addEventListener('click', async () => {
+      b.disabled = true;
+      const r = await marcarFeito(s, b.dataset.ok, true);
+      if (r === 'fila') mostrarAviso('Sem conexão: marcado neste aparelho, sobe sozinho quando a rede voltar.');
+      else mostrarAviso('Atividade marcada como concluída. Obrigado!');
+    }));
+  };
+  if (pintarAlerta) ouvintes.delete(pintarAlerta);
+  pintarAlerta = pintar;
+  ouvintes.add(pintar);
+  pintar();
+}
+
 /* ---------------- ícones próprios ---------------- */
 
 const IC = {
   aspas: '<path d="M10 7H6a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/><path d="M20 7h-4a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/>',
   cima: '<path d="M6 15l6-6 6 6"/>',
+  alerta: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.01"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
   baixo: '<path d="M6 9l6 6 6-6"/>',
   esq: '<path d="M15 5l-7 7 7 7"/>',
   dir: '<path d="M9 5l7 7-7 7"/>',

@@ -1474,3 +1474,14 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .reu-ativ.inativo{opacity:.6}
 .reu-ativ-num{font-size:11.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--marrom)}
 .reu-ativ .btn.mini{display:inline-flex;align-items:center;gap:3px}
+/* alerta da atividade da semana na tela principal (15/10/2026) */
+.reu-alertas{display:flex;flex-direction:column;gap:8px;margin:-8px 0 18px}
+.reu-alerta{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;border-radius:10px;
+  border:1px solid rgba(201,138,0,.45);background:rgba(201,138,0,.10);color:var(--texto)}
+.reu-alerta-ic{color:var(--alerta);display:inline-flex}
+.reu-alerta-ic svg{width:20px;height:20px}
+.reu-alerta-txt{display:flex;flex-direction:column;flex:1;min-width:180px;line-height:1.3}
+.reu-alerta-txt b{font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--alerta)}
+.reu-alerta-txt span{font-weight:600}
+.reu-alerta-ok{display:inline-flex;align-items:center;gap:5px;border-color:var(--verde);color:var(--verde-esc)}
+.reu-alerta-ok:hover{background:var(--verde);color:#fff}

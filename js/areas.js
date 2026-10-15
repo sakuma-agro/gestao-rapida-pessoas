@@ -10,7 +10,7 @@
 // Área nova no futuro: um item em AREAS e a regra dela em liberada().
 import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
-import { desenharFraseInicio } from './reuniao.js';
+import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -199,6 +199,7 @@ export function mostrarAreas({ direto = false } = {}) {
   /* Frase da semana (15/10/2026, pedido dele): ao lado do "Boa tarde, …",
      a frase que alguém do administrativo trouxe e o nome de quem trouxe. */
   try {
+    desenharAlertaAtividade($('arAlerta'));
     desenharFraseInicio($('arFrase'), { abrir: tela => { entrarNaArea('pessoas'); abrirModulo('reuniao', tela); } });
   } catch (e) { $('arFrase').hidden = true; }
 
