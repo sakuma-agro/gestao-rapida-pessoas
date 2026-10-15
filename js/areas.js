@@ -199,8 +199,9 @@ export function mostrarAreas({ direto = false } = {}) {
   /* Frase da semana (15/10/2026, pedido dele): ao lado do "Boa tarde, …",
      a frase que alguém do administrativo trouxe e o nome de quem trouxe. */
   try {
-    desenharAlertaAtividade($('arAlerta'));
-    desenharFraseInicio($('arFrase'), { abrir: tela => { entrarNaArea('pessoas'); abrirModulo('reuniao', tela); } });
+    const abrirReu = tela => { entrarNaArea('pessoas'); abrirModulo('reuniao', tela); };
+    desenharAlertaAtividade($('arAlerta'), { abrir: abrirReu });
+    desenharFraseInicio($('arFrase'), { abrir: abrirReu });
   } catch (e) { $('arFrase').hidden = true; }
 
   // liberadas primeiro, na ordem de AREAS; depois as fantasmas

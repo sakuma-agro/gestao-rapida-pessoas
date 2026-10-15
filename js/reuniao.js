@@ -241,16 +241,34 @@ async function enviarMarcas() {
 }
 
 /** Mensagem de alerta com a atividade da semana de quem está logado. */
-export function desenharAlertaAtividade(alvo) {
+let abrirTela = null;
+export function desenharAlertaAtividade(alvo, { abrir } = {}) {
   if (!alvo) return;
+  abrirTela = abrir || null;
   const pintar = () => {
     const s = segundaDe();
     const eu = meuNome();
-    const minhas = eu ? escalaDaSemana(s).filter(e => e.pessoa && e.pessoa.tarefas !== false &&
-      semAcento(e.pessoa.nome.split(' ')[0]) === eu && !e.feito) : [];
-    if (!minhas.length) { alvo.hidden = true; alvo.innerHTML = ''; return; }
+    const casa = p => p && eu && semAcento(p.nome.split(' ')[0]) === eu;
+    const minhas = escalaDaSemana(s).filter(e => e.pessoa?.tarefas !== false && casa(e.pessoa) && !e.feito);
+    /* 15/10/2026, pedido dele: virou a semana, quem traz a frase recebe o
+       alerta ao abrir o app. Some quando a frase da semana é cadastrada (ou
+       quando a pessoa toca em "Ok, entendi" — vale só para aquela semana,
+       neste aparelho). */
+    const respFrase = responsavelFrase(s).pessoa;
+    const vistoFrase = ler('gr.reuniao.vistoFrase', '') === s;
+    const alertaFrase = casa(respFrase) && !limpo(semanaReg(s)?.frase) && !vistoFrase;
+    if (!minhas.length && !alertaFrase) { alvo.hidden = true; alvo.innerHTML = ''; return; }
     alvo.hidden = false;
-    alvo.innerHTML = minhas.map(e => `
+    alvo.innerHTML = (alertaFrase ? `
+      <div class="reu-alerta" role="alert">
+        <span class="reu-alerta-ic">${icone('alerta')}</span>
+        <div class="reu-alerta-txt">
+          <b>Frase da semana</b>
+          <span>Nesta semana (${faixaSemana(s)}) é você quem traz a frase da reunião semanal.</span>
+        </div>
+        ${podeTela('reuSemana') ? `<button type="button" class="btn mini reu-alerta-ok" data-frase="ir">${icone('aspas')} Cadastrar a frase</button>` : ''}
+        <button type="button" class="btn mini" data-frase="ok">Ok, entendi</button>
+      </div>` : '') + minhas.map(e => `
       <div class="reu-alerta" role="alert">
         <span class="reu-alerta-ic">${icone('alerta')}</span>
         <div class="reu-alerta-txt">
@@ -264,6 +282,11 @@ export function desenharAlertaAtividade(alvo) {
       const r = await marcarFeito(s, b.dataset.ok, true);
       if (r === 'fila') mostrarAviso('Sem conexão: marcado neste aparelho, sobe sozinho quando a rede voltar.');
       else mostrarAviso('Atividade marcada como concluída. Obrigado!');
+    }));
+    alvo.querySelectorAll('[data-frase]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.frase === 'ir' && abrirTela) return abrirTela('reuSemana');
+      gravar('gr.reuniao.vistoFrase', s);
+      pintar();
     }));
   };
   if (pintarAlerta) ouvintes.delete(pintarAlerta);
