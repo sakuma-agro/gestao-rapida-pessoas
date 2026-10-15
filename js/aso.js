@@ -7,7 +7,8 @@
 //
 // A mesma lista alimenta dois papéis: a guia que o candidato leva na clínica e
 // o quadro geral de todas as funções, para conferir com o técnico.
-import { estado } from './store.js';
+import { estado, novoId } from './store.js';
+import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
 
 const $ = id => document.getElementById(id);
@@ -57,9 +58,17 @@ export async function carregarAso() {
     c.from('sst_aso_itens').select('*'),
   ]);
   if (pf.error || it.error) throw (pf.error || it.error);
-  A.porFuncao = pf.data || [];
+  definirAso({ porFuncao: pf.data || [], itens: it.data || [] });
+}
+/* Cópia local (rodada C, 15/10/2026): o sst.js guarda isto na caixa do núcleo
+   junto com exames e treinamentos, para o SST abrir sem sinal. */
+export function dadosAso() {
+  return { porFuncao: A.porFuncao, itens: [...A.itens.values()].flat() };
+}
+export function definirAso(d) {
+  A.porFuncao = d.porFuncao || [];
   A.itens = new Map();
-  (it.data || []).forEach(x => {
+  (d.itens || []).forEach(x => {
     if (!A.itens.has(x.exame_id)) A.itens.set(x.exame_id, []);
     A.itens.get(x.exame_id).push(x);
   });
@@ -195,9 +204,10 @@ export async function salvarItens(exameId) {
     feito: !!p.feito,
     realizado: p.feito ? (p.realizado || null) : null,
   }));
-  const { error } = await estado.cliente.from('sst_aso_itens').upsert(linhas);
-  if (error) throw error;
+  // Pela fila do núcleo (rodada C): sem sinal fica guardado e sobe depois.
   A.itens.set(exameId, linhas);
+  for (const l of linhas) await nucleo.adicionarNaFila('sst', { colecao: 'sst_aso_itens', acao: 'salvar', item: l, base: null });
+  if (window.enviarFilaSst) window.enviarFilaSst();
 }
 
 /* ==================================================================

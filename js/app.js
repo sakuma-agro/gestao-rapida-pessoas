@@ -18,7 +18,7 @@ import { abrirBoletins, fecharDocBoletins, fecharMenuBoletins } from './jornada-
 import { abrirDocumentos, fecharDocDocumentos, fecharMenuDocumentos } from './jornada-documentos.js';
 import { abrirTicket } from './jornada-ticket.js';
 import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from './atalhos.js';
-import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
+import { ligarSst, abrirSst, limparSst, limparPreviaSst, enviarFilaSst, carregarSst } from './sst.js';
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao } from './reuniao.js';
@@ -83,7 +83,7 @@ function limparPrevias() {
 
 /* Telas que só funcionam com internet (rodada C): sem cópia local nem fila.
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
-const SO_ONLINE = new Set(['disc', 'config', 'exPainel', 'exVenc', 'exTipos', 'exFuncoes', 'trPainel', 'trVenc', 'trTipos',
+const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
   ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_SALARIO_DIGNO, ...TELAS_CERT]);
 function avisarSoOnline(nome) {
@@ -1605,7 +1605,7 @@ let contandoPendentes = null;
 async function contarPendentes() {
   if (contandoPendentes) return contandoPendentes;
   contandoPendentes = (async () => {
-    let n = estado.pendentes + jd.pendentes() + pendentesReuniao();
+    let n = nucleo.pendentes() + pendentesReuniao();   // todas as camadas do núcleo (EPI, DP, SST)
     try { n += await pendentesAnexos(); } catch {}
     for (const k in pendentesMoldura) n += pendentesMoldura[k] || 0;
     estado.pendentesTotal = n;
@@ -1630,14 +1630,15 @@ const NOME_COLECAO = { funcionarios: 'funcionário', epis: 'EPI', fichas: 'ficha
   boletins: 'boletim', apuracoes: 'apuração', ocorrencias: 'ocorrência', vinculos: 'cadastro nível 2', emprestimos: 'empréstimo',
   abatimentos: 'abatimento', salarios: 'salário', afastamentos: 'afastamento', feriasInicial: 'férias (inicial)', feriasGozos: 'férias',
   feriasPerdas: 'perda de férias', bolEntregas: 'entrega de boletim', docEntregas: 'entrega de documento', banco: 'horas guardadas',
-  ticketMes: 'ticket do mês', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria' };
+  ticketMes: 'ticket do mês', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria',
+  sst_exames: 'exame', sst_tipos_exame: 'tipo de exame', sst_treinamentos: 'treinamento', sst_tipos_treinamento: 'tipo de treinamento', sst_aso_itens: 'marcação do ASO' };
 const rotuloItem = p => {
   const it = p.item || {};
   const quem = it.funcionario_id ? estado.funcionarios.find(f => f.id === it.funcionario_id)?.nome : (it.nome || it.descricao || '');
   return `${NOME_COLECAO[p.colecao] || p.colecao}${quem ? ' · ' + quem : ''}${it.data_fato ? ' · ' + it.data_fato.split('-').reverse().join('/') : ''}`;
 };
 async function desenharDlgFila() {
-  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor')].sort((a, b) => a.em - b.em);
+  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor'), ...await nucleo.listarFila('sst')].sort((a, b) => a.em - b.em);
   const alvo = $('dlgFilaLista');
   if (!lista.length) { alvo.innerHTML = '<p class="dica">Nada esperando. Tudo o que você lançou já está no servidor.</p>'; return; }
   alvo.innerHTML = lista.map(p => {
@@ -1662,13 +1663,13 @@ function abrirDlgFila() { desenharDlgFila().then(() => $('dlgFila').showModal())
 $('estadoRede').addEventListener('click', () => { if (estado.pendentesTotal) abrirDlgFila(); });
 $('dlgFilaEnviar').addEventListener('click', async () => {
   if (!estado.online) return;
-  try { await db.enviarFila(); await jd.enviarFila(); } catch {}
+  try { await db.enviarFila(); await jd.enviarFila(); await enviarFilaSst(); } catch {}
   desenharDlgFila(); contarPendentes();
 });
 $('dlgFilaLista').addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   const { camada } = b.dataset;
-  const enviar = () => (camada === 'epi' ? db.enviarFila() : jd.enviarFila()).catch(() => {});
+  const enviar = () => (camada === 'epi' ? db.enviarFila() : camada === 'sst' ? enviarFilaSst() : jd.enviarFila()).catch(() => {});
   if (b.dataset.filaManter) { await nucleo.manterMeu(b.dataset.filaManter, camada); await enviar(); }
   else if (b.dataset.filaTentar) { await nucleo.tentarDeNovo(b.dataset.filaTentar, camada); await enviar(); }
   else if (b.dataset.filaServidor || b.dataset.filaDescartar) {
@@ -1676,7 +1677,7 @@ $('dlgFilaLista').addEventListener('click', async ev => {
     if (b.dataset.filaDescartar && !confirm('Descartar este lançamento? Ele some deste aparelho e não vai para o servidor.')) return;
     await nucleo.descartar(uuid, camada);
     // o cache deste aparelho volta a espelhar o servidor
-    try { camada === 'epi' ? await db.sincronizar() : await jd.carregar(jd.competenciaCarregada() || undefined); } catch {}
+    try { camada === 'epi' ? await db.sincronizar() : camada === 'sst' ? await carregarSst() : await jd.carregar(jd.competenciaCarregada() || undefined); } catch {}
   }
   desenharDlgFila(); contarPendentes();
 });
@@ -1697,7 +1698,7 @@ async function desenharSaude() {
   linhas.push(['Versão do app', await versaoDoApp()]);
   linhas.push(['Internet agora', navigator.onLine ? 'sim' : 'não']);
   linhas.push(['Última leitura do servidor', (await nucleo.lerMeta('ultima_sinc')) ? new Date(await nucleo.lerMeta('ultima_sinc')).toLocaleString('pt-BR') : 'nunca neste aparelho']);
-  linhas.push(['Para enviar · parados (Pessoas)', `${nucleo.pendentes()} · ${nucleo.parados()}`]);
+  linhas.push(['Para enviar · parados (Cadastros, DP, SST)', `${nucleo.pendentes()} · ${nucleo.parados()}`]);
   for (const k in pendentesMoldura) linhas.push([`Para enviar (${k})`, String(pendentesMoldura[k])]);
   linhas.push(['Espaço usado pelo app', est ? `${kb(est.usage)} de ${kb(est.quota)}` : 'não informado']);
   linhas.push(['Cadastro local', `${estado.funcionarios.length} funcionários · ${estado.fichas.length} fichas · ${jd.dados.boletins.length} boletins do mês`]);

@@ -168,6 +168,13 @@ export function erroPermanente(e) {
    quando este aparelho leu o registro (null = registro novo aqui). */
 export async function gravarRegistro(cliente, tabela, pk, item, base, { forcar = false } = {}) {
   const envio = { ...item }; delete envio._base; delete envio.atualizado_em;
+  // Chave composta (ex.: sst_aso_itens = exame_id + tipo_id): sem conferência
+  // de conflito, upsert direto com onConflict nas duas colunas.
+  if (Array.isArray(pk)) {
+    const r = await cliente.from(tabela).upsert(envio, { onConflict: pk.join(',') }).select();
+    if (r.error) throw r.error;
+    return r.data && r.data[0] ? r.data[0] : null;
+  }
   const id = item[pk];
   if (base && !forcar && id !== undefined && id !== null) {
     const r = await cliente.from(tabela).update(envio).eq(pk, id).eq('atualizado_em', base).select();
@@ -183,7 +190,9 @@ export async function gravarRegistro(cliente, tabela, pk, item, base, { forcar =
   return r.data && r.data[0] ? r.data[0] : null;
 }
 export async function apagarRegistro(cliente, tabela, pk, id) {
-  const r = await cliente.from(tabela).delete().eq(pk, id);
+  let q = cliente.from(tabela).delete();
+  if (Array.isArray(pk)) { for (const c of pk) q = q.eq(c, id[c]); } else q = q.eq(pk, id);
+  const r = await q;
   if (r.error) throw r.error;
 }
 
@@ -208,7 +217,7 @@ async function enviarAgora(camada, def) {
     const tabela = def.tabelaDe(p.colecao), pk = def.chaveDe(p.colecao);
     try {
       if (p.acao === 'apagar') {
-        await apagarRegistro(cliente, tabela, pk, p.item[pk]);
+        await apagarRegistro(cliente, tabela, pk, Array.isArray(pk) ? p.item : p.item[pk]);
       } else {
         const salvo = await gravarRegistro(cliente, tabela, pk, def.paraBanco(p.colecao, p.item), p.base, { forcar: !!p.forcar });
         if (salvo) {
@@ -217,7 +226,7 @@ async function enviarAgora(camada, def) {
           // o carimbo novo — senão ela chegaria com a base velha e "conflitaria"
           // consigo mesma.
           for (const q of fila) {
-            if (q !== p && q.colecao === p.colecao && q.status !== 'parado' && q.item?.[pk] === p.item[pk]) {
+            if (q !== p && q.colecao === p.colecao && q.status !== 'parado' && !Array.isArray(pk) && q.item?.[pk] === p.item[pk]) {
               q.base = salvo.atualizado_em ?? q.base; await porFila(q);
             }
           }

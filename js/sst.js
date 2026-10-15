@@ -5,9 +5,10 @@
 // calculada pelo tipo. Por isso quase tudo aqui é escrito uma vez só e recebe
 // a "receita" do exame ou do treinamento em RECEITAS.
 import { campoAnexos, listarArquivos, donosComArquivo, abrirArquivo, aoMudarArquivos } from './arquivos.js';
-import { estado } from './store.js';
+import { estado, novoId } from './store.js';
+import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
-import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
+import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens, dadosAso, definirAso,
   conferenciaDo, pendenciasDe } from './aso.js';
 import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
 import { abrirModulo, podeTela } from './acesso.js';
@@ -136,8 +137,53 @@ async function lerDonos(r) {
 const editando = { exame: null, treinamento: null };
 const editandoTipo = { exame: null, treinamento: null };
 
+/* Cópia local e fila (rodada C, 15/10/2026): o SST abre sem sinal com o que
+   ficou guardado da última leitura (caixa 'sst.cache' do núcleo) e o que for
+   lançado sem sinal entra na fila 'sst' e sobe quando a rede volta, com a
+   mesma conferência de conflito do resto do app (_base = atualizado_em). */
+const CAIXA = 'sst.cache';
+const CAMADA = 'sst';
+const comBase = lista => (lista || []).map(r => ({ ...r, _base: r.atualizado_em ?? null }));
+const COLECOES = { sst_exames: ['exame', 'regs'], sst_tipos_exame: ['exame', 'tipos'],
+  sst_treinamentos: ['treinamento', 'regs'], sst_tipos_treinamento: ['treinamento', 'tipos'] };
+const CHAVES = { sst_aso_itens: ['exame_id', 'tipo_id'] };
+function salvarCaixa() {
+  nucleo.gravarCaixa(CAIXA, { exame: S.exame, treinamento: S.treinamento, aso: dadosAso() });
+}
+const CAMADA_DEF = {
+  tabelaDe: c => c,
+  chaveDe: c => CHAVES[c] || 'id',
+  paraBanco: (c, item) => item,
+  cliente: () => estado.cliente,
+  podeEnviar: () => !!(estado.cliente && estado.sessao && navigator.onLine),
+  aoEnviado: (colecao, salvo) => {
+    const onde = COLECOES[colecao]; if (!onde) return;
+    const alvo = S[onde[0]][onde[1]].find(x => x.id === salvo.id);
+    if (alvo) { alvo.atualizado_em = salvo.atualizado_em; alvo._base = salvo.atualizado_em; salvarCaixa(); }
+  },
+};
+export const enviarFilaSst = () => nucleo.enviarFila(CAMADA, CAMADA_DEF);
+window.enviarFilaSst = enviarFilaSst;
+async function enviarSst(colecao, acao, item, base = null) {
+  await nucleo.adicionarNaFila(CAMADA, { colecao, acao, item, base });
+  if (CAMADA_DEF.podeEnviar()) { try { await enviarFilaSst(); } catch {} }
+}
+addEventListener('online', () => { enviarFilaSst().catch(() => {}); });
+setInterval(() => { if (nucleo.pendentes(CAMADA) - nucleo.parados(CAMADA) > 0) enviarFilaSst().catch(() => {}); }, 2 * 60 * 1000);
+
 export async function carregarSst() {
+  // 1) o que está no aparelho, para a tela abrir já com algo
+  const c0 = await nucleo.lerCaixa(CAIXA, null);
+  if (c0 && !S.carregado) {
+    S.exame = c0.exame || S.exame; S.treinamento = c0.treinamento || S.treinamento;
+    definirTipos(S.exame.tipos); definirAso(c0.aso || {});
+    S.carregado = true;
+  }
+  await nucleo.contarFila(CAMADA);
   const c = estado.cliente;
+  if (!c || !estado.sessao || !navigator.onLine) { if (S.carregado) return; throw new Error('sem internet e sem cópia neste aparelho'); }
+  // 2) o servidor; o que ainda está na fila (a nuvem não sabe dele) fica como está aqui
+  await enviarFilaSst().catch(() => {});
   const [te, ex, tt, tr] = await Promise.all([
     c.from('sst_tipos_exame').select('*').order('ordem').order('nome'),
     c.from('sst_exames').select('*').order('realizado', { ascending: false }),
@@ -145,14 +191,22 @@ export async function carregarSst() {
     c.from('sst_treinamentos').select('*').order('realizado', { ascending: false }),
   ]);
   const erro = te.error || ex.error || tt.error || tr.error;
-  if (erro) throw erro;
-  S.exame.tipos = te.data || [];
-  S.exame.regs = ex.data || [];
-  S.treinamento.tipos = tt.data || [];
-  S.treinamento.regs = tr.data || [];
+  if (erro) { if (S.carregado) return; throw erro; }
+  const fila = await nucleo.listarFila(CAMADA);
+  const comFila = (lista, colecao) => {
+    const ids = new Set(fila.filter(p => p.colecao === colecao).map(p => p.item?.id));
+    const locais = (S[COLECOES[colecao][0]][COLECOES[colecao][1]] || []).filter(x => ids.has(x.id));
+    const apagados = new Set(fila.filter(p => p.colecao === colecao && p.acao === 'apagar').map(p => p.item?.id));
+    return [...comBase(lista).filter(x => !ids.has(x.id) && !apagados.has(x.id)), ...locais.filter(x => !apagados.has(x.id))];
+  };
+  S.exame.tipos = comFila(te.data, 'sst_tipos_exame');
+  S.exame.regs = comFila(ex.data, 'sst_exames');
+  S.treinamento.tipos = comFila(tt.data, 'sst_tipos_treinamento');
+  S.treinamento.regs = comFila(tr.data, 'sst_treinamentos');
   S.carregado = true;
   definirTipos(S.exame.tipos);
-  await carregarAso();
+  try { await carregarAso(); } catch { /* fica o que havia */ }
+  salvarCaixa();
 }
 
 export function limparSst() {
@@ -161,6 +215,7 @@ export function limparSst() {
   S.exame = { tipos: [], regs: [] };
   S.treinamento = { tipos: [], regs: [] };
   S.carregado = false;
+  nucleo.apagarCaixa(CAIXA);
 }
 
 const funcionario = id => estado.funcionarios.find(f => f.id === id);
@@ -968,21 +1023,23 @@ function ligarReceita(r, avisar) {
       linha.instrutor = so($(r.el.instrutor).value) || null;
       linha.observacao = so($(r.el.obs).value) || null;
     }
-    if (!e.novo) linha.id = e.id;
+    linha.id = e.novo ? novoId() : e.id;
 
-    const { data, error } = await estado.cliente.from(r.tabelaRegs)
-      .upsert(linha).select().single();
-    if (error) return mostrarErro(r.el.erro, error.message);
-    try { await anexosDe(r).salvar(data.id); }
-    catch (err) { return mostrarErro(r.el.erro, 'O lançamento foi salvo, mas o anexo não: ' + err.message); }
-
-    const i = S[r.id].regs.findIndex(x => x.id === data.id);
+    // Rodada C: grava no aparelho e na fila; com rede sobe na hora, sem rede
+    // sobe depois. A base (carimbo do servidor) vai junto para conferir conflito.
+    const i = S[r.id].regs.findIndex(x => x.id === linha.id);
+    const base = i >= 0 ? (S[r.id].regs[i]._base ?? null) : null;
+    const data = i >= 0 ? { ...S[r.id].regs[i], ...linha } : { ...linha, _base: null };
     if (i >= 0) S[r.id].regs[i] = data; else S[r.id].regs.unshift(data);
     S[r.id].regs.sort((a, b) => String(b.realizado).localeCompare(String(a.realizado)));
+    salvarCaixa();
+    await enviarSst(r.tabelaRegs, 'salvar', linha, base);
+    try { await anexosDe(r).salvar(data.id); }
+    catch (err) { mostrarErro(r.el.erro, 'O lançamento ficou guardado, mas o anexo não: ' + err.message); }
 
     if (r.id === 'exame') {
-      try { await salvarItens(data.id); }
-      catch (err) { return mostrarErro(r.el.erro, 'O ASO foi salvo, mas a marcação dos exames não: ' + err.message); }
+      try { await salvarItens(data.id); salvarCaixa(); }
+      catch (err) { return mostrarErro(r.el.erro, 'O ASO ficou guardado, mas a marcação dos exames não: ' + err.message); }
     }
     $(r.el.dlg).close();
     desenharVenc(r);
@@ -995,9 +1052,9 @@ function ligarReceita(r, avisar) {
     const e = editando[r.id];
     if (!e?.id) return;
     if (!confirm('Apagar este lançamento?')) return;
-    const { error } = await estado.cliente.from(r.tabelaRegs).delete().eq('id', e.id);
-    if (error) return mostrarErro(r.el.erro, error.message);
     S[r.id].regs = S[r.id].regs.filter(x => x.id !== e.id);
+    salvarCaixa();
+    await enviarSst(r.tabelaRegs, 'apagar', { id: e.id });
     $(r.el.dlg).close();
     desenharVenc(r);
     desenharPainel(r);
@@ -1020,14 +1077,15 @@ function ligarReceita(r, avisar) {
     }
     if (r.el.tCategoria) linha.categoria = $(r.el.tCategoria).value;
     if (r.el.tRecicla) linha.recicla_tipo_id = $(r.el.tRecicla).value || null;
-    if (!e.novo) linha.id = e.id;
+    linha.id = e.novo ? novoId() : e.id;
 
-    const { data, error } = await estado.cliente.from(r.tabelaTipos)
-      .upsert(linha).select().single();
-    if (error) return mostrarErro(r.el.erroTipo, error.message);
-
-    const i = S[r.id].tipos.findIndex(x => x.id === data.id);
+    const i = S[r.id].tipos.findIndex(x => x.id === linha.id);
+    const base = i >= 0 ? (S[r.id].tipos[i]._base ?? null) : null;
+    const data = i >= 0 ? { ...S[r.id].tipos[i], ...linha } : { ...linha, _base: null };
     if (i >= 0) S[r.id].tipos[i] = data; else S[r.id].tipos.push(data);
+    if (r.id === 'exame') definirTipos(S.exame.tipos);
+    salvarCaixa();
+    await enviarSst(r.tabelaTipos, 'salvar', linha, base);
     $(r.el.dlgTipo).close();
     desenharTipos(r);
   });
@@ -1041,9 +1099,9 @@ function ligarReceita(r, avisar) {
         `Este tipo tem ${usos} lançamento(s). Desative em vez de apagar, senão o histórico se perde.`);
     }
     if (!confirm(`Apagar "${e.nome}"?`)) return;
-    const { error } = await estado.cliente.from(r.tabelaTipos).delete().eq('id', e.id);
-    if (error) return mostrarErro(r.el.erroTipo, error.message);
     S[r.id].tipos = S[r.id].tipos.filter(x => x.id !== e.id);
+    salvarCaixa();
+    await enviarSst(r.tabelaTipos, 'apagar', { id: e.id });
     $(r.el.dlgTipo).close();
     desenharTipos(r);
   });
