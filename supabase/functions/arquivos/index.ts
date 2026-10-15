@@ -18,6 +18,7 @@
 //   pessoas/exame/<id do lançamento>/….pdf
 //   certificacao/documento/<id do documento>/….pdf
 //   manutencoes/os/<código>/<uuid>.jpg  ·  manutencoes/checklist/<código>/<uuid>.jpg
+//   manutencoes/maquina/<id da máquina>/<uuid>.jpg  ·  manutencoes/patrimonio/<id do bem>/<uuid>.jpg
 //
 // No Drive: pasta "LOP - Gestão Rápida – arquivos" › área › tipo.
 //
@@ -34,13 +35,14 @@ const G_SEGREDO = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
 const G_RENOVA = Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "";
 const RAIZ_NOME = "LOP - Gestão Rápida – arquivos";
 const MAX_BYTES = 15 * 1024 * 1024;
-const CHAVE_OK = /^(pessoas|manutencoes|certificacao)\/(funcionario|treinamento|exame|os|checklist|documento)\/[\w.-]{1,80}\/[\w.-]{1,120}\.(jpe?g|png|webp|pdf)$/;   // chaves geradas pelo app, sempre em minúsculas
+const CHAVE_OK = /^(pessoas|manutencoes|certificacao)\/(funcionario|treinamento|exame|os|checklist|documento|maquina|patrimonio)\/[\w.-]{1,80}\/[\w.-]{1,120}\.(jpe?g|png|webp|pdf)$/;   // chaves geradas pelo app, sempre em minúsculas
 const TIPOS_OK = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 
 const NOME_AREA: Record<string, string> = { pessoas: "Pessoas", manutencoes: "Manutenções", certificacao: "Certificação" };
 const NOME_TIPO: Record<string, string> = {
   funcionario: "Fotos dos funcionários", treinamento: "Certificados de treinamento", exame: "ASO e exames",
   os: "Ordens de serviço", checklist: "Check lists", documento: "Documentos",
+  maquina: "Fotos das máquinas", patrimonio: "Fotos do patrimônio",
 };
 
 const CORS = {
