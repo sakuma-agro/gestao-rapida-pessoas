@@ -10,7 +10,7 @@
 
 /* Tudo o que a contagem precisa para funcionar sem sinal no almoxarifado. */
 const TABELAS_BASE = ['est_locais', 'est_itens', 'est_contagens', 'est_contagem_itens', 'est_contagem_lotes',
-  'est_compras', 'est_compra_itens'];
+  'est_compras', 'est_compra_itens', 'est_compra_estoques'];
 const GERADAS_NO_BANCO = {};
 const CHAVE_PK = {};
 /* Na contagem vale a última gravação (15/10/2026). Com a conferência de
@@ -19,7 +19,7 @@ const CHAVE_PK = {};
    chave como "composta" (de uma parte só, o próprio id) faz o núcleo gravar por
    upsert direto, sem o carimbo. Itens e almoxarifados continuam conferindo. */
 const CHAVE_COMPOSTA = { est_contagens: ['id'], est_contagem_itens: ['id'], est_contagem_lotes: ['id'],
-  est_compras: ['id'], est_compra_itens: ['id'] };
+  est_compras: ['id'], est_compra_itens: ['id'], est_compra_estoques: ['id'] };
 function chaveDrive(caminho) { return 'estoque/' + String(caminho).toLowerCase(); }
 
 /* Avisa as telas (módulos) que a base local mudou. */

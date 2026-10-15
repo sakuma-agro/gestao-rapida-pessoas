@@ -229,3 +229,15 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ci-comprar .ci-num{width:84px !important;text-align:right;font-weight:700;min-height:40px;color:var(--marrom)}
 .ci-refaz{border:0;background:none;color:var(--suave);font-size:18px;cursor:pointer;padding:0 2px}
 @media (max-width:420px){ .ci-cab,.ci-trio{grid-template-columns:1fr 50px 50px 100px;gap:5px} .ci-comprar .ci-num{width:70px !important} }
+/* conferência nos cinco estoques (15/10/2026) */
+.ci-conf{padding:10px;border:1px solid var(--linha);border-left:4px solid var(--linha);border-radius:10px;background:var(--papel)}
+.ci-conf.feito{border-left-color:var(--verde)}
+.ci-conf-topo{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.ci-total{text-align:right;flex:none}
+.ci-total span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--suave)}
+.ci-total strong{font-size:22px;color:var(--verde-esc)}
+.ci-estoques{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.ci-estoques label{display:block;font-size:11.5px;font-weight:600;color:var(--suave)}
+.ci-estoques .ci-num{width:100% !important;margin-top:3px;text-align:right;font-weight:700;font-size:17px !important;min-height:42px}
+.ci-estoques .ci-num.erro{border-color:#c0392b}
+.ci-onde{color:var(--verde-esc) !important;font-weight:600}

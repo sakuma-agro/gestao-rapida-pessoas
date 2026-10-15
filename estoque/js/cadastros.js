@@ -191,12 +191,12 @@ function desenharLocais() {
       || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   alvo.innerHTML = `
     <form class="grade larga cad-novo" id="cadLocalNovo" autocomplete="off">
-      <label class="campo">Nome <input type="text" name="nome" required placeholder="igual ao da aba Sistema - ... da planilha"></label>
+      <label class="campo">Nome <input type="text" name="nome" required placeholder="ex.: Faz. Faca"></label>
       <label class="campo">Fazenda <input type="text" name="fazenda" placeholder="ex.: Fazenda Faca"></label>
       <div class="barra fim" style="align-self:end"><button class="btn principal" type="submit">Adicionar</button></div>
     </form>
-    <p class="es-nota">O nome do almoxarifado é o que liga a contagem ao Acerto: precisa ser o mesmo da aba
-      <strong>"Sistema - …"</strong> da planilha (ex.: Faz. Faca).</p>
+    <p class="es-nota">O nome do almoxarifado é o que liga a contagem ao Acerto: precisa começar igual ao da aba
+      <strong>"Sistema - …"</strong> da planilha (ex.: Faz. Faca; "Lote 35 PADAP" casa com a aba "Lote 35").</p>
     <div class="lista">${lista.map(l => `<div class="item"><span></span>
       <div><div class="nome">${esc(l.nome)} <span class="tag ${l.ativo === false ? 'inativo">desativado' : 'ativo">ativo'}</span></div>
         <div class="sub">${esc(l.fazenda || '')}</div></div>

@@ -141,7 +141,9 @@ export async function importarPlanilha(arquivo, mesApp = null) {
     const app = fisicoDoApp(mesApp);
     const nomesApp = new Set();
     for (const [k, d] of app) {
-      let dep = depositos.find(x => chaveDep(x) === k);
+      // "Lote 35" (aba da planilha) casa com "Lote 35 PADAP" (estoque do app)
+      let dep = depositos.find(x => chaveDep(x) === k)
+        || depositos.find(x => k.startsWith(chaveDep(x) + ' ') || chaveDep(x).startsWith(k + ' '));
       if (!dep) { dep = d.nome; depositos.push(dep); }      // almoxarifado sem aba de sistema
       for (const it of d.itens) {
         const kp = chaveProduto(it.nome);

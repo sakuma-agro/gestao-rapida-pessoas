@@ -100,9 +100,21 @@ create table if not exists public.est_compra_itens (
 );
 create index if not exists est_cpi_compra on public.est_compra_itens(compra_id);
 
+-- Etapa 2 por estoque (pedido dele, 15/10/2026): quanto tem de cada produto em
+-- cada um dos estoques. id = '<compra_item_id>:<local_id>'. O total vai para
+-- est_compra_itens.estoque.
+create table if not exists public.est_compra_estoques (
+  id text primary key,
+  compra_item_id uuid not null references public.est_compra_itens(id) on delete cascade,
+  local_id uuid not null references public.est_locais(id),
+  quantidade numeric,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists est_cpe_item on public.est_compra_estoques(compra_item_id);
+
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.
 do $$ declare t text; begin
-  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens'] loop
+  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens','est_compra_estoques'] loop
     execute format('drop trigger if exists marcar_atualizacao on public.%I', t);
     execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
     execute format('alter table public.%I enable row level security', t);
@@ -117,12 +129,14 @@ do $$ declare t text; begin
   end loop;
 end $$;
 
--- Os quatro depósitos da planilha do acerto, com o mesmo nome das abas
--- "Sistema - ..." (é por esse nome que a contagem entra no Acerto).
+-- Os cinco estoques (pedido dele, 15/10/2026). O nome liga a contagem ao
+-- Acerto pela aba "Sistema - ..." da planilha ("Lote 35" casa com
+-- "Lote 35 PADAP"). Só insere o que ainda não existe.
 insert into public.est_locais (nome, fazenda, ordem)
 select v.nome, v.fazenda, v.ordem from (values
-  ('Lote 35', 'Lote 35 PADAP', 1),
+  ('Lote 35 PADAP', 'Lote 35 PADAP', 1),
   ('Faz. Faca', 'Fazenda Faca', 2),
   ('Faz. Morro Branco', 'Fazenda Morro Branco', 3),
-  ('Faz. Três Riachos', 'Fazenda Três Riachos', 4)) v(nome, fazenda, ordem)
-where not exists (select 1 from public.est_locais);
+  ('Faz. Três Riachos', 'Fazenda Três Riachos', 4),
+  ('Faz. Quebra Cocão', 'Fazenda Quebra Cocão', 5)) v(nome, fazenda, ordem)
+where not exists (select 1 from public.est_locais l where lower(l.nome) = lower(v.nome));
