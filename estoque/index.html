@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Estoque · LOP - Gestão Rápida</title>
+<meta name="theme-color" content="#1B232B">
+<link rel="stylesheet" href="css/app.css?v=1">
+<link rel="stylesheet" href="css/estoque.css?v=1">
+<!-- Área Estoque do LOP - Gestão Rápida (15/10/2026).
+     Veio do app avulso Gestão Rápida (Estoque Inteligente). Esta página não
+     abre sozinha: mora dentro do app principal (a pasta de cima), numa
+     moldura, e usa o login de lá. Quem abrir este endereço direto é levado
+     para o app principal, que abre a área. -->
+<script>
+  (function () {
+    var dentro = false;
+    try { dentro = window.parent !== window && !!window.parent.grCliente; } catch (e) {}
+    if (!dentro) {
+      var q = location.search ? location.search.slice(1) + '&' : '';
+      location.replace('../?' + q + 'area=estoque');
+    }
+  })();
+</script>
+</head>
+<body class="embutido">
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <header class="topo">
+    <!-- Nome, marcas, sair e instalar ficam no topo do LOP, acima da moldura. -->
+    <nav class="abas" role="tablist" id="navModulos"></nav>
+    <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
+    <nav class="aba3s" role="tablist" id="navSub" hidden></nav>
+  </header>
+
+  <main>
+    <div class="aviso info" id="avisoGlobal" hidden></div>
+
+    <!-- ---- ENTRADA: nenhum módulo aberto (as marcas estão no topo do LOP) ---- -->
+    <section class="tela inicio" id="telaInicio">
+      <h2>Estoque <span>Balanço e acerto</span></h2>
+      <p class="in-dica">Escolha um módulo no menu acima: <strong>Contagem</strong>, <strong>Acerto</strong> ou <strong>Cadastros</strong>.</p>
+    </section>
+
+    <!-- =================== CONTAGEM =================== -->
+    <section class="tela" id="telaCtNova" hidden>
+      <div class="cartao">
+        <h2>Nova contagem</h2>
+        <p class="dica">O balanço começa aqui: escolhe-se o almoxarifado, o grupo de itens e a data.</p>
+        <div class="grade">
+          <label class="campo">Almoxarifado
+            <select disabled><option>Lote 35 PADAP</option></select></label>
+          <label class="campo">Grupo
+            <select disabled><option>Insumos</option><option>Fertilizantes</option><option>EPIs</option></select></label>
+          <label class="campo">Data do balanço <input type="date" disabled></label>
+          <label class="campo">Responsável pela contagem <input type="text" disabled placeholder="quem está contando"></label>
+        </div>
+        <div class="barra fim"><button class="btn principal" disabled>Abrir contagem</button></div>
+      </div>
+      <div class="es-plano">
+        <h3>O que esta tela vai fazer</h3>
+        <ul>
+          <li>Listar os itens do grupo escolhido, um por linha, com um campo grande de quantidade — pensado para contar de celular, no almoxarifado.</li>
+          <li>Guardar sozinha o que já foi digitado, mesmo sem internet, e enviar quando o sinal voltar.</li>
+          <li>Não pede entrada nem saída: o app registra <strong>o que existe na prateleira</strong>.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="tela" id="telaCtAndamento" hidden>
+      <div class="cartao">
+        <h2>Contagens em andamento</h2>
+        <p class="dica">O que está aberto agora, por almoxarifado, e quanto falta contar de cada.</p>
+        <div class="vazio">A lista aparece aqui quando o banco estiver ligado.</div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaCtHistorico" hidden>
+      <div class="cartao">
+        <h2>Histórico de balanços</h2>
+        <p class="dica">Todo balanço fechado fica guardado com data, responsável e as quantidades contadas.</p>
+        <div class="vazio">O histórico aparece aqui quando o banco estiver ligado.</div>
+      </div>
+    </section>
+
+    <!-- =================== ACERTO =================== -->
+    <section class="tela" id="telaAcPainel" hidden>
+      <div class="cartao">
+        <h2>Painel do acerto</h2>
+        <p class="dica">A leitura em quatro números: o que bateu, o que se resolve transferindo entre as fazendas, o que precisa de baixa e o que precisa de lançamento.</p>
+        <div class="barra">
+          <label class="btn principal" for="acArquivo" id="acArquivoRot">Escolher planilha do acerto</label>
+          <input type="file" id="acArquivo" accept=".xlsx,.xlsm" hidden>
+          <span class="dc-sem">Abas "Sistema - ..." e "Físico - ...". O arquivo não sai do seu computador.</span>
+          <label class="es-check" hidden><input type="checkbox" id="acFora">
+            incluir os produtos que não estão no cadastro</label>
+        </div>
+        <div id="acResumo"></div>
+      </div>
+      <div id="acPainelCorpo"></div>
+      <div class="es-plano" id="acPlano">
+        <h3>A conta, do jeito que a planilha faz</h3>
+        <ul>
+          <li><strong>Diferença</strong> = saldo do sistema − contagem física, produto por produto, depósito por depósito.</li>
+          <li>Sobra num depósito e falta do mesmo produto em outro viram <strong>transferência</strong> — material que trocou de lugar sem documento. A menor falta é coberta primeiro.</li>
+          <li>A sobra que restar vira <strong>saída a registrar</strong>; a falta que restar vira <strong>entrada a registrar</strong> (NF, estorno ou devolução).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="tela" id="telaAcDivergencias" hidden>
+      <div class="cartao">
+        <h2>Divergências</h2>
+        <p class="dica">Produto a produto: quanto o sistema aponta, quanto foi contado e o que isso significa.</p>
+        <div class="barra">
+          <label class="campo" style="flex:1;min-width:220px">Buscar produto
+            <input type="text" id="acBusca" placeholder="Digite parte do nome..."></label>
+          <label class="es-check"><input type="checkbox" id="acSoDif" checked> só o que não bateu</label>
+        </div>
+        <div id="acDivCorpo"></div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaAcTransferencias" hidden>
+      <div class="cartao">
+        <h2>Transferências sugeridas</h2>
+        <p class="dica">De onde sobrou para onde faltou, na quantidade que fecha as duas pontas.</p>
+        <div id="acTransfCorpo"></div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaAcRelatorio" hidden>
+      <div class="cartao naoimprimir">
+        <h2>Relatório do acerto</h2>
+        <p class="dica">Sai em A4, no padrão SAKUMA: marca no alto, tabela com grade e a assinatura ao pé.</p>
+        <div class="barra fim"><button class="btn principal" id="acImprimir">Imprimir / salvar em PDF</button></div>
+      </div>
+      <div class="previa" id="acRelCorpo"></div>
+    </section>
+
+    <!-- =================== CADASTROS =================== -->
+    <section class="tela" id="telaCadItens" hidden>
+      <div class="cartao">
+        <h2>Itens</h2>
+        <p class="dica">O catálogo do que se conta: insumos, fertilizantes e EPIs, cada um com código, unidade e grupo.</p>
+        <div class="vazio">O cadastro entra na próxima etapa.</div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaCadGrupos" hidden>
+      <div class="cartao">
+        <h2>Grupos e unidades</h2>
+        <p class="dica">Os grupos de contagem e as unidades de cada item.</p>
+        <div class="es-plano">
+          <h3>Regra já definida</h3>
+          <ul>
+            <li>Fertilizante é contado <strong>sempre em quilos</strong>, mesmo o item cadastrado como Ton, Tn ou Sc — o valor lançado é o peso total, nunca o número de sacas.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaCadLocais" hidden>
+      <div class="cartao">
+        <h2>Almoxarifados</h2>
+        <p class="dica">Os locais onde se conta, ligados à fazenda de cada um.</p>
+        <div class="lista">
+          <div class="item"><span></span><div><div class="nome">Lote 35 PADAP</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
+          <div class="item"><span></span><div><div class="nome">Fazenda Faca</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
+          <div class="item"><span></span><div><div class="nome">Fazenda Morro Branco</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
+          <div class="item"><span></span><div><div class="nome">Fazenda Três Riachos</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
+          <div class="item"><span></span><div><div class="nome">Fazenda Quebra Cocão</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaCadSaldos" hidden>
+      <div class="cartao">
+        <h2>Saldo do sistema</h2>
+        <p class="dica">O app não dá entrada nem saída: o saldo vem de fora, importado da planilha, e serve de espelho para a contagem.</p>
+        <div class="barra"><button class="btn" disabled>Escolher planilha</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>

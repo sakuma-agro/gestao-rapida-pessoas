@@ -22,6 +22,8 @@ const esc = s => String(s == null ? '' : s)
 const VERSAO_AREA = '23';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
 const VERSAO_PROG = '4';
+/* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
+const VERSAO_EST = '1';
 
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
@@ -36,6 +38,11 @@ export const AREAS = [
      implementos (Máquinas e Patrimônio). Mora em programacao/, numa moldura. */
   { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v1.svg',
     desc: 'Painel anual · Atividades · Reunião semanal · Relatório diário' },
+  /* Estoque (15/10/2026, pedido dele): o app avulso Gestão Rápida (Estoque
+     Inteligente) veio para dentro do LOP. Balanço, não movimento: contagem,
+     acerto entre as fazendas e cadastros. Mora em estoque/, numa moldura. */
+  { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v1.svg',
+    desc: 'Contagem · Acerto entre fazendas · Cadastros' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
   { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
@@ -115,6 +122,8 @@ function liberada(id) {
   /* Vistorias e Segurança (14/10/2026): administrador ou módulo 'vistorias' —
      a mesma regra do banco (vistorias.pode_usar). */
   if (id === 'vistorias') return acesso.admin || (acesso.modulos || []).includes('vistorias');
+  /* Estoque (15/10/2026): administrador ou módulo 'estoque'. */
+  if (id === 'estoque') return acesso.admin || (acesso.modulos || []).includes('estoque');
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -129,6 +138,7 @@ let vistNums = {};                // números das abas (pendências) para a faix
 let molduraCarregada = false;
 let molduraVistCarregada = false;
 let molduraProgCarregada = false;
+let molduraEstCarregada = false;
 
 export const areaAberta = () => areaAtual;
 
@@ -294,6 +304,25 @@ export function entrarNaArea(id, tela, extra) {
     return;
   }
 
+  if (id === 'estoque') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('estoque');
+    medirTopo();
+    const moldura = $('molduraEst');
+    if (!molduraEstCarregada || extra) {
+      molduraEstCarregada = true;
+      moldura.src = 'estoque/?v=' + VERSAO_EST + (extra ? '&' + extra : '');
+    } else {
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'estoque/?v=' + VERSAO_EST + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
+
   if (id === 'manutencoes') {
     $('navModulos').hidden = true;
     $('navTelas').hidden = true;
@@ -337,6 +366,7 @@ export function limparAreas() {
   molduraCarregada = false;
   molduraVistCarregada = false;
   molduraProgCarregada = false;
+  molduraEstCarregada = false;
   vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
@@ -344,6 +374,8 @@ export function limparAreas() {
   if (mv) mv.src = 'about:blank';
   const mp = $('molduraProg');
   if (mp) mp.src = 'about:blank';
+  const me = $('molduraEst');
+  if (me) me.src = 'about:blank';
   pintarEtiqueta();
 }
 

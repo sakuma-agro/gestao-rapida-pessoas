@@ -1,0 +1,89 @@
+/* estoque.css — o que é só deste app.
+   O resto da aparência (cores, botões, abas, marcas) vem do css/app.css,
+   que é o mesmo desenho do Gestão Rápida (Pessoas).
+   Nunca declarar @page aqui: este arquivo carrega depois e sobrescreveria
+   a regra de impressão do app inteiro. */
+
+/* ---- cartões de leitura do painel do acerto ----
+   A urgência entra pela faixa da esquerda e pela cor do número, nunca por
+   fundo colorido: o Chrome imprime sem fundo. */
+.es-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin-top:6px}
+.es-card{border:1px solid var(--linha);border-left:4px solid var(--linha);border-radius:10px;
+  padding:10px 12px;background:var(--fundo)}
+.es-card span{display:block;font-size:10.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
+.es-card strong{display:block;font-size:24px;line-height:1.2;margin-top:2px;color:var(--suave)}
+.es-card small{display:block;font-size:11px;color:var(--suave)}
+.es-ok{border-left-color:var(--verde)} .es-ok strong{color:var(--verde-esc)}
+.es-sobra{border-left-color:var(--marrom)} .es-sobra strong{color:var(--marrom)}
+.es-falta{border-left-color:#c0392b} .es-falta strong{color:#a5342a}
+.es-transf{border-left-color:var(--alerta)} .es-transf strong{color:#8a5f00}
+
+/* ---- bloco "o que esta tela vai fazer" ----
+   Fica enquanto a tela não tem dados: serve para você conferir a regra antes
+   de eu escrever o código dela. Sai quando o módulo entrar de verdade. */
+.es-plano{border:1px dashed var(--linha);border-radius:12px;padding:14px 16px;
+  background:var(--verde-fundo);margin-bottom:16px}
+.es-plano h3{margin:0 0 8px;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--marrom)}
+.es-plano ul{margin:0;padding-left:18px;font-size:13px;line-height:1.6}
+.es-plano li{margin:4px 0}
+.es-plano strong{color:var(--marrom)}
+.es-nota{margin:10px 0 0;font-size:12.5px;color:var(--suave);border-left:3px solid var(--verde);padding-left:10px}
+
+/* ---- as marcações de situação na tabela de divergência ---- */
+.es-pin-ok{background:var(--tagA-bg);color:var(--tagA-tx)}
+.es-pin-transf{background:rgba(201,138,0,.18);color:#8a5f00}
+.es-pin-falta{background:rgba(192,57,43,.16);color:#a5342a}
+.es-pin-sobra{background:rgba(116,79,40,.14);color:var(--marrom)}
+
+/* ---- origem dos dados e filtros ---- */
+.es-origem{margin:12px 0 4px;font-size:12.5px;color:var(--suave)}
+.es-origem strong{color:var(--marrom)}
+.es-fora{color:#8a5f00;font-weight:600}
+.es-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--suave);white-space:nowrap}
+.es-check input{width:16px;height:16px;accent-color:var(--verde)}
+.es-secao{margin:18px 0 6px;font-size:13px;color:var(--marrom)}
+.es-secao small{font-weight:600;color:var(--suave);margin-left:6px}
+.es-larga{display:block;overflow-x:auto;white-space:nowrap}
+.es-num-sobra{color:var(--marrom);font-weight:700}
+.es-num-falta{color:#a5342a;font-weight:700}
+
+/* ---- folha A4 do relatório do acerto ----
+   Padrão SAKUMA: marca no alto, filete verde, tabela com grade, cabeçalho
+   verde, assinatura ao pé. Sem preto: o texto é o cinza da marca. */
+.rel{width:210mm;min-height:296.8mm;background:#fff;color:#51534A;padding:13mm 12mm 10mm;
+  font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;
+  box-shadow:0 4px 20px rgba(0,0,0,.16)}
+.rel-topo{display:flex;align-items:center;gap:7mm;border-bottom:1.2mm solid #84BD00;padding-bottom:4mm}
+.rel-topo img{height:20mm;width:auto;display:block}
+.rel-tit h1{margin:0;font-size:16pt;font-weight:bold;color:#744F28;letter-spacing:.3pt}
+.rel-tit p{margin:1.5mm 0 0;font-size:9.5pt;color:#51534A}
+.rel-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:3mm;margin-top:6mm}
+.rel-kpis div{border:.3mm solid #dfe2d8;border-left:1mm solid #84BD00;border-radius:1.5mm;padding:2.5mm 3mm}
+.rel-kpis span{display:block;font-size:7pt;letter-spacing:.3pt;text-transform:uppercase;color:#51534A}
+.rel-kpis b{display:block;font-size:15pt;color:#744F28;line-height:1.2}
+.rel-tab{width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:8.5pt}
+.rel-tab th{background:#84BD00;color:#fff;border:.25mm solid #84BD00;padding:1.6mm 2mm;text-align:left;
+  font-size:7.5pt;letter-spacing:.3pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rel-tab td{border:.25mm solid #dfe2d8;padding:1.4mm 2mm}
+.rel-tab tbody tr:nth-child(even) td{background:#f3f8e8;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.rel-tab .ce{text-align:center}
+.rel .rel-secao{font-size:11pt;color:#744F28;margin:6mm 0 2mm;font-weight:bold}
+.rel-pe{margin-top:auto;padding-top:8mm;display:flex;align-items:flex-end;justify-content:space-between;gap:10mm}
+.rel-assina{width:80mm;text-align:center}
+.rel-assina span{display:block;border-top:.3mm solid #51534A;height:10mm;margin-bottom:1mm}
+.rel-assina small{font-size:8.5pt;color:#51534A}
+/* A LOP assina uma vez só, no canto direito do pé da folha. */
+.rel-lop{height:9mm;width:auto;opacity:.85}
+@media print{
+  .rel{box-shadow:none;padding:10mm 10mm 8mm}
+  .previa{display:block}
+}
+
+/* ---- dentro do LOP (15/10/2026) ----
+   O atributo hidden perdia para o display:flex do .es-check: a chave dos
+   produtos fora do cadastro aparecia antes de haver planilha. */
+.es-check[hidden]{display:none}
+/* a moldura do LOP já tem o topo com as marcas: aqui só as faixas do menu */
+body.embutido .topo{border-bottom:1px solid var(--linha)}
+body.embutido .abas{padding-top:4px}

@@ -930,6 +930,7 @@ function desenharPermissoes() {
     ${blocoManut(e)}
     ${blocoVist(e)}
     ${blocoProg(e)}
+    ${blocoEst(e)}
     ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
@@ -952,6 +953,12 @@ function desenharPermissoes() {
   $('usProg')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('programacao'); else mods.delete('programacao');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usEst')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('estoque'); else mods.delete('estoque');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -1016,6 +1023,19 @@ function blocoProg(e) {
       <input type="checkbox" id="usProg" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Programação Campo</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · as fazendas que vê são marcadas lá dentro'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Área Estoque" (15/10/2026): entra ou não. Enquanto o banco do
+   Estoque não entra, quem entra enxerga todas as telas da área. */
+function blocoEst(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('estoque'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="estoque">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usEst" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Estoque</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · contagem, acerto e cadastros'}</span>
     </label>
   </div>`;
 }
