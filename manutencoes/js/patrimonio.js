@@ -83,8 +83,12 @@ function fotoPrincipalHtml(caminho, podeTrocar) {
   return `<div class="pt-foto" data-foto="${esc(caminho || '')}">
       <div class="pt-foto-img">${caminho ? '<span class="pt-foto-msg">carregando a foto…</span>'
         : '<span class="pt-foto-msg">sem foto</span>'}</div>
-      ${podeTrocar ? `<label class="btn-fantasma pt-foto-btn">${caminho ? 'Trocar foto' : 'Pôr foto'}
-        <input type="file" accept="image/*" capture="environment" hidden></label>` : ''}
+      ${podeTrocar ? `<div class="pt-foto-botoes">
+        <label class="btn-fantasma pt-foto-btn">Tirar foto
+          <input type="file" accept="image/*" capture="environment" hidden></label>
+        <label class="btn-fantasma pt-foto-btn">Escolher da galeria
+          <input type="file" accept="image/*" hidden></label>
+      </div>` : ''}
     </div>`;
 }
 
@@ -104,15 +108,14 @@ async function ligarFoto(corpo, tipo, idDono, aoTrocar) {
       : `<span class="pt-foto-msg">${App.online ? 'foto ainda não chegou ao Drive' : 'foto disponível com internet'}</span>`;
   };
   mostrar(caixa.dataset.foto);
-  const inp = caixa.querySelector('input[type=file]');
-  if (inp) inp.onchange = async () => {
+  caixa.querySelectorAll('input[type=file]').forEach(inp => inp.onchange = async () => {
     const f = inp.files && inp.files[0];
     if (!f) return;
     try {
       img.innerHTML = '<span class="pt-foto-msg">guardando…</span>';
       const caminho = await guardarFoto(f, 'drive', tipo + '/' + idDono);
       caixa.dataset.foto = caminho;
-      const rot = caixa.querySelector('.pt-foto-btn'); if (rot && rot.firstChild) rot.firstChild.nodeValue = 'Trocar foto';
+      inp.value = '';
       await aoTrocar(caminho);
       await mostrar(caminho);
       aviso(App.online ? 'Foto guardada. Sobe para o Drive agora.' : 'Foto guardada no aparelho. Sobe quando a internet voltar.');
@@ -120,7 +123,7 @@ async function ligarFoto(corpo, tipo, idDono, aoTrocar) {
       img.innerHTML = '<span class="pt-foto-msg">não consegui ler a foto</span>';
       aviso('Não consegui guardar a foto: ' + (e.message || e), true);
     }
-  };
+  });
 }
 
 /* ---------------------------------------------------------------- lista */
@@ -275,8 +278,13 @@ function formBem(b, modelo) {
     local_id: modelo.local_id, data_compra: modelo.data_compra, valor_compra: modelo.valor_compra,
   } : {}, { patrimonio: proximoPatrimonio() });
   const titulo = novo ? (modelo ? 'Duplicar bem' : 'Cadastrar bem') : 'Editar ' + (b.patrimonio || b.descricao);
+  // A foto entra já no cadastro (15/10/2026): o id do bem novo nasce aqui para
+  // a foto ter onde morar antes de salvar.
+  const idBem = novo ? crypto.randomUUID() : b.id;
+  let fotoEscolhida = novo ? null : (b.foto_url || null);
 
   abrirModal(titulo, `
+    <div class="pt-foto-form">${fotoPrincipalHtml(fotoEscolhida, true)}</div>
     <div class="colunas">
       ${campoTexto('Código de patrimônio', 'patrimonio', base.patrimonio, 'text',
         novo ? 'Próximo número livre já preenchido. Único entre máquinas e bens.' : 'Único entre máquinas e bens.')}
@@ -300,6 +308,7 @@ function formBem(b, modelo) {
       <button type="button" class="btn neutro" id="fb-cancelar">Cancelar</button>
       ${!novo ? '<button type="button" class="btn-fantasma" id="fb-excluir" style="margin-left:auto">Excluir cadastro</button>' : ''}
     </div>`, corpo => {
+    ligarFoto(corpo, 'patrimonio', idBem, async caminho => { fotoEscolhida = caminho; });
     corpo.querySelector('#fb-cancelar').onclick = () => (novo ? fecharModal() : fichaBem(b.id));
     corpo.querySelector('#fb-salvar').onclick = async () => {
       const d = lerForm(corpo);
@@ -312,8 +321,8 @@ function formBem(b, modelo) {
       d.descricao = d.descricao.trim();
 
       const agora = new Date().toISOString();
-      const reg = Object.assign({}, novo ? {} : b, d, { ativo: true, atualizado_em: agora });
-      if (novo) { reg.id = crypto.randomUUID(); reg.criado_por = App.usuario.id || null; reg.criado_em = agora; }
+      const reg = Object.assign({}, novo ? {} : b, d, { foto_url: fotoEscolhida, ativo: true, atualizado_em: agora });
+      if (novo) { reg.id = idBem; reg.criado_por = App.usuario.id || null; reg.criado_em = agora; }
       await gravar('bens_patrimonio', reg);
       if (novo) {
         await gravar('patrimonio_movimentos', {

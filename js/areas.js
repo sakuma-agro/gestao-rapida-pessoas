@@ -18,7 +18,7 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '19';
+const VERSAO_AREA = '20';
 
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',

@@ -1241,6 +1241,9 @@ body.embutido .modal header button{color:var(--cinza)}
 .pt-foto-img{width:100%;aspect-ratio:4/3;border-radius:var(--raio);background:var(--fundo);
   border:1px dashed var(--linha);display:flex;align-items:center;justify-content:center;overflow:hidden}
 .pt-foto-img img{width:100%;height:100%;object-fit:cover;display:block}
+.pt-foto-botoes{display:flex;gap:8px;flex-wrap:wrap}
+.pt-foto-botoes .pt-foto-btn{flex:1 1 140px}
+.pt-foto-form{max-width:280px;margin:0 0 14px}
 .pt-foto-msg{font-size:13px;color:var(--cinza-claro);padding:8px;text-align:center}
 .pt-foto-btn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;text-align:center}
 .pt-resumo{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}

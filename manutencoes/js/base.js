@@ -255,8 +255,9 @@ function chaveDrive(caminho) {
   return 'manutencoes/' + caminho.replace(/^checklists\//, 'checklist/').toLowerCase();
 }
 async function chamarArquivos(acao, chave, init = {}, extra = '') {
-  const { data } = await App.sb.auth.getSession();
-  const t = data && data.session && data.session.access_token;
+  // 15/10/2026: App.sb usa a sessão emprestada (accessToken) e o supabase-js
+  // proíbe App.sb.auth nesse modo — o token vem do app principal.
+  const t = await tokenDoPrincipal();
   if (!t) throw new Error('sem-login');
   return fetch(CONFIG.SUPABASE_URL + '/functions/v1/arquivos?acao=' + acao + '&chave=' + encodeURIComponent(chave) + extra, {
     ...init, headers: { Authorization: 'Bearer ' + t, apikey: CONFIG.SUPABASE_ANON_KEY, ...(init.headers || {}) },
