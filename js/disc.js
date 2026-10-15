@@ -322,15 +322,14 @@ async function salvarLancamento() {
       .select().single();
     if (error) throw error;
 
-    // notas da folha: regrava do zero
-    await estado.cliente.from('disc_marcacoes').delete().eq('avaliacao_id', data.id);
-    if (lanc.origem === 'notas' && Object.keys(lanc.notas).length) {
-      const linhas = Object.entries(lanc.notas).map(([ch, v]) => ({
-        avaliacao_id: data.id, linha: +ch.slice(0, -1), coluna: ch.slice(-1), valor: v,
-      }));
-      const r = await estado.cliente.from('disc_marcacoes').insert(linhas);
-      if (r.error) throw r.error;
-    }
+    // notas da folha: regrava do zero — numa transação só (rodada C, 15/10/2026).
+    // Antes era apagar e inserir em duas chamadas; falhando a segunda, as
+    // respostas da folha sumiam do banco.
+    const linhas = lanc.origem === 'notas'
+      ? Object.entries(lanc.notas).map(([ch, v]) => ({ linha: +ch.slice(0, -1), coluna: ch.slice(-1), valor: v }))
+      : [];
+    const r = await estado.cliente.rpc('disc_regravar_marcacoes', { p_avaliacao: data.id, p_linhas: linhas });
+    if (r.error) throw r.error;
 
     D.avaliacoes = D.avaliacoes.filter(a => a.id !== data.id);
     D.avaliacoes.push(data);

@@ -138,6 +138,7 @@ addEventListener('beforeinstallprompt', function (ev) {
     <div class="aviso info" id="avisoGlobal" hidden></div>
     <div class="aviso erro" id="avisoArmazenamento" hidden></div>
     <div class="aviso erro" id="avisoErro" hidden></div>
+    <div class="aviso info" id="avisoSoOnline" hidden>Esta tela lê direto do servidor e você está sem internet: o que aparece pode estar vazio ou desatualizado, e o que gravar aqui não fica guardado para depois. Cadastros, EPI, DP, Máquinas, Programação e Vistorias funcionam sem sinal.</div>
 
     <!-- ---- ÁREAS do LOP - Gestão Rápida (09/10/2026): a primeira tela depois
          do login. Cada área tem o seu menu; Pessoas é tudo o que já existia. ---- -->
@@ -1357,6 +1358,17 @@ addEventListener('beforeinstallprompt', function (ev) {
           <button class="btn principal" id="cfBackup">Gerar backup</button>
         </div>
         <p class="dica" id="cfBackupStatus" style="margin:10px 0 0"></p>
+        <!-- Saúde deste aparelho (rodada C, 15/10/2026): o que o administrador
+             precisa olhar quando alguém diz "o app está estranho". -->
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.08)">
+          <div class="barra entre" style="margin:0">
+            <h2 style="margin:0">Saúde deste aparelho</h2>
+            <button class="btn mini" type="button" id="cfSaudeAtualizar">Atualizar</button>
+          </div>
+          <table id="cfSaude" style="margin-top:8px;max-width:640px;border-collapse:collapse;font-size:13px"><tbody></tbody></table>
+          <p class="dica" style="margin:8px 0 0">"Para enviar" = lançamentos feitos sem internet que ainda vão subir. "Parados" = o servidor recusou ou houve conflito; toque no contador do topo para decidir. "Limpar cópia local" apaga só o que está guardado neste aparelho e baixa de novo — nada do servidor é apagado; não use com algo para enviar.</p>
+          <div class="barra" style="margin-top:8px"><button class="btn mini" type="button" id="cfLimparLocal">Limpar cópia local e recarregar</button></div>
+        </div>
         <p class="dica" style="margin:10px 0 0">
           Saem <b>dois arquivos</b>: a planilha <b>.xlsx</b>, com uma aba por tabela, para ler e arquivar; e o
           <b>.json</b>, que é a cópia fiel do banco — é ele que serve para repor os dados se algo se perder.

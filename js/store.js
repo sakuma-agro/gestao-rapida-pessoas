@@ -247,14 +247,17 @@ export async function sincronizar() {
   estado.fichas = comBase(fi.data);
   estado.modelo = m.data ? { ...m.data, _base: m.data.atualizado_em ?? null } : null;
 
-  // Primeira execução: leva os dados da planilha para o banco.
+  // Primeira execução: leva os dados da planilha para o banco — só com a
+  // pessoa confirmando (rodada C): um login que por engano enxergasse zero
+  // linhas não pode encher o cadastro com a planilha-semente sozinho.
   if (!estado.funcionarios.length && !estado.epis.length && !estado.modelo) {
-    await semear();
+    if (confirm('O cadastro no servidor está vazio. Carregar os dados iniciais da planilha?')) await semear();
   } else if (!estado.modelo) {
     estado.modelo = { ...SEED_MODELO };
     await salvarModelo(estado.modelo);
   }
   salvarCache();
+  nucleo.gravarMeta('ultima_sinc', new Date().toISOString());
   avisar();
 }
 

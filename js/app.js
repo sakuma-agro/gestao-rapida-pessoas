@@ -81,10 +81,21 @@ function limparPrevias() {
 /* Acesso rápido na lateral da tela inicial: mora em js/atalhos.js desde
    24/09/2026 — cada login escolhe os seus (tabela app_preferencias). */
 
+/* Telas que só funcionam com internet (rodada C): sem cópia local nem fila.
+   Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
+const SO_ONLINE = new Set(['disc', 'config', 'exPainel', 'exVenc', 'exTipos', 'exFuncoes', 'trPainel', 'trVenc', 'trTipos',
+  'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
+  ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_SALARIO_DIGNO, ...TELAS_CERT]);
+function avisarSoOnline(nome) {
+  $('avisoSoOnline').hidden = !(SO_ONLINE.has(nome) && !navigator.onLine);
+}
+addEventListener('online', () => { $('avisoSoOnline').hidden = true; });
+
 function abrirAba(nome) {
   // telas do menu do Vistorias: moram na moldura (js/areas.js)
   if (ehTelaVist(nome)) return abrirTelaVist(nome);
   limparPrevias();
+  avisarSoOnline(nome);
   $('telaInicio').hidden = nome !== 'inicio';
   $('telaAreas').hidden = nome !== 'areas';
   $('telaManut').hidden = nome !== 'manutencoes';
@@ -108,6 +119,7 @@ function abrirAba(nome) {
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
+  if (nome === 'config') dispatchEvent(new Event('gr:tela-config'));
   $('telaExPainel').hidden = nome !== 'exPainel';
   $('telaTrPainel').hidden = nome !== 'trPainel';
   $('telaExVenc').hidden  = nome !== 'exVenc';
@@ -1676,6 +1688,36 @@ addEventListener('gr:fila-parada', ev => {
   a.hidden = false;
   contarPendentes();
 });
+
+/* Saúde deste aparelho (rodada C): em Usuários - Acessos › Backup. */
+const kb = n => n == null ? '—' : n > 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
+async function desenharSaude() {
+  const linhas = [];
+  let est = null; try { est = await navigator.storage.estimate(); } catch {}
+  linhas.push(['Versão do app', await versaoDoApp()]);
+  linhas.push(['Internet agora', navigator.onLine ? 'sim' : 'não']);
+  linhas.push(['Última leitura do servidor', (await nucleo.lerMeta('ultima_sinc')) ? new Date(await nucleo.lerMeta('ultima_sinc')).toLocaleString('pt-BR') : 'nunca neste aparelho']);
+  linhas.push(['Para enviar · parados (Pessoas)', `${nucleo.pendentes()} · ${nucleo.parados()}`]);
+  for (const k in pendentesMoldura) linhas.push([`Para enviar (${k})`, String(pendentesMoldura[k])]);
+  linhas.push(['Espaço usado pelo app', est ? `${kb(est.usage)} de ${kb(est.quota)}` : 'não informado']);
+  linhas.push(['Cadastro local', `${estado.funcionarios.length} funcionários · ${estado.fichas.length} fichas · ${jd.dados.boletins.length} boletins do mês`]);
+  linhas.push(['Manter conectado neste aparelho', db.manterConectado() ? 'sim' : 'não']);
+  linhas.push(['Navegador', navigator.userAgent.replace(/^.*\) /, '').slice(0, 80)]);
+  $('cfSaude').querySelector('tbody').innerHTML = linhas.map(([a, b]) => `<tr><th style="text-align:left;padding:4px 10px 4px 0;border-bottom:1px solid rgba(0,0,0,.06)">${esc(a)}</th><td style="padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)">${esc(b)}</td></tr>`).join('');
+}
+async function versaoDoApp() {
+  try { const t = await (await fetch('./sw.js', { cache: 'no-store' })).text(); return (t.match(/VERSAO = '([^']+)'/) || [])[1] || '?'; }
+  catch { return 'sem rede para conferir'; }
+}
+$('cfSaudeAtualizar').addEventListener('click', desenharSaude);
+$('cfLimparLocal').addEventListener('click', async () => {
+  if (nucleo.pendentes()) return alert('Ainda há lançamentos para enviar. Conecte na internet, espere "sincronizado" e tente de novo.');
+  if (!confirm('Apagar a cópia local deste aparelho e baixar tudo de novo do servidor?')) return;
+  await nucleo.apagarCaixa('epi.cache'); await nucleo.apagarCaixa('jor.cache');
+  try { localStorage.removeItem('gr.reuniao'); localStorage.removeItem('gr.arquivos.lista'); } catch {}
+  location.reload();
+});
+addEventListener('gr:tela-config', desenharSaude);
 
 /* Dados renovam ao voltar para a tela (rodada B): tablet aberto o dia todo
    mostrava o cadastro da manhã. Se ficou mais de 10 min fora, relê Cadastros/

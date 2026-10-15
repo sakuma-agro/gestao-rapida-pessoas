@@ -804,17 +804,17 @@ function formParam(chave) {
         return erro('Já existe uma alteração programada para esta data ou depois. Ajuste a data.');
       $('spmOk').disabled = true;
       try {
-        const c = estado.cliente.from('rh_sd_parametros');
-        if (reg) {
-          const { data, error } = await c.update({ fim: diaAntes(ini) }).eq('id', reg.id).select().single();
-          if (error) throw error;
-          S.params[S.params.findIndex(x => x.id === reg.id)] = data;
-        }
+        // Fechar o período vigente e abrir o novo numa transação só (rodada C,
+        // 15/10/2026): antes, falhando a inserção, o parâmetro ficava sem período aberto.
         const novo = { chave, valor, inicio: ini, fonte: $('spmFonte').value.trim() || null, criado_por: quem(),
           provisorio: bench ? $('spmProv').checked : false, proxima_revisao: bench ? ($('spmRev').value || null) : null };
-        const { data, error } = await estado.cliente.from('rh_sd_parametros').insert(novo).select().single();
+        const { data, error } = await estado.cliente.rpc('rh_sd_novo_parametro',
+          { p_anterior: reg ? reg.id : null, p_fim: reg ? diaAntes(ini) : null, p_novo: novo });
         if (error) throw error;
-        S.params.push(data);
+        for (const linha of data || []) {
+          const i = S.params.findIndex(x => x.id === linha.id);
+          if (i >= 0) S.params[i] = linha; else S.params.push(linha);
+        }
         d.close(); desenharConfig();
       } catch (e) { $('spmOk').disabled = false; erro('Não consegui gravar: ' + (e.message || e)); }
     });
