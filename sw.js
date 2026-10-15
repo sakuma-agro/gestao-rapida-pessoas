@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v231';
+const VERSAO = 'gr-v232';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -50,7 +50,7 @@ const ARQUIVOS = [
   './programacao/img/sakuma-logo.png', './programacao/img/lop-marca.png',
   './programacao/img/whatsapp.png',
   // Estoque (15/10/2026): conta-se no almoxarifado, muitas vezes sem sinal.
-  './icons/area-estoque.v1.svg',
+  './icons/area-estoque.v2.svg',
   './estoque/', './estoque/index.html', './estoque/css/app.css', './estoque/css/estoque.css',
   './estoque/js/app.js', './estoque/js/acesso.js', './estoque/js/acerto.js',
   './estoque/js/acerto-motor.js', './estoque/js/planilha.js',

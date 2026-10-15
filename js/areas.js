@@ -41,7 +41,7 @@ export const AREAS = [
   /* Estoque (15/10/2026, pedido dele): o app avulso Gestão Rápida (Estoque
      Inteligente) veio para dentro do LOP. Balanço, não movimento: contagem,
      acerto entre as fazendas e cadastros. Mora em estoque/, numa moldura. */
-  { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v1.svg',
+  { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v2.svg',
     desc: 'Contagem · Acerto entre fazendas · Cadastros' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
