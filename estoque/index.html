@@ -88,15 +88,30 @@
     </section>
 
     <!-- =================== ACERTO =================== -->
+    <section class="tela" id="telaAcSaldo" hidden>
+      <div class="cartao">
+        <h2>Saldo do sistema</h2>
+        <p class="dica">O estoque virtual do sistema agro, por estoque, no mês do acerto. O físico vem sozinho da última
+          contagem fechada de cada estoque.</p>
+        <div id="acSaldoCorpo"></div>
+      </div>
+    </section>
+
     <section class="tela" id="telaAcPainel" hidden>
       <div class="cartao">
         <h2>Painel do acerto</h2>
         <p class="dica">A leitura em quatro números: o que bateu, o que se resolve transferindo entre as fazendas, o que precisa de baixa e o que precisa de lançamento.</p>
         <div class="grade">
+          <label class="campo">De onde vem a conta
+            <select id="acModo">
+              <option value="app">Saldo lançado no app + última contagem de cada estoque</option>
+              <option value="planilha">Planilha do acerto (como era antes)</option>
+            </select></label>
+          <label class="campo" id="acMesCampo">Mês do acerto <input type="month" id="acMes"></label>
           <label class="campo" id="acFonteCampo" hidden>Contagem física (o que está na prateleira)
             <select id="acFonte"></select></label>
         </div>
-        <div class="barra">
+        <div class="barra ac-so-planilha" hidden>
           <label class="btn principal" for="acArquivo" id="acArquivoRot">Escolher planilha do acerto</label>
           <input type="file" id="acArquivo" accept=".xlsx,.xlsm" hidden>
           <span class="dc-sem">A planilha traz o saldo do sistema (abas "Sistema - ..."); o físico vem da contagem escolhida acima. O arquivo não sai do seu computador.</span>
@@ -110,6 +125,7 @@
         <h3>A conta, do jeito que a planilha faz</h3>
         <ul>
           <li><strong>Diferença</strong> = saldo do sistema − contagem física, produto por produto, depósito por depósito.</li>
+          <li>Lote 35, Faca, Morro Branco e Três Riachos acertam <strong>juntas</strong>; a <strong>Quebra Cocão</strong> acerta sozinha (só saída e entrada, sem transferência).</li>
           <li>Sobra num depósito e falta do mesmo produto em outro viram <strong>transferência</strong> — material que trocou de lugar sem documento. A menor falta é coberta primeiro.</li>
           <li>A sobra que restar vira <strong>saída a registrar</strong>; a falta que restar vira <strong>entrada a registrar</strong> (NF, estorno ou devolução).</li>
         </ul>

@@ -26,6 +26,7 @@ export const MODULOS = [
     ['ciLista',      'Levantamentos'],
   ] },
   { id: 'acerto', nome: 'Acerto', telas: [
+    ['acSaldo',           'Saldo do sistema'],
     ['acPainel',          'Painel'],
     ['acDivergencias',    'Divergências'],
     ['acTransferencias',  'Transferências'],

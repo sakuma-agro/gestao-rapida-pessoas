@@ -9,6 +9,7 @@ import { ligarAcerto, abrirAcerto } from './acerto.js';
 import { abrirContagem, soltarContagem } from './contagem.js';
 import { abrirCadastro, soltarCadastro } from './cadastros.js';
 import { abrirCompra, soltarCompra } from './compra.js';
+import { abrirSaldo, soltarSaldo } from './saldo.js';
 
 const $ = id => document.getElementById(id);
 
@@ -22,8 +23,9 @@ function abrirAba(nome) {
     const el = $(idDaTela(t));
     if (el) el.hidden = t !== nome;
   }
-  soltarContagem(); soltarCadastro(); soltarCompra();
-  if (nome.startsWith('ac')) abrirAcerto(nome);
+  soltarContagem(); soltarCadastro(); soltarCompra(); soltarSaldo();
+  if (nome === 'acSaldo') abrirSaldo();
+  else if (nome.startsWith('ac')) abrirAcerto(nome);
   if (nome.startsWith('ct')) abrirContagem(nome);
   if (nome.startsWith('cad')) abrirCadastro(nome);
   if (nome.startsWith('ci')) abrirCompra(nome);

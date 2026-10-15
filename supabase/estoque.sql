@@ -6,6 +6,7 @@ create table if not exists public.est_locais (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   fazenda text,
+  acerto_grupo text,   -- vazio = acerto junto com as outras fazendas; com nome = acerto independente
   ordem int default 0,
   ativo boolean not null default true,
   atualizado_em timestamptz not null default now()
@@ -21,6 +22,8 @@ create table if not exists public.est_itens (
   ativo boolean not null default true,
   atualizado_em timestamptz not null default now()
 );
+
+alter table public.est_locais add column if not exists acerto_grupo text;
 
 -- quem rodar o script depois de já ter a tabela ganha as duas colunas também
 alter table public.est_itens add column if not exists estoque_minimo numeric;
@@ -114,9 +117,23 @@ create table if not exists public.est_compra_estoques (
 alter table public.est_compra_estoques add column if not exists transferir numeric;
 create index if not exists est_cpe_item on public.est_compra_estoques(compra_item_id);
 
+-- Acerto (pedido dele, 15/10/2026): o saldo do sistema (estoque virtual do
+-- sistema agro) lançado no app, por mês, item e estoque. O físico é a última
+-- contagem fechada de cada estoque. id = 'AAAA-MM:<item_id>:<local_id>'.
+create table if not exists public.est_saldos_sistema (
+  id text primary key,
+  mes text not null check (mes ~ '^\d{4}-\d{2}$'),
+  item_id uuid not null references public.est_itens(id),
+  local_id uuid not null references public.est_locais(id),
+  saldo numeric,
+  lancado_por text,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists est_ss_mes on public.est_saldos_sistema(mes);
+
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.
 do $$ declare t text; begin
-  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens','est_compra_estoques'] loop
+  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens','est_compra_estoques','est_saldos_sistema'] loop
     execute format('drop trigger if exists marcar_atualizacao on public.%I', t);
     execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
     execute format('alter table public.%I enable row level security', t);
@@ -142,3 +159,7 @@ select v.nome, v.fazenda, v.ordem from (values
   ('Faz. Três Riachos', 'Fazenda Três Riachos', 4),
   ('Faz. Quebra Cocão', 'Fazenda Quebra Cocão', 5)) v(nome, fazenda, ordem)
 where not exists (select 1 from public.est_locais l where lower(l.nome) = lower(v.nome));
+
+-- Quebra Cocão tem acerto independente: não troca transferência com as outras.
+update public.est_locais set acerto_grupo = 'Quebra Cocão'
+ where lower(nome) = lower('Faz. Quebra Cocão') and acerto_grupo is null;

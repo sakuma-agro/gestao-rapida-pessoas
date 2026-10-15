@@ -29,8 +29,108 @@ try { incluirFora = localStorage.getItem(CHAVE_FORA) === '1'; } catch { /* sem l
 const itensDaConta = () =>
   (dados?.itens || []).filter(i => incluirFora || i.noCadastro);
 
+/* Acerto por grupo (15/10/2026): Lote 35, Faca, Morro Branco e Três Riachos
+   acertam juntas (sobra numa cobre falta na outra = transferência); a Quebra
+   Cocão acerta sozinha — sem transferência com as outras. O grupo vem do
+   cadastro do estoque (est_locais.acerto_grupo; vazio = conjunto). */
 function recalcular() {
-  conta = dados ? acertar(itensDaConta(), dados.depositos) : null;
+  if (!dados) { conta = null; return; }
+  const grupos = new Map();
+  for (const d of dados.depositos) {
+    const g = (dados.grupos && dados.grupos[d]) || '';
+    if (!grupos.has(g)) grupos.set(g, []);
+    grupos.get(g).push(d);
+  }
+  if (grupos.size <= 1) { conta = acertar(itensDaConta(), dados.depositos); return; }
+  const partes = [...grupos.values()].map(deps => acertar(itensDaConta(), deps));
+  // junta as linhas do mesmo produto (cada grupo vê só os seus depósitos)
+  const porProduto = new Map();
+  for (const p of partes) for (const l of p.linhas) {
+    const j = porProduto.get(l.produto);
+    if (!j) { porProduto.set(l.produto, { ...l, dif: { ...l.dif } }); continue; }
+    Object.assign(j.dif, l.dif);
+    for (const k of ['totSobra', 'totFalta', 'transf', 'saidaResidual', 'entradaResidual']) j[k] = arred4(j[k] + l[k]);
+    j.ok = j.ok && l.ok;
+    j.transferencias = j.transferencias.concat(l.transferencias);
+    j.saidas = j.saidas.concat(l.saidas);
+    j.entradas = j.entradas.concat(l.entradas);
+  }
+  const linhas = [...porProduto.values()];
+  const transferencias = partes.flatMap(p => p.transferencias);
+  const saidas = partes.flatMap(p => p.saidas);
+  const entradas = partes.flatMap(p => p.entradas);
+  const soma = a => arred4(a.reduce((t, x) => t + x.qtd, 0));
+  conta = { linhas, transferencias, saidas, entradas, resumo: {
+    produtos: linhas.length,
+    conferidos: linhas.filter(l => l.ok).length,
+    comTransferencia: linhas.filter(l => l.transf > 0.0001).length,
+    comSaida: linhas.filter(l => l.saidaResidual > 0.0001).length,
+    comEntrada: linhas.filter(l => l.entradaResidual > 0.0001).length,
+    acoes: transferencias.length + saidas.length + entradas.length,
+    qtdTransferida: soma(transferencias), qtdSaida: soma(saidas), qtdEntrada: soma(entradas),
+  } };
+}
+const arred4 = n => Math.round(n * 10000) / 10000;
+
+/* =============== acerto pelo app (15/10/2026) ===============
+   Pedido dele: o físico é a ÚLTIMA contagem fechada de cada estoque (até o
+   mês do acerto) e o sistema é o saldo lançado em Acerto › Saldo do sistema. */
+const CHAVE_MODO = 'estoque.acertoModo';
+let modo = 'app';
+try { modo = localStorage.getItem(CHAVE_MODO) || 'app'; } catch { /* segue */ }
+let mesAcerto = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); })();
+
+function dadosDoApp(mes) {
+  const locaisAtivos = appDados('est_locais').filter(l => l.ativo !== false)
+    .sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+  const itens = new Map(appDados('est_itens').map(i => [i.id, i]));
+  const porItem = new Map();     // item_id → { produto, dep:{} }
+  const pega = (itemId) => {
+    if (!porItem.has(itemId)) {
+      const it = itens.get(itemId);
+      porItem.set(itemId, { produto: it ? it.nome : '(item apagado)', dep: {}, noCadastro: true });
+    }
+    return porItem.get(itemId);
+  };
+  const fisicos = [];
+  let semSaldo = 0;
+  for (const l of locaisAtivos) {
+    const dep = arrumarNome(l.nome);
+    // última contagem fechada até o mês do acerto
+    const c = appDados('est_contagens').filter(x => x.local_id === l.id && x.status === 'fechada' && x.mes <= mes)
+      .sort((a, b) => b.mes.localeCompare(a.mes))[0];
+    fisicos.push({ local: dep, mes: c ? c.mes : null });
+    if (c) for (const ln of appDados('est_contagem_itens')) {
+      if (ln.contagem_id !== c.id || ln.quantidade === null || ln.quantidade === undefined) continue;
+      const it = pega(ln.item_id);
+      it.dep[dep] = it.dep[dep] || { sistema: 0, fisico: 0 };
+      it.dep[dep].fisico += Number(ln.quantidade) || 0;
+    }
+    const saldos = appDados('est_saldos_sistema').filter(x => x.mes === mes && x.local_id === l.id);
+    if (!saldos.length) semSaldo++;
+    for (const sd of saldos) {
+      if (sd.saldo === null || sd.saldo === undefined) continue;
+      const it = pega(sd.item_id);
+      it.dep[dep] = it.dep[dep] || { sistema: 0, fisico: 0 };
+      it.dep[dep].sistema += Number(sd.saldo) || 0;
+    }
+  }
+  const grupos = {};
+  for (const l of locaisAtivos) grupos[arrumarNome(l.nome)] = l.acerto_grupo || '';
+  const itensLista = [...porItem.values()].sort((a, b) => a.produto.localeCompare(b.produto, 'pt-BR'));
+  return {
+    arquivo: null, quando: new Date().toISOString(),
+    depositos: locaisAtivos.map(l => arrumarNome(l.nome)),
+    grupos, itens: itensLista, fora: 0,
+    fonte: { tipo: 'app2', mes, fisicos, semSaldo,
+      independentes: locaisAtivos.filter(l => l.acerto_grupo).map(l => l.nome) },
+  };
+}
+
+function refazerDoApp() {
+  if (modo !== 'app') return;
+  dados = dadosDoApp(mesAcerto);
+  recalcular();
 }
 
 /* =============== leitura da planilha =============== */
@@ -188,6 +288,7 @@ export async function importarPlanilha(arquivo, mesApp = null) {
 }
 
 function guardar() {
+  if (dados && dados.fonte && dados.fonte.tipo === 'app2') return;
   try { localStorage.setItem(CHAVE, JSON.stringify(dados)); } catch { /* sem espaço: segue sem guardar */ }
 }
 
@@ -209,6 +310,13 @@ const dataHora = iso => {
 
 function cabecalhoOrigem() {
   if (!dados) return '';
+  if (dados.fonte && dados.fonte.tipo === 'app2') {
+    const f = dados.fonte;
+    return `<p class="es-origem">Acerto de <strong>${esc(nomeMes(f.mes))}</strong> · ${numero(itensDaConta().length)} produtos ·
+      sistema: saldo lançado no app${f.semSaldo ? ` · <span class="es-fora">${f.semSaldo} estoque(s) sem saldo lançado neste mês</span>` : ''}<br>
+      físico (última contagem fechada): ${f.fisicos.map(x => `${esc(x.local)} <strong>${x.mes ? esc(nomeMes(x.mes)) : '<span class="es-fora">sem contagem</span>'}</strong>`).join(' · ')}
+      ${f.independentes.length ? `<br>Acerto independente (sem transferência com as outras): <strong>${f.independentes.map(esc).join(', ')}</strong>` : ''}</p>`;
+  }
   const contados = itensDaConta().length;
   return `<p class="es-origem">Planilha <strong>${esc(dados.arquivo)}</strong> ·
     lida em ${dataHora(dados.quando)} · ${numero(contados)} produtos ·
@@ -221,13 +329,16 @@ function cabecalhoOrigem() {
       : ''}</p>`;
 }
 
-const semDados = onde => `<div class="vazio">
-  Nenhuma planilha carregada. Abra <strong>Acerto → Painel</strong> e escolha o arquivo do acerto${onde ? ' para ver ' + onde : ''}.
+const semDados = onde => `<div class="vazio">${modo === 'app'
+  ? `Nada para acertar ainda${onde ? ' em ' + onde : ''}. Lance o saldo em <strong>Acerto › Saldo do sistema</strong> e feche as contagens dos estoques.`
+  : `Nenhuma planilha carregada. Abra <strong>Acerto → Painel</strong> e escolha o arquivo do acerto${onde ? ' para ver ' + onde : ''}.`}
 </div>`;
 
 function desenharPainel() {
   const alvo = $('acPainelCorpo');
-  if (!conta) { alvo.innerHTML = ''; $('acResumo').innerHTML = ''; return; }
+  if (!conta || (modo === 'app' && !conta.linhas.length)) {
+    alvo.innerHTML = ''; $('acResumo').innerHTML = modo === 'app' ? semDados('') : ''; return;
+  }
   const r = conta.resumo;
   $('acResumo').innerHTML = cabecalhoOrigem() + `
     <div class="es-cards">
@@ -365,7 +476,7 @@ function desenharRelatorio() {
 
 /* =============== ligação com o app =============== */
 export function ligarAcerto(aviso) {
-  recuperar();
+  if (modo === 'planilha') recuperar();
 
   $('acArquivo').addEventListener('change', async ev => {
     const arquivo = ev.target.files?.[0];
@@ -391,6 +502,18 @@ export function ligarAcerto(aviso) {
       await importarPlanilha(ultimoArquivo, fonteEscolhida());
       abrirAcerto('acPainel');
     } catch (e) { aviso(e.message || 'Não consegui refazer a conta.', 'erro'); }
+  });
+
+  $('acModo')?.addEventListener('change', e => {
+    modo = e.target.value;
+    try { localStorage.setItem(CHAVE_MODO, modo); } catch { /* segue */ }
+    if (modo === 'planilha') { dados = null; conta = null; recuperar(); }
+    abrirAcerto('acPainel');
+  });
+  $('acMes')?.addEventListener('change', e => {
+    if (!/^\d{4}-\d{2}$/.test(e.target.value)) return;
+    mesAcerto = e.target.value;
+    abrirAcerto('acPainel');
   });
 
   $('acFora')?.addEventListener('change', ev => {
@@ -420,10 +543,21 @@ function desenharFonte() {
   sel.innerHTML = meses.map(m => `<option value="${esc(m.mes)}">${esc(nomeMes(m.mes))} — contagem do app (${m.fechados} de ${m.total})</option>`).join('')
     + '<option value="">Abas "Físico" da planilha</option>';
   sel.value = meses.some(m => m.mes === atual) ? atual : '';
-  $('acFonteCampo').hidden = false;
+  $('acFonteCampo').hidden = modo !== 'planilha';
+}
+
+function desenharModo() {
+  const m = $('acModo');
+  if (!m) return;
+  m.value = modo;
+  $('acMesCampo').hidden = modo !== 'app';
+  $('acMes').value = mesAcerto;
+  document.querySelectorAll('.ac-so-planilha').forEach(el => { el.hidden = modo !== 'planilha'; });
 }
 
 export function abrirAcerto(tela) {
+  desenharModo();
+  if (modo === 'app') refazerDoApp(); else if (dados && dados.fonte && dados.fonte.tipo === 'app2') { dados = null; conta = null; recuperar(); }
   desenharFonte();
   const chave = $('acFora');
   if (chave) {
@@ -440,6 +574,9 @@ export const temDados = () => !!conta;
 
 /* A lista de meses contados chega depois que a base do app termina de abrir. */
 window.addEventListener('estoque-dados', () => {
-  const sec = document.getElementById('telaAcPainel');
-  if (sec && !sec.hidden && document.activeElement !== $('acFonte')) desenharFonte();
+  const visivel = ['telaAcPainel', 'telaAcDivergencias', 'telaAcTransferencias', 'telaAcRelatorio']
+    .find(id => { const el = document.getElementById(id); return el && !el.hidden; });
+  if (!visivel) return;
+  if (modo === 'app') { abrirAcerto('ac' + visivel.slice(6)); return; }
+  if (document.activeElement !== $('acFonte')) desenharFonte();
 });

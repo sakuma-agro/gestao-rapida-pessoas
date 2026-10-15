@@ -199,7 +199,7 @@ function desenharLocais() {
       <strong>"Sistema - …"</strong> da planilha (ex.: Faz. Faca; "Lote 35 PADAP" casa com a aba "Lote 35").</p>
     <div class="lista">${lista.map(l => `<div class="item"><span></span>
       <div><div class="nome">${esc(l.nome)} <span class="tag ${l.ativo === false ? 'inativo">desativado' : 'ativo">ativo'}</span></div>
-        <div class="sub">${esc(l.fazenda || '')}</div></div>
+        <div class="sub">${esc(l.fazenda || '')}${l.acerto_grupo ? ' · acerto independente' : ''}</div></div>
       <div class="acoes"><button class="btn mini" type="button" data-local="${esc(l.id)}">Editar</button></div>
     </div>`).join('') || '<div class="vazio">Nenhum almoxarifado cadastrado.</div>'}</div>`;
 
@@ -220,6 +220,8 @@ function desenharLocais() {
       <form id="cadLocalEd" autocomplete="off">
         <label class="campo">Nome <input type="text" name="nome" required value="${esc(l.nome)}"></label>
         <label class="campo">Fazenda <input type="text" name="fazenda" value="${esc(l.fazenda || '')}"></label>
+        <label class="es-check" style="margin:4px 0 12px"><input type="checkbox" name="indep"${l.acerto_grupo ? ' checked' : ''}>
+          Acerto independente (não troca transferência com as outras fazendas)</label>
         <div class="barra entre">
           <button class="btn${l.ativo === false ? '' : ' perigo'}" type="button" id="cadLocalAtivo">${l.ativo === false ? 'Reativar' : 'Desativar'}</button>
           <button class="btn principal" type="submit">Salvar</button>
@@ -230,7 +232,8 @@ function desenharLocais() {
         const f = new FormData(e.target);
         const nome = String(f.get('nome') || '').trim();
         if (!nome) return;
-        await gravar('est_locais', Object.assign({}, l, { nome, fazenda: String(f.get('fazenda') || '').trim() || null }));
+        await gravar('est_locais', Object.assign({}, l, { nome, fazenda: String(f.get('fazenda') || '').trim() || null,
+          acerto_grupo: f.get('indep') ? (l.acerto_grupo || nome) : null }));
         window.fecharModal(); desenharLocais();
       });
       corpo.querySelector('#cadLocalAtivo').addEventListener('click', async () => {
