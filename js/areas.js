@@ -18,13 +18,16 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '16';
+const VERSAO_AREA = '17';
 
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
     desc: 'Cadastros · SST · RH · DP' },
-  { id: 'manutencoes', nome: 'Manutenções', icone: 'icons/area-manutencoes.v1.svg',
-    desc: 'Vencimentos · Ordens de serviço · Check list · Máquinas' },
+  /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
+     ganhou o módulo Patrimônio. Só o nome mudou: o id segue 'manutencoes', a
+     pasta segue manutencoes/ e o banco segue no esquema manutencao. */
+  { id: 'manutencoes', nome: 'Máquinas e Patrimônio', icone: 'icons/area-manutencoes.v1.svg',
+    desc: 'Máquinas · Patrimônio · Vencimentos · Ordens de serviço · Check list' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
   { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',

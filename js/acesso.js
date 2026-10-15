@@ -284,7 +284,7 @@ async function carregarManut() {
     manut.admins = new Set((a.data || []).map(x => x.email.toLowerCase()));
     manut.erro = '';
   } catch (e) {
-    manut.erro = 'Não consegui ler as fazendas da área Manutenções: ' + (e.message || e);
+    manut.erro = 'Não consegui ler as fazendas da área Máquinas e Patrimônio: ' + (e.message || e);
   }
 }
 
@@ -308,7 +308,7 @@ async function gravarManut(email, dados) {
     return true;
   } catch (e) {
     const a = $('cfAviso');
-    a.textContent = 'O acesso foi salvo, mas as fazendas da área Manutenções não: ' + (e.message || e);
+    a.textContent = 'O acesso foi salvo, mas as fazendas da área Máquinas e Patrimônio não: ' + (e.message || e);
     a.hidden = false;
     return false;
   }
@@ -702,7 +702,7 @@ export function desenharConfig() {
               ? (r.txt === 'tudo' ? '' : r.txt + ' · ') + 'só ' + nomesDp(u.destinos) : '';
             return r ? `<button type="button" class="cf-chip ${dp ? 'cf-parte' : r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${esc(dp || r.txt)}</button>` : ''; })
             .concat([resumoManut(u)].filter(Boolean).map(t =>
-              `<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="manutencoes">Manutenções · ${esc(t)}</button>`))
+              `<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="manutencoes">Máquinas e Patrimônio · ${esc(t)}</button>`))
             .concat((u.modulos || []).includes(PERM_SALARIOS)
               ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="salarios">Vê salários</button>`] : [])
             .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';
@@ -1005,12 +1005,12 @@ function blocoManut(e) {
   return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="manutencoes">
     <label class="us-mod__topo">
       <input type="checkbox" id="usManut" ${tem ? 'checked' : ''}>
-      <b>Área Manutenções</b>
+      <b>Área Máquinas e Patrimônio</b>
       <span class="dc-sem">${!tem ? 'não entra' : m.admin ? 'administra a área · todas as fazendas' : `${m.fazendas.length} fazenda(s)`}</span>
     </label>
     ${!tem ? '' : manut.erro ? `<p class="dc-sem">${esc(manut.erro)}</p>` : `
     <label class="us-tela"><input type="checkbox" id="usManutAdmin" ${m.admin ? 'checked' : ''}>
-      <span>Administrador da área<small>mexe nos cadastros de máquinas, planos e check lists; vê todas as fazendas</small></span></label>
+      <span>Administrador da área<small>mexe nos cadastros de máquinas, patrimônio, planos e check lists; vê todas as fazendas</small></span></label>
     ${m.admin ? '' : `<div class="us-subbloco"><span class="us-sub">Fazendas que enxerga</span>
       <div class="us-telas">${manut.locais.map(l => `
         <label class="us-tela"><input type="checkbox" data-fazenda="${l.id}" ${m.fazendas.includes(l.id) ? 'checked' : ''}>
