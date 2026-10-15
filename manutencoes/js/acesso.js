@@ -18,7 +18,7 @@ const MODULOS = [
   // Painel (09/10/2026): o retrato do dia, no modelo dos painéis da área Pessoas.
   { id: 'painel',      nome: 'Painel',            telas: [['painel', 'Painel']] },
   { id: 'maquinas',    nome: 'Máquinas',          telas: [['maquinas', 'Máquinas']] },
-  { id: 'vencimentos', nome: 'Vencimentos',       telas: [['vencimentos', 'Vencimentos']] },
+  { id: 'vencimentos', nome: 'Vencimentos',       telas: [['vencimentos', 'Vencimentos'], ['calendario', 'Calendário']] },
   { id: 'ordens',      nome: 'Ordens de serviço', telas: [['ordens', 'Ordens de serviço']] },
   { id: 'checklist',   nome: 'Check list',        telas: [['checklist', 'Check list']] },
 ];
@@ -164,6 +164,7 @@ const ICONE_MODULO_M = { painel: 'painel', maquinas: 'bens', vencimentos: 'venc'
 const ATALHOS_INICIO = [
   ['painel', 'painel', 'Painel', 'prim'],
   ['vencimentos', 'venc', 'Vencimentos'],
+  ['calendario', 'venc', 'Calendário'],
   ['ordens', 'os', 'Ordens de serviço'],
   ['maquinas', 'bens', 'Máquinas'],
   ['checklist', 'check', 'Check list'],

@@ -139,7 +139,7 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
   if (opcoes.silencioso) return os;
   aviso(juntou ? `Item incluído na OS ${numeroOS(os)} que já estava aberta para o ${e.codigo}.`
                : `OS preventiva aberta para o ${e.codigo}.`);
-  if (document.querySelector('#vc-lista')) irPara('vencimentos');
+  if (document.querySelector('#vc-lista')) irPara(window.modoVenc === 'calendario' || (typeof modoVenc !== 'undefined' && modoVenc === 'calendario') ? 'calendario' : 'vencimentos');
   abrirOS(os.id);
   return os;
 }
@@ -392,7 +392,7 @@ function abrirOS(idOS) {
 
 /* Redesenha a tela aberta, para a lista refletir o que mudou */
 function recarregarTela() {
-  const ativo = document.querySelector('#vc-lista') ? 'vencimentos'
+  const ativo = document.querySelector('#vc-lista') ? ((typeof modoVenc !== 'undefined' && modoVenc === 'calendario') ? 'calendario' : 'vencimentos')
               : document.querySelector('#os-lista') ? 'ordens'
               : document.querySelector('#mq-lista') ? 'maquinas' : null;
   if (ativo) irPara(ativo);

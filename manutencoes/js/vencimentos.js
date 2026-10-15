@@ -63,7 +63,7 @@ TELAS.vencimentos = el => {
 
   el.innerHTML = `
     <div class="pn-cabeca">
-      <div><h1>Vencimentos${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
+      <div><h1>${modoVenc === 'calendario' ? 'Calendário de vencimentos' : 'Vencimentos'}${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
         <p class="sub">Toda a frota no desenho da planilha. Toque nos itens para marcar e gere a OS de uma vez.</p></div>
     </div>
     <div class="pn-cards" id="vc-cards"></div>
@@ -106,6 +106,7 @@ TELAS.vencimentos = el => {
     filtroVenc = { busca: $('#vc-busca').value, sit: $('#vc-sit').value, local: $('#vc-local').value, item: $('#vc-item').value };
     letraVenc = $('#vc-letra').value;
     modoVenc = $('#vc-modo').value;
+    if (modoVenc !== 'calendario') modoTabelaVenc = modoVenc;
     try { localStorage.setItem('gr.manut.modoVenc', modoVenc); } catch (e) {}
     const b = filtroVenc.busca.toLowerCase();
 
@@ -434,8 +435,15 @@ function ajustarAlturaVenc() {
 }
 window.addEventListener('resize', () => { if (document.querySelector('#vc-lista')) ajustarAlturaVenc(); });
 
+/* Calendário como aba própria (15/10/2026): "Vencimentos" abre a planilha/
+   consolidado/lista; "Calendário" abre direto no mês. */
+let modoTabelaVenc = modoVenc === 'calendario' ? 'planilha' : modoVenc;
+const vencimentosBase = TELAS.vencimentos;
+TELAS.vencimentos = el => { modoVenc = modoTabelaVenc; return vencimentosBase(el); };
+TELAS.calendario = el => { modoVenc = 'calendario'; return vencimentosBase(el); };
+
 /* Saindo da tela de vencimentos, a largura volta ao normal. */
 const irParaOriginalVenc = window.irPara;
-window.irPara = nome => { if (nome !== 'vencimentos') document.body.classList.remove('modo-quadro'); return irParaOriginalVenc(nome); };
+window.irPara = nome => { if (nome !== 'vencimentos' && nome !== 'calendario') document.body.classList.remove('modo-quadro'); return irParaOriginalVenc(nome); };
 const marcaOriginalVenc = TELAS.marca;
 TELAS.marca = el => { document.body.classList.remove('modo-quadro'); return marcaOriginalVenc(el); };
