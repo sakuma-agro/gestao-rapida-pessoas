@@ -304,3 +304,6 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .qc-mov-txt small{display:block;color:var(--suave);font-size:12px;margin-top:2px}
 .qc-mov-lin strong{white-space:nowrap;font-size:14.5px}
 .rel-mov{font-size:7.6pt}
+
+.qc-imp{border-bottom:1px solid var(--linha);padding-bottom:8px;margin-bottom:8px}
+.qc-imp p{margin:4px 0;font-size:13.5px}

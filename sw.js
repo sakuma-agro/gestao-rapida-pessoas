@@ -55,7 +55,7 @@ const ARQUIVOS = [
   './estoque/js/app.js', './estoque/js/acesso.js', './estoque/js/acerto.js',
   './estoque/js/acerto-motor.js', './estoque/js/planilha.js',
   './estoque/js/config.js', './estoque/js/base.js', './estoque/js/dados.js',
-  './estoque/js/contagem.js', './estoque/js/cadastros.js', './estoque/js/compra.js', './estoque/js/saldo.js', './estoque/js/qc.js',
+  './estoque/js/contagem.js', './estoque/js/cadastros.js', './estoque/js/compra.js', './estoque/js/saldo.js', './estoque/js/qc.js', './estoque/js/qc-importar.js',
   './estoque/img/sakuma-logo.png', './estoque/img/lop-marca.png',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
