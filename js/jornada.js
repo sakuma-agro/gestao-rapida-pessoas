@@ -407,7 +407,7 @@ function desenharLancar() {
         </div>
         <div class="jl-linha jl-4">
           <div class="jor-nivel" id="bNivelBox" role="radiogroup" aria-label="Nível do boletim">
-            <span>Nível do boletim <b class="jor-obrig" title="obrigatório">*</b></span>
+            <span>Nível do boletim <b class="jor-obrig" id="bNivelObrig" title="obrigatório no dia normal">*</b></span>
             ${NIVEIS.map(([k, t]) => `<label class="jor-nivel__op jor-nivel--${k}"><input type="radio" name="bNivel" value="${k}"> ${t}</label>`).join('')}
           </div>
           <label>Observação <input type="text" id="bObs" maxlength="200"></label>
@@ -437,6 +437,7 @@ function desenharLancar() {
   // Funcionário, data ou tipo do dia mudou → a jornada padrão entra de novo.
   ['bFunc','bData','bTipo'].forEach(id => $(id).addEventListener('change', () => {
     if (id === 'bFunc') cadastroDoSelecionado();
+    if (id === 'bTipo') marcarNivelObrigatorio();
     mostrarDiaAuto(); mostrarMotivo();
     preencherJornadaPadrao(); mostrarApurado();
     carregarDia();
@@ -594,6 +595,14 @@ function apurarComplemento(entrada) {
 /* Nível do boletim (28/09/2026): nota de quem lança sobre a qualidade do
    boletim preenchido à mão. Opcional; vai para o painel Qualidade dos boletins. */
 const NIVEIS = [['ruim', 'Ruim'], ['bom', 'Bom'], ['otimo', 'Ótimo']];
+/* Nível do boletim só é obrigatório no Dia normal (15/10/2026, pedido dele):
+   falta, atestado, treinamento e os demais lançam sem nível. */
+const nivelObrigatorio = () => jd.dados.tipos.find(t => t.id === $('bTipo')?.value)?.codigo === 'NORMAL';
+function marcarNivelObrigatorio() {
+  const obrig = nivelObrigatorio();
+  const ast = $('bNivelObrig'); if (ast) ast.hidden = !obrig;
+  if (!obrig) $('bNivelBox')?.classList.remove('jor-falta');
+}
 const nivelMarcado = () => document.querySelector('input[name="bNivel"]:checked')?.value || null;
 const nivelTexto = k => (NIVEIS.find(n => n[0] === k) || [])[1] || '';
 
@@ -843,6 +852,7 @@ function entradaDoFormulario() {
 
 /** O painel "Apurado" roda o motor a cada tecla — sem gravar nada. */
 function mostrarApurado() {
+  marcarNivelObrigatorio();
   const entrada = entradaDoFormulario();
   const alvo = $('jorApurado');
   if (!entrada) { alvo.innerHTML = '<div class="vazio">Escolha o funcionário e a data.</div>'; return; }
@@ -893,7 +903,7 @@ async function gravarBoletim(ev) {
     $('bNumero').classList.add('jor-falta');
     aviso('Preencha o nº do boletim.'); $('bNumero').focus(); return;
   }
-  if (!nivelMarcado()) {
+  if (nivelObrigatorio() && !nivelMarcado()) {
     $('bNivelBox').classList.add('jor-falta');
     aviso('Marque o nível do boletim: Ruim, Bom ou Ótimo.');
     document.querySelector('input[name="bNivel"]')?.focus(); return;
