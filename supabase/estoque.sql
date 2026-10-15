@@ -69,9 +69,40 @@ create table if not exists public.est_contagem_lotes (
 );
 create index if not exists est_cl_contagem on public.est_contagem_lotes(contagem_id);
 
+-- Compra inteligente (pedido dele, 15/10/2026): o agrônomo levanta o que vai
+-- precisar aplicar (etapa 1), confere só esses produtos no estoque (etapa 2,
+-- sem ligação com o balanço mensal) e a etapa 3 mostra o que comprar
+-- (necessário − estoque), editável.
+create table if not exists public.est_compras (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null,                 -- ex.: "Batata Pivô 1 — novembro"
+  local_id uuid references public.est_locais(id),
+  etapa int not null default 1 check (etapa between 1 and 3),
+  status text not null default 'aberta' check (status in ('aberta','concluida')),
+  criado_por text,
+  criado_em timestamptz not null default now(),
+  concluida_por text,
+  concluida_em timestamptz,
+  obs text,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create table if not exists public.est_compra_itens (
+  id uuid primary key default gen_random_uuid(),
+  compra_id uuid not null references public.est_compras(id) on delete cascade,
+  item_id uuid not null references public.est_itens(id),
+  necessario numeric,                   -- etapa 1
+  estoque numeric,                      -- etapa 2 (conferido na prateleira)
+  comprar numeric,                      -- etapa 3: vazio = necessário − estoque
+  obs text,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists est_cpi_compra on public.est_compra_itens(compra_id);
+
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.
 do $$ declare t text; begin
-  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes'] loop
+  foreach t in array array['est_locais','est_itens','est_contagens','est_contagem_itens','est_contagem_lotes','est_compras','est_compra_itens'] loop
     execute format('drop trigger if exists marcar_atualizacao on public.%I', t);
     execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
     execute format('alter table public.%I enable row level security', t);

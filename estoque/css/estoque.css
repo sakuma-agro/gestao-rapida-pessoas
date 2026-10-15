@@ -195,3 +195,37 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ct-chip-repor[aria-pressed="true"]{background:#a5342a;border-color:#a5342a;color:#fff}
 .rp-pedir{color:var(--marrom);font-size:13.5px;white-space:nowrap}
 .cad-sem-min{color:var(--alerta)}
+
+/* ================= Compra inteligente (15/10/2026) ================= */
+.ci-passos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0 6px}
+.ci-passo{border:1px solid var(--linha);background:var(--papel);color:var(--suave);border-radius:10px;padding:9px 6px;
+  font:600 13px/1.2 inherit;cursor:pointer;text-align:center}
+.ci-passo b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--linha);
+  color:var(--texto);font-size:11.5px;margin-right:3px}
+.ci-passo.feito b{background:var(--verde);color:#fff}
+.ci-passo.atual{border-color:var(--verde);color:var(--verde-esc);background:var(--verde-fundo)}
+.ci-passo.atual b{background:var(--verde-esc);color:#fff}
+.ci-add{display:grid;grid-template-columns:1fr 110px auto;gap:8px;align-items:end;margin-bottom:10px}
+.ci-add .btn{min-height:42px}
+@media (max-width:480px){ .ci-add{grid-template-columns:1fr 1fr} .ci-add .btn{grid-column:1 / 3} }
+.ci-lista{display:flex;flex-direction:column;gap:6px}
+.ci-linha{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 10px;border:1px solid var(--linha);
+  border-left:4px solid var(--linha);border-radius:10px;background:var(--papel)}
+.ci-linha.feito{border-left-color:var(--verde)}
+.ci-linha.erro{border-left-color:#c0392b}
+.ci-nome{flex:1;min-width:0;font-weight:600;font-size:14.5px;line-height:1.25;overflow-wrap:break-word}
+.ci-nome small{display:block;font-weight:400;font-size:12px;color:var(--suave)}
+.ci-nome small b{color:var(--marrom)}
+.ci-linha .ci-num{width:120px !important;flex:none;text-align:right;font-weight:700;font-size:17px !important;min-height:42px}
+.ci-linha .ci-num.grande{font-size:20px !important;min-height:46px}
+.ci-pe{margin-top:14px;border-top:1px solid var(--linha);padding-top:12px}
+.ci-tab{display:flex;flex-direction:column;gap:4px}
+.ci-cab,.ci-trio{display:grid;grid-template-columns:1fr 64px 64px 116px;gap:8px;align-items:center}
+.ci-cab{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--suave);padding:0 8px}
+.ci-cab span:not(:first-child),.ci-trio>span:not(:first-child){text-align:right}
+.ci-trio{padding:8px;border:1px solid var(--linha);border-left:4px solid var(--linha);border-radius:10px;background:var(--papel);font-size:14px}
+.ci-trio.comprar{border-left-color:var(--marrom)}
+.ci-comprar{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+.ci-comprar .ci-num{width:84px !important;text-align:right;font-weight:700;min-height:40px;color:var(--marrom)}
+.ci-refaz{border:0;background:none;color:var(--suave);font-size:18px;cursor:pointer;padding:0 2px}
+@media (max-width:420px){ .ci-cab,.ci-trio{grid-template-columns:1fr 50px 50px 100px;gap:5px} .ci-comprar .ci-num{width:70px !important} }

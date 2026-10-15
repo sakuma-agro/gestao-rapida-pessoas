@@ -22,6 +22,9 @@ export const MODULOS = [
     ['ctRepor',      'Reposição'],
     ['ctHistorico',  'Histórico'],
   ] },
+  { id: 'compra', nome: 'Compra inteligente', telas: [
+    ['ciLista',      'Levantamentos'],
+  ] },
   { id: 'acerto', nome: 'Acerto', telas: [
     ['acPainel',          'Painel'],
     ['acDivergencias',    'Divergências'],
