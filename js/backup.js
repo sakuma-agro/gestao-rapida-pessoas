@@ -80,6 +80,7 @@ const GRUPOS = [
   ['Vistorias e Segurança', 'vistorias', ['vistorias', 'itens', 'antes_depois', 'anomalias_relatorios',
     'extintores', 'fotos_drive', 'configuracoes', 'administradores']],
   // vistorias.importacao_chave fica de fora: guarda chave de importação e o banco não abre para ninguém.
+  ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],
 ];
 /* A chave de cada tabela no .json e o nome da aba: as do Pessoas ficam com o
