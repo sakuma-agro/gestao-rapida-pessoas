@@ -29,6 +29,7 @@ const GRUPOS: [string, string, string[]][] = [
   ['Manutenções', 'manutencao', ['equipamentos', 'tipos_equipamento', 'marcas', 'locais', 'setores', 'planos_manutencao', 'tipos_manutencao', 'manutencoes', 'responsaveis_manutencao', 'leituras', 'ajustes_contador', 'usos_implemento', 'parametros', 'importacoes']],
   ['Manutenções · Ordens de serviço', 'manutencao', ['ordens_servico', 'os_itens']],
   ['Manutenções · Check list', 'manutencao', ['checklist_modelos', 'checklist_versoes', 'checklist_grupos', 'checklist_itens', 'checklist_equipamento', 'checklists', 'checklist_respostas', 'checklist_fotos']],
+  ['Patrimônio', 'manutencao', ['bens_patrimonio', 'patrimonio_movimentos']],
   ['Manutenções · Acesso', 'manutencao', ['administradores', 'usuario_fazendas', 'usuario_locais', 'auditoria']],
   ['Vistorias e Segurança', 'vistorias', ['vistorias', 'itens', 'antes_depois', 'anomalias_relatorios', 'extintores', 'fotos_drive', 'configuracoes', 'administradores']],
   ['Anexos no Drive (lista)', 'public', ['arquivos']],
