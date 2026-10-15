@@ -41,7 +41,56 @@ const arrumarNome = s => String(s || '').replace(/\s+/g, ' ')
 
 const chaveProduto = s => semAcento(s).replace(/\s+/g, ' ').trim();
 
-export async function importarPlanilha(arquivo) {
+/* =============== físico vindo da contagem do app (15/10/2026) ===============
+   Decisão do Guilherme: fechada a contagem do mês, ela entra sozinha no
+   Acerto, no lugar das abas "Físico - ..." da planilha. A planilha continua
+   trazendo o saldo do SISTEMA; o físico sai das contagens fechadas do mês,
+   almoxarifado por almoxarifado, ligadas ao depósito pelo nome. */
+const chaveDep = s => semAcento(arrumarNome(s));
+const appDados = t => (window.App && window.App.dados && window.App.dados[t]) || [];
+
+/** Meses com contagem fechada no app, do mais novo para o mais velho. */
+export function mesesContados() {
+  const locaisAtivos = appDados('est_locais').filter(l => l.ativo !== false).length;
+  const porMes = new Map();
+  for (const c of appDados('est_contagens')) {
+    if (c.status !== 'fechada') continue;
+    porMes.set(c.mes, (porMes.get(c.mes) || 0) + 1);
+  }
+  return [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([mes, fechados]) => ({ mes, fechados, total: locaisAtivos }));
+}
+
+const NOMES_MES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho',
+  'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const nomeMes = m => { const [a, mm] = String(m).split('-'); return (NOMES_MES[Number(mm) - 1] || '?') + '/' + a; };
+
+/** Depósito → itens contados, das contagens FECHADAS do mês. */
+function fisicoDoApp(mes) {
+  const locais = new Map(appDados('est_locais').map(l => [l.id, l]));
+  const itens = new Map(appDados('est_itens').map(i => [i.id, i]));
+  const linhas = appDados('est_contagem_itens');
+  const res = new Map();
+  for (const c of appDados('est_contagens')) {
+    if (c.mes !== mes || c.status !== 'fechada') continue;
+    const local = locais.get(c.local_id);
+    if (!local) continue;
+    const d = { nome: arrumarNome(local.nome), itens: [] };
+    for (const l of linhas) {
+      if (l.contagem_id !== c.id) continue;
+      const item = itens.get(l.item_id);
+      const qtd = Number(l.quantidade);
+      if (item && isFinite(qtd)) d.itens.push({ nome: item.nome, qtd });
+    }
+    res.set(chaveDep(local.nome), d);
+  }
+  return res;
+}
+
+let ultimoArquivo = null;   // para refazer a conta quando a fonte do físico muda
+
+export async function importarPlanilha(arquivo, mesApp = null) {
+  ultimoArquivo = arquivo;
   const abas = await listarAbas(arquivo);
   const achar = prefixo => abas
     .filter(a => semAcento(a).startsWith(prefixo))
@@ -49,8 +98,11 @@ export async function importarPlanilha(arquivo) {
 
   const sistema = achar('SISTEMA -');
   const fisico = achar('FISICO -');
-  if (!sistema.length || !fisico.length) {
-    throw new Error('Não achei as abas "Sistema - ..." e "Físico - ..." nesta planilha.');
+  if (!sistema.length) {
+    throw new Error('Não achei as abas "Sistema - ..." nesta planilha.');
+  }
+  if (!mesApp && !fisico.length) {
+    throw new Error('Não achei as abas "Físico - ..." nesta planilha. Feche a contagem do mês no app e escolha ela em "Contagem física".');
   }
 
   // a ordem dos depósitos é a ordem das abas de sistema — a mesma das colunas
@@ -84,19 +136,43 @@ export async function importarPlanilha(arquivo) {
   };
 
   for (const s of sistema) await somar(s.aba, s.dep, 'sistema');
-  for (const s of sistema) {
-    const aba = ondeFisico.get(semAcento(s.dep));
-    if (aba) await somar(aba, s.dep, 'fisico');
+  let fonte = { tipo: 'planilha' };
+  if (mesApp) {
+    const app = fisicoDoApp(mesApp);
+    const nomesApp = new Set();
+    for (const [k, d] of app) {
+      let dep = depositos.find(x => chaveDep(x) === k);
+      if (!dep) { dep = d.nome; depositos.push(dep); }      // almoxarifado sem aba de sistema
+      for (const it of d.itens) {
+        const kp = chaveProduto(it.nome);
+        nomesApp.add(kp);
+        if (!porProduto.has(kp)) porProduto.set(kp, { produto: it.nome, dep: {} });
+        const item = porProduto.get(kp);
+        item.deApp = true;
+        item.dep[dep] = item.dep[dep] || { sistema: 0, fisico: 0 };
+        item.dep[dep].fisico += it.qtd;
+      }
+    }
+    // produto com saldo no sistema que não está na lista do app: o físico dele é zero
+    const semLista = [...porProduto.entries()].filter(([k, v]) => !nomesApp.has(k)
+      && Object.values(v.dep).some(d => d.sistema)).length;
+    fonte = { tipo: 'app', mes: mesApp, fechados: app.size, semLista };
+  } else {
+    for (const s of sistema) {
+      const aba = ondeFisico.get(semAcento(s.dep));
+      if (aba) await somar(aba, s.dep, 'fisico');
+    }
   }
 
   const itens = [...porProduto.entries()]
-    .map(([k, v]) => ({ ...v, noCadastro: cadastro.size === 0 || cadastro.has(k) }))
+    .map(([k, v]) => ({ ...v, noCadastro: cadastro.size === 0 || cadastro.has(k) || !!v.deApp }))
     .sort((a, b) => a.produto.localeCompare(b.produto, 'pt-BR'));
 
   dados = {
     arquivo: arquivo.name,
     quando: new Date().toISOString(),
     depositos,
+    fonte,
     itens,
     fora: itens.filter(i => !i.noCadastro).length,
   };
@@ -130,7 +206,11 @@ function cabecalhoOrigem() {
   const contados = itensDaConta().length;
   return `<p class="es-origem">Planilha <strong>${esc(dados.arquivo)}</strong> ·
     lida em ${dataHora(dados.quando)} · ${numero(contados)} produtos ·
-    ${dados.depositos.length} depósitos${dados.fora
+    ${dados.depositos.length} depósitos ·
+    físico ${dados.fonte && dados.fonte.tipo === 'app'
+      ? `da <strong>contagem do app de ${esc(nomeMes(dados.fonte.mes))}</strong> (${dados.fonte.fechados} almoxarifado(s) fechado(s))${dados.fonte.semLista
+        ? ` · <span class="es-fora">${dados.fonte.semLista} produto(s) do sistema não estão na lista de itens do app e entram com físico zero</span>` : ''}`
+      : 'das abas "Físico" da planilha'}${dados.fora
       ? ` · <span class="es-fora">${dados.fora} fora do cadastro ${incluirFora ? 'incluídos' : 'de fora'}</span>`
       : ''}</p>`;
 }
@@ -287,7 +367,7 @@ export function ligarAcerto(aviso) {
     const botao = $('acArquivoRot');
     botao.textContent = 'Lendo a planilha...';
     try {
-      await importarPlanilha(arquivo);
+      await importarPlanilha(arquivo, fonteEscolhida());
       aviso(`Planilha lida: ${numero(dados.itens.length)} produtos e ${numero(conta.resumo.acoes)} ações de acerto.`, 'ok');
       abrirAcerto('acPainel');
     } catch (e) {
@@ -296,6 +376,15 @@ export function ligarAcerto(aviso) {
       botao.textContent = 'Escolher planilha do acerto';
       ev.target.value = '';
     }
+  });
+
+  $('acFonte')?.addEventListener('change', async () => {
+    try { localStorage.setItem(CHAVE_FONTE, $('acFonte').value || 'planilha'); } catch { /* segue */ }
+    if (!ultimoArquivo) return;          // a escolha vale para a próxima planilha
+    try {
+      await importarPlanilha(ultimoArquivo, fonteEscolhida());
+      abrirAcerto('acPainel');
+    } catch (e) { aviso(e.message || 'Não consegui refazer a conta.', 'erro'); }
   });
 
   $('acFora')?.addEventListener('change', ev => {
@@ -310,7 +399,26 @@ export function ligarAcerto(aviso) {
   $('acImprimir')?.addEventListener('click', () => window.print());
 }
 
+/* "Contagem física": as contagens fechadas do app (padrão: o mês mais novo)
+   ou as abas "Físico" da planilha, como era antes. */
+const CHAVE_FONTE = 'estoque.acertoFonte';
+const fonteEscolhida = () => ($('acFonte') && $('acFonte').value) || null;
+
+function desenharFonte() {
+  const sel = $('acFonte');
+  if (!sel) return;
+  const meses = mesesContados();
+  let guardada = null;
+  try { guardada = localStorage.getItem(CHAVE_FONTE); } catch { /* segue */ }
+  const atual = sel.value || (guardada === 'planilha' ? '' : (meses.some(m => m.mes === guardada) ? guardada : (meses[0] || {}).mes || ''));
+  sel.innerHTML = meses.map(m => `<option value="${esc(m.mes)}">${esc(nomeMes(m.mes))} — contagem do app (${m.fechados} de ${m.total})</option>`).join('')
+    + '<option value="">Abas "Físico" da planilha</option>';
+  sel.value = meses.some(m => m.mes === atual) ? atual : '';
+  $('acFonteCampo').hidden = false;
+}
+
 export function abrirAcerto(tela) {
+  desenharFonte();
   const chave = $('acFora');
   if (chave) {
     chave.checked = incluirFora;
@@ -323,3 +431,9 @@ export function abrirAcerto(tela) {
 }
 
 export const temDados = () => !!conta;
+
+/* A lista de meses contados chega depois que a base do app termina de abrir. */
+window.addEventListener('estoque-dados', () => {
+  const sec = document.getElementById('telaAcPainel');
+  if (sec && !sec.hidden && document.activeElement !== $('acFonte')) desenharFonte();
+});

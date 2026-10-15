@@ -17,7 +17,7 @@ const esc = s => String(s == null ? '' : s)
    essas duas coisas funcionarem. */
 export const MODULOS = [
   { id: 'contagem', nome: 'Contagem', telas: [
-    ['ctNova',       'Nova contagem'],
+    ['ctNova',       'Contar'],
     ['ctAndamento',  'Em andamento'],
     ['ctHistorico',  'Histórico'],
   ] },

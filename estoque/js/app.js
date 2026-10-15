@@ -4,8 +4,10 @@
 // dentro do LOP. Esta página mora numa moldura do app principal: quem entra,
 // sai, instala e troca senha é o LOP, e quem pode abrir a área é marcado em
 // Usuários - Acessos (módulo 'estoque'). Aqui não há login nem topo de marca.
-import { MODULOS, telasDe, montarMenu, mostrarInicio } from './acesso.js';
+import { MODULOS, telasDe, montarMenu, mostrarInicio, abrirModulo } from './acesso.js';
 import { ligarAcerto, abrirAcerto } from './acerto.js';
+import { abrirContagem, soltarContagem } from './contagem.js';
+import { abrirCadastro, soltarCadastro } from './cadastros.js';
 
 const $ = id => document.getElementById(id);
 
@@ -19,7 +21,10 @@ function abrirAba(nome) {
     const el = $(idDaTela(t));
     if (el) el.hidden = t !== nome;
   }
+  soltarContagem(); soltarCadastro();
   if (nome.startsWith('ac')) abrirAcerto(nome);
+  if (nome.startsWith('ct')) abrirContagem(nome);
+  if (nome.startsWith('cad')) abrirCadastro(nome);
   // a tela nova começa do alto, não no meio da anterior
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
@@ -34,6 +39,13 @@ function mostrarAviso(texto, tipo = 'info') {
   clearTimeout(sumir);
   sumir = setTimeout(() => { el.hidden = true; }, 6000);
 }
+
+/* Abre uma tela pelo nome, marcando o módulo certo no menu (usado pelos
+   botões "Contar" / "Ver" que pulam de uma tela para outra). */
+window.abrirTelaEstoque = tela => {
+  const m = MODULOS.find(x => telasDe(x).some(([t]) => t === tela));
+  if (m) abrirModulo(m.id, tela);
+};
 
 /* =============== arranque =============== */
 try { ligarAcerto(mostrarAviso); }

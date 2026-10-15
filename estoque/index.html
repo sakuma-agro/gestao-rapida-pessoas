@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Estoque · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
-<link rel="stylesheet" href="css/app.css?v=1">
-<link rel="stylesheet" href="css/estoque.css?v=1">
+<link rel="stylesheet" href="css/app.css?v=2">
+<link rel="stylesheet" href="css/estoque.css?v=2">
 <!-- Área Estoque do LOP - Gestão Rápida (15/10/2026).
      Veio do app avulso Gestão Rápida (Estoque Inteligente). Esta página não
      abre sozinha: mora dentro do app principal (a pasta de cima), numa
@@ -36,52 +36,40 @@
 
   <main>
     <div class="aviso info" id="avisoGlobal" hidden></div>
+    <div class="aviso erro" id="estSemAcesso" hidden></div>
+    <!-- estado da conexão e da fila de envio (núcleo das molduras) -->
+    <div class="est-estado naoimprimir">
+      <span class="estado" id="estado-conexao"><span class="ponto" id="ponto-conexao"></span><span id="txt-conexao"></span></span>
+      <button type="button" id="btn-fila" class="fila oculto">0 aguardando envio</button>
+    </div>
 
     <!-- ---- ENTRADA: nenhum módulo aberto (as marcas estão no topo do LOP) ---- -->
     <section class="tela inicio" id="telaInicio">
       <h2>Estoque <span>Balanço e acerto</span></h2>
       <p class="in-dica">Escolha um módulo no menu acima: <strong>Contagem</strong>, <strong>Acerto</strong> ou <strong>Cadastros</strong>.</p>
+      <p class="in-dica">Todo mês: <strong>Contagem › Contar</strong>, escolha o almoxarifado e digite o total na frente de cada item.</p>
     </section>
 
     <!-- =================== CONTAGEM =================== -->
     <section class="tela" id="telaCtNova" hidden>
-      <div class="cartao">
-        <h2>Nova contagem</h2>
-        <p class="dica">O balanço começa aqui: escolhe-se o almoxarifado, o grupo de itens e a data.</p>
-        <div class="grade">
-          <label class="campo">Almoxarifado
-            <select disabled><option>Lote 35 PADAP</option></select></label>
-          <label class="campo">Grupo
-            <select disabled><option>Insumos</option><option>Fertilizantes</option><option>EPIs</option></select></label>
-          <label class="campo">Data do balanço <input type="date" disabled></label>
-          <label class="campo">Responsável pela contagem <input type="text" disabled placeholder="quem está contando"></label>
-        </div>
-        <div class="barra fim"><button class="btn principal" disabled>Abrir contagem</button></div>
-      </div>
-      <div class="es-plano">
-        <h3>O que esta tela vai fazer</h3>
-        <ul>
-          <li>Listar os itens do grupo escolhido, um por linha, com um campo grande de quantidade — pensado para contar de celular, no almoxarifado.</li>
-          <li>Guardar sozinha o que já foi digitado, mesmo sem internet, e enviar quando o sinal voltar.</li>
-          <li>Não pede entrada nem saída: o app registra <strong>o que existe na prateleira</strong>.</li>
-        </ul>
-      </div>
+      <div id="ctCorpo"></div>
     </section>
 
     <section class="tela" id="telaCtAndamento" hidden>
       <div class="cartao">
-        <h2>Contagens em andamento</h2>
-        <p class="dica">O que está aberto agora, por almoxarifado, e quanto falta contar de cada.</p>
-        <div class="vazio">A lista aparece aqui quando o banco estiver ligado.</div>
+        <h2>Contagens do mês</h2>
+        <p class="dica">Como está cada almoxarifado no mês: não começada, em andamento ou fechada.</p>
+        <div id="ctAndCorpo"></div>
       </div>
     </section>
 
     <section class="tela" id="telaCtHistorico" hidden>
-      <div class="cartao">
-        <h2>Histórico de balanços</h2>
-        <p class="dica">Todo balanço fechado fica guardado com data, responsável e as quantidades contadas.</p>
-        <div class="vazio">O histórico aparece aqui quando o banco estiver ligado.</div>
+      <div class="cartao naoimprimir">
+        <h2>Histórico de contagens</h2>
+        <p class="dica">Toda contagem fechada fica guardada com o mês, quem fechou e as quantidades. Dá para ver e imprimir.</p>
+        <div id="ctHistCorpo"></div>
       </div>
+      <div class="previa" id="ctFolha"></div>
     </section>
 
     <!-- =================== ACERTO =================== -->
@@ -89,10 +77,14 @@
       <div class="cartao">
         <h2>Painel do acerto</h2>
         <p class="dica">A leitura em quatro números: o que bateu, o que se resolve transferindo entre as fazendas, o que precisa de baixa e o que precisa de lançamento.</p>
+        <div class="grade">
+          <label class="campo" id="acFonteCampo" hidden>Contagem física (o que está na prateleira)
+            <select id="acFonte"></select></label>
+        </div>
         <div class="barra">
           <label class="btn principal" for="acArquivo" id="acArquivoRot">Escolher planilha do acerto</label>
           <input type="file" id="acArquivo" accept=".xlsx,.xlsm" hidden>
-          <span class="dc-sem">Abas "Sistema - ..." e "Físico - ...". O arquivo não sai do seu computador.</span>
+          <span class="dc-sem">A planilha traz o saldo do sistema (abas "Sistema - ..."); o físico vem da contagem escolhida acima. O arquivo não sai do seu computador.</span>
           <label class="es-check" hidden><input type="checkbox" id="acFora">
             incluir os produtos que não estão no cadastro</label>
         </div>
@@ -143,8 +135,8 @@
     <section class="tela" id="telaCadItens" hidden>
       <div class="cartao">
         <h2>Itens</h2>
-        <p class="dica">O catálogo do que se conta: insumos, fertilizantes e EPIs, cada um com código, unidade e grupo.</p>
-        <div class="vazio">O cadastro entra na próxima etapa.</div>
+        <p class="dica">O que se conta: insumos, fertilizantes e EPIs, cada um com a sua unidade. A mesma lista vale para todos os almoxarifados.</p>
+        <div id="cadItensCorpo"></div>
       </div>
     </section>
 
@@ -165,13 +157,7 @@
       <div class="cartao">
         <h2>Almoxarifados</h2>
         <p class="dica">Os locais onde se conta, ligados à fazenda de cada um.</p>
-        <div class="lista">
-          <div class="item"><span></span><div><div class="nome">Lote 35 PADAP</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
-          <div class="item"><span></span><div><div class="nome">Fazenda Faca</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
-          <div class="item"><span></span><div><div class="nome">Fazenda Morro Branco</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
-          <div class="item"><span></span><div><div class="nome">Fazenda Três Riachos</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
-          <div class="item"><span></span><div><div class="nome">Fazenda Quebra Cocão</div><div class="sub">exemplo</div></div><span class="tag ativo">ativo</span></div>
-        </div>
+        <div id="cadLocaisCorpo"></div>
       </div>
     </section>
 
@@ -185,6 +171,19 @@
   </main>
 </div>
 
-<script type="module" src="js/app.js?v=1"></script>
+<div id="modal" class="modal oculto naoimprimir" role="dialog" aria-modal="true">
+  <div class="caixa">
+    <header><h2 id="modal-titulo"></h2>
+      <button type="button" id="modal-fechar" aria-label="Fechar">×</button></header>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
+<div id="aviso" class="est-toast oculto naoimprimir" role="status"></div>
+
+<script src="../vendor/supabase.js"></script>
+<script src="js/config.js?v=2"></script>
+<script src="../js/moldura-nucleo.js?v=2"></script>
+<script src="js/base.js?v=2"></script>
+<script type="module" src="js/app.js?v=2"></script>
 </body>
 </html>
