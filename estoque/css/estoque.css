@@ -185,3 +185,13 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ct-chip[aria-pressed="true"]{background:var(--verde);border-color:var(--verde);color:#fff}
 .ct-chip[aria-pressed="true"] small{color:#fff}
 .ct-grupo[hidden]{display:none}
+
+/* ---- estoque mínimo / reposição (15/10/2026) ---- */
+.ct-alerta{display:block;font-size:12px;font-weight:700;color:#a5342a;margin-top:2px}
+.ct-alerta:empty{display:none}
+.ct-item.repor .ct-linha{border-left-color:#c0392b}
+.ct-chip-repor{border-color:#c0392b;color:#a5342a}
+.ct-chip-repor small{color:#a5342a}
+.ct-chip-repor[aria-pressed="true"]{background:#a5342a;border-color:#a5342a;color:#fff}
+.rp-pedir{color:var(--marrom);font-size:13.5px;white-space:nowrap}
+.cad-sem-min{color:var(--alerta)}

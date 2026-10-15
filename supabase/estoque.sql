@@ -16,9 +16,15 @@ create table if not exists public.est_itens (
   nome text not null,
   unidade text,
   grupo text not null default 'Defensivos',  -- Defensivos, Fertilizantes, EPIs, Lubrificantes, Material de limpeza, Papelaria
+  estoque_minimo numeric,      -- chegou nele (ou abaixo) na contagem → avisa reposição
+  pedido_reposicao numeric,    -- quanto pedir quando chegar no mínimo
   ativo boolean not null default true,
   atualizado_em timestamptz not null default now()
 );
+
+-- quem rodar o script depois de já ter a tabela ganha as duas colunas também
+alter table public.est_itens add column if not exists estoque_minimo numeric;
+alter table public.est_itens add column if not exists pedido_reposicao numeric;
 
 -- id = '<local_id>:<AAAA-MM>': dois aparelhos abrindo o mesmo mês caem no mesmo registro.
 create table if not exists public.est_contagens (

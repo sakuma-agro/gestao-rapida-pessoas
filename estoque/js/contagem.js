@@ -9,6 +9,7 @@ import {
   $, esc, pronto, todos, aviso, souAdmin, meuNome, locais, itensOrdenados,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
+  temMinimo, precisaRepor, textoPedido,
 } from './dados.js';
 import { gravar as gravarDireto } from './dados.js';
 
@@ -101,10 +102,12 @@ function desenharContar() {
       cab = `<h3 class="ct-grupo" data-grupo="${esc(i.grupo || 'Outros')}">${esc(i.grupo || 'Outros')}${i.grupo === 'Fertilizantes'
         ? ' <small>sempre em quilos — o peso total, não o número de sacas</small>' : ''}</h3>`;
     }
-    return cab + `<div class="ct-item" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}" data-grupo="${esc(i.grupo || 'Outros')}">
+    const repor = l && precisaRepor(i, l.quantidade);
+    return cab + `<div class="ct-item${repor ? ' repor' : ''}" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}" data-grupo="${esc(i.grupo || 'Outros')}">
       <div class="ct-linha${valor !== '' ? ' feito' : ''}">
         <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${esc(i.unidade || '')}${lotes.length
-          ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}</small></label>
+          ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}</small>
+          <span class="ct-alerta">${repor ? textoAlerta(i, l.quantidade) : ''}</span></label>
         <input class="ct-qtd" id="q-${esc(i.id)}" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next"
           data-item="${esc(i.id)}" value="${esc(valor)}" placeholder="—"${fechada || lotes.length ? ' disabled' : ''}
           title="${lotes.length ? 'Soma dos lotes' : ''}" aria-label="Total de ${esc(i.nome)}">
@@ -143,11 +146,7 @@ function desenharContar() {
   ligarEscolha();
   filtrar();
   $('ctBusca').addEventListener('input', e => { busca = e.target.value; filtrar(); });
-  alvo.querySelectorAll('[data-chip]').forEach(b => b.addEventListener('click', () => {
-    grupoFiltro = b.dataset.chip;
-    alvo.querySelectorAll('[data-chip]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    filtrar();
-  }));
+  ligarChips();
   $('ctSoFalta').addEventListener('change', e => {
     soFalta = e.target.checked;
     $('ctLista').classList.toggle('so-falta', soFalta);
@@ -185,20 +184,50 @@ function chipsGrupos(itens, linhas) {
     const l = linhas.get(i.id);
     if (l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '') r.feitos++;
   }
-  if (grupos.length < 2) return '';
-  if (grupoFiltro && !grupos.some(g => g.nome === grupoFiltro)) grupoFiltro = '';
+  const nRepor = itens.filter(i => { const l = linhas.get(i.id); return l && precisaRepor(i, l.quantidade); }).length;
+  if (grupos.length < 2 && !nRepor) return '';
+  if (grupoFiltro === '__repor' && !nRepor) grupoFiltro = '';
+  if (grupoFiltro && grupoFiltro !== '__repor' && !grupos.some(g => g.nome === grupoFiltro)) grupoFiltro = '';
   const chip = (id, rot, f, t) => `<button type="button" class="ct-chip${t && f === t ? ' completo' : ''}" data-chip="${esc(id)}"
     aria-pressed="${grupoFiltro === id}">${esc(rot)}${t ? ` <small>${f}/${t}</small>` : ''}</button>`;
-  return `<div class="ct-chips">${chip('', 'Todos', 0, 0)}${grupos.map(g => chip(g.nome, g.nome, g.feitos, g.total)).join('')}</div>`;
+  const repor = nRepor ? `<button type="button" class="ct-chip ct-chip-repor" data-chip="__repor"
+    aria-pressed="${grupoFiltro === '__repor'}">A repor <small>${nRepor}</small></button>` : '';
+  return `<div class="ct-chips">${chip('', 'Todos', 0, 0)}${repor}${grupos.length > 1 ? grupos.map(g => chip(g.nome, g.nome, g.feitos, g.total)).join('') : ''}</div>`;
+}
+
+function ligarChips() {
+  document.querySelectorAll('.ct-chips [data-chip]').forEach(b => b.addEventListener('click', () => {
+    grupoFiltro = b.dataset.chip;
+    document.querySelectorAll('.ct-chips [data-chip]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    filtrar();
+  }));
+}
+
+/** O aviso embaixo do nome quando a contagem chegou no estoque mínimo. */
+const textoAlerta = (item, qtd) => `${Number(qtd) < Number(item.estoque_minimo) ? 'Abaixo do mínimo' : 'No mínimo'} (${esc(mostrarNumero(item.estoque_minimo))}) · ${esc(textoPedido(item))}`;
+
+/** Depois de gravar um total: liga ou desliga o aviso de reposição do item. */
+function marcarMinimo(itemId, qtd) {
+  const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
+  const item = todos('est_itens').find(i => i.id === itemId);
+  if (!bloco || !item) return;
+  const repor = precisaRepor(item, qtd);
+  bloco.classList.toggle('repor', repor);
+  const el = bloco.querySelector('.ct-alerta');
+  if (el) el.innerHTML = repor ? textoAlerta(item, qtd) : '';
 }
 
 function filtrar() {
   const b = semAcento(busca).trim();
+  const soRepor = grupoFiltro === '__repor';
   document.querySelectorAll('#ctLista .ct-item').forEach(l => {
-    l.hidden = (!!b && !l.dataset.nome.includes(b)) || (!!grupoFiltro && l.dataset.grupo !== grupoFiltro);
+    l.hidden = (!!b && !l.dataset.nome.includes(b))
+      || (soRepor ? !l.classList.contains('repor') : (!!grupoFiltro && l.dataset.grupo !== grupoFiltro));
   });
   document.querySelectorAll('#ctLista .ct-grupo').forEach(h => {
-    h.hidden = !!grupoFiltro && h.dataset.grupo !== grupoFiltro;
+    h.hidden = soRepor
+      ? !document.querySelector(`#ctLista .ct-item.repor[data-grupo="${CSS.escape(h.dataset.grupo)}"]`)
+      : !!grupoFiltro && h.dataset.grupo !== grupoFiltro;
   });
 }
 
@@ -337,6 +366,7 @@ async function somarLotes(c, itemId) {
       id: idLinha(c.id, itemId), contagem_id: c.id, item_id: itemId, quantidade: total, contado_por: meuNome(),
     });
     if (inp) { inp.value = mostrarNumero(total); inp.disabled = true; inp.title = 'Soma dos lotes'; }
+    marcarMinimo(itemId, total);
     if (bloco) bloco.querySelector('.ct-linha').classList.toggle('feito', total !== null);
   } else if (inp) { inp.disabled = false; inp.title = ''; }
   if (bloco) {
@@ -380,6 +410,7 @@ async function salvarCampo(inp) {
     });
     if (inp.value === digitado) inp.value = mostrarNumero(n);
     linha.classList.toggle('feito', n !== null);
+    marcarMinimo(inp.dataset.item, n);
     atualizarConta();
   } catch (e) {
     console.error(e);
@@ -391,17 +422,15 @@ function atualizarConta() {
   const c = contagem(sel.localId, sel.mes);
   if (!c) return;
   const chips = document.querySelector('.ct-chips');
-  if (chips) {
+  const lugar = chips || document.querySelector('.ct-barra');
+  if (lugar) {
     const linhas = new Map(linhasDe(c.id).map(l => [l.item_id, l]));
     const novo = document.createElement('div');
     novo.innerHTML = chipsGrupos(itensOrdenados(), linhas);
     const n = novo.firstElementChild;
-    if (n) {
-      chips.querySelectorAll('[data-chip]').forEach(b => {
-        const igual = n.querySelector(`[data-chip="${CSS.escape(b.dataset.chip)}"]`);
-        if (igual) { b.innerHTML = igual.innerHTML; b.classList.toggle('completo', igual.classList.contains('completo')); }
-      });
-    }
+    const rolagem = chips ? chips.scrollLeft : 0;
+    if (chips) chips.remove();
+    if (n) { document.querySelector('.ct-barra').after(n); n.scrollLeft = rolagem; ligarChips(); }
   }
   const p = progresso(c.id);
   const el = document.querySelector('.ct-conta');
@@ -592,9 +621,92 @@ function montarFolha(contagemId) {
 }
 
 /* ===================================================================
+   Tela Reposição — o que chegou no estoque mínimo na contagem do mês
+   (pedido dele, 15/10/2026): contou o EPI e ele está no mínimo → aparece
+   aqui com a quantidade a pedir, almoxarifado por almoxarifado.
+   =================================================================== */
+let mesRepor = mesAtual();
+let grupoRepor = '';
+
+function listaRepor() {
+  const itens = new Map(todos('est_itens').filter(i => i.ativo !== false).map(i => [i.id, i]));
+  const res = [];
+  for (const l of locais()) {
+    const c = contagem(l.id, mesRepor);
+    if (!c) continue;
+    for (const ln of linhasDe(c.id)) {
+      const item = itens.get(ln.item_id);
+      if (!item || !precisaRepor(item, ln.quantidade)) continue;
+      if (grupoRepor && item.grupo !== grupoRepor) continue;
+      res.push({ local: l, contagem: c, item, qtd: ln.quantidade });
+    }
+  }
+  return res;
+}
+
+function desenharRepor() {
+  const alvo = $('ctReporCorpo');
+  if (!alvo) return;
+  if (!pronto()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
+  const lista = listaRepor();
+  const semMin = todos('est_itens').filter(i => i.ativo !== false && !temMinimo(i)).length;
+  const grupos = [...new Set(todos('est_itens').filter(i => i.ativo !== false).map(i => i.grupo))];
+  const porLocal = new Map();
+  for (const r of lista) {
+    if (!porLocal.has(r.local.id)) porLocal.set(r.local.id, []);
+    porLocal.get(r.local.id).push(r);
+  }
+  alvo.innerHTML = `
+    <div class="grade">
+      <label class="campo">Mês <input type="month" id="rpMes" value="${esc(mesRepor)}" max="${mesAtual()}"></label>
+      <label class="campo">Grupo <select id="rpGrupo"><option value="">Todos</option>${grupos.map(g =>
+        `<option${g === grupoRepor ? ' selected' : ''}>${esc(g)}</option>`).join('')}</select></label>
+    </div>
+    ${semMin ? `<p class="es-nota">${semMin} ${semMin === 1 ? 'item ainda não tem' : 'itens ainda não têm'} estoque mínimo e não
+      ${semMin === 1 ? 'entra' : 'entram'} nesta lista. Defina em <strong>Cadastros › Itens</strong>.</p>` : ''}
+    ${lista.length ? [...porLocal.values()].map(rs => `
+      <h3 class="es-secao">${esc(rs[0].local.nome)} <small>${rs[0].contagem.status === 'fechada' ? 'contagem fechada' : 'contagem em andamento'}</small></h3>
+      <div class="lista">${rs.map(r => `<div class="item"><span></span>
+        <div><div class="nome">${esc(r.item.nome)} <span class="tag alerta">${esc(r.item.grupo || '')}</span></div>
+          <div class="sub">contado ${esc(mostrarNumero(r.qtd))} ${esc(r.item.unidade || '')} · mínimo ${esc(mostrarNumero(r.item.estoque_minimo))}</div></div>
+        <div class="acoes"><strong class="rp-pedir">${esc(textoPedido(r.item))}</strong></div>
+      </div>`).join('')}</div>`).join('')
+      + `<div class="barra fim"><button class="btn principal" type="button" id="rpImprimir">Imprimir o pedido</button></div>`
+      : `<div class="vazio">Nada no estoque mínimo nas contagens de ${esc(nomeMes(mesRepor))}${grupoRepor ? ' (' + esc(grupoRepor) + ')' : ''}.</div>`}`;
+  $('rpMes').addEventListener('change', e => {
+    if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesRepor = e.target.value; desenharRepor(); }
+  });
+  $('rpGrupo').addEventListener('change', e => { grupoRepor = e.target.value; desenharRepor(); });
+  $('rpImprimir')?.addEventListener('click', () => { montarFolhaRepor(lista); setTimeout(() => window.print(), 50); });
+}
+
+/** Folha A4 do pedido de reposição, no padrão SAKUMA. */
+function montarFolhaRepor(lista) {
+  const linhas = lista.map(r => [r.local.nome, r.item.nome, r.item.grupo || '',
+    mostrarNumero(r.qtd) + ' ' + (r.item.unidade || ''), mostrarNumero(r.item.estoque_minimo),
+    r.item.pedido_reposicao != null && r.item.pedido_reposicao !== '' ? mostrarNumero(r.item.pedido_reposicao) + ' ' + (r.item.unidade || '') : '—']);
+  $('rpFolha').innerHTML = `<div class="folha rel">
+    <div class="rel-topo">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit">
+        <h1>Pedido de Reposição</h1>
+        <p>Itens no estoque mínimo · contagem de ${esc(nomeMes(mesRepor))}${grupoRepor ? ' · ' + esc(grupoRepor) : ''} · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p>
+      </div>
+    </div>
+    <table class="rel-tab" style="margin-top:6mm"><thead><tr><th>Almoxarifado</th><th>Item</th><th>Grupo</th>
+      <th class="ce">Contado</th><th class="ce">Mínimo</th><th class="ce">Pedir</th></tr></thead>
+    <tbody>${linhas.map(l => `<tr>${l.map((v, k) => `<td${k >= 3 ? ' class="ce"' : ''}>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <div class="rel-pe">
+      <div class="rel-assina"><span></span><small>Responsável pelo pedido</small></div>
+      <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
+    </div>
+  </div>`;
+}
+
+/* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctHistorico: desenharHistorico };
+const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico };
 
 export function abrirContagem(tela) {
   telaAberta = tela;

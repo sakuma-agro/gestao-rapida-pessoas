@@ -3,7 +3,10 @@
 // A lista de itens é cadastrada no próprio app (decisão do Guilherme) e vale
 // para todos os almoxarifados. Nada se apaga: desativa-se, e o item some das
 // contagens novas sem sumir das que já foram fechadas.
-import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados } from './dados.js';
+import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados, lerNumero, mostrarNumero, temMinimo } from './dados.js';
+
+/** Campo de número opcional: vazio = null; texto que não é número = NaN. */
+const numOpc = v => lerNumero(v);
 
 let buscaItens = '';
 let verInativos = false;
@@ -27,6 +30,8 @@ function desenharItens() {
       <label class="campo">Nome do item <input type="text" name="nome" required placeholder="ex.: Glifosato 480"></label>
       <label class="campo">Unidade <select name="unidade">${UNIDADES.map(u => `<option>${u}</option>`).join('')}</select></label>
       <label class="campo">Grupo <select name="grupo">${GRUPOS.map(g => `<option>${g}</option>`).join('')}</select></label>
+      <label class="campo">Estoque mínimo <input type="text" name="minimo" inputmode="decimal" placeholder="ex.: 10"></label>
+      <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal" placeholder="quanto pedir"></label>
       <div class="barra fim" style="align-self:end"><button class="btn principal" type="submit">Adicionar</button></div>
     </form>
     <div class="barra entre">
@@ -42,7 +47,10 @@ function desenharItens() {
       const cab = i.grupo !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo)}</h3>` : '';
       return cab + `<div class="item"><span></span>
         <div><div class="nome">${esc(i.nome)}${i.ativo === false ? ' <span class="tag inativo">desativado</span>' : ''}</div>
-          <div class="sub">${esc(i.unidade || 'sem unidade')}</div></div>
+          <div class="sub">${esc(i.unidade || 'sem unidade')}${temMinimo(i)
+            ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
+              ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
+            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}</div></div>
         <div class="acoes"><button class="btn mini" type="button" data-editar="${esc(i.id)}">Editar</button></div>
       </div>`;
     }).join('') || `<div class="vazio">${todosItens.length ? 'Nenhum item com esse nome.' : 'Nenhum item cadastrado ainda.'}</div>`}</div>`;
@@ -55,7 +63,10 @@ function desenharItens() {
     if (todosItens.some(i => semAcento(i.nome) === semAcento(nome))) {
       aviso('Já existe um item com esse nome.', true); return;
     }
-    await gravar('est_itens', { nome, unidade: f.get('unidade'), grupo: f.get('grupo'), ativo: true });
+    const minimo = numOpc(f.get('minimo')), pedido = numOpc(f.get('pedido'));
+    if (Number.isNaN(minimo) || Number.isNaN(pedido)) { aviso('Estoque mínimo e pedido: use só números (ex.: 10 ou 2,5).', true); return; }
+    await gravar('est_itens', { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
+      estoque_minimo: minimo, pedido_reposicao: pedido, ativo: true });
     aviso('Item adicionado.');
     desenharItens();
     $('cadItemNovo').querySelector('[name=nome]').focus();
@@ -83,7 +94,12 @@ function editarItem(id) {
           `<option${u === i.unidade ? ' selected' : ''}>${esc(u)}</option>`).join('')}</select></label>
         <label class="campo">Grupo <select name="grupo">${GRUPOS.map(g =>
           `<option${g === i.grupo ? ' selected' : ''}>${g}</option>`).join('')}</select></label>
+        <label class="campo">Estoque mínimo <input type="text" name="minimo" inputmode="decimal"
+          value="${esc(mostrarNumero(i.estoque_minimo))}" placeholder="ex.: 10"></label>
+        <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal"
+          value="${esc(mostrarNumero(i.pedido_reposicao))}" placeholder="quanto pedir"></label>
       </div>
+      <p class="dc-sem">Quando a contagem der igual ou abaixo do mínimo, o item aparece na Reposição com a quantidade a pedir.</p>
       <div class="barra entre">
         <button class="btn${i.ativo === false ? '' : ' perigo'}" type="button" id="cadAtivo">${i.ativo === false ? 'Reativar' : 'Desativar'}</button>
         <button class="btn principal" type="submit">Salvar</button>
@@ -97,7 +113,10 @@ function editarItem(id) {
       if (todos('est_itens').some(x => x.id !== id && semAcento(x.nome) === semAcento(nome))) {
         aviso('Já existe outro item com esse nome.', true); return;
       }
-      await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo') }));
+      const minimo = numOpc(f.get('minimo')), pedido = numOpc(f.get('pedido'));
+      if (Number.isNaN(minimo) || Number.isNaN(pedido)) { aviso('Estoque mínimo e pedido: use só números (ex.: 10 ou 2,5).', true); return; }
+      await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
+        estoque_minimo: minimo, pedido_reposicao: pedido }));
       window.fecharModal(); desenharItens();
     });
     corpo.querySelector('#cadAtivo').addEventListener('click', async () => {
@@ -110,11 +129,11 @@ function editarItem(id) {
 /** Cola a lista inteira de uma vez: um item por linha, "nome ; unidade ; grupo". */
 function colarLista() {
   window.abrirModal('Colar uma lista de itens', `
-    <p class="dica">Um item por linha. Se quiser, depois do nome ponha a unidade e o grupo separados por
-      ponto e vírgula (ou cole direto as colunas de uma planilha):</p>
-    <pre class="cad-exemplo">Afalon ; L ; Defensivos
+    <p class="dica">Um item por linha. Se quiser, depois do nome ponha a unidade, o grupo, o estoque mínimo e
+      o pedido de reposição, separados por ponto e vírgula (ou cole direto as colunas de uma planilha):</p>
+    <pre class="cad-exemplo">Afalon ; L ; Defensivos ; 20 ; 100
 MAP 11-52-00 ; kg ; Fertilizantes
-Luva nitrílica ; par ; EPIs
+Luva nitrílica ; par ; EPIs ; 30 ; 100
 Óleo 15W40 ; L ; Lubrificantes
 Detergente ; L ; Material de limpeza
 Papel A4 ; pct ; Papelaria</pre>
@@ -139,7 +158,9 @@ Papel A4 ; pct ; Papelaria</pre>
         vistos.add(k);
         const uni = UNIDADES.find(u => u.toLowerCase() === (partes[1] || '').toLowerCase()) || partes[1] || corpo.querySelector('#colUni').value;
         const grupo = GRUPOS.find(g => semAcento(g) === semAcento(partes[2] || '')) || corpo.querySelector('#colGrupo').value;
-        novos.push({ nome, unidade: uni, grupo, ativo: true });
+        const min = lerNumero(partes[3] || ''), ped = lerNumero(partes[4] || '');
+        novos.push({ nome, unidade: uni, grupo, ativo: true,
+          estoque_minimo: Number.isNaN(min) ? null : min, pedido_reposicao: Number.isNaN(ped) ? null : ped });
       }
       corpo.querySelector('#colResumo').textContent = novos.length || repetidos
         ? `${novos.length} ${novos.length === 1 ? 'item novo' : 'itens novos'}${repetidos ? ` · ${repetidos} já cadastrado(s), ficam de fora` : ''}`

@@ -19,6 +19,7 @@ export const MODULOS = [
   { id: 'contagem', nome: 'Contagem', telas: [
     ['ctNova',       'Contar'],
     ['ctAndamento',  'Em andamento'],
+    ['ctRepor',      'Reposição'],
     ['ctHistorico',  'Histórico'],
   ] },
   { id: 'acerto', nome: 'Acerto', telas: [

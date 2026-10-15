@@ -85,3 +85,12 @@ export const lotesDe = (contagemId, itemId) => [...new Map(todos('est_contagem_l
 
 export const dataBR = d => d ? String(d).slice(0, 10).split('-').reverse().join('/') : '';
 export const hojeISO = () => new Date().toISOString().slice(0, 10);
+
+/* ---- estoque mínimo (pedido dele, 15/10/2026) ----
+   Cada item pode ter um estoque mínimo e a quantidade a pedir. Contou e deu
+   igual ou abaixo do mínimo → o item entra na reposição. */
+export const temMinimo = item => item && item.estoque_minimo !== null && item.estoque_minimo !== undefined && item.estoque_minimo !== '';
+export const precisaRepor = (item, qtd) => temMinimo(item) && qtd !== null && qtd !== undefined && qtd !== ''
+  && Number(qtd) <= Number(item.estoque_minimo);
+export const textoPedido = item => item.pedido_reposicao !== null && item.pedido_reposicao !== undefined && item.pedido_reposicao !== ''
+  ? 'pedir ' + mostrarNumero(item.pedido_reposicao) + ' ' + (item.unidade || '') : 'definir quanto pedir';
