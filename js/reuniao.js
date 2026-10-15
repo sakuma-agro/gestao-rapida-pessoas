@@ -22,7 +22,7 @@
 // 'reuniao' (RLS app_pode('reuniao')).
 
 import { estado, novoId } from './store.js';
-import { acesso, podeTela } from './acesso.js';
+import { podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -178,29 +178,19 @@ let pintarInicio = null;
 /** Cartão da frase da semana ao lado do "Boa tarde, …". */
 export function desenharFraseInicio(alvo, { abrir } = {}) {
   if (!alvo) return;
+  /* 15/10/2026, ajuste dele: no painel principal fica SÓ a frase (e quem
+     trouxe). Sem frase cadastrada na semana, o cartão não aparece. */
   const pintar = () => {
     const s = segundaDe();
     const reg = semanaReg(s);
-    const resp = responsavelFrase(s).pessoa;
     const frase = limpo(reg?.frase);
-    if (!frase && !resp) { alvo.hidden = true; return; }
-    const autor = limpo(reg?.autor_nome) || resp?.nome || '';
-    /* A atividade de quem está logado, se o primeiro nome casar com uma
-       pessoa do rodízio. */
-    const meu = semAcento((acesso.nome || '').split(' ')[0]);
-    const minhas = meu ? escalaDaSemana(s).filter(e => e.pessoa && semAcento(e.pessoa.nome.split(' ')[0]) === meu) : [];
-    const pode = podeTela('reuSemana');
+    if (!frase) { alvo.hidden = true; alvo.innerHTML = ''; return; }
+    const autor = limpo(reg?.autor_nome) || responsavelFrase(s).pessoa?.nome || '';
     alvo.hidden = false;
     alvo.innerHTML = `
-      <div class="reu-ini-rot">${icone('aspas')} Frase da semana <small>${faixaSemana(s)}</small></div>
-      ${frase
-        ? `<blockquote class="reu-ini-frase">“${esc(frase)}”</blockquote>
-           <div class="reu-ini-autor">— ${esc(autor)}</div>`
-        : `<p class="reu-ini-vazia">Ainda não cadastrada. Nesta semana quem traz a frase é <b>${esc(resp?.nome || '—')}</b>.</p>`}
-      ${minhas.length ? `<div class="reu-ini-minha">Sua atividade da semana: <b>${minhas.map(e => esc(e.atividade.nome)).join(' · ')}</b></div>` : ''}
-      ${pode ? `<button type="button" class="reu-ini-ir">${frase ? 'Abrir a reunião semanal →' : 'Cadastrar a frase →'}</button>` : ''}`;
-    const b = alvo.querySelector('.reu-ini-ir');
-    if (b && abrir) b.addEventListener('click', () => abrir('reuSemana'));
+      <div class="reu-ini-rot">${icone('aspas')} Frase da semana</div>
+      <blockquote class="reu-ini-frase">“${esc(frase)}”</blockquote>
+      ${autor ? `<div class="reu-ini-autor">— ${esc(autor)}</div>` : ''}`;
   };
   if (pintarInicio) ouvintes.delete(pintarInicio);
   pintarInicio = pintar;
