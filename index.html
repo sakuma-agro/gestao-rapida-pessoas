@@ -176,7 +176,10 @@ addEventListener('beforeinstallprompt', function (ev) {
     </section>
 
     <!-- ---- ENTRADA: nenhum módulo aberto, só as duas marcas ---- -->
-    <section class="tela inicio" id="telaInicio">
+    <!-- Nasce escondida (15/10/2026): antes ela aparecia por um instante ao
+         abrir o app, com a marca SAKUMA e "Gestão Rápida Pessoas", até a tela
+         das áreas carregar. Quem mostra é o abrirAba('inicio'). -->
+    <section class="tela inicio" id="telaInicio" hidden>
       <div class="ini-lateral">
         <!-- acesso rápido na lateral (mesmo modelo do Programação Campo) -->
         <nav class="ql" id="atalhosInicio" aria-label="Acesso rápido"></nav>
