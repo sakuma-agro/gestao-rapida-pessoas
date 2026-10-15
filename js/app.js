@@ -30,7 +30,7 @@ import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
 import { campoAnexos } from './arquivos.js';
-import { desenharCadRelatorios } from './cad-relatorios.js';
+import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
@@ -153,6 +153,8 @@ function abrirAba(nome) {
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
   $('telaCadRelatorios').hidden = nome !== 'cadRelatorios';
   if (nome === 'cadRelatorios') desenharCadRelatorios();
+  $('telaCadFerias').hidden = nome !== 'cadFerias';
+  if (nome === 'cadFerias') desenharCadFerias();
   if (nome === 'disc') abrirDisc();
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();

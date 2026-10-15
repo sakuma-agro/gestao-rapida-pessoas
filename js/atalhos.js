@@ -36,6 +36,7 @@ const PROPRIOS = {
   rhOrganograma: ['pessoas', 'Organograma'],
   rhQuadro:      ['pessoas', 'Quadro de pessoal'],
   cadRelatorios: ['pessoas', 'Relatórios de cadastro'],
+  cadFerias:     ['sol', 'Férias do mês'],
   jorPainel:     ['painel', 'Painel DP'],
   jorLancar:     ['relogio', 'Lançar jornada'],
   jorBoletins:   ['relogio', 'Jornadas lançadas'],

@@ -11,6 +11,8 @@ import { estado } from './store.js';
 import { montarMulti } from './multisel.js';
 import { mostrar, imprimir } from './jornada-relatorios.js';
 import { quadroPara } from './rh.js';
+import * as jd from './jornada-dados.js';
+import { pode } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -318,4 +320,154 @@ export function desenharCadRelatorios() {
     const r = achar(b.dataset.crCsv);
     baixarCsv(nomeArq(r.nome.toLowerCase().replace(/\s+/g, '-')), r.gerar().csv);
   }));
+}
+
+/* ===================================================================
+   FÉRIAS DO MÊS (15/10/2026)
+   Pedido dele: um acesso rápido em Cadastros com quem está de férias no mês,
+   só para ver — Vinícius, Laís e Lincoln não editam nada aqui. Os dados são os
+   lançamentos do DP › Férias (jor_ferias_gozos, situação "lancado"); esta
+   tela não grava em lugar nenhum. A permissão é a da tela (pessoas:cadFerias).
+   =================================================================== */
+
+const fer = { mes: hoje().slice(0, 7), empregador: '', fazendas: [] };
+
+const addDiaIso = (s, n) => {
+  const [a, m, d] = s.split('-').map(Number);
+  const dt = new Date(Date.UTC(a, m - 1, d + n));
+  return dt.toISOString().slice(0, 10);
+};
+const diasEntre = (a, b) => Math.round((Date.UTC(...b.split('-').map((v, i) => i === 1 ? v - 1 : +v)) -
+  Date.UTC(...a.split('-').map((v, i) => i === 1 ? v - 1 : +v))) / 86400000) + 1;
+const fimMes = ym => { const [a, m] = ym.split('-').map(Number); return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10); };
+const rotMes = ym => `${MESES[Number(ym.slice(5, 7)) - 1]} de ${ym.slice(0, 4)}`;
+
+function feriasDoMes() {
+  const ini = fer.mes + '-01', fim = fimMes(fer.mes), h = hoje();
+  const porId = new Map(estado.funcionarios.map(f => [f.id, f]));
+  return (jd.dados.feriasGozos || [])
+    .filter(g => g.situacao === 'lancado' && g.data_ini && g.data_fim)
+    .map(g => ({ g, f: porId.get(g.funcionario_id) }))
+    .filter(({ g, f }) => f &&
+      String(g.data_ini).slice(0, 10) <= fim && String(g.data_fim).slice(0, 10) >= ini &&
+      (!fer.empregador || limpo(f.empregador) === fer.empregador) &&
+      (!fer.fazendas.length || fer.fazendas.some(z => z === '-' ? !limpo(f.fazenda) : limpo(f.fazenda) === z)))
+    .map(({ g, f }) => {
+      const di = String(g.data_ini).slice(0, 10), df = String(g.data_fim).slice(0, 10);
+      const a = di > ini ? di : ini, b = df < fim ? df : fim;
+      const sit = di > h ? 'Programada' : df < h ? 'Concluída' : 'Em férias';
+      return { f, di, df, volta: addDiaIso(df, 1), total: diasEntre(di, df), noMes: diasEntre(a, b), sit };
+    })
+    .sort((x, y) => x.di.localeCompare(y.di) || x.f.nome.localeCompare(y.f.nome, 'pt-BR'));
+}
+
+function relFerias() {
+  const l = feriasDoMes();
+  const agora = l.filter(x => x.sit === 'Em férias').length;
+  const pessoas = new Set(l.map(x => x.f.id)).size;
+  const diasMes = l.reduce((s, x) => s + x.noMes, 0);
+  const cols = ['Nome', 'Empregador', 'Fazenda', 'Cargo', 'Saída', 'Último dia', 'Retorno', 'Dias', 'Dias no mês', 'Situação'];
+  const linhas = l.map(x => [x.f.nome, limpo(x.f.empregador), limpo(x.f.fazenda), limpo(x.f.cargo),
+    br(x.di), br(x.df), br(x.volta), String(x.total), String(x.noMes), x.sit]);
+  const filtro = [fer.empregador, fer.fazendas.length ? fer.fazendas.map(z => z === '-' ? 'sem fazenda' : z).join(', ') : 'todas as fazendas'].filter(Boolean).join(' · ');
+  const html = `
+  <article class="rel rel-paisagem">
+    <header class="rel-cabecalho">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-titulo">
+        <h1>FUNCIONÁRIOS EM FÉRIAS</h1>
+        <p>${esc(rotMes(fer.mes))} · lançamentos do DP › Férias</p>
+      </div>
+      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${esc(filtro)}</span></div>
+    </header>
+    <div class="rel-ficha">
+      <div><span>Pessoas no mês</span><b>${pessoas}</b></div>
+      <div><span>Em férias hoje</span><b>${fer.mes === hoje().slice(0, 7) ? agora : '—'}</b></div>
+      <div><span>Dias de férias no mês</span><b>${diasMes}</b></div>
+    </div>
+    ${tabela(cols.map((t, i) => ({ t, num: i === 7 || i === 8 })),
+      linhas.map(r => r.map((v, i) => i === 9
+        ? `<span class="cf-sit cf-sit--${v === 'Em férias' ? 'em' : v === 'Programada' ? 'prog' : 'fim'}">${esc(v)}</span>`
+        : esc(v) || '—')),
+      l.length ? `${l.length} período(s) de férias · ${pessoas} pessoa(s)` : '',
+      `Ninguém de férias em ${rotMes(fer.mes)} neste recorte.`)}
+    <footer class="rel-rodape">
+      <img src="img/lop-marca.png" alt="LOP">
+      <span class="rel-lop">Inteligência para o agronegócio</span>
+    </footer>
+  </article>`;
+  return { html, csv: [cols, ...linhas], l, agora, pessoas, diasMes };
+}
+
+export function desenharCadFerias() {
+  const alvo = $('telaCadFerias');
+  if (!alvo) return;
+  const r = relFerias();
+  const semDados = !pode('jornada');   // o banco só abre as férias para quem tem o DP
+  const emps = valores('empregador');
+  const doMesAtual = fer.mes === hoje().slice(0, 7);
+
+  alvo.innerHTML = `
+    <header class="jor-cabecalho"><div>
+      <div class="jor-cabecalho__titulo">Férias do mês</div>
+      <div class="jor-cabecalho__sub">Quem sai, quem está fora e quando volta — só para consulta; os lançamentos são feitos no DP › Férias</div></div>
+      <div class="jor-cabecalho__direita">mês<strong class="jor-cabecalho__competencia">${esc(rotMes(fer.mes))}</strong></div></header>
+    <div class="jor-corpo">
+      <div class="jor-barra rel-filtros cr-filtros">
+        <label>Mês <span class="cf-mes">
+          <button class="btn mini" type="button" id="cfAnt" aria-label="Mês anterior">‹</button>
+          <input type="month" id="cfMes" class="dc-mini" value="${fer.mes}">
+          <button class="btn mini" type="button" id="cfProx" aria-label="Próximo mês">›</button>
+          ${doMesAtual ? '' : '<button class="btn mini" type="button" id="cfHoje">Este mês</button>'}
+        </span></label>
+        <label>Empregador <select id="cfEmp" class="dc-mini">
+          <option value="">Todos os empregadores</option>
+          ${emps.map(e => `<option${e === fer.empregador ? ' selected' : ''}>${esc(e)}</option>`).join('')}</select></label>
+        <div class="cr-campo">Fazenda <div id="cfFaz"></div></div>
+      </div>
+      <div class="cf-kpis">
+        <div><span>Pessoas no mês</span><b>${r.pessoas}</b></div>
+        <div><span>Em férias hoje</span><b>${doMesAtual ? r.agora : '—'}</b></div>
+        <div><span>Dias de férias no mês</span><b>${r.diasMes}</b></div>
+      </div>
+      ${semDados ? '<p class="dc-sem jor-nota">Não consegui ler as férias do DP neste login. Fale com o administrador.</p>' : ''}
+      <div class="cf-lista">
+        ${r.l.length ? `<table class="cf-tabela">
+          <thead><tr><th>Nome</th><th>Fazenda</th><th>Saída</th><th>Retorno</th><th class="rel-num">Dias</th><th>Situação</th></tr></thead>
+          <tbody>${r.l.map(x => `<tr>
+            <td><b>${esc(x.f.nome)}</b><small>${esc([limpo(x.f.cargo), limpo(x.f.empregador)].filter(Boolean).join(' · '))}</small></td>
+            <td>${esc(limpo(x.f.fazenda)) || '—'}</td>
+            <td>${br(x.di)}</td>
+            <td>${br(x.volta)}</td>
+            <td class="rel-num">${x.total}${x.noMes !== x.total ? `<small>${x.noMes} no mês</small>` : ''}</td>
+            <td><span class="cf-sit cf-sit--${x.sit === 'Em férias' ? 'em' : x.sit === 'Programada' ? 'prog' : 'fim'}">${x.sit}</span></td>
+          </tr>`).join('')}</tbody></table>`
+        : `<p class="dc-sem cf-vazio">Ninguém de férias em ${esc(rotMes(fer.mes))} neste recorte.</p>`}
+      </div>
+      <div class="rel-linha">
+        <b>Funcionários em férias</b><span class="dc-sem">Documento no padrão SAKUMA com saída, último dia, retorno e dias no mês</span>
+        <span class="rel-linha__acoes">
+          <button class="btn principal" type="button" id="cfVer">Visualizar</button>
+          <button class="btn" type="button" id="cfImp">Imprimir</button>
+          <button class="btn mini" type="button" id="cfCsv">Excel</button>
+        </span></div>
+    </div>`;
+
+  const fechar = () => { const p = $('jorImpressao'); if (p) { p.hidden = true; p.innerHTML = ''; } };
+  const irMes = ym => { if (/^\d{4}-\d{2}$/.test(ym)) { fer.mes = ym; fechar(); desenharCadFerias(); } };
+  const passo = n => { const [a, m] = fer.mes.split('-').map(Number); const d = new Date(Date.UTC(a, m - 1 + n, 1)); irMes(d.toISOString().slice(0, 7)); };
+  $('cfMes').addEventListener('change', ev => irMes(ev.target.value));
+  $('cfAnt').addEventListener('click', () => passo(-1));
+  $('cfProx').addEventListener('click', () => passo(1));
+  $('cfHoje')?.addEventListener('click', () => irMes(hoje().slice(0, 7)));
+  $('cfEmp').addEventListener('change', ev => { fer.empregador = ev.target.value; fechar(); desenharCadFerias(); });
+  const semFaz = estado.funcionarios.some(f => !limpo(f.fazenda));
+  montarMulti($('cfFaz'), {
+    opcoes: [...valores('fazenda').map(z => [z, z]), ...(semFaz ? [['-', 'Sem fazenda']] : [])],
+    marcados: fer.fazendas, todas: 'Todas as fazendas', plural: 'fazendas',
+  });
+  $('cfFaz').addEventListener('change', () => { fer.fazendas = $('cfFaz').valores; fechar(); desenharCadFerias(); });
+  $('cfVer').addEventListener('click', () => mostrar(relFerias().html, { barra: true }));
+  $('cfImp').addEventListener('click', () => { mostrar(relFerias().html, { barra: true }); setTimeout(() => imprimir(), 300); });
+  $('cfCsv').addEventListener('click', () => baixarCsv(`ferias-${fer.mes}-${hoje()}.csv`, relFerias().csv));
 }

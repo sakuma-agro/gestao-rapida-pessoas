@@ -649,3 +649,23 @@
   padding: 4px 6px; border-radius: 6px; font: inherit; color: inherit; }
 .dc-planilha .tk-obs:hover { border-color: #D9DCD2; background: #fff; }
 .dc-planilha .tk-obs:focus { border-color: #84BD00; background: #fff; outline: none; }
+
+/* Cadastros › Relatórios › Férias do mês (15/10/2026) — só consulta */
+.cf-mes{display:flex;gap:6px;align-items:center}
+.cf-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.cf-kpis div{border:1px solid #E3E6DA;border-radius:10px;padding:10px 14px;background:var(--verde-fundo,#F4F8EA)}
+.cf-kpis span{display:block;font-size:11px;letter-spacing:.4px;text-transform:uppercase;color:#51534A}
+.cf-kpis b{font-size:22px;color:#744F28}
+.cf-lista{overflow-x:auto;margin-bottom:6px}
+.cf-tabela{width:100%;border-collapse:collapse;font-size:13.5px}
+.cf-tabela th,.cf-tabela td{border:1px solid #DADDD2;padding:7px 9px;text-align:left;vertical-align:top}
+.cf-tabela th{background:#84BD00;color:#fff;font-weight:600}
+.cf-tabela tbody tr:nth-child(odd) td{background:#F4F8EA}
+.cf-tabela small{display:block;font-size:11.5px;color:#8A8D86}
+.cf-tabela .rel-num{text-align:right}
+.cf-vazio{padding:18px 0}
+.cf-sit{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;white-space:nowrap}
+.cf-sit--em{background:#E6F2C8;color:#3F5E00}
+.cf-sit--prog{background:#F3E9DC;color:#744F28}
+.cf-sit--fim{background:#ECEDE9;color:#51534A}
+@media (max-width:640px){.rel-linha{grid-template-columns:1fr}.rel-linha__acoes{justify-content:flex-start}}

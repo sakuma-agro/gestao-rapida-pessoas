@@ -48,7 +48,7 @@ export const ICONES = {
 export const ICONE_TELA = {
   funcionarios: 'pessoa', funcionariosN2: 'ficha', aniversarios: 'bolo', folhaPonto: 'calendario',
   lista: 'check', termoSindical: 'documento', termoContrato: 'documento',
-  cadRelatorios: 'grafico', rhQuadro: 'pizza', cadFuncoes: 'cargo', cadEstrutura: 'predio',
+  cadRelatorios: 'grafico', rhQuadro: 'pizza', cadFerias: 'sol', cadFuncoes: 'cargo', cadEstrutura: 'predio',
   fichas: 'escudo', epis: 'lista', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exFuncoes: 'cargo', exTipos: 'ajuste',
   trPainel: 'painel', trVenc: 'treino', trTipos: 'ajuste',

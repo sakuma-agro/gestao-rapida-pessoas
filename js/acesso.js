@@ -46,6 +46,8 @@ export const MODULOS = [
     { id: 'relatoriosCad', nome: 'Relatórios', telas: [
       ['cadRelatorios', 'Relatórios'],
       ['rhQuadro', 'Quadro de pessoal'],
+      /* Férias do mês (15/10/2026): só consulta, lê o DP › Férias. */
+      ['cadFerias', 'Férias do mês'],
     ] },
     /* "Estrutura" (29/09/2026): Funções e setores e Empregador e fazenda viraram
        um submódulo só, a pedido dele. As chaves das telas não mudaram. */

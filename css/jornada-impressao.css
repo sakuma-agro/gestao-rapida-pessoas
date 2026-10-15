@@ -327,3 +327,9 @@
 .ce-anual-papel td:nth-child(n+4) { width: 26px; }
 .rel a.rel-link { color: #51534A; font-weight: 700; text-decoration: none; border: 0; }
 .rel a.rel-link span { display: none; }
+
+/* Férias do mês (15/10/2026): selo da situação no documento */
+.rel .cf-sit{display:inline-block;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:700}
+.rel .cf-sit--em{background:#E6F2C8;color:#3F5E00}
+.rel .cf-sit--prog{background:#F3E9DC;color:#744F28}
+.rel .cf-sit--fim{background:#ECEDE9;color:#51534A}
