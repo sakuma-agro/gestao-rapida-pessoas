@@ -87,6 +87,7 @@ TELAS.vencimentos = el => {
         <option value="planilha">Planilha — última e próxima troca</option>
         <option value="quadro">Consolidado — tudo numa tela</option>
         <option value="lista">Lista — um item por linha</option>
+        <option value="calendario">Calendário — preventivas e check lists por dia</option>
       </select>
     </div>
     <div class="acoes pv-acoes oculto" id="vc-acoes">
@@ -134,9 +135,15 @@ TELAS.vencimentos = el => {
       : filtroVenc.sit === 'pendentes' ? ['VENCIDO', 'ATENCAO'].includes(c.status)
       : c.status === filtroVenc.sit;
 
-    document.body.classList.toggle('modo-quadro', modoVenc !== 'lista');
+    document.body.classList.toggle('modo-quadro', modoVenc !== 'lista' && modoVenc !== 'calendario');
+    $('#vc-sit').hidden = modoVenc === 'calendario';
 
-    if (modoVenc === 'lista') {
+    if (modoVenc === 'calendario') {
+      const prev = todos.filter(x => passa(x) && (!filtroVenc.item || x.p.tipo_manutencao_id === filtroVenc.item));
+      const cks = filtroVenc.item ? [] : agendaChecklists().filter(l => passa({ c: { equipamento: l.e } }));
+      $('#vc-lista').innerHTML = calendarioVenc(prev, cks);
+      ligarCalendarioVenc(desenhar);
+    } else if (modoVenc === 'lista') {
       const lista = todos.filter(x => passa(x) && statusOk(x.c) && (!filtroVenc.item || x.p.tipo_manutencao_id === filtroVenc.item));
       $('#vc-lista').innerHTML = listaVenc(lista);
     } else {
@@ -290,6 +297,102 @@ function quadroVenc(linhas, colunas) {
         }).join('')}
       </tr>`;
     }).join('') + '</tbody></table></div>';
+}
+
+/* ------------------------------------------------------------- calendário
+   (15/10/2026, pedido dele: "um calendário com todos os vencimentos").
+   Um mês por vez, cada dia com o que vence nele: preventivas (pela data da
+   próxima troca) e check lists (pela data do próximo). O que só vence pelo
+   horímetro não tem data — fica no quadro "Pelo horímetro", ao lado do que
+   já passou ("Atrasados") e do check list que nunca foi feito. */
+let mesCalVenc = hoje().slice(0, 7);
+
+function mesTexto(ym) {
+  const [a, m] = ym.split('-').map(Number);
+  const t = new Date(a, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function somarMes(ym, n) {
+  const [a, m] = ym.split('-').map(Number);
+  const d = new Date(a, m - 1 + n, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function eventosVenc(prev, cks) {
+  const h = hoje(), ev = [], semData = [], nunca = [];
+  for (const { p, c } of prev) {
+    const e = c.equipamento, os = osAbertaDoPlano(p);
+    const base = { tipo: 'prev', e, nome: q.nome('tipos_manutencao', p.tipo_manutencao_id),
+      st: (ETIQUETA[c.status] || ETIQUETA.SEM_DADO)[0], motivo: c.motivo, plano: p.id, os: os ? os.id : null };
+    if (c.proxima_data) ev.push({ ...base, data: c.proxima_data });
+    else if (c.status !== 'SEM_DADO') semData.push(base);
+  }
+  for (const l of cks) {
+    const st = l.status === 'atrasado' ? 'urgente' : (l.status === 'hoje' || l.status === 'semana') ? 'atencao' : 'ok';
+    const base = { tipo: 'ck', e: l.e, nome: 'Check list', st, motivo: l.modelo.nome, maq: l.e.id };
+    if (l.status === 'nunca') nunca.push({ ...base, st: 'neutro' });
+    else ev.push({ ...base, data: l.vence });
+  }
+  const atrasados = ev.filter(x => x.data < h).sort((a, b) => a.data.localeCompare(b.data));
+  return { ev, semData, nunca, atrasados };
+}
+
+function chipVenc(x, comData) {
+  const alvo = x.tipo === 'ck' ? `data-ckmaq="${esc(x.maq)}"`
+    : x.os ? `data-os="${esc(x.os)}"` : `data-abrir="${esc(x.plano)}"`;
+  return `<button type="button" class="cal-chip st-${x.st}${x.tipo === 'ck' ? ' cal-ck' : ''}" ${alvo}
+      title="${esc(x.e.codigo + ' · ' + x.e.descricao + ' · ' + x.nome + ' · ' + x.motivo)}">
+    <b>${esc(x.e.codigo)}</b> ${esc(x.nome)}${comData && x.data ? ' <small>' + formatarData(x.data) + '</small>' : ''}${x.os ? ' <small>na OS</small>' : ''}</button>`;
+}
+
+function calendarioVenc(prev, cks) {
+  const { ev, semData, nunca, atrasados } = eventosVenc(prev, cks);
+  const ym = mesCalVenc, h = hoje();
+  const [a, m] = ym.split('-').map(Number);
+  const primeiro = new Date(a, m - 1, 1), diasMes = new Date(a, m, 0).getDate();
+  const porDia = {};
+  ev.filter(x => x.data.slice(0, 7) === ym).forEach(x => (porDia[x.data] = porDia[x.data] || []).push(x));
+  const nomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  let cel = nomes.map(n => `<div class="cal-sem">${n}</div>`).join('');
+  for (let i = 0; i < primeiro.getDay(); i++) cel += '<div class="cal-dia fora"></div>';
+  for (let d = 1; d <= diasMes; d++) {
+    const data = ym + '-' + String(d).padStart(2, '0');
+    const itens = (porDia[data] || []).sort((x, y) => porCodigo(x.e, y.e));
+    cel += `<div class="cal-dia${data === h ? ' hoje' : ''}${data < h ? ' passado' : ''}">
+      <span class="cal-n">${d}</span>${itens.map(x => chipVenc(x)).join('')}</div>`;
+  }
+  const noMes = Object.values(porDia).reduce((s, l) => s + l.length, 0);
+  const caixa = (titulo, lista, vazio) => `<section class="cal-caixa"><h3>${titulo} <span>${lista.length}</span></h3>
+      ${lista.length ? lista.map(x => chipVenc(x, true)).join('') : `<p class="sub">${vazio}</p>`}</section>`;
+  return `<div class="legenda">
+      <span class="lg st-urgente">vencido</span><span class="lg st-atencao">perto de vencer</span>
+      <span class="lg st-ok">em dia</span><span class="lg cal-ck-lg">check list</span>
+      <span class="lg-pe">toque no item para abrir a OS ou o check list</span>
+    </div>
+    <div class="cal-nav">
+      <button type="button" class="btn neutro" data-mes="-1" aria-label="Mês anterior">‹</button>
+      <strong>${mesTexto(ym)}</strong>
+      <button type="button" class="btn neutro" data-mes="1" aria-label="Próximo mês">›</button>
+      ${ym !== h.slice(0, 7) ? '<button type="button" class="btn-fantasma" data-mes="0">Hoje</button>' : ''}
+      <span class="sub">${noMes} ${noMes === 1 ? 'vencimento' : 'vencimentos'} no mês</span>
+    </div>
+    <div class="cal-corpo">
+      <div class="cal-grade">${cel}</div>
+      <aside class="cal-lado">
+        ${caixa('Atrasados', atrasados, 'Nada atrasado.')}
+        ${caixa('Pelo horímetro', semData, 'Nenhum item só por hora.')}
+        ${caixa('Check list nunca feito', nunca, 'Todas já têm check list.')}
+      </aside>
+    </div>`;
+}
+
+function ligarCalendarioVenc(desenhar) {
+  $$('#vc-lista [data-mes]').forEach(b => b.onclick = () => {
+    const n = Number(b.dataset.mes);
+    mesCalVenc = n === 0 ? hoje().slice(0, 7) : somarMes(mesCalVenc, n);
+    desenhar();
+  });
+  $$('#vc-lista [data-ckmaq]').forEach(b => b.onclick = () => { irPara('checklist'); preencherChecklist(b.dataset.ckmaq); });
 }
 
 /* ------------------------------------------------------------- lista */
