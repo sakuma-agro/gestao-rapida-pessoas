@@ -243,18 +243,45 @@ async function fotosPendentes() {
   return todas.filter(f => f.status !== 'enviada');
 }
 
+/* Caminho gravado nos registros (os/<código>/<id>.jpg, checklists/<código>/<id>.jpg)
+   → chave do arquivo no Drive (manutencoes/os/…, manutencoes/checklist/…). */
+function chaveDrive(caminho) {
+  return 'manutencoes/' + caminho.replace(/^checklists\//, 'checklist/').toLowerCase();
+}
+async function chamarArquivos(acao, chave, init = {}, extra = '') {
+  const { data } = await App.sb.auth.getSession();
+  const t = data && data.session && data.session.access_token;
+  if (!t) throw new Error('sem-login');
+  return fetch(CONFIG.SUPABASE_URL + '/functions/v1/arquivos?acao=' + acao + '&chave=' + encodeURIComponent(chave) + extra, {
+    ...init, headers: { Authorization: 'Bearer ' + t, apikey: CONFIG.SUPABASE_ANON_KEY, ...(init.headers || {}) },
+  });
+}
+/* Foto que já subiu (ou foi feita em outro aparelho): baixa do Drive. */
+async function blobDoDrive(caminho) {
+  if (!App.online || !App.sb) return null;
+  try {
+    const r = await chamarArquivos('ver', chaveDrive(caminho));
+    return r.ok ? await r.blob() : null;
+  } catch (e) { return null; }
+}
+
 let enviandoFotos = false;
 async function enviarFotos() {
   if (enviandoFotos || !App.online || !App.sb) return;
   enviandoFotos = true;
   try {
     for (const f of await fotosPendentes()) {
-      const { error } = await App.sb.storage.from(f.bucket)
-        .upload(f.caminho, f.blob, { contentType: 'image/jpeg', upsert: true });
-      if (!error || (error.message || '').includes('already exists')) {
+      // Fotos no Google Drive (15/10/2026), pela função "arquivos" do Supabase.
+      let r;
+      try {
+        r = await chamarArquivos('enviar', chaveDrive(f.caminho), {
+          method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: f.blob,
+        }, '&nome=' + encodeURIComponent(f.caminho.split('/').pop()));
+      } catch (e) { break; }                       // sem conexão: tenta depois
+      if (r.ok) {
         f.status = 'enviada';
         await promessa(tx('fotos', 'readwrite').put(f));
-      }
+      } else if (r.status >= 500) break;           // Drive fora ou sem autorização: tenta depois
     }
   } finally {
     enviandoFotos = false;

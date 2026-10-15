@@ -297,11 +297,9 @@ async function urlFoto(caminho) {
   if (urlsFotos.has(caminho)) return urlsFotos.get(caminho);
   const blob = await blobDaFoto(caminho);
   if (blob) { const u = URL.createObjectURL(blob); urlsFotos.set(caminho, u); return u; }
-  // Foto já enviada e apagada do aparelho (ou feita em outro aparelho): pede ao Storage.
-  if (App.online && App.sb) {
-    const { data } = await App.sb.storage.from('manutencao-checklists').createSignedUrl(caminho, 3600);
-    if (data && data.signedUrl) { urlsFotos.set(caminho, data.signedUrl); return data.signedUrl; }
-  }
+  // Foto já enviada e apagada do aparelho (ou feita em outro aparelho): pede ao Google Drive.
+  const doDrive = await blobDoDrive(caminho);
+  if (doDrive) { const u = URL.createObjectURL(doDrive); urlsFotos.set(caminho, u); return u; }
   return null;
 }
 
