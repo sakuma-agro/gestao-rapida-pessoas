@@ -41,6 +41,9 @@ export const ICONES = {
   antesDepois: '<rect x="2.5" y="6" width="8" height="12" rx="1.5"/><rect x="13.5" y="6" width="8" height="12" rx="1.5"/><path d="M5 14l2-2 2 2M16 12l1.5 1.5L20 11"/>',
   extintor: '<rect x="8" y="7" width="8" height="14" rx="3"/><path d="M10 7V4h4v3M14 4h3l2 2M12 11v4"/>',
   capacete: '<path d="M4 17a8 8 0 0116 0"/><path d="M2.5 17h19v2.5h-19z"/><path d="M12 9V6M8.5 10.5L8 8M15.5 10.5L16 8"/>',
+  reuniao: '<circle cx="12" cy="7" r="2.6"/><circle cx="5" cy="10" r="2.2"/><circle cx="19" cy="10" r="2.2"/><path d="M7.5 20c0-2.8 2-4.6 4.5-4.6s4.5 1.8 4.5 4.6M1.8 19c0-2 1.3-3.4 3.2-3.4M22.2 19c0-2-1.3-3.4-3.2-3.4"/>',
+  aspas: '<path d="M10 7H6a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/><path d="M20 7h-4a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/>',
+  vassoura: '<path d="M14 3l-4.5 9"/><path d="M6.5 12h7l2 9h-11z"/><path d="M8 16.5v4M11 16.5v4"/>',
   lapis: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
 };
 
@@ -65,9 +68,10 @@ export const ICONE_TELA = {
   vsAnNovo: 'mais', vsAnAberto: 'relogio', vsAnHist: 'historico',
   vsAdNovo: 'mais', vsAdAberto: 'relogio', vsAdFechados: 'check', vsAdHist: 'historico',
   vsEx: 'extintor', vsPainel: 'painel', vsRelatorio: 'documento', vsConfig: 'config',
+  reuSemana: 'reuniao', reuFrases: 'aspas', reuResp: 'pessoas', reuAtiv: 'vassoura',
   cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
 };
-export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check' };
+export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check', reuniao: 'reuniao' };
 
 export const svgIcone = (nome, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${ICONES[nome] || ICONES.lista}</svg>`;

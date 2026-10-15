@@ -1407,3 +1407,70 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
   .ql-item{min-width:0;flex:0 0 auto;white-space:nowrap}
 }
 .ql-item.ql-editar{min-height:36px}
+
+/* ---------- Reunião semanal (15/10/2026) — js/reuniao.js ---------- */
+.ar-topo{display:flex;align-items:flex-start;gap:20px;margin-bottom:22px}
+.ar-topo .ar-cabeca{flex:1;margin-bottom:0}
+.reu-ini{flex:0 1 420px;background:var(--papel);border:1.5px solid var(--linha);border-left:4px solid var(--verde);
+  border-radius:14px;padding:14px 16px;box-shadow:var(--sombra)}
+.reu-ini-rot{display:flex;align-items:center;gap:6px;color:var(--marrom);font-weight:700;font-size:11.5px;
+  letter-spacing:.6px;text-transform:uppercase}
+.reu-ini-rot svg{color:var(--verde)}
+.reu-ini-rot small{margin-left:auto;color:var(--suave);font-weight:600;letter-spacing:0;text-transform:none}
+.reu-ini-frase{margin:8px 0 4px;font-size:16.5px;line-height:1.4;font-style:italic;font-weight:600}
+.reu-ini-autor{color:var(--verde-esc);font-weight:700;font-size:13px;text-align:right}
+.reu-ini-vazia{margin:8px 0 0;color:var(--suave);font-size:13px}
+.reu-ini-minha{margin-top:10px;padding-top:8px;border-top:1px dashed var(--linha);font-size:12.5px;color:var(--suave)}
+.reu-ini-minha b{color:var(--texto)}
+.reu-ini-ir{margin-top:8px;background:none;border:0;padding:0;font:inherit;font-size:12.5px;font-weight:700;
+  color:var(--verde-esc);cursor:pointer}
+.reu-ini-ir:hover{text-decoration:underline}
+@media (max-width:760px){ .ar-topo{flex-direction:column;gap:14px} .reu-ini{flex:none;width:100%} }
+
+.reu-cabeca{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.reu-semana{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.reu-semana .btn.mini{display:inline-flex;align-items:center}
+.reu-semana-rot{display:flex;flex-direction:column;line-height:1.2;min-width:150px;text-align:center}
+.reu-semana-rot small{color:var(--suave);font-size:12px}
+.cartao h2 svg{vertical-align:-3px;color:var(--verde)}
+.reu-como{margin-top:10px;border:1px solid var(--linha);border-radius:10px;padding:8px 12px;background:var(--verde-fundo)}
+.reu-como summary{cursor:pointer;font-weight:700;display:flex;align-items:center;gap:6px}
+.reu-como ol{margin:8px 0 2px;padding-left:20px}
+.reu-como li{margin:4px 0}
+.reu-campo{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--suave);flex:1;min-width:200px}
+.reu-campo textarea,.reu-campo input,.reu-campo select{font-weight:400;color:var(--texto)}
+.reu-linha{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px}
+.reu-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.reu-escala{display:flex;flex-direction:column;gap:10px}
+.reu-atv{display:grid;grid-template-columns:120px 1fr 200px;gap:12px;align-items:start;
+  border:1px solid var(--linha);border-radius:10px;padding:12px}
+.reu-atv.feito{border-color:rgba(132,189,0,.55);background:var(--verde-fundo)}
+.reu-atv-txt b{display:block;margin-bottom:2px}
+.reu-atv-txt ul{margin:4px 0 0;padding-left:18px;color:var(--suave);font-size:13px}
+.reu-atv-quem{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.reu-pessoa{font-weight:700;font-size:15px;color:var(--marrom)}
+.reu-atv-quem select{font-size:12px;padding:5px 6px}
+.reu-check{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;cursor:pointer}
+.reu-check input{width:18px;height:18px;accent-color:var(--verde)}
+@media (max-width:700px){ .reu-atv{grid-template-columns:1fr} }
+.reu-frases{display:flex;flex-direction:column;gap:10px}
+.reu-fr{border:1px solid var(--linha);border-left:4px solid var(--verde);border-radius:10px;padding:10px 14px}
+.reu-fr-data{font-size:12px;color:var(--suave);font-weight:600}
+.reu-fr blockquote{margin:4px 0;font-style:italic;font-size:15px}
+.reu-fr-autor{text-align:right;color:var(--verde-esc);font-weight:700;font-size:13px}
+.reu-sub{font-size:13px;margin:14px 0 6px;color:var(--marrom)}
+.reu-tab-rolar{overflow-x:auto}
+.reu-tab{border-collapse:collapse;width:100%;font-size:13px}
+.reu-tab th,.reu-tab td{border:1px solid var(--linha);padding:6px 8px;text-align:left;vertical-align:middle}
+.reu-tab th{background:var(--verde-fundo);color:var(--verde-esc);font-weight:700}
+.reu-tab tr.atual td{font-weight:700;background:var(--verde-fundo)}
+.reu-tab tr.inativo td{color:var(--suave)}
+.reu-tab input[type=text]{min-width:140px}
+.reu-tab input[type=checkbox]{width:17px;height:17px;accent-color:var(--verde)}
+.reu-ord{white-space:nowrap}
+.reu-ord .btn.mini{padding:3px 5px;display:inline-flex;vertical-align:middle}
+.reu-ativs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.reu-ativ{border:1px solid var(--linha);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.reu-ativ.inativo{opacity:.6}
+.reu-ativ-num{font-size:11.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--marrom)}
+.reu-ativ .btn.mini{display:inline-flex;align-items:center;gap:3px}

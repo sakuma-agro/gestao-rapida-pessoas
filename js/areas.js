@@ -10,6 +10,7 @@
 // Área nova no futuro: um item em AREAS e a regra dela em liberada().
 import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
+import { desenharFraseInicio } from './reuniao.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -24,7 +25,7 @@ const VERSAO_PROG = '4';
 
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
-    desc: 'Cadastros · SST · RH · DP' },
+    desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
   /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
      ganhou o módulo Patrimônio. Só o nome mudou: o id segue 'manutencoes', a
      pasta segue manutencoes/ e o banco segue no esquema manutencao. */
@@ -184,6 +185,12 @@ export function mostrarAreas({ direto = false } = {}) {
   const nome = (acesso.nome || '').split(' ')[0];
   const h = new Date().getHours();
   $('arOla').textContent = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + (nome ? ', ' + nome : '');
+
+  /* Frase da semana (15/10/2026, pedido dele): ao lado do "Boa tarde, …",
+     a frase que alguém do administrativo trouxe e o nome de quem trouxe. */
+  try {
+    desenharFraseInicio($('arFrase'), { abrir: tela => { entrarNaArea('pessoas'); abrirModulo('reuniao', tela); } });
+  } catch (e) { $('arFrase').hidden = true; }
 
   // liberadas primeiro, na ordem de AREAS; depois as fantasmas
   const lista = [...AREAS.filter(a => !a.emBreve && liberada(a.id)), ...AREAS.filter(a => a.emBreve || !liberada(a.id))];

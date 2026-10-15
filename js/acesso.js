@@ -177,6 +177,17 @@ export const MODULOS = [
       ['empSalarios',     'Salário base'],
     ] },
   ] },
+  /* Reunião semanal do administrativo (15/10/2026, pedido dele): frase da
+     semana (aparece na tela principal), responsáveis fixos em rodízio e as
+     atividades semanais do escritório. js/reuniao.js; tabelas reu_*. */
+  { id: 'reuniao', nome: 'Reunião semanal', subs: [
+    { id: 'reuSub', nome: 'Reunião semanal', telas: [
+      ['reuSemana', 'Esta semana'],
+      ['reuFrases', 'Frases'],
+      ['reuResp',   'Responsáveis'],
+      ['reuAtiv',   'Atividades'],
+    ] },
+  ] },
   /* Área Certificação (13/10/2026): o módulo mora na área dela (`area`), não
      no menu de Pessoas. js/certificacao.js; tabelas cert_*; permissão 'cert'. */
   { id: 'cert', nome: 'Certificação', area: 'certificacao', subs: [
@@ -532,6 +543,7 @@ const ICONE_SUB = {
   vsSubVistoria: 'escudo', vsSubChecklists: 'boletim', vsSubAberto: 'relogio',
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
+  reuSub: 'reuniao',
   cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';

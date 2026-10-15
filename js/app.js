@@ -21,6 +21,7 @@ import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from '.
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
+import { abrirReuniao, TELAS_REUNIAO, limparReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
@@ -166,6 +167,9 @@ function abrirAba(nome) {
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
   $('telaSstCal').hidden = nome !== 'sstCal';
   if (nome === 'sstCal') abrirCalendarioSst();
+  // Reunião semanal (15/10/2026) — js/reuniao.js
+  for (const t of TELAS_REUNIAO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_REUNIAO.includes(nome)) abrirReuniao(nome);
   // Área Certificação (13/10/2026) — js/certificacao.js
   for (const t of TELAS_CERT) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_CERT.includes(nome)) abrirCertificacao(nome);
@@ -226,7 +230,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno(); limparReuniao();
   mostrar('login');
 });
 

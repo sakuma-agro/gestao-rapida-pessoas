@@ -140,10 +140,14 @@ addEventListener('beforeinstallprompt', function (ev) {
     <!-- ---- ÁREAS do LOP - Gestão Rápida (09/10/2026): a primeira tela depois
          do login. Cada área tem o seu menu; Pessoas é tudo o que já existia. ---- -->
     <section class="tela areas" id="telaAreas" hidden>
-      <div class="ar-cabeca">
-        <div class="ar-ola" id="arOla">Bem-vindo</div>
-        <h2>Em qual área você vai trabalhar?</h2>
-        <p class="dica">Cada área tem o seu próprio menu. Para trocar, toque em <b>Gestão Rápida</b>, no alto.</p>
+      <div class="ar-topo">
+        <div class="ar-cabeca">
+          <div class="ar-ola" id="arOla">Bem-vindo</div>
+          <h2>Em qual área você vai trabalhar?</h2>
+          <p class="dica">Cada área tem o seu próprio menu. Para trocar, toque em <b>Gestão Rápida</b>, no alto.</p>
+        </div>
+        <!-- Frase da semana (15/10/2026) — js/reuniao.js -->
+        <div class="reu-ini" id="arFrase" hidden></div>
       </div>
       <div class="ar-grade" id="arGrade"></div>
       <div class="ar-pe" id="arPe"></div>
@@ -906,6 +910,11 @@ addEventListener('beforeinstallprompt', function (ev) {
     <section class="tela" id="telaCeIndRh" hidden></section>
     <section class="tela" id="telaCeIndMetas" hidden></section>
     <section class="tela" id="telaCeCertificacoes" hidden></section>
+    <!-- Reunião semanal (15/10/2026) — js/reuniao.js -->
+    <section class="tela" id="telaReuSemana" hidden></section>
+    <section class="tela" id="telaReuFrases" hidden></section>
+    <section class="tela" id="telaReuResp" hidden></section>
+    <section class="tela" id="telaReuAtiv" hidden></section>
     <!-- SST › Calendário (15/10/2026) — js/sst-calendario.js -->
     <section class="tela" id="telaSstCal" hidden></section>
     <section class="tela" id="telaAcPainel" hidden></section>

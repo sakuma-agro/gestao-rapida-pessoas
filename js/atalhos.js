@@ -32,6 +32,8 @@ const PROPRIOS = {
   trVenc:        ['treino', 'Treinamentos a vencer'],
   trPainel:      ['treino', 'Painel de treinamentos'],
   sstCal:        ['calendario', 'Calendário do SST'],
+  reuSemana:     ['reuniao', 'Reunião semanal'],
+  reuFrases:     ['aspas', 'Frases da semana'],
   disc:          ['disc', 'Perfil DISC'],
   rhCargos:      ['cargo', 'Plano de cargos'],
   rhOrganograma: ['pessoas', 'Organograma'],
