@@ -307,3 +307,7 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 
 .qc-imp{border-bottom:1px solid var(--linha);padding-bottom:8px;margin-bottom:8px}
 .qc-imp p{margin:4px 0;font-size:13.5px}
+
+/* Cadastros › Itens: "Contado em" (estoques em que o item aparece na contagem) */
+.cad-locais{border:1px solid var(--linha,#dfe3e6);border-radius:8px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;grid-column:1/-1}
+.cad-locais legend{font-size:12px;color:var(--suave);padding:0 4px}

@@ -1,14 +1,39 @@
 // cadastros.js — Cadastros › Itens e Almoxarifados da área Estoque (15/10/2026).
 //
-// A lista de itens é cadastrada no próprio app (decisão do Guilherme) e vale
-// para todos os almoxarifados. Nada se apaga: desativa-se, e o item some das
+// A lista de itens é cadastrada no próprio app (decisão do Guilherme). Cada
+// item é contado nos estoques marcados em "Contado em" (nada marcado à parte =
+// todos). Nada se apaga: desativa-se, e o item some das
 // contagens novas sem sumir das que já foram fechadas.
-import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados, lerNumero, mostrarNumero, temMinimo } from './dados.js';
+import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados, lerNumero, mostrarNumero, temMinimo,
+  locais, contaNoLocal } from './dados.js';
 
 /** Campo de número opcional: vazio = null; texto que não é número = NaN. */
 const numOpc = v => lerNumero(v);
 
 let buscaItens = '';
+let filtroLocal = '';
+const nomeCurto = n => String(n || '').replace(/^Faz(enda)?\.?\s+/i, '');
+
+/** Caixinhas "Contado em": todas marcadas = conta em todos os estoques. */
+function caixasLocais(marcados) {
+  const todosMarcados = !Array.isArray(marcados) || !marcados.length;
+  return `<fieldset class="campo plena cad-locais"><legend>Contado em</legend>
+    ${locais().map(l => `<label class="es-check"><input type="checkbox" data-local="${esc(l.id)}"${
+      todosMarcados || marcados.includes(l.id) ? ' checked' : ''}> ${esc(l.nome)}</label>`).join('')}
+  </fieldset>`;
+}
+/** null = todos; [] = nenhum (não pode); [ids] = só esses. */
+function lerLocais(raiz) {
+  const cx = [...raiz.querySelectorAll('.cad-locais [data-local]')];
+  const ids = cx.filter(c => c.checked).map(c => c.dataset.local);
+  return ids.length === cx.length ? null : ids;
+}
+function textoLocais(i) {
+  const l = i.locais_contagem;
+  if (!Array.isArray(l) || !l.length) return '';
+  const nomes = locais().filter(x => l.includes(x.id)).map(x => nomeCurto(x.nome));
+  return ` · contado em ${esc(nomes.join(', ') || '—')}`;
+}
 let verInativos = false;
 const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 
@@ -21,7 +46,7 @@ function desenharItens() {
   const todosItens = todos('est_itens');
   const lista = itensOrdenados(todosItens.filter(i => verInativos || i.ativo !== false));
   const b = semAcento(buscaItens);
-  const vistos = lista.filter(i => !b || semAcento(i.nome).includes(b));
+  const vistos = lista.filter(i => (!b || semAcento(i.nome).includes(b)) && (!filtroLocal || contaNoLocal(i, filtroLocal)));
   const nAtivos = todosItens.filter(i => i.ativo !== false).length;
 
   let grupo = null;
@@ -32,15 +57,18 @@ function desenharItens() {
       <label class="campo">Grupo <select name="grupo">${GRUPOS.map(g => `<option>${g}</option>`).join('')}</select></label>
       <label class="campo">Estoque mínimo <input type="text" name="minimo" inputmode="decimal" placeholder="ex.: 10"></label>
       <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal" placeholder="quanto pedir"></label>
+      ${caixasLocais(null)}
       <div class="barra fim" style="align-self:end"><button class="btn principal" type="submit">Adicionar</button></div>
     </form>
     <div class="barra entre">
-      <span class="dc-sem">${nAtivos} ${nAtivos === 1 ? 'item ativo' : 'itens ativos'} · todos aparecem na contagem de todos os almoxarifados</span>
+      <span class="dc-sem">${nAtivos} ${nAtivos === 1 ? 'item ativo' : 'itens ativos'} · cada item aparece na contagem dos estoques marcados em "Contado em"</span>
       <button class="btn" type="button" id="cadColar">Colar uma lista</button>
     </div>
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Procurar
         <input type="text" id="cadBusca" placeholder="Digite parte do nome..." value="${esc(buscaItens)}"></label>
+      <label class="campo">Contado em <select id="cadFiltroLocal"><option value="">Todos os estoques</option>${locais().map(l =>
+        `<option value="${esc(l.id)}"${l.id === filtroLocal ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
       <label class="es-check"><input type="checkbox" id="cadInativos"${verInativos ? ' checked' : ''}> mostrar desativados</label>
     </div>
     <div class="lista">${vistos.map(i => {
@@ -50,7 +78,7 @@ function desenharItens() {
           <div class="sub">${esc(i.unidade || 'sem unidade')}${temMinimo(i)
             ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
               ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
-            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}</div></div>
+            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoLocais(i)}</div></div>
         <div class="acoes"><button class="btn mini" type="button" data-editar="${esc(i.id)}">Editar</button></div>
       </div>`;
     }).join('') || `<div class="vazio">${todosItens.length ? 'Nenhum item com esse nome.' : 'Nenhum item cadastrado ainda.'}</div>`}</div>`;
@@ -65,8 +93,10 @@ function desenharItens() {
     }
     const minimo = numOpc(f.get('minimo')), pedido = numOpc(f.get('pedido'));
     if (Number.isNaN(minimo) || Number.isNaN(pedido)) { aviso('Estoque mínimo e pedido: use só números (ex.: 10 ou 2,5).', true); return; }
+    const onde = lerLocais(e.target);
+    if (onde && !onde.length) { aviso('Marque pelo menos um estoque em "Contado em".', true); return; }
     await gravar('est_itens', { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
-      estoque_minimo: minimo, pedido_reposicao: pedido, ativo: true });
+      estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde, ativo: true });
     aviso('Item adicionado.');
     desenharItens();
     $('cadItemNovo').querySelector('[name=nome]').focus();
@@ -77,6 +107,7 @@ function desenharItens() {
     desenharItens();
     const el = $('cadBusca'); el.focus(); el.setSelectionRange(pos, pos);
   });
+  $('cadFiltroLocal').addEventListener('change', e => { filtroLocal = e.target.value; desenharItens(); });
   $('cadInativos').addEventListener('change', e => { verInativos = e.target.checked; desenharItens(); });
   $('cadColar').addEventListener('click', colarLista);
   alvo.querySelectorAll('[data-editar]').forEach(b => b.addEventListener('click', () => editarItem(b.dataset.editar)));
@@ -99,6 +130,7 @@ function editarItem(id) {
         <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal"
           value="${esc(mostrarNumero(i.pedido_reposicao))}" placeholder="quanto pedir"></label>
       </div>
+      ${caixasLocais(i.locais_contagem)}
       <p class="dc-sem">Quando a contagem der igual ou abaixo do mínimo, o item aparece na Reposição com a quantidade a pedir.</p>
       <div class="barra entre">
         <button class="btn${i.ativo === false ? '' : ' perigo'}" type="button" id="cadAtivo">${i.ativo === false ? 'Reativar' : 'Desativar'}</button>
@@ -115,8 +147,10 @@ function editarItem(id) {
       }
       const minimo = numOpc(f.get('minimo')), pedido = numOpc(f.get('pedido'));
       if (Number.isNaN(minimo) || Number.isNaN(pedido)) { aviso('Estoque mínimo e pedido: use só números (ex.: 10 ou 2,5).', true); return; }
+      const onde = lerLocais(e.target);
+      if (onde && !onde.length) { aviso('Marque pelo menos um estoque em "Contado em".', true); return; }
       await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
-        estoque_minimo: minimo, pedido_reposicao: pedido }));
+        estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde }));
       window.fecharModal(); desenharItens();
     });
     corpo.querySelector('#cadAtivo').addEventListener('click', async () => {
@@ -141,6 +175,7 @@ Papel A4 ; pct ; Papelaria</pre>
       <label class="campo">Unidade padrão <select id="colUni">${UNIDADES.map(u => `<option>${u}</option>`).join('')}</select></label>
       <label class="campo">Grupo padrão <select id="colGrupo">${GRUPOS.map(g => `<option>${g}</option>`).join('')}</select></label>
     </div>
+    ${caixasLocais(null)}
     <label class="campo plena">Lista <textarea id="colTexto" rows="9" placeholder="Cole aqui..."></textarea></label>
     <p class="dc-sem" id="colResumo"></p>
     <div class="barra fim"><button class="btn principal" type="button" id="colOk" disabled>Adicionar</button></div>`, corpo => {
@@ -171,8 +206,10 @@ Papel A4 ; pct ; Papelaria</pre>
     ['input', 'change'].forEach(ev => corpo.addEventListener(ev, ler));
     corpo.querySelector('#colOk').addEventListener('click', async () => {
       const novos = ler();
+      const onde = lerLocais(corpo);
+      if (onde && !onde.length) { aviso('Marque pelo menos um estoque em "Contado em".', true); return; }
       corpo.querySelector('#colOk').disabled = true;
-      for (const n of novos) await gravar('est_itens', n);
+      for (const n of novos) await gravar('est_itens', Object.assign(n, { locais_contagem: onde }));
       window.fecharModal();
       aviso(novos.length + ' itens adicionados.');
       desenharItens();

@@ -33,6 +33,8 @@ let mesLista = hojeISO().slice(0, 7);
 
 /** O estoque da Quebra Cocão no cadastro de almoxarifados. */
 const localQc = () => todos('est_locais').find(l => l.ativo !== false && semAcento(l.nome).includes('QUEBRA COCAO')) || null;
+/** Produto novo criado aqui só aparece na contagem mensal da Quebra Cocão. */
+const soQc = () => { const l = localQc(); return l ? [l.id] : null; };
 const movimentos = () => {
   const lc = localQc();
   return lc ? [...new Map(todos('est_movimentos').filter(m => m.local_id === lc.id).map(m => [m.id, m])).values()]
@@ -404,7 +406,7 @@ function cadastrarNaHora(nomes, sentido, form) {
     corpo.querySelector('#qnNao').onclick = window.fecharModal;
     corpo.querySelector('#qnSim').onclick = async () => {
       for (const nome of nomes) await gravar('est_itens', { nome: nome.replace(/\s+/g, ' '), unidade: corpo.querySelector('#qnUni').value,
-        grupo: corpo.querySelector('#qnGrupo').value, ativo: true });
+        grupo: corpo.querySelector('#qnGrupo').value, ativo: true, locais_contagem: soQc() });
       window.fecharModal();
       lancar(sentido, form);
     };
@@ -683,7 +685,8 @@ async function importar(lidos, progresso) {
     for (const p of r.produtos) nomes.set(semAcento(p.nome), p.nome);
     for (const m of r.movs) if (!nomes.has(semAcento(m.produto))) nomes.set(semAcento(m.produto), m.produto);
     for (const [k, nome] of nomes) if (!itens.has(k)) {
-      const it = { id: crypto.randomUUID(), nome, unidade: unidadeDe(nome, r.grupo), grupo: r.grupo, ativo: true };
+      const it = { id: crypto.randomUUID(), nome, unidade: unidadeDe(nome, r.grupo), grupo: r.grupo, ativo: true,
+        locais_contagem: soQc() };
       itens.set(k, it); novos.push(it);
     }
   }

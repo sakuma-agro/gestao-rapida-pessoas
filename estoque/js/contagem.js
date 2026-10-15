@@ -6,7 +6,7 @@
 // número é guardado no aparelho na hora e sobe quando há sinal. Fechada a
 // contagem, ela entra sozinha no Acerto, no lugar das abas "Físico".
 import {
-  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais, itensOrdenados,
+  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais, itensOrdenados, itensDoLocal,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
   temMinimo, precisaRepor, textoPedido,
@@ -69,11 +69,13 @@ function desenharContar() {
       <div class="vazio">Nenhum almoxarifado cadastrado. Cadastre em <strong>Cadastros › Almoxarifados</strong>.</div></div>`;
     return;
   }
-  const itens = itensOrdenados();
+  const itens = itensDoLocal(sel.localId);
   if (!itens.length) {
-    alvo.innerHTML = cabecalhoEscolha() + `<div class="cartao">
+    alvo.innerHTML = cabecalhoEscolha() + (itensOrdenados().length ? `<div class="cartao">
+      <div class="vazio">Nenhum item marcado para ser contado neste estoque. Marque em
+      <strong>Cadastros › Itens</strong> (campo "Contado em").</div></div>` : `<div class="cartao">
       <div class="vazio">Nenhum item cadastrado ainda. Cadastre os insumos em
-      <strong>Cadastros › Itens</strong> — dá para colar a lista inteira de uma vez.</div></div>`;
+      <strong>Cadastros › Itens</strong> — dá para colar a lista inteira de uma vez.</div></div>`);
     ligarEscolha();
     return;
   }
@@ -426,7 +428,7 @@ function atualizarConta() {
   if (lugar) {
     const linhas = new Map(linhasDe(c.id).map(l => [l.item_id, l]));
     const novo = document.createElement('div');
-    novo.innerHTML = chipsGrupos(itensOrdenados(), linhas);
+    novo.innerHTML = chipsGrupos(itensDoLocal(sel.localId), linhas);
     const n = novo.firstElementChild;
     const rolagem = chips ? chips.scrollLeft : 0;
     if (chips) chips.remove();
@@ -446,7 +448,7 @@ function confirmarFechar() {
   // o que estiver no campo e ainda não saiu dele também vale
   if (document.activeElement && document.activeElement.classList.contains('ct-qtd')) document.activeElement.blur();
   const c = contagem(sel.localId, sel.mes);
-  const itens = itensOrdenados();
+  const itens = itensDoLocal(sel.localId);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const branco = itens.filter(i => {
     const l = linhas.get(i.id);
@@ -513,7 +515,7 @@ function desenharAndamento() {
   const ls = locais();
   const linhas = ls.map(l => {
     const c = contagem(l.id, mesAndamento);
-    const p = c ? progresso(c.id) : { feitos: 0, total: itensOrdenados().length };
+    const p = c ? progresso(c.id) : { feitos: 0, total: itensDoLocal(l.id).length };
     const situ = !c ? '<span class="tag neutra">não começada</span>'
       : c.status === 'fechada' ? '<span class="tag ativo">fechada</span>'
         : '<span class="tag alerta">em andamento</span>';

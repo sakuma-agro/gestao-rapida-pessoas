@@ -26,6 +26,14 @@ const ordemGrupo = g => { const i = GRUPOS.indexOf(g); return i < 0 ? 99 : i; };
 export const itensOrdenados = (lista = ativos('est_itens')) => lista.slice()
   .sort((a, b) => ordemGrupo(a.grupo) - ordemGrupo(b.grupo) || porNome(a, b));
 
+/* ---- em quais estoques o item é contado ----
+   locais_contagem vazio/nulo = conta em todos (pedido dele, 15/10/2026). */
+export const contaNoLocal = (item, localId) => {
+  const l = item && item.locais_contagem;
+  return !Array.isArray(l) || !l.length || l.includes(localId);
+};
+export const itensDoLocal = localId => itensOrdenados().filter(i => contaNoLocal(i, localId));
+
 /* ---- mês ---- */
 export const mesAtual = () => {
   const d = new Date();
@@ -49,7 +57,8 @@ export const linhasDe = contagemId =>
 
 /** Quantos itens já têm quantidade numa contagem (dos itens ativos). */
 export function progresso(contagemId) {
-  const itens = ativos('est_itens');
+  const localId = String(contagemId).split(':')[0];
+  const itens = ativos('est_itens').filter(i => contaNoLocal(i, localId));
   const ids = new Set(itens.map(i => i.id));
   const feitos = linhasDe(contagemId)
     .filter(l => ids.has(l.item_id) && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '').length;
