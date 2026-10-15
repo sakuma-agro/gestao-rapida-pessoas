@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v215';
+const VERSAO = 'gr-v216';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -49,7 +49,9 @@ const ARQUIVOS = [
 
 self.addEventListener('install', ev => {
   ev.waitUntil(caches.open(VERSAO)
-    .then(c => c.addAll(ARQUIVOS))
+    // cache: 'reload' (15/10/2026): o GitHub Pages manda guardar cada arquivo
+    // por 10 min; sem isso a versão nova nascia com o JS da anterior.
+    .then(c => c.addAll(ARQUIVOS.map(u => new Request(u, { cache: 'reload' }))))
     .then(() => self.skipWaiting()));
 });
 
@@ -72,8 +74,14 @@ self.addEventListener('activate', ev => {
 const ESPERA_REDE_MS = 3000;
 const PESADO = /\/(vendor|img|icons)\/|\.(png|jpe?g|svg|ico|webp|woff2?|xlsx)$/i;
 
-function buscarEGuardar(cache, req) {
-  return fetch(req).then(resp => {
+function buscarEGuardar(cache, req, pesado = false) {
+  // Página, JS e CSS: sempre confere com o servidor (no-cache), para a
+  // publicação aparecer na hora e não depois dos 10 min do GitHub Pages.
+  // (uma navegação não pode ser copiada com opções: refaz pelo endereço)
+  const pedido = pesado ? req
+    : req.mode === 'navigate' ? new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+    : new Request(req, { cache: 'no-cache' });
+  return fetch(pedido).then(resp => {
     if (resp && resp.ok) cache.put(req, resp.clone()).catch(() => {});
     return resp;
   });
@@ -107,10 +115,10 @@ async function redeComPrazo(ev, cache, req) {
 async function copiaPrimeiro(ev, cache, req) {
   const guardado = await cache.match(req);
   if (guardado) {
-    ev.waitUntil(buscarEGuardar(cache, req).catch(() => {}));
+    ev.waitUntil(buscarEGuardar(cache, req, true).catch(() => {}));
     return guardado;
   }
-  try { return await buscarEGuardar(cache, req); }
+  try { return await buscarEGuardar(cache, req, true); }
   catch { return reserva(cache, req); }
 }
 
