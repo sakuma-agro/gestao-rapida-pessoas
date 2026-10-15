@@ -47,17 +47,37 @@ const json = (o: unknown, s = 200) =>
 class FalhaDrive extends Error { constructor(public codigo: string, msg?: string) { super(msg ?? codigo); } }
 
 /* ─────────── Google: token de acesso (renovado a cada ~55 min) ─────────── */
+// Autorização do Drive (15/10/2026): vem primeiro da tabela public.drive_autorizacao,
+// gravada pela função "drive-autorizar" (um clique, sem copiar token); se a tabela
+// estiver vazia, usa o segredo GOOGLE_REFRESH_TOKEN, como antes.
+const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+let renova = "", renovaAte = 0;
+async function refreshToken(): Promise<string> {
+  if (renova && Date.now() < renovaAte) return renova;
+  let t = "";
+  if (SERVICO) {
+    try {
+      const r = await fetch(`${URL_BASE}/rest/v1/drive_autorizacao?select=refresh_token&id=eq.1`,
+        { headers: { apikey: SERVICO, Authorization: `Bearer ${SERVICO}` } });
+      if (r.ok) t = (await r.json())?.[0]?.refresh_token ?? "";
+    } catch { /* sem banco: fica com o segredo */ }
+  }
+  renova = t || G_RENOVA; renovaAte = Date.now() + 5 * 60000;
+  return renova;
+}
 let token = "", tokenAte = 0;
 async function tokenGoogle(): Promise<string> {
-  if (!G_ID || !G_SEGREDO || !G_RENOVA) throw new FalhaDrive("drive-nao-configurado");
   if (token && Date.now() < tokenAte) return token;
+  const rt = await refreshToken();
+  if (!G_ID || !G_SEGREDO || !rt) throw new FalhaDrive("drive-nao-configurado");
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: G_ID, client_secret: G_SEGREDO, refresh_token: G_RENOVA, grant_type: "refresh_token" }),
+    body: new URLSearchParams({ client_id: G_ID, client_secret: G_SEGREDO, refresh_token: rt, grant_type: "refresh_token" }),
   });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) {
+    renovaAte = 0;
     // invalid_grant = autorização revogada ou expirada (app deixado "em teste" expira em 7 dias)
     throw new FalhaDrive(d.error === "invalid_grant" ? "drive-autorizacao-expirou" : "drive-token", JSON.stringify(d));
   }
