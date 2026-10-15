@@ -1372,3 +1372,24 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
   .sc-ponto.sc-treinamento.sc-feito{color:#4E7300}
   .sc-nav strong{min-width:0;font-size:16px}
 }
+
+/* ---------- faixa de submódulos compacta (15/10/2026, pedido dele) ----------
+   Ocupava muito espaço: ícone grande em cima e nome embaixo. Agora o ícone
+   fica ao lado do nome, numa linha só, como os botões dos módulos. */
+.aba2s.rb{padding:6px 16px 8px;gap:6px;align-items:center}
+.rb-grupo{flex-direction:row;align-items:stretch;border-radius:8px}
+.rb-botoes{padding:3px;gap:2px;align-items:center;justify-content:flex-start}
+.rb-btn,.rb-sub{width:auto;min-width:0;max-width:none;min-height:34px;flex-direction:row;align-items:center;justify-content:flex-start;
+  gap:6px;padding:4px 10px;font-size:13px;line-height:1.2;white-space:nowrap}
+.rb-btn svg{width:17px;height:17px}
+.rb-btn span{display:inline;-webkit-line-clamp:unset;overflow:visible;overflow-wrap:normal;hyphens:none}
+.rb-sub small{display:inline;font-size:10.5px;margin-left:2px}
+.rb-sub small::before{content:'· '}
+.rb-rotulo{display:flex;align-items:center;order:-1;padding:0 9px;font-size:10px;writing-mode:horizontal-tb;border-right:1px solid var(--linha)}
+.rb-voltar{flex-direction:row;gap:5px;min-height:34px;padding:4px 10px;font-size:13px;align-self:center}
+.rb-voltar svg{width:17px;height:17px}
+.rb-num{top:-5px;right:-4px}
+@media (max-width:640px){
+  .rb-btn,.rb-sub{min-height:32px;padding:3px 8px;font-size:12.5px}
+  .rb-btn svg{width:16px;height:16px}
+}
