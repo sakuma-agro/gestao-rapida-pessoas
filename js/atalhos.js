@@ -31,7 +31,7 @@ const PROPRIOS = {
   exPainel:      ['exame', 'Painel de exames'],
   trVenc:        ['treino', 'Treinamentos a vencer'],
   trPainel:      ['treino', 'Painel de treinamentos'],
-  trCert:        ['documento', 'Certificados de treinamento'],
+  sstCal:        ['calendario', 'Calendário do SST'],
   disc:          ['disc', 'Perfil DISC'],
   rhCargos:      ['cargo', 'Plano de cargos'],
   rhOrganograma: ['pessoas', 'Organograma'],

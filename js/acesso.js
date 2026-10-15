@@ -72,14 +72,16 @@ export const MODULOS = [
       ['trPainel', 'Painel'],
       ['trVenc', 'Vencimentos'],
       ['trTipos', 'Tipos e periodicidade'],
-      /* Certificados (15/10/2026): a lista dos treinamentos com filtro por
-         funcionário e o botão de ver o certificado anexado — js/sst.js. */
-      ['trCert', 'Certificados'],
     ] },
     /* Acidentes e CAT (08/10/2026): js/sst-acidentes.js, tabela sst_acidentes. */
     { id: 'acidentes', nome: 'Acidentes', telas: [
       ['acPainel', 'Painel'],
       ['acLista', 'Registros e CAT'],
+    ] },
+    /* Calendário (15/10/2026): vencimentos e realizados de exames e
+       treinamentos num mês só — js/sst-calendario.js. Só consulta. */
+    { id: 'sstCalendario', nome: 'Calendário', telas: [
+      ['sstCal', 'Calendário'],
     ] },
   ] },
   { id: 'rh', nome: 'RH', subs: [

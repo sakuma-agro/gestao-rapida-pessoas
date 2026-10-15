@@ -71,11 +71,13 @@ const RECEITAS = {
     tabelaRegs: 'sst_exames',
     tela: 'exVenc', telaTipos: 'exTipos', telaPainel: 'exPainel',
     semNenhum: 'sem nenhum exame lançado',
+    rotuloAnexo: 'ASO',
     tituloFolha: 'PAINEL DE ALERTA · EXAMES OCUPACIONAIS',
     completo: false,                   // exame guarda só tipo, data e vencimento
     el: {
       pCards: 'exPnCards', pAlerta: 'exPnAlerta', pTipos: 'exPnTipos', pSemNada: 'exPnSemNada',
       pSaida: 'exPnSaida', pImprimir: 'bImprimirPnEx', pZoom: 'zoomPnEx', pZoomV: 'zoomVPnEx',
+      fFunc: 'exFiltroFunc', fAnexo: 'exFiltroAnexo',
       busca: 'exBusca', fTipo: 'exFiltroTipo', fStatus: 'exFiltroStatus', fSit: 'exFiltroSit',
       tPainel: 'exTipoPn', resumo: 'exResumo', historico: 'exHistorico', tabela: 'exTabela', semNada: 'exSemNada',
       saida: 'exSaida', zoom: 'zoomEx', zoomV: 'zoomVEx', imprimir: 'bImprimirEx',
@@ -98,11 +100,13 @@ const RECEITAS = {
     tabelaRegs: 'sst_treinamentos',
     tela: 'trVenc', telaTipos: 'trTipos', telaPainel: 'trPainel',
     semNenhum: 'sem nenhum treinamento lançado',
+    rotuloAnexo: 'Certificado',
     tituloFolha: 'PAINEL DE ALERTA · TREINAMENTOS',
     completo: true,                    // treinamento guarda carga, instrutor e observação
     el: {
       pCards: 'trPnCards', pAlerta: 'trPnAlerta', pTipos: 'trPnTipos', pSemNada: 'trPnSemNada',
       pSaida: 'trPnSaida', pImprimir: 'bImprimirPnTr', pZoom: 'zoomPnTr', pZoomV: 'zoomVPnTr',
+      fFunc: 'trFiltroFunc', fAnexo: 'trFiltroAnexo',
       busca: 'trBusca', fTipo: 'trFiltroTipo', fStatus: 'trFiltroStatus', fSit: 'trFiltroSit',
       tPainel: 'trTipoPn', resumo: 'trResumo', historico: 'trHistorico', tabela: 'trTabela', semNada: 'trSemNada',
       saida: 'trSaida', zoom: 'zoomTr', zoomV: 'zoomVTr', imprimir: 'bImprimirTr',
@@ -122,6 +126,13 @@ const RECEITAS = {
 
 /* =============== dados =============== */
 const S = { exame: { tipos: [], regs: [] }, treinamento: { tipos: [], regs: [] }, carregado: false };
+/* Quem tem anexo (15/10/2026): ids dos lançamentos com certificado ou ASO no
+   Drive. Certificados virou coluna da tela de Vencimentos, a pedido dele. */
+const donos = { exame: new Set(), treinamento: new Set() };
+const temAnexo = (r, x) => donos[r.id].has(String(x.id));
+async function lerDonos(r) {
+  try { donos[r.id] = await donosComArquivo('pessoas', r.id); } catch { /* sem rede: fica o que havia */ }
+}
 const editando = { exame: null, treinamento: null };
 const editandoTipo = { exame: null, treinamento: null };
 
@@ -172,7 +183,6 @@ function grupoDe(r, tipoId) {
 
 /* =============== abrir uma tela =============== */
 export async function abrirSst(tela) {
-  if (tela === 'trCert') return abrirCertificados();
   const r = Object.values(RECEITAS).find(x =>
     x.tela === tela || x.telaTipos === tela || x.telaPainel === tela);
   if (!r) return;
@@ -190,7 +200,7 @@ export async function abrirSst(tela) {
   }
   if (tela === r.telaTipos) desenharTipos(r);
   else if (tela === r.telaPainel) desenharPainel(r);
-  else desenharVenc(r);
+  else { desenharVenc(r); await lerDonos(r); desenharVenc(r); }
 }
 
 /* =============== cadastro de tipos =============== */
@@ -288,11 +298,14 @@ function visiveis(r) {
   const status = $(r.el.fStatus).value;
   const sit = $(r.el.fSit).value;
   const historico = $(r.el.historico).checked;
+  const fid = $(r.el.fFunc).value;
+  const anexo = $(r.el.fAnexo).value;
 
   let regs = S[r.id].regs.filter(x => {
     const f = funcionario(x.funcionario_id);
     if (!f) return false;
-    if (sit && f.situacao !== sit) return false;
+    if (fid && x.funcionario_id !== fid) return false;
+    if (sit && f.situacao !== sit && x.funcionario_id !== fid) return false;
     if (tipo && grupoDe(r, x.tipo_id) !== grupoDe(r, tipo)) return false;
     if (q && !f.nome.toLowerCase().includes(q)) return false;
     return true;
@@ -309,7 +322,8 @@ function visiveis(r) {
     });
   }
 
-  const comSit = regs.map(x => ({ ...x, sit: situacaoDe(x.vence) }));
+  const comSit = regs.map(x => ({ ...x, sit: situacaoDe(x.vence) }))
+    .filter(x => !anexo || (anexo === 'com') === temAnexo(r, x));
   const filtradas = status ? comSit.filter(x => x.sit.faixa === status) : comSit;
 
   // primeiro o que está mais perto de vencer
@@ -463,6 +477,15 @@ function desenharVenc(r) {
     S[r.id].tipos.map(t => `<option value="${t.id}">${esc(t.nome)}${t.ativo === false ? ' (inativo)' : ''}</option>`).join('');
   sel.value = antes;
 
+  // funcionário: só quem tem lançamento; mantém o escolhido
+  const selF = $(r.el.fFunc), antesF = selF.value, sitF = $(r.el.fSit).value;
+  const comReg = new Set(S[r.id].regs.map(x => x.funcionario_id));
+  selF.innerHTML = '<option value="">Todos</option>' + estado.funcionarios
+    .filter(f => comReg.has(f.id) && (!sitF || f.situacao === sitF || f.id === antesF))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map(f => `<option value="${f.id}">${esc(f.nome)}</option>`).join('');
+  selF.value = antesF;
+
   const linhas = visiveis(r);
   const tipoSel = sel.value;
 
@@ -483,7 +506,7 @@ function desenharVenc(r) {
       <th>Funcionário</th><th>${esc(r.rotuloTipo)}</th>
       <th class="ce">Realizado</th><th class="ce">Vence</th>
       ${r.completo ? '<th class="ce">Carga</th><th>Instrutor</th>' : ''}
-      <th class="ce">Situação</th><th></th>
+      <th class="ce">Situação</th><th class="ce">${esc(r.rotuloAnexo)}</th><th></th>
     </tr></thead><tbody>
     ${linhas.map(x => {
       const f = funcionario(x.funcionario_id) || {};
@@ -497,6 +520,9 @@ function desenharVenc(r) {
         <td>${esc(x.instrutor || '—')}</td>` : ''}
         <td class="ce"><span class="tag ${x.sit.cor}">${esc(x.sit.rotulo)}</span>
           ${etiquetaConferencia(r, x, f)}</td>
+        <td class="ce">${temAnexo(r, x)
+          ? `<button class="btn mini principal" type="button" data-anexo="${x.id}">Visualizar</button>`
+          : `<button class="btn mini" type="button" data-reg="${x.id}" title="Abre o lançamento para anexar">Anexar</button>`}</td>
         <td class="ce"><button class="btn mini" data-reg="${x.id}">Editar</button></td>
       </tr>`;
     }).join('')}</tbody></table>`
@@ -504,6 +530,8 @@ function desenharVenc(r) {
 
   $(r.el.tabela).querySelectorAll('[data-reg]').forEach(b =>
     b.addEventListener('click', () => abrirReg(r, b.dataset.reg)));
+  $(r.el.tabela).querySelectorAll('[data-anexo]').forEach(b =>
+    b.addEventListener('click', () => verAnexo(r, b.dataset.anexo, b)));
 
   // quem ainda não tem nenhum lançamento (com tipo escolhido, a lista de quem
   // falta é a do tipo, e mora no painel dele)
@@ -887,7 +915,7 @@ function ligarReceita(r, avisar) {
   // filtros
   // trocar de tipo fecha a lista de "quem não tem" do tipo anterior
   $(r.el.fTipo).addEventListener('input', () => { $(r.el.tPainel).dataset.sem = ''; });
-  [r.el.busca, r.el.fTipo, r.el.fStatus, r.el.fSit, r.el.historico].forEach(id =>
+  [r.el.busca, r.el.fTipo, r.el.fStatus, r.el.fSit, r.el.historico, r.el.fFunc, r.el.fAnexo].forEach(id =>
     $(id).addEventListener('input', () => desenharVenc(r)));
 
   // painel
@@ -959,7 +987,7 @@ function ligarReceita(r, avisar) {
     $(r.el.dlg).close();
     desenharVenc(r);
     desenharPainel(r);
-    if (r.id === 'treinamento') redesenharCertificados();
+    lerDonos(r).then(() => { if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r); });
     avisar(`${r.id === 'exame' ? 'Exame' : 'Treinamento'} salvo.`);
   });
 
@@ -973,7 +1001,7 @@ function ligarReceita(r, avisar) {
     $(r.el.dlg).close();
     desenharVenc(r);
     desenharPainel(r);
-    if (r.id === 'treinamento') redesenharCertificados();
+    lerDonos(r).then(() => { if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r); });
   });
 
   /* ---- salvar tipo ---- */
@@ -1029,7 +1057,8 @@ function mostrarErro(id, texto) {
 
 export function ligarSst(avisar = () => {}) {
   Object.values(RECEITAS).forEach(r => ligarReceita(r, avisar));
-  ligarCertificados();
+  aoMudarArquivos(() => Object.values(RECEITAS).forEach(r =>
+    lerDonos(r).then(() => { if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r); })));
 
   // o diálogo de escolher a pessoa é um só para as duas telas
   $('formFichaSst').addEventListener('submit', ev => {
@@ -1042,96 +1071,14 @@ export function ligarSst(avisar = () => {}) {
   });
 }
 
-/* =============== Certificados (15/10/2026) ===============
-   SST › Treinamentos › Certificados, a pedido dele: a mesma lista dos
-   treinamentos, com filtro por funcionário, e o botão Visualizar certificado.
-   Colunas: funcionário, treinamento, data de emissão e o certificado.
-   O certificado é o anexo do lançamento (tabela arquivos, área pessoas, tipo
-   treinamento, dono = id do lançamento), guardado no Google Drive. Como o
-   lançamento não tem campo próprio de emissão, a data de emissão é a data de
-   realização do treinamento. */
-const cert = { func: '', tipo: '', so: '', sit: 'ATIVO', donos: new Set() };
-
-async function abrirCertificados() {
-  const alvo = $('trCertLista');
-  if (!S.carregado) {
-    alvo.innerHTML = '<div class="vazio">Carregando…</div>';
-    try { await carregarSst(); }
-    catch (e) { alvo.innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`; return; }
-  }
-  preencherFiltrosCert();
-  desenharCertificados();
-  try { cert.donos = await donosComArquivo('pessoas', 'treinamento'); } catch { /* sem rede: fica o que havia */ }
-  desenharCertificados();
-}
-
-function redesenharCertificados() {
-  if ($('telaTrCert') && !$('telaTrCert').hidden) abrirCertificados();
-}
-
-function preencherFiltrosCert() {
-  const r = RECEITAS.treinamento;
-  const comTreino = new Set(S.treinamento.regs.map(x => x.funcionario_id));
-  const gente = estado.funcionarios
-    .filter(f => comTreino.has(f.id) && (!cert.sit || (f.situacao || 'ATIVO') === cert.sit || f.id === cert.func))
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  $('tcFunc').innerHTML = '<option value="">Todos os funcionários</option>' +
-    gente.map(f => `<option value="${f.id}"${f.id === cert.func ? ' selected' : ''}>${esc(f.nome)}</option>`).join('');
-  const tipos = S[r.id].tipos.filter(t => S.treinamento.regs.some(x => x.tipo_id === t.id))
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  $('tcTipo').innerHTML = '<option value="">Todos os treinamentos</option>' +
-    tipos.map(t => `<option value="${t.id}"${t.id === cert.tipo ? ' selected' : ''}>${esc(t.nome)}</option>`).join('');
-  $('tcSo').value = cert.so;
-  $('tcSit').value = cert.sit;
-}
-
-function linhasCert() {
-  const r = RECEITAS.treinamento;
-  return S.treinamento.regs
-    .map(x => ({ x, f: funcionario(x.funcionario_id), t: tipoDe(r, x.tipo_id), tem: cert.donos.has(String(x.id)) }))
-    .filter(({ x, f, tem }) => f &&
-      (!cert.func || x.funcionario_id === cert.func) &&
-      (!cert.tipo || x.tipo_id === cert.tipo) &&
-      (!cert.sit || (f.situacao || 'ATIVO') === cert.sit || x.funcionario_id === cert.func) &&
-      (cert.so !== 'com' || tem) && (cert.so !== 'sem' || !tem))
-    .sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR') ||
-      String(b.x.realizado).localeCompare(String(a.x.realizado)));
-}
-
-function desenharCertificados() {
-  const alvo = $('trCertLista');
-  if (!alvo) return;
-  const l = linhasCert();
-  const com = l.filter(y => y.tem).length;
-  const anexar = podeTela('trVenc');
-  $('tcResumo').innerHTML = `<span class="tag">${l.length} treinamento(s)</span>
-    <span class="tag ativo">${com} com certificado</span>
-    ${l.length - com ? `<span class="tag alerta">${l.length - com} sem certificado</span>` : ''}`;
-  alvo.innerHTML = l.length ? `
-    <div class="tc-rolagem"><table class="dc-planilha tc-tabela">
-      <thead><tr><th>Funcionário</th><th>Treinamento</th><th>Data de emissão</th><th>Certificado</th></tr></thead>
-      <tbody>${l.map(({ x, f, t, tem }) => `<tr>
-        <td><b>${esc(f.nome)}</b>${(f.situacao || 'ATIVO') !== 'ATIVO' ? ' <span class="tag">inativo</span>' : ''}</td>
-        <td>${esc(t?.nome || '—')}</td>
-        <td>${dataBr(x.realizado)}</td>
-        <td class="tc-acao">${tem
-          ? `<button class="btn mini principal" type="button" data-tc-ver="${x.id}">Visualizar certificado</button>`
-          : `<span class="tc-sem">Sem certificado</span>${anexar ? ` <button class="btn mini" type="button" data-tc-anexar="${x.id}">Anexar</button>` : ''}`}</td>
-      </tr>`).join('')}</tbody></table></div>`
-    : '<div class="vazio">Nenhum treinamento neste filtro.</div>';
-
-  alvo.querySelectorAll('[data-tc-ver]').forEach(b => b.addEventListener('click', () => verCertificado(b.dataset.tcVer, b)));
-  alvo.querySelectorAll('[data-tc-anexar]').forEach(b => b.addEventListener('click', () =>
-    abrirReg(RECEITAS.treinamento, b.dataset.tcAnexar)));
-}
-
-/* Um lançamento pode ter mais de um arquivo: um só abre direto; mais de um
-   abre uma listinha para escolher. */
-async function verCertificado(id, botao) {
+/* =============== ver o anexo (15/10/2026) ===============
+   Um lançamento pode ter mais de um arquivo: um só abre direto; mais de um
+   abre uma listinha logo abaixo do botão para escolher. */
+async function verAnexo(r, id, botao) {
   let lista = [];
-  try { lista = await listarArquivos('pessoas', 'treinamento', id); }
-  catch (e) { alert('Não consegui ler o certificado: ' + (e.message || e)); return; }
-  if (!lista.length) { alert('Este treinamento ainda não tem certificado anexado.'); return; }
+  try { lista = await listarArquivos('pessoas', r.id, id); }
+  catch (e) { alert('Não consegui ler o arquivo: ' + (e.message || e)); return; }
+  if (!lista.length) { alert(`Este lançamento ainda não tem ${r.rotuloAnexo.toLowerCase()} anexado.`); return; }
   if (lista.length === 1) return abrirArquivo(lista[0].chave);
   document.querySelector('.tc-escolha')?.remove();
   const caixa = document.createElement('div');
@@ -1145,18 +1092,12 @@ async function verCertificado(id, botao) {
   }));
 }
 
-export function ligarCertificados() {
-  const muda = (id, k) => $(id).addEventListener('change', ev => {
-    cert[k] = ev.target.value;
-    if (k === 'sit') preencherFiltrosCert();
-    desenharCertificados();
-  });
-  muda('tcFunc', 'func'); muda('tcTipo', 'tipo'); muda('tcSo', 'so'); muda('tcSit', 'sit');
-  $('tcLimpar').addEventListener('click', () => {
-    Object.assign(cert, { func: '', tipo: '', so: '', sit: 'ATIVO' });
-    preencherFiltrosCert(); desenharCertificados();
-  });
-  aoMudarArquivos(() => {
-    donosComArquivo('pessoas', 'treinamento').then(d => { cert.donos = d; if (!$('telaTrCert').hidden) desenharCertificados(); }).catch(() => {});
-  });
-}
+/* Para o Calendário do SST (js/sst-calendario.js). */
+export { carregarSst as garantirSst };
+export const sstCarregado = () => S.carregado;
+export const lancamentosSst = () => ({ exame: S.exame, treinamento: S.treinamento });
+export const grupoSst = (kind, tipoId) => grupoDe(RECEITAS[kind], tipoId);
+export const anexoSst = (kind, id) => donos[kind].has(String(id));
+export async function lerAnexosSst() { await Promise.all(Object.values(RECEITAS).map(lerDonos)); }
+export const abrirLancamentoSst = (kind, id) => abrirReg(RECEITAS[kind], id);
+export const verAnexoSst = (kind, id, botao) => verAnexo(RECEITAS[kind], id, botao);

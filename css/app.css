@@ -1314,3 +1314,52 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .tc-acao{white-space:nowrap;position:relative}
 .tc-sem{color:#8A8D86;font-size:13px}
 .tc-escolha{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+
+/* SST › Calendário (15/10/2026) — exame em marrom, treinamento em verde;
+   realizado em contorno, vencido em vermelho-tijolo */
+.sc-nav{display:flex;align-items:center;gap:10px;margin:14px 0 6px}
+.sc-nav strong{font-size:18px;text-transform:capitalize;min-width:170px;text-align:center}
+.sc-filtros{margin-top:6px}
+.sc-marcas{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:10px 0}
+.sc-marca{display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer}
+.sc-marca.sc-exame{color:#744F28;font-weight:600}
+.sc-marca.sc-treinamento{color:#4E7300;font-weight:600}
+.sc-sep{width:1px;height:18px;background:#DADDD2}
+.sc-resumo{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.sc-atrasados{cursor:pointer;border:1px solid #E0B4A8;background:#FBEDE8;color:#8E3B26;border-radius:8px;padding:4px 10px;font:inherit}
+.sc-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.sc-sem{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#51534A;text-align:center;padding:4px 0}
+.sc-dia{min-height:92px;border:1px solid #E3E6DA;border-radius:8px;background:var(--card,#fff);padding:4px 5px;text-align:left;
+  display:flex;flex-direction:column;gap:3px;cursor:pointer;font:inherit;color:inherit;overflow:hidden}
+.sc-dia:hover{border-color:#84BD00}
+.sc-dia:focus-visible{outline:2px solid #84BD00;outline-offset:1px}
+.sc-fora{border:none;background:transparent;cursor:default}
+.sc-num{font-size:12px;font-weight:700;color:#51534A}
+.sc-hoje .sc-num{background:#84BD00;color:#fff;border-radius:10px;padding:0 6px;align-self:flex-start}
+.sc-sel{border:2px solid #744F28;padding:3px 4px}
+.sc-chips{display:flex;flex-direction:column;gap:2px}
+.sc-chip{display:inline-block;font-size:11px;line-height:1.35;padding:1px 6px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.sc-chip.sc-exame.sc-vence{background:#F3E9DC;color:#744F28}
+.sc-chip.sc-treinamento.sc-vence{background:#E6F2C8;color:#3F5E00}
+.sc-chip.sc-feito{background:transparent;border:1px dashed currentColor}
+.sc-chip.sc-exame.sc-feito{color:#744F28}
+.sc-chip.sc-treinamento.sc-feito{color:#4E7300}
+.sc-chip.sc-atraso{background:#FBEDE8;color:#8E3B26}
+.sc-mais{font-size:11px;color:#8A8D86;padding-left:4px}
+.sc-pontos{display:none}
+.sc-legenda{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0}
+.sc-dialista{margin-top:16px;border-top:1px solid #E3E6DA;padding-top:12px}
+.sc-dialista h3{margin:0 0 8px}
+.sc-acoes{white-space:nowrap}
+@media (max-width:700px){
+  .sc-dia{min-height:54px;padding:3px}
+  .sc-chips{display:none}
+  .sc-pontos{display:flex;flex-wrap:wrap;gap:2px}
+  .sc-ponto{font-style:normal;font-size:10px;font-weight:700;min-width:16px;text-align:center;border-radius:8px;padding:0 3px}
+  .sc-ponto.sc-exame.sc-vence{background:#F3E9DC;color:#744F28}
+  .sc-ponto.sc-treinamento.sc-vence{background:#E6F2C8;color:#3F5E00}
+  .sc-ponto.sc-feito{border:1px dashed currentColor}
+  .sc-ponto.sc-exame.sc-feito{color:#744F28}
+  .sc-ponto.sc-treinamento.sc-feito{color:#4E7300}
+  .sc-nav strong{min-width:0;font-size:16px}
+}
