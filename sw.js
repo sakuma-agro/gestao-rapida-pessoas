@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v206';
+const VERSAO = 'gr-v207';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -59,27 +59,67 @@ self.addEventListener('activate', ev => {
     .then(() => self.clients.claim()));
 });
 
+/* Estratégia por tipo (15/10/2026) — antes era "rede primeiro" sem limite
+   de tempo, e com sinal fraco cada arquivo ficava esperando a rede mesmo já
+   guardado.
+   - Página, JS e CSS do app: rede primeiro, mas desiste em 3 s e usa a cópia
+     guardada; a resposta que chegar depois ainda atualiza a cópia. Continua
+     rede primeiro (e não cópia primeiro) para a página nova nunca abrir com o
+     JS da versão anterior logo depois de uma publicação.
+   - Bibliotecas (vendor/), imagens e ícones: abrem na hora pela cópia e a
+     rede é conferida por trás. São os arquivos pesados e mudam raramente.
+   - Supabase e outros endereços: nunca passam por aqui. */
+const ESPERA_REDE_MS = 3000;
+const PESADO = /\/(vendor|img|icons)\/|\.(png|jpe?g|svg|ico|webp|woff2?|xlsx)$/i;
+
+function buscarEGuardar(cache, req) {
+  return fetch(req).then(resp => {
+    if (resp && resp.ok) cache.put(req, resp.clone()).catch(() => {});
+    return resp;
+  });
+}
+
+async function reserva(cache, req) {
+  const guardado = await cache.match(req, { ignoreSearch: true });
+  if (guardado) return guardado;
+  // navegação sem rede e sem cópia exata: entrega a tela inicial
+  if (req.mode === 'navigate') {
+    const inicial = await cache.match('./index.html');
+    if (inicial) return inicial;
+  }
+  return Response.error();
+}
+
+async function redeComPrazo(ev, cache, req) {
+  const rede = buscarEGuardar(cache, req);
+  ev.waitUntil(rede.catch(() => {}));
+  const tempo = new Promise(ok => setTimeout(() => ok(null), ESPERA_REDE_MS));
+  try {
+    const resp = await Promise.race([rede, tempo]);
+    if (resp) return resp;
+  } catch { /* sem rede: cai na reserva */ }
+  const guardado = await cache.match(req, { ignoreSearch: true });
+  if (guardado) return guardado;
+  // nada guardado: espera a rede até o fim
+  try { return await rede; } catch { return reserva(cache, req); }
+}
+
+async function copiaPrimeiro(ev, cache, req) {
+  const guardado = await cache.match(req);
+  if (guardado) {
+    ev.waitUntil(buscarEGuardar(cache, req).catch(() => {}));
+    return guardado;
+  }
+  try { return await buscarEGuardar(cache, req); }
+  catch { return reserva(cache, req); }
+}
+
 self.addEventListener('fetch', ev => {
   const req = ev.request;
   if (req.method !== 'GET') return;
   // chamadas ao Supabase nunca passam pelo cache
   if (new URL(req.url).origin !== self.location.origin) return;
 
-  ev.respondWith((async () => {
-    const cache = await caches.open(VERSAO);
-    try {
-      const resp = await fetch(req);
-      if (resp && resp.ok) cache.put(req, resp.clone()).catch(() => {});
-      return resp;
-    } catch {
-      const guardado = await cache.match(req, { ignoreSearch: true });
-      if (guardado) return guardado;
-      // navegação sem rede e sem cópia exata: entrega a tela inicial
-      if (req.mode === 'navigate') {
-        const inicial = await cache.match('./index.html');
-        if (inicial) return inicial;
-      }
-      return Response.error();
-    }
-  })());
+  ev.respondWith(caches.open(VERSAO).then(cache =>
+    PESADO.test(new URL(req.url).pathname) ? copiaPrimeiro(ev, cache, req) : redeComPrazo(ev, cache, req)));
 });

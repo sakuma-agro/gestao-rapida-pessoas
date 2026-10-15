@@ -342,15 +342,16 @@ function traduzirErro(e) {
 async function carregarTudo() {
   const recado = [];
 
-  try {
-    await db.sincronizar();
-  } catch (e) {
+  /* Abertura em paralelo (15/10/2026). Antes era uma fila: cadastros
+     básicos → permissões → atalhos → DP. Os básicos (funcionários, EPIs,
+     fichas, modelo) não dependem de nada e vão logo; o DP precisa saber as
+     permissões (o que a pessoa vê e o recorte de DP), então espera só elas. */
+  const basicos = db.sincronizar().catch(e => {
     recado.push('Usando os dados salvos neste aparelho. ' + traduzirErro(e));
-  }
+  });
 
   try {
     await carregarAcesso();
-    await carregarAtalhos();
   } catch (e) {
     recado.push('Não consegui ler suas permissões: ' + (e.message || e));
   }
@@ -360,9 +361,15 @@ async function carregarTudo() {
      que a pessoa vá direto para Funcionários, sem abrir o DP. */
   /* Quem tem só Cadastros também precisa delas: sem isso as listas de
      unidade, setor e função do cadastro de funcionário abrem vazias. */
-  if (pode('jornada') || pode('pessoas')) {
-    try { await jd.carregar(); } catch { /* sem rede: usa o que está no cache */ }
-  }
+  await Promise.all([
+    basicos,
+    carregarAtalhos().catch(e => {
+      recado.push('Não consegui ler suas permissões: ' + (e.message || e));
+    }),
+    (pode('jornada') || pode('pessoas'))
+      ? jd.carregar().catch(() => { /* sem rede: usa o que está no cache */ })
+      : null,
+  ]);
 
   montarMenu(abrirAba);
   // Primeira tela: a escolha das áreas (ou a área pedida no endereço).

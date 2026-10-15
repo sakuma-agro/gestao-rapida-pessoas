@@ -171,54 +171,43 @@ export async function carregar(competencia = competenciaAtual()) {
   dados.competencias = respostas[cadastros.length + 1].data || [];
   dados.ocorrencias  = respostas[cadastros.length + 2].data || [];
 
-  // Apurações dos boletins que vieram
+  // Daqui para baixo nada depende de nada, a não ser as apurações (precisam
+  // dos boletins) e o apoio de férias (precisa dos tipos e dos gozos).
+  // Antes eram ~8 idas ao servidor em fila; agora vão todas juntas
+  // (15/10/2026). Cada parte que falhar continua não derrubando o DP.
+  const lerTabela = async k => {
+    const r = await c.from(TABELAS[k]).select('*');
+    if (!r.error) dados[k] = r.data || [];
+    else dados[k] = dados[k] || [];
+  };
   const ids = dados.boletins.map(b => b.id);
-  if (ids.length) {
-    const a = await c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids);
-    if (a.error) throw a.error;
-    dados.apuracoes = a.data || [];
-  } else {
-    dados.apuracoes = [];
-  }
-
-  // Tipos de hora extra especial: tabela nova (25/09/2026). Se falhar,
-  // o DP abre do mesmo jeito — só o seletor fica vazio.
-  const he = await c.from(TABELAS.tiposHe).select('*');
-  dados.tiposHe = he.error ? (dados.tiposHe || []) : (he.data || []);
-
-  // Empréstimos: pequenos, vêm inteiros — o saldo depende de todo o histórico.
-  // Tabela que ainda não existe (ou sem permissão) não derruba o DP.
-  const extras = await Promise.all(['emprestimos', 'abatimentos', 'salarios']
-    .map(k => c.from(TABELAS[k]).select('*')));
-  ['emprestimos', 'abatimentos', 'salarios'].forEach((k, i) => {
-    dados[k] = extras[i].error ? (dados[k] || []) : (extras[i].data || []);
-  });
-
-  // Férias e afastamentos: pequenos, vêm inteiros, pelo mesmo motivo.
   const FER = ['afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas'];
-  const fer = await Promise.all(FER.map(k => c.from(TABELAS[k]).select('*')));
-  FER.forEach((k, i) => { dados[k] = fer[i].error ? (dados[k] || []) : (fer[i].data || []); });
-  try { await carregarApoioFerias(); } catch { /* sem rede: fica o que estava no cache */ }
-
-  // Boletins diários: o mês da competência e as pendências em aberto (painel).
-  try {
-    const [a, m] = competencia.split('-').map(Number);
-    await carregarEntregas(competencia, new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10));
-  } catch { /* tabela sem permissão ou sem rede: o DP abre mesmo assim */ }
-  // Folha, holerite e recibo: tabela pequena, vem inteira (painel do DP).
-  try { await carregarDocs(); } catch { /* idem */ }
-  // Vínculos dos indicadores: pequenos, vêm inteiros. Sem permissão ou
-  // tabela ainda ausente, o cadastro abre do mesmo jeito.
-  // Horas guardadas: tabela pequena, vem inteira — o saldo é de todo o histórico.
-  const bh = await c.from(TABELAS.banco).select('*').like('chave', 'bh|%');
-  dados.banco = bh.error ? (dados.banco || []) : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave }));
-  // Ticket: tabelas pequenas, vêm inteiras. Sem tabela ou sem rede, o DP abre igual.
-  const TK = ['ticketMes', 'ticketEmissoes'];
-  const tk = await Promise.all(TK.map(k => c.from(TABELAS[k]).select('*')));
-  TK.forEach((k, i) => { dados[k] = tk[i].error ? (dados[k] || []) : (tk[i].data || []); });
-  const IND = ['indVinculos', 'tiposDeslig'];
-  const ind = await Promise.all(IND.map(k => c.from(TABELAS[k]).select('*')));
-  IND.forEach((k, i) => { dados[k] = ind[i].error ? (dados[k] || []) : (ind[i].data || []); });
+  const [a, m] = competencia.split('-').map(Number);
+  const [apur] = await Promise.all([
+    ids.length ? c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids)
+               : Promise.resolve({ data: [], error: null }),
+    // Tipos de hora extra especial (25/09/2026): se falhar, só o seletor fica vazio.
+    lerTabela('tiposHe'),
+    // Empréstimos: pequenos, vêm inteiros — o saldo depende de todo o histórico.
+    ...['emprestimos', 'abatimentos', 'salarios'].map(k => lerTabela(k)),
+    // Férias e afastamentos: inteiros pelo mesmo motivo; o apoio vem logo depois.
+    Promise.all(FER.map(k => lerTabela(k)))
+      .then(() => carregarApoioFerias()).catch(() => { /* sem rede: fica o cache */ }),
+    // Boletins diários: o mês da competência e as pendências em aberto (painel).
+    carregarEntregas(competencia, new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10))
+      .catch(() => { /* sem permissão ou sem rede: o DP abre mesmo assim */ }),
+    // Folha, holerite e recibo: tabela pequena, vem inteira (painel do DP).
+    carregarDocs().catch(() => {}),
+    // Horas guardadas: o saldo é de todo o histórico.
+    c.from(TABELAS.banco).select('*').like('chave', 'bh|%').then(bh => {
+      dados.banco = bh.error ? (dados.banco || [])
+        : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave }));
+    }),
+    // Ticket e vínculos dos indicadores: pequenos, vêm inteiros.
+    ...['ticketMes', 'ticketEmissoes', 'indVinculos', 'tiposDeslig'].map(k => lerTabela(k)),
+  ]);
+  if (apur.error) throw apur.error;
+  dados.apuracoes = apur.data || [];
 
   recortar();
   dados.carregado = true;
@@ -249,16 +238,19 @@ export async function carregarApoioFerias() {
 
   const gozos = (dados.feriasGozos || []).filter(g => g.situacao === 'lancado');
   if (!gozos.length) { dados.bolFerias = []; recortar(); salvarCache(); return; }
-  // Uma consulta por férias lançada: cada uma traz no máximo ~30 boletins, e
-  // assim nenhuma resposta bate no limite de 1.000 linhas do Supabase.
-  const rs = await Promise.all(gozos.map(g => c.from(TABELAS.boletins)
+  // Uma consulta só (15/10/2026) — antes era uma por férias lançada. Vem tudo
+  // entre a primeira e a última férias dos funcionários envolvidos, em páginas
+  // de 1.000, e o recorte de cada período é feito aqui.
+  const ini = gozos.reduce((m, g) => g.data_ini < m ? g.data_ini : m, gozos[0].data_ini);
+  const fim = gozos.reduce((m, g) => g.data_fim > m ? g.data_fim : m, gozos[0].data_fim);
+  const funcs = [...new Set(gozos.map(g => g.funcionario_id))];
+  const todosBol = await todas(() => c.from(TABELAS.boletins)
     .select('id,funcionario_id,data_fato,competencia,situacao')
-    .eq('funcionario_id', g.funcionario_id).gte('data_fato', g.data_ini).lte('data_fato', g.data_fim)));
-  const erro = rs.find(r => r.error)?.error;
-  if (erro) throw erro;
-  const vistos = new Set();
-  dados.bolFerias = rs.flatMap(r => r.data || [])
-    .filter(b => b.situacao !== 'cancelado' && !vistos.has(b.id) && vistos.add(b.id));
+    .in('funcionario_id', funcs).gte('data_fato', ini).lte('data_fato', fim).order('data_fato'));
+  const porFunc = new Map();
+  gozos.forEach(g => { if (!porFunc.has(g.funcionario_id)) porFunc.set(g.funcionario_id, []); porFunc.get(g.funcionario_id).push(g); });
+  dados.bolFerias = todosBol.filter(b => b.situacao !== 'cancelado'
+    && (porFunc.get(b.funcionario_id) || []).some(g => b.data_fato >= g.data_ini && b.data_fato <= g.data_fim));
   recortar();
   salvarCache();
 }
@@ -373,7 +365,17 @@ function enfileirar(colecao, acao, item) {
   gravar(CHAVE_FILA, fila);
 }
 
-export async function enviarFila() {
+/* Um envio por vez (15/10/2026). A abertura agora lê várias partes em
+   paralelo e cada uma chama enviarFila(); sem esta trava, dois envios
+   simultâneos mandariam o mesmo item duas vezes e um sobrescreveria a fila
+   do outro. Quem chega com um envio em curso espera o mesmo envio. */
+let filaEmCurso = null;
+export function enviarFila() {
+  if (!filaEmCurso) filaEmCurso = enviarFilaAgora().finally(() => { filaEmCurso = null; });
+  return filaEmCurso;
+}
+
+async function enviarFilaAgora() {
   const fila = ler(CHAVE_FILA, []);
   if (!fila.length || !estado.cliente || !estado.sessao) return;
   const restantes = [];
@@ -386,7 +388,9 @@ export async function enviarFila() {
       if (error) throw error;
     } catch { restantes.push(p); }
   }
-  gravar(CHAVE_FILA, restantes);
+  // O que entrou na fila enquanto este envio rodava fica no fim dela: não se perde.
+  const novos = ler(CHAVE_FILA, []).slice(fila.length);
+  gravar(CHAVE_FILA, [...restantes, ...novos]);
 }
 
 async function enviar(colecao, acao, item) {
