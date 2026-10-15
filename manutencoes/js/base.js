@@ -89,6 +89,10 @@ function idDe(tabela, registro) {
 
 async function gravarLocal(tabela, linhas) {
   const s = tx('cache', 'readwrite');
+  const fim = new Promise((ok, erro) => {
+    s.transaction.oncomplete = () => ok(true);
+    s.transaction.onerror = s.transaction.onabort = () => erro(s.transaction.error);
+  });
   for (const l of linhas) {
     const id = idDe(tabela, l);
     // uma linha sem chave não pode derrubar a gravação das outras
@@ -98,7 +102,7 @@ async function gravarLocal(tabela, linhas) {
     }
     s.put({ tabela, id, dado: l });
   }
-  return new Promise(ok => { s.transaction.oncomplete = () => ok(true); });
+  return fim;
 }
 
 async function lerLocal(tabela) {
@@ -286,15 +290,31 @@ async function inativar(tabela, id) {
    Só fica marcada como "baixada" se TODAS as tabelas vieram — uma carga que
    falhou (banco fora do ar, permissão faltando) tenta de novo na próxima vez,
    em vez de deixar a tela vazia por horas. */
+/* Prazo de cada consulta (15/10/2026). Sem ele, uma resposta que se perdia
+   no sinal fraco deixava a tela em "Baixando os cadastros…" para sempre. */
+const PRAZO_CONSULTA_MS = 20000;
+
+async function baixarTabela(t) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), PRAZO_CONSULTA_MS);
+  try {
+    const { data, error } = await App.sb.from(t).select('*').abortSignal(ctl.signal);
+    if (error) throw error;
+    return data || [];
+  } finally { clearTimeout(timer); }
+}
+
 async function baixarBase() {
   if (!App.online) return false;
   const falhas = [];
-  for (const t of TABELAS_BASE) {
-    const { data, error } = await App.sb.from(t).select('*');
-    if (error) { console.warn('não baixou', t, error.message); falhas.push(t); continue; }
-    await limparLocal(t);
-    await gravarLocal(t, data);
-    App.dados[t] = data;
+  // As consultas vão todas juntas; a gravação no aparelho é uma por vez.
+  const resultados = await Promise.all(TABELAS_BASE.map(t =>
+    baixarTabela(t).then(data => ({ t, data }), e => ({ t, erro: e }))));
+  for (const r of resultados) {
+    if (r.erro) { console.warn('não baixou', r.t, r.erro.message || r.erro); falhas.push(r.t); continue; }
+    await limparLocal(r.t);
+    await gravarLocal(r.t, r.data);
+    App.dados[r.t] = r.data;
   }
   // O que foi feito neste aparelho e ainda não subiu continua aparecendo.
   for (const item of await itensDaFila()) {
@@ -317,10 +337,15 @@ async function baixarBase() {
 /* Apaga a cópia local de uma tabela antes de gravar a nova: assim o que foi
    inativado ou apagado no servidor some daqui também. */
 async function limparLocal(tabela) {
+  // O "fim da transação" é ligado antes de qualquer espera: assim a promessa
+  // não fica pendurada se a transação terminar antes da hora.
   const s = tx('cache', 'readwrite');
-  const chaves = await promessa(s.index('por_tabela').getAllKeys(tabela));
-  for (const k of chaves) s.delete(k);
-  return new Promise(ok => { s.transaction.oncomplete = () => ok(true); });
+  return new Promise((ok, erro) => {
+    s.transaction.oncomplete = () => ok(true);
+    s.transaction.onerror = s.transaction.onabort = () => erro(s.transaction.error);
+    const req = s.index('por_tabela').getAllKeys(tabela);
+    req.onsuccess = () => { for (const k of req.result) s.delete(k); };
+  });
 }
 
 async function carregarDaBaseLocal() {
@@ -489,9 +514,19 @@ async function iniciarSessao() {
   }
   await meta('usuario', App.usuario);
 
-  $('#tela').innerHTML = '<section class="carregando"><p>Baixando os cadastros para uso sem internet…</p></section>';
-  await baixarBase();
-  await carregarDaBaseLocal();
+  /* 15/10/2026: se este aparelho já tem a base guardada, a área abre na hora
+     com ela e a atualização desce por trás. Só no primeiro uso a tela espera
+     o download — e mesmo assim com prazo, nunca para sempre. */
+  const jaTemBase = !!(await meta('baixada_em'));
+  if (jaTemBase) {
+    baixarBase().catch(e => console.warn('atualização da base', e));
+  } else {
+    $('#tela').innerHTML = '<section class="carregando"><p>Baixando os cadastros para uso sem internet…</p></section>';
+    const prazo = new Promise(ok => setTimeout(() => ok('prazo'), 45000));
+    const r = await Promise.race([baixarBase().catch(e => { console.warn(e); return false; }), prazo]);
+    if (r === 'prazo') aviso('O download está demorando. Abrindo com o que já chegou.', true);
+    await carregarDaBaseLocal();
+  }
 
   // O que essa pessoa enxerga: módulos e o menu montado em cima disso.
   carregarAcesso(App.usuario);
@@ -508,7 +543,23 @@ async function iniciarSessao() {
   if (ck && window.abrirRelatorioChecklist) { irPara('checklist'); abrirRelatorioChecklist(ck); }
   else if (acao && TELAS[acao] && podeTela(acao)) irPara(acao);
   if (acao || ck) history.replaceState(null, '', location.pathname);
+  window.areaPronta = true;
   sincronizar();
+}
+
+/* Qualquer erro na abertura vira um aviso com "Tentar de novo", em vez de a
+   tela ficar parada em "Baixando os cadastros…". */
+async function abrirArea() {
+  try {
+    await iniciarSessao();
+  } catch (e) {
+    console.error('abertura da área', e);
+    telaSemAcesso('Não consegui abrir as Manutenções agora (' + (e && e.message || e) + ').');
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn'; b.textContent = 'Tentar de novo';
+    b.onclick = () => location.reload();
+    $('#tela .carregando').appendChild(b);
+  }
 }
 
 /* ---------------------------------------------------------------- navegação */
@@ -556,7 +607,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   await carregarDaBaseLocal();
-  iniciarSessao();
+  abrirArea();
 });
 
 /* O app principal chama isto quando a pessoa volta para a área já aberta. */

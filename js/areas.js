@@ -18,7 +18,7 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '13';
+const VERSAO_AREA = '14';
 
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
@@ -262,8 +262,12 @@ export function entrarNaArea(id, tela, extra) {
       // minutos e, sem isto, abria a área com a versão anterior.
       moldura.src = 'manutencoes/?v=' + VERSAO_AREA + (extra ? '&' + extra : '');
     } else {
-      // já aberta: volta para o início da área, sem recarregar a base
-      try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+      // já aberta: volta para o início da área, sem recarregar a base.
+      // Se a abertura anterior não terminou (ficou em "Baixando…"), recarrega.
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'manutencoes/?v=' + VERSAO_AREA + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
   }
 }
