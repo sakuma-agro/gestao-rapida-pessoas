@@ -42,3 +42,22 @@ create policy arquivos_le     on public.arquivos for select to authenticated usi
 create policy arquivos_insere on public.arquivos for insert to authenticated with check (public.arquivo_pode(area, tipo, true));
 create policy arquivos_altera on public.arquivos for update to authenticated using (public.arquivo_pode(area, tipo, true)) with check (public.arquivo_pode(area, tipo, true));
 create policy arquivos_apaga  on public.arquivos for delete to authenticated using (public.arquivo_pode(area, tipo, true));
+
+-- Autorização do Google Drive guardada no banco (15/10/2026) — migração "drive_autorizacao".
+-- Gravada pela função drive-autorizar (um clique com a conta escritoriosakuma1);
+-- lida só pelas funções (service_role). Para renovar: abrir
+-- https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/drive-autorizar e confirmar.
+create table if not exists public.drive_autorizacao (
+  id int primary key default 1 check (id = 1),
+  refresh_token text not null,
+  conta text not null,
+  escopos text,
+  autorizado_em timestamptz not null default now()
+);
+create table if not exists public.drive_autorizacao_estado (
+  estado text primary key,
+  criado_em timestamptz not null default now()
+);
+alter table public.drive_autorizacao enable row level security;
+alter table public.drive_autorizacao_estado enable row level security;
+revoke all on public.drive_autorizacao, public.drive_autorizacao_estado from anon, authenticated;
