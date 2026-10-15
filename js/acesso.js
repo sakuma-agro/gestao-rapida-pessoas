@@ -912,6 +912,7 @@ function desenharPermissoes() {
     }).join('')}
     ${blocoManut(e)}
     ${blocoVist(e)}
+    ${blocoProg(e)}
     ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
@@ -928,6 +929,12 @@ function desenharPermissoes() {
   $('usSal')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add(PERM_SALARIOS); else mods.delete(PERM_SALARIOS);
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usProg')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('programacao'); else mods.delete('programacao');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -979,6 +986,19 @@ function blocoVist(e) {
       <input type="checkbox" id="usVist" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Vistorias e Segurança</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · quem administra a área é marcado lá dentro'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Área Programação Campo" (15/10/2026): entra ou não. As fazendas que
+   cada pessoa enxerga são marcadas lá dentro, em Configurações. */
+function blocoProg(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('programacao'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="programacao">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usProg" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Programação Campo</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · as fazendas que vê são marcadas lá dentro'}</span>
     </label>
   </div>`;
 }

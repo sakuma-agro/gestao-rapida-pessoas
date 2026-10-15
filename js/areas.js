@@ -19,6 +19,8 @@ const esc = s => String(s == null ? '' : s)
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
 const VERSAO_AREA = '20';
+/* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
+const VERSAO_PROG = '1';
 
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
@@ -28,6 +30,11 @@ export const AREAS = [
      pasta segue manutencoes/ e o banco segue no esquema manutencao. */
   { id: 'manutencoes', nome: 'Máquinas e Patrimônio', icone: 'icons/area-manutencoes.v1.svg',
     desc: 'Máquinas · Patrimônio · Vencimentos · Ordens de serviço · Check list' },
+  /* Programação Campo (15/10/2026, pedido dele): o app avulso veio para dentro
+     do LOP para usar os cadastros de funcionários (Pessoas) e de máquinas e
+     implementos (Máquinas e Patrimônio). Mora em programacao/, numa moldura. */
+  { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v1.svg',
+    desc: 'Painel anual · Atividades · Reunião semanal · Relatório diário' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
   { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
@@ -101,6 +108,9 @@ function liberada(id) {
   if (id === 'manutencoes') return acesso.admin || (acesso.modulos || []).includes('manutencoes');
   /* Certificação (13/10/2026): módulo 'cert' do acesso.js, com menu próprio. */
   if (id === 'certificacao') return telasLiberadas('cert').length > 0;
+  /* Programação Campo (15/10/2026): administrador ou módulo 'programacao' —
+     a mesma regra do banco (programacao.pode_usar). */
+  if (id === 'programacao') return acesso.admin || (acesso.modulos || []).includes('programacao');
   /* Vistorias e Segurança (14/10/2026): administrador ou módulo 'vistorias' —
      a mesma regra do banco (vistorias.pode_usar). */
   if (id === 'vistorias') return acesso.admin || (acesso.modulos || []).includes('vistorias');
@@ -117,6 +127,7 @@ let vistTela = null;              // tela do topo aberta na moldura agora
 let vistNums = {};                // números das abas (pendências) para a faixa
 let molduraCarregada = false;
 let molduraVistCarregada = false;
+let molduraProgCarregada = false;
 
 export const areaAberta = () => areaAtual;
 
@@ -252,6 +263,25 @@ export function entrarNaArea(id, tela, extra) {
     return;
   }
 
+  if (id === 'programacao') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('programacao');
+    medirTopo();
+    const moldura = $('molduraProg');
+    if (!molduraProgCarregada || extra) {
+      molduraProgCarregada = true;
+      moldura.src = 'programacao/?v=' + VERSAO_PROG + (extra ? '&' + extra : '');
+    } else {
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'programacao/?v=' + VERSAO_PROG + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
+
   if (id === 'manutencoes') {
     $('navModulos').hidden = true;
     $('navTelas').hidden = true;
@@ -294,11 +324,14 @@ export function limparAreas() {
   areaAtual = null;
   molduraCarregada = false;
   molduraVistCarregada = false;
+  molduraProgCarregada = false;
   vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
   const mv = $('molduraVist');
   if (mv) mv.src = 'about:blank';
+  const mp = $('molduraProg');
+  if (mp) mp.src = 'about:blank';
   pintarEtiqueta();
 }
 

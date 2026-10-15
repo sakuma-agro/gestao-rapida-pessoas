@@ -87,7 +87,8 @@ function abrirAba(nome) {
   $('telaAreas').hidden = nome !== 'areas';
   $('telaManut').hidden = nome !== 'manutencoes';
   $('telaVist').hidden = nome !== 'vistorias';
-  document.body.classList.toggle('na-moldura', nome === 'manutencoes' || nome === 'vistorias');
+  $('telaProg').hidden = nome !== 'programacao';
+  document.body.classList.toggle('na-moldura', nome === 'manutencoes' || nome === 'vistorias' || nome === 'programacao');
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';

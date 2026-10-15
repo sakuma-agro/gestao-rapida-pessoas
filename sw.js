@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v221';
+const VERSAO = 'gr-v222';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -40,6 +40,15 @@ const ARQUIVOS = [
   /* ícones das áreas (14/10/2026): uma família, cor e símbolo por área */
   './icons/area-pessoas.v1.svg', './icons/area-manutencoes.v1.svg',
   './icons/area-certificacao.v1.svg', './icons/area-vistorias.v1.svg', './icons/area-usuarios.v1.svg',
+  // Programação Campo (15/10/2026): abre sem sinal no campo, como o app avulso abria.
+  './icons/area-programacao.v1.svg',
+  './vendor/jspdf.umd.min.js', './vendor/jspdf.plugin.autotable.min.js',
+  './programacao/', './programacao/index.html', './programacao/css/app.css', './programacao/css/programacao.css',
+  './programacao/js/config.js', './programacao/js/base.js', './programacao/js/comum.js', './programacao/js/acesso.js',
+  './programacao/js/painel.js', './programacao/js/atividades.js', './programacao/js/reuniao.js', './programacao/js/relatorio.js',
+  './programacao/js/cadastros.js', './programacao/js/ficha.js', './programacao/js/diario.js',
+  './programacao/img/sakuma-logo.png', './programacao/img/lop-marca.png',
+  './programacao/img/whatsapp.png',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
   './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v1.svg',
