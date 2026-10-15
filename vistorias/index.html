@@ -3273,6 +3273,15 @@ async function salvarVistoria(){
         foto_encontrada:it.fotoEPath||null,foto_requerida:it.fotoRPath||null
       })))
     });
+    /* Rodada C (15/10/2026): item tirado da vistoria neste aparelho sai do
+       servidor também. Antes só havia upsert e o item apagado continuava lá,
+       aparecendo nas pendências para sempre. Só itens em aberto são apagados:
+       um já encerrado por outra pessoa fica como registro. */
+    try{
+      const ids=estado.itens.map(it=>it.uid).filter(Boolean);
+      const filtro=`vistoria_id=eq.${encodeURIComponent(estado.id)}&status=eq.Aberto`+(ids.length?`&id=not.in.(${ids.map(encodeURIComponent).join(",")})`:"");
+      await rest(`itens?${filtro}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
+    }catch(e){ console.warn("itens removidos não saíram do servidor",e); }
 
     estado.salvoEm=new Date().toISOString();
     salvar();

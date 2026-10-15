@@ -22,6 +22,7 @@
 // topo e só a LOP no pé, sem nome de pessoa.
 
 import { estado } from './store.js';
+import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
@@ -83,9 +84,42 @@ const S = {
   anual: { ano: 0, cert: '', docs: false },
 };
 
+/* Cópia local (rodada C, 15/10/2026): a Certificação abre sem sinal para
+   consulta (requisitos, documentos, calendário) com o que foi lido da última
+   vez; marcar "feito" sem sinal entra na fila 'cert' e sobe depois, por item
+   (cert_marcar_feito). Cadastrar/editar requisitos continua só com internet. */
+const CAIXA = 'cert.cache';
+const CAMADA = 'cert';
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs });
+const CAMADA_DEF = {
+  tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, i) => i,
+  cliente: () => estado.cliente,
+  podeEnviar: () => !!(estado.cliente && estado.sessao && navigator.onLine),
+  aoEnviado: (colecao, dado) => {
+    if (colecao === 'cert_eventos' && dado && dado.id != null) {
+      const i = S.evs.findIndex(x => x.id === dado.id);
+      if (i >= 0) S.evs[i] = dado; else S.evs.push(dado);
+      salvarCaixa();
+    }
+  },
+};
+export const enviarFilaCert = () => nucleo.enviarFila(CAMADA, CAMADA_DEF);
+addEventListener('online', () => { enviarFilaCert().catch(() => {}); });
+setInterval(() => { if (nucleo.pendentes(CAMADA) - nucleo.parados(CAMADA) > 0) enviarFilaCert().catch(() => {}); }, 2 * 60 * 1000);
+
 async function carregar() {
+  const c0 = await nucleo.lerCaixa(CAIXA, null);
+  if (c0 && !S.carregado) {
+    S.certs = c0.certs || []; S.reqs = c0.reqs || []; S.docs = c0.docs || []; S.evs = c0.evs || [];
+    S.carregado = true;
+  }
+  await nucleo.contarFila(CAMADA);
   const c = estado.cliente;
-  if (!c) throw new Error('Sem conexão com o banco.');
+  if (!c || !estado.sessao || !navigator.onLine) {
+    if (S.carregado) return;
+    throw new Error('Sem internet e sem cópia da certificação neste aparelho.');
+  }
+  await enviarFilaCert().catch(() => {});
   const [a, b, d, e] = await Promise.all([
     c.from('cert_certificacoes').select('*').order('ordem').order('nome'),
     c.from('cert_requisitos').select('*').order('id'),
@@ -93,6 +127,7 @@ async function carregar() {
     c.from('cert_eventos').select('*').order('data'),
   ]);
   const erro = a.error || b.error || d.error || e.error;
+  if (erro && S.carregado) return;   // rede falhou: fica a cópia
   if (erro) {
     if (/documentos/i.test(erro.message || '') && /column/i.test(erro.message || ''))
       throw new Error('Falta a coluna "documentos" em cert_requisitos no banco (supabase/cert.sql).');
@@ -102,6 +137,7 @@ async function carregar() {
   }
   S.certs = a.data || []; S.reqs = b.data || []; S.docs = d.data || []; S.evs = e.data || [];
   S.carregado = true;
+  salvarCaixa();
   S.docArq = await donosComArquivo('certificacao', 'documento').catch(() => new Set());
 }
 
@@ -810,12 +846,17 @@ function formEvento(id, dia) {
     $('ceeApagar')?.addEventListener('click', () => apagar('cert_eventos', ev.id, ev.titulo + (ev.repetir ? ` (e todas as repetições ${ev.repetir.toLowerCase()}s)` : ''),
       () => { S.evs = S.evs.filter(x => x.id !== ev.id); }));
     $('ceeFeito')?.addEventListener('click', async () => {
+      // Por item e pela fila (rodada C): sem sinal fica guardado e sobe depois;
+      // no servidor, cert_marcar_feito acrescenta/tira só esta data.
       const feitos = new Set(ev.feitos || []);
-      feitos.has(ocorr) ? feitos.delete(ocorr) : feitos.add(ocorr);
+      const marcar = !feitos.has(ocorr);
+      marcar ? feitos.add(ocorr) : feitos.delete(ocorr);
       $('ceeFeito').disabled = true;
-      const { data, error } = await estado.cliente.from('cert_eventos').update({ feitos: [...feitos].sort() }).eq('id', ev.id).select().single();
-      if (error) { $('ceeFeito').disabled = false; return erroDlg('Não consegui gravar: ' + error.message); }
-      S.evs[S.evs.findIndex(x => x.id === ev.id)] = data;
+      const i = S.evs.findIndex(x => x.id === ev.id);
+      S.evs[i] = { ...ev, feitos: [...feitos].sort() };
+      salvarCaixa();
+      await nucleo.adicionarNaFila(CAMADA, { colecao: 'cert_eventos', acao: 'rpc', item: { nome: 'cert_marcar_feito', args: { p_id: ev.id, p_ocorr: ocorr, p_feito: marcar } }, base: null });
+      if (CAMADA_DEF.podeEnviar()) enviarFilaCert().catch(() => {});
       fechar(); redesenhar();
     });
   });
@@ -1220,6 +1261,7 @@ export async function abrirCertificacao(tela) {
 
 export function limparCertificacao() {
   S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = [];
+  nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '' });
   Object.assign(S.cal, { ano: 0, mes: 0, cert: '', auto: true });

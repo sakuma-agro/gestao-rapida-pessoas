@@ -216,7 +216,12 @@ async function enviarAgora(camada, def) {
     if (p.status === 'parado') continue;
     const tabela = def.tabelaDe(p.colecao), pk = def.chaveDe(p.colecao);
     try {
-      if (p.acao === 'apagar') {
+      if (p.acao === 'rpc') {
+        // Chamada de função do banco (item = { nome, args }); o resultado vai para aoEnviado.
+        const r = await cliente.rpc(p.item.nome, p.item.args);
+        if (r.error) throw r.error;
+        def.aoEnviado(p.colecao, r.data);
+      } else if (p.acao === 'apagar') {
         await apagarRegistro(cliente, tabela, pk, Array.isArray(pk) ? p.item : p.item[pk]);
       } else {
         const salvo = await gravarRegistro(cliente, tabela, pk, def.paraBanco(p.colecao, p.item), p.base, { forcar: !!p.forcar });

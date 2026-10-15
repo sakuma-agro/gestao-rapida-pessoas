@@ -40,7 +40,7 @@ import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js'
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist } from './areas.js';
-import { abrirCertificacao, limparCertificacao, TELAS_CERT } from './certificacao.js';
+import { abrirCertificacao, limparCertificacao, TELAS_CERT, enviarFilaCert } from './certificacao.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -85,7 +85,7 @@ function limparPrevias() {
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
 const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
-  ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_SALARIO_DIGNO, ...TELAS_CERT]);
+  ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
   $('avisoSoOnline').hidden = !(SO_ONLINE.has(nome) && !navigator.onLine);
 }
@@ -1631,14 +1631,15 @@ const NOME_COLECAO = { funcionarios: 'funcionário', epis: 'EPI', fichas: 'ficha
   abatimentos: 'abatimento', salarios: 'salário', afastamentos: 'afastamento', feriasInicial: 'férias (inicial)', feriasGozos: 'férias',
   feriasPerdas: 'perda de férias', bolEntregas: 'entrega de boletim', docEntregas: 'entrega de documento', banco: 'horas guardadas',
   ticketMes: 'ticket do mês', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria',
-  sst_exames: 'exame', sst_tipos_exame: 'tipo de exame', sst_treinamentos: 'treinamento', sst_tipos_treinamento: 'tipo de treinamento', sst_aso_itens: 'marcação do ASO' };
+  sst_exames: 'exame', sst_tipos_exame: 'tipo de exame', sst_treinamentos: 'treinamento', sst_tipos_treinamento: 'tipo de treinamento', sst_aso_itens: 'marcação do ASO',
+  cert_eventos: 'evento da certificação (feito)' };
 const rotuloItem = p => {
-  const it = p.item || {};
+  const it = p.acao === 'rpc' ? { nome: (p.item?.args?.p_ocorr ? 'ocorrência de ' + String(p.item.args.p_ocorr).split('-').reverse().join('/') : '') } : (p.item || {});
   const quem = it.funcionario_id ? estado.funcionarios.find(f => f.id === it.funcionario_id)?.nome : (it.nome || it.descricao || '');
   return `${NOME_COLECAO[p.colecao] || p.colecao}${quem ? ' · ' + quem : ''}${it.data_fato ? ' · ' + it.data_fato.split('-').reverse().join('/') : ''}`;
 };
 async function desenharDlgFila() {
-  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor'), ...await nucleo.listarFila('sst')].sort((a, b) => a.em - b.em);
+  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor'), ...await nucleo.listarFila('sst'), ...await nucleo.listarFila('cert')].sort((a, b) => a.em - b.em);
   const alvo = $('dlgFilaLista');
   if (!lista.length) { alvo.innerHTML = '<p class="dica">Nada esperando. Tudo o que você lançou já está no servidor.</p>'; return; }
   alvo.innerHTML = lista.map(p => {
@@ -1663,13 +1664,13 @@ function abrirDlgFila() { desenharDlgFila().then(() => $('dlgFila').showModal())
 $('estadoRede').addEventListener('click', () => { if (estado.pendentesTotal) abrirDlgFila(); });
 $('dlgFilaEnviar').addEventListener('click', async () => {
   if (!estado.online) return;
-  try { await db.enviarFila(); await jd.enviarFila(); await enviarFilaSst(); } catch {}
+  try { await db.enviarFila(); await jd.enviarFila(); await enviarFilaSst(); await enviarFilaCert(); } catch {}
   desenharDlgFila(); contarPendentes();
 });
 $('dlgFilaLista').addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   const { camada } = b.dataset;
-  const enviar = () => (camada === 'epi' ? db.enviarFila() : camada === 'sst' ? enviarFilaSst() : jd.enviarFila()).catch(() => {});
+  const enviar = () => (camada === 'epi' ? db.enviarFila() : camada === 'sst' ? enviarFilaSst() : camada === 'cert' ? enviarFilaCert() : jd.enviarFila()).catch(() => {});
   if (b.dataset.filaManter) { await nucleo.manterMeu(b.dataset.filaManter, camada); await enviar(); }
   else if (b.dataset.filaTentar) { await nucleo.tentarDeNovo(b.dataset.filaTentar, camada); await enviar(); }
   else if (b.dataset.filaServidor || b.dataset.filaDescartar) {
@@ -1698,7 +1699,7 @@ async function desenharSaude() {
   linhas.push(['Versão do app', await versaoDoApp()]);
   linhas.push(['Internet agora', navigator.onLine ? 'sim' : 'não']);
   linhas.push(['Última leitura do servidor', (await nucleo.lerMeta('ultima_sinc')) ? new Date(await nucleo.lerMeta('ultima_sinc')).toLocaleString('pt-BR') : 'nunca neste aparelho']);
-  linhas.push(['Para enviar · parados (Cadastros, DP, SST)', `${nucleo.pendentes()} · ${nucleo.parados()}`]);
+  linhas.push(['Para enviar · parados (Cadastros, DP, SST, Certificação)', `${nucleo.pendentes()} · ${nucleo.parados()}`]);
   for (const k in pendentesMoldura) linhas.push([`Para enviar (${k})`, String(pendentesMoldura[k])]);
   linhas.push(['Espaço usado pelo app', est ? `${kb(est.usage)} de ${kb(est.quota)}` : 'não informado']);
   linhas.push(['Cadastro local', `${estado.funcionarios.length} funcionários · ${estado.fichas.length} fichas · ${jd.dados.boletins.length} boletins do mês`]);

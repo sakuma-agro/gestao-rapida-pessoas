@@ -119,6 +119,15 @@ export async function carregarReuniao() {
 /* O que está na fila e ainda não subiu continua valendo na tela. */
 function aplicarFilaLocal() {
   for (const p of ler(FILA, [])) {
+    if (p.rpc) {   // semana: reaplica só o que mudou por cima do que veio do servidor
+      const a = p.rpc.args, i = dados.semanas.findIndex(x => x.semana === a.p_semana);
+      const reg = i >= 0 ? dados.semanas[i] : { semana: a.p_semana, ajustes: {}, feitos: {} };
+      const ajustes = { ...(reg.ajustes || {}), ...(a.p_ajustes || {}) };
+      (a.p_ajustes_del || []).forEach(k => delete ajustes[k]);
+      const novo = { ...reg, ...(a.p_campos || {}), ajustes };
+      if (i >= 0) dados.semanas[i] = novo; else dados.semanas.push(novo);
+      continue;
+    }
     const k = CHAVE[p.colecao], lista = dados[p.colecao];
     const i = lista.findIndex(x => x[k] === p.item[k]);
     if (i >= 0) lista[i] = { ...lista[i], ...p.item }; else lista.push(p.item);
@@ -132,8 +141,11 @@ function enviarFila() {
     if (!fila.length || !estado.cliente || !estado.sessao) return;
     const resto = [];
     for (const p of fila) {
-      const { error } = await estado.cliente.from(TABELAS[p.colecao])
-        .upsert(p.item, { onConflict: CHAVE[p.colecao] }).then(r => r, e => ({ error: e }));
+      // Rodada C: a semana vai por função (só o que mudou); o resto por upsert.
+      const { error } = p.rpc
+        ? await estado.cliente.rpc(p.rpc.nome, p.rpc.args).then(r => r, e => ({ error: e }))
+        : await estado.cliente.from(TABELAS[p.colecao])
+            .upsert(p.item, { onConflict: CHAVE[p.colecao] }).then(r => r, e => ({ error: e }));
       if (error) resto.push(p);
     }
     gravar(FILA, [...resto, ...ler(FILA, []).slice(fila.length)]);
@@ -164,10 +176,38 @@ async function salvar(colecao, item) {
 }
 
 const quem = () => estado.sessao?.user?.email || null;
+/* Grava só o que mudou na semana (rodada C, 15/10/2026), pela função
+   reu_salvar_semana: campos simples por nome e `ajustes` por chave
+   (acrescentar/remover). Antes a linha inteira (frase + ajustes + feitos) era
+   regravada a partir da cópia local, e um item na fila passava por cima do que
+   outra pessoa marcou. "Feitos" vai por marcarFeito (reu_marcar_feito). */
 async function salvarSemana(s, parcial) {
   const atual = semanaReg(s) || { semana: s, ajustes: {}, feitos: {} };
-  return salvar('semanas', { ...atual, ...parcial, semana: s,
-    atualizado_em: new Date().toISOString(), atualizado_por: quem() });
+  const campos = {};
+  for (const k of ['frase', 'autor_id', 'autor_nome', 'obs']) if (k in parcial) campos[k] = parcial[k];
+  const ajustes = {}, ajustesDel = [];
+  if (parcial.ajustes) {
+    const antes = atual.ajustes || {};
+    for (const [k, v] of Object.entries(parcial.ajustes)) if (antes[k] !== v) ajustes[k] = v;
+    for (const k of Object.keys(antes)) if (!(k in parcial.ajustes)) ajustesDel.push(k);
+  }
+  const novo = { ...atual, ...campos, semana: s, ajustes: parcial.ajustes ? { ...parcial.ajustes } : atual.ajustes,
+    atualizado_em: new Date().toISOString(), atualizado_por: quem() };
+  const i = dados.semanas.findIndex(x => x.semana === s);
+  if (i >= 0) dados.semanas[i] = novo; else dados.semanas.push(novo);
+  salvarCache(); avisar();
+  const args = { p_semana: s, p_campos: campos, p_ajustes: ajustes, p_ajustes_del: ajustesDel };
+  const enfileirar = () => { const f = ler(FILA, []); f.push({ colecao: 'semanas', rpc: { nome: 'reu_salvar_semana', args } }); gravar(FILA, f); };
+  if (!estado.cliente || !estado.sessao || !navigator.onLine) { enfileirar(); return 'fila'; }
+  const { data, error } = await estado.cliente.rpc('reu_salvar_semana', args).then(r => r, e => ({ error: e }));
+  if (error) {
+    if (/row-level|permission|42501/i.test(error.message || error.code || '')) {
+      await carregarReuniao(); throw new Error('Seu login não tem permissão para alterar a Reunião semanal.');
+    }
+    enfileirar(); return 'fila';
+  }
+  if (data && data.semana) { const j = dados.semanas.findIndex(x => x.semana === s); if (j >= 0) dados.semanas[j] = data; salvarCache(); avisar(); }
+  return 'ok';
 }
 async function salvarRodizio(parcial) {
   return salvar('config', { chave: 'rodizio', valor: { ...rodizio(), ...parcial } });
@@ -460,11 +500,9 @@ function telaSemana(sec, pode) {
     return salvarSemana(s, { frase: frase || null, autor_id: autor?.id || null, autor_nome: autor?.nome || null, ajustes });
   }));
   $('reuSalvarObs').addEventListener('click', () => tentar(() => salvarSemana(s, { obs: limpo($('reuObs').value) || null })));
-  sec.querySelectorAll('[data-feito]').forEach(c => c.addEventListener('change', () => tentar(() => {
-    const feitos = { ...(semanaReg(s)?.feitos || {}) };
-    if (c.checked) feitos[c.dataset.feito] = true; else delete feitos[c.dataset.feito];
-    return salvarSemana(s, { feitos });
-  })));
+  // Feito/não feito por item (reu_marcar_feito), nunca o mapa inteiro.
+  sec.querySelectorAll('[data-feito]').forEach(c => c.addEventListener('change', () => tentar(() =>
+    marcarFeito(s, c.dataset.feito, c.checked))));
   sec.querySelectorAll('[data-troca]').forEach(sl => sl.addEventListener('change', () => tentar(() => {
     const ajustes = { ...(semanaReg(s)?.ajustes || {}) };
     if (sl.value) ajustes['atv:' + sl.dataset.troca] = sl.value; else delete ajustes['atv:' + sl.dataset.troca];
