@@ -6,11 +6,15 @@
 //
 // Nada aqui altera tabela existente: só as tabelas jor_*.
 
-import { estado, novoId, gravarLocal } from './store.js';
+import { estado, novoId } from './store.js';
 import { acesso, dpRestrito, veDestino } from './acesso.js';
+import * as nucleo from './nucleo.js';
 
-const CHAVE_CACHE = 'jor.cache';
-const CHAVE_FILA = 'jor.fila';
+/* Rodada B (15/10/2026): cache e fila no IndexedDB pelo núcleo (js/nucleo.js),
+   caixa 'jor.cache' e camada 'jor'. A gravação confere conflito por
+   atualizado_em (campo local `_base`). */
+const CAIXA = 'jor.cache';
+const CAMADA = 'jor';
 
 /* Cada coleção do módulo e a tabela onde ela mora. */
 export const TABELAS = {
@@ -84,15 +88,17 @@ const ouvintes = new Set();
 export const aoMudarJornada = fn => { ouvintes.add(fn); return () => ouvintes.delete(fn); };
 const avisar = () => ouvintes.forEach(fn => fn());
 
-const ler = (k, p) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : p; } catch { return p; } };
-const gravar = gravarLocal; // avisa na tela quando o armazenamento enche (rodada A)
-
-export const pendentes = () => ler(CHAVE_FILA, []).length;
+export const pendentes = () => nucleo.pendentes(CAMADA);
+export const parados = () => nucleo.parados(CAMADA);
+/* O carimbo do servidor viaja em `_base` (ver nucleo.gravarRegistro). */
+const comBase = lista => (lista || []).map(r => ({ ...r, _base: r.atualizado_em ?? null }));
+nucleo.aoMudarFila(avisar);
 
 /* ---------------- cache ---------------- */
 
-function carregarCache() {
-  const c = ler(CHAVE_CACHE, null);
+async function carregarCache() {
+  const c = await nucleo.lerCaixa(CAIXA, null);
+  await nucleo.contarFila(CAMADA);
   if (!c) return;
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = c[k] || [];
   recortar();
@@ -134,7 +140,7 @@ const soMeuDp = lista => dpRestrito() ? (lista || []).filter(x => !x?.funcionari
 function salvarCache() {
   const c = {};
   for (const k of [...Object.keys(TABELAS), ...APOIO]) c[k] = dados[k];
-  gravar(CHAVE_CACHE, c);
+  nucleo.gravarCaixa(CAIXA, c);
 }
 
 /* ---------------- leitura ---------------- */
@@ -144,9 +150,12 @@ function salvarCache() {
  * pedida. Boletim de outro mês só é lido quando alguém pede.
  * @param {string} competencia 'YYYY-MM-01'
  */
+let ultimaCompetencia = null;
+export const competenciaCarregada = () => ultimaCompetencia;
 export async function carregar(competencia = competenciaAtual()) {
-  carregarCache();
+  await carregarCache();
   if (!estado.cliente || !estado.sessao) return dados;
+  ultimaCompetencia = competencia;
 
   await enviarFila();
 
@@ -166,10 +175,10 @@ export async function carregar(competencia = competenciaAtual()) {
   const erro = respostas.find(r => r.error)?.error;
   if (erro) throw erro;
 
-  cadastros.forEach((k, i) => { dados[k] = respostas[i].data || []; });
-  dados.boletins     = respostas[cadastros.length].data || [];
-  dados.competencias = respostas[cadastros.length + 1].data || [];
-  dados.ocorrencias  = respostas[cadastros.length + 2].data || [];
+  cadastros.forEach((k, i) => { dados[k] = comBase(respostas[i].data); });
+  dados.boletins     = comBase(respostas[cadastros.length].data);
+  dados.competencias = comBase(respostas[cadastros.length + 1].data);
+  dados.ocorrencias  = comBase(respostas[cadastros.length + 2].data);
 
   // Daqui para baixo nada depende de nada, a não ser as apurações (precisam
   // dos boletins) e o apoio de férias (precisa dos tipos e dos gozos).
@@ -177,7 +186,7 @@ export async function carregar(competencia = competenciaAtual()) {
   // (15/10/2026). Cada parte que falhar continua não derrubando o DP.
   const lerTabela = async k => {
     const r = await c.from(TABELAS[k]).select('*');
-    if (!r.error) dados[k] = r.data || [];
+    if (!r.error) dados[k] = comBase(r.data);
     else dados[k] = dados[k] || [];
   };
   const ids = dados.boletins.map(b => b.id);
@@ -201,13 +210,13 @@ export async function carregar(competencia = competenciaAtual()) {
     // Horas guardadas: o saldo é de todo o histórico.
     c.from(TABELAS.banco).select('*').like('chave', 'bh|%').then(bh => {
       dados.banco = bh.error ? (dados.banco || [])
-        : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave }));
+        : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave, _base: r.atualizado_em ?? null }));
     }),
     // Ticket e vínculos dos indicadores: pequenos, vêm inteiros.
     ...['ticketMes', 'ticketEmissoes', 'indVinculos', 'tiposDeslig'].map(k => lerTabela(k)),
   ]);
   if (apur.error) throw apur.error;
-  dados.apuracoes = apur.data || [];
+  dados.apuracoes = comBase(apur.data);
 
   recortar();
   dados.carregado = true;
@@ -314,8 +323,8 @@ export async function carregarDocs() {
   const c = estado.cliente;
   if (!c || !estado.sessao) return;
   await enviarFila();
-  const todos = await todas(() => c.from(TABELAS.docEntregas).select('*').order('competencia'));
-  const fila = new Set(ler(CHAVE_FILA, []).filter(p => p.colecao === 'docEntregas').map(p => p.item.chave));
+  const todos = comBase(await todas(() => c.from(TABELAS.docEntregas).select('*').order('competencia')));
+  const fila = new Set((await nucleo.listarFila(CAMADA)).filter(p => p.colecao === 'docEntregas').map(p => p.item.chave));
   const mapa = new Map(todos.filter(x => !fila.has(x.chave)).map(x => [x.chave, x]));
   for (const x of dados.docEntregas || []) if (fila.has(x.chave)) mapa.set(x.chave, x);
   dados.docEntregas = [...mapa.values()];
@@ -333,14 +342,14 @@ export async function carregarEntregas(ini, fim) {
     todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao,numero')
       .gte('data_fato', ini).lte('data_fato', fim).order('data_fato')),
   ]);
-  const fila = new Set(ler(CHAVE_FILA, []).filter(p => p.colecao === 'bolEntregas').map(p => p.item.chave));
+  const fila = new Set((await nucleo.listarFila(CAMADA)).filter(p => p.colecao === 'bolEntregas').map(p => p.item.chave));
   const mapa = new Map();
   // Fica do cache o que está fora do intervalo e não é pendência, e o que
   // ainda está na fila (a nuvem não sabe dele).
   for (const x of dados.bolEntregas) {
     if (fila.has(x.chave) || ((x.data < ini || x.data > fim) && !['nao_entregou', 'correcao'].includes(x.situacao))) mapa.set(x.chave, x);
   }
-  for (const x of [...pend, ...marc]) if (!fila.has(x.chave)) mapa.set(x.chave, x);
+  for (const x of comBase([...pend, ...marc])) if (!fila.has(x.chave)) mapa.set(x.chave, x);
   dados.bolEntregas = [...mapa.values()];
   const outros = (dados.bolJornada || []).filter(b => b.data_fato < ini || b.data_fato > fim);
   dados.bolJornada = [...outros, ...bol.filter(b => b.situacao !== 'cancelado')];
@@ -359,53 +368,26 @@ const PARA_BANCO = {
 };
 const paraBanco = (colecao, item) => (PARA_BANCO[colecao] ? PARA_BANCO[colecao](item) : item);
 
-function enfileirar(colecao, acao, item) {
-  const fila = ler(CHAVE_FILA, []);
-  fila.push({ colecao, acao, item, em: Date.now() });
-  gravar(CHAVE_FILA, fila);
-}
+/* Rodada B: um caminho só — tudo entra na fila do núcleo e sobe dali, com
+   rede ou sem. O núcleo garante um envio por vez e a ordem de preenchimento. */
+const CAMADA_DEF = {
+  tabelaDe: c => TABELAS[c],
+  chaveDe,
+  paraBanco,
+  cliente: () => estado.cliente,
+  podeEnviar: () => !!(estado.cliente && estado.sessao && navigator.onLine),
+  aoEnviado: (colecao, salvo) => {
+    const k = chaveDe(colecao);
+    const alvo = (dados[colecao] || []).find(x => x[k] === salvo[k]);
+    if (alvo) { alvo.atualizado_em = salvo.atualizado_em; alvo._base = salvo.atualizado_em; salvarCache(); }
+  },
+};
+export const enviarFila = () => nucleo.enviarFila(CAMADA, CAMADA_DEF);
 
-/* Um envio por vez (15/10/2026). A abertura agora lê várias partes em
-   paralelo e cada uma chama enviarFila(); sem esta trava, dois envios
-   simultâneos mandariam o mesmo item duas vezes e um sobrescreveria a fila
-   do outro. Quem chega com um envio em curso espera o mesmo envio. */
-let filaEmCurso = null;
-export function enviarFila() {
-  if (!filaEmCurso) filaEmCurso = enviarFilaAgora().finally(() => { filaEmCurso = null; });
-  return filaEmCurso;
-}
-
-async function enviarFilaAgora() {
-  const fila = ler(CHAVE_FILA, []);
-  if (!fila.length || !estado.cliente || !estado.sessao) return;
-  const restantes = [];
-  for (const p of fila) {
-    try {
-      const q = estado.cliente.from(TABELAS[p.colecao]);
-      const { error } = p.acao === 'apagar'
-        ? await q.delete().eq(chaveDe(p.colecao), p.item[chaveDe(p.colecao)])
-        : await q.upsert(paraBanco(p.colecao, p.item), { onConflict: chaveDe(p.colecao) });
-      if (error) throw error;
-    } catch { restantes.push(p); }
-  }
-  // O que entrou na fila enquanto este envio rodava fica no fim dela: não se perde.
-  const novos = ler(CHAVE_FILA, []).slice(fila.length);
-  gravar(CHAVE_FILA, [...restantes, ...novos]);
-}
-
-async function enviar(colecao, acao, item) {
-  if (!estado.cliente || !estado.sessao || !navigator.onLine) { enfileirar(colecao, acao, item); return false; }
-  try {
-    const q = estado.cliente.from(TABELAS[colecao]);
-    const { error } = acao === 'apagar'
-      ? await q.delete().eq(chaveDe(colecao), item[chaveDe(colecao)])
-      : await q.upsert(paraBanco(colecao, item), { onConflict: chaveDe(colecao) });
-    if (error) throw error;
-    return true;
-  } catch {
-    enfileirar(colecao, acao, item);
-    return false;
-  }
+async function enviar(colecao, acao, item, base = null) {
+  await nucleo.adicionarNaFila(CAMADA, { colecao, acao, item, base });
+  if (CAMADA_DEF.podeEnviar()) { try { await enviarFila(); } catch {} }
+  return nucleo.pendentes(CAMADA) === 0;
 }
 
 /**
@@ -417,9 +399,10 @@ export async function salvar(colecao, item) {
   if (!item[k]) item[k] = novoId();
   const lista = dados[colecao];
   const i = lista.findIndex(x => x[k] === item[k]);
-  if (i >= 0) lista[i] = { ...lista[i], ...item }; else lista.push(item);
+  const base = i >= 0 ? (lista[i]._base ?? null) : null;
+  if (i >= 0) lista[i] = { ...lista[i], ...item, _base: base }; else lista.push({ ...item, _base: null });
   salvarCache(); avisar();
-  await enviar(colecao, 'salvar', item);
+  await enviar(colecao, 'salvar', item, base);
   avisar();
   return item;
 }
@@ -435,7 +418,6 @@ export async function salvarVinculo(funcionarioId, parcial) {
     ...atual,
     ...parcial,
     funcionario_id: funcionarioId,
-    atualizado_em: new Date().toISOString(),
   });
 }
 
@@ -457,11 +439,12 @@ export async function inativar(colecao, id) {
   return salvar(colecao, { ...item, ativo: false });
 }
 
+const semBase = o => { if (!o || typeof o !== 'object') return o || null; const { _base, ...r } = o; return r; };
 /** Trilha de auditoria (RN-126). Justificativa é obrigatória na alteração. */
 export async function registrar({ tabela, registro_id, acao, antes, depois, justificativa }) {
   const linha = {
     id: novoId(), tabela, registro_id, acao,
-    antes: antes || null, depois: depois || null,
+    antes: semBase(antes), depois: semBase(depois),
     justificativa: justificativa || null,
     usuario: estado.sessao?.user?.email || null,
     em: new Date().toISOString(),
@@ -615,9 +598,11 @@ export async function boletinsDoDia(fid, data) {
 /* Rede de volta (15/10/2026, rodada A): antes a fila do DP só subia quando
    alguém abria o DP de novo — o store.js só esvaziava a fila do EPI. */
 addEventListener('online', () => { enviarFila().then(avisar).catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && pendentes()) enviarFila().catch(() => {}); });
+setInterval(() => { if (pendentes() - parados() > 0) enviarFila().catch(() => {}); }, 2 * 60 * 1000);
 
 export function limparJornadaDados() {
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = [];
   dados.carregado = false;
-  try { localStorage.removeItem(CHAVE_CACHE); } catch {}
+  nucleo.apagarCaixa(CAIXA);
 }

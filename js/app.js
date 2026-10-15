@@ -27,6 +27,7 @@ import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
+import * as nucleo from './nucleo.js';
 import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
@@ -1601,13 +1602,93 @@ async function contarPendentes() {
   return contandoPendentes;
 }
 function pintarEstadoRede() {
-  const online = estado.online, n = estado.pendentesTotal;
+  const online = estado.online, n = estado.pendentesTotal, par = nucleo.parados();
   $('estadoTexto').textContent = n
-    ? `${n} para enviar`
+    ? `${n} para enviar` + (par ? ` · ${par} parado${par > 1 ? 's' : ''}` : '')
     : (online ? 'sincronizado' : 'offline');
-  $('estadoRede').title = n ? 'Lançamentos feitos sem internet; sobem sozinhos quando o sinal volta.' : '';
+  $('estadoRede').title = par ? 'Toque para ver o que parou e decidir.'
+    : n ? 'Lançamentos feitos sem internet; sobem sozinhos quando o sinal volta. Toque para ver.' : '';
+  $('estadoRede').style.cursor = n ? 'pointer' : '';
   $('estadoRede').querySelector('.pt').classList.toggle('off', !online || n > 0);
 }
+
+/* Tela da fila do Pessoas (rodada B): o que espera envio e o que parou, com
+   as decisões sobre conflito. As molduras têm a tela delas ("aguardando envio"). */
+const NOME_COLECAO = { funcionarios: 'funcionário', epis: 'EPI', fichas: 'ficha de EPI', modelo: 'modelo da ficha',
+  boletins: 'boletim', apuracoes: 'apuração', ocorrencias: 'ocorrência', vinculos: 'cadastro nível 2', emprestimos: 'empréstimo',
+  abatimentos: 'abatimento', salarios: 'salário', afastamentos: 'afastamento', feriasInicial: 'férias (inicial)', feriasGozos: 'férias',
+  feriasPerdas: 'perda de férias', bolEntregas: 'entrega de boletim', docEntregas: 'entrega de documento', banco: 'horas guardadas',
+  ticketMes: 'ticket do mês', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria' };
+const rotuloItem = p => {
+  const it = p.item || {};
+  const quem = it.funcionario_id ? estado.funcionarios.find(f => f.id === it.funcionario_id)?.nome : (it.nome || it.descricao || '');
+  return `${NOME_COLECAO[p.colecao] || p.colecao}${quem ? ' · ' + quem : ''}${it.data_fato ? ' · ' + it.data_fato.split('-').reverse().join('/') : ''}`;
+};
+async function desenharDlgFila() {
+  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor')].sort((a, b) => a.em - b.em);
+  const alvo = $('dlgFilaLista');
+  if (!lista.length) { alvo.innerHTML = '<p class="dica">Nada esperando. Tudo o que você lançou já está no servidor.</p>'; return; }
+  alvo.innerHTML = lista.map(p => {
+    const quando = new Date(p.em).toLocaleString('pt-BR');
+    const conflito = p.erro === 'conflito' && p.atual;
+    const parado = p.status === 'parado';
+    const quemMexeu = conflito ? (p.atual.atualizado_por || p.atual.usuario || 'outra pessoa') + ' às ' + new Date(p.atual.atualizado_em).toLocaleString('pt-BR') : '';
+    return `<div class="aviso ${parado ? 'erro' : 'info'}" style="margin:0 0 8px">
+      <strong>${esc(rotuloItem(p))}</strong> <small>· ${p.acao === 'apagar' ? 'exclusão' : 'gravação'} em ${quando}</small><br>
+      ${parado ? (conflito ? `<small>Outra pessoa alterou este registro depois de você (${esc(quemMexeu)}).</small>` : `<small>O servidor recusou: ${esc(p.erro || '')}</small>`)
+               : `<small>${p.status === 'erro' ? 'Falhou por rede; tenta de novo sozinho.' : 'Esperando rede.'}</small>`}
+      ${parado ? `<div class="barra" style="margin-top:6px">
+        ${conflito ? `<button type="button" class="btn mini" data-fila-manter="${p.uuid}" data-camada="${p.camada}">Manter o meu</button>
+                      <button type="button" class="btn mini" data-fila-servidor="${p.uuid}" data-camada="${p.camada}">Usar o do servidor</button>`
+                   : `<button type="button" class="btn mini" data-fila-tentar="${p.uuid}" data-camada="${p.camada}">Tentar de novo</button>`}
+        <button type="button" class="btn mini" data-fila-descartar="${p.uuid}" data-camada="${p.camada}">Descartar</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+function abrirDlgFila() { desenharDlgFila().then(() => $('dlgFila').showModal()); }
+$('estadoRede').addEventListener('click', () => { if (estado.pendentesTotal) abrirDlgFila(); });
+$('dlgFilaEnviar').addEventListener('click', async () => {
+  if (!estado.online) return;
+  try { await db.enviarFila(); await jd.enviarFila(); } catch {}
+  desenharDlgFila(); contarPendentes();
+});
+$('dlgFilaLista').addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const { camada } = b.dataset;
+  const enviar = () => (camada === 'epi' ? db.enviarFila() : jd.enviarFila()).catch(() => {});
+  if (b.dataset.filaManter) { await nucleo.manterMeu(b.dataset.filaManter, camada); await enviar(); }
+  else if (b.dataset.filaTentar) { await nucleo.tentarDeNovo(b.dataset.filaTentar, camada); await enviar(); }
+  else if (b.dataset.filaServidor || b.dataset.filaDescartar) {
+    const uuid = b.dataset.filaServidor || b.dataset.filaDescartar;
+    if (b.dataset.filaDescartar && !confirm('Descartar este lançamento? Ele some deste aparelho e não vai para o servidor.')) return;
+    await nucleo.descartar(uuid, camada);
+    // o cache deste aparelho volta a espelhar o servidor
+    try { camada === 'epi' ? await db.sincronizar() : await jd.carregar(jd.competenciaCarregada() || undefined); } catch {}
+  }
+  desenharDlgFila(); contarPendentes();
+});
+addEventListener('gr:fila-parada', ev => {
+  const a = $('avisoGlobal');
+  a.textContent = ev.detail?.conflito
+    ? 'Outra pessoa alterou um registro que você também mudou. Toque em "parado" no topo para decidir.'
+    : 'Um lançamento não pôde ser enviado. Toque em "parado" no topo para ver o motivo.';
+  a.hidden = false;
+  contarPendentes();
+});
+
+/* Dados renovam ao voltar para a tela (rodada B): tablet aberto o dia todo
+   mostrava o cadastro da manhã. Se ficou mais de 10 min fora, relê Cadastros/
+   EPI e o DP (mesma competência aberta) por trás, sem trocar de tela. */
+let escondidoDesde = null;
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') { escondidoDesde = Date.now(); return; }
+  if (!escondidoDesde || Date.now() - escondidoDesde < 10 * 60 * 1000) return;
+  escondidoDesde = null;
+  if (!estado.sessao || !navigator.onLine) return;
+  try { await db.sincronizar(); } catch {}
+  if (jd.dados.carregado) { try { await jd.carregar(jd.competenciaCarregada() || undefined); } catch {} }
+});
 db.aoMudar(() => { contarPendentes(); });
 jd.aoMudarJornada(() => { contarPendentes(); });
 addEventListener('online', () => setTimeout(contarPendentes, 1500));

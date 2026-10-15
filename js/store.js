@@ -1,8 +1,11 @@
 // store.js — Supabase + cache local + fila de envios offline
 import { SEED_FUNCIONARIOS, SEED_EPIS, SEED_MODELO } from './seed.js';
+import * as nucleo from './nucleo.js';
 
-const CHAVE_CACHE = 'epi.cache';
-const CHAVE_FILA = 'epi.fila';
+/* Rodada B (15/10/2026): cache e fila moram no IndexedDB (js/nucleo.js),
+   caixa 'epi.cache' e camada 'epi' da fila. localStorage fica só para flags. */
+const CAIXA = 'epi.cache';
+const CAMADA = 'epi';
 
 // Projeto Supabase da SAKUMA. A chave "publishable" é feita para ficar
 // visível no navegador: quem protege os dados são as regras de acesso
@@ -121,7 +124,8 @@ function criarCliente() {
 
 /* ---------------- sessão ---------------- */
 export async function iniciar() {
-  carregarCache();
+  await nucleo.migrarDoLocalStorage({ 'epi.cache': CAIXA, 'epi.fila': { camada: CAMADA }, 'jor.cache': 'jor.cache', 'jor.fila': { camada: 'jor' } });
+  await carregarCache();
   criarCliente();
   try {
     const { data } = await estado.cliente.auth.getSession();
@@ -203,23 +207,27 @@ export async function trocarSenha(senha) {
 }
 
 /* ---------------- cache ---------------- */
-function carregarCache() {
-  const c = ler(CHAVE_CACHE, null);
+async function carregarCache() {
+  const c = await nucleo.lerCaixa(CAIXA, null);
   estado.funcionarios = c?.funcionarios ?? [];
   estado.epis = c?.epis ?? [];
   estado.fichas = c?.fichas ?? [];
   estado.modelo = c?.modelo ?? null;
-  estado.pendentes = ler(CHAVE_FILA, []).length;
+  estado.pendentes = (await nucleo.contarFila(CAMADA)).pendentes;
 }
 
 function salvarCache() {
-  gravar(CHAVE_CACHE, {
+  nucleo.gravarCaixa(CAIXA, {
     funcionarios: estado.funcionarios,
     epis: estado.epis,
     fichas: estado.fichas,
     modelo: estado.modelo,
   });
 }
+/* O carimbo do servidor viaja em `_base`: é com ele que a gravação confere se
+   alguém mexeu no registro desde a leitura (ver nucleo.gravarRegistro). */
+const comBase = lista => (lista || []).map(r => ({ ...r, _base: r.atualizado_em ?? null }));
+nucleo.aoMudarFila(() => { estado.pendentes = nucleo.pendentes(CAMADA); estado.parados = nucleo.parados(CAMADA); avisar(); });
 
 /* ---------------- leitura ---------------- */
 export async function sincronizar() {
@@ -234,10 +242,10 @@ export async function sincronizar() {
   const erro = f.error || e.error || fi.error || m.error;
   if (erro) throw erro;
 
-  estado.funcionarios = f.data || [];
-  estado.epis = e.data || [];
-  estado.fichas = fi.data || [];
-  estado.modelo = m.data || null;
+  estado.funcionarios = comBase(f.data);
+  estado.epis = comBase(e.data);
+  estado.fichas = comBase(fi.data);
+  estado.modelo = m.data ? { ...m.data, _base: m.data.atualizado_em ?? null } : null;
 
   // Primeira execução: leva os dados da planilha para o banco.
   if (!estado.funcionarios.length && !estado.epis.length && !estado.modelo) {
@@ -260,61 +268,47 @@ export async function semear() {
   if (r2.error) throw r2.error;
   const r3 = await estado.cliente.from('modelo').upsert(modelo).select().single();
   if (r3.error) throw r3.error;
-  estado.funcionarios = r1.data; estado.epis = r2.data; estado.modelo = r3.data;
+  estado.funcionarios = comBase(r1.data); estado.epis = comBase(r2.data); estado.modelo = { ...r3.data, _base: r3.data.atualizado_em ?? null };
   salvarCache();
 }
 
-/* ---------------- escrita (otimista + fila) ---------------- */
-function enfileirar(tabela, acao, dados) {
-  const fila = ler(CHAVE_FILA, []);
-  fila.push({ tabela, acao, dados, em: Date.now() });
-  gravar(CHAVE_FILA, fila);
-  estado.pendentes = fila.length;
-}
-
-export async function enviarFila() {
-  let fila = ler(CHAVE_FILA, []);
-  if (!fila.length || !estado.cliente || !estado.sessao) return;
-  const restantes = [];
-  for (const item of fila) {
-    try {
-      const q = estado.cliente.from(item.tabela);
-      const { error } = item.acao === 'apagar'
-        ? await q.delete().eq('id', item.dados.id)
-        : await q.upsert(item.dados);
-      if (error) throw error;
-    } catch { restantes.push(item); }
-  }
-  gravar(CHAVE_FILA, restantes);
-  estado.pendentes = restantes.length;
-}
-
-async function gravarRemoto(tabela, acao, dados) {
-  if (!estado.cliente || !estado.sessao || !navigator.onLine) { enfileirar(tabela, acao, dados); return false; }
-  try {
-    const q = estado.cliente.from(tabela);
-    const { error } = acao === 'apagar'
-      ? await q.delete().eq('id', dados.id)
-      : await q.upsert(dados);
-    if (error) throw error;
-    return true;
-  } catch {
-    enfileirar(tabela, acao, dados);
-    return false;
-  }
-}
-
+/* ---------------- escrita (otimista + fila) ----------------
+   Rodada B: toda gravação passa pela fila do núcleo, mesmo com rede — assim
+   o caminho é um só (ordem garantida, conflito conferido, erro visível). */
 const listaDe = tabela => ({
   funcionarios: 'funcionarios', epis: 'epis', fichas: 'fichas',
 }[tabela]);
 
+/* O que o núcleo precisa saber desta camada. */
+const CAMADA_DEF = {
+  tabelaDe: c => c,
+  chaveDe: () => 'id',
+  paraBanco: (c, item) => item,
+  cliente: () => estado.cliente,
+  podeEnviar: () => !!(estado.cliente && estado.sessao && navigator.onLine),
+  aoEnviado: (tabela, salvo) => {
+    // Só o carimbo: o resto do registro local pode já ter edição mais nova.
+    const lista = tabela === 'modelo' ? null : estado[listaDe(tabela)];
+    const alvo = lista ? lista.find(x => x.id === salvo.id) : estado.modelo;
+    if (alvo) { alvo.atualizado_em = salvo.atualizado_em; alvo._base = salvo.atualizado_em; salvarCache(); }
+  },
+};
+export const enviarFila = () => nucleo.enviarFila(CAMADA, CAMADA_DEF);
+
+async function gravarRemoto(tabela, acao, dados, base) {
+  await nucleo.adicionarNaFila(CAMADA, { colecao: tabela, acao, item: dados, base });
+  if (CAMADA_DEF.podeEnviar()) { try { await enviarFila(); } catch {} }
+  return nucleo.pendentes(CAMADA) === 0;
+}
+
 async function salvarItem(tabela, item) {
   const lista = estado[listaDe(tabela)];
   const i = lista.findIndex(x => x.id === item.id);
-  if (i >= 0) lista[i] = { ...lista[i], ...item }; else lista.push(item);
+  const base = i >= 0 ? (lista[i]._base ?? null) : null;
+  if (i >= 0) lista[i] = { ...lista[i], ...item, _base: base }; else lista.push({ ...item, _base: null });
   if (tabela === 'funcionarios') lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   salvarCache(); avisar();
-  await gravarRemoto(tabela, 'salvar', item);
+  await gravarRemoto(tabela, 'salvar', item, base);
   avisar();
   return item;
 }
@@ -335,9 +329,10 @@ export const salvarFicha = f => salvarItem('fichas', f);
 export const apagarFicha = id => apagarItem('fichas', id);
 
 export async function salvarModelo(m) {
-  estado.modelo = { ...m, id: 1 };
+  const base = estado.modelo?._base ?? null;
+  estado.modelo = { ...m, id: 1, _base: base };
   salvarCache(); avisar();
-  await gravarRemoto('modelo', 'salvar', estado.modelo);
+  await gravarRemoto('modelo', 'salvar', { ...m, id: 1 }, base);
   avisar();
 }
 
@@ -349,4 +344,7 @@ addEventListener('online', async () => {
   try { await enviarFila(); } catch {}
   avisar();
 });
+/* Rodada B: fila com algo pendente tenta de novo ao voltar para a tela e a cada 2 min. */
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && nucleo.pendentes(CAMADA)) enviarFila().catch(() => {}); });
+setInterval(() => { if (nucleo.pendentes(CAMADA) - nucleo.parados(CAMADA) > 0) enviarFila().catch(() => {}); }, 2 * 60 * 1000);
 addEventListener('offline', () => { estado.online = false; avisar(); });

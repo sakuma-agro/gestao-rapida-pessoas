@@ -10,7 +10,7 @@
 // Salário é dado sensível: as tabelas rh_* só abrem para quem tem o módulo RH,
 // e isso é conferido no banco (política app_pode('rh')), não só na tela.
 import { montarMulti } from './multisel.js';
-import { estado } from './store.js';
+import { estado, salvarFuncionario } from './store.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -1335,9 +1335,9 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
     b.disabled = true;
     const f = estado.funcionarios.find(x => x.id === b.dataset.id);
     if (!f) return;
-    const { error } = await estado.cliente.from('funcionarios')
-      .update({ sexo: b.dataset.sexo }).eq('id', f.id);
-    if (error) { b.disabled = false; return avisar(`Não deu para gravar: ${error.message}`); }
+    // Rodada B: pela camada do store (fila + conferência de conflito), não por
+    // update direto — o update direto deixava o cache sem o carimbo novo.
+    await salvarFuncionario({ ...f, sexo: b.dataset.sexo });
     f.sexo = b.dataset.sexo;
     desenharQuadro();
     redesenharFuncionarios();

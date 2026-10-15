@@ -1409,6 +1409,18 @@ addEventListener('beforeinstallprompt', function (ev) {
 <div id="jorImpressao" hidden></div>
 
 <!-- ============ DIÁLOGO: PESSOA ============ -->
+<!-- Rodada B (15/10/2026): o que ainda não subiu e o que parou (conflito ou recusa) -->
+<dialog id="dlgFila">
+  <form method="dialog">
+    <h3>Lançamentos aguardando envio</h3>
+    <div id="dlgFilaLista"></div>
+    <p class="dica">"Parado" = o servidor recusou ou outra pessoa alterou o mesmo registro depois de você. Repetir não resolve sozinho: escolha o que fazer.</p>
+    <div class="barra entre">
+      <button type="button" class="btn" id="dlgFilaEnviar">Enviar agora</button>
+      <button class="btn" data-fechar>Fechar</button>
+    </div>
+  </form>
+</dialog>
 <dialog id="dlgUsuario">
   <form method="dialog" id="formUsuario">
     <h3 id="tituloUsuario">Adicionar pessoa</h3>
