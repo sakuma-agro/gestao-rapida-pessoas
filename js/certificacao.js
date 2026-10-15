@@ -25,6 +25,7 @@ import { estado } from './store.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
+import { caixaAnexos } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -637,6 +638,7 @@ function formDocumento(id) {
       <label class="campo plena">Link no OneDrive <small>da pasta ou do arquivo — no OneDrive: Compartilhar › Copiar link</small>
         <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://…sharepoint.com/… ou https://1drv.ms/…">
         <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" ${linkOk(v.link) ? `href="${esc(v.link)}"` : 'hidden'}>Abrir ↗</a></span></label>
+      <div class="campo plena" id="cedAnexos"></div>
       <p class="dica plena" id="cedProx"></p>
       <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
       <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
@@ -663,10 +665,21 @@ function formDocumento(id) {
       if (linkOk(u)) { a.href = u; a.hidden = false; } else { a.removeAttribute('href'); a.hidden = true; }
     });
     document.querySelectorAll('#dlgCe [data-lreq]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.lreq))));
+    anexosDoc = caixaAnexos($('cedAnexos'), {
+      area: 'certificacao', tipo: 'documento', rotulo: 'Arquivo no Google Drive',
+      dica: 'Opcional: anexe o PDF ou a foto do documento — fica no Google Drive. O link do OneDrive continua valendo.',
+      nome: () => [so($('cedCod').value), so($('cedNome').value)].filter(Boolean).join(' - '),
+    });
+    anexosDoc.carregar(d ? d.id : null);
     $('cedGravar').addEventListener('click', () => gravarDocumento(d));
-    $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
+    $('cedApagar')?.addEventListener('click', () => {
+      const caixa = anexosDoc;
+      apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); caixa?.apagarTodos(d.id); });
+    });
   });
 }
+
+let anexosDoc = null;   // caixa de anexos do documento aberto (Google Drive, 15/10/2026)
 
 /** Leva à lista de requisitos filtrada por um documento. */
 function verReqsDoDoc(id) {
@@ -685,7 +698,11 @@ async function gravarDocumento(d) {
   if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
   if (S.docs.some(x => x.id !== d?.id && so(x.codigo).toLowerCase() === linha.codigo.toLowerCase()))
     return erroDlg(`Já existe um documento com o código ${linha.codigo}.`);
-  await salvar('cert_documentos', d, linha, S.docs, 'cedGravar');
+  await salvar('cert_documentos', d, linha, S.docs, 'cedGravar', async data => {
+    if (!anexosDoc?.temPendentes) return;
+    const erros = await anexosDoc.salvarPendentes(data.id);
+    if (erros.length) throw new Error('o documento foi gravado, mas o anexo não subiu (' + erros.join('; ') + '). Abra o documento e anexe de novo');
+  });
   S.docs.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 }
 
@@ -974,13 +991,17 @@ async function gravarCertificacao(c) {
 /* ===================================================================
    GRAVAR / APAGAR (comum)
    =================================================================== */
-async function salvar(tabela, atual, linha, lista, botao) {
+async function salvar(tabela, atual, linha, lista, botao, depois) {
   $(botao).disabled = true;
   try {
     const t = estado.cliente.from(tabela);
     const { data, error } = atual ? await t.update(linha).eq('id', atual.id).select().single() : await t.insert(linha).select().single();
     if (error) throw error;
     if (atual) lista[lista.findIndex(x => x.id === atual.id)] = data; else lista.push(data);
+    if (depois) {
+      try { await depois(data); }
+      catch (e) { fechar(); redesenhar(); return alert('Atenção: ' + e.message + '.'); }
+    }
     fechar(); redesenhar();
   } catch (e) { $(botao).disabled = false; erroDlg('Não consegui gravar: ' + (e.message || e)); }
 }

@@ -215,11 +215,41 @@ async function comprimirFoto(arquivo, larguraMax = 1600) {
   return new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.82));
 }
 
-/* Guarda a foto no aparelho e devolve o caminho que ela terá no Storage. */
+/* Desde 15/10/2026 as fotos vão para o Google Drive (função "arquivos" do
+   Supabase, conta escritoriosakuma1), e não mais para o Storage do Supabase.
+   O caminho novo começa com "manutencoes/" — é assim que o app sabe onde
+   cada foto está. Foto antiga (caminho "os/…" ou "checklists/…") continua
+   no bucket e abre de lá; foto que ainda estava na fila do aparelho com o
+   caminho antigo também sobe para o bucket, como antes. */
+const FN_ARQUIVOS = () => CONFIG.SUPABASE_URL + '/functions/v1/arquivos';
+const noDrive = caminho => String(caminho || '').startsWith('manutencoes/');
+async function cabecalhoArquivos() {
+  const { data } = await App.sb.auth.getSession();
+  const t = data && data.session && data.session.access_token;
+  if (!t) throw new Error('sem sessão');
+  return { Authorization: 'Bearer ' + t, apikey: CONFIG.SUPABASE_ANON_KEY };
+}
+async function enviarAoDrive(caminho, blob) {
+  const r = await fetch(FN_ARQUIVOS() + '?acao=enviar&chave=' + encodeURIComponent(caminho) +
+    '&nome=' + encodeURIComponent(caminho.split('/').slice(2).join(' - ')),
+    { method: 'POST', headers: { ...(await cabecalhoArquivos()), 'Content-Type': 'image/jpeg' }, body: blob });
+  return r.ok;
+}
+/* Baixa uma foto do Drive (pela função) e devolve um endereço local para o <img>. */
+async function urlDoDrive(caminho) {
+  const r = await fetch(FN_ARQUIVOS() + '?acao=ver&chave=' + encodeURIComponent(caminho), { headers: await cabecalhoArquivos() });
+  if (!r.ok) return null;
+  return URL.createObjectURL(await r.blob());
+}
+
+/* Guarda a foto no aparelho e devolve o caminho dela (no Drive). */
 async function guardarFoto(arquivo, bucket, prefixo) {
   const blob = await comprimirFoto(arquivo);
   const id = crypto.randomUUID();
-  const caminho = prefixo + '/' + id + '.jpg';
+  // "checklists/<código>" → "manutencoes/checklist/<código>"; "os/<código>" → "manutencoes/os/<código>"
+  const resto = prefixo.replace(/^checklists\//, 'checklist/');
+  const resto2 = resto.endsWith('/') ? resto + 'sem-codigo' : resto;   // máquina sem código
+  const caminho = 'manutencoes/' + resto2 + '/' + id + '.jpg';
   await promessa(tx('fotos', 'readwrite').put({
     id, bucket, caminho, blob, status: 'pendente',
     registrado_em: new Date().toISOString()
@@ -249,9 +279,15 @@ async function enviarFotos() {
   enviandoFotos = true;
   try {
     for (const f of await fotosPendentes()) {
-      const { error } = await App.sb.storage.from(f.bucket)
-        .upload(f.caminho, f.blob, { contentType: 'image/jpeg', upsert: true });
-      if (!error || (error.message || '').includes('already exists')) {
+      let subiu = false;
+      if (noDrive(f.caminho)) {
+        try { subiu = await enviarAoDrive(f.caminho, f.blob); } catch (e) { subiu = false; }
+      } else {
+        const { error } = await App.sb.storage.from(f.bucket)
+          .upload(f.caminho, f.blob, { contentType: 'image/jpeg', upsert: true });
+        subiu = !error || (error.message || '').includes('already exists');
+      }
+      if (subiu) {
         f.status = 'enviada';
         await promessa(tx('fotos', 'readwrite').put(f));
       }
@@ -617,6 +653,6 @@ window.voltarAoInicioDaArea = () => { if (App.usuario && window.mostrarInicio) m
    window. Publico o que telas.js usa, para a ordem de carga não importar. */
 Object.assign(window, {
   App, q, $, $$, esc, aviso, abrirModal, fecharModal,
-  gravar, inativar, irPara, sincronizar, pk, meta, blobDaFoto, baixarBase,
+  gravar, inativar, irPara, sincronizar, pk, meta, blobDaFoto, baixarBase, noDrive, urlDoDrive,
   guardarFoto, enviarFotos
 });

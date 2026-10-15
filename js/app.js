@@ -37,6 +37,7 @@ import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist } from './areas.js';
 import { abrirCertificacao, limparCertificacao, TELAS_CERT } from './certificacao.js';
+import { preparar, enviarArquivo, apagarArquivo, mostrarFotoFunc, chaveFotoFunc } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -922,7 +923,67 @@ function abrirFuncionario(id) {
   $('fuSituacao').value = editandoFunc.situacao || 'ATIVO';
   preencherFichaCompleta(editandoFunc);
   $('bApagarFunc').hidden = !f;
+  abrirFotoFunc(f);
   $('dlgFunc').showModal();
+}
+
+/* =============== foto do funcionário (Google Drive, 15/10/2026) ===============
+   Uma foto por pessoa, chave fixa pessoas/funcionario/<id>/foto.jpg: trocar a
+   foto regrava o mesmo arquivo no Drive. Escolhida, aparece na hora e só sobe
+   ao salvar o cadastro. */
+let fotoFunc = { pendente: null, temSalva: false, url: null };
+function pintarFotoFunc() {
+  const img = $('fuFotoImg');
+  const tem = !img.hidden;
+  $('fuFotoVazia').hidden = tem;
+  $('fuFotoTirar').hidden = !tem;
+  $('fuFotoDica').textContent = fotoFunc.pendente ? 'Sobe para o Google Drive ao salvar.' : 'Guardada no Google Drive.';
+}
+async function abrirFotoFunc(f) {
+  fotoFunc = { pendente: null, temSalva: false, url: null };
+  const img = $('fuFotoImg');
+  img.hidden = true; img.removeAttribute('src');
+  pintarFotoFunc();
+  if (!f || !navigator.onLine) return;
+  const id = f.id;
+  const ok = await mostrarFotoFunc(img, id);
+  if (editandoFunc?.id !== id) return;          // trocou de pessoa enquanto carregava
+  fotoFunc.temSalva = ok;
+  pintarFotoFunc();
+}
+$('fuFotoArq').addEventListener('change', async ev => {
+  const arq = ev.target.files[0]; ev.target.value = '';
+  if (!arq) return;
+  try {
+    const p = await preparar(arq);
+    if (p.mime !== 'image/jpeg') throw new Error('escolha uma foto (JPG ou PNG)');
+    fotoFunc.pendente = p.blob;
+    const img = $('fuFotoImg');
+    if (fotoFunc.url) URL.revokeObjectURL(fotoFunc.url);
+    img.src = fotoFunc.url = URL.createObjectURL(p.blob);
+    img.hidden = false;
+    pintarFotoFunc();
+  } catch (e) { alert('Não deu para usar esta foto: ' + e.message); }
+});
+$('fuFotoTirar').addEventListener('click', async () => {
+  if (fotoFunc.pendente) {
+    fotoFunc.pendente = null;
+    $('fuFotoImg').hidden = !fotoFunc.temSalva;
+    if (fotoFunc.temSalva) await mostrarFotoFunc($('fuFotoImg'), editandoFunc.id);
+    return pintarFotoFunc();
+  }
+  if (!fotoFunc.temSalva || !confirm('Tirar a foto deste funcionário? Ela vai para a lixeira do Drive.')) return;
+  try {
+    await apagarArquivo(chaveFotoFunc(editandoFunc.id));
+    fotoFunc.temSalva = false; $('fuFotoImg').hidden = true; pintarFotoFunc();
+  } catch (e) { alert('Não consegui tirar a foto: ' + e.message); }
+});
+async function subirFotoFunc(f) {
+  if (!fotoFunc.pendente) return;
+  try {
+    await enviarArquivo(chaveFotoFunc(f.id), fotoFunc.pendente, 'image/jpeg', f.nome || 'funcionario');
+    fotoFunc.pendente = null;
+  } catch (e) { alert(`O cadastro foi salvo, mas a foto não subiu: ${e.message}. Abra o cadastro e escolha a foto de novo.`); }
 }
 
 /* Os três blocos recolhidos da ficha: contato e emergência, endereço e
@@ -1193,6 +1254,7 @@ $('formFunc').addEventListener('submit', async ev => {
     else await iv.sincronizar(f);
   } catch (e) { console.warn('vínculo dos indicadores', e); }
 
+  await subirFotoFunc(f);
   $('dlgFunc').close();
   preencherControles(); desenharFuncionarios(); desenharSelecao();
 });
@@ -1201,6 +1263,7 @@ $('bApagarFunc').addEventListener('click', async () => {
   if (!editandoFunc?.id) return;
   if (!confirm(`Apagar ${editandoFunc.nome}? As fichas salvas dele também saem.`)) return;
   await db.apagarFuncionario(editandoFunc.id);
+  if (fotoFunc.temSalva) apagarArquivo(chaveFotoFunc(editandoFunc.id)).catch(() => null);
   marcados.delete(editandoFunc.id);
   naLista.delete(editandoFunc.id);
   $('dlgFunc').close();

@@ -298,6 +298,12 @@ async function urlFoto(caminho) {
   const blob = await blobDaFoto(caminho);
   if (blob) { const u = URL.createObjectURL(blob); urlsFotos.set(caminho, u); return u; }
   // Foto já enviada e apagada do aparelho (ou feita em outro aparelho): pede ao Storage.
+  if (App.online && App.sb && noDrive(caminho)) {
+    // foto no Google Drive (desde 15/10/2026)
+    const u = await urlDoDrive(caminho).catch(() => null);
+    if (u) urlsFotos.set(caminho, u);
+    return u;
+  }
   if (App.online && App.sb) {
     const { data } = await App.sb.storage.from('manutencao-checklists').createSignedUrl(caminho, 3600);
     if (data && data.signedUrl) { urlsFotos.set(caminho, data.signedUrl); return data.signedUrl; }

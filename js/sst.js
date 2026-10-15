@@ -10,6 +10,7 @@ import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
   conferenciaDo, pendenciasDe } from './aso.js';
 import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
 import { abrirModulo } from './acesso.js';
+import { caixaAnexos } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -86,7 +87,7 @@ const RECEITAS = {
       dica: 'exDicaVence', apagar: 'bApagarExame',
       dlgTipo: 'dlgTipoEx', formTipo: 'formTipoEx', tituloTipo: 'tituloTipoEx', erroTipo: 'erroTipoEx',
       tNome: 'txNome', tMeses: 'txMeses', tAtivo: 'txAtivo', tApagar: 'bApagarTipoEx', tCarga: null,
-      tCategoria: 'txCategoria',
+      tCategoria: 'txCategoria', anexos: 'exAnexos',
     },
   },
   treinamento: {
@@ -114,7 +115,7 @@ const RECEITAS = {
       carga: 'trCarga', instrutor: 'trInstrutor', obs: 'trObs',
       dlgTipo: 'dlgTipoTr', formTipo: 'formTipoTr', tituloTipo: 'tituloTipoTr', erroTipo: 'erroTipoTr',
       tNome: 'ttNome', tMeses: 'ttMeses', tAtivo: 'ttAtivo', tCarga: 'ttCarga', tApagar: 'bApagarTipoTr',
-      tRecicla: 'ttRecicla',
+      tRecicla: 'ttRecicla', anexos: 'trAnexos',
     },
   },
 };
@@ -123,6 +124,20 @@ const RECEITAS = {
 const S = { exame: { tipos: [], regs: [] }, treinamento: { tipos: [], regs: [] }, carregado: false };
 const editando = { exame: null, treinamento: null };
 const editandoTipo = { exame: null, treinamento: null };
+/* anexos no Google Drive: ASO/exame e certificado do treinamento (15/10/2026) */
+const caixas = {};
+function caixaDe(r) {
+  if (!caixas[r.id]) caixas[r.id] = caixaAnexos($(r.el.anexos), {
+    area: 'pessoas', tipo: r.id,
+    rotulo: r.id === 'exame' ? 'ASO e exames escaneados' : 'Certificado do treinamento',
+    nome: () => {
+      const f = estado.funcionarios.find(x => x.id === $(r.el.func).value);
+      const t = S[r.id].tipos.find(x => x.id === $(r.el.tipo).value);
+      return [t?.nome, f?.nome, $(r.el.data).value].filter(Boolean).join(' - ');
+    },
+  });
+  return caixas[r.id];
+}
 
 export async function carregarSst() {
   const c = estado.cliente;
@@ -629,6 +644,7 @@ function abrirReg(r, id) {
   $(r.el.apagar).hidden = !x;
   atualizarVencimento(r, !x);
   if (r.id === 'exame') mostrarItens(r);
+  caixaDe(r).carregar(x ? x.id : null);
   $(r.el.dlg).showModal();
 }
 
@@ -942,6 +958,14 @@ function ligarReceita(r, avisar) {
       try { await salvarItens(data.id); }
       catch (err) { return mostrarErro(r.el.erro, 'O ASO foi salvo, mas a marcação dos exames não: ' + err.message); }
     }
+    if (caixaDe(r).temPendentes) {
+      e.novo = false; e.id = data.id;            // salvar de novo não duplica o lançamento
+      const erros = await caixaDe(r).salvarPendentes(data.id);
+      if (erros.length) {
+        desenharVenc(r); desenharPainel(r);
+        return mostrarErro(r.el.erro, 'O lançamento foi salvo, mas o anexo não subiu: ' + erros.join('; ') + '. Tente salvar de novo.');
+      }
+    }
     $(r.el.dlg).close();
     desenharVenc(r);
     desenharPainel(r);
@@ -954,6 +978,7 @@ function ligarReceita(r, avisar) {
     if (!confirm('Apagar este lançamento?')) return;
     const { error } = await estado.cliente.from(r.tabelaRegs).delete().eq('id', e.id);
     if (error) return mostrarErro(r.el.erro, error.message);
+    await caixaDe(r).apagarTodos(e.id);
     S[r.id].regs = S[r.id].regs.filter(x => x.id !== e.id);
     $(r.el.dlg).close();
     desenharVenc(r);
