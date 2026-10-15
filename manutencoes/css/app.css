@@ -1283,3 +1283,6 @@ body.embutido .menu,body.embutido .menu2,body.embutido .grupos{padding-left:max(
   .ql{width:100%}
   .ql-item{min-width:0;flex:0 0 auto;white-space:nowrap}
 }
+
+/* rodada A (15/10/2026): nota curta na tela da fila */
+.dica{font-size:12px;color:var(--cinza,#51534A);margin:8px 0 4px}

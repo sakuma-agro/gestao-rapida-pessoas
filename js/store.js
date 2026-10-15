@@ -22,7 +22,8 @@ export const estado = {
   fichas: [],
   modelo: null,
   online: navigator.onLine,
-  pendentes: 0,
+  pendentes: 0,      // fila do EPI (esta camada)
+  pendentesTotal: 0, // todas as filas do app (DP, Reunião, anexos, molduras) — ver app.js
 };
 
 const ouvintes = new Set();
@@ -41,9 +42,24 @@ const ler = (chave, padrao) => {
   try { const v = localStorage.getItem(chave); return v ? JSON.parse(v) : padrao; }
   catch { return padrao; }
 };
-const gravar = (chave, valor) => {
-  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch {}
-};
+/* Armazenamento cheio (15/10/2026, rodada A). O localStorage tem ~5 MB por
+   site, divididos entre todas as áreas. Antes, estourada a cota, o setItem
+   falhava em silêncio — e a FILA de envio deixava de ser gravada: o lançamento
+   sumia ao fechar a aba sem ninguém saber. Agora a falha vira um aviso na
+   tela (evento 'gr:armazenamento-cheio', ouvido pelo app.js). */
+export const armazenamento = { cheio: false, chave: null };
+export function gravarLocal(chave, valor) {
+  try {
+    localStorage.setItem(chave, JSON.stringify(valor));
+    if (armazenamento.cheio && armazenamento.chave === chave) { armazenamento.cheio = false; dispatchEvent(new Event('gr:armazenamento-ok')); }
+    return true;
+  } catch (e) {
+    armazenamento.cheio = true; armazenamento.chave = chave;
+    try { dispatchEvent(new CustomEvent('gr:armazenamento-cheio', { detail: { chave, erro: String(e?.name || e) } })); } catch {}
+    return false;
+  }
+}
+const gravar = gravarLocal;
 
 /* ---------------- conexão ---------------- */
 /* Onde a sessão fica (10/10/2026).

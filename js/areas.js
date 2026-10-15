@@ -19,9 +19,9 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '23';
+const VERSAO_AREA = '24';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '4';
+const VERSAO_PROG = '5';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
 const VERSAO_EST = '1';
 
@@ -59,7 +59,7 @@ export const AREAS = [
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '11';
+const VERSAO_VIST = '12';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa

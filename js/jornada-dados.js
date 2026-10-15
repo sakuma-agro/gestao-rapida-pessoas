@@ -6,7 +6,7 @@
 //
 // Nada aqui altera tabela existente: só as tabelas jor_*.
 
-import { estado, novoId } from './store.js';
+import { estado, novoId, gravarLocal } from './store.js';
 import { acesso, dpRestrito, veDestino } from './acesso.js';
 
 const CHAVE_CACHE = 'jor.cache';
@@ -85,7 +85,7 @@ export const aoMudarJornada = fn => { ouvintes.add(fn); return () => ouvintes.de
 const avisar = () => ouvintes.forEach(fn => fn());
 
 const ler = (k, p) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : p; } catch { return p; } };
-const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const gravar = gravarLocal; // avisa na tela quando o armazenamento enche (rodada A)
 
 export const pendentes = () => ler(CHAVE_FILA, []).length;
 
@@ -611,6 +611,10 @@ export async function boletinsDoDia(fid, data) {
   } catch { /* sem rede: fica com o que já estava na memória */ }
   return { boletins, apuracoes };
 }
+
+/* Rede de volta (15/10/2026, rodada A): antes a fila do DP só subia quando
+   alguém abria o DP de novo — o store.js só esvaziava a fila do EPI. */
+addEventListener('online', () => { enviarFila().then(avisar).catch(() => {}); });
 
 export function limparJornadaDados() {
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = [];

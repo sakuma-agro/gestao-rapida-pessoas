@@ -21,7 +21,7 @@
 // todo login (a frase aparece na tela principal); gravar exige o módulo
 // 'reuniao' (RLS app_pode('reuniao')).
 
-import { estado, novoId } from './store.js';
+import { estado, novoId, gravarLocal } from './store.js';
 import { acesso, podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
@@ -38,7 +38,7 @@ const CACHE = 'gr.reuniao';
 const FILA = 'gr.reuniao.fila';
 
 const ler = (k, p) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : p; } catch { return p; } };
-const gravar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const gravar = gravarLocal; // avisa na tela quando o armazenamento enche (rodada A)
 
 const dados = { pessoas: [], atividades: [], semanas: [], config: [], carregado: false };
 (() => { const c = ler(CACHE, null); if (c) Object.assign(dados, c, { carregado: false }); })();
@@ -664,6 +664,11 @@ function telaAtiv(sec, pode) {
     const ini = inicioPara(sel.value, nasTarefas());
     if (ini) tentar(() => salvarRodizio({ inicio_tarefas: ini }));
   });
+}
+
+/** Quantos itens da reunião ainda esperam envio (fila + marcas). Rodada A. */
+export function pendentesReuniao() {
+  return ler(FILA, []).length + (ler('gr.reuniao.marcas', []).length || 0);
 }
 
 export function limparReuniao() { telaAberta = null; est.semana = null; est.busca = ''; }

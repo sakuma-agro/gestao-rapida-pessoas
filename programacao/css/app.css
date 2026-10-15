@@ -866,3 +866,6 @@ body.embutido .menu,body.embutido .menu2{padding-left:max(14px, calc((100% - var
 .menu2 button{display:inline-flex;align-items:center;gap:6px}
 .menu2 button svg{width:16px;height:16px;flex:none;color:var(--verde)}
 .menu2 button.ativo svg{color:#fff}
+
+/* rodada A (15/10/2026): nota curta na tela da fila */
+.dica{font-size:12px;color:var(--cinza,#51534A);margin:8px 0 4px}

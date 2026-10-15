@@ -92,6 +92,12 @@ function idDe(tabela, registro) {
 
 async function gravarLocal(tabela, linhas) {
   const s = tx('cache', 'readwrite');
+  // Rodada A: transação que falha (cota cheia, base corrompida) rejeita em vez
+  // de deixar a promessa pendurada para sempre — como já fazia a Manutenções.
+  const fim = new Promise((ok, erro) => {
+    s.transaction.oncomplete = () => ok(true);
+    s.transaction.onerror = s.transaction.onabort = () => erro(s.transaction.error);
+  });
   for (const l of linhas) {
     const id = idDe(tabela, l);
     // uma linha sem chave não pode derrubar a gravação das outras
@@ -101,14 +107,17 @@ async function gravarLocal(tabela, linhas) {
     }
     s.put({ tabela, id, dado: l });
   }
-  return new Promise(ok => { s.transaction.oncomplete = () => ok(true); });
+  return fim;
 }
 
 async function limparLocal(tabela) {
   const s = tx('cache', 'readwrite');
   const chaves = await promessa(s.index('por_tabela').getAllKeys(tabela));
   chaves.forEach(k => s.delete(k));
-  return new Promise(ok => { s.transaction.oncomplete = () => ok(true); });
+  return new Promise((ok, erro) => {
+    s.transaction.oncomplete = () => ok(true);
+    s.transaction.onerror = s.transaction.onabort = () => erro(s.transaction.error);
+  });
 }
 
 async function lerLocal(tabela) {
@@ -150,10 +159,9 @@ async function itensDaFila() {
 
 async function contarFila() {
   const itens = await itensDaFila();
-  let fotos = 0;
-  try { fotos = (await promessa(tx('fotos').getAll())).filter(f => f.status !== 'enviada').length; }
-  catch (e) { /* base antiga, sem a store de fotos */ }
-  App.pendentes = itens.filter(i => i.status !== 'enviado').length + fotos;
+  const fotos = await fotosNaFila();
+  App.pendentes = itens.filter(i => i.status !== 'enviado').length + fotos.length;
+  App.parados = itens.filter(i => i.status === 'parado').length + fotos.filter(f => f.status === 'parada').length;
   pintarEstado();
   return App.pendentes;
 }
@@ -172,6 +180,7 @@ async function sincronizar() {
     const itens = (await itensDaFila()).filter(i => i.status !== 'enviado')
       .sort((x, y) => String(x.preenchido_em).localeCompare(String(y.preenchido_em)));
     for (const item of itens) {
+      if (item.status === 'parado') continue;   // espera a pessoa decidir (tela da fila)
       try {
         let r;
         if (item.operacao === 'upsert') {
@@ -194,13 +203,26 @@ async function sincronizar() {
                 .eq(pk(item.tabela), idDe(item.tabela, item.registro));
         }
         if (r.error) throw r.error;
-        // Só sai da fila depois do OK do servidor.
-        await promessa(tx('fila', 'readwrite').delete(item.uuid));
+        /* Só sai da fila depois do OK do servidor — e só se ninguém regravou o
+           mesmo registro enquanto ele subia (rodada A, 15/10/2026): antes o
+           envio antigo apagava da fila a edição nova, que nunca subia. */
+        const agora = await promessa(tx('fila').get(item.uuid));
+        if (!agora || agora.preenchido_em === item.preenchido_em) {
+          await promessa(tx('fila', 'readwrite').delete(item.uuid));
+        }
       } catch (e) {
-        item.status = 'erro';
+        /* Erro de rede (sem código) → 'erro': tenta de novo na próxima.
+           Erro do banco (código Postgres/PostgREST: sem permissão, dado
+           inválido…) → 'parado': repetir não resolve; a tela da fila mostra
+           o motivo e a pessoa escolhe tentar de novo ou descartar. A exceção
+           é chave estrangeira (23503): o pai pode subir na próxima rodada. */
+        const codigo = e && e.code ? String(e.code) : '';
+        const permanente = codigo && codigo !== '23503' && !/^(08|53|57|58)/.test(codigo);
+        item.status = permanente || item.tentativas >= 20 ? 'parado' : 'erro';
         item.tentativas += 1;
         item.erro = e.message || String(e);
         await promessa(tx('fila', 'readwrite').put(item));
+        if (item.status === 'parado') aviso('Um registro não pôde ser enviado (' + item.tabela + '). Veja em "aguardando envio".', true);
       }
     }
   } finally {
@@ -251,7 +273,11 @@ async function blobDaFoto(caminho) {
 
 async function fotosPendentes() {
   const todas = await promessa(tx('fotos').getAll());
-  return todas.filter(f => f.status !== 'enviada');
+  return todas.filter(f => f.status !== 'enviada' && f.status !== 'parada');
+}
+async function fotosNaFila() {
+  try { return (await promessa(tx('fotos').getAll())).filter(f => f.status !== 'enviada'); }
+  catch (e) { return []; }
 }
 
 /* ---------------------------------------------------------------- Google Drive
@@ -293,9 +319,19 @@ async function enviarFotos() {
         }, '&nome=' + encodeURIComponent(f.caminho.split('/').pop()));
       } catch (e) { break; }                       // sem conexão: tenta depois
       if (r.ok) {
-        f.status = 'enviada';
+        // Enviada: sai do aparelho (rodada A, 15/10/2026). Antes ficava marcada
+        // 'enviada' para sempre e o IndexedDB crescia sem parar; quem precisa
+        // da foto depois baixa do Drive (blobDoDrive).
+        await promessa(tx('fotos', 'readwrite').delete(f.id));
+      } else if (r.status >= 500) {
+        break;                                      // Drive fora ou sem autorização: tenta depois
+      } else {
+        // 4xx: repetir não resolve. Fica 'parada' com o motivo, visível na fila.
+        let motivo = ''; try { motivo = (await r.text()).slice(0, 160); } catch (e) {}
+        f.status = 'parada'; f.erro = r.status + ' ' + motivo;
         await promessa(tx('fotos', 'readwrite').put(f));
-      } else if (r.status >= 500) break;           // Drive fora ou sem autorização: tenta depois
+        aviso('Uma foto não pôde ser enviada (' + r.status + '). Veja em "aguardando envio".', true);
+      }
     }
   } finally {
     enviandoFotos = false;
@@ -333,6 +369,7 @@ async function baixarBase(forcar = false) {
   const recente = baixadaEm && (Date.now() - new Date(baixadaEm).getTime() < 6 * 3600 * 1000);
   if (!forcar && recente && versao === CONFIG.VERSAO_BASE) return false;
 
+  const falhas = [];
   for (const t of TABELAS_BASE) {
     // O servidor devolve no máximo 1000 linhas por vez: busco em páginas.
     let data = [], error = null;
@@ -342,7 +379,7 @@ async function baixarBase(forcar = false) {
       data = data.concat(r.data || []);
       if (!r.data || r.data.length < 1000) break;
     }
-    if (error) { console.warn('não baixou', t, error.message); continue; }
+    if (error) { console.warn('não baixou', t, error.message); falhas.push(t); continue; }
     // apaga o que sumiu do servidor (ex.: fazenda tirada da pessoa)
     await limparLocal(t);
     // o que foi feito aqui e ainda não subiu continua valendo na tela
@@ -354,6 +391,11 @@ async function baixarBase(forcar = false) {
     });
     await gravarLocal(t, data);
     App.dados[t] = data;
+  }
+  if (falhas.length) {
+    // Rodada A: antes marcava a base como baixada mesmo faltando tabela.
+    aviso('Não consegui baixar ' + falhas.length + ' cadastro(s) do servidor. Usando o que está guardado neste aparelho.', true);
+    return false;
   }
   await meta('versao_base', CONFIG.VERSAO_BASE);
   await meta('baixada_em', new Date().toISOString());
@@ -412,33 +454,66 @@ function pintarEstado() {
   txt.textContent = App.online ? 'conectado' : 'sem internet';
   if (App.pendentes > 0) {
     fila.textContent = App.pendentes + (App.pendentes === 1
-      ? ' registro aguardando envio' : ' registros aguardando envio');
+      ? ' registro aguardando envio' : ' registros aguardando envio')
+      + (App.parados ? ' · ' + App.parados + ' parado(s)' : '');
     fila.classList.remove('oculto');
   } else {
     fila.classList.add('oculto');
   }
+  // Avisa o LOP (app principal) para o contador do topo somar esta área (rodada A).
+  try {
+    if (window.parent !== window) window.parent.postMessage({ tipo: 'gr-pendentes', area: CONFIG.SCHEMA, n: App.pendentes }, location.origin);
+  } catch (e) {}
 }
 
 /* ---------------------------------------------------------------- fila: tela */
 async function telaFila() {
-  const itens = await itensDaFila();
-  const html = itens.length === 0
-    ? '<div class="vazio"><p>Nada esperando. Tudo que você registrou já está no servidor.</p></div>'
-    : '<ul class="lista">' + itens.map(i => `
+  const itens = (await itensDaFila()).filter(i => i.status !== 'enviado')
+    .sort((x, y) => String(x.preenchido_em).localeCompare(String(y.preenchido_em)));
+  const fotos = await fotosNaFila();   // rodada A: a tela listava só registros; o botão contava fotos também
+  const linha = (tipo, chave, nome, quando, status, erro) => `
         <li>
           <div class="info">
-            <strong>${esc(i.tabela)}</strong>
-            <small>preenchido em ${new Date(i.preenchido_em).toLocaleString('pt-BR')}</small>
-            ${i.erro ? `<small style="color:var(--urgente)">${esc(i.erro)}</small>` : ''}
+            <strong>${esc(nome)}</strong>
+            <small>${tipo === 'foto' ? 'foto tirada' : 'preenchido'} em ${new Date(quando).toLocaleString('pt-BR')}</small>
+            ${erro ? `<small style="color:var(--urgente)">${esc(erro)}</small>` : ''}
+            ${status === 'parado' || status === 'parada' ? `<small>
+              <button type="button" class="btn mini" data-fila-tentar="${esc(chave)}" data-tipo="${tipo}">Tentar de novo</button>
+              <button type="button" class="btn mini" data-fila-descartar="${esc(chave)}" data-tipo="${tipo}">Descartar</button></small>` : ''}
           </div>
-          <span class="etq ${i.status === 'erro' ? 'urgente' : 'atencao'}">${esc(i.status)}</span>
-        </li>`).join('') + '</ul>'
+          <span class="etq ${status === 'erro' || status === 'parado' || status === 'parada' ? 'urgente' : 'atencao'}">${esc(status)}</span>
+        </li>`;
+  const html = itens.length === 0 && fotos.length === 0
+    ? '<div class="vazio"><p>Nada esperando. Tudo que você registrou já está no servidor.</p></div>'
+    : '<ul class="lista">'
+      + itens.map(i => linha('registro', i.uuid, i.tabela, i.preenchido_em, i.status, i.erro)).join('')
+      + fotos.map(f => linha('foto', f.id, 'foto · ' + f.caminho, f.registrado_em, f.status, f.erro)).join('')
+      + '</ul>'
+      + '<p class="dica">"parado" = o servidor recusou (sem permissão ou dado inválido); repetir não resolve sozinho. '
+      + 'Descartar apaga o lançamento deste aparelho.</p>'
       + '<div class="acoes"><button type="button" class="btn" id="btn-sinc">Sincronizar agora</button></div>';
   abrirModal('Registros aguardando envio', html, corpo => {
+    corpo.querySelectorAll('[data-fila-tentar]').forEach(b => b.onclick = async () => {
+      const foto = b.dataset.tipo === 'foto';
+      const loja = foto ? 'fotos' : 'fila';
+      const it = await promessa(tx(loja).get(b.dataset.filaTentar));
+      if (it) { it.status = 'pendente'; it.erro = null; if (!foto) it.tentativas = 0; await promessa(tx(loja, 'readwrite').put(it)); }
+      await contarFila();
+      foto ? enviarFotos() : await sincronizar();
+      telaFila();
+    });
+    corpo.querySelectorAll('[data-fila-descartar]').forEach(b => b.onclick = async () => {
+      if (!confirm('Descartar este lançamento? Ele some deste aparelho e não vai para o servidor.')) return;
+      const loja = b.dataset.tipo === 'foto' ? 'fotos' : 'fila';
+      await promessa(tx(loja, 'readwrite').delete(b.dataset.filaDescartar));
+      await contarFila();
+      telaFila();
+    });
     const b = corpo.querySelector('#btn-sinc');
     if (b) b.onclick = async () => {
       if (!App.online) return aviso('Sem internet. A fila sobe sozinha quando o sinal voltar.', true);
       await sincronizar();
+      enviarFotos();
       aviso(App.pendentes === 0 ? 'Tudo enviado.' : 'Ainda restam ' + App.pendentes + '.');
       telaFila();
     };
@@ -522,7 +597,7 @@ async function iniciarSessao() {
   const jaTemBase = !!(await meta('baixada_em'));
   if (jaTemBase) {
     (async () => {
-      try { await sincronizar(); await baixarBase(true); if (window.repintarTela) repintarTela(); }
+      try { await sincronizar(); enviarFotos(); await baixarBase(true); if (window.repintarTela) repintarTela(); }
       catch (e) { console.warn('atualização da base', e); }
     })();
   } else {
@@ -587,7 +662,8 @@ window.addEventListener('online',  () => { App.online = true;  pintarEstado(); s
 window.addEventListener('offline', () => { App.online = false; pintarEstado(); });
 
 window.addEventListener('beforeunload', e => {
-  if (App.pendentes > 0) { e.preventDefault(); e.returnValue = ''; }
+  // Item 'parado' espera decisão da pessoa; não prende a página para sempre (rodada A).
+  if (App.pendentes - (App.parados || 0) > 0) { e.preventDefault(); e.returnValue = ''; }
 });
 
 document.addEventListener('DOMContentLoaded', async () => {

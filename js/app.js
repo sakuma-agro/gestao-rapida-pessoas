@@ -21,7 +21,7 @@ import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from '.
 import { ligarSst, abrirSst, limparSst, limparPreviaSst } from './sst.js';
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
-import { abrirReuniao, TELAS_REUNIAO, limparReuniao } from './reuniao.js';
+import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
@@ -31,7 +31,7 @@ import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
-import { campoAnexos } from './arquivos.js';
+import { campoAnexos, contarPendentes as pendentesAnexos } from './arquivos.js';
 import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
@@ -1582,13 +1582,82 @@ iv.ligarMovVinc();
 document.querySelectorAll('[data-fechar]').forEach(b =>
   b.addEventListener('click', () => b.closest('dialog').close()));
 
-db.aoMudar(() => {
-  const online = estado.online;
-  $('estadoTexto').textContent = estado.pendentes
-    ? `${estado.pendentes} para enviar`
+/* Contador do topo (15/10/2026, rodada A). Antes "N para enviar" contava só a
+   fila do EPI; DP, Reunião, anexos e as molduras (Máquinas e Patrimônio,
+   Programação Campo) têm filas próprias que o topo não via. Agora soma todas:
+   as do Pessoas direto, as das molduras pelo recado 'gr-pendentes' que cada
+   iframe manda ao repintar o seu estado. */
+const pendentesMoldura = {};
+let contandoPendentes = null;
+async function contarPendentes() {
+  if (contandoPendentes) return contandoPendentes;
+  contandoPendentes = (async () => {
+    let n = estado.pendentes + jd.pendentes() + pendentesReuniao();
+    try { n += await pendentesAnexos(); } catch {}
+    for (const k in pendentesMoldura) n += pendentesMoldura[k] || 0;
+    estado.pendentesTotal = n;
+    pintarEstadoRede();
+  })().finally(() => { contandoPendentes = null; });
+  return contandoPendentes;
+}
+function pintarEstadoRede() {
+  const online = estado.online, n = estado.pendentesTotal;
+  $('estadoTexto').textContent = n
+    ? `${n} para enviar`
     : (online ? 'sincronizado' : 'offline');
-  $('estadoRede').querySelector('.pt').classList.toggle('off', !online || estado.pendentes > 0);
+  $('estadoRede').title = n ? 'Lançamentos feitos sem internet; sobem sozinhos quando o sinal volta.' : '';
+  $('estadoRede').querySelector('.pt').classList.toggle('off', !online || n > 0);
+}
+db.aoMudar(() => { contarPendentes(); });
+jd.aoMudarJornada(() => { contarPendentes(); });
+addEventListener('online', () => setTimeout(contarPendentes, 1500));
+setInterval(contarPendentes, 60 * 1000);
+addEventListener('message', ev => {
+  if (ev.origin !== location.origin) return;
+  const d = ev.data;
+  if (d && d.tipo === 'gr-pendentes' && typeof d.n === 'number' && d.area) {
+    pendentesMoldura[d.area] = d.n;
+    contarPendentes();
+  }
 });
+
+/* Erro que escapa (rodada A, 15/10/2026). Antes, um erro dentro de um botão
+   sumia sem rastro: o botão ficava travado e a pessoa não sabia o quê. Agora
+   aparece uma faixa com a mensagem e um botão para copiar o erro (para mandar
+   no WhatsApp). Não trata nada — só mostra. */
+let errosMostrados = 0;
+function mostrarErroGlobal(origem, e) {
+  const msg = (e && (e.message || e.reason?.message || e.reason)) || String(e);
+  if (!msg || /ResizeObserver|AbortError|Load failed|Failed to fetch|NetworkError/i.test(String(msg))) return; // rede e ruído do navegador
+  if (++errosMostrados > 3) return;  // não inunda a tela
+  const a = $('avisoErro');
+  const txt = `${origem}: ${String(msg).slice(0, 300)}`;
+  a.innerHTML = '';
+  a.append('Algo deu errado nesta tela. Se um botão parou de responder, feche e abra o app de novo. ');
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn mini'; b.textContent = 'Copiar o erro';
+  b.onclick = () => { try { navigator.clipboard.writeText(txt + ' · ' + navigator.userAgent); b.textContent = 'Copiado'; } catch { b.textContent = txt; } };
+  const x = document.createElement('button');
+  x.type = 'button'; x.className = 'btn mini'; x.textContent = 'Fechar';
+  x.onclick = () => { a.hidden = true; };
+  a.append(b, ' ', x);
+  a.hidden = false;
+  console.error('[LOP]', txt, e);
+}
+addEventListener('error', ev => mostrarErroGlobal('Erro', ev.error || ev.message));
+addEventListener('unhandledrejection', ev => mostrarErroGlobal('Falha', ev.reason));
+
+/* Armazenamento do aparelho cheio (rodada A): a fila de envio não pôde ser
+   gravada. Aviso vermelho fixo até a gravação voltar a dar certo. */
+addEventListener('gr:armazenamento-cheio', ev => {
+  const a = $('avisoArmazenamento');
+  a.textContent = 'O armazenamento deste aparelho para o app encheu e o último lançamento '
+    + 'NÃO ficou guardado para envio. Conecte na internet e abra de novo; se seguir assim, '
+    + 'o administrador precisa limpar fotos antigas (Vistorias) ou dados do aparelho. '
+    + '(' + (ev.detail?.chave || '') + ')';
+  a.hidden = false;
+});
+addEventListener('gr:armazenamento-ok', () => { $('avisoArmazenamento').hidden = true; });
 
 /* =============== manter conectado neste aparelho =============== */
 $('logManter').checked = db.manterConectado();

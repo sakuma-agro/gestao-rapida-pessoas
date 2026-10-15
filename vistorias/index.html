@@ -3609,17 +3609,21 @@ async function gravarStatus(uid,status,obs,fotoEv){
   if(status==="Concluído"){p.encerradoEm=new Date().toISOString();p.encerradoObs=obs||"";}
   else{p.encerradoEm=null;p.encerradoObs="";}
 
-  if(conectado()&&p.remoto){
-    try{
-      let caminho=null;
-      if(fotoEv)caminho=await enviarFoto(`${p.vistoriaId}/${uid}-encerramento.jpg`,fotoEv);
-      await rest(`itens?id=eq.${uid}`,{
-        method:"PATCH",headers:{"Prefer":"return=minimal"},
-        body:JSON.stringify({status,encerrado_em:p.encerradoEm,encerrado_obs:p.encerradoObs,
-          ...(caminho?{foto_encerramento:caminho}:{})})
-      });
-    }catch(e){
-      toast("Status mudou aqui, mas a base recusou: "+String(e.message).slice(0,100));
+  /* Rodada A (15/10/2026): mudança de status feita sem sinal ia ficar só
+     neste aparelho para sempre (o comentário dizia o contrário). Agora, sem
+     rede ou com a rede caindo no meio, ela entra na fila K_STATUS_FILA e sobe
+     quando o sinal volta. Recusa do servidor (permissão, dado) não entra na
+     fila: avisa e pronto. */
+  if(p.remoto){
+    const item={uid,vistoriaId:p.vistoriaId,status,encerradoEm:p.encerradoEm,encerradoObs:p.encerradoObs,foto:fotoEv||null,em:new Date().toISOString()};
+    if(!conectado()||!navigator.onLine){
+      enfileirarStatus(item);
+    }else{
+      try{ await enviarStatus(item); }
+      catch(e){
+        if(e instanceof TypeError||!navigator.onLine){ enfileirarStatus(item); }
+        else toast("Status mudou aqui, mas a base recusou: "+String(e.message).slice(0,100));
+      }
     }
   }
 
@@ -3635,6 +3639,55 @@ async function gravarStatus(uid,status,obs,fotoEv){
   renderAberto();
   if(typeof fichaAtual==="object"&&fichaAtual&&fichaAtual.uid===uid&&$("#dlg-item").open)abrirFicha(uid);
 }
+
+/* ─────────────── fila de status (rodada A, 15/10/2026) ─────────────── */
+const K_STATUS_FILA="sakuma-status-fila";
+async function enviarStatus(item){
+  let caminho=null;
+  if(item.foto)caminho=await enviarFoto(`${item.vistoriaId}/${item.uid}-encerramento.jpg`,item.foto);
+  await rest(`itens?id=eq.${item.uid}`,{
+    method:"PATCH",headers:{"Prefer":"return=minimal"},
+    body:JSON.stringify({status:item.status,encerrado_em:item.encerradoEm,encerrado_obs:item.encerradoObs,
+      ...(caminho?{foto_encerramento:caminho}:{})})
+  });
+}
+function enfileirarStatus(item){
+  const fila=(lerJSON(K_STATUS_FILA)||[]).filter(x=>x.uid!==item.uid); // a última mudança do item vale
+  fila.push(item);
+  try{ localStorage.setItem(K_STATUS_FILA,JSON.stringify(fila)); }
+  catch(e){ toast("Sem espaço neste aparelho: a mudança de status NÃO ficou guardada para envio."); return; }
+  toast("Sem sinal: o status sobe sozinho quando a internet voltar.");
+  avisarPendentesStatus();
+}
+function avisarPendentesStatus(){
+  const n=(lerJSON(K_STATUS_FILA)||[]).length;
+  try{ if(window.parent!==window)window.parent.postMessage({tipo:"gr-pendentes",area:"vistorias",n},location.origin); }catch(e){}
+  return n;
+}
+let enviandoStatus=false;
+async function enviarStatusPendentes(){
+  if(enviandoStatus||!navigator.onLine||!conectado())return;
+  const fila=lerJSON(K_STATUS_FILA)||[];
+  if(!fila.length)return;
+  enviandoStatus=true;
+  let ok=0;
+  try{
+    for(const item of fila){
+      try{ await enviarStatus(item); ok++; }
+      catch(e){
+        if(e instanceof TypeError||!navigator.onLine)break;       // caiu a rede: para e tenta depois
+        toast("A base recusou um status ("+String(e.message).slice(0,80)+"); ele foi descartado.");
+        ok++;                                                     // recusa: repetir não resolve
+      }
+      const resto=(lerJSON(K_STATUS_FILA)||[]).filter(x=>x.uid!==item.uid);
+      try{ localStorage.setItem(K_STATUS_FILA,JSON.stringify(resto)); }catch(e){}
+    }
+  }finally{ enviandoStatus=false; avisarPendentesStatus(); }
+  if(ok)toast(ok+(ok===1?" status enviado.":" status enviados."));
+}
+window.addEventListener("online",()=>setTimeout(enviarStatusPendentes,1500));
+setTimeout(()=>{ avisarPendentesStatus(); enviarStatusPendentes(); },4000);
+setInterval(enviarStatusPendentes,2*60*1000);
 
 /* ══════════════════════════ conta ══════════════════════════ */
 function atualizarConta(){
