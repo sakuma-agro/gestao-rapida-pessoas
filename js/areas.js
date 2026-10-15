@@ -25,6 +25,9 @@ const VERSAO_PROG = '4';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
 const VERSAO_EST = '1';
 
+/* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
+   Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
+   Estoque · (Usuários - Acessos, só admin). */
 export const AREAS = [
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
@@ -33,6 +36,10 @@ export const AREAS = [
      pasta segue manutencoes/ e o banco segue no esquema manutencao. */
   { id: 'manutencoes', nome: 'Máquinas e Patrimônio', icone: 'icons/area-manutencoes.v1.svg',
     desc: 'Máquinas · Patrimônio · Vencimentos · Ordens de serviço · Check list' },
+  { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
+    desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
+  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
+    desc: 'Vistorias · Checklists · Anomalias · Extintores' },
   /* Programação Campo (15/10/2026, pedido dele): o app avulso veio para dentro
      do LOP para usar os cadastros de funcionários (Pessoas) e de máquinas e
      implementos (Máquinas e Patrimônio). Mora em programacao/, numa moldura. */
@@ -43,10 +50,6 @@ export const AREAS = [
      acerto entre as fazendas e cadastros. Mora em estoque/, numa moldura. */
   { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v2.svg',
     desc: 'Contagem · Acerto entre fazendas · Cadastros' },
-  { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
-    desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
-  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
-    desc: 'Vistorias · Checklists · Anomalias · Extintores' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
