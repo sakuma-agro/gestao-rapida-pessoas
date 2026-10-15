@@ -1282,3 +1282,27 @@ span.ce-doc{cursor:default}
 /* Faixa "nova versão" (15/10/2026) */
 .faixa-versao{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;background:#1B232B;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:14px;max-width:calc(100% - 32px)}
 .faixa-versao button{background:#84BD00;color:#1B232B;border:0;border-radius:6px;padding:7px 12px;font-weight:bold;font-size:14px;cursor:pointer}
+
+/* ===== Anexos no Google Drive (15/10/2026) ===== */
+.anx{margin:12px 0 0;padding:10px 12px;border:1px dashed var(--linha);border-radius:10px;background:var(--papel)}
+.anx-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.anx-rot{font-weight:700;font-size:13px;color:var(--texto)}
+.anx-rot small{display:block;font-weight:400;color:var(--suave);font-size:11.5px}
+.anx-botao{cursor:pointer;white-space:nowrap}
+.anx-lista{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.anx-lista li{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.anx-lista li small{color:var(--suave);white-space:nowrap}
+.anx-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;
+  background:none;border:0;padding:2px 0;color:var(--verde-esc);font:inherit;cursor:pointer;text-decoration:underline}
+span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
+.anx-novo .anx-nome{font-style:italic}
+.anx-x{background:none;border:1px solid var(--linha);border-radius:6px;color:var(--suave);cursor:pointer;font-size:12px;padding:2px 7px}
+.anx-x:hover{color:var(--erro);border-color:var(--erro)}
+.anx-vazio{color:var(--suave);font-size:12.5px}
+.anx-aviso{margin:6px 0 0;font-size:12px;color:var(--alerta)}
+.anx-foto{margin-top:8px;display:flex;align-items:center;gap:10px}
+.anx-foto img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--linha);cursor:pointer}
+.anx-semfoto{color:var(--suave);font-size:12.5px}
+#fuFoto.anx{margin:0 0 10px}
+.ce-anx{margin-left:4px;font-size:12px}
+@media print{.anx{display:none}}
