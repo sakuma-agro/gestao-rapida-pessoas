@@ -810,6 +810,40 @@ addEventListener('beforeinstallprompt', function (ev) {
       </div>
     </section>
 
+    <!-- ---- SST · TREINAMENTOS: certificados (15/10/2026) ---- -->
+    <section class="tela" id="telaTrCert" hidden>
+      <div class="cartao">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Certificados de treinamento</h2>
+            <p class="dica" style="margin:2px 0 0">
+              Todos os treinamentos lançados, com o certificado anexado. Filtre pelo funcionário para ver os dele.
+            </p>
+          </div>
+        </div>
+        <div class="grade larga" style="margin-top:14px">
+          <label class="campo">Funcionário <select id="tcFunc"><option value="">Todos os funcionários</option></select></label>
+          <label class="campo">Treinamento <select id="tcTipo"><option value="">Todos os treinamentos</option></select></label>
+          <label class="campo">Certificado
+            <select id="tcSo">
+              <option value="">Todos</option>
+              <option value="com">Com certificado</option>
+              <option value="sem">Sem certificado</option>
+            </select>
+          </label>
+          <label class="campo">Funcionários
+            <select id="tcSit">
+              <option value="ATIVO">Somente ativos</option>
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+        <div class="barra" style="margin-top:10px"><span id="tcResumo" class="barra"></span><span class="cresce"></span>
+          <button class="btn mini" type="button" id="tcLimpar">Limpar filtros</button></div>
+        <div id="trCertLista" style="margin-top:12px"></div>
+      </div>
+    </section>
+
     <!-- ---- SST · TREINAMENTOS: vencimentos ---- -->
     <section class="tela" id="telaTrVenc" hidden>
       <div class="cartao naoimprimir">

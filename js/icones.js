@@ -51,7 +51,7 @@ export const ICONE_TELA = {
   cadRelatorios: 'grafico', rhQuadro: 'pizza', cadFerias: 'sol', cadFuncoes: 'cargo', cadEstrutura: 'predio',
   fichas: 'escudo', epis: 'lista', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exFuncoes: 'cargo', exTipos: 'ajuste',
-  trPainel: 'painel', trVenc: 'treino', trTipos: 'ajuste',
+  trPainel: 'painel', trVenc: 'treino', trTipos: 'ajuste', trCert: 'documento',
   disc: 'disc', rhCargos: 'cargo', sdQuadro: 'balanca', sdPlanos: 'check', sdConfig: 'config', rhProposta: 'documento', rhOrganograma: 'organograma',
   jorPainel: 'painel', jorLancar: 'relogio', jorBoletins: 'lista', jorExtras: 'grafico', jorAbatimento: 'ajuste',
   jorFechamento: 'calendario', jorHistorico: 'historico',

@@ -1306,3 +1306,11 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 #fuFoto.anx{margin:0 0 10px}
 .ce-anx{margin-left:4px;font-size:12px}
 @media print{.anx{display:none}}
+
+/* SST › Treinamentos › Certificados (15/10/2026) */
+.tc-rolagem{overflow-x:auto}
+.tc-tabela{width:100%}
+.tc-tabela td{vertical-align:middle}
+.tc-acao{white-space:nowrap;position:relative}
+.tc-sem{color:#8A8D86;font-size:13px}
+.tc-escolha{display:flex;flex-direction:column;gap:4px;margin-top:6px}

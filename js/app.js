@@ -109,6 +109,7 @@ function abrirAba(nome) {
   $('telaExTipos').hidden = nome !== 'exTipos';
   $('telaExFuncoes').hidden = nome !== 'exFuncoes';
   $('telaTrVenc').hidden  = nome !== 'trVenc';
+  $('telaTrCert').hidden  = nome !== 'trCert';
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
@@ -158,7 +159,7 @@ function abrirAba(nome) {
   if (nome === 'disc') abrirDisc();
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();
-  if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
+  if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos', 'trCert'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
   for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);

@@ -4,13 +4,13 @@
 // e uma tela de vencimentos, onde cada lançamento ganha a data de vencimento
 // calculada pelo tipo. Por isso quase tudo aqui é escrito uma vez só e recebe
 // a "receita" do exame ou do treinamento em RECEITAS.
-import { campoAnexos } from './arquivos.js';
+import { campoAnexos, listarArquivos, donosComArquivo, abrirArquivo, aoMudarArquivos } from './arquivos.js';
 import { estado } from './store.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
   conferenciaDo, pendenciasDe } from './aso.js';
 import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
-import { abrirModulo } from './acesso.js';
+import { abrirModulo, podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -172,6 +172,7 @@ function grupoDe(r, tipoId) {
 
 /* =============== abrir uma tela =============== */
 export async function abrirSst(tela) {
+  if (tela === 'trCert') return abrirCertificados();
   const r = Object.values(RECEITAS).find(x =>
     x.tela === tela || x.telaTipos === tela || x.telaPainel === tela);
   if (!r) return;
@@ -958,6 +959,7 @@ function ligarReceita(r, avisar) {
     $(r.el.dlg).close();
     desenharVenc(r);
     desenharPainel(r);
+    if (r.id === 'treinamento') redesenharCertificados();
     avisar(`${r.id === 'exame' ? 'Exame' : 'Treinamento'} salvo.`);
   });
 
@@ -971,6 +973,7 @@ function ligarReceita(r, avisar) {
     $(r.el.dlg).close();
     desenharVenc(r);
     desenharPainel(r);
+    if (r.id === 'treinamento') redesenharCertificados();
   });
 
   /* ---- salvar tipo ---- */
@@ -1026,6 +1029,7 @@ function mostrarErro(id, texto) {
 
 export function ligarSst(avisar = () => {}) {
   Object.values(RECEITAS).forEach(r => ligarReceita(r, avisar));
+  ligarCertificados();
 
   // o diálogo de escolher a pessoa é um só para as duas telas
   $('formFichaSst').addEventListener('submit', ev => {
@@ -1035,5 +1039,124 @@ export function ligarSst(avisar = () => {}) {
     if (!r || !id) return;
     $('dlgFichaSst').close();
     gerarFicha(r, id);
+  });
+}
+
+/* =============== Certificados (15/10/2026) ===============
+   SST › Treinamentos › Certificados, a pedido dele: a mesma lista dos
+   treinamentos, com filtro por funcionário, e o botão Visualizar certificado.
+   Colunas: funcionário, treinamento, data de emissão e o certificado.
+   O certificado é o anexo do lançamento (tabela arquivos, área pessoas, tipo
+   treinamento, dono = id do lançamento), guardado no Google Drive. Como o
+   lançamento não tem campo próprio de emissão, a data de emissão é a data de
+   realização do treinamento. */
+const cert = { func: '', tipo: '', so: '', sit: 'ATIVO', donos: new Set() };
+
+async function abrirCertificados() {
+  const alvo = $('trCertLista');
+  if (!S.carregado) {
+    alvo.innerHTML = '<div class="vazio">Carregando…</div>';
+    try { await carregarSst(); }
+    catch (e) { alvo.innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`; return; }
+  }
+  preencherFiltrosCert();
+  desenharCertificados();
+  try { cert.donos = await donosComArquivo('pessoas', 'treinamento'); } catch { /* sem rede: fica o que havia */ }
+  desenharCertificados();
+}
+
+function redesenharCertificados() {
+  if ($('telaTrCert') && !$('telaTrCert').hidden) abrirCertificados();
+}
+
+function preencherFiltrosCert() {
+  const r = RECEITAS.treinamento;
+  const comTreino = new Set(S.treinamento.regs.map(x => x.funcionario_id));
+  const gente = estado.funcionarios
+    .filter(f => comTreino.has(f.id) && (!cert.sit || (f.situacao || 'ATIVO') === cert.sit || f.id === cert.func))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  $('tcFunc').innerHTML = '<option value="">Todos os funcionários</option>' +
+    gente.map(f => `<option value="${f.id}"${f.id === cert.func ? ' selected' : ''}>${esc(f.nome)}</option>`).join('');
+  const tipos = S[r.id].tipos.filter(t => S.treinamento.regs.some(x => x.tipo_id === t.id))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  $('tcTipo').innerHTML = '<option value="">Todos os treinamentos</option>' +
+    tipos.map(t => `<option value="${t.id}"${t.id === cert.tipo ? ' selected' : ''}>${esc(t.nome)}</option>`).join('');
+  $('tcSo').value = cert.so;
+  $('tcSit').value = cert.sit;
+}
+
+function linhasCert() {
+  const r = RECEITAS.treinamento;
+  return S.treinamento.regs
+    .map(x => ({ x, f: funcionario(x.funcionario_id), t: tipoDe(r, x.tipo_id), tem: cert.donos.has(String(x.id)) }))
+    .filter(({ x, f, tem }) => f &&
+      (!cert.func || x.funcionario_id === cert.func) &&
+      (!cert.tipo || x.tipo_id === cert.tipo) &&
+      (!cert.sit || (f.situacao || 'ATIVO') === cert.sit || x.funcionario_id === cert.func) &&
+      (cert.so !== 'com' || tem) && (cert.so !== 'sem' || !tem))
+    .sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR') ||
+      String(b.x.realizado).localeCompare(String(a.x.realizado)));
+}
+
+function desenharCertificados() {
+  const alvo = $('trCertLista');
+  if (!alvo) return;
+  const l = linhasCert();
+  const com = l.filter(y => y.tem).length;
+  const anexar = podeTela('trVenc');
+  $('tcResumo').innerHTML = `<span class="tag">${l.length} treinamento(s)</span>
+    <span class="tag ativo">${com} com certificado</span>
+    ${l.length - com ? `<span class="tag alerta">${l.length - com} sem certificado</span>` : ''}`;
+  alvo.innerHTML = l.length ? `
+    <div class="tc-rolagem"><table class="dc-planilha tc-tabela">
+      <thead><tr><th>Funcionário</th><th>Treinamento</th><th>Data de emissão</th><th>Certificado</th></tr></thead>
+      <tbody>${l.map(({ x, f, t, tem }) => `<tr>
+        <td><b>${esc(f.nome)}</b>${(f.situacao || 'ATIVO') !== 'ATIVO' ? ' <span class="tag">inativo</span>' : ''}</td>
+        <td>${esc(t?.nome || '—')}</td>
+        <td>${dataBr(x.realizado)}</td>
+        <td class="tc-acao">${tem
+          ? `<button class="btn mini principal" type="button" data-tc-ver="${x.id}">Visualizar certificado</button>`
+          : `<span class="tc-sem">Sem certificado</span>${anexar ? ` <button class="btn mini" type="button" data-tc-anexar="${x.id}">Anexar</button>` : ''}`}</td>
+      </tr>`).join('')}</tbody></table></div>`
+    : '<div class="vazio">Nenhum treinamento neste filtro.</div>';
+
+  alvo.querySelectorAll('[data-tc-ver]').forEach(b => b.addEventListener('click', () => verCertificado(b.dataset.tcVer, b)));
+  alvo.querySelectorAll('[data-tc-anexar]').forEach(b => b.addEventListener('click', () =>
+    abrirReg(RECEITAS.treinamento, b.dataset.tcAnexar)));
+}
+
+/* Um lançamento pode ter mais de um arquivo: um só abre direto; mais de um
+   abre uma listinha para escolher. */
+async function verCertificado(id, botao) {
+  let lista = [];
+  try { lista = await listarArquivos('pessoas', 'treinamento', id); }
+  catch (e) { alert('Não consegui ler o certificado: ' + (e.message || e)); return; }
+  if (!lista.length) { alert('Este treinamento ainda não tem certificado anexado.'); return; }
+  if (lista.length === 1) return abrirArquivo(lista[0].chave);
+  document.querySelector('.tc-escolha')?.remove();
+  const caixa = document.createElement('div');
+  caixa.className = 'tc-escolha';
+  caixa.innerHTML = lista.map((a, i) =>
+    `<button class="btn mini" type="button" data-i="${i}">${esc(a.nome || 'Arquivo ' + (i + 1))}</button>`).join('');
+  botao.after(caixa);
+  caixa.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => {
+    abrirArquivo(lista[Number(b.dataset.i)].chave);
+    caixa.remove();
+  }));
+}
+
+export function ligarCertificados() {
+  const muda = (id, k) => $(id).addEventListener('change', ev => {
+    cert[k] = ev.target.value;
+    if (k === 'sit') preencherFiltrosCert();
+    desenharCertificados();
+  });
+  muda('tcFunc', 'func'); muda('tcTipo', 'tipo'); muda('tcSo', 'so'); muda('tcSit', 'sit');
+  $('tcLimpar').addEventListener('click', () => {
+    Object.assign(cert, { func: '', tipo: '', so: '', sit: 'ATIVO' });
+    preencherFiltrosCert(); desenharCertificados();
+  });
+  aoMudarArquivos(() => {
+    donosComArquivo('pessoas', 'treinamento').then(d => { cert.donos = d; if (!$('telaTrCert').hidden) desenharCertificados(); }).catch(() => {});
   });
 }
