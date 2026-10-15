@@ -27,6 +27,7 @@ export const MODULOS = [
   ] },
   { id: 'qc', nome: 'Estoque Quebra Cocão', telas: [
     ['qcVisao',    'Estoque'],
+    ['qcPainel',   'Movimentações'],
     ['qcEntrada',  'Entradas'],
     ['qcSaida',    'Saídas'],
   ] },

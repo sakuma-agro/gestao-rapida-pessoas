@@ -457,9 +457,147 @@ function desenharListaMes(sentido) {
 }
 
 /* ===================================================================
+   Movimentações — painel consolidado (pedido dele, 15/10/2026): todas as
+   entradas e saídas em ordem de data, com filtros, totais e impressão.
+   =================================================================== */
+const pf = { de: hojeISO().slice(0, 8) + '01', ate: hojeISO(), sentido: '', tipo: '', grupo: '', texto: '' };
+
+function filtrados() {
+  const t = semAcento(pf.texto);
+  return movimentos().filter(m => {
+    const d = String(m.data).slice(0, 10);
+    if (pf.de && d < pf.de) return false;
+    if (pf.ate && d > pf.ate) return false;
+    if (pf.sentido && m.sentido !== pf.sentido) return false;
+    if (pf.tipo && m.tipo !== pf.tipo) return false;
+    const i = itemDe(m.item_id);
+    if (pf.grupo && (i.grupo || 'Outros') !== pf.grupo) return false;
+    if (t && ![i.nome, m.documento, m.plantio, m.operador, m.outra_fazenda, m.fornecedor, m.obs]
+      .some(v => semAcento(v).includes(t))) return false;
+    return true;
+  }).sort((a, b) => String(b.data).localeCompare(String(a.data))
+    || String(b.atualizado_em || '').localeCompare(String(a.atualizado_em || '')));
+}
+
+const nomeTipo = m => (m.sentido === 'entrada' ? TIPOS_ENTRADA : TIPOS_SAIDA)[m.tipo] || m.tipo;
+
+function desenharPainel() {
+  const alvo = $('qcPainelCorpo');
+  if (!pronto()) { alvo.innerHTML = '<div class="cartao"><div class="vazio">Abrindo…</div></div>'; return; }
+  if (!localQc()) return semLocal(alvo);
+  $('qcPainelFolha').innerHTML = '';
+  const lista = filtrados();
+  const ent = lista.filter(m => m.sentido === 'entrada'), sai = lista.filter(m => m.sentido === 'saida');
+  const lancs = l => new Set(l.map(m => m.lancamento_id || m.id)).size;
+  const grupos = [...new Set(itensOrdenados().map(i => i.grupo || 'Outros'))];
+  const tipos = pf.sentido === 'entrada' ? TIPOS_ENTRADA : pf.sentido === 'saida' ? TIPOS_SAIDA
+    : { ...TIPOS_ENTRADA, uso: 'Uso' };
+  let dia = null;
+  alvo.innerHTML = `
+  <div class="cartao">
+    <h2>Movimentações · Faz. Quebra Cocão</h2>
+    <p class="dica">Todas as entradas e saídas, da mais nova para a mais antiga.</p>
+    <div class="grade">
+      <label class="campo">De <input type="date" id="pfDe" value="${esc(pf.de)}"></label>
+      <label class="campo">Até <input type="date" id="pfAte" value="${esc(pf.ate)}"></label>
+      <label class="campo">Entradas e saídas <select id="pfSentido">
+        <option value="">Todas</option><option value="entrada"${pf.sentido === 'entrada' ? ' selected' : ''}>Só entradas</option>
+        <option value="saida"${pf.sentido === 'saida' ? ' selected' : ''}>Só saídas</option></select></label>
+      <label class="campo">Tipo <select id="pfTipo"><option value="">Todos</option>${Object.entries(tipos).map(([k, v]) =>
+        `<option value="${k}"${pf.tipo === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+      <label class="campo">Categoria <select id="pfGrupo"><option value="">Todas</option>${grupos.map(g =>
+        `<option${pf.grupo === g ? ' selected' : ''}>${esc(g)}</option>`).join('')}</select></label>
+      <label class="campo">Procurar <input type="text" id="pfTexto" value="${esc(pf.texto)}" placeholder="produto, documento, plantio, operador…"></label>
+    </div>
+    <div class="ct-chips">
+      ${[['mes', 'Este mês'], ['30', 'Últimos 30 dias'], ['ano', 'Este ano'], ['tudo', 'Tudo']].map(([k, v]) =>
+        `<button type="button" class="ct-chip" data-periodo="${k}">${v}</button>`).join('')}
+    </div>
+    <div class="es-cards">
+      <div class="es-card es-ok"><span>Entradas</span><strong>${ent.length}</strong><small>itens em ${lancs(ent)} lançamento(s)</small></div>
+      <div class="es-card es-sobra"><span>Saídas</span><strong>${sai.length}</strong><small>itens em ${lancs(sai)} lançamento(s)</small></div>
+      <div class="es-card es-transf"><span>Transferências</span><strong>${lista.filter(m => m.tipo === 'transferencia').length}</strong><small>entrando e saindo</small></div>
+      <div class="es-card"><span>Produtos diferentes</span><strong>${new Set(lista.map(m => m.item_id)).size}</strong><small>no período</small></div>
+    </div>
+    <div class="barra fim" style="margin-top:10px">
+      <button class="btn" type="button" id="pfCsv"${lista.length ? '' : ' disabled'}>Baixar planilha</button>
+      <button class="btn" type="button" id="pfImprimir"${lista.length ? '' : ' disabled'}>Imprimir</button>
+    </div>
+  </div>
+  <div class="cartao">
+    <div class="qc-mov">${lista.map(m => {
+      const i = itemDe(m.item_id);
+      const d = String(m.data).slice(0, 10);
+      const cab = d !== dia ? `<h3 class="es-secao">${esc(dataBR(dia = d))} <small>${esc(new Date(d + 'T12:00').toLocaleDateString('pt-BR', { weekday: 'long' }))}</small></h3>` : '';
+      const e = m.sentido === 'entrada';
+      return cab + `<div class="qc-mov-lin ${e ? 'ent' : 'sai'}">
+        <span class="qc-mov-sinal">${e ? 'E' : 'S'}</span>
+        <div class="qc-mov-txt"><b>${esc(i.nome)}</b> <span class="tag ${e ? 'ativo' : 'alerta'}">${esc(nomeTipo(m))}</span>
+          <small>${detalhe(m)}</small></div>
+        <strong class="${e ? 'qc-ent' : 'qc-sai'}">${e ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</strong>
+      </div>`;
+    }).join('') || '<div class="vazio">Nenhuma movimentação com esses filtros.</div>'}</div>
+  </div>`;
+
+  const refaz = () => desenharPainel();
+  $('pfDe').onchange = e => { pf.de = e.target.value; refaz(); };
+  $('pfAte').onchange = e => { pf.ate = e.target.value; refaz(); };
+  $('pfSentido').onchange = e => { pf.sentido = e.target.value; pf.tipo = ''; refaz(); };
+  $('pfTipo').onchange = e => { pf.tipo = e.target.value; refaz(); };
+  $('pfGrupo').onchange = e => { pf.grupo = e.target.value; refaz(); };
+  $('pfTexto').oninput = e => {
+    pf.texto = e.target.value; const pos = e.target.selectionStart;
+    refaz(); const el = $('pfTexto'); el.focus(); el.setSelectionRange(pos, pos);
+  };
+  alvo.querySelectorAll('[data-periodo]').forEach(b => b.onclick = () => {
+    const hoje = hojeISO();
+    if (b.dataset.periodo === 'mes') { pf.de = hoje.slice(0, 8) + '01'; pf.ate = hoje; }
+    if (b.dataset.periodo === '30') { const d = new Date(); d.setDate(d.getDate() - 30); pf.de = d.toISOString().slice(0, 10); pf.ate = hoje; }
+    if (b.dataset.periodo === 'ano') { pf.de = hoje.slice(0, 4) + '-01-01'; pf.ate = hoje; }
+    if (b.dataset.periodo === 'tudo') { pf.de = ''; pf.ate = ''; }
+    refaz();
+  });
+  $('pfCsv')?.addEventListener('click', () => baixarCsv(lista));
+  $('pfImprimir')?.addEventListener('click', () => { montarFolhaMov(lista); setTimeout(() => window.print(), 50); });
+}
+
+const periodoTxt = () => pf.de || pf.ate ? `${pf.de ? dataBR(pf.de) : 'início'} a ${pf.ate ? dataBR(pf.ate) : 'hoje'}` : 'todo o período';
+
+function baixarCsv(lista) {
+  const c = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const linhas = [['Data', 'Entrada/Saída', 'Tipo', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Documento',
+    'Plantio', 'Operador', 'Fazenda (origem/destino)', 'Fornecedor', 'Observação', 'Lançado por']]
+    .concat(lista.map(m => { const i = itemDe(m.item_id); return [dataBR(m.data), m.sentido === 'entrada' ? 'Entrada' : 'Saída',
+      nomeTipo(m), i.nome, i.grupo || '', String(m.quantidade).replace('.', ','), i.unidade || '', m.documento, m.plantio,
+      m.operador, m.outra_fazenda, m.fornecedor, m.obs, m.criado_por]; }));
+  const blob = new Blob(['﻿' + linhas.map(l => l.map(c).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `movimentacoes-quebra-cocao-${(pf.de || 'inicio')}_${(pf.ate || 'hoje')}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+function montarFolhaMov(lista) {
+  $('qcPainelFolha').innerHTML = `<div class="folha rel">
+    <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit"><h1>Movimentações do Estoque — Faz. Quebra Cocão</h1>
+        <p>${esc(periodoTxt())} · ${lista.length} lançamento(s) · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
+    <table class="rel-tab rel-mov" style="margin-top:6mm"><thead><tr><th class="ce">Data</th><th class="ce">E/S</th><th>Tipo</th><th>Produto</th>
+      <th class="ce">Qtd.</th><th>Documento</th><th>Plantio / Operador / Fazenda</th></tr></thead>
+    <tbody>${lista.map(m => { const i = itemDe(m.item_id); return `<tr><td class="ce">${esc(dataBR(m.data))}</td>
+      <td class="ce">${m.sentido === 'entrada' ? 'E' : 'S'}</td><td>${esc(nomeTipo(m))}</td><td>${esc(i.nome)}</td>
+      <td class="ce">${m.sentido === 'entrada' ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</td>
+      <td>${esc(m.documento || '')}</td><td>${esc([m.plantio, m.operador, m.outra_fazenda, m.fornecedor].filter(Boolean).join(' · '))}</td></tr>`; }).join('')}</tbody></table>
+    <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
+      <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+  </div>`;
+}
+
+/* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { qcVisao: desenharVisao, qcEntrada: () => desenharMov('entrada'), qcSaida: () => desenharMov('saida') };
+const DESENHOS = { qcVisao: desenharVisao, qcPainel: desenharPainel, qcEntrada: () => desenharMov('entrada'), qcSaida: () => desenharMov('saida') };
 export function abrirQc(tela) { telaAberta = tela; (DESENHOS[tela] || (() => {}))(); }
 export function soltarQc() {
   telaAberta = null;
@@ -470,7 +608,7 @@ window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;
   // nunca redesenha com um formulário sendo preenchido
-  if (foco && foco.closest && foco.closest('#qcForm, #qcVisaoCorpo') && /INPUT|SELECT|TEXTAREA/.test(foco.tagName)) return;
+  if (foco && foco.closest && foco.closest('#qcForm, #qcVisaoCorpo, #qcPainelCorpo') && /INPUT|SELECT|TEXTAREA/.test(foco.tagName)) return;
   const form = $('qcForm');
   if (form && [...form.querySelectorAll('input[type=text]')].some(i => i.value)) { desenharListaMes(telaAberta === 'qcEntrada' ? 'entrada' : 'saida'); return; }
   if (document.querySelector('#modal') && !document.querySelector('#modal.oculto')) return;

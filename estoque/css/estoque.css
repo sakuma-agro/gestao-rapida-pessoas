@@ -294,3 +294,13 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .qc-lanc-itens{border-top:1px solid var(--linha);padding:6px 12px 10px}
 .qc-lanc-item{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--linha)}
 .qc-lanc-item:last-of-type{border-bottom:0}
+
+/* Movimentações (15/10/2026) */
+.qc-mov .es-secao small{text-transform:none;font-weight:600}
+.qc-mov-lin{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--linha)}
+.qc-mov-sinal{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:700 12px/1 inherit;color:#fff}
+.qc-mov-lin.ent .qc-mov-sinal{background:var(--verde)}
+.qc-mov-lin.sai .qc-mov-sinal{background:var(--marrom)}
+.qc-mov-txt small{display:block;color:var(--suave);font-size:12px;margin-top:2px}
+.qc-mov-lin strong{white-space:nowrap;font-size:14.5px}
+.rel-mov{font-size:7.6pt}
