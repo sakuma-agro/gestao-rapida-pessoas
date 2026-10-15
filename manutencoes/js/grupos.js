@@ -123,7 +123,7 @@ window.irPara = nome => {
   telaAtualGrupo = nome;
   const nav = document.getElementById('grupos');
   // Patrimônio (15/10/2026) não é frota: a faixa de grupos some ali também.
-  if (nav) { if (nome === 'marca' || nome === 'config' || nome === 'patrimonio') nav.hidden = true; else pintarGrupos(); }
+  if (nav) { if (nome === 'marca' || nome === 'config' || nome === 'patrimonio' || nome === 'patrimonio_mov') nav.hidden = true; else pintarGrupos(); }
   return irParaOriginalGrupo(nome);
 };
 const marcaOriginalGrupo = TELAS.marca;

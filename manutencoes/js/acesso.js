@@ -15,19 +15,21 @@
    aqui com as telas que já existem em TELAS — o menu, a tela de
    configurações e as permissões passam a enxergá-lo sozinhos. */
 const MODULOS = [
-  // Painel (09/10/2026): o retrato do dia, no modelo dos painéis da área Pessoas.
-  { id: 'painel',      nome: 'Painel',            telas: [['painel', 'Painel']] },
-  { id: 'maquinas',    nome: 'Máquinas',          telas: [['maquinas', 'Máquinas']] },
-  // Patrimônio (15/10/2026): bens fora da frota — furadeira, gerador, móveis…
-  { id: 'patrimonio',  nome: 'Patrimônio',        telas: [['patrimonio', 'Patrimônio']] },
-  { id: 'vencimentos', nome: 'Vencimentos',       telas: [['vencimentos', 'Vencimentos'], ['calendario', 'Calendário']] },
-  { id: 'ordens',      nome: 'Ordens de serviço', telas: [['ordens', 'Ordens de serviço']] },
-  { id: 'checklist',   nome: 'Check list',        telas: [['checklist', 'Check list']] },
+  /* 15/10/2026: a área virou "Máquinas e Patrimônio" com dois módulos.
+     Manutenções guarda tudo o que a área já tinha; Patrimônio é o novo.
+     Os ids das telas não mudaram — atalhos e links de WhatsApp continuam. */
+  { id: 'manutencoes', nome: 'Manutenções', telas: [
+    ['painel', 'Painel'], ['maquinas', 'Máquinas'], ['vencimentos', 'Vencimentos'],
+    ['calendario', 'Calendário'], ['ordens', 'Ordens de serviço'], ['checklist', 'Check list'],
+  ] },
+  { id: 'patrimonio', nome: 'Patrimônio', telas: [
+    ['patrimonio', 'Bens'], ['patrimonio_mov', 'Movimentações'],
+  ] },
 ];
 
 /* Quem ainda não tiver módulo marcado entra com estes — assim ninguém fica
    trancado do lado de fora por esquecimento. */
-const MODULOS_PADRAO = ['painel', 'maquinas', 'patrimonio', 'vencimentos', 'ordens', 'checklist'];
+const MODULOS_PADRAO = ['manutencoes', 'patrimonio'];
 
 const Acesso = {
   admin: false,
@@ -68,8 +70,8 @@ const modulosLiberados = () =>
 /* ---------------------------------------------------------------- carga */
 
 function carregarAcesso(u) {
-  // A lista de gente é a do app inteiro: quem tem a área liberada vê os quatro
-  // módulos. Quem é administrador (do app ou só desta área) mexe nos cadastros.
+  // A lista de gente é a do app inteiro: quem tem a área liberada vê os dois
+  // módulos (Manutenções e Patrimônio). Quem é administrador (do app ou só desta área) mexe nos cadastros.
   Acesso.admin = !!(u && u.admin);
   Acesso.modulos = [...MODULOS_PADRAO];
   Acesso.telas = [];
@@ -162,16 +164,19 @@ const ICONE_ATALHO = {
   horimetro: '<circle cx="12" cy="13" r="8"/><path d="M12 13l4-3M9 2h6"/>',
   bens: '<rect x="3" y="11" width="18" height="6" rx="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M6 11l2-5h8l2 5"/>',
   patrimonio: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  manut: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  mov: '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
 };
-const ICONE_MODULO_M = { painel: 'painel', maquinas: 'bens', patrimonio: 'patrimonio', vencimentos: 'venc', ordens: 'os', checklist: 'check' };
+const ICONE_MODULO_M = { manutencoes: 'manut', patrimonio: 'patrimonio' };
 const ATALHOS_INICIO = [
   ['painel', 'painel', 'Painel', 'prim'],
   ['vencimentos', 'venc', 'Vencimentos'],
   ['calendario', 'venc', 'Calendário'],
   ['ordens', 'os', 'Ordens de serviço'],
   ['maquinas', 'bens', 'Máquinas'],
-  ['patrimonio', 'patrimonio', 'Patrimônio'],
   ['checklist', 'check', 'Check list'],
+  ['patrimonio', 'patrimonio', 'Patrimônio'],
+  ['patrimonio_mov', 'mov', 'Movimentações'],
 ];
 
 TELAS.marca = el => {

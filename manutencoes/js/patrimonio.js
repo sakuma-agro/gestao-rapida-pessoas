@@ -444,6 +444,79 @@ function imprimirPatrimonio(lista) {
   w.document.close();
 }
 
+/* ---------------------------------------------------------------- movimentações
+
+   15/10/2026: segunda tela do módulo Patrimônio. O histórico de todos os bens
+   numa lista só — o que saiu, para onde foi, quem levou. Lançar continua sendo
+   pela ficha do bem (botão "Registrar movimentação"); aqui é para consultar. */
+
+let filtroMov = { busca: '', local: '', tipo: '', de: '', ate: '' };
+
+TELAS.patrimonio_mov = el => {
+  el.innerHTML = `
+    <h1>Movimentações</h1>
+    <p class="sub">Histórico de todos os bens: transferências, empréstimos, idas para manutenção e baixas.
+       Para registrar uma, abra o bem em <strong>Bens</strong>.</p>
+    <div class="filtros">
+      <input type="search" id="pm-busca" placeholder="Buscar por código, descrição ou responsável" value="${esc(filtroMov.busca)}">
+      <select id="pm-local"><option value="">Todas as fazendas</option>
+        ${q.ordenado('locais').map(l => `<option value="${esc(l.id)}"${l.id === filtroMov.local ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}
+      </select>
+      <select id="pm-tipo"><option value="">Todos os tipos</option>
+        ${Object.entries(TIPOS_MOV).map(([k, n]) => `<option value="${k}"${k === filtroMov.tipo ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+      </select>
+      <input type="date" id="pm-de" value="${esc(filtroMov.de)}" title="De">
+      <input type="date" id="pm-ate" value="${esc(filtroMov.ate)}" title="Até">
+    </div>
+    <div id="pm-resumo"></div>
+    <div id="pm-lista"></div>`;
+
+  const desenhar = () => {
+    filtroMov = { busca: $('#pm-busca').value, local: $('#pm-local').value, tipo: $('#pm-tipo').value,
+      de: $('#pm-de').value, ate: $('#pm-ate').value };
+    const b = filtroMov.busca.toLowerCase();
+    const lista = q.todos('patrimonio_movimentos').map(m => [m, q.por_id('bens_patrimonio', m.bem_id)])
+      .filter(([m, bem]) => bem &&
+        (!filtroMov.local || m.de_local_id === filtroMov.local || m.para_local_id === filtroMov.local) &&
+        (!filtroMov.tipo || m.tipo === filtroMov.tipo) &&
+        (!filtroMov.de || (m.data || '') >= filtroMov.de) &&
+        (!filtroMov.ate || (m.data || '') <= filtroMov.ate) &&
+        (!b || [bem.patrimonio, bem.descricao, m.responsavel, m.observacao, m.registrado_por]
+          .filter(Boolean).join(' ').toLowerCase().includes(b)))
+      .sort(([a], [c]) => (c.data || '').localeCompare(a.data || '') || (c.criado_em || '').localeCompare(a.criado_em || ''));
+
+    const fora = q.ativos('bens_patrimonio').filter(x => x.situacao === 'EMPRESTADO' || x.situacao === 'EM_MANUTENCAO');
+    $('#pm-resumo').innerHTML = `<div class="pt-resumo">
+        <div><span>Movimentações</span><b>${lista.length}</b></div>
+        <div><span>Emprestados agora</span><b>${fora.filter(x => x.situacao === 'EMPRESTADO').length}</b></div>
+        <div><span>Em manutenção agora</span><b>${fora.filter(x => x.situacao === 'EM_MANUTENCAO').length}</b></div>
+      </div>`;
+    $('#pm-lista').innerHTML = lista.length === 0
+      ? `<div class="vazio"><p>${q.todos('patrimonio_movimentos').length ? 'Nenhuma movimentação com esses filtros.'
+          : 'Nenhuma movimentação registrada ainda.'}</p></div>`
+      : `<table class="tabela mq-tabela pt-tabela"><thead><tr>
+          <th>Data</th><th>Patrimônio</th><th>Bem</th><th>O que aconteceu</th><th>Fazenda</th><th>Com quem</th><th>Por</th>
+        </tr></thead><tbody>` + lista.map(([m, bem]) => {
+          const de = q.nome('locais', m.de_local_id), para = q.nome('locais', m.para_local_id);
+          const faz = de && para && de !== para ? de + ' → ' + para : (para || de || '—');
+          return `<tr data-bem="${esc(bem.id)}" class="clicavel">
+            <td>${m.data ? formatarData(m.data) : '—'}</td>
+            <td class="codigo">${esc(bem.patrimonio || '—')}</td>
+            <td><strong>${esc(bem.descricao)}</strong>${m.observacao ? `<small>${esc(m.observacao)}</small>` : ''}</td>
+            <td>${esc(TIPOS_MOV[m.tipo] || m.tipo)}</td>
+            <td>${esc(faz)}</td>
+            <td>${esc(m.responsavel || '—')}</td>
+            <td>${esc(m.registrado_por || '—')}</td>
+          </tr>`;
+        }).join('') + '</tbody></table>';
+    $$('#pm-lista [data-bem]').forEach(tr => tr.onclick = () => fichaBem(tr.dataset.bem));
+  };
+  ['pm-busca', 'pm-local', 'pm-tipo', 'pm-de', 'pm-ate'].forEach(id => {
+    const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar;
+  });
+  desenhar();
+};
+
 Object.assign(window, {
   proximoPatrimonio, normalizarPatrimonio, donoDoPatrimonio, fotoPrincipalHtml, ligarFoto, fichaBem,
 });
