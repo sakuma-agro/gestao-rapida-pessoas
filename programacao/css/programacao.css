@@ -362,3 +362,16 @@ body.modo-quadro .pc-rolagem{max-height:calc(100vh - 180px)}
   box-shadow:0 1px 1px rgba(0,0,0,.08)}
 .rd-obs-geral{margin-top:18px}
 .rd-obs-geral header{background:#E3E4E0}
+
+/* Acesso rápido compacto (15/10/2026, pedido dele): ícone ao lado do nome,
+   numa linha só, no lugar do quadrado alto com ícone em cima. */
+.ql{width:200px;gap:6px}
+.ql-item{flex-direction:row;justify-content:flex-start;align-items:center;min-height:40px;padding:8px 12px;gap:10px;
+  text-align:left;font-size:13px;line-height:1.2}
+.ql-item svg{width:18px;height:18px}
+.ql-item span{flex:1}
+.ql-item .ql-num{position:static;order:3;margin-left:auto}
+@media (max-width:700px){
+  .ql{width:100%}
+  .ql-item{min-width:0;flex:0 0 auto;white-space:nowrap}
+}

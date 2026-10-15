@@ -82,7 +82,7 @@ function desenharMenu2(id) {
   const telas = telasLiberadas(id);
   $('#menu2').hidden = telas.length < 2;
   $('#menu2').innerHTML = telas.map(([t, rot]) =>
-    `<button type="button" data-tela="${t}">${esc(rot)}</button>`).join('');
+    `<button type="button" data-tela="${t}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_TELA_P[t]] || ''}</svg><span>${esc(rot)}</span></button>`).join('');
   $$('#menu2 button').forEach(b => b.onclick = () => irPara(b.dataset.tela));
 }
 
@@ -117,8 +117,14 @@ function marcarMenu(tela) {
 /* ---------------------------------------------------------------- tela de marca */
 
 /* Ícones dos atalhos (traço simples, cor do texto) */
+/* Ícone de cada tela na segunda faixa (15/10/2026, pedido dele: "que todas
+   tenham um ícone"). */
+const ICONE_TELA_P = { painel: 'painel', lancar: 'lancar', atividades: 'lista', reuniao: 'reuniao',
+  diario: 'lancar', diarios: 'historico', 'diario-config': 'config', relatorio: 'relatorio', cadastros: 'cadastros' };
 const ICONE_MODULO = { programacao: 'painel', diario: 'diario', relatorio: 'relatorio', cadastros: 'cadastros', config: 'config' };
 const ICONE_ATALHO = {
+  lista: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  historico: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
   cadastros: '<path d="M4 6h16M4 12h16M4 18h10"/>',
   config: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
   lancar: '<path d="M12 5v14M5 12h14"/>',

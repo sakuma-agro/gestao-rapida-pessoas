@@ -861,3 +861,8 @@ body.embutido .menu button.fantasma svg{color:#C2C5BE}
    esquerda e o conteúdo, centralizado, começava bem mais para dentro. Agora
    o menu, a faixa da fazenda e o conteúdo começam na mesma linha. */
 body.embutido .menu,body.embutido .menu2{padding-left:max(14px, calc((100% - var(--largura)) / 2 + 14px));padding-right:max(14px, calc((100% - var(--largura)) / 2 + 14px))}
+
+/* Segunda faixa com ícone ao lado do nome (15/10/2026) */
+.menu2 button{display:inline-flex;align-items:center;gap:6px}
+.menu2 button svg{width:16px;height:16px;flex:none;color:var(--verde)}
+.menu2 button.ativo svg{color:#fff}

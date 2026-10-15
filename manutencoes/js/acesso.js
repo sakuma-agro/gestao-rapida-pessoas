@@ -125,8 +125,7 @@ function abrirModulo(id, tela) {
 
   // Módulo de uma tela só não ganha segunda faixa: seria uma aba sozinha.
   $('#menu2').hidden = telas.length < 2;
-  $('#menu2').innerHTML = telas.map(([t, rot]) =>
-    `<button type="button" data-tela="${t}">${esc(rot)}</button>`).join('');
+  $('#menu2').innerHTML = telas.map(botaoTela).join('');
   $$('#menu2 button').forEach(b => b.onclick = () => irPara(b.dataset.tela));
   irPara(alvo);
 }
@@ -140,8 +139,7 @@ function marcarMenu(tela) {
     $$('#menu button').forEach(b => b.classList.toggle('ativo', b.dataset.modulo === m));
     const telas = telasLiberadas(m);
     $('#menu2').hidden = telas.length < 2;
-    $('#menu2').innerHTML = telas.map(([t, rot]) =>
-      `<button type="button" data-tela="${t}">${esc(rot)}</button>`).join('');
+    $('#menu2').innerHTML = telas.map(botaoTela).join('');
     $$('#menu2 button').forEach(b => b.onclick = () => irPara(b.dataset.tela));
   }
   $$('#menu2 button').forEach(b => b.classList.toggle('ativo', b.dataset.tela === tela));
@@ -170,6 +168,13 @@ const ICONE_ATALHO = {
   mov: '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
 };
 const ICONE_MODULO_M = { manutencoes: 'manut', patrimonio: 'patrimonio' };
+/* Ícone de cada tela na segunda faixa (15/10/2026, pedido dele: "que todas
+   tenham um ícone"). */
+ICONE_ATALHO.cal = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0M8 18h2M12 18h2"/>';
+const ICONE_TELA_M = { painel: 'painel', maquinas: 'bens', vencimentos: 'venc', calendario: 'cal',
+  ordens: 'os', checklist: 'check', patrimonio: 'patrimonio', patrimonio_mov: 'mov' };
+const botaoTela = ([t, rot]) =>
+  `<button type="button" data-tela="${t}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_TELA_M[t]] || ''}</svg><span>${esc(rot)}</span></button>`;
 const ATALHOS_INICIO = [
   ['painel', 'painel', 'Painel', 'prim'],
   ['vencimentos', 'venc', 'Vencimentos'],

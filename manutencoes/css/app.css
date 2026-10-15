@@ -1265,3 +1265,21 @@ body.embutido .menu button.fantasma svg{color:#C2C5BE}
    esquerda e o conteúdo, centralizado, começava bem mais para dentro. Agora
    o menu, a faixa da fazenda e o conteúdo começam na mesma linha. */
 body.embutido .menu,body.embutido .menu2,body.embutido .grupos{padding-left:max(14px, calc((100% - var(--largura)) / 2 + 14px));padding-right:max(14px, calc((100% - var(--largura)) / 2 + 14px))}
+
+/* Segunda faixa com ícone ao lado do nome (15/10/2026) */
+.menu2 button{display:inline-flex;align-items:center;gap:6px}
+.menu2 button svg{width:16px;height:16px;flex:none;color:var(--verde)}
+.menu2 button.ativo svg{color:#fff}
+
+/* Acesso rápido compacto (15/10/2026, pedido dele): ícone ao lado do nome,
+   numa linha só, no lugar do quadrado alto com ícone em cima. */
+.ql{width:200px;gap:6px}
+.ql-item{flex-direction:row;justify-content:flex-start;align-items:center;min-height:40px;padding:8px 12px;gap:10px;
+  text-align:left;font-size:13px;line-height:1.2}
+.ql-item svg{width:18px;height:18px}
+.ql-item span{flex:1}
+.ql-item .ql-num{position:static;order:3;margin-left:auto}
+@media (max-width:700px){
+  .ql{width:100%}
+  .ql-item{min-width:0;flex:0 0 auto;white-space:nowrap}
+}
