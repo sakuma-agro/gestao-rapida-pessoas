@@ -1173,6 +1173,12 @@ dialog.rs-largo form{max-height:88vh;overflow:auto}
 .ar-cartao.ar-embreve{cursor:default;background:transparent;border-style:dashed;box-shadow:none;color:var(--suave)}
 .ar-cartao.ar-embreve img{filter:grayscale(1);opacity:.55}
 .ar-cartao.ar-embreve .ar-ir{color:var(--suave);font-weight:600}
+/* áreas sem acesso (15/10/2026): aparecem para todos, em cinza, e não abrem */
+.ar-cartao.ar-fantasma{cursor:not-allowed;background:#F3F4F1;border-color:#E2E4DE;box-shadow:none;color:#9A9D96}
+.ar-cartao.ar-fantasma:hover{border-color:#E2E4DE;box-shadow:none}
+.ar-cartao.ar-fantasma img{filter:grayscale(1);opacity:.45}
+.ar-cartao.ar-fantasma .ar-txt small{color:#A9ACA5}
+.ar-cartao.ar-fantasma .ar-ir{color:#A9ACA5;font-weight:600;font-size:13px}
 .ar-pe{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
 /* Backup de todo o app — faixa da tela inicial, só administrador (14/10/2026) */
 .ar-backup{flex:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;

@@ -167,11 +167,13 @@ function avisarInicio(texto) {
   avisarInicio.t = setTimeout(() => { a.hidden = true; a.className = 'aviso info'; }, 9000);
 }
 
-/** A tela das áreas. Com uma área só, nem aparece: entra direto nela. */
+/** A tela das áreas: todas aparecem; as sem acesso ficam em cinza (15/10/2026). */
 export function mostrarAreas({ direto = false } = {}) {
   window.grCliente = estado.cliente;
-  const libs = areasLiberadas();
-  if (direto && libs.length === 1) return entrarNaArea(libs[0].id);
+  /* 15/10/2026, pedido dele: a tela das áreas aparece sempre, com TODAS as
+     áreas do sistema — as que a pessoa não tem acesso ficam em cinza
+     (fantasma) e não abrem, para todo mundo entender o que o LOP tem. Por
+     isso não entra mais direto quando a pessoa tem uma área só. */
 
   areaAtual = null;
   pintarEtiqueta();
@@ -183,13 +185,16 @@ export function mostrarAreas({ direto = false } = {}) {
   const h = new Date().getHours();
   $('arOla').textContent = (h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite') + (nome ? ', ' + nome : '');
 
-  $('arGrade').innerHTML = AREAS.map(a => {
+  // liberadas primeiro, na ordem de AREAS; depois as fantasmas
+  const lista = [...AREAS.filter(a => !a.emBreve && liberada(a.id)), ...AREAS.filter(a => a.emBreve || !liberada(a.id))];
+  $('arGrade').innerHTML = lista.map(a => {
     const ok = !a.emBreve && liberada(a.id);
-    if (!ok && !a.emBreve) return '';
-    return `<button type="button" class="ar-cartao${a.emBreve ? ' ar-embreve' : ''}" data-area="${a.id}" ${a.emBreve ? 'disabled' : ''}>
+    const fantasma = !ok && !a.emBreve;
+    return `<button type="button" class="ar-cartao${a.emBreve ? ' ar-embreve' : ''}${fantasma ? ' ar-fantasma' : ''}" data-area="${a.id}"
+        ${ok ? '' : 'disabled aria-disabled="true"'} ${fantasma ? 'title="Você não tem acesso a esta área. Peça ao administrador."' : ''}>
       <img src="${a.icone}" alt="">
       <span class="ar-txt"><b>${esc(a.nome)}</b><small>${esc(a.desc)}</small></span>
-      <span class="ar-ir">${a.emBreve ? 'Em breve' : 'Entrar →'}</span>
+      <span class="ar-ir">${a.emBreve ? 'Em breve' : fantasma ? 'Sem acesso' : 'Entrar →'}</span>
     </button>`;
   }).join('');
   $('arGrade').querySelectorAll('[data-area]:not([disabled])').forEach(b =>
