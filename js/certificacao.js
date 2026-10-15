@@ -25,6 +25,7 @@ import { estado } from './store.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
+import { campoAnexos, donosComArquivo } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -101,6 +102,7 @@ async function carregar() {
   }
   S.certs = a.data || []; S.reqs = b.data || []; S.docs = d.data || []; S.evs = e.data || [];
   S.carregado = true;
+  S.docArq = await donosComArquivo('certificacao', 'documento').catch(() => new Set());
 }
 
 /* ===================================================================
@@ -123,9 +125,9 @@ const reqsDoDoc = d => S.reqs.filter(r => (r.documentos || []).includes(d.id));
 const rotDoc = d => `${d.codigo} · ${d.nome}`;
 /* Link da pasta/arquivo no OneDrive (13/10/2026): o código vira link que abre numa aba nova. */
 const linkOk = u => /^https?:\/\//i.test(so(u));
-const codigoLink = (d, cls = '') => linkOk(d.link)
+const codigoLink = (d, cls = '') => (linkOk(d.link)
   ? `<a class="ce-cod-link ${cls}" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abrir no OneDrive: ${esc(d.nome)}">${esc(d.codigo)}<span aria-hidden="true">↗</span></a>`
-  : `<b>${esc(d.codigo)}</b>`;
+  : `<b>${esc(d.codigo)}</b>`) + (S.docArq?.has(String(d.id)) ? '<span class="ce-anx" title="Tem arquivo no Google Drive">📎</span>' : '');
 /** Códigos das normas que o documento atende, pelos requisitos ligados a ele
  *  (só das certificações ligadas, sem repetir, na ordem das certificações). */
 function codigosDoDoc(d) {
@@ -619,6 +621,7 @@ const caixasCert = (marcadas, prefixo) => `<div class="ce-caixas">${S.certs.filt
   `<label class="rs-check"><input type="checkbox" data-${prefixo}="${esc(c.id)}" ${(marcadas || []).includes(c.id) ? 'checked' : ''}> ${esc(c.nome)}</label>`).join('')}</div>`;
 const lerCaixas = prefixo => [...document.querySelectorAll(`#dlgCe [data-${prefixo}]`)].filter(x => x.checked).map(x => x.dataset[prefixo]);
 
+let anexosDoc = null;
 function formDocumento(id) {
   const d = id ? S.docs.find(x => x.id === id) : null;
   const v = d || { categoria: S.fd.cat || 'ANEXO', situacao: 'Em dia', periodicidade: 'Anual', certificacoes: [] };
@@ -637,6 +640,7 @@ function formDocumento(id) {
       <label class="campo plena">Link no OneDrive <small>da pasta ou do arquivo — no OneDrive: Compartilhar › Copiar link</small>
         <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://…sharepoint.com/… ou https://1drv.ms/…">
         <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" ${linkOk(v.link) ? `href="${esc(v.link)}"` : 'hidden'}>Abrir ↗</a></span></label>
+      <div class="plena" id="cedAnexos"></div>
       <p class="dica plena" id="cedProx"></p>
       <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
       <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
@@ -663,6 +667,9 @@ function formDocumento(id) {
       if (linkOk(u)) { a.href = u; a.hidden = false; } else { a.removeAttribute('href'); a.hidden = true; }
     });
     document.querySelectorAll('#dlgCe [data-lreq]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.lreq))));
+    // Arquivo do documento no Google Drive (15/10/2026) — o link do OneDrive continua valendo.
+    anexosDoc = campoAnexos($('cedAnexos'), { area: 'certificacao', tipo: 'documento', rotulo: 'Arquivo do documento', dica: 'PDF ou foto' });
+    anexosDoc.abrir(d ? d.id : null);
     $('cedGravar').addEventListener('click', () => gravarDocumento(d));
     $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
   });
@@ -685,7 +692,10 @@ async function gravarDocumento(d) {
   if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
   if (S.docs.some(x => x.id !== d?.id && so(x.codigo).toLowerCase() === linha.codigo.toLowerCase()))
     return erroDlg(`Já existe um documento com o código ${linha.codigo}.`);
-  await salvar('cert_documentos', d, linha, S.docs, 'cedGravar');
+  const anexos = anexosDoc;
+  const gravado = await salvar('cert_documentos', d, linha, S.docs, 'cedGravar');
+  if (gravado && anexos?.mudou) { S.docArq?.add(String(gravado.id)); redesenhar(); }
+  if (gravado && anexos) anexos.salvar(gravado.id).catch(e => alert('O documento foi gravado, mas o arquivo não: ' + e.message));
   S.docs.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 }
 
@@ -982,6 +992,7 @@ async function salvar(tabela, atual, linha, lista, botao) {
     if (error) throw error;
     if (atual) lista[lista.findIndex(x => x.id === atual.id)] = data; else lista.push(data);
     fechar(); redesenhar();
+    return data;
   } catch (e) { $(botao).disabled = false; erroDlg('Não consegui gravar: ' + (e.message || e)); }
 }
 

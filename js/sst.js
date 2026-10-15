@@ -4,6 +4,7 @@
 // e uma tela de vencimentos, onde cada lançamento ganha a data de vencimento
 // calculada pelo tipo. Por isso quase tudo aqui é escrito uma vez só e recebe
 // a "receita" do exame ou do treinamento em RECEITAS.
+import { campoAnexos } from './arquivos.js';
 import { estado } from './store.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens,
@@ -83,7 +84,7 @@ const RECEITAS = {
       fichaImprimir: 'bImprimirFichaEx', fichaFechar: 'bFecharFichaEx',
       dlg: 'dlgExame', form: 'formExame', titulo: 'tituloExame', erro: 'erroExame',
       func: 'exFunc', tipo: 'exTipo', data: 'exData', vence: 'exVence',
-      dica: 'exDicaVence', apagar: 'bApagarExame',
+      dica: 'exDicaVence', apagar: 'bApagarExame', anexos: 'exAnexos',
       dlgTipo: 'dlgTipoEx', formTipo: 'formTipoEx', tituloTipo: 'tituloTipoEx', erroTipo: 'erroTipoEx',
       tNome: 'txNome', tMeses: 'txMeses', tAtivo: 'txAtivo', tApagar: 'bApagarTipoEx', tCarga: null,
       tCategoria: 'txCategoria',
@@ -110,7 +111,7 @@ const RECEITAS = {
       fichaImprimir: 'bImprimirFichaTr', fichaFechar: 'bFecharFichaTr',
       dlg: 'dlgTreino', form: 'formTreino', titulo: 'tituloTreino', erro: 'erroTreino',
       func: 'trFunc', tipo: 'trTipo', data: 'trData', vence: 'trVence',
-      dica: 'trDicaVence', apagar: 'bApagarTreino',
+      dica: 'trDicaVence', apagar: 'bApagarTreino', anexos: 'trAnexos',
       carga: 'trCarga', instrutor: 'trInstrutor', obs: 'trObs',
       dlgTipo: 'dlgTipoTr', formTipo: 'formTipoTr', tituloTipo: 'tituloTipoTr', erroTipo: 'erroTipoTr',
       tNome: 'ttNome', tMeses: 'ttMeses', tAtivo: 'ttAtivo', tCarga: 'ttCarga', tApagar: 'bApagarTipoTr',
@@ -627,9 +628,19 @@ function abrirReg(r, id) {
     $(r.el.obs).value = e.observacao || '';
   }
   $(r.el.apagar).hidden = !x;
+  anexosDe(r).abrir(x ? x.id : null);
   atualizarVencimento(r, !x);
   if (r.id === 'exame') mostrarItens(r);
   $(r.el.dlg).showModal();
+}
+
+/* Anexos no Google Drive (15/10/2026): certificado do treinamento e ASO/exames. */
+const camposAnexo = {};
+function anexosDe(r) {
+  if (!camposAnexo[r.id]) camposAnexo[r.id] = campoAnexos($(r.el.anexos), r.id === 'exame'
+    ? { area: 'pessoas', tipo: 'exame', rotulo: 'ASO e exames', dica: 'PDF ou foto do ASO' }
+    : { area: 'pessoas', tipo: 'treinamento', rotulo: 'Certificado', dica: 'PDF ou foto do certificado' });
+  return camposAnexo[r.id];
 }
 
 /** A lista de exames da função, dentro do lançamento do ASO. */
@@ -933,6 +944,8 @@ function ligarReceita(r, avisar) {
     const { data, error } = await estado.cliente.from(r.tabelaRegs)
       .upsert(linha).select().single();
     if (error) return mostrarErro(r.el.erro, error.message);
+    try { await anexosDe(r).salvar(data.id); }
+    catch (err) { return mostrarErro(r.el.erro, 'O lançamento foi salvo, mas o anexo não: ' + err.message); }
 
     const i = S[r.id].regs.findIndex(x => x.id === data.id);
     if (i >= 0) S[r.id].regs[i] = data; else S[r.id].regs.unshift(data);

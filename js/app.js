@@ -29,6 +29,7 @@ import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
+import { campoAnexos } from './arquivos.js';
 import { desenharCadRelatorios } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
@@ -922,8 +923,14 @@ function abrirFuncionario(id) {
   $('fuSituacao').value = editandoFunc.situacao || 'ATIVO';
   preencherFichaCompleta(editandoFunc);
   $('bApagarFunc').hidden = !f;
+  fotoFunc().abrir(f ? f.id : null);
   $('dlgFunc').showModal();
 }
+
+/* Foto do funcionário no Google Drive (15/10/2026). */
+let _fotoFunc = null;
+const fotoFunc = () => _fotoFunc || (_fotoFunc = campoAnexos($('fuFoto'),
+  { area: 'pessoas', tipo: 'funcionario', rotulo: 'Foto do funcionário', dica: 'tire ou escolha uma foto', foto: true }));
 
 /* Os três blocos recolhidos da ficha: contato e emergência, endereço e
    transporte, documentos. Um mapa só serve para preencher e para salvar —
@@ -1170,6 +1177,7 @@ $('formFunc').addEventListener('submit', async ev => {
   });
 
   await db.salvarFuncionario(f);
+  try { await fotoFunc().salvar(f.id); } catch (e) { alert('O cadastro foi salvo, mas a foto não: ' + e.message); }
 
   if (temDP) {
     // Só os campos do Nível 1. Jornada e riscos ficam como estão.
