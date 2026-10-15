@@ -85,12 +85,14 @@ let moduloAberto = null;
 
 /** Monta a primeira faixa (módulos) e abre a tela de marca. */
 function montarMenu() {
-  const libs = modulosLiberados();
-  // Botões com ícone, como os módulos da área Pessoas (09/10/2026).
-  $('#menu').innerHTML = libs.map(m =>
-    `<button type="button" data-modulo="${m.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_MODULO_M[m.id]] || ''}</svg><span>${esc(m.nome)}</span></button>`).join('')
-;
-  $$('#menu button').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
+  const libs = new Set(modulosLiberados().map(m => m.id));
+  // Botões com ícone, como os módulos da área Pessoas (09/10/2026). Todos os
+  // módulos aparecem; os sem acesso ficam em cinza e não abrem (15/10/2026).
+  const ic = m => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_MODULO_M[m.id]] || ''}</svg>`;
+  $('#menu').innerHTML = MODULOS.map(m => libs.has(m.id)
+    ? `<button type="button" data-modulo="${m.id}">${ic(m)}<span>${esc(m.nome)}</span></button>`
+    : `<button type="button" class="fantasma" disabled aria-disabled="true" title="Você não tem acesso a este módulo. Peça ao administrador.">${ic(m)}<span>${esc(m.nome)}</span></button>`).join('');
+  $$('#menu button[data-modulo]').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
   $('#menu').hidden = false;
   mostrarInicio();
 }

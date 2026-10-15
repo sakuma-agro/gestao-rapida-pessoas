@@ -968,6 +968,9 @@ label.campo.fu-inline input{width:auto;margin:0;flex:none}
 .aba[aria-selected="true"] svg{color:#fff}
 .aba:focus-visible{outline:2px solid var(--marrom);outline-offset:2px}
 .aba-config{margin-left:auto}
+/* módulos sem acesso (15/10/2026): aparecem em cinza e não abrem */
+.aba.aba-fantasma,.aba.aba-fantasma:hover{cursor:not-allowed;background:#F3F4F1;border-color:#E2E4DE;color:#A9ACA5}
+.aba.aba-fantasma svg{color:#C2C5BE}
 @media (max-width:600px){
   .abas{gap:6px;padding:6px 10px 8px}
   .aba{padding:7px 12px;font-size:13px}

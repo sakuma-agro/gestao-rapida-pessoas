@@ -852,3 +852,7 @@ body.embutido .menu button.ativo svg{color:#fff}
 body.embutido .modal header{background:#fff;border-bottom:3px solid #CFE3A0}
 body.embutido .modal header h2{color:var(--cinza)}
 body.embutido .modal header button{color:var(--cinza)}
+
+/* módulos sem acesso (15/10/2026): aparecem em cinza e não abrem */
+body.embutido .menu button.fantasma,body.embutido .menu button.fantasma:hover{cursor:not-allowed;background:#F3F4F1;border-color:#E2E4DE;color:#A9ACA5}
+body.embutido .menu button.fantasma svg{color:#C2C5BE}

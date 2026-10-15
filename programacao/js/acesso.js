@@ -57,10 +57,14 @@ let moduloAberto = null;
 
 function montarMenu() {
   const ic = id => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_MODULO[id]] || ''}</svg>`;
-  $('#menu').innerHTML = modulosLiberados().map(m =>
-    `<button type="button" data-modulo="${m.id}">${ic(m.id)}<span>${esc(m.nome)}</span></button>`).join('')
-    + (Acesso.admin ? `<button type="button" data-modulo="config">${ic('config')}<span>Configurações</span></button>` : '');
-  $$('#menu button').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
+  // Todos os módulos aparecem; os sem acesso ficam em cinza e não abrem (15/10/2026).
+  const libs = new Set(modulosLiberados().map(m => m.id));
+  const fantasma = (id, nome) => `<button type="button" class="fantasma" disabled aria-disabled="true" title="Você não tem acesso a este módulo. Peça ao administrador.">${ic(id)}<span>${esc(nome)}</span></button>`;
+  $('#menu').innerHTML = MODULOS.map(m => libs.has(m.id)
+    ? `<button type="button" data-modulo="${m.id}">${ic(m.id)}<span>${esc(m.nome)}</span></button>`
+    : fantasma(m.id, m.nome)).join('')
+    + (Acesso.admin ? `<button type="button" data-modulo="config">${ic('config')}<span>Configurações</span></button>` : fantasma('config', 'Configurações'));
+  $$('#menu button[data-modulo]').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
   $('#menu').hidden = false;
   mostrarInicio();
 }

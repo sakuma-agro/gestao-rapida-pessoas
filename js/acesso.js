@@ -446,7 +446,11 @@ export function montarMenu(callback) {
   /* Configurações (quem acessa o quê) saiu da barra (14/10/2026, pedido dele):
      virou o cartão "Usuários - Acessos" da tela principal (js/areas.js).
      abrirModulo('config') continua abrindo a tela. */
-  pintarModulos(modulosLiberados().map(m => ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista' })));
+  /* 15/10/2026, pedido dele: todos os módulos da área aparecem; os que a
+     pessoa não tem ficam em cinza (fantasma) e não abrem. */
+  const libs = new Set(modulosLiberados().map(m => m.id));
+  pintarModulos(MODULOS.filter(m => !m.area).map(m =>
+    ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista', bloqueado: !libs.has(m.id) })));
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   mostrarInicio();
@@ -455,9 +459,10 @@ export function montarMenu(callback) {
 /** A barra de módulos do topo. Cada área pinta a sua (Pessoas, Vistorias). */
 export function pintarModulos(itens) {
   moduloAberto = null;
-  $('navModulos').innerHTML = itens.map(m =>
-    `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`).join('');
-  $('navModulos').querySelectorAll('.aba').forEach(b =>
+  $('navModulos').innerHTML = itens.map(m => m.bloqueado
+    ? `<button class="aba aba-fantasma${m.direita ? ' aba-config' : ''}" type="button" disabled aria-disabled="true" data-fantasma="${m.id}" title="Você não tem acesso a este módulo. Peça ao administrador.">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`
+    : `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`).join('');
+  $('navModulos').querySelectorAll('.aba[data-modulo]').forEach(b =>
     b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
 }
 
