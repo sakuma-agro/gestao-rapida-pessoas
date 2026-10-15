@@ -76,7 +76,7 @@ create index if not exists est_cl_contagem on public.est_contagem_lotes(contagem
 create table if not exists public.est_compras (
   id uuid primary key default gen_random_uuid(),
   titulo text not null,                 -- ex.: "Batata Pivô 1 — novembro"
-  local_id uuid references public.est_locais(id),
+  local_id uuid references public.est_locais(id),   -- estoque de DESTINO (onde vai ser usado)
   etapa int not null default 1 check (etapa between 1 and 3),
   status text not null default 'aberta' check (status in ('aberta','concluida')),
   criado_por text,
@@ -108,8 +108,10 @@ create table if not exists public.est_compra_estoques (
   compra_item_id uuid not null references public.est_compra_itens(id) on delete cascade,
   local_id uuid not null references public.est_locais(id),
   quantidade numeric,
+  transferir numeric,                   -- etapa 3: vazio = sugestão automática
   atualizado_em timestamptz not null default now()
 );
+alter table public.est_compra_estoques add column if not exists transferir numeric;
 create index if not exists est_cpe_item on public.est_compra_estoques(compra_item_id);
 
 -- Carimbo do servidor, RLS (quem tem o módulo 'estoque' ou é admin) e permissões.

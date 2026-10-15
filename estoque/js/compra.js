@@ -5,7 +5,10 @@
 //   1. Levantamento — o que vai precisar e quanto.
 //   2. Conferência — conta no estoque SÓ os produtos dessa lista (não tem
 //      ligação com o balanço mensal da Contagem).
-//   3. Compra — necessário − estoque = o que comprar, e dá para ajustar.
+//   3. Compra — o levantamento é para um estoque de destino (a fazenda que vai
+//      usar). Primeiro usa o que já tem lá; o que faltar vem por transferência
+//      dos outros estoques; o resto é compra. Sai o relatório de transferência
+//      e o pedido de compra. Tudo editável.
 import {
   $, esc, pronto, todos, aviso, meuNome, locais, GRUPOS, UNIDADES,
   lerNumero, mostrarNumero, dataHora,
@@ -47,12 +50,36 @@ function ondeTem(l) {
     .map(([lc, e]) => `${lc.nome} ${mostrarNumero(e.quantidade)}`).join(' · ');
 }
 
-/** O que comprar: o ajustado, se houver; senão necessário − estoque (nunca negativo). */
-export function aComprar(l) {
-  if (!vazio(l.comprar)) return Number(l.comprar);
-  if (vazio(l.necessario)) return null;
-  return Math.max(0, Number(l.necessario) - (vazio(l.estoque) ? 0 : Number(l.estoque)));
+/* A conta da etapa 3 (15/10/2026).
+   precisa N · tem no destino D · falta F = max(0, N − D)
+   Transferência: dos outros estoques, do que tem mais para o que tem menos,
+   até cobrir F (cada origem pode ser ajustada à mão — campo `transferir`).
+   Comprar = max(0, F − transferido), ou o valor ajustado. */
+export function plano(l, c) {
+  const n = vazio(l.necessario) ? 0 : Number(l.necessario);
+  const m = porEstoque(l.id);
+  const destino = c && c.local_id;
+  const qDestino = destino && m.get(destino) && !vazio(m.get(destino).quantidade) ? Number(m.get(destino).quantidade) : 0;
+  const falta = Math.max(0, n - (destino ? qDestino : (vazio(l.estoque) ? 0 : Number(l.estoque))));
+  const origens = destino ? locais().filter(lc => lc.id !== destino)
+    .map(lc => ({ local: lc, reg: m.get(lc.id), disp: m.get(lc.id) && !vazio(m.get(lc.id).quantidade) ? Number(m.get(lc.id).quantidade) : 0 }))
+    .filter(o => o.disp > 0 || (o.reg && !vazio(o.reg.transferir)))
+    .sort((a, b) => b.disp - a.disp) : [];
+  let resta = falta;
+  for (const o of origens) {
+    o.ajustado = !!(o.reg && !vazio(o.reg.transferir));
+    o.sugerido = Math.min(o.disp, Math.max(0, resta));
+    o.qtd = o.ajustado ? Number(o.reg.transferir) : o.sugerido;
+    resta -= o.qtd;
+  }
+  const transferido = origens.reduce((t, o) => t + o.qtd, 0);
+  const comprarCalc = Math.max(0, falta - transferido);
+  const comprar = vazio(l.comprar) ? comprarCalc : Number(l.comprar);
+  return { necessario: n, qDestino, falta, origens, transferido, comprarCalc, comprar, ajustado: !vazio(l.comprar) };
 }
+
+/** O que comprar (o ajustado, se houver). */
+export function aComprar(l, c) { return vazio(l.necessario) ? null : plano(l, c).comprar; }
 
 /* ===================================================================
    Lista de levantamentos
@@ -70,6 +97,8 @@ function desenharLista() {
       mostra o que comprar. Três etapas: <strong>Levantamento → Conferência → Compra</strong>.</p>
     <form class="grade larga cad-novo" id="ciNovo" autocomplete="off">
       <label class="campo">Levantamento <input type="text" name="titulo" required placeholder="ex.: Batata Pivô 1 — novembro"></label>
+      <label class="campo">Para qual estoque (destino)
+        <select name="local">${locais().map(l => `<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</select></label>
       <div class="barra fim" style="align-self:end"><button class="btn principal" type="submit">Começar levantamento</button></div>
     </form>
     <div class="barra entre">
@@ -78,12 +107,12 @@ function desenharLista() {
     </div>
     <div class="lista">${lista.map(c => {
       const ls = linhasDe(c.id);
-      const comprar = ls.filter(l => (aComprar(l) || 0) > 0).length;
+      const comprar = ls.filter(l => (aComprar(l, c) || 0) > 0).length;
       return `<div class="item"><span></span>
         <div><div class="nome">${esc(c.titulo)} ${c.status === 'concluida'
           ? '<span class="tag ativo">concluído</span>'
           : `<span class="tag alerta">etapa ${c.etapa} · ${ETAPAS[c.etapa - 1]}</span>`}</div>
-          <div class="sub">${ls.length} produto(s)${c.etapa === 3 || c.status === 'concluida'
+          <div class="sub">para ${esc(nomeLocal(c.local_id))} · ${ls.length} produto(s)${c.etapa === 3 || c.status === 'concluida'
             ? ` · ${comprar} a comprar` : ''} · ${esc(c.criado_por || '')} em ${esc(dataHora(c.criado_em))}</div></div>
         <div class="acoes"><button class="btn mini principal" type="button" data-abrir="${esc(c.id)}">Abrir</button></div>
       </div>`;
@@ -96,7 +125,7 @@ function desenharLista() {
     const titulo = String(f.get('titulo') || '').trim();
     if (!titulo) return;
     const c = await gravar('est_compras', {
-      titulo, local_id: null, etapa: 1, status: 'aberta',
+      titulo, local_id: f.get('local') || null, etapa: 1, status: 'aberta',
       criado_por: meuNome(), criado_em: new Date().toISOString(), ativo: true,
     });
     aberto = c.id; etapaVista = 1;
@@ -132,13 +161,19 @@ function desenharLevantamento() {
     <div class="barra entre"><button class="btn mini" type="button" id="ciVoltar">‹ Levantamentos</button>
       ${fechado ? '<span class="tag ativo">concluído</span>' : ''}</div>
     <h2 style="margin-top:8px">${esc(c.titulo)}</h2>
-    <p class="dica">Começado por ${esc(c.criado_por || '—')}
+    <p class="dica">Para <strong>${esc(nomeLocal(c.local_id))}</strong> · começado por ${esc(c.criado_por || '—')}
       em ${esc(dataHora(c.criado_em))}${fechado ? ` · concluído por ${esc(c.concluida_por || '—')} em ${esc(dataHora(c.concluida_em))}` : ''}</p>
+    ${fechado ? '' : `<label class="campo ci-destino">Estoque de destino (onde vai ser usado)
+      <select id="ciDestino"><option value="">—</option>${locais().map(l => `<option value="${esc(l.id)}"${l.id === c.local_id ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>`}
     <div class="ci-passos">${passos}</div>
     ${corpo}
   </div>`;
 
   $('ciVoltar').onclick = () => { aberto = null; desenhar(); };
+  $('ciDestino')?.addEventListener('change', async e => {
+    await gravar('est_compras', Object.assign({}, compra(c.id), { local_id: e.target.value || null }));
+    desenharLevantamento();
+  });
   alvo.querySelectorAll('[data-etapa]').forEach(b => b.addEventListener('click', () => {
     etapaVista = Number(b.dataset.etapa); desenharLevantamento();
   }));
@@ -241,7 +276,7 @@ function etapa2(c, ls, fechado) {
         </div>
         <div class="ci-estoques">${lcs.map(lc => {
           const e = m.get(lc.id);
-          return `<label>${esc(lc.nome)}<input class="ci-num ci-est" data-local="${esc(lc.id)}" type="text" inputmode="decimal"
+          return `<label${lc.id === c.local_id ? ' class="destino"' : ''}>${esc(lc.nome)}${lc.id === c.local_id ? ' <b>· destino</b>' : ''}<input class="ci-num ci-est" data-local="${esc(lc.id)}" type="text" inputmode="decimal"
             enterkeyhint="next" value="${esc(e ? mostrarNumero(e.quantidade) : '')}" placeholder="—"${fechado ? ' disabled' : ''}></label>`;
         }).join('')}</div>
       </div>`;
@@ -285,59 +320,91 @@ function ligarEtapa2(c) {
   ligarFluxo(c);
 }
 
-/* ---------------- Etapa 3: compra ---------------- */
+/* ---------------- Etapa 3: transferência e compra ---------------- */
 function etapa3(c, ls, fechado) {
-  const comprar = ls.filter(l => (aComprar(l) || 0) > 0);
+  const planos = ls.map(l => ({ l, i: itemDe(l.item_id), p: plano(l, c) }));
+  const nComprar = planos.filter(x => x.p.comprar > 0).length;
+  const nTransf = planos.filter(x => x.p.transferido > 0).length;
   const semConf = ls.filter(l => vazio(l.estoque)).length;
+  const dest = nomeLocal(c.local_id);
   return `
-    <h3 class="es-secao">3 · O que comprar <small>${comprar.length} de ${ls.length} produtos</small></h3>
-    ${semConf ? `<p class="es-nota">${semConf} produto(s) ainda sem conferência: a conta considera estoque zero para eles.</p>` : ''}
-    <div class="ci-tab">
-      <div class="ci-cab"><span>Produto</span><span>Precisa</span><span>Estoque</span><span>Comprar</span></div>
-      ${ls.map(l => {
-        const i = itemDe(l.item_id);
-        const valor = aComprar(l);
-        const ajustado = !vazio(l.comprar);
-        return `<div class="ci-trio${(valor || 0) > 0 ? ' comprar' : ''}" data-linha="${esc(l.id)}">
-          <span class="ci-nome">${esc(i.nome)}<small>${esc(i.unidade || '')}${ajustado ? ' · <b>ajustado</b>' : ''}</small>
-            ${ondeTem(l) ? `<small class="ci-onde">tem em: ${esc(ondeTem(l))}</small>` : ''}</span>
-          <span>${esc(mostrarNumero(l.necessario))}</span>
-          <span>${vazio(l.estoque) ? '—' : esc(mostrarNumero(l.estoque))}</span>
-          <span class="ci-comprar">
-            <input class="ci-num" data-campo="comprar" type="text" inputmode="decimal" value="${esc(mostrarNumero(valor))}"
-              aria-label="Comprar de ${esc(i.nome)}"${fechado ? ' disabled' : ''}>
-            ${ajustado && !fechado ? `<button type="button" class="ci-refaz" data-refaz="${esc(l.id)}" title="Voltar ao calculado">↺</button>` : ''}
-          </span>
-        </div>`;
-      }).join('')}
-    </div>
-    <div class="barra entre ci-pe">
-      ${fechado ? (window.App?.usuario?.admin ? '<button class="btn" type="button" id="ciReabrir">Reabrir</button>' : '<span></span>')
-        : '<button class="btn" type="button" data-ir="2">‹ Conferência</button>'}
-      <span class="barra" style="margin:0">
-        <button class="btn" type="button" id="ciImprimir"${comprar.length ? '' : ' disabled'}>Imprimir pedido de compra</button>
+    <h3 class="es-secao">3 · Transferir e comprar <small>${nTransf} a transferir · ${nComprar} a comprar</small></h3>
+    ${c.local_id ? '' : '<p class="es-nota">Escolha o estoque de destino acima para o app montar as transferências.</p>'}
+    ${semConf ? `<p class="es-nota">${semConf} produto(s) sem conferência: a conta considera que não tem em lugar nenhum.</p>` : ''}
+    <div class="ci-lista">${planos.map(({ l, i, p }) => `
+      <div class="ci-plano" data-linha="${esc(l.id)}">
+        <div class="ci-nome">${esc(i.nome)}<small>precisa ${esc(mostrarNumero(p.necessario))} ${esc(i.unidade || '')}${c.local_id
+          ? ` · já tem em ${esc(dest)}: ${esc(mostrarNumero(p.qDestino))} · falta ${esc(mostrarNumero(p.falta))}` : ''}</small></div>
+        ${p.origens.length ? `<div class="ci-transf">${p.origens.map(o => `
+          <label class="ci-orig"><span class="ci-orig-txt">Transferir de <b>${esc(o.local.nome)}</b><small>tem ${esc(mostrarNumero(o.disp))} ${esc(i.unidade || '')}</small></span>
+            <span><input class="ci-num" data-transf="${esc(o.local.id)}" type="text" inputmode="decimal"
+              value="${esc(mostrarNumero(o.qtd))}"${fechado || !o.reg ? ' disabled' : ''}>
+            ${o.ajustado && !fechado ? `<button type="button" class="ci-refaz" data-refaz-t="${esc(o.local.id)}" title="Voltar à sugestão">↺</button>` : ''}</span>
+          </label>`).join('')}</div>` : ''}
+        <label class="ci-orig ci-compra"><span class="ci-orig-txt">Comprar${p.ajustado ? ' <b>· ajustado</b>' : ''}</span>
+          <span><input class="ci-num" data-campo="comprar" type="text" inputmode="decimal"
+            value="${esc(mostrarNumero(p.comprar))}"${fechado ? ' disabled' : ''}>
+          ${p.ajustado && !fechado ? `<button type="button" class="ci-refaz" data-refaz="${esc(l.id)}" title="Voltar ao calculado">↺</button>` : ''}</span>
+        </label>
+      </div>`).join('')}</div>
+    <div class="ci-pe">
+      <div class="barra">
+        <button class="btn" type="button" id="ciImpTransf"${nTransf ? '' : ' disabled'}>Imprimir transferência</button>
+        <button class="btn" type="button" id="ciImprimir"${nComprar ? '' : ' disabled'}>Imprimir pedido de compra</button>
+      </div>
+      <div class="barra entre">
+        ${fechado ? (window.App?.usuario?.admin ? '<button class="btn" type="button" id="ciReabrir">Reabrir</button>' : '<span></span>')
+          : '<button class="btn" type="button" data-ir="2">‹ Conferência</button>'}
         ${fechado ? '' : '<button class="btn principal" type="button" id="ciConcluir">Concluir</button>'}
-      </span>
+      </div>
     </div>`;
 }
 
 function ligarEtapa3(c, ls) {
-  ligarNumeros(c, 'comprar');
-  ligarFluxo(c);
-  document.querySelectorAll('[data-refaz]').forEach(b => b.addEventListener('click', async () => {
+  // Comprar (ajuste manual)
+  document.querySelectorAll('#ciCorpo .ci-num[data-campo="comprar"]').forEach(inp => inp.addEventListener('change', async () => {
+    const n = lerNumero(inp.value);
+    if (Number.isNaN(n)) { aviso('Use só números (ex.: 120 ou 2,5).', true); return; }
+    const l = linhasDe(c.id).find(x => x.id === inp.closest('[data-linha]').dataset.linha);
+    if (!l) return;
+    if (n !== null && vazio(l.comprar) && n === plano(l, c).comprarCalc) return;
+    await gravar('est_compra_itens', Object.assign({}, l, { comprar: n }));
+    desenharLevantamento();
+  }));
+  // Transferir de cada origem (ajuste manual)
+  document.querySelectorAll('#ciCorpo [data-transf]').forEach(inp => inp.addEventListener('change', async () => {
+    const n = lerNumero(inp.value);
+    if (Number.isNaN(n)) { aviso('Use só números (ex.: 120 ou 2,5).', true); return; }
+    const l = linhasDe(c.id).find(x => x.id === inp.closest('[data-linha]').dataset.linha);
+    const reg = l && porEstoque(l.id).get(inp.dataset.transf);
+    if (!reg) return;
+    const o = plano(l, c).origens.find(x => x.local.id === inp.dataset.transf);
+    if (o && n !== null && !o.ajustado && n === o.sugerido) return;
+    if (n !== null && n > o.disp) aviso(`Atenção: ${o.local.nome} só tem ${mostrarNumero(o.disp)}.`, true);
+    await gravar('est_compra_estoques', Object.assign({}, reg, { transferir: n }));
+    desenharLevantamento();
+  }));
+  document.querySelectorAll('#ciCorpo [data-refaz]').forEach(b => b.addEventListener('click', async () => {
     const l = linhasDe(c.id).find(x => x.id === b.dataset.refaz);
     if (l) { await gravar('est_compra_itens', Object.assign({}, l, { comprar: null })); desenharLevantamento(); }
   }));
+  document.querySelectorAll('#ciCorpo [data-refaz-t]').forEach(b => b.addEventListener('click', async () => {
+    const l = linhasDe(c.id).find(x => x.id === b.closest('[data-linha]').dataset.linha);
+    const reg = l && porEstoque(l.id).get(b.dataset.refazT);
+    if (reg) { await gravar('est_compra_estoques', Object.assign({}, reg, { transferir: null })); desenharLevantamento(); }
+  }));
+  ligarFluxo(c);
   $('ciImprimir')?.addEventListener('click', () => { montarFolha(c); setTimeout(() => window.print(), 50); });
+  $('ciImpTransf')?.addEventListener('click', () => { montarTransferencia(c); setTimeout(() => window.print(), 50); });
   $('ciConcluir')?.addEventListener('click', async () => {
     if (!confirm('Concluir este levantamento? A lista fica guardada e não muda mais.')) return;
-    await gravar('est_compras', Object.assign({}, c, { status: 'concluida', etapa: 3,
+    await gravar('est_compras', Object.assign({}, compra(c.id), { status: 'concluida', etapa: 3,
       concluida_por: meuNome(), concluida_em: new Date().toISOString() }));
     aviso('Levantamento concluído.');
     desenharLevantamento();
   });
   $('ciReabrir')?.addEventListener('click', async () => {
-    await gravar('est_compras', Object.assign({}, c, { status: 'aberta', concluida_por: null, concluida_em: null }));
+    await gravar('est_compras', Object.assign({}, compra(c.id), { status: 'aberta', concluida_por: null, concluida_em: null }));
     desenharLevantamento();
   });
 }
@@ -358,8 +425,6 @@ function ligarNumeros(c, campo) {
       if (!l) return;
       // na etapa 3, digitar o mesmo número do calculado não conta como ajuste
       let valor = n;
-      if (campo === 'comprar' && n !== null && vazio(l.comprar) && n === aComprar(l)) return;
-      if (campo === 'comprar' && n === null) valor = null;
       await gravar('est_compra_itens', Object.assign({}, l, { [campo]: valor }));
       if (inp.value === digitado) inp.value = mostrarNumero(n);
       if (campo === 'estoque') {
@@ -368,7 +433,6 @@ function ligarNumeros(c, campo) {
         const ls = linhasDe(c.id);
         if (t) t.textContent = `${ls.filter(x => !vazio(x.estoque)).length} de ${ls.length} conferidos`;
       }
-      if (campo === 'comprar') desenharLevantamento();
     });
     inp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
@@ -398,28 +462,49 @@ function ligarFluxo(c) {
   }));
 }
 
+const cabecalho = (titulo, sub) => `<div class="rel-topo">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit"><h1>${esc(titulo)}</h1><p>${sub}</p></div>
+    </div>`;
+const pe = rotulos => `<div class="rel-pe">
+      ${rotulos.map(r => `<div class="rel-assina"><span></span><small>${esc(r)}</small></div>`).join('')}
+      <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
+    </div>`;
+const ordenar = ls => ls.slice().sort((a, b) => itemDe(a.item_id).nome.localeCompare(itemDe(b.item_id).nome, 'pt-BR'));
+
 /** Folha A4 do pedido de compra, no padrão SAKUMA. */
 function montarFolha(c) {
-  const ls = linhasDe(c.id).filter(l => (aComprar(l) || 0) > 0)
-    .sort((a, b) => itemDe(a.item_id).nome.localeCompare(itemDe(b.item_id).nome, 'pt-BR'));
+  const ls = ordenar(linhasDe(c.id)).map(l => ({ l, i: itemDe(l.item_id), p: plano(l, c) })).filter(x => x.p.comprar > 0);
   $('ciFolha').innerHTML = `<div class="folha rel">
-    <div class="rel-topo">
-      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-tit">
-        <h1>Pedido de Compra</h1>
-        <p>${esc(c.titulo)} · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p>
-      </div>
-    </div>
+    ${cabecalho('Pedido de Compra', `${esc(c.titulo)} · para ${esc(nomeLocal(c.local_id))} · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}`)}
     <table class="rel-tab" style="margin-top:6mm"><thead><tr><th>Produto</th><th class="ce">Unidade</th>
-      <th class="ce">Necessário</th><th class="ce">Em estoque</th><th>Onde tem</th><th class="ce">Comprar</th></tr></thead>
-    <tbody>${ls.map(l => { const i = itemDe(l.item_id); return `<tr><td>${esc(i.nome)}</td><td class="ce">${esc(i.unidade || '')}</td>
-      <td class="ce">${esc(mostrarNumero(l.necessario))}</td><td class="ce">${vazio(l.estoque) ? '—' : esc(mostrarNumero(l.estoque))}</td>
-      <td style="font-size:7.8pt">${esc(ondeTem(l) || '—')}</td>
-      <td class="ce"><b>${esc(mostrarNumero(aComprar(l)))}</b></td></tr>`; }).join('')}</tbody></table>
-    <div class="rel-pe">
-      <div class="rel-assina"><span></span><small>Responsável pela compra</small></div>
-      <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
-    </div>
+      <th class="ce">Necessário</th><th class="ce">No destino</th><th class="ce">Transferido</th><th class="ce">Comprar</th></tr></thead>
+    <tbody>${ls.map(({ i, p }) => `<tr><td>${esc(i.nome)}</td><td class="ce">${esc(i.unidade || '')}</td>
+      <td class="ce">${esc(mostrarNumero(p.necessario))}</td><td class="ce">${esc(mostrarNumero(p.qDestino))}</td>
+      <td class="ce">${esc(mostrarNumero(p.transferido))}</td><td class="ce"><b>${esc(mostrarNumero(p.comprar))}</b></td></tr>`).join('')}</tbody></table>
+    ${pe(['Responsável pela compra'])}
+  </div>`;
+}
+
+/** Relatório de transferência entre estoques: uma tabela por origem → destino. */
+function montarTransferencia(c) {
+  const dest = nomeLocal(c.local_id);
+  const porOrigem = new Map();
+  for (const l of ordenar(linhasDe(c.id))) {
+    const i = itemDe(l.item_id);
+    for (const o of plano(l, c).origens) {
+      if (!(o.qtd > 0)) continue;
+      if (!porOrigem.has(o.local.id)) porOrigem.set(o.local.id, { nome: o.local.nome, linhas: [] });
+      porOrigem.get(o.local.id).linhas.push([i.nome, i.unidade || '', mostrarNumero(o.qtd)]);
+    }
+  }
+  const total = [...porOrigem.values()].reduce((t, g) => t + g.linhas.length, 0);
+  $('ciFolha').innerHTML = `<div class="folha rel">
+    ${cabecalho('Transferência entre Estoques', `${esc(c.titulo)} · destino <b>${esc(dest)}</b> · ${total} item(ns) · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}`)}
+    ${[...porOrigem.values()].map(g => `<h3 class="rel-secao">De ${esc(g.nome)} → para ${esc(dest)}</h3>
+      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Unidade</th><th class="ce">Quantidade</th><th class="ce">Conferido</th></tr></thead>
+      <tbody>${g.linhas.map(r => `<tr><td>${esc(r[0])}</td><td class="ce">${esc(r[1])}</td><td class="ce"><b>${esc(r[2])}</b></td><td class="ce">☐</td></tr>`).join('')}</tbody></table>`).join('')}
+    ${pe(['Entregue por (origem)', 'Recebido por (destino)'])}
   </div>`;
 }
 
