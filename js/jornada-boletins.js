@@ -469,8 +469,8 @@ export async function imagemIndividual(fid, ini = '', fim = '', tipo = '') {
 const nomeArquivo = (f) => 'boletins-' + String(f?.nome || 'funcionario').normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '.jpg';
 
-/* 13/10/2026 (pedido dele): vai só a imagem — o nome e o recado já estão
-   escritos dentro dela; nada de texto separado na conversa. */
+/* 13/10/2026: o nome e o recado vão escritos dentro da imagem.
+   16/10/2026: o nome vai também na legenda — ver legendaDe(). */
 const ZAP_WEB = 'https://web.whatsapp.com/';
 /* 13/10/2026: uma aba só do WhatsApp Web — reaproveita a que já abriu. */
 let janZap = null;
@@ -495,18 +495,28 @@ async function arquivoDe(fid) {
   return new File([jpg], nomeArquivo(pessoa(fid)), { type: 'image/jpeg' });
 }
 
-/** Botão WhatsApp de uma pessoa: só a imagem do relatório individual. */
+/* 16/10/2026 (pedido dele): a imagem vai com o NOME do funcionário na
+   legenda (text do navigator.share). Sem legenda o WhatsApp agrupava as
+   imagens enviadas em sequência num álbum só; com o nome cada uma sai
+   separada e já identificada. Vale no individual e no lote. */
+const legendaDe = fid => (pessoa(fid)?.nome || '').trim();
+async function copiarTexto(t) { try { await navigator.clipboard.writeText(t); return true; } catch { return false; } }
+
+/** Botão WhatsApp de uma pessoa: imagem do relatório + nome na legenda. */
 async function enviarZap(fid, botao) {
   const rotulo = botao?.innerHTML;
   if (botao) { botao.disabled = true; botao.textContent = 'Preparando...'; }
   try {
     const arquivo = await arquivoDe(fid);
+    const nome = legendaDe(fid);
     if (podeCompartilhar([arquivo])) {
-      await navigator.share({ files: [arquivo] });
+      await navigator.share({ files: [arquivo], text: nome });
     } else {
       baixarArquivos([arquivo]);
+      const copiou = await copiarTexto(nome);
       abrirZapWeb();
-      avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo.`, true);
+      avisar(`A imagem foi baixada (${arquivo.name}). No WhatsApp que abriu, anexe o arquivo` +
+        (copiou ? ' e cole o nome na legenda (já está copiado).' : ` e escreva "${nome}" na legenda.`), true);
     }
   } catch (e) {
     if (!(e && e.name === 'AbortError')) avisar('Não consegui preparar a imagem: ' + (e?.message || e));
@@ -515,14 +525,14 @@ async function enviarZap(fid, botao) {
   }
 }
 
-/* ---------------- Envio em lote (13/10/2026, pedido dele) ----------------
-   Marca as pessoas na lista e envia de uma vez: uma imagem por pessoa, cada
-   uma sai como mensagem própria no WhatsApp, sem texto à parte. As imagens
-   são preparadas primeiro e o envio sai de um clique novo — o navegador só
-   deixa abrir o compartilhar logo depois de um toque, e preparar várias
-   imagens passa desse tempo. O WhatsApp aceita até 30 por envio; acima disso
-   o lote vem em partes. */
-const POR_ENVIO = 30;
+/* ---------------- Envio em lote (13/10/2026; legenda em 16/10/2026) ----------------
+   Marca as pessoas na lista e envia: uma imagem por pessoa, com o NOME na
+   legenda. O compartilhar do celular só leva uma legenda por envio — mandar
+   todas de uma vez fazia o WhatsApp juntar as imagens num álbum sem nome. Por
+   isso o diálogo tem um botão por pessoa; cada toque abre o WhatsApp com a
+   imagem e o nome, e o botão fica verde ("Enviado"). As imagens são
+   preparadas antes: o navegador só abre o compartilhar logo depois de um
+   toque. */
 async function enviarLote(ids, botao) {
   if (!ids.length) return;
   const rotulo = botao?.innerHTML;
@@ -538,18 +548,16 @@ async function enviarLote(ids, botao) {
   } finally {
     if (botao) { botao.disabled = false; botao.innerHTML = rotulo; }
   }
-  const partes = [];
-  for (let i = 0; i < arqs.length; i += POR_ENVIO) partes.push(arqs.slice(i, i + POR_ENVIO));
-  const compartilha = podeCompartilhar(partes[0]);
+  const compartilha = podeCompartilhar(arqs.slice(0, 1));
   const dlg = $('dlgBd');
   $('dlgBdCorpo').innerHTML = `<h3>Enviar pelo WhatsApp</h3>
-    <p class="dc-sem">${arqs.length} ${arqs.length === 1 ? 'imagem pronta' : 'imagens prontas'} — uma por pessoa, cada uma sai como mensagem própria,
-      com o nome e o recado escritos na imagem.${partes.length > 1 ? ` O WhatsApp aceita até ${POR_ENVIO} por vez: envie em ${partes.length} partes.` : ''}</p>
-    <ul class="bd-lote-lista">${ids.map(id => `<li>${esc(pessoa(id)?.nome || '')}</li>`).join('')}</ul>
-    ${compartilha ? '' : `<div class="jor-caixa">Este navegador não envia arquivos direto para o WhatsApp. Baixe as imagens e anexe no WhatsApp Web.</div>`}
+    <p class="dc-sem">${arqs.length} ${arqs.length === 1 ? 'imagem pronta' : 'imagens prontas'} — toque em cada pessoa:
+      a imagem vai com o nome dela na legenda, como mensagem própria. O botão fica verde depois de enviado.</p>
+    ${compartilha ? `<div class="bd-lote-envio">${ids.map((id, i) => `<button class="btn mini btn-zap" type="button" data-i="${i}"><img class="ic-zap" src="img/whatsapp.png" alt=""><span>${esc(legendaDe(id))}</span></button>`).join('')}</div>`
+      : `<ul class="bd-lote-lista">${ids.map(id => `<li>${esc(legendaDe(id))}</li>`).join('')}</ul>
+         <div class="jor-caixa">Este navegador não envia arquivos direto para o WhatsApp. Baixe as imagens e anexe no WhatsApp Web, escrevendo o nome de cada pessoa na legenda (o arquivo já tem o nome).</div>`}
     <div class="barra entre" style="margin-top:12px"><button class="btn" type="button" id="bdLoteFechar">Fechar</button>
-      <span>${compartilha ? partes.map((pt, i) => `<button class="btn mini btn-zap" type="button" data-parte="${i}"><img class="ic-zap" src="img/whatsapp.png" alt="">${
-          partes.length > 1 ? `Parte ${i + 1} (${i * POR_ENVIO + 1}–${i * POR_ENVIO + pt.length})` : `Enviar ${pt.length} ${pt.length === 1 ? 'imagem' : 'imagens'}`}</button>`).join(' ') : ''}
+      <span><span class="dc-sem" id="bdLoteConta">${compartilha ? `0 de ${arqs.length} enviados` : ''}</span>
         <button class="btn ${compartilha ? 'mini' : 'principal'}" type="button" id="bdLoteBaixar">Baixar ${arqs.length === 1 ? 'a imagem' : 'as imagens'}</button></span></div>`;
   if (!dlg.open) dlg.showModal();
   $('bdLoteFechar').addEventListener('click', () => dlg.close());
@@ -557,10 +565,17 @@ async function enviarLote(ids, botao) {
     baixarArquivos(arqs);
     if (!compartilha) abrirZapWeb();
   });
-  $('dlgBdCorpo').querySelectorAll('[data-parte]').forEach(b => b.addEventListener('click', async () => {
+  let enviados = 0;
+  $('dlgBdCorpo').querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', async () => {
+    const i = +b.dataset.i;
     try {
-      await navigator.share({ files: partes[+b.dataset.parte] });
-      b.classList.add('bd-enviado'); b.lastChild.textContent = b.lastChild.textContent.replace(/^Enviar/, 'Enviado:');
+      await navigator.share({ files: [arqs[i]], text: legendaDe(ids[i]) });
+      if (!b.classList.contains('bd-enviado')) {
+        b.classList.add('bd-enviado'); enviados++;
+        $('bdLoteConta').textContent = `${enviados} de ${arqs.length} enviados`;
+      }
+      const prox = $('dlgBdCorpo').querySelector('[data-i]:not(.bd-enviado)');
+      if (prox) prox.focus();
     } catch (e) {
       if (!(e && e.name === 'AbortError')) avisar('O WhatsApp não aceitou o envio: ' + (e?.message || e));
     }

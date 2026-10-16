@@ -669,3 +669,7 @@
 .cf-sit--prog{background:#F3E9DC;color:#744F28}
 .cf-sit--fim{background:#ECEDE9;color:#51534A}
 @media (max-width:640px){.rel-linha{grid-template-columns:1fr}.rel-linha__acoes{justify-content:flex-start}}
+
+/* 16/10/2026 — lote do WhatsApp: um botão por pessoa (imagem + nome na legenda) */
+.bd-lote-envio { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 8px 0 0; max-height: 300px; overflow: auto; }
+.bd-lote-envio .btn-zap { justify-content: flex-start; text-align: left; white-space: normal; }
