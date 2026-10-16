@@ -229,9 +229,15 @@ export async function abrirFuncoes() {
   desenharFuncao();
 }
 
+const pessoasNa = funcao => estado.funcionarios
+  .filter(f => f.situacao === 'ATIVO' && so(f.cargo) === so(funcao)).length;
+
 function desenharFuncao() {
   const funcao = $('efFuncao').value;
   const exigidos = exigidosDe(funcao);
+  /* Excluir (16/10/2026): só aparece em função que tem lista montada. */
+  $('bExcluirFuncao').hidden = !funcao ||
+    !A.porFuncao.some(x => so(x.funcao) === so(funcao));
   const todos = complementares();
 
   $('efResumo').textContent = funcao
@@ -254,6 +260,38 @@ function desenharFuncao() {
 
   $('efLista').querySelectorAll('[data-exame]').forEach(cx =>
     cx.addEventListener('change', () => trocarExame(funcao, cx.dataset.exame, cx.checked, cx)));
+}
+
+/* Excluir uma função da lista (pedido dele, 16/10/2026 — havia duas
+   "ENG. AGRÔNOMO" com grafias diferentes). Apaga a lista de exames dela.
+   Função que ainda tem gente ativa no cadastro não some do seletor, porque
+   ele também lê os cargos do cadastro — por isso a exclusão só vale para
+   função sem ninguém; a lista da que tem gente se limpa desmarcando. */
+async function excluirFuncao() {
+  const funcao = $('efFuncao').value;
+  if (!funcao) return;
+  const gente = pessoasNa(funcao);
+  if (gente) {
+    alert(`"${funcao}" ainda tem ${gente} pessoa(s) ativa(s) no cadastro com esse cargo, ` +
+      'então ela continua aparecendo aqui. Corrija o cargo dessas pessoas em Cadastros ' +
+      'ou desmarque os exames dela.');
+    return;
+  }
+  const n = exigidosDe(funcao).length;
+  if (!confirm(`Excluir a função "${funcao}" e a lista de ${n} exame(s) dela?\n\n` +
+    'Os ASOs já lançados não mudam.')) return;
+  const b = $('bExcluirFuncao');
+  b.disabled = true;
+  try {
+    const { error } = await estado.cliente.from('sst_exames_funcao')
+      .delete().eq('funcao', funcao);
+    if (error) throw error;
+    A.porFuncao = A.porFuncao.filter(x => so(x.funcao) !== so(funcao));
+    $('efFuncao').value = '';
+    await abrirFuncoes();
+  } catch (e) {
+    alert('Não deu para excluir: ' + (e.message || e));
+  } finally { b.disabled = false; }
 }
 
 async function trocarExame(funcao, tipoId, ligar, caixa) {
@@ -377,6 +415,7 @@ export function documentoQuadro() {
 /* =============== ligações =============== */
 export function ligarAso() {
   $('efFuncao').addEventListener('change', desenharFuncao);
+  $('bExcluirFuncao').addEventListener('click', excluirFuncao);
 
   $('bGuiaFuncao').addEventListener('click', () => {
     const funcao = $('efFuncao').value;
