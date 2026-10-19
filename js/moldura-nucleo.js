@@ -157,8 +157,14 @@ async function sincronizar() {
     const itens = (await itensDaFila()).filter(i => i.status !== 'enviado')
       .sort((x, y) => String(x.preenchido_em).localeCompare(String(y.preenchido_em)));
     for (const item of itens) {
-      if (item.status === 'parado' && item.erro === 'conflito') { item.status = 'pendente'; item.tentativas = 0; item.avisado = false; }   // regra nova: a mais recente vence
-      if (item.status === 'parado') continue;   // espera a pessoa decidir (tela da fila)
+      // Parado volta sozinho (19/10/2026): conflito sempre (a mais recente vence);
+      // recusa do servidor depois de 30 min, ou já no Sincronizar / volta do sinal.
+      if (item.status === 'parado') {
+        const volta = item.erro === 'conflito' || Date.now() < App.retentarAte || !item.paradoEm || Date.now() - item.paradoEm > 30 * 60 * 1000;
+        if (!volta) continue;
+        item.status = 'pendente'; item.tentativas = 0;
+        if (item.erro === 'conflito') item.avisado = false;
+      }
       try {
         let r;
         if (item.operacao === 'upsert') {
@@ -233,7 +239,7 @@ async function sincronizar() {
         const permanente = codigo && codigo !== '23503' && !/^(08|53|57|58)/.test(codigo);
         item.tentativas += 1;
         if (e && e.conflito) { item.status = 'parado'; item.erro = 'conflito'; item.atual = e.atual; }
-        else { item.status = permanente || item.tentativas >= 20 ? 'parado' : 'erro'; item.erro = e.message || String(e); }
+        else { item.status = permanente || item.tentativas >= 20 ? 'parado' : 'erro'; item.erro = e.message || String(e); if (item.status === 'parado') item.paradoEm = Date.now(); }
         const avisar = item.status === 'parado' && !item.avisado;
         if (avisar) item.avisado = true;
         await promessa(tx('fila', 'readwrite').put(item));
@@ -660,11 +666,12 @@ function telaSemAcesso(texto) {
 
 /* ---------------------------------------------------------------- partida */
 
-window.addEventListener('online',  () => { App.online = true;  pintarEstado(); sincronizar(); enviarFotos(); });
+window.addEventListener('online',  () => { App.online = true;  App.retentarAte = Date.now() + 60 * 1000; pintarEstado(); sincronizar(); enviarFotos(); });
 /* Botão Sincronizar do topo do LOP (19/10/2026): o pai manda 'gr-sincronizar'
    e cada moldura envia a sua fila e as fotos. */
 window.addEventListener('message', ev => {
   if (ev.origin !== location.origin || !ev.data || ev.data.tipo !== 'gr-sincronizar') return;
+  App.retentarAte = Date.now() + 60 * 1000;   // o Sincronizar tenta os parados também
   App.online = navigator.onLine;
   Promise.resolve(sincronizar()).then(() => enviarFotos()).catch(() => {}).finally(() => pintarEstado());
 });

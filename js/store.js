@@ -388,5 +388,5 @@ addEventListener('online', async () => {
 });
 /* Rodada B: fila com algo pendente tenta de novo ao voltar para a tela e a cada 2 min. */
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && nucleo.pendentes(CAMADA)) enviarFila().catch(() => {}); });
-setInterval(() => { if (nucleo.pendentes(CAMADA) - nucleo.parados(CAMADA) > 0) enviarFila().catch(() => {}); }, 2 * 60 * 1000);
+setInterval(() => { if (nucleo.pendentes(CAMADA) > 0) enviarFila().catch(() => {}); }, 2 * 60 * 1000);
 addEventListener('offline', () => { estado.online = false; avisar(); });

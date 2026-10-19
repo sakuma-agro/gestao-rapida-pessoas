@@ -599,7 +599,7 @@ export async function boletinsDoDia(fid, data) {
    alguém abria o DP de novo — o store.js só esvaziava a fila do EPI. */
 addEventListener('online', () => { enviarFila().then(avisar).catch(() => {}); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && pendentes()) enviarFila().catch(() => {}); });
-setInterval(() => { if (pendentes() - parados() > 0) enviarFila().catch(() => {}); }, 2 * 60 * 1000);
+setInterval(() => { if (pendentes() > 0) enviarFila().catch(() => {}); }, 2 * 60 * 1000);
 
 export function limparJornadaDados() {
   for (const k of [...Object.keys(TABELAS), ...APOIO]) dados[k] = [];

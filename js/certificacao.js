@@ -106,7 +106,7 @@ const CAMADA_DEF = {
 };
 export const enviarFilaCert = () => nucleo.enviarFila(CAMADA, CAMADA_DEF);
 addEventListener('online', () => { enviarFilaCert().catch(() => {}); });
-setInterval(() => { if (nucleo.pendentes(CAMADA) - nucleo.parados(CAMADA) > 0) enviarFilaCert().catch(() => {}); }, 2 * 60 * 1000);
+setInterval(() => { if (nucleo.pendentes(CAMADA) > 0) enviarFilaCert().catch(() => {}); }, 2 * 60 * 1000);
 
 async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);

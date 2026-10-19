@@ -203,6 +203,17 @@ export async function apagarRegistro(cliente, tabela, pk, id) {
      aoEnviado(colecao, registroDoServidor) → atualiza o cache da camada;
      cliente() → cliente Supabase; podeEnviar() → há sessão e rede. */
 const emCurso = {};
+/* Itens parados voltam sozinhos (19/10/2026, pedido do Guilherme: "ao pegar
+   sinal, se auto atualizar"). Antes, uma recusa do servidor parava o item para
+   sempre até alguém tocar em "Tentar de novo" — e quando a causa era do lado
+   do servidor (ex.: o check de jor_auditoria), ninguém sabia que já estava
+   corrigido. Agora:
+   - toda rodada de envio tenta de novo os parados com mais de 30 min;
+   - "Sincronizar" e a volta do sinal (retentarParados) tentam todos já.
+   Conflito já voltava sozinho pela regra "a mais recente vence". */
+const ESFRIAR_MS = 30 * 60 * 1000;
+let retentarAte = 0;
+export function retentarParados() { retentarAte = Date.now() + 60 * 1000; }
 export function enviarFila(camada, def) {
   if (!emCurso[camada]) emCurso[camada] = enviarAgora(camada, def).finally(() => { emCurso[camada] = null; });
   return emCurso[camada];
@@ -215,8 +226,12 @@ async function enviarAgora(camada, def) {
   for (const p of fila) {
     // Conflito parado de antes da regra "a mais recente vence" (19/10/2026):
     // volta à fila e passa pelo caminho novo (auditoria + grava por cima).
-    if (p.status === 'parado' && p.erro === 'conflito') { p.status = 'pendente'; p.tentativas = 0; p.avisado = false; }
-    if (p.status === 'parado') continue;
+    if (p.status === 'parado') {
+      const volta = p.erro === 'conflito' || Date.now() < retentarAte || !p.paradoEm || Date.now() - p.paradoEm > ESFRIAR_MS;
+      if (!volta) continue;
+      p.status = 'pendente'; p.tentativas = 0;
+      if (p.erro === 'conflito') p.avisado = false;
+    }
     const tabela = def.tabelaDe(p.colecao), pk = def.chaveDe(p.colecao);
     try {
       if (p.acao === 'rpc') {
@@ -256,7 +271,7 @@ async function enviarAgora(camada, def) {
       p.tentativas += 1;
       p.erro = e?.message || String(e);
       if (e?.conflito) { p.status = 'parado'; p.atual = e.atual; p.erro = 'conflito'; }
-      else if (erroPermanente(e) || p.tentativas >= 20) p.status = 'parado';
+      else if (erroPermanente(e) || p.tentativas >= 20) { p.status = 'parado'; p.paradoEm = Date.now(); }
       else p.status = 'erro';
       try { await porFila(p); } catch {}
       if (p.status === 'parado' && !p.avisado) {

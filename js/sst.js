@@ -169,7 +169,7 @@ async function enviarSst(colecao, acao, item, base = null) {
   if (CAMADA_DEF.podeEnviar()) { try { await enviarFilaSst(); } catch {} }
 }
 addEventListener('online', () => { enviarFilaSst().catch(() => {}); });
-setInterval(() => { if (nucleo.pendentes(CAMADA) - nucleo.parados(CAMADA) > 0) enviarFilaSst().catch(() => {}); }, 2 * 60 * 1000);
+setInterval(() => { if (nucleo.pendentes(CAMADA) > 0) enviarFilaSst().catch(() => {}); }, 2 * 60 * 1000);
 
 export async function carregarSst() {
   // 1) o que está no aparelho, para a tela abrir já com algo

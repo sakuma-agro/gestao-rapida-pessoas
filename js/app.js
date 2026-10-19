@@ -1665,6 +1665,7 @@ async function desenharDlgFila() {
         <small style="display:block;margin-top:4px"><b>O que causa isso:</b> outra pessoa editou o mesmo registro; você editou em dois aparelhos ou duas abas; ou a tela ficou aberta muito tempo sem atualizar.</small>
         <small style="display:block;margin-top:4px"><b>Manter o meu</b> grava a sua versão por cima (a outra se perde). <b>Usar o do servidor</b> descarta a sua e traz a atual — depois confira e refaça só o que faltar.</small>` : `<small>O servidor recusou: ${esc(p.erro || '')}</small>`)
                : `<small>${p.status === 'erro' ? 'Falhou por rede; tenta de novo sozinho.' : 'Esperando rede.'}</small>`}
+      ${parado && !conflito ? `<small style="display:block;margin-top:2px">O app tenta de novo sozinho ao voltar o sinal, no Sincronizar e a cada 30 min.</small>` : ''}
       ${parado ? `<div class="barra" style="margin-top:6px">
         ${conflito ? `<button type="button" class="btn mini" data-fila-manter="${p.uuid}" data-camada="${p.camada}">Manter o meu</button>
                       <button type="button" class="btn mini" data-fila-servidor="${p.uuid}" data-camada="${p.camada}">Usar o do servidor</button>`
@@ -1690,6 +1691,7 @@ async function sincronizarTudo() {
   if (!navigator.onLine) { alert('Sem internet agora. Os lançamentos ficam guardados neste aparelho e sobem na próxima sincronização.'); return; }
   sincronizandoTudo = true;
   const rotulo = b.textContent; b.textContent = 'Sincronizando…'; b.disabled = true;
+  nucleo.retentarParados();   // os parados também voltam à fila neste toque
   try {
     for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarAnexos()]) {
       try { await fn(); } catch {}
@@ -1789,6 +1791,9 @@ document.addEventListener('visibilitychange', async () => {
 db.aoMudar(() => { contarPendentes(); });
 jd.aoMudarJornada(() => { contarPendentes(); });
 addEventListener('online', () => setTimeout(contarPendentes, 1500));
+/* Voltou o sinal: os parados voltam à fila e sobem junto (19/10/2026). As
+   camadas já disparam o próprio envio no 'online'; aqui só liberamos os parados. */
+addEventListener('online', () => nucleo.retentarParados());
 setInterval(contarPendentes, 60 * 1000);
 addEventListener('message', ev => {
   if (ev.origin !== location.origin) return;
