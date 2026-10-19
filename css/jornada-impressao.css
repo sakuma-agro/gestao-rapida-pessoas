@@ -174,7 +174,11 @@
 .rel-via .rel-cabecalho img { height: 36px; }
 .rel-via .rel-ficha { margin-bottom: 8px; padding: 7px 10px; }
 .rel-via p { margin: 6px 0; }
+/* Recibo de empréstimo (19/10/2026): só o funcionário assina, linha
+   centralizada, com espaço maior entre a declaração e a linha. */
 .rel-via .rel-assinaturas { margin-top: 20px; }
+.rel-via .rel-assina-so-func { margin-top: 44px; justify-content: center; }
+.rel-via .rel-assina-so-func .rel-assina { flex: 0 0 60%; }
 .rel-via .rel-rodape { margin-top: 8px; }
 .rel-corte { border: 0; border-top: 1px dashed #8A8D86; margin: 0; }
 

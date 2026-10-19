@@ -484,9 +484,8 @@ export function reciboHTML(e, reimpressao = false) {
     <b>a partir da ${esc(folha)}</b>${fila ? ' (previsão, após quitar o empréstimo anterior)' : ''}, conforme o art. 462 da CLT. Em caso de desligamento, autorizo o desconto do saldo nas verbas
     rescisórias, no limite da lei.${e.motivo ? ` Motivo informado: ${esc(e.motivo)}.` : ''}</p>
     ${e.liberado_por ? `<p class="rel-nota">Liberado acima do teto de ${TETO_PERC}% do salário pelo administrador: ${esc(e.justificativa_teto || '')}</p>` : ''}
-    <div class="rel-assinaturas">
+    <div class="rel-assinaturas rel-assina-so-func">
       <div class="rel-assina"><span></span><small>${esc(f.nome || 'Funcionário')}</small></div>
-      <div class="rel-assina"><span></span><small>${esc(empresa)}</small></div>
     </div>
     ${rodapeLop(false)}</article>`;
   return `<div class="rel-duasvias">${via('via da empresa')}<hr class="rel-corte">${via('via do funcionário')}</div>`;
