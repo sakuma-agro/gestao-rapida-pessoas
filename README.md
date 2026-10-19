@@ -100,3 +100,21 @@ supabase.sql            tabelas, índices e regras de acesso
 Sem build, sem dependências para instalar: são arquivos estáticos.
 Para rodar na sua máquina, `python3 -m http.server` na pasta e abra
 `http://localhost:8000`.
+
+---
+
+## Certificação › Caderno de campo (19/10/2026)
+
+Registros de campo por plantio para a auditoria GLOBALG.A.P. IFA v6:
+aplicações (com carência e reentrada calculadas e travando a colheita),
+adubação, irrigação, MIP, operações, colheita, higiene e não conformidades;
+cadastros de insumos (nº MAPA), análises e calibrações; painel de
+conformidade e relatórios em PDF com o índice de evidências IFA.
+
+- Código: `js/cert-caderno.js` · banco: `supabase/cert-caderno.sql` (tabelas `cc_*`, permissão `cert`).
+- Talhões, culturas, pulverizadores e aplicadores (NR-31/ASO) vêm das outras
+  áreas pela RPC `cc_referencias()`.
+- Anexos vão para o Drive em `certificacao/caderno/<id>` — a função `arquivos`
+  precisa estar publicada com o tipo `caderno`.
+- Funciona offline (fila `caderno`); registro aprovado só muda com motivo e
+  guarda a versão anterior.

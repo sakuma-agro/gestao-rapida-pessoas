@@ -27,6 +27,7 @@ import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
 import { campoAnexos, donosComArquivo } from './arquivos.js';
+import { itensCaderno } from './cert-caderno.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -253,6 +254,8 @@ function itensEntre(de, ate, { cert = '', auto = true } = {}) {
     if (cert && (d.certificacoes || []).length && !d.certificacoes.includes(cert)) continue;
     r.push({ data: p, tipo: 'Revisão de documento', cor: 'cinza', titulo: `${d.codigo} · ${d.nome}`, auto: 'doc', ref: d.id, certs: d.certificacoes || [], resp: d.responsavel });
   }
+  // Caderno de campo (19/10/2026): análises, calibrações, prazos de NC e colheitas previstas — IFA.
+  if (!cert || cert === 'IFA') for (const i of itensCaderno(de, ate)) r.push({ ...i, cor: 'verde', auto: 'caderno', ref: i.tela, certs: ['IFA'] });
   return r.sort(ordemItem);
 }
 const ordemItem = (a, b) => a.data.localeCompare(b.data) || (a.auto ? 1 : 0) - (b.auto ? 1 : 0) || a.titulo.localeCompare(b.titulo, 'pt-BR');
@@ -786,6 +789,7 @@ function desenharCalendario() {
     if (k === 'req') formRequisito(Number(id));
     else if (k === 'doc') formDocumento(Number(id));
     else if (k === 'cert') formCertificacao(id);
+    else if (k === 'caderno') abrirModulo('cert', id || 'ccPainel');
   }));
   ligarItens(tela);
 }

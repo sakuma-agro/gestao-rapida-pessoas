@@ -1489,3 +1489,16 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 /* Botão Sincronizar do topo (19/10/2026): verde para ser achado de longe. */
 #btnSincronizar{background:var(--verde);border-color:var(--verde);color:#fff;font-weight:600}
 #btnSincronizar:disabled{opacity:.7;cursor:wait}
+
+/* ---- Certificação › Caderno de campo (19/10/2026) ---- */
+.cc-tipos{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0 4px}
+.cc-tipo{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 10px;font:inherit;font-size:13px;font-weight:700;color:var(--texto);
+  background:var(--fundo);border:1px solid var(--linha);border-radius:10px;cursor:pointer;min-height:92px}
+.cc-tipo span{font-size:26px;line-height:1}
+.cc-tipo:hover,.cc-tipo:focus-visible{border-color:var(--verde);transform:translateY(-1px)}
+.cc-prod{display:grid;grid-template-columns:minmax(160px,3fr) 90px 110px 32px;gap:6px;align-items:center;margin-top:6px}
+.cc-prod select,.cc-prod input{margin:0;min-width:0}
+@media (max-width:560px){.cc-prod{grid-template-columns:1fr 80px 100px 32px}}
+.cc-cults{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px}
+.cc-cults label{font-weight:400}
+.cc-cults .cc-carc{width:84px;margin:0 0 0 4px;padding:2px 6px;font-size:11px}

@@ -70,6 +70,7 @@ export const ICONE_TELA = {
   vsEx: 'extintor', vsPainel: 'painel', vsRelatorio: 'documento', vsConfig: 'config',
   reuSemana: 'reuniao', reuFrases: 'aspas', reuResp: 'pessoas', reuAtiv: 'vassoura',
   cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
+  ccPainel: 'painel', ccRegistros: 'boletim', ccPlantios: 'lista', ccInsumos: 'documento', ccAnalises: 'exame', ccCalibracoes: 'ajuste', ccRelatorios: 'grafico',
 };
 export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check', reuniao: 'reuniao' };
 

@@ -41,6 +41,7 @@ import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist } from './areas.js';
 import { abrirCertificacao, limparCertificacao, TELAS_CERT, enviarFilaCert } from './certificacao.js';
+import { abrirCaderno, limparCaderno, TELAS_CADERNO, enviarFilaCaderno, recarregarCaderno } from './cert-caderno.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -187,6 +188,9 @@ function abrirAba(nome) {
   // Área Certificação (13/10/2026) — js/certificacao.js
   for (const t of TELAS_CERT) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_CERT.includes(nome)) abrirCertificacao(nome);
+  // Certificação › Caderno de campo (19/10/2026) — js/cert-caderno.js
+  for (const t of TELAS_CADERNO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_CADERNO.includes(nome)) abrirCaderno(nome);
   if (nome.startsWith('jor')) abrirJornada(nome);
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
   if (nome.startsWith('fer')) abrirFerias(nome);
@@ -244,7 +248,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno(); limparReuniao();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno(); limparReuniao();
   mostrar('login');
 });
 
@@ -1639,14 +1643,15 @@ const NOME_COLECAO = { funcionarios: 'funcionário', epis: 'EPI', fichas: 'ficha
   feriasPerdas: 'perda de férias', bolEntregas: 'entrega de boletim', docEntregas: 'entrega de documento', banco: 'horas guardadas',
   ticketMes: 'ticket do mês', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria',
   sst_exames: 'exame', sst_tipos_exame: 'tipo de exame', sst_treinamentos: 'treinamento', sst_tipos_treinamento: 'tipo de treinamento', sst_aso_itens: 'marcação do ASO',
-  cert_eventos: 'evento da certificação (feito)' };
+  cert_eventos: 'evento da certificação (feito)',
+  cc_plantios: 'plantio', cc_insumos: 'insumo', cc_analises: 'análise', cc_calibracoes: 'calibração', cc_registros: 'lançamento de campo', cc_config: 'responsável técnico' };
 const rotuloItem = p => {
   const it = p.acao === 'rpc' ? { nome: (p.item?.args?.p_ocorr ? 'ocorrência de ' + String(p.item.args.p_ocorr).split('-').reverse().join('/') : '') } : (p.item || {});
   const quem = it.funcionario_id ? estado.funcionarios.find(f => f.id === it.funcionario_id)?.nome : (it.nome || it.descricao || '');
   return `${NOME_COLECAO[p.colecao] || p.colecao}${quem ? ' · ' + quem : ''}${it.data_fato ? ' · ' + it.data_fato.split('-').reverse().join('/') : ''}`;
 };
 async function desenharDlgFila() {
-  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor'), ...await nucleo.listarFila('sst'), ...await nucleo.listarFila('cert')].sort((a, b) => a.em - b.em);
+  const lista = [...await nucleo.listarFila('epi'), ...await nucleo.listarFila('jor'), ...await nucleo.listarFila('sst'), ...await nucleo.listarFila('cert'), ...await nucleo.listarFila('caderno')].sort((a, b) => a.em - b.em);
   const alvo = $('dlgFilaLista');
   if (!lista.length) { alvo.innerHTML = '<p class="dica">Nada esperando. Tudo o que você lançou já está no servidor.</p>'; return; }
   alvo.innerHTML = lista.map(p => {
@@ -1686,7 +1691,7 @@ async function sincronizarTudo() {
   sincronizandoTudo = true;
   const rotulo = b.textContent; b.textContent = 'Sincronizando…'; b.disabled = true;
   try {
-    for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => sincronizarReuniao(), () => enviarAnexos()]) {
+    for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarAnexos()]) {
       try { await fn(); } catch {}
     }
     for (const id of ['molduraManut', 'molduraProg', 'molduraEst']) {
@@ -1708,7 +1713,7 @@ $('btnSincronizar').addEventListener('click', sincronizarTudo);
 $('dlgFilaLista').addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   const { camada } = b.dataset;
-  const enviar = () => (camada === 'epi' ? db.enviarFila() : camada === 'sst' ? enviarFilaSst() : camada === 'cert' ? enviarFilaCert() : jd.enviarFila()).catch(() => {});
+  const enviar = () => (camada === 'epi' ? db.enviarFila() : camada === 'sst' ? enviarFilaSst() : camada === 'cert' ? enviarFilaCert() : camada === 'caderno' ? enviarFilaCaderno() : jd.enviarFila()).catch(() => {});
   if (b.dataset.filaManter) { await nucleo.manterMeu(b.dataset.filaManter, camada); await enviar(); }
   else if (b.dataset.filaTentar) { await nucleo.tentarDeNovo(b.dataset.filaTentar, camada); await enviar(); }
   else if (b.dataset.filaServidor || b.dataset.filaDescartar) {
@@ -1716,7 +1721,7 @@ $('dlgFilaLista').addEventListener('click', async ev => {
     if (b.dataset.filaDescartar && !confirm('Descartar este lançamento? Ele some deste aparelho e não vai para o servidor.')) return;
     await nucleo.descartar(uuid, camada);
     // o cache deste aparelho volta a espelhar o servidor
-    try { camada === 'epi' ? await db.sincronizar() : camada === 'sst' ? await carregarSst() : await jd.carregar(jd.competenciaCarregada() || undefined); } catch {}
+    try { camada === 'epi' ? await db.sincronizar() : camada === 'sst' ? await carregarSst() : camada === 'caderno' ? await recarregarCaderno() : await jd.carregar(jd.competenciaCarregada() || undefined); } catch {}
   }
   desenharDlgFila(); contarPendentes();
 });

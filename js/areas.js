@@ -37,7 +37,7 @@ export const AREAS = [
   { id: 'manutencoes', nome: 'Máquinas e Patrimônio', icone: 'icons/area-manutencoes.v1.svg',
     desc: 'Máquinas · Patrimônio · Vencimentos · Ordens de serviço · Check list' },
   { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
-    desc: 'IFA · GRASP · Rainforest · SMETA — listas e cronograma' },
+    desc: 'IFA · GRASP · Rainforest · SMETA — listas, cronograma e caderno de campo' },
   { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
     desc: 'Vistorias · Checklists · Anomalias · Extintores' },
   /* Programação Campo (15/10/2026, pedido dele): o app avulso veio para dentro

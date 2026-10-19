@@ -200,6 +200,17 @@ export const MODULOS = [
     { id: 'ceDocSub', nome: 'Lista mestra', telas: [
       ['ceDocumentos', 'Lista mestra'],
     ] },
+    /* Caderno de campo (19/10/2026): registros por plantio para a auditoria
+       IFA. js/cert-caderno.js; tabelas cc_*; mesma permissão 'cert'. */
+    { id: 'ceCadSub', nome: 'Caderno de campo', telas: [
+      ['ccPainel',      'Painel'],
+      ['ccRegistros',   'Lançamentos'],
+      ['ccPlantios',    'Plantios'],
+      ['ccInsumos',     'Insumos'],
+      ['ccAnalises',    'Análises'],
+      ['ccCalibracoes', 'Calibrações'],
+      ['ccRelatorios',  'Relatórios'],
+    ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
@@ -544,7 +555,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
