@@ -157,6 +157,7 @@ async function sincronizar() {
     const itens = (await itensDaFila()).filter(i => i.status !== 'enviado')
       .sort((x, y) => String(x.preenchido_em).localeCompare(String(y.preenchido_em)));
     for (const item of itens) {
+      if (item.status === 'parado' && item.erro === 'conflito') { item.status = 'pendente'; item.tentativas = 0; item.avisado = false; }   // regra nova: a mais recente vence
       if (item.status === 'parado') continue;   // espera a pessoa decidir (tela da fila)
       try {
         let r;
@@ -172,8 +173,19 @@ async function sincronizar() {
             if (!r.error && !(r.data && r.data.length)) {
               const a = await App.sb.from(item.tabela).select('*').eq(chave, id).maybeSingle();
               if (a.error) throw a.error;
-              if (a.data) { const e = new Error('conflito'); e.conflito = true; e.atual = a.data; throw e; }
-              r = null;   // sumiu do servidor: grava de novo
+              if (a.data) {
+                // Regra da casa (19/10/2026): a mais recente vence. A versão
+                // atropelada vai para a auditoria (se a RLS deixar) e o upsert segue.
+                try {
+                  const u = await App.sb.auth.getUser().then(x => x.data?.user?.email || null, () => null);
+                  const dep = Object.assign({}, item.registro); delete dep._base;
+                  await App.sb.from('jor_auditoria').insert({ tabela: item.tabela, registro_id: /^[0-9a-f-]{36}$/i.test(String(id)) ? id : null,
+                    acao: 'conflito_sobrescrito', antes: a.data, depois: dep, usuario: u,
+                    justificativa: 'Conflito resolvido pela regra "a mais recente vence". Versão do servidor (' + (a.data.atualizado_em || '?') + ') substituída.' });
+                } catch (_) {}
+                aviso('Conflito resolvido: a sua gravação mais recente ficou (' + item.tabela + '). A anterior está na auditoria.');
+              }
+              r = null;   // grava por cima (ou de novo, se sumiu do servidor)
             }
           }
           if (!r) r = await App.sb.from(item.tabela).upsert(envio, { onConflict: chave }).select();

@@ -1720,6 +1720,16 @@ $('dlgFilaLista').addEventListener('click', async ev => {
   }
   desenharDlgFila(); contarPendentes();
 });
+/* Conflito resolvido sozinho (regra "a mais recente vence", 19/10/2026): uma
+   linha de aviso, sem pedir decisão. A versão anterior fica na auditoria. */
+addEventListener('gr:conflito-resolvido', ev => {
+  const a = $('avisoGlobal');
+  const d = ev.detail || {};
+  const rot = (() => { try { return rotuloItem({ colecao: d.colecao, item: d.item }); } catch { return d.colecao || 'registro'; } })();
+  a.textContent = `Conflito resolvido: a sua gravação mais recente ficou (${rot}). A versão anterior está guardada na auditoria.`;
+  a.hidden = false;
+  contarPendentes();
+});
 addEventListener('gr:fila-parada', ev => {
   const a = $('avisoGlobal');
   a.textContent = ev.detail?.conflito

@@ -19,11 +19,11 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '27';
+const VERSAO_AREA = '28';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '8';
+const VERSAO_PROG = '9';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
-const VERSAO_EST = '4';
+const VERSAO_EST = '5';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·

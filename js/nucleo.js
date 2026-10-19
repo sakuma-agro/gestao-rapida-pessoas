@@ -213,6 +213,9 @@ async function enviarAgora(camada, def) {
   if (!fila.length) return;
   const cliente = def.cliente();
   for (const p of fila) {
+    // Conflito parado de antes da regra "a mais recente vence" (19/10/2026):
+    // volta à fila e passa pelo caminho novo (auditoria + grava por cima).
+    if (p.status === 'parado' && p.erro === 'conflito') { p.status = 'pendente'; p.tentativas = 0; p.avisado = false; }
     if (p.status === 'parado') continue;
     const tabela = def.tabelaDe(p.colecao), pk = def.chaveDe(p.colecao);
     try {
@@ -224,7 +227,18 @@ async function enviarAgora(camada, def) {
       } else if (p.acao === 'apagar') {
         await apagarRegistro(cliente, tabela, pk, Array.isArray(pk) ? p.item : p.item[pk]);
       } else {
-        const salvo = await gravarRegistro(cliente, tabela, pk, def.paraBanco(p.colecao, p.item), p.base, { forcar: !!p.forcar });
+        let salvo;
+        try {
+          salvo = await gravarRegistro(cliente, tabela, pk, def.paraBanco(p.colecao, p.item), p.base, { forcar: !!p.forcar });
+        } catch (e) {
+          if (!e?.conflito) throw e;
+          // Regra da casa (Guilherme, 19/10/2026): a gravação mais recente vence,
+          // sem perguntar. A versão atropelada vai para a auditoria (acao
+          // 'conflito_sobrescrito') para dar para recuperar se foi engano.
+          await anotarAtropelo(cliente, tabela, pk, e.atual, p).catch(() => {});
+          salvo = await gravarRegistro(cliente, tabela, pk, def.paraBanco(p.colecao, p.item), null, { forcar: true });
+          try { dispatchEvent(new CustomEvent('gr:conflito-resolvido', { detail: { camada, colecao: p.colecao, item: p.item, atual: e.atual } })); } catch {}
+        }
         if (salvo) {
           def.aoEnviado(p.colecao, salvo);
           // Regravação do mesmo registro ainda na fila: a base dela passa a ser
@@ -252,6 +266,23 @@ async function enviarAgora(camada, def) {
     }
   }
   await contarFila(camada);
+}
+
+/* A versão do servidor que foi atropelada pela gravação mais recente vai para
+   jor_auditoria. Se o usuário não tem o módulo jornada a RLS recusa — não
+   importa, a gravação segue; quem chama ignora o erro. */
+const pareceUuid = v => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+async function anotarAtropelo(cliente, tabela, pk, atual, p) {
+  let usuario = null;
+  try { usuario = (await cliente.auth.getUser()).data?.user?.email || null; } catch {}
+  const id = Array.isArray(pk) ? null : atual?.[pk];
+  const depois = { ...p.item }; delete depois._base;
+  await cliente.from('jor_auditoria').insert({
+    tabela, registro_id: pareceUuid(id) ? id : null, acao: 'conflito_sobrescrito',
+    antes: atual, depois,
+    justificativa: `Conflito resolvido pela regra "a mais recente vence". Versão do servidor (${atual?.atualizado_em || '?'}) substituída pela gravação de ${new Date(p.em || Date.now()).toISOString()}${id && !pareceUuid(id) ? ` · chave ${id}` : ''}.`,
+    usuario,
+  });
 }
 
 /* Decisões da pessoa sobre um item parado. */
