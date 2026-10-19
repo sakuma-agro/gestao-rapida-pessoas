@@ -1575,6 +1575,27 @@ addEventListener('beforeinstallprompt', function (ev) {
       </div>
     </details>
 
+    <!-- Dados bancários e Pix (19/10/2026): a chave Pix sai no recibo de empréstimo. -->
+    <details class="fu-bloco">
+      <summary>Dados bancários e Pix</summary>
+      <div class="grade">
+        <label class="campo">Banco <input type="text" id="fuBanco" placeholder="Ex.: Sicoob, Bradesco"></label>
+        <label class="campo">Tipo de conta
+          <select id="fuContaTipo">
+            <option value="">Não informado</option><option>Corrente</option><option>Poupança</option><option>Salário</option>
+          </select>
+        </label>
+        <label class="campo">Agência <input type="text" id="fuAgencia" inputmode="numeric"></label>
+        <label class="campo">Conta (com dígito) <input type="text" id="fuConta" inputmode="numeric"></label>
+        <label class="campo">Tipo da chave Pix
+          <select id="fuPixTipo">
+            <option value="">Não informado</option><option>CPF</option><option>Telefone</option><option>E-mail</option><option>Aleatória</option>
+          </select>
+        </label>
+        <label class="campo plena">Chave Pix <input type="text" id="fuPixChave" placeholder="Sai no recibo de empréstimo"></label>
+      </div>
+    </details>
+
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarFunc">Apagar</button>
       <span>

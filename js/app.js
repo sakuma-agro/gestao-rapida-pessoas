@@ -978,6 +978,13 @@ const FICHA = {
   fuEscolaridade: 'escolaridade',
   fuNomeMae: 'nome_mae',
   fuNaturalidade: 'naturalidade',
+  // Dados bancários e Pix (19/10/2026) — a chave Pix sai no recibo de empréstimo.
+  fuBanco: 'banco',
+  fuAgencia: 'agencia',
+  fuConta: 'conta',
+  fuContaTipo: 'conta_tipo',
+  fuPixTipo: 'pix_tipo',
+  fuPixChave: 'pix_chave',
 };
 /* Sim/Não/não informado: no banco é true, false ou nulo. */
 const FICHA_SN = { fuAlojamento: 'alojamento', fuTransporte: 'transporte_empresa' };

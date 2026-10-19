@@ -427,8 +427,12 @@ export function reciboHTML(e, reimpressao = false) {
     : compLonga(proj[0]?.competencia || e.primeira_comp);
   const parc = vs[0] === vs[vs.length - 1] ? `${e.parcelas} × ${brl(vs[0])}` : `${e.parcelas} × ${brl(vs[0])} (última ${brl(vs[vs.length - 1])})`;
   const empresa = f.empregador || 'SAKUMA Agronegócios';
+  /* Pix do cadastro (19/10/2026): sai no recibo para o caixa pagar na chave certa. */
+  const pix = (f.pix_chave || '').trim();
+  const pixTxt = pix ? `${pix}${f.pix_tipo ? ` (${f.pix_tipo})` : ''}` : '';
   const via = qual => `<article class="rel rel-via">
     ${reimpressao ? `<div class="rel-tarja">2ª VIA — reimpressão em ${dataBR(hoje())} por ${esc(usuario() || '')}</div>` : ''}
+    ${e.editado_em ? `<div class="rel-tarja">RECIBO CORRIGIDO em ${dataBR(e.editado_em)} — substitui o anterior</div>` : ''}
     ${cabecalhoDoc('Recibo de empréstimo', `${numeroTxt(e)} · ${qual}`, `data<strong>${dataBR(e.data)}</strong>`)}
     <div class="rel-ficha">
       <div><span>Funcionário</span><b>${esc(f.nome || '—')}</b></div>
@@ -437,8 +441,10 @@ export function reciboHTML(e, reimpressao = false) {
       <div><span>Valor recebido</span><b>${brl(e.valor)}</b></div>
       <div><span>Parcelas</span><b>${parc}</b></div>
       <div><span>Início do desconto</span><b>${esc(inicio)}</b></div>
+      ${pix ? `<div><span>Pix para pagamento</span><b>${esc(pixTxt)}</b></div>` : ''}
     </div>
-    <p>Declaro que recebi de <b>${esc(empresa)}</b> a quantia de <b>${brl(e.valor)}</b> (${esc(extenso(Number(e.valor)))}),
+    <p>Declaro que recebi de <b>${esc(empresa)}</b> a quantia de <b>${brl(e.valor)}</b> (${esc(extenso(Number(e.valor)))}),${
+      pix ? ` por Pix na chave <b>${esc(pix)}</b>,` : ''}
     a título de empréstimo, <b>sem juros e sem correção</b>, e autorizo o desconto no meu pagamento nas parcelas
     indicadas, conforme o art. 462 da CLT. Em caso de desligamento, autorizo o desconto do saldo nas verbas
     rescisórias, no limite da lei.${e.motivo ? ` Motivo informado: ${esc(e.motivo)}.` : ''}</p>
@@ -851,7 +857,7 @@ function desenharRecibos() {
     .filter(e => !b || nomeDe(e.funcionario_id).toLowerCase().includes(b) || numeroTxt(e).toLowerCase().includes(b))
     .sort((x, y) => ordem(y, x));
 
-  $('telaEmpRecibos').innerHTML = cabecalho('Recibos emitidos', 'Reimprimir, cancelar e registrar desligamento') + `
+  $('telaEmpRecibos').innerHTML = cabecalho('Recibos emitidos', 'Reimprimir, corrigir, cancelar e registrar desligamento') + `
     <div class="jor-corpo">
       ${aguardando.length ? `<h3 class="jor-h3">Aguardando liberação · acima do teto</h3>
       <div class="jor-caixa alerta">${acesso.admin ? 'Libere ou recuse com justificativa. O recibo só sai depois de liberado.'
@@ -938,6 +944,7 @@ function detalhe(id) {
     <div class="barra entre" style="margin-top:14px"><span></span><span>
       <button class="btn" type="button" data-emp-fechar>Fechar</button>
       ${e.origem === 'concessao' && ['desconto', 'fila', 'quitado'].includes(s) ? '<button class="btn" type="button" id="empReimp">Reimprimir recibo</button>' : ''}
+      ${['desconto', 'fila'].includes(s) ? '<button class="btn" type="button" id="empEditar">Editar</button>' : ''}
       ${['desconto', 'fila'].includes(s) && !temAbat ? '<button class="btn perigo" type="button" id="empCancelar">Cancelar</button>' : ''}
       ${['desconto', 'fila'].includes(s) ? '<button class="btn principal" type="button" id="empDeslig">Registrar desligamento</button>' : ''}
     </span></div>`, () => {
@@ -948,9 +955,71 @@ function detalhe(id) {
       $('dlgEmp').close();
       mostrarDoc(reciboHTML(novo, true), 'empBarraRecibos');
     });
+    $('empEditar')?.addEventListener('click', () => editar(e, temAbat));
     $('empCancelar')?.addEventListener('click', () => cancelar(e));
     $('empDeslig')?.addEventListener('click', () => desligamento(e.funcionario_id));
   });
+}
+
+/* Editar um empréstimo já emitido (pedido dele, 19/10/2026).
+   Sem parcela abatida: muda tudo (data, valor, parcelas, primeiro desconto,
+   motivo). Com parcela abatida: só data e motivo — valor e parcelas mudariam
+   o que já foi descontado. Toda edição pede justificativa, fica no log e,
+   quando é concessão, sai um recibo novo marcado "RECIBO CORRIGIDO".
+   Aumento de valor que passa do teto: admin libera com a mesma justificativa;
+   outro login não consegue (teria de lançar um novo). */
+function editar(e, temAbat) {
+  const imp = e.origem === 'importado';
+  const trava = temAbat ? 'disabled' : '';
+  dialogo(`<h3>Editar ${numeroTxt(e)} · ${esc(nomeDe(e.funcionario_id))}</h3>
+    <p class="dc-sem">${temAbat ? 'Já tem parcela abatida: só a data e o motivo podem mudar.'
+      : imp ? 'Saldo trazido da planilha: corrija o saldo, as parcelas que faltam ou a próxima parcela.'
+      : 'Nenhuma parcela abatida ainda: pode corrigir tudo. O recibo anterior deixa de valer e sai um novo.'}</p>
+    <form id="empEdForm" class="jor-form" autocomplete="off">
+      <div class="jor-linha">
+        <label>Data <input type="date" id="empEdData" value="${esc(e.data)}" required></label>
+        <label>${imp ? 'Saldo' : 'Valor'} <input type="number" id="empEdValor" min="0.01" step="0.01" value="${num(e.valor)}" required ${trava}></label>
+        <label>Parcelas <input type="number" id="empEdParc" min="1" step="1" value="${e.parcelas}" required ${trava}></label>
+      </div>
+      <div class="jor-linha">
+        <label>${imp ? 'Próxima parcela' : 'Primeiro desconto'} <input type="month" id="empEdPrim" value="${esc((e.primeira_comp || '').slice(0, 7))}" required ${trava}></label>
+        <label>Motivo <input type="text" id="empEdMotivo" maxlength="120" value="${esc(e.motivo || '')}"></label>
+      </div>
+    </form>
+    ${campoJust('Por que está corrigindo? (obrigatório)')}
+    ${rodapeDlg('<button class="btn principal" type="button" id="empOkDlg">Salvar correção</button>')}`, () =>
+    $('empOkDlg').addEventListener('click', async () => {
+      const j = exigeJust(); if (!j) return;
+      const erro = m => { $('empDlgErro').textContent = m; };
+      const data = $('empEdData').value;
+      const v = temAbat ? Number(e.valor) : num($('empEdValor').value);
+      const n = temAbat ? e.parcelas : Math.max(1, Math.floor(Number($('empEdParc').value) || 1));
+      const prim = temAbat ? e.primeira_comp : ($('empEdPrim').value || '') + '-01';
+      if (!data) return erro('Informe a data.');
+      if (!v || v <= 0) return erro('Informe o valor.');
+      if (!temAbat && !$('empEdPrim').value) return erro('Informe o mês do primeiro desconto.');
+
+      const novo = { ...e, data, valor: v, parcelas: n, primeira_comp: prim,
+        motivo: $('empEdMotivo').value.trim() || null, editado_em: agora(), editado_por: usuario() };
+
+      /* Subiu o valor? Confere o teto de novo (só concessão). */
+      if (!imp && v > Number(e.valor) + 0.004) {
+        const t = await tetoDe(e.funcionario_id, data);
+        const outros = num(abertoDe(e.funcionario_id) - saldo(e));
+        const estoura = t.teto == null || num(outros + v) > t.teto + 0.004;
+        if (estoura && !acesso.admin) return erro('O valor novo passa do teto de ' + TETO_PERC + '% do salário. Só o administrador pode liberar — ou lance um novo empréstimo.');
+        if (estoura) { novo.teto = t.teto; novo.justificativa_teto = j; novo.liberado_por = usuario(); novo.liberado_em = agora(); }
+      }
+
+      const mudou = ['data', 'valor', 'parcelas', 'primeira_comp', 'motivo'].filter(k => String(e[k] ?? '') !== String(novo[k] ?? ''));
+      if (!mudou.length) return erro('Nada mudou.');
+      await jd.salvar('emprestimos', novo);
+      await jd.registrar({ tabela: 'jor_emprestimos', registro_id: e.id, acao: 'editar', antes: e, depois: novo, justificativa: j });
+      $('dlgEmp').close(); desenharRecibos();
+      if (imp) { avisar(`${numeroTxt(e)} corrigido.`, true); return; }
+      avisar(`${numeroTxt(e)} corrigido. Imprima o recibo novo — o anterior não vale mais.`, true);
+      mostrarDoc(reciboHTML(novo), 'empBarraRecibos');
+    }));
 }
 
 function cancelar(e) {
