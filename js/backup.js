@@ -36,8 +36,18 @@
 //    pedido, e uma tabela grande sairia cortada sem ninguém perceber.
 //  · Tabela que o banco recusar não derruba o backup: entra na aba Resumo com
 //    o motivo, à vista. Backup que falha calado é pior do que backup nenhum.
-//  · Fotos e PDFs anexados ficam no Storage do Supabase; o backup guarda os
-//    registros (com o caminho de cada arquivo), não os arquivos em si.
+//  · Fotos e PDFs anexados ficam no Google Drive (e uns poucos antigos no
+//    Storage); o backup guarda os registros (com o caminho de cada arquivo),
+//    não os arquivos em si.
+//
+// Backup completo (19/10/2026, pedido dele):
+//  · Terceiro arquivo, o …-esquema.sql: a ESTRUTURA do banco (tabelas,
+//    funções, políticas, gatilhos…), gerada na hora por public.backup_esquema().
+//    É o que permite reconstruir o sistema num projeto Supabase vazio e então
+//    recolocar os dados do .json. Dado sem estrutura não religa nada.
+//  · O banco diz quais tabelas existem (public.backup_tabelas()); se alguma
+//    não está na lista abaixo, a aba Resumo avisa em vermelho. Foi assim que
+//    Programação Campo, Estoque e Reunião ficaram 5 dias fora do backup.
 import { estado } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -81,13 +91,30 @@ const GRUPOS = [
   ['Vistorias e Segurança', 'vistorias', ['vistorias', 'itens', 'antes_depois', 'anomalias_relatorios',
     'extintores', 'fotos_drive', 'configuracoes', 'administradores']],
   // vistorias.importacao_chave fica de fora: guarda chave de importação e o banco não abre para ninguém.
+  ['Programação Campo', 'programacao', ['locais', 'culturas', 'tipos_atividade', 'maquinas_genericas',
+    'implementos_genericos', 'atividades', 'historico', 'diarios', 'reunioes', 'parametros',
+    'usuario_fazendas', 'usuarios_antigos']],
+  // programacao.contadores e _pacotes_antigo: internos, fechados para o app.
+  ['Estoque', 'public', ['est_locais', 'est_itens', 'est_saldos_sistema', 'est_movimentos',
+    'est_contagem_lotes', 'est_contagens', 'est_contagem_itens', 'est_compras', 'est_compra_itens',
+    'est_compra_estoques']],
+  ['Reunião semanal', 'public', ['reu_config', 'reu_pessoas', 'reu_atividades', 'reu_semanas']],
   ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],
 ];
+/* Tabelas que existem no banco e ficam de fora de propósito: o aviso de
+   "tabela esquecida" não reclama destas. */
+const FORA_DE_PROPOSITO = new Set([
+  'vistorias.importacao_chave', 'programacao.contadores', 'programacao._pacotes_antigo',
+  'public.backup_config', 'public.drive_autorizacao', 'public.drive_autorizacao_estado',
+  'public.integracao_privada',
+]);
+const foraDeProposito = (esq, t) => FORA_DE_PROPOSITO.has(`${esq}.${t}`)
+  || t.startsWith('out_') || t.includes('_bkp_');
 /* A chave de cada tabela no .json e o nome da aba: as do Pessoas ficam com o
    nome de sempre (o .json antigo continua lendo igual); as das outras áreas
    ganham prefixo, porque "administradores" existe nas duas. */
-const PREFIXO = { public: '', manutencao: 'man_', vistorias: 'vis_' };
+const PREFIXO = { public: '', manutencao: 'man_', vistorias: 'vis_', programacao: 'prog_' };
 const TABELAS = GRUPOS.flatMap(([grupo, esquema, ts]) =>
   ts.map(t => ({ grupo, esquema, tabela: t, chave: PREFIXO[esquema] + t })));
 
@@ -124,6 +151,26 @@ async function lerTudo(passo = () => {}) {
     }
   }
   return { dados, resumo };
+}
+
+/* Pergunta ao banco quais tabelas existem e devolve as que não estão na
+   lista deste arquivo (e não são "fora de propósito"). Lista vazia = em dia.
+   Se a pergunta falhar, devolve null: o Resumo diz que não conferiu. */
+async function tabelasEsquecidas() {
+  const { data, error } = await estado.cliente.rpc('backup_tabelas');
+  if (error) return null;
+  const temos = new Set(TABELAS.map(t => `${t.esquema}.${t.tabela}`));
+  return (data || [])
+    .filter(t => !temos.has(`${t.esquema}.${t.tabela}`) && !foraDeProposito(t.esquema, t.tabela))
+    .map(t => `${t.esquema}.${t.tabela}`);
+}
+
+/* A estrutura do banco, em SQL. Falhou? Devolve null e o backup segue só
+   com os dados — mas avisa. */
+async function lerEsquema() {
+  const { data, error } = await estado.cliente.rpc('backup_esquema');
+  if (error || typeof data !== 'string' || data.length < 1000) return null;
+  return data;
 }
 
 /* ---------------- planilha ---------------- */
@@ -279,13 +326,20 @@ function planilha(abas) {           // [{nome, linhas}]
 }
 
 /** Cada tabela vira uma aba: as colunas são a união das chaves das linhas. */
-function abasDoBackup(dados, resumo, quando) {
+function abasDoBackup(dados, resumo, quando, extras = {}) {
+  const { esquecidas, temEsquema } = extras;
+  const avisos = [];
+  if (esquecidas === null) avisos.push(['ATENÇÃO', 'Não deu para conferir se há tabela nova fora do backup.']);
+  else if (esquecidas?.length) avisos.push(['ATENÇÃO', `Tabelas que existem no banco e NÃO estão neste backup: ${esquecidas.join(', ')}. Pedir ao Claude para incluir em js/backup.js.`]);
+  if (!temEsquema) avisos.push(['ATENÇÃO', 'O arquivo …-esquema.sql (estrutura do banco) não foi gerado. Só com os dados não dá para reconstruir o sistema.']);
   const abas = [{
     nome: 'Resumo',
     linhas: [
       ['Backup do LOP - Gestão Rápida (todas as áreas) · SAKUMA Agronegócios'],
       ['Gerado em', carimboHora(quando)],
       ['Gerado por', estado.sessao?.user?.email || ''],
+      ['Arquivos', temEsquema ? 'planilha .xlsx (leitura) · .json (dados) · -esquema.sql (estrutura)' : 'planilha .xlsx (leitura) · .json (dados)'],
+      ...avisos,
       [],
       ['Módulo', 'Tabela', 'Registros', 'Observação'],
       ...resumo.map(r => [r.grupo, r.tabela, r.registros, r.obs]),
@@ -390,17 +444,24 @@ export async function gerarBackup(passo = () => {}, { usarPasta = true } = {}) {
 
   const quando = new Date();
   const { dados, resumo } = await lerTudo(passo);
+  passo('Conferindo se há tabela nova fora do backup…');
+  const esquecidas = await tabelasEsquecidas();
+  passo('Lendo a estrutura do banco (esquema)…');
+  const esquemaSql = await lerEsquema();
 
   passo('Montando a planilha…');
-  const xlsx = planilha(abasDoBackup(dados, resumo, quando));
+  const xlsx = planilha(abasDoBackup(dados, resumo, quando, { esquecidas, temEsquema: !!esquemaSql }));
   const json = new Blob([JSON.stringify({
     app: 'LOP - Gestão Rápida · SAKUMA',
-    versao_backup: 2,
+    versao_backup: 3,
     gerado_em: quando.toISOString(),
     gerado_por: estado.sessao?.user?.email || null,
+    esquema_no_arquivo: esquemaSql ? '-esquema.sql ao lado deste .json' : null,
+    tabelas_fora_do_backup: esquecidas,
     origem: Object.fromEntries(TABELAS.map(t => [t.chave, `${t.esquema}.${t.tabela}`])),
     tabelas: dados,
   }, null, 2)], { type: 'application/json' });
+  const sql = esquemaSql ? new Blob([esquemaSql], { type: 'application/sql' }) : null;
 
   /* Data e hora no nome: dá para ver de quando é cada um, e um segundo
      backup no mesmo dia não apaga o primeiro. */
@@ -412,6 +473,7 @@ export async function gerarBackup(passo = () => {}, { usarPasta = true } = {}) {
     try {
       await gravarNaPasta(pasta, xlsx, `${nome}.xlsx`);
       await gravarNaPasta(pasta, json, `${nome}.json`);
+      if (sql) await gravarNaPasta(pasta, sql, `${nome}-esquema.sql`);
       destino = 'pasta';
     } catch (e) {
       // pasta apagada, movida ou sem espaço: não perde o backup, baixa
@@ -425,13 +487,18 @@ export async function gerarBackup(passo = () => {}, { usarPasta = true } = {}) {
        instante; meio segundo entre um e outro resolve. */
     await new Promise(r => setTimeout(r, 600));
     baixar(json, `${nome}.json`);
+    if (sql) { await new Promise(r => setTimeout(r, 600)); baixar(sql, `${nome}-esquema.sql`); }
   }
 
   const total = resumo.reduce((s, r) => s + r.registros, 0);
   const falhas = resumo.filter(r => r.obs);
-  gravarUltimo({ quando: quando.toISOString(), total, falhas: falhas.length, destino,
+  const avisos = [];
+  if (!sql) avisos.push('a estrutura do banco (-esquema.sql) não foi gerada');
+  if (esquecidas === null) avisos.push('não deu para conferir tabelas novas');
+  else if (esquecidas.length) avisos.push(`${esquecidas.length} tabela(s) do banco estão fora do backup: ${esquecidas.join(', ')}`);
+  gravarUltimo({ quando: quando.toISOString(), total, falhas: falhas.length + avisos.length, destino,
     pasta: destino === 'pasta' ? pasta.name : '' });
-  return { resumo, total, falhas, destino, pasta: pasta?.name || '', nome, motivoSemPasta };
+  return { resumo, total, falhas, avisos, temEsquema: !!sql, destino, pasta: pasta?.name || '', nome, motivoSemPasta };
 }
 
 /** Frase única de "deu certo", usada pelos dois botões. */
@@ -439,8 +506,10 @@ function frasePronto(r) {
   const onde = r.destino === 'pasta'
     ? `salvos na pasta "${r.pasta}"`
     : `baixados para Downloads${r.motivoSemPasta ? ` (${r.motivoSemPasta})` : ''}`;
-  return `Backup pronto: ${r.total.toLocaleString('pt-BR')} registros, planilha e .json ${onde}.`
-    + (r.falhas.length ? ` Atenção: ${r.falhas.length} tabela(s) não vieram — a aba Resumo diz qual e por quê.` : '');
+  const oque = r.temEsquema ? 'planilha, .json e esquema' : 'planilha e .json';
+  return `Backup pronto: ${r.total.toLocaleString('pt-BR')} registros, ${oque} ${onde}.`
+    + (r.falhas.length ? ` Atenção: ${r.falhas.length} tabela(s) não vieram — a aba Resumo diz qual e por quê.` : '')
+    + (r.avisos?.length ? ` Atenção: ${r.avisos.join('; ')}.` : '');
 }
 
 function textoUltimo() {
@@ -449,7 +518,7 @@ function textoUltimo() {
   const d = new Date(u.quando);
   return `Último: ${dataBr(d)} · ${Number(u.total || 0).toLocaleString('pt-BR')} registros`
     + (u.destino === 'pasta' && u.pasta ? ` · pasta "${u.pasta}"` : ' · Downloads')
-    + (u.falhas ? ` · ${u.falhas} tabela(s) não vieram` : '');
+    + (u.falhas ? ` · ${u.falhas} aviso(s) — ver aba Resumo` : '');
 }
 
 async function textoPasta() {
