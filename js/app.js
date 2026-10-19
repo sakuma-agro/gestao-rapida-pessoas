@@ -2016,14 +2016,18 @@ function telaDeSocorro(texto) {
 
   if (demorou) {
     const erro = $('erroLogin');
-    erro.textContent = 'O servidor está demorando para responder. Pode ser o banco pausado — '
-      + 'espere um minuto e recarregue.';
+    erro.textContent = navigator.onLine
+      ? 'O servidor está demorando para responder. Pode ser o banco pausado — espere um minuto e recarregue.'
+      : 'Sem internet. Para abrir o app sem sinal, entre uma vez com "Manter conectado neste aparelho" marcado.';
     erro.hidden = false;
     arranque.then(x => { if (x?.etapa === 'app') { mostrar('app'); carregarTudo(); } }).catch(() => {});
     return;
   }
 
-  if (r.etapa === 'app') await carregarTudo();
+  if (r.etapa === 'app') {
+    if (r.semRede) mostrarAviso('Sem internet. Abrindo com os dados guardados neste aparelho — o que você lançar fica na fila e sobe quando o sinal voltar.');
+    await carregarTudo();
+  }
 
   if (falhasAoLigar.length) {
     const aviso = $('avisoGlobal');

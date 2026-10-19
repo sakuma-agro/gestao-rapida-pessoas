@@ -123,16 +123,55 @@ function criarCliente() {
 }
 
 /* ---------------- sessão ---------------- */
+/* Sessão guardada no aparelho (19/10/2026). Só existe em localStorage quando
+   a pessoa marcou "Manter conectado". É o que permite abrir o app sem sinal:
+   o token pode estar vencido, mas a pessoa continua sendo quem é — e sem rede
+   nada sai do aparelho de qualquer jeito. */
+export function sessaoGuardada() {
+  if (!manterConectado()) return null;
+  const v = tentar(() => localStorage.getItem('gr.auth'));
+  if (!v) return null;
+  try { const s = JSON.parse(v); return s && s.access_token && s.user ? s : null; }
+  catch { return null; }
+}
+
+/* Entrar sem rede. Quando o sinal voltar o supabase-js renova o token sozinho
+   (autoRefreshToken) e avisa pelo onAuthStateChange. */
+export function entrarSemRede() {
+  const s = sessaoGuardada();
+  if (!s) return false;
+  estado.sessao = s;
+  avisar();
+  return true;
+}
+
 export async function iniciar() {
   await nucleo.migrarDoLocalStorage({ 'epi.cache': CAIXA, 'epi.fila': { camada: CAMADA }, 'jor.cache': 'jor.cache', 'jor.fila': { camada: 'jor' } });
   await carregarCache();
   criarCliente();
+  /* getSession() renova o token pela rede quando ele venceu. Sem sinal (ou com
+     sinal fraco que não responde), isso falha ou fica pendurado. Então: até
+     6 segundos; se não vier, usa a sessão guardada no aparelho. Antes, a
+     pessoa com "Manter conectado" caía na tela de login no meio do campo —
+     e offline não dá para entrar. */
   try {
-    const { data } = await estado.cliente.auth.getSession();
-    estado.sessao = data.session || null;
+    const r = await Promise.race([
+      estado.cliente.auth.getSession(),
+      new Promise(ok => setTimeout(() => ok(null), 6000)),
+    ]);
+    estado.sessao = (r && r.data && r.data.session) || null;
   } catch { estado.sessao = null; }
-  estado.cliente.auth.onAuthStateChange((_evt, sessao) => { estado.sessao = sessao; avisar(); });
-  return estado.sessao ? { etapa: 'app' } : { etapa: 'login' };
+  let semRede = false;
+  if (!estado.sessao && (!navigator.onLine || sessaoGuardada())) {
+    semRede = entrarSemRede();
+  }
+  estado.cliente.auth.onAuthStateChange((_evt, sessao) => {
+    /* Sem rede, o supabase-js pode responder "sem sessão" a um refresh que
+       não chegou ao servidor. Não derruba quem entrou com a sessão guardada. */
+    if (!sessao && _evt !== 'SIGNED_OUT' && sessaoGuardada()) return;
+    estado.sessao = sessao; avisar();
+  });
+  return estado.sessao ? { etapa: 'app', semRede } : { etapa: 'login' };
 }
 
 const pareceEmail = v => /@/.test(String(v || ''));
