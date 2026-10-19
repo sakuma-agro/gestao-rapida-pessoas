@@ -676,7 +676,7 @@ function ligarBarraDoc(raiz) {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { busca: '', buscaSal: '', filtro: 'aberto', pessoa: '*', importar: false, junto: false };
+const est = { busca: '', buscaSal: '', filtro: 'aberto', pessoa: '*', importar: false, junto: true };
 const focarNoFim = el => { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} };
 
 function cabecalho(titulo, sub) {
@@ -752,8 +752,8 @@ function desenharEmissao() {
         </div>
         <div id="empFilaBox" hidden><fieldset class="jor-form" style="border:0;padding:0;margin:0">
           <legend style="font-weight:600;margin-bottom:4px">Já tem empréstimo em aberto. Este:</legend>
-          <label class="jor-inline"><input type="radio" name="empFila" value="fila" ${est.junto ? '' : 'checked'}> Entra na fila — começa depois de quitar o anterior</label>
-          <label class="jor-inline"><input type="radio" name="empFila" value="junto" ${est.junto ? 'checked' : ''}> Desconta junto com o anterior, a partir do mês do "Primeiro desconto"</label>
+          <label class="jor-inline"><input type="radio" name="empFila" value="junto" ${est.junto ? 'checked' : ''}> Desconta no mês do "Primeiro desconto", junto com o anterior — o recibo sai com esse mês</label>
+          <label class="jor-inline"><input type="radio" name="empFila" value="fila" ${est.junto ? '' : 'checked'}> Entra na fila — só começa depois de quitar o anterior (o recibo sai como previsão)</label>
         </fieldset></div>
         <div id="empJustBox" hidden><label>Justificativa para liberar acima do teto (obrigatória)
           <input type="text" id="empJust" maxlength="200"></label></div>
@@ -771,7 +771,7 @@ function desenharEmissao() {
     $(id).addEventListener('input', calcular));
   $('empImportar').addEventListener('change', () => { est.importar = $('empImportar').checked; calcular(); });
   document.querySelectorAll('input[name=empFila]').forEach(r => r.addEventListener('change', () => { est.junto = r.value === 'junto'; calcular(); }));
-  $('empLimpar').addEventListener('click', () => { f.reset(); $('empPrim').value = mesQueVem; fecharPrevia(); calcular(); });
+  $('empLimpar').addEventListener('click', () => { f.reset(); $('empPrim').value = mesQueVem; est.junto = true; fecharPrevia(); calcular(); });
   f.addEventListener('submit', gravarEmissao);
   ligarBarraDoc($('telaEmpEmissao'));
   calcular();
