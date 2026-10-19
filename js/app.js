@@ -1656,7 +1656,9 @@ async function desenharDlgFila() {
     const quemMexeu = conflito ? (p.atual.atualizado_por || p.atual.usuario || 'outra pessoa') + ' às ' + new Date(p.atual.atualizado_em).toLocaleString('pt-BR') : '';
     return `<div class="aviso ${parado ? 'erro' : 'info'}" style="margin:0 0 8px">
       <strong>${esc(rotuloItem(p))}</strong> <small>· ${p.acao === 'apagar' ? 'exclusão' : 'gravação'} em ${quando}</small><br>
-      ${parado ? (conflito ? `<small>Outra pessoa alterou este registro depois de você (${esc(quemMexeu)}).</small>` : `<small>O servidor recusou: ${esc(p.erro || '')}</small>`)
+      ${parado ? (conflito ? `<small>Este registro foi alterado no servidor depois de você abrir a tela (${esc(quemMexeu)}). Sua gravação ficou em cima de uma versão antiga.</small>
+        <small style="display:block;margin-top:4px"><b>O que causa isso:</b> outra pessoa editou o mesmo registro; você editou em dois aparelhos ou duas abas; ou a tela ficou aberta muito tempo sem atualizar.</small>
+        <small style="display:block;margin-top:4px"><b>Manter o meu</b> grava a sua versão por cima (a outra se perde). <b>Usar o do servidor</b> descarta a sua e traz a atual — depois confira e refaça só o que faltar.</small>` : `<small>O servidor recusou: ${esc(p.erro || '')}</small>`)
                : `<small>${p.status === 'erro' ? 'Falhou por rede; tenta de novo sozinho.' : 'Esperando rede.'}</small>`}
       ${parado ? `<div class="barra" style="margin-top:6px">
         ${conflito ? `<button type="button" class="btn mini" data-fila-manter="${p.uuid}" data-camada="${p.camada}">Manter o meu</button>
