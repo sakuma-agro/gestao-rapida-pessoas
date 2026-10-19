@@ -1845,7 +1845,7 @@ body[data-aba="an"] #bt-salvar,body[data-aba="an"] #bt-pdf,body[data-aba="an"] .
 
     <div class="cfg-secao" id="sec-modelos">
       <h3>Checklists prontos <span class="cfg-trava" id="trava-modelos" hidden>somente administradores</span></h3>
-      <p>Os checklists que aparecem prontos para preencher. <b>editar</b> muda título, campos e itens; <b>duplicar</b> cria uma cópia para você ajustar (por exemplo, o mesmo checklist para outro local); <b>＋ Novo checklist</b> começa do zero. Ao guardar, a mudança já vai para a base e vale para toda a equipe. Checklist já preenchido não muda quando o modelo muda: o enunciado fica gravado junto da resposta.</p>
+      <p>Os checklists que aparecem prontos para preencher. <b>editar</b> muda título, campos e itens; <b>duplicar</b> cria uma cópia para você ajustar (por exemplo, o mesmo checklist para outro local); <b>＋ Novo checklist</b> começa do zero; e <b>Importar planilha</b> lê uma planilha no formato do Checklist NR-24 (colunas Nº, Categoria, Item de verificação, C, NC, NA). Ao guardar, a mudança já vai para a base e vale para toda a equipe. Checklist já preenchido não muda quando o modelo muda: o enunciado fica gravado junto da resposta.</p>
       <div class="cfg-tabela-env" style="max-height:460px">
         <table class="cfg-anomalias">
           <thead><tr><th>Checklist</th><th style="width:52px">Itens</th><th style="width:170px"></th></tr></thead>
@@ -1854,8 +1854,7 @@ body[data-aba="an"] #bt-salvar,body[data-aba="an"] #bt-pdf,body[data-aba="an"] .
       </div>
       <div id="md-editor"></div>
       <div class="rodape-item" style="margin-top:12px">
-        <!-- 14/10/2026: importação só serviu à carga inicial; tudo agora é pelo app. Para voltar, tirar o hidden. -->
-        <button class="bt" type="button" id="md-importar" hidden>Importar planilha (.xlsx)</button>
+        <button class="bt" type="button" id="md-importar">Importar planilha (.xlsx)</button>
         <button class="bt bt-fantasma" type="button" id="md-novo">＋ Novo checklist</button>
         <span class="cfg-salvo" id="md-aviso"></span>
       </div>
@@ -2318,74 +2317,12 @@ function prazoData(dias){
 }
 
 /* ══════════════════════════ persistência ══════════════════════════ */
-/* Fotos do rascunho no IndexedDB (rodada B, 15/10/2026). Antes cada foto ia
-   como texto (data URL) dentro do rascunho no localStorage — 300 KB cada,
-   numa cota de ~5 MB dividida com o Pessoas. Agora o rascunho guarda só uma
-   marca "idb:<chave>" e a foto fica no banco 'lop-vistorias'; ao abrir, as
-   marcas são trocadas de volta pela foto. */
-const FOTOS_BD="lop-vistorias";
-let fotosIdb=null;
-function abrirFotosIdb(){
-  if(fotosIdb)return Promise.resolve(fotosIdb);
-  return new Promise((ok,erro)=>{
-    let req; try{ req=indexedDB.open(FOTOS_BD,1); }catch(e){ return erro(e); }
-    req.onupgradeneeded=()=>{ if(!req.result.objectStoreNames.contains("fotos"))req.result.createObjectStore("fotos"); };
-    req.onsuccess=()=>{ fotosIdb=req.result; ok(fotosIdb); };
-    req.onerror=()=>erro(req.error);
-  });
-}
-async function fotoIdbGravar(chave,dataUrl){
-  const bd=await abrirFotosIdb();
-  return new Promise((ok,erro)=>{ const t=bd.transaction("fotos","readwrite"); t.objectStore("fotos").put(dataUrl,chave); t.oncomplete=()=>ok(true); t.onerror=t.onabort=()=>erro(t.error); });
-}
-async function fotoIdbLer(chave){
-  const bd=await abrirFotosIdb();
-  return new Promise((ok,erro)=>{ const r=bd.transaction("fotos").objectStore("fotos").get(chave); r.onsuccess=()=>ok(r.result||null); r.onerror=()=>erro(r.error); });
-}
-async function fotoIdbLimpar(prefixo){
-  try{ const bd=await abrirFotosIdb(); const t=bd.transaction("fotos","readwrite"), s=t.objectStore("fotos");
-    const r=s.getAllKeys(); r.onsuccess=()=>{ for(const k of r.result) if(!prefixo||String(k).startsWith(prefixo)) s.delete(k); };
-    await new Promise(ok=>{ t.oncomplete=ok; t.onerror=ok; t.onabort=ok; }); }catch(e){}
-}
-const CAMPOS_FOTO=["fotoE","fotoR"];
-const ehDataUrl=v=>typeof v==="string"&&v.startsWith("data:");
-/* Devolve a cópia do estado sem as fotos (marcas no lugar) e grava as fotos no IndexedDB. */
-async function estadoSemFotos(){
-  const copia=JSON.parse(JSON.stringify(estado));
-  const usadas=new Set();
-  for(const it of copia.itens){
-    for(const c of CAMPOS_FOTO){
-      if(ehDataUrl(it[c])){
-        const chave="rasc|"+(it.uid||it.id)+"|"+c;
-        await fotoIdbGravar(chave,it[c]); it[c]="idb:"+chave; usadas.add(chave);
-      }else if(typeof it[c]==="string"&&it[c].startsWith("idb:"))usadas.add(it[c].slice(4));
-    }
-  }
-  // o que já não é usado sai do IndexedDB
-  try{ const bd=await abrirFotosIdb(); const t=bd.transaction("fotos","readwrite"), s=t.objectStore("fotos"); const r=s.getAllKeys();
-    r.onsuccess=()=>{ for(const k of r.result) if(String(k).startsWith("rasc|")&&!usadas.has(k)) s.delete(k); }; }catch(e){}
-  return copia;
-}
-async function rehidratarFotos(){
-  let trocou=false;
-  for(const it of estado.itens){
-    for(const c of CAMPOS_FOTO){
-      if(typeof it[c]==="string"&&it[c].startsWith("idb:")){
-        try{ const f=await fotoIdbLer(it[c].slice(4)); it[c]=f||""; trocou=true; }catch(e){ it[c]=""; }
-      }
-    }
-  }
-  return trocou;
-}
 let salvarTimer=null;
 function salvar(){
   clearTimeout(salvarTimer);
-  salvarTimer=setTimeout(async()=>{
-    let dados=estado;
-    try{ dados=await estadoSemFotos(); }
-    catch(e){ /* IndexedDB indisponível (navegador privado?): vai como antes, com as fotos */ }
+  salvarTimer=setTimeout(()=>{
     try{
-      localStorage.setItem(CHAVE,JSON.stringify(dados));
+      localStorage.setItem(CHAVE,JSON.stringify(estado));
       const h=new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
       $("#status-txt").innerHTML=`<span class="ok">✓</span> Rascunho salvo às ${h} neste navegador.`;
     }catch(e){
@@ -2850,8 +2787,6 @@ if(!estado.cab.data)estado.cab.data=new Date().toISOString().slice(0,10);
 $("#logo-img").src=LOGO;
 preencherCabecalho();
 render();
-// fotos do rascunho voltam do IndexedDB (rodada B); a tela redesenha quando chegarem
-rehidratarFotos().then(trocou=>{ if(trocou)render(); }).catch(()=>{});
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3273,15 +3208,6 @@ async function salvarVistoria(){
         foto_encontrada:it.fotoEPath||null,foto_requerida:it.fotoRPath||null
       })))
     });
-    /* Rodada C (15/10/2026): item tirado da vistoria neste aparelho sai do
-       servidor também. Antes só havia upsert e o item apagado continuava lá,
-       aparecendo nas pendências para sempre. Só itens em aberto são apagados:
-       um já encerrado por outra pessoa fica como registro. */
-    try{
-      const ids=estado.itens.map(it=>it.uid).filter(Boolean);
-      const filtro=`vistoria_id=eq.${encodeURIComponent(estado.id)}&status=eq.Aberto`+(ids.length?`&id=not.in.(${ids.map(encodeURIComponent).join(",")})`:"");
-      await rest(`itens?${filtro}`,{method:"DELETE",headers:{"Prefer":"return=minimal"}});
-    }catch(e){ console.warn("itens removidos não saíram do servidor",e); }
 
     estado.salvoEm=new Date().toISOString();
     salvar();
@@ -3682,21 +3608,17 @@ async function gravarStatus(uid,status,obs,fotoEv){
   if(status==="Concluído"){p.encerradoEm=new Date().toISOString();p.encerradoObs=obs||"";}
   else{p.encerradoEm=null;p.encerradoObs="";}
 
-  /* Rodada A (15/10/2026): mudança de status feita sem sinal ia ficar só
-     neste aparelho para sempre (o comentário dizia o contrário). Agora, sem
-     rede ou com a rede caindo no meio, ela entra na fila K_STATUS_FILA e sobe
-     quando o sinal volta. Recusa do servidor (permissão, dado) não entra na
-     fila: avisa e pronto. */
-  if(p.remoto){
-    const item={uid,vistoriaId:p.vistoriaId,status,encerradoEm:p.encerradoEm,encerradoObs:p.encerradoObs,foto:fotoEv||null,em:new Date().toISOString()};
-    if(!conectado()||!navigator.onLine){
-      enfileirarStatus(item);
-    }else{
-      try{ await enviarStatus(item); }
-      catch(e){
-        if(e instanceof TypeError||!navigator.onLine){ enfileirarStatus(item); }
-        else toast("Status mudou aqui, mas a base recusou: "+String(e.message).slice(0,100));
-      }
+  if(conectado()&&p.remoto){
+    try{
+      let caminho=null;
+      if(fotoEv)caminho=await enviarFoto(`${p.vistoriaId}/${uid}-encerramento.jpg`,fotoEv);
+      await rest(`itens?id=eq.${uid}`,{
+        method:"PATCH",headers:{"Prefer":"return=minimal"},
+        body:JSON.stringify({status,encerrado_em:p.encerradoEm,encerrado_obs:p.encerradoObs,
+          ...(caminho?{foto_encerramento:caminho}:{})})
+      });
+    }catch(e){
+      toast("Status mudou aqui, mas a base recusou: "+String(e.message).slice(0,100));
     }
   }
 
@@ -3712,55 +3634,6 @@ async function gravarStatus(uid,status,obs,fotoEv){
   renderAberto();
   if(typeof fichaAtual==="object"&&fichaAtual&&fichaAtual.uid===uid&&$("#dlg-item").open)abrirFicha(uid);
 }
-
-/* ─────────────── fila de status (rodada A, 15/10/2026) ─────────────── */
-const K_STATUS_FILA="sakuma-status-fila";
-async function enviarStatus(item){
-  let caminho=null;
-  if(item.foto)caminho=await enviarFoto(`${item.vistoriaId}/${item.uid}-encerramento.jpg`,item.foto);
-  await rest(`itens?id=eq.${item.uid}`,{
-    method:"PATCH",headers:{"Prefer":"return=minimal"},
-    body:JSON.stringify({status:item.status,encerrado_em:item.encerradoEm,encerrado_obs:item.encerradoObs,
-      ...(caminho?{foto_encerramento:caminho}:{})})
-  });
-}
-function enfileirarStatus(item){
-  const fila=(lerJSON(K_STATUS_FILA)||[]).filter(x=>x.uid!==item.uid); // a última mudança do item vale
-  fila.push(item);
-  try{ localStorage.setItem(K_STATUS_FILA,JSON.stringify(fila)); }
-  catch(e){ toast("Sem espaço neste aparelho: a mudança de status NÃO ficou guardada para envio."); return; }
-  toast("Sem sinal: o status sobe sozinho quando a internet voltar.");
-  avisarPendentesStatus();
-}
-function avisarPendentesStatus(){
-  const n=(lerJSON(K_STATUS_FILA)||[]).length;
-  try{ if(window.parent!==window)window.parent.postMessage({tipo:"gr-pendentes",area:"vistorias",n},location.origin); }catch(e){}
-  return n;
-}
-let enviandoStatus=false;
-async function enviarStatusPendentes(){
-  if(enviandoStatus||!navigator.onLine||!conectado())return;
-  const fila=lerJSON(K_STATUS_FILA)||[];
-  if(!fila.length)return;
-  enviandoStatus=true;
-  let ok=0;
-  try{
-    for(const item of fila){
-      try{ await enviarStatus(item); ok++; }
-      catch(e){
-        if(e instanceof TypeError||!navigator.onLine)break;       // caiu a rede: para e tenta depois
-        toast("A base recusou um status ("+String(e.message).slice(0,80)+"); ele foi descartado.");
-        ok++;                                                     // recusa: repetir não resolve
-      }
-      const resto=(lerJSON(K_STATUS_FILA)||[]).filter(x=>x.uid!==item.uid);
-      try{ localStorage.setItem(K_STATUS_FILA,JSON.stringify(resto)); }catch(e){}
-    }
-  }finally{ enviandoStatus=false; avisarPendentesStatus(); }
-  if(ok)toast(ok+(ok===1?" status enviado.":" status enviados."));
-}
-window.addEventListener("online",()=>setTimeout(enviarStatusPendentes,1500));
-setTimeout(()=>{ avisarPendentesStatus(); enviarStatusPendentes(); },4000);
-setInterval(enviarStatusPendentes,2*60*1000);
 
 /* ══════════════════════════ conta ══════════════════════════ */
 function atualizarConta(){
@@ -6416,12 +6289,12 @@ $("#md-novo").onclick=()=>{
 /* Importar planilha: lê a planilha no formato do checklist NR-24 — título na
    primeira linha, campos "Rótulo:" no cabeçalho, depois a tabela Nº /
    Categoria / Item de verificação / C / NC / NA. A leitura do Excel usa a
-   cópia do SheetJS em ../vendor/ (14/10/2026): fica no aparelho, funciona sem internet. */
+   biblioteca SheetJS, baixada só na hora de importar (precisa de internet). */
 function ckCarregarSheetJS(){
   if(window.XLSX)return Promise.resolve(window.XLSX);
   return new Promise((ok,erro)=>{
     const s=document.createElement("script");
-    s.src="../vendor/xlsx-js-style.min.js";
+    s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
     s.onload=()=>ok(window.XLSX); s.onerror=()=>erro(new Error("sem-internet"));
     document.head.appendChild(s);
   });
@@ -6485,7 +6358,7 @@ $("#md-importar").onclick=()=>{
       $("#md-titulo").scrollIntoView({block:"center"});
     }catch(e){
       aviso.textContent=e.message==="sem-internet"
-        ?"Não consegui abrir o leitor de Excel. Abra o app uma vez com internet para ele ficar guardado no aparelho."
+        ?"Para importar planilha é preciso internet (o leitor de Excel é baixado na hora)."
         :e.message;
     }
   };
@@ -8237,7 +8110,14 @@ async function anMontarDoc(r){
   </div>`;
 }
 
+let anPreviaRel=null;
+/* nome do arquivo ao salvar em PDF: "ANOM-012 - Anomalias - 19-10-2026" */
+function anNomeArquivo(r){
+  const data=anData((r&&r.data)||anHoje()).replace(/\//g,"-");
+  return [r&&r.codigo?r.codigo:"Relatório","Anomalias",data].join(" - ");
+}
 async function anPrevia(r,voltar){
+  anPreviaRel=r;
   anVoltar=voltar||anVista; anVista="previa"; anRender();
   const C=$("#an-corpo");
   C.innerHTML=`<div class="secao-topo ad-previa-topo">
@@ -8268,7 +8148,12 @@ async function anImprimir(html){
   st.textContent="@media print{@page{size:A4 portrait;margin:0 12mm}}";
   document.head.appendChild(st);
   document.body.classList.add("an-imprimindo");
-  const limpar=()=>{ document.body.classList.remove("an-imprimindo"); st.remove(); alvo.innerHTML=""; window.removeEventListener("afterprint",limpar); };
+  /* nome do PDF: dentro do LOP o navegador usa o título da janela de fora, então troca nas duas */
+  const docs=[document]; try{ if(window.top!==window&&window.top.document)docs.push(window.top.document); }catch(e){}
+  const titulosAntes=docs.map(d=>d.title);
+  const novoTitulo=html?"Painel de Anomalias - "+anData(anHoje()).replace(/\//g,"-"):anNomeArquivo(anPreviaRel);
+  docs.forEach(d=>{ d.title=novoTitulo; });
+  const limpar=()=>{ document.body.classList.remove("an-imprimindo"); st.remove(); alvo.innerHTML=""; docs.forEach((d,i)=>{ d.title=titulosAntes[i]; }); window.removeEventListener("afterprint",limpar); };
   window.addEventListener("afterprint",limpar);
   setTimeout(()=>{ try{ window.print(); }catch(e){ toast("A impressão foi bloqueada aqui."); limpar(); } },150);
 }
