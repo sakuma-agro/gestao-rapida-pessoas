@@ -104,25 +104,43 @@ const ativosDa = fid => emprestimos().filter(e => e.funcionario_id === fid && e.
 export const abertoDe = fid => num(ativosDa(fid).reduce((s, e) => s + saldo(e), 0));
 
 /**
- * A parcela que vale na competência: é do primeiro empréstimo da pessoa que
- * ainda tinha saldo ANTES dessa competência. Os outros esperam na fila.
+ * Quais empréstimos da pessoa descontam num mês (19/10/2026, pedido dele):
+ * o primeiro com saldo ocupa a vaga da fila; os seguintes só entram se foram
+ * marcados "descontar junto" (`desconto_junto`) — senão esperam na fila.
+ * `saldoDe(e)` permite simular (projeção) em vez de olhar o saldo real.
  */
-export function previstoEm(fid, competencia) {
+function quemDesconta(fid, competencia, saldoDe) {
+  const saida = [];
+  let vagaLivre = true;
   for (const e of ativosDa(fid)) {
-    const antes = saldoBruto(e, competencia);
+    const antes = saldoDe(e);
     if (antes <= 0.004) continue;
-    if (e.primeira_comp > competencia) return null;
+    if (!e.desconto_junto) {
+      if (!vagaLivre) continue;            // fila: espera quitar o da frente
+      vagaLivre = false;
+    }
+    if (e.primeira_comp > competencia) continue;
+    saida.push({ e, antes });
+  }
+  return saida;
+}
+
+/** As parcelas que valem na competência, uma por empréstimo que desconta. */
+export function previstosEm(fid, competencia) {
+  /* RN-80: recebendo do INSS (16º dia de afastamento em diante), a parcela
+     do mês não é descontada — vai para o fim, como mês sem desconto. */
+  const bloq = bloqueioInss(fid, competencia);
+  return quemDesconta(fid, competencia, e => saldoBruto(e, competencia)).map(({ e, antes }) => {
     const padrao = parcelaDe(e, antes);
-    /* RN-80: recebendo do INSS (16º dia de afastamento em diante), a parcela
-       do mês não é descontada — vai para o fim, como mês sem desconto. */
-    const bloq = bloqueioInss(fid, competencia);
-    if (bloq) return { emprestimo: e, saldoAntes: antes, padrao, ajuste: ajusteDe(e.id, competencia), valor: 0, bloqueado: bloq };
     const ajuste = ajusteDe(e.id, competencia);
+    if (bloq) return { emprestimo: e, saldoAntes: antes, padrao, ajuste, valor: 0, bloqueado: bloq };
     return { emprestimo: e, saldoAntes: antes, padrao, ajuste,
       valor: ajuste ? Math.min(num(ajuste.valor), antes) : padrao };
-  }
-  return null;
+  });
 }
+/** Compatibilidade: a parcela de um empréstimo (ou a primeira da pessoa). */
+export const previstoEm = (fid, competencia, empId = null) =>
+  previstosEm(fid, competencia).find(p => !empId || p.emprestimo.id === empId) || null;
 
 /** Os meses de cada parcela que falta, simulando a fila da pessoa. */
 export function projecaoDa(fid) {
@@ -134,14 +152,15 @@ export function projecaoDa(fid) {
   let c = jaAbateu ? proxComp(atual) : atual;
   const saida = [];
   for (let i = 0; i < 480; i++) {
-    const e = lista.find(x => resto.get(x.id) > 0.004);
-    if (!e) break;
-    if (e.primeira_comp > c) c = e.primeira_comp;
-    if (bloqueioInss(fid, c)) { c = proxComp(c); continue; }   // RN-80: pula o mês
-    const aj = ajusteDe(e.id, c);
-    const v = aj ? Math.min(num(aj.valor), resto.get(e.id)) : parcelaDe(e, resto.get(e.id));
-    saida.push({ emprestimo_id: e.id, competencia: c, valor: v, ajuste: aj });
-    resto.set(e.id, num(resto.get(e.id) - v));
+    if (!lista.some(x => resto.get(x.id) > 0.004)) break;
+    if (!bloqueioInss(fid, c)) {   // RN-80: pula o mês
+      for (const { e } of quemDesconta(fid, c, x => resto.get(x.id))) {
+        const aj = ajusteDe(e.id, c);
+        const v = aj ? Math.min(num(aj.valor), resto.get(e.id)) : parcelaDe(e, resto.get(e.id));
+        saida.push({ emprestimo_id: e.id, competencia: c, valor: v, ajuste: aj });
+        resto.set(e.id, num(resto.get(e.id) - v));
+      }
+    }
     c = proxComp(c);
   }
   return saida;
@@ -150,6 +169,7 @@ export function projecaoDa(fid) {
 export function situacaoDe(e) {
   if (e.situacao !== 'ativo') return e.situacao;
   if (saldo(e) <= 0.004) return 'quitado';
+  if (e.desconto_junto) return 'desconto';
   const antes = ativosDa(e.funcionario_id).filter(o => ordem(o, e) < 0 && saldo(o) > 0.004);
   return antes.length ? 'fila' : 'desconto';
 }
@@ -183,19 +203,25 @@ function competenciaAberta(fid) {
 export function linhasFechamento(competencia, destinoId) {
   const pessoas = [...new Set(emprestimos().map(e => e.funcionario_id))]
     .filter(fid => destinoDaPessoa(fid) === destinoId);
-  return pessoas.map(fid => {
+  /* Uma linha por empréstimo que desconta no mês (pode ter dois da mesma
+     pessoa quando um foi marcado "descontar junto"). Já lançado → só os
+     lançados; aberta → os previstos. */
+  return pessoas.flatMap(fid => {
     const lancados = abatimentos().filter(a => a.funcionario_id === fid && a.competencia === competencia);
-    const p = previstoEm(fid, competencia);
-    if (!p && !lancados.length) return null;
-    return { fid, nome: nomeDe(fid), previsto: lancados.length ? null : p, lancados };
-  }).filter(Boolean).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const nome = nomeDe(fid);
+    if (lancados.length) {
+      const porEmp = [...new Set(lancados.map(a => a.emprestimo_id))];
+      return porEmp.map(id => ({ fid, nome, previsto: null, lancados: lancados.filter(a => a.emprestimo_id === id) }));
+    }
+    return previstosEm(fid, competencia).map(p => ({ fid, nome, previsto: p, lancados: [] }));
+  }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
 /** O que vai para o escritório: o lançado, ou o previsto (com ajuste) se aberta. */
 export function valorParaFolha(fid, competencia) {
   const lanc = abatimentos().filter(a => a.funcionario_id === fid && a.competencia === competencia);
   if (lanc.length) return num(lanc.reduce((s, a) => s + Number(a.valor), 0));
-  return previstoEm(fid, competencia)?.valor || 0;
+  return num(previstosEm(fid, competencia).reduce((s, p) => s + p.valor, 0));
 }
 
 const efeito = (v, prev, saldoAntes) =>
@@ -238,7 +264,7 @@ export function blocoFechamento(competencia, destino, situacao) {
         <td class="ce">${brl(l.previsto)}</td>
         <td class="ce"><b>${brl(l.valor)}</b>${l.bloqueado ? ' <span class="tag neutra">afastado</span>' : l.ajustado ? ' <span class="tag alerta">ajustado</span>' : ''}</td>
         <td class="dc-sem">${l.lancado ? 'baixado no envio' : l.bloqueado ? '' : efeito(l.valor, l.previsto, l.saldoAntes)}${l.obs ? `${l.bloqueado ? '' : '<br>'}${esc(l.obs)}` : ''}</td>
-        ${aberta ? `<td class="ce">${l.lancado || l.bloqueado ? '' : `<button class="btn mini" type="button" data-ajustar="${l.fid}" data-comp="${competencia}">Ajustar</button>`}</td>` : ''}
+        ${aberta ? `<td class="ce">${l.lancado || l.bloqueado ? '' : `<button class="btn mini" type="button" data-ajustar="${l.fid}" data-comp="${competencia}" data-emp="${l.emprestimo?.id || ''}">Ajustar</button>`}</td>` : ''}
       </tr>`).join('')}</tbody>
       <tfoot><tr class="jor-total"><td colspan="3">Total a descontar</td>
         <td class="ce">${brl(total)}</td><td colspan="${aberta ? 2 : 1}"></td></tr></tfoot></table>
@@ -251,7 +277,7 @@ let redesenharFechamento = () => {};
 export function ligarBlocoFechamento(aoMudar) {
   if (aoMudar) redesenharFechamento = aoMudar;
   document.querySelectorAll('[data-ajustar]').forEach(b =>
-    b.addEventListener('click', () => dlgAjuste(b.dataset.ajustar, b.dataset.comp, redesenharFechamento)));
+    b.addEventListener('click', () => dlgAjuste(b.dataset.ajustar, b.dataset.comp, redesenharFechamento, b.dataset.emp || null)));
 }
 
 /** Confere antes do envio e devolve o que vai ser baixado. */
@@ -298,11 +324,11 @@ export async function estornarAbatimentos(competencia, destinoId, motivo) {
 
 /* Baixa manual: o valor combinado para um mês (menos que a parcela, ou nada).
    Fica gravado como "ajustado" e só baixa o saldo no envio da competência. */
-function dlgAjuste(fid, competencia, depois) {
+function dlgAjuste(fid, competencia, depois, empId = null) {
   const c = competencia || competenciaAberta(fid);
   const d = destinoDaPessoa(fid);
   if (d && jd.travada(c, d)) { avisar(`A competência de ${compLonga(c)} já foi enviada. Reabra no Fechamento para mudar o desconto.`); return; }
-  const p = previstoEm(fid, c);
+  const p = previstoEm(fid, c, empId);
   if (!p) { avisar(`${nomeDe(fid)} não tem parcela prevista em ${compLonga(c)}.`); return; }
   if (p.bloqueado) { avisar(`${nomeDe(fid)} está afastado pelo INSS em ${compLonga(c)}: a parcela já não é descontada (RN-80) e vai para o fim.`); return; }
   dialogo(`<h3>Ajustar o desconto — ${esc(nomeDe(fid))}</h3>
@@ -422,17 +448,26 @@ export function reciboHTML(e, reimpressao = false) {
   const vs = valoresParcelas(Number(e.valor), e.parcelas);
   const proj = projecaoDa(e.funcionario_id).filter(p => p.emprestimo_id === e.id);
   const fila = situacaoDe(e) === 'fila';
+  /* O mês da folha tem de ficar bem claro (pedido dele, 19/10/2026):
+     "folha de outubro de 2026". Na fila é previsão; "descontar junto" cita
+     o empréstimo que já está em desconto. */
+  const anterior = ativosDa(e.funcionario_id).find(o => o.id !== e.id && ordem(o, e) < 0 && saldo(o) > 0.004);
+  const mes = proj[0]?.competencia || e.primeira_comp;
+  const folha = `folha de ${compLonga(mes)}`;
   const inicio = fila
-    ? `após quitar o empréstimo anterior${proj[0] ? ` (previsão: ${compLonga(proj[0].competencia)})` : ''}`
-    : compLonga(proj[0]?.competencia || e.primeira_comp);
+    ? `${folha} (previsão) — após quitar ${anterior ? numeroTxt(anterior) : 'o empréstimo anterior'}`
+    : e.desconto_junto && anterior ? `${folha} — junto com a parcela do ${numeroTxt(anterior)}`
+    : folha;
   const parc = vs[0] === vs[vs.length - 1] ? `${e.parcelas} × ${brl(vs[0])}` : `${e.parcelas} × ${brl(vs[0])} (última ${brl(vs[vs.length - 1])})`;
   const empresa = f.empregador || 'SAKUMA Agronegócios';
   /* Pix do cadastro (19/10/2026): sai no recibo para o caixa pagar na chave certa. */
   const pix = (f.pix_chave || '').trim();
   const pixTxt = pix ? `${pix}${f.pix_tipo ? ` (${f.pix_tipo})` : ''}` : '';
+  /* Sem tarja de "2ª via" nem de "corrigido" (pedido dele, 19/10/2026): a
+     reimpressão sai limpa, igual à primeira. O app continua contando as
+     reimpressões e guardando a correção no registro. */
+  void reimpressao;
   const via = qual => `<article class="rel rel-via">
-    ${reimpressao ? `<div class="rel-tarja">2ª VIA — reimpressão em ${dataBR(hoje())} por ${esc(usuario() || '')}</div>` : ''}
-    ${e.editado_em ? `<div class="rel-tarja">RECIBO CORRIGIDO em ${dataBR(e.editado_em)} — substitui o anterior</div>` : ''}
     ${cabecalhoDoc('Recibo de empréstimo', `${numeroTxt(e)} · ${qual}`, `data<strong>${dataBR(e.data)}</strong>`)}
     <div class="rel-ficha">
       <div><span>Funcionário</span><b>${esc(f.nome || '—')}</b></div>
@@ -440,13 +475,13 @@ export function reciboHTML(e, reimpressao = false) {
       <div><span>Fazenda</span><b>${esc(f.fazenda || '—')}</b></div>
       <div><span>Valor recebido</span><b>${brl(e.valor)}</b></div>
       <div><span>Parcelas</span><b>${parc}</b></div>
-      <div><span>Início do desconto</span><b>${esc(inicio)}</b></div>
+      <div><span>Desconto a partir da</span><b>${esc(inicio)}</b></div>
       ${pix ? `<div><span>Pix para pagamento</span><b>${esc(pixTxt)}</b></div>` : ''}
     </div>
     <p>Declaro que recebi de <b>${esc(empresa)}</b> a quantia de <b>${brl(e.valor)}</b> (${esc(extenso(Number(e.valor)))}),${
       pix ? ` por Pix na chave <b>${esc(pix)}</b>,` : ''}
-    a título de empréstimo, <b>sem juros e sem correção</b>, e autorizo o desconto no meu pagamento nas parcelas
-    indicadas, conforme o art. 462 da CLT. Em caso de desligamento, autorizo o desconto do saldo nas verbas
+    a título de empréstimo, <b>sem juros e sem correção</b>, e autorizo o desconto no meu pagamento em <b>${esc(parc)}</b>,
+    <b>a partir da ${esc(folha)}</b>${fila ? ' (previsão, após quitar o empréstimo anterior)' : ''}, conforme o art. 462 da CLT. Em caso de desligamento, autorizo o desconto do saldo nas verbas
     rescisórias, no limite da lei.${e.motivo ? ` Motivo informado: ${esc(e.motivo)}.` : ''}</p>
     ${e.liberado_por ? `<p class="rel-nota">Liberado acima do teto de ${TETO_PERC}% do salário pelo administrador: ${esc(e.justificativa_teto || '')}</p>` : ''}
     <div class="rel-assinaturas">
@@ -641,7 +676,7 @@ function ligarBarraDoc(raiz) {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { busca: '', buscaSal: '', filtro: 'aberto', pessoa: '*', importar: false };
+const est = { busca: '', buscaSal: '', filtro: 'aberto', pessoa: '*', importar: false, junto: false };
 const focarNoFim = el => { el.focus(); const n = el.value.length; try { el.setSelectionRange(n, n); } catch {} };
 
 function cabecalho(titulo, sub) {
@@ -715,6 +750,11 @@ function desenharEmissao() {
           <label><span id="empRotPrim">Primeiro desconto</span> <input type="month" id="empPrim" value="${mesQueVem}" required></label>
           <label>Motivo <small class="dc-sem">opcional</small><input type="text" id="empMotivo" maxlength="120" placeholder="Ex.: conserto da moto"></label>
         </div>
+        <div id="empFilaBox" hidden><fieldset class="jor-form" style="border:0;padding:0;margin:0">
+          <legend style="font-weight:600;margin-bottom:4px">Já tem empréstimo em aberto. Este:</legend>
+          <label class="jor-inline"><input type="radio" name="empFila" value="fila" ${est.junto ? '' : 'checked'}> Entra na fila — começa depois de quitar o anterior</label>
+          <label class="jor-inline"><input type="radio" name="empFila" value="junto" ${est.junto ? 'checked' : ''}> Desconta junto com o anterior, a partir do mês do "Primeiro desconto"</label>
+        </fieldset></div>
         <div id="empJustBox" hidden><label>Justificativa para liberar acima do teto (obrigatória)
           <input type="text" id="empJust" maxlength="200"></label></div>
         <div class="jor-acoes">
@@ -730,6 +770,7 @@ function desenharEmissao() {
   ['empFunc', 'empData', 'empValor', 'empParc', 'empPrim', 'empImportar'].forEach(id =>
     $(id).addEventListener('input', calcular));
   $('empImportar').addEventListener('change', () => { est.importar = $('empImportar').checked; calcular(); });
+  document.querySelectorAll('input[name=empFila]').forEach(r => r.addEventListener('change', () => { est.junto = r.value === 'junto'; calcular(); }));
   $('empLimpar').addEventListener('click', () => { f.reset(); $('empPrim').value = mesQueVem; fecharPrevia(); calcular(); });
   f.addEventListener('submit', gravarEmissao);
   ligarBarraDoc($('telaEmpEmissao'));
@@ -757,7 +798,10 @@ async function calcular() {
   const aberto = abertoDe(fid), soma = num(aberto + v);
   const semTeto = !imp && t.teto == null;
   const estoura = !imp && (semTeto || soma > t.teto + 0.004);
-  const fila = ativosDa(fid).some(e => saldo(e) > 0.004);
+  const temAberto = ativosDa(fid).some(e => saldo(e) > 0.004);
+  const junto = temAberto && est.junto;
+  const fila = temAberto && !junto;
+  $('empFilaBox').hidden = !temAberto || imp;
   const semVinculo = !destinoDaPessoa(fid);
   const pl = v ? valoresParcelas(v, n) : [];
   let c = prim;
@@ -786,7 +830,8 @@ async function calcular() {
         <td class="ce">${brl(x)}</td></tr>`; c = proxComp(c); return r; }).join('')}
     </tbody><tfoot><tr class="jor-total"><td colspan="2">Total</td><td class="ce">${brl(pl.reduce((s, x) => s + x, 0))}</td></tr></tfoot></table>` : '') +
     `<ul class="jor-avisos">
-      ${fila ? `<li>Já tem empréstimo em aberto (${brl(aberto)}). Este entra na fila e começa no mês seguinte à quitação do anterior — o recibo diz isso, sem cravar o mês.</li>` : ''}
+      ${fila ? `<li>Já tem empréstimo em aberto (${brl(aberto)}). Este entra na fila e começa no mês seguinte à quitação do anterior — o recibo diz isso como previsão.</li>` : ''}
+      ${junto ? `<li>Desconta junto com o que já está em aberto (${brl(aberto)}): no mês somam as duas parcelas. O recibo diz "a partir da folha de ${compLonga(prim)}".</li>` : ''}
       ${semVinculo ? '<li>Sem unidade no cadastro: a parcela só aparece no fechamento depois que a pessoa tiver unidade (Cadastro · Nível 1).</li>' : ''}
       ${n > 12 ? '<li>Mais de 12 parcelas. É só um aviso.</li>' : ''}
     </ul>`;
@@ -803,7 +848,7 @@ async function calcular() {
     : !estoura ? 'Lançar e emitir recibo'
     : acesso.admin ? 'Liberar acima do teto e emitir recibo' : 'Enviar para liberação do administrador';
   ok.className = 'btn principal';
-  ultimoCalculo = { fid, data, v, n, prim, imp, estoura, teto: t.teto };
+  ultimoCalculo = { fid, data, v, n, prim, imp, estoura, teto: t.teto, junto };
 }
 
 async function gravarEmissao(ev) {
@@ -817,6 +862,7 @@ async function gravarEmissao(ev) {
     numero: Math.max(0, ...emprestimos().map(x => x.numero || 0)) + 1,
     funcionario_id: k.fid, data: k.data, valor: k.v, parcelas: k.n, primeira_comp: k.prim,
     origem: k.imp ? 'importado' : 'concessao',
+    desconto_junto: !!k.junto,
     situacao: k.estoura && !acesso.admin ? 'aguardando' : 'ativo',
     motivo: $('empMotivo').value.trim() || (k.imp ? 'Saldo trazido da planilha na implantação' : null),
     teto: k.teto,
@@ -985,6 +1031,8 @@ function editar(e, temAbat) {
         <label>${imp ? 'Próxima parcela' : 'Primeiro desconto'} <input type="month" id="empEdPrim" value="${esc((e.primeira_comp || '').slice(0, 7))}" required ${trava}></label>
         <label>Motivo <input type="text" id="empEdMotivo" maxlength="120" value="${esc(e.motivo || '')}"></label>
       </div>
+      ${!temAbat && !imp ? `<label class="jor-inline"><input type="checkbox" id="empEdJunto" ${e.desconto_junto ? 'checked' : ''}>
+        Desconta junto com o empréstimo anterior (não entra na fila)</label>` : ''}
     </form>
     ${campoJust('Por que está corrigindo? (obrigatório)')}
     ${rodapeDlg('<button class="btn principal" type="button" id="empOkDlg">Salvar correção</button>')}`, () =>
@@ -1000,6 +1048,7 @@ function editar(e, temAbat) {
       if (!temAbat && !$('empEdPrim').value) return erro('Informe o mês do primeiro desconto.');
 
       const novo = { ...e, data, valor: v, parcelas: n, primeira_comp: prim,
+        desconto_junto: $('empEdJunto') ? $('empEdJunto').checked : !!e.desconto_junto,
         motivo: $('empEdMotivo').value.trim() || null, editado_em: agora(), editado_por: usuario() };
 
       /* Subiu o valor? Confere o teto de novo (só concessão). */
@@ -1012,6 +1061,7 @@ function editar(e, temAbat) {
       }
 
       const mudou = ['data', 'valor', 'parcelas', 'primeira_comp', 'motivo'].filter(k => String(e[k] ?? '') !== String(novo[k] ?? ''));
+      if (!!e.desconto_junto !== !!novo.desconto_junto) mudou.push('desconto_junto');
       if (!mudou.length) return erro('Nada mudou.');
       await jd.salvar('emprestimos', novo);
       await jd.registrar({ tabela: 'jor_emprestimos', registro_id: e.id, acao: 'editar', antes: e, depois: novo, justificativa: j });
