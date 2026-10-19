@@ -1028,6 +1028,19 @@ textarea.ck-tp-campo{resize:vertical}
 .ck-item-tp.r-ok{border-left-color:#84BD00}
 @media (max-width:600px){.pd-controle{font-size:9.5px}}
 
+/* tela só para assinar (19/10/2026) */
+.ck-assin-abrir{width:100%;min-height:64px;border:1.5px dashed #B9BDAE;border-radius:10px;background:#FCFDF8;color:var(--marrom,#744F28);font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.ck-assin-abrir:hover{background:var(--verde-claro,#F1F7E3)}
+.tela-assin{position:fixed;inset:0;z-index:10000;background:#fff;display:flex;flex-direction:column;padding:12px 14px;gap:10px;font-family:Arial,Helvetica,sans-serif;color:#51534A}
+.tela-assin-topo{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tela-assin-topo b{display:block;font-size:17px;color:#744F28}
+.tela-assin-topo span{font-size:13px;color:#7d8175}
+.tela-assin-area{flex:1;min-height:0;display:flex}
+.tela-assin-canvas{flex:1;min-height:0;width:100%;height:100%!important;border-width:2px;border-radius:12px}
+.tela-assin-dica{margin:0;font-size:12.5px;color:#7d8175;text-align:center}
+.tela-assin-pe{display:flex;gap:10px;justify-content:flex-end}
+body.tela-assin-aberta{overflow:hidden}
+
 /* ═══════════════════════════ Antes e Depois ═══════════════════════════ */
 body[data-aba="ad"] #bt-salvar,body[data-aba="ad"] #bt-pdf,body[data-aba="ad"] .status{display:none}
 
@@ -1157,6 +1170,16 @@ body[data-aba="ad"] #bt-salvar,body[data-aba="ad"] #bt-pdf,body[data-aba="ad"] .
 .ad-hist tr.ad-h-aberto td:first-child{box-shadow:inset 4px 0 0 #c98a00}
 .ad-hist tr.ad-h-ok td:first-child{box-shadow:inset 4px 0 0 var(--verde)}
 .ad-hist td .anp-btn.mini{white-space:nowrap;margin:2px 0}
+
+/* mais fotos (19/10/2026) */
+.ad-mais{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ad-mini{position:relative;width:72px;height:54px;border:1px solid var(--linha);border-radius:6px;overflow:hidden;background:#1d1e1a}
+.ad-mini img{width:100%;height:100%;object-fit:cover;display:block}
+.ad-mini-x{position:absolute;top:2px;right:2px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:15px;line-height:20px;padding:0;cursor:pointer}
+.ad-mais-bt{height:54px;padding:0 12px;border:1.5px dashed var(--linha-forte);border-radius:6px;background:var(--superficie-2);color:var(--texto-2);cursor:pointer;font:inherit;font-size:13px}
+.adr-mais-grade{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1fr;grid-auto-rows:1fr;gap:4mm}
+.adr-mais-grade .adr-fig figcaption{padding:1.5mm 2.5mm}
+.adr-mais-grade .adr-fig figcaption b{font-size:12px}
 
 /* ═══════════════════════════ Extintores ═══════════════════════════ */
 body[data-aba="ex"] #bt-salvar,body[data-aba="ex"] #bt-pdf,body[data-aba="ex"] .status{display:none}
@@ -5499,7 +5522,7 @@ function ckRenderAssin(){
   const cx=$("#ck-assin"); if(!cx||!estado.modelo)return;
   const lista=ckAssinaturas();
   cx.innerHTML=`<h3 class="ck-assin-tt">Assinatura</h3>
-    <p class="ck-assin-ajuda">O responsável pela verificação assina com o dedo ou o mouse dentro do quadro e toca em <b>Assinar</b>. A data e a hora ficam gravadas junto da assinatura e saem no relatório.</p>
+    <p class="ck-assin-ajuda">Escreva o nome e toque em <b>Assinar</b>: abre uma tela só para a assinatura, com o dedo ou a caneta. A data e a hora ficam gravadas junto da assinatura e saem no relatório.</p>
     <div class="ck-assin-grade">${lista.map((a,i)=>a.em?`
       <div class="ck-assin feita">
         <div class="ck-assin-papel">${esc(a.papel)}</div>
@@ -5511,14 +5534,53 @@ function ckRenderAssin(){
       <div class="ck-assin">
         <div class="ck-assin-papel">${esc(a.papel)}</div>
         <input type="text" placeholder="Nome de quem assina" value="${esc(a.nome||"")}" data-as-nome="${i}">
-        <canvas class="ck-assin-tela" data-as-tela="${i}" aria-label="Quadro para assinar"></canvas>
-        <div class="ck-assin-bts">
-          <button type="button" class="bt bt-fantasma" data-as-limpar="${i}">Limpar</button>
-          <button type="button" class="btn" data-as-assinar="${i}">Assinar</button>
-        </div>
+        <button type="button" class="ck-assin-abrir" data-as-assinar="${i}">✍ Assinar</button>
       </div>`).join("")}</div>`;
-  cx.querySelectorAll("canvas[data-as-tela]").forEach(ckLigarTela);
 }
+/* Tela só para assinar (19/10/2026, pedido dele): o quadro pequeno dentro
+   do formulário era apertado no celular. Abre em tela cheia, com o quadro
+   ocupando o espaço todo; Confirmar devolve a imagem para quem chamou. */
+function abrirTelaAssinatura(op){
+  const velho=$("#tela-assin"); if(velho)velho.remove();
+  const ov=document.createElement("div"); ov.id="tela-assin"; ov.className="tela-assin";
+  ov.innerHTML=`<div class="tela-assin-topo"><div><b>${esc(op.titulo||"Assinatura")}</b>${op.nome?`<span>${esc(op.nome)}</span>`:""}</div>
+      <button type="button" class="bt bt-fantasma" data-ta-cancelar>Cancelar</button></div>
+    <div class="tela-assin-area"><canvas class="ck-assin-tela tela-assin-canvas" aria-label="Quadro para assinar"></canvas></div>
+    <p class="tela-assin-dica">Assine com o dedo ou a caneta dentro do quadro. No celular, vire o aparelho se quiser mais espaço.</p>
+    <div class="tela-assin-pe"><button type="button" class="bt bt-fantasma" data-ta-limpar>Limpar</button><button type="button" class="btn" data-ta-confirmar>Confirmar assinatura</button></div>`;
+  document.body.appendChild(ov); document.body.classList.add("tela-assin-aberta");
+  const cv=ov.querySelector("canvas"); ckLigarTela(cv);
+  const fechar=()=>{ ov.remove(); document.body.classList.remove("tela-assin-aberta"); };
+  ov.addEventListener("click",ev=>{
+    if(ev.target.closest("[data-ta-cancelar]")){ fechar(); return; }
+    if(ev.target.closest("[data-ta-limpar]")){ ckLigarTela(cv); return; }
+    if(ev.target.closest("[data-ta-confirmar]")){
+      if(!cv._riscou){ toast("Assine dentro do quadro antes de confirmar."); return; }
+      const img=recortarTraco(cv); fechar(); op.aoConfirmar(img);
+    }
+  });
+}
+window.abrirTelaAssinatura=abrirTelaAssinatura;
+/* recorta a imagem no traço (com folga), senão a assinatura feita num quadro
+   em pé sai minúscula dentro da caixa deitada do relatório */
+function recortarTraco(cv){
+  try{
+    const x=cv.getContext("2d"), d=x.getImageData(0,0,cv.width,cv.height).data;
+    let x0=cv.width,y0=cv.height,x1=-1,y1=-1;
+    for(let y=0;y<cv.height;y++)for(let i=0;i<cv.width;i++){ if(d[(y*cv.width+i)*4+3]>10){ if(i<x0)x0=i; if(i>x1)x1=i; if(y<y0)y0=y; if(y>y1)y1=y; } }
+    if(x1<0)return cv.toDataURL("image/png");
+    const f=Math.round(Math.max(12,(x1-x0)*0.06));
+    x0=Math.max(0,x0-f); y0=Math.max(0,y0-f); x1=Math.min(cv.width-1,x1+f); y1=Math.min(cv.height-1,y1+f);
+    let w=x1-x0+1, h=y1-y0+1;
+    /* caixa no mínimo 3:1 deitada, para a assinatura não virar um risco gigante */
+    const minW=h*2.2, minH=w/4;
+    const W=Math.round(Math.max(w,minW)), H=Math.round(Math.max(h,minH));
+    const c2=document.createElement("canvas"); c2.width=W; c2.height=H;
+    c2.getContext("2d").drawImage(cv,x0,y0,w,h,Math.round((W-w)/2),Math.round((H-h)/2),w,h);
+    return c2.toDataURL("image/png");
+  }catch(e){ return cv.toDataURL("image/png"); }
+}
+
 function ckLigarTela(cv){
   const dpr=window.devicePixelRatio||1, w=cv.clientWidth||300, h=cv.clientHeight||140;
   cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
@@ -5536,18 +5598,16 @@ function ckLigarTela(cv){
 }
 $("#painel-checklists").addEventListener("click",ev=>{
   const t=ev.target;
-  const lim=t.closest("[data-as-limpar]");
-  if(lim){ const cv=document.querySelector(`canvas[data-as-tela="${lim.dataset.asLimpar}"]`); if(cv)ckLigarTela(cv); return; }
   const ass=t.closest("[data-as-assinar]");
   if(ass){
     const i=Number(ass.dataset.asAssinar), a=ckAssinaturas()[i];
-    const cv=document.querySelector(`canvas[data-as-tela="${i}"]`);
     const nome=(document.querySelector(`[data-as-nome="${i}"]`)||{}).value||"";
     if(!nome.trim()){ toast("Escreva o nome de quem está assinando."); return; }
-    if(!cv||!cv._riscou){ toast("Assine dentro do quadro antes de confirmar."); return; }
-    a.nome=nome.trim(); a.img=cv.toDataURL("image/png"); a.em=new Date().toISOString();
-    ckRenderAssin(); salvar(); renderDoc();
-    toast("Assinado em "+ckQuando(a.em)+".");
+    abrirTelaAssinatura({titulo:a.papel||"Assinatura",nome:nome.trim(),aoConfirmar:img=>{
+      a.nome=nome.trim(); a.img=img; a.em=new Date().toISOString();
+      ckRenderAssin(); salvar(); renderDoc();
+      toast("Assinado em "+ckQuando(a.em)+".");
+    }});
     return;
   }
   const ref=t.closest("[data-as-refazer]");
@@ -6516,6 +6576,26 @@ function adTemDepois(r){ return !!(r&&(r._depoisSrc||r.foto_depois)); }
 function adTemAntes(r){ return !!(r&&(r._antesSrc||r.foto_antes)); }
 function adNomePadrao(){ try{ return localStorage.getItem(AD_NOME)||""; }catch(e){ return ""; } }
 function adSituacao(r){ return adTemDepois(r)?"Concluído":"Aguardando o depois"; }
+/* Mais fotos (19/10/2026, pedido dele): além da foto principal de cada lado,
+   quantas quiser. Na base ficam em `fotos_mais` (lista de {lado, caminho});
+   as recém-tiradas ficam em `_mais` ({lado, src}) até salvar. */
+function adMais(r,lado){ return [...((r&&r.fotos_mais)||[]).filter(f=>f.lado===lado).map(f=>({caminho:f.caminho})), ...((r&&r._mais)||[]).filter(f=>f.lado===lado).map(f=>({src:f.src}))]; }
+function adMaisTotal(r){ return ((r&&r.fotos_mais)||[]).length+((r&&r._mais)||[]).length; }
+async function adMaisSrcDados(r,lado){
+  const out=[];
+  for(const f of adMais(r,lado)){ if(f.src){ out.push(f.src); continue; } const d=await adSrcDadosCaminho(f.caminho); if(d)out.push(d); }
+  return out;
+}
+async function adSrcDadosCaminho(cam){
+  if(!cam)return "";
+  if(adDados.has(cam))return adDados.get(cam);
+  const url=await urlDaFoto(cam); if(!url)return "";
+  try{
+    const b=await (await fetch(url)).blob();
+    const d=await new Promise((ok,erro)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=erro;fr.readAsDataURL(b);});
+    adDados.set(cam,d); return d;
+  }catch(e){ return url; }
+}
 
 /* foto do registro: a recém-tirada (data URL) ou a da base (URL assinada) */
 async function adSrc(r,lado){
@@ -6591,12 +6671,27 @@ async function adSalvar(){
     const carimbo=Date.now();
     if(r._antesSrc){ r.foto_antes=await enviarFoto(`${r.id}/antes-${carimbo}.jpg`,r._antesSrc); adDados.set(r.foto_antes,r._antesSrc); }
     if(r._depoisSrc){ r.foto_depois=await enviarFoto(`${r.id}/depois-${carimbo}.jpg`,r._depoisSrc); adDados.set(r.foto_depois,r._depoisSrc); }
+    /* mais fotos: sobe as novas, tira da lista as apagadas */
+    r.fotos_mais=(r.fotos_mais||[]).filter(f=>!(r._maisApagar||[]).includes(f.caminho));
+    const novas=r._mais||[];
+    for(let k=0;k<novas.length;k++){
+      const f=novas[k];
+      const cam=await enviarFoto(`${r.id}/mais-${f.lado}-${carimbo}-${k+1}.jpg`,f.src);
+      adDados.set(cam,f.src); r.fotos_mais.push({lado:f.lado,caminho:cam});
+    }
+    r._mais=[];
+    for(const cam of (r._maisApagar||[])){
+      try{ if(typeof window.apagarFoto==="function")await window.apagarFoto(cam);
+           else{ const h=await comToken(); await fetch(`${cfg.url}/storage/v1/object/${encodeURI("vistorias/"+cam)}`,{method:"DELETE",headers:h}); } }catch(e){}
+    }
+    r._maisApagar=[];
     if(r.autor_nome){ try{ localStorage.setItem(AD_NOME,r.autor_nome); }catch(e){} }
     const corpo={
       titulo:String(r.titulo).trim(), unidade:r.unidade||null, local:r.local||null, descricao:r.descricao||null,
       responsavel:r.responsavel||null, autor:r.autor_nome||r.autor||(sessao&&sessao.email)||null,
       data_antes:r.data_antes||null, foto_antes:r.foto_antes||null,
-      data_depois:adTemDepois(r)?(r.data_depois||adHoje()):null, foto_depois:r.foto_depois||null, obs_depois:r.obs_depois||null
+      data_depois:adTemDepois(r)?(r.data_depois||adHoje()):null, foto_depois:r.foto_depois||null, obs_depois:r.obs_depois||null,
+      fotos_mais:r.fotos_mais||[]
     };
     let salvo;
     if(r._novo){
@@ -6605,7 +6700,8 @@ async function adSalvar(){
     }else{
       salvo=await rest(`antes_depois?id=eq.${encodeURIComponent(r.id)}`,{method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify(corpo)});
     }
-    const novo=(salvo&&salvo[0])||{...r,...corpo};
+    let novo=(salvo&&salvo[0])||{...r,...corpo};
+    if(novo&&!novo.fotos_mais)novo={...novo,fotos_mais:corpo.fotos_mais};
     if(!salvo||!salvo.length)throw new Error("A base não confirmou a gravação. Confira se você tem acesso a este registro.");
     adRegs=[novo,...adRegs.filter(x=>x.id!==novo.id)];
     try{ localStorage.setItem(AD_CACHE,JSON.stringify(adRegs)); }catch(e){}
@@ -6635,7 +6731,7 @@ async function adApagar(){
   try{
     const d=await rest(`antes_depois?id=eq.${encodeURIComponent(r.id)}`,{method:"DELETE",headers:{Prefer:"return=representation"}});
     if(!d||!d.length)throw new Error("Só quem lançou ou um administrador pode apagar.");
-    for(const cam of [r.foto_antes,r.foto_depois].filter(Boolean)){
+    for(const cam of [r.foto_antes,r.foto_depois,...(r.fotos_mais||[]).map(f=>f.caminho)].filter(Boolean)){
       try{ if(typeof window.apagarFoto==="function")await window.apagarFoto(cam);
            else{ const h=await comToken(); await fetch(`${cfg.url}/storage/v1/object/${encodeURI("vistorias/"+cam)}`,{method:"DELETE",headers:h}); } }catch(e){}
     }
@@ -6649,7 +6745,7 @@ async function adApagar(){
 function adCopia(r){ const c=JSON.parse(JSON.stringify(r)); delete c._sujo; return c; }
 function adNovo(){
   return {id:uuid(),_novo:true,codigo:"",titulo:"",unidade:"",local:"",descricao:"",responsavel:"",
-    autor_nome:adNomePadrao(),data_antes:adHoje(),foto_antes:"",data_depois:"",foto_depois:"",obs_depois:""};
+    autor_nome:adNomePadrao(),data_antes:adHoje(),foto_antes:"",data_depois:"",foto_depois:"",obs_depois:"",fotos_mais:[],_mais:[]};
 }
 
 /* ─────────── telas ─────────── */
@@ -6726,7 +6822,7 @@ function adRenderGrade(){
       <div class="ad-info">
         <span class="ref">${esc([r.codigo,r.unidade].filter(Boolean).join(" · ")||"—")}</span>
         <h3>${esc(r.titulo)}</h3>
-        <span class="info">${esc([r.local,adData(r.data_antes)+(dep&&r.data_depois?" → "+adData(r.data_depois):"")].filter(Boolean).join(" · "))}</span>
+        <span class="info">${esc([r.local,adData(r.data_antes)+(dep&&r.data_depois?" → "+adData(r.data_depois):"")].filter(Boolean).join(" · "))}${adMaisTotal(r)?` · <b>+${adMaisTotal(r)} foto${adMaisTotal(r)>1?"s":""}</b>`:""}</span>
       </div>
       <div class="pe">
         ${dep?"":`<button class="bt bt-forte" type="button" data-ad-depois="${esc(r.id)}">📷 Tirar o depois</button>`}
@@ -6792,6 +6888,10 @@ function adRenderForm(){
         ${adTemAntes(r)&&q==="antes"||dep&&q==="depois"?`<img alt="Foto do ${q}" data-ad-src="${q}"><span class="ad-trocar">Trocar foto</span>`
           :`<span class="ad-vazia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Tirar foto do ${q}</span>`}
       </button>
+      <div class="ad-mais">
+        ${adMais(r,q).map((f,i)=>`<span class="ad-mini"><img alt="" ${f.src?`src="${esc(f.src)}"`:`data-ad-mini="${esc(f.caminho)}"`}><button type="button" class="ad-mini-x" data-ad-mais-tirar="${q}" data-ad-mais-i="${i}" aria-label="Tirar esta foto">×</button></span>`).join("")}
+        <button type="button" class="ad-mais-bt" data-ad-mais="${q}">＋ Mais fotos</button>
+      </div>
       <div class="campo"><label for="ad-d-${q}">Data do ${q}</label><input type="date" id="ad-d-${q}" data-ad="data_${q}" value="${esc(r["data_"+q]||"")}"></div>
       ${q==="depois"?`<div class="campo"><label for="ad-obs">O que foi feito</label><textarea id="ad-obs" data-ad="obs_depois" placeholder="Ex.: tampa trocada e lixeira lavada">${esc(r.obs_depois||"")}</textarea></div>`:""}
     </div>`;
@@ -6822,6 +6922,33 @@ function adRenderForm(){
     const im=alvo.querySelector(`img[data-ad-src="${q}"]`); if(!im)return;
     const u=await adSrc(r,q); if(u)im.src=u; else im.replaceWith(Object.assign(document.createElement("span"),{className:"ad-vazia",textContent:"Foto indisponível sem rede"}));
   });
+  alvo.querySelectorAll("img[data-ad-mini]").forEach(async im=>{
+    const cam=im.dataset.adMini; const u=adDados.get(cam)||await urlDaFoto(cam);
+    if(u)im.src=u; else im.alt="sem rede";
+  });
+}
+
+/* mais fotos: aceita várias de uma vez */
+function adMaisFotos(q){
+  const inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.multiple=true;
+  inp.onchange=()=>{
+    const fs=[...(inp.files||[])]; if(!fs.length||!adAtual)return;
+    let n=0;
+    const prox=()=>{
+      const f=fs.shift();
+      if(!f){ adGuardarRascunho(); adRenderForm(); toast(`${n} foto${n>1?"s":""} do ${q} adicionada${n>1?"s":""}. Salve para registrar.`); return; }
+      comprimir(f,url=>{ if(adAtual){ (adAtual._mais=adAtual._mais||[]).push({lado:q,src:url}); n++; } prox(); });
+    };
+    prox();
+  };
+  inp.click();
+}
+function adMaisTirar(q,i){
+  const r=adAtual; if(!r)return;
+  const lista=adMais(r,q), f=lista[i]; if(!f)return;
+  if(f.caminho){ r.fotos_mais=(r.fotos_mais||[]).filter(x=>x.caminho!==f.caminho); (r._maisApagar=r._maisApagar||[]).push(f.caminho); }
+  else{ const k=(r._mais||[]).findIndex(x=>x.lado===q&&x.src===f.src); if(k>=0)r._mais.splice(k,1); }
+  adGuardarRascunho(); adRenderForm();
 }
 
 function adAbrir(id){
@@ -6870,7 +6997,23 @@ function adFolha(r,fA,fD,n,total,tag){
   </section>`;
 }
 
-function adCapa(regs,fotos,total,pag,nPags,ini){
+/* folha extra: as fotos a mais de um registro (até 6 por folha, 3 colunas) */
+const AD_MAIS_POR_FOLHA=6;
+function adFolhaMais(r,fotos,n,total,tag,parte,nPartes){
+  return `<section class="adr-folha">
+    <header class="adr-cab">
+      <div><h1>${esc(r.titulo||"Antes e depois")} · mais fotos${nPartes>1?` (${parte} de ${nPartes})`:""}</h1>
+        <p>${esc(["Antes e Depois",r.codigo,adSituacao(r)].filter(Boolean).join(" · "))}</p></div>
+      <img src="${LOGO}" alt="SAKUMA Agronegócios">
+    </header>
+    <div class="adr-mais-grade">${fotos.map(f=>`<figure class="adr-fig ${f.lado}">
+      <figcaption><b>${f.lado==="antes"?"ANTES":"DEPOIS"}</b><span>${esc(adData(f.lado==="antes"?r.data_antes:r.data_depois))}</span></figcaption>
+      <div class="adr-img"><img src="${esc(f.src)}" alt=""></div></figure>`).join("")}</div>
+    <footer class="adr-rod"><span>SAKUMA Agronegócios · ${esc(tag)} · Folha ${n} de ${total}</span>${typeof docLop==="function"?docLop():""}</footer>
+  </section>`;
+}
+
+function adCapa(regs,fotos,total,pag,nPags,ini,folhaDe){
   const ok=regs.filter(adTemDepois).length;
   const unids=[...new Set(regs.map(r=>r.unidade).filter(Boolean))];
   const datas=regs.map(r=>r.data_antes).filter(Boolean).sort();
@@ -6889,7 +7032,7 @@ function adCapa(regs,fotos,total,pag,nPags,ini){
       <td><div class="adr-mini">${fotos[i][0]?`<img src="${esc(fotos[i][0])}" alt="">`:""}</div></td>
       <td><div class="adr-mini">${fotos[i][1]?`<img src="${esc(fotos[i][1])}" alt="">`:"—"}</div></td>
       <td><b>${esc(r.titulo)}</b></td><td>${esc([r.unidade,r.local].filter(Boolean).join(" · "))||"—"}</td>
-      <td>${esc(adData(r.data_antes))||"—"}</td><td>${adTemDepois(r)?esc(adData(r.data_depois)):"aguardando"}</td><td>${nPags+i+1}</td></tr>`;}).join("")}
+      <td>${esc(adData(r.data_antes))||"—"}</td><td>${adTemDepois(r)?esc(adData(r.data_depois)):"aguardando"}</td><td>${folhaDe?folhaDe[i]:nPags+i+1}</td></tr>`;}).join("")}
     </tbody></table>
     <footer class="adr-rod"><span>SAKUMA Agronegócios · Galeria Antes e Depois · emitida em ${esc(adData(adHoje()))} · Folha ${pag} de ${total}</span>${typeof docLop==="function"?docLop():""}</footer>
   </section>`;
@@ -6897,12 +7040,26 @@ function adCapa(regs,fotos,total,pag,nPags,ini){
 
 async function adMontarDoc(regs,galeria){
   const fotos=await Promise.all(regs.map(async r=>[await adSrcDados(r,"antes"),adTemDepois(r)?await adSrcDados(r,"depois"):""]));
+  /* as fotos a mais de cada registro, em folhas de até 6 */
+  const mais=await Promise.all(regs.map(async r=>{
+    const a=(await adMaisSrcDados(r,"antes")).map(src=>({lado:"antes",src}));
+    const d=adTemDepois(r)?(await adMaisSrcDados(r,"depois")).map(src=>({lado:"depois",src})):[];
+    const todas=[...a,...d], folhas=[];
+    for(let i=0;i<todas.length;i+=AD_MAIS_POR_FOLHA)folhas.push(todas.slice(i,i+AD_MAIS_POR_FOLHA));
+    return folhas;
+  }));
   const nPags=galeria?Math.ceil(regs.length/AD_POR_INDICE):0;
-  const total=regs.length+nPags;
+  const total=regs.length+nPags+mais.reduce((s,f)=>s+f.length,0);
   const tag="Galeria Antes e Depois";
   let html="";
-  for(let p=0;p<nPags;p++)html+=adCapa(regs,fotos,total,p+1,nPags,p*AD_POR_INDICE);
-  html+=regs.map((r,i)=>adFolha(r,fotos[i][0],fotos[i][1],nPags+i+1,total,galeria?tag:(r.codigo||"Antes e Depois"))).join("");
+  const folhaDe=[]; { let f=nPags; regs.forEach((r,i)=>{ folhaDe.push(++f); f+=mais[i].length; }); }
+  for(let p=0;p<nPags;p++)html+=adCapa(regs,fotos,total,p+1,nPags,p*AD_POR_INDICE,folhaDe);
+  let n=nPags;
+  regs.forEach((r,i)=>{
+    const t=galeria?tag:(r.codigo||"Antes e Depois");
+    html+=adFolha(r,fotos[i][0],fotos[i][1],++n,total,t);
+    mais[i].forEach((f,k)=>{ html+=adFolhaMais(r,f,++n,total,t,k+1,mais[i].length); });
+  });
   return `<div class="adr-doc">${html}</div>`;
 }
 
@@ -7036,6 +7193,8 @@ $("#painel-ad").addEventListener("click",ev=>{
   if(el=q("[data-ad-rel]")){ const r=adRegs.find(x=>x.id===el.dataset.adRel); if(r)adPrevia([r],false,"lista"); return; }
   if(el=q("[data-ad-abrir]")){ adAbrir(el.dataset.adAbrir); return; }
   if(q("[data-ad-voltar]")){ adMostrar("lista"); return; }
+  if(el=q("[data-ad-mais-tirar]")){ adMaisTirar(el.dataset.adMaisTirar,+el.dataset.adMaisI); return; }
+  if(el=q("[data-ad-mais]")){ adMaisFotos(el.dataset.adMais); return; }
   if(el=q("[data-ad-tirar]")){ adTirarFoto(el.dataset.adTirar); return; }
   if(q("#ad-salvar")){ adSalvar(); return; }
   if(q("[data-ad-apagar]")){ adApagar(); return; }
@@ -7653,9 +7812,8 @@ function anRenderApontamento(){
       ${r.assinatura?`<div class="ck-assin feita"><img src="${esc(r.assinatura)}" alt="Assinatura">
           <span><b>${esc(r.responsavel||"")}</b> · assinado em ${esc(anQuando(r.assinado_em))}</span>
           <div class="ck-assin-bts"><button class="bt bt-fantasma" type="button" data-an-refazer>Refazer</button></div></div>`
-        :`<p class="ck-assin-ajuda">Assine com o dedo ou o mouse no quadro e toque em Confirmar. Sai no fim do relatório, com o nome de quem está fazendo.</p>
-          <div class="ck-assin"><canvas class="ck-assin-tela" id="an-tela" aria-label="Quadro para assinar"></canvas>
-          <div class="ck-assin-bts"><button class="bt bt-fantasma" type="button" data-an-limpar>Limpar</button><button class="bt bt-forte" type="button" data-an-assinar>Confirmar assinatura</button></div></div>`}
+        :`<p class="ck-assin-ajuda">Toque em <b>Assinar</b>: abre uma tela só para a assinatura, com o dedo ou a caneta. Sai no fim do relatório, com o nome de quem está fazendo.</p>
+          <button class="ck-assin-abrir" type="button" data-an-assinar>✍ Assinar</button>`}
     </div>
 
     <div class="ad-acoes an-acoes">
@@ -8183,13 +8341,13 @@ $("#painel-an").addEventListener("click",ev=>{
     if((it.problema||it.foto||it._fotoSrc)&&!confirm(`Tirar a anomalia ${i+1} do relatório?${anAtual._novo?"":" Ela só sai da base quando você salvar."}`))return;
     anAtual.itens.splice(i,1); anGuardarRascunho(); anRender(); return;
   }
-  if(q("[data-an-limpar]")){ const cv=$("#an-tela"); if(cv)ckLigarTela(cv); return; }
   if(q("[data-an-assinar]")){
-    const cv=$("#an-tela");
     if(!String(anAtual.responsavel||"").trim()){ toast("Escreva primeiro quem está fazendo o relatório."); const e=$("#an-resp"); if(e)e.focus(); return; }
-    if(!cv||!cv._riscou){ toast("Assine no quadro antes de confirmar."); return; }
-    anAtual.assinatura=cv.toDataURL("image/png"); anAtual.assinado_em=new Date().toISOString();
-    anGuardarRascunho(); anRender(); toast("Assinatura registrada. Salve o relatório para gravar."); return;
+    abrirTelaAssinatura({titulo:"Assinatura de quem fez os apontamentos",nome:anAtual.responsavel,aoConfirmar:img=>{
+      anAtual.assinatura=img; anAtual.assinado_em=new Date().toISOString();
+      anGuardarRascunho(); anRender(); toast("Assinatura registrada. Salve o relatório para gravar.");
+    }});
+    return;
   }
   if(q("[data-an-refazer]")){ anAtual.assinatura=""; anAtual.assinado_em=null; anGuardarRascunho(); anRender(); return; }
   if(q("#an-salvar")){ anSalvar(); return; }

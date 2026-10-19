@@ -102,6 +102,9 @@ create table if not exists vistorias.antes_depois (
   data_antes date, foto_antes text, data_depois date, foto_depois text, obs_depois text, responsavel text,
   criado_em timestamptz not null default now(), atualizado_em timestamptz not null default now()
 );
+-- Mais fotos (19/10/2026): lista de {lado, caminho} além da foto principal de cada lado.
+alter table vistorias.antes_depois add column if not exists fotos_mais jsonb not null default '[]'::jsonb;
+
 create index if not exists antes_depois_data_idx on vistorias.antes_depois (data_antes desc);
 
 create table if not exists vistorias.extintores (
