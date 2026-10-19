@@ -649,6 +649,13 @@ function telaSemAcesso(texto) {
 /* ---------------------------------------------------------------- partida */
 
 window.addEventListener('online',  () => { App.online = true;  pintarEstado(); sincronizar(); enviarFotos(); });
+/* Botão Sincronizar do topo do LOP (19/10/2026): o pai manda 'gr-sincronizar'
+   e cada moldura envia a sua fila e as fotos. */
+window.addEventListener('message', ev => {
+  if (ev.origin !== location.origin || !ev.data || ev.data.tipo !== 'gr-sincronizar') return;
+  App.online = navigator.onLine;
+  Promise.resolve(sincronizar()).then(() => enviarFotos()).catch(() => {}).finally(() => pintarEstado());
+});
 window.addEventListener('offline', () => { App.online = false; pintarEstado(); });
 
 window.addEventListener('beforeunload', e => {

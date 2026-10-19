@@ -153,6 +153,8 @@ function enviarFila() {
   return filaRodando;
 }
 window.addEventListener('online', () => { enviarFila().then(() => carregarReuniao()).catch(() => {}); });
+/** Botão Sincronizar do topo (19/10/2026): fila + marcas, depois relê. */
+export async function sincronizarReuniao() { await enviarFila(); await enviarMarcas(); await carregarReuniao(); }
 
 async function salvar(colecao, item) {
   const k = CHAVE[colecao];

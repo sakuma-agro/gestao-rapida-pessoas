@@ -1485,3 +1485,7 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .reu-alerta-txt span{font-weight:600}
 .reu-alerta-ok{display:inline-flex;align-items:center;gap:5px;border-color:var(--verde);color:var(--verde-esc)}
 .reu-alerta-ok:hover{background:var(--verde);color:#fff}
+
+/* Botão Sincronizar do topo (19/10/2026): verde para ser achado de longe. */
+#btnSincronizar{background:var(--verde);border-color:var(--verde);color:#fff;font-weight:600}
+#btnSincronizar:disabled{opacity:.7;cursor:wait}

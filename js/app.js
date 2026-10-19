@@ -21,7 +21,7 @@ import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from '.
 import { ligarSst, abrirSst, limparSst, limparPreviaSst, enviarFilaSst, carregarSst } from './sst.js';
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
-import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao } from './reuniao.js';
+import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
@@ -32,7 +32,7 @@ import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
-import { campoAnexos, contarPendentes as pendentesAnexos } from './arquivos.js';
+import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as enviarAnexos } from './arquivos.js';
 import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
@@ -1669,11 +1669,40 @@ async function desenharDlgFila() {
 }
 function abrirDlgFila() { desenharDlgFila().then(() => $('dlgFila').showModal()); }
 $('estadoRede').addEventListener('click', () => { if (estado.pendentesTotal) abrirDlgFila(); });
-$('dlgFilaEnviar').addEventListener('click', async () => {
-  if (!estado.online) return;
-  try { await db.enviarFila(); await jd.enviarFila(); await enviarFilaSst(); await enviarFilaCert(); } catch {}
-  desenharDlgFila(); contarPendentes();
-});
+$('dlgFilaEnviar').addEventListener('click', async () => { await sincronizarTudo(); desenharDlgFila(); });
+
+/* Botão Sincronizar do topo (19/10/2026). Antes o "Enviar agora" ficava
+   escondido na lista da fila e o envio automático só acontecia com o app
+   aberto. Um toque: sobe todas as filas (Pessoas, Reunião, anexos e as
+   molduras Máquinas, Programação e Estoque) e relê o que mudou no servidor.
+   Se sobrar algo parado, abre a lista para a pessoa decidir. */
+let sincronizandoTudo = false;
+async function sincronizarTudo() {
+  if (sincronizandoTudo) return;
+  const b = $('btnSincronizar');
+  if (!navigator.onLine) { alert('Sem internet agora. Os lançamentos ficam guardados neste aparelho e sobem na próxima sincronização.'); return; }
+  sincronizandoTudo = true;
+  const rotulo = b.textContent; b.textContent = 'Sincronizando…'; b.disabled = true;
+  try {
+    for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => sincronizarReuniao(), () => enviarAnexos()]) {
+      try { await fn(); } catch {}
+    }
+    for (const id of ['molduraManut', 'molduraProg', 'molduraEst']) {
+      const m = $(id); try { if (m && m.src) m.contentWindow.postMessage({ tipo: 'gr-sincronizar' }, location.origin); } catch {}
+    }
+    try { await db.sincronizar(); } catch {}
+    if (jd.dados.carregado) { try { await jd.carregar(jd.competenciaCarregada() || undefined); } catch {} }
+    try { await carregarSst(); } catch {}
+    await contarPendentes();
+    const par = nucleo.parados();
+    b.textContent = par ? `${par} parado${par > 1 ? 's' : ''}` : estado.pendentesTotal ? 'Ainda enviando…' : 'Sincronizado ✓';
+    if (par && !$('dlgFila').open) abrirDlgFila();
+  } finally {
+    sincronizandoTudo = false; b.disabled = false;
+    setTimeout(() => { b.textContent = rotulo; }, 2500);
+  }
+}
+$('btnSincronizar').addEventListener('click', sincronizarTudo);
 $('dlgFilaLista').addEventListener('click', async ev => {
   const b = ev.target.closest('button'); if (!b) return;
   const { camada } = b.dataset;
