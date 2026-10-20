@@ -134,6 +134,9 @@
       document.body.classList.toggle('com-rodape', !!alvo);
       faixas.forEach(f => obsFaixas.observe(f, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class', 'aria-selected'] }));
     }
+    /* 20/10/2026, pedido dele: a faixa de telas fica no topo, como era
+       (o rodapé embaixo não ficou bom). Só liga com { rodape: true }. */
+    if (!op.rodape) return;
     const obsFaixas = new MutationObserver(() => requestAnimationFrame(tudo));
     tudo();
     addEventListener('resize', () => requestAnimationFrame(tudo));

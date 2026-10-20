@@ -1709,5 +1709,4 @@ body.com-rodape .ia-botao{bottom:76px !important}
 body.tv-menu-aberto .ia-botao{display:none !important}
 /* molduras no estilo TOTVS (Máquinas, Estoque, Custo Base): o Pergunte ao LOP
    não cobre o rodapé de ações nem a barra de baixo de dentro da moldura */
-body.tv-moldura .ia-botao{bottom:76px !important}
-@media (max-width:760px){ body.tv-moldura .ia-botao{bottom:124px !important} }
+@media (max-width:760px){ body.tv-moldura .ia-botao{bottom:72px !important} }

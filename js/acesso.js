@@ -93,8 +93,7 @@ export const MODULOS = [
        rodapé fixo de ações, sempre no mesmo lugar; as telas em `acoes` ficam
        atrás de "Ações relacionadas ▾", como no Protheus. `inicial` é a tela
        de trabalho que abre primeiro. Tirar `acoes` volta ao padrão. */
-    { id: 'cargos', nome: 'Cargos e salários', inicial: 'rhSalarios',
-      acoes: ['rhSalProj', 'rhEnquadra', 'rhReajuste', 'rhProposta'], telas: [
+    { id: 'cargos', nome: 'Cargos e salários', inicial: 'rhSalarios', telas: [
       ['rhCargos', 'Plano de cargos'],
       /* Salários e projeção por pessoa (01/10/2026) — js/rh-salarios.js. */
       ['rhSalarios', 'Salários'],
@@ -255,7 +254,11 @@ const ACOES_TOTVS = {
   reuSub: ['reuFrases', 'reuResp', 'reuAtiv'],
   ceCadSub: ['ccInsumos', 'ccAnalises', 'ccCalibracoes', 'ccRelatorios'], ceCrono: [], ceIndSub: ['ceIndRh', 'ceIndMetas'],
 };
-MODULOS.forEach(m => (m.subs || []).forEach(s => {
+/* 20/10/2026, pedido dele ("como era"): o rodapé embaixo não ficou bom. Ao
+   clicar no submódulo, as telas voltam a aparecer logo abaixo, com "‹ Módulo"
+   para voltar. O rodapé fica desligado aqui; true liga de novo. */
+const RODAPE_TOTVS = false;
+if (RODAPE_TOTVS) MODULOS.forEach(m => (m.subs || []).forEach(s => {
   if (!s.acoes && ACOES_TOTVS[s.id]) s.acoes = ACOES_TOTVS[s.id];
 }));
 
@@ -677,8 +680,9 @@ function pintarFaixa(id, subs) {
     // Dentro de um submódulo: voltar + as telas dele.
     const s = subs.find(x => x.id === faixaEstado.sub);
     const i = subs.indexOf(s);
-    faixa.innerHTML = `<button type="button" class="rb-voltar" data-voltar title="Voltar aos submódulos de ${esc(mod?.nome || '')}">
-        ${svgIcone('seta-esq')}<span>${esc(mod?.nome || 'Voltar')}</span></button>
+    // Módulo lateral (Certificação): os submódulos já estão no menu, sem "‹ voltar".
+    faixa.innerHTML = `${mod?.lateral ? '' : `<button type="button" class="rb-voltar" data-voltar title="Voltar aos submódulos de ${esc(mod?.nome || '')}">
+        ${svgIcone('seta-esq')}<span>${esc(mod?.nome || 'Voltar')}</span></button>`}
       <section class="rb-grupo ${CORES_GRUPO[i % CORES_GRUPO.length]}" aria-label="${esc(s.nome)}">
         <div class="rb-botoes">${s.telas.map(([t, rot]) => botaoTela(t, rot)).join('')}</div>
         <div class="rb-rotulo">${esc(s.nome)}</div></section>`;
