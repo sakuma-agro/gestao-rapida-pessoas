@@ -19,6 +19,9 @@ let ouvindo = false;
 let mesSel = null;
 let busca = '';
 let lendoPessoas = false;
+// mês aberto puxa o Pessoas sozinho, uma vez por sessão (20/10/2026: o ADM não
+// tinha aparecido porque o mês foi criado antes e ninguém clicou em "Puxar").
+const sincronizados = new Set();
 
 /* ---------------- dados ---------------- */
 const PADRAO = { encargo_fixo: 1.3917, encargo_temporario: 1.5705,
@@ -101,6 +104,10 @@ function desenhar() {
   const m = mes(mesSel);
   const fechado = m && m.status === 'fechado';
   const p = parametrosDoMes(mesSel);
+  if (m && !fechado && !lendoPessoas && window.App && App.online && App.sb && !sincronizados.has(mesSel)) {
+    sincronizados.add(mesSel);
+    setTimeout(() => atualizarDoPessoas(mesSel, true), 0);
+  }
 
   const topo = `
     <div class="cb-mes-topo">
@@ -264,7 +271,7 @@ async function criarMes(mesId, anterior) {
 
 /** Acerta o mês aberto com o Pessoas: entra quem é ativo e falta, horas
  *  atualizadas, e quem saiu do cadastro de ativos (sem boletim) fica fora. */
-async function atualizarDoPessoas(mesId) {
+async function atualizarDoPessoas(mesId, sozinho) {
   if (lendoPessoas) return;
   lendoPessoas = true; desenhar();
   try {
@@ -294,8 +301,8 @@ async function atualizarDoPessoas(mesId) {
         await gravar('cb_hh_itens', { ...it, incluido: false, obs: 'fora do cadastro de ativos' });
       }
     }
-    aviso(`Pessoas: ${novos} entrou(aram), ${mudou} atualizado(s), ${sairam} fora por não estar(em) ativo(s).`);
-  } catch (e) { aviso(e.message || 'Não consegui ler o Pessoas.', true); }
+    if (!sozinho || novos + mudou + sairam) aviso(`Pessoas: ${novos} entrou(aram), ${mudou} atualizado(s), ${sairam} fora por não estar(em) ativo(s).`);
+  } catch (e) { if (!sozinho) aviso(e.message || 'Não consegui ler o Pessoas.', true); else sincronizados.delete(mesId); }
   finally { lendoPessoas = false; desenhar(); }
 }
 
