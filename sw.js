@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v273';
+const VERSAO = 'gr-v274';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -63,6 +63,14 @@ const ARQUIVOS = [
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
   './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
   './custobase/img/sakuma-logo.png', './custobase/img/lop-marca.png', './custobase/img/sakuma-marca-vertical.png', './custobase/img/lop-assinatura-laser-claro.png',
+  // Colheita e Produção (20/10/2026)
+  './icons/area-colheita.v1.svg',
+  './colheita/', './colheita/index.html', './colheita/css/app.css', './colheita/css/base.css', './colheita/css/colheita.css',
+  './colheita/js/config.js', './colheita/js/base.js', './colheita/js/acesso.js', './colheita/js/app.js', './colheita/js/dados.js',
+  './colheita/js/painel.js', './colheita/js/cargas.js', './colheita/js/conciliacao.js', './colheita/js/cadastros.js',
+  './colheita/js/financeiro.js', './colheita/js/parametros.js', './colheita/js/pdf.js',
+  './colheita/img/sakuma-logo.png', './colheita/img/lop-marca.png', './colheita/img/sakuma-marca-vertical.png',
+  './colheita/img/lop-assinatura-laser-claro.png', './colheita/img/whatsapp.png',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
   './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v1.svg',

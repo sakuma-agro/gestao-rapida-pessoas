@@ -99,6 +99,7 @@ const GRUPOS = [
     'est_contagem_lotes', 'est_contagens', 'est_contagem_itens', 'est_compras', 'est_compra_itens',
     'est_compra_estoques']],
   ['Custo Base', 'public', ['cb_culturas', 'cb_talhoes', 'cb_meses', 'cb_itens', 'cb_hh_parametros', 'cb_hh_meses', 'cb_hh_itens']],
+  ['Colheita e Produção', 'public', ['cp_culturas', 'cp_safras', 'cp_plantios', 'cp_cargas', 'cp_balanca', 'cp_cooperativa', 'cp_historico', 'cp_custos', 'cp_veiculos']],
   ['Reunião semanal', 'public', ['reu_config', 'reu_pessoas', 'reu_atividades', 'reu_semanas']],
   ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],

@@ -943,6 +943,7 @@ function desenharPermissoes() {
     ${blocoProg(e)}
     ${blocoEst(e)}
     ${blocoCB(e)}
+    ${blocoCP(e)}
     ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
@@ -977,6 +978,12 @@ function desenharPermissoes() {
   $('usCB')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('custobase'); else mods.delete('custobase');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usCP')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('colheita'); else mods.delete('colheita');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -1066,6 +1073,18 @@ function blocoCB(e) {
       <input type="checkbox" id="usCB" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Custo Base</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · rateio mensal, plantios e culturas'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Área Colheita e Produção" (20/10/2026): entra ou não. */
+function blocoCP(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('colheita'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="colheita">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usCP" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Colheita e Produção</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · cargas, conferência, painel e cadastros'}</span>
     </label>
   </div>`;
 }

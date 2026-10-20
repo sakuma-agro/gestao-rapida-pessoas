@@ -1,0 +1,114 @@
+/* colheita.css — o que é só da área Colheita e Produção (20/10/2026).
+   A base (cores, botões, abas, tabela no estilo da planilha) vem de
+   app.css e base.css. Nunca declarar @page aqui. */
+
+.grade > .plena{grid-column:1/-1}
+.aviso.alerta{background:rgba(201,138,0,.10);border-color:rgba(201,138,0,.4);color:#8a5f00}
+.aviso.alerta .btn, .aviso.info .btn{margin-left:8px}
+
+/* ---- faixa cultura + safra ---- */
+.cp-seletor{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px;
+  padding:10px 12px;background:var(--papel);border:1px solid var(--linha);border-radius:12px}
+.cp-chips{display:flex;gap:6px;flex-wrap:wrap}
+.cp-chip{font:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:999px;
+  border:1px solid var(--linha);background:var(--fundo);color:var(--suave);cursor:pointer}
+.cp-chip i{width:10px;height:10px;border-radius:50%;background:var(--cor)}
+.cp-chip:hover{border-color:var(--cor);color:var(--texto)}
+.cp-chip.ativo{background:var(--cor);border-color:var(--cor);color:#fff}
+.cp-chip.ativo i{background:#fff}
+.cp-safra{display:flex;flex-direction:column;gap:4px;font-size:11.5px;font-weight:700;color:var(--suave);text-transform:uppercase;letter-spacing:.4px}
+.cp-safra select{font:inherit;font-size:14px;font-weight:600;text-transform:none;letter-spacing:0;padding:7px 10px;border-radius:8px;border:1px solid var(--linha);background:var(--fundo);color:var(--texto);min-width:190px}
+
+/* ---- tela inicial: um cartão por cultura ---- */
+.cp-ini-culturas{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;width:min(820px,100%);margin-top:26px}
+.cp-ini-culturas .in-dica{grid-column:1/-1}
+.cp-ini-card{font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:12px;
+  border:1px solid var(--linha);border-top:4px solid var(--cor);background:var(--papel);color:var(--texto)}
+.cp-ini-card:hover{border-color:var(--cor);box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.cp-ini-nome{font-size:14px;font-weight:700;color:var(--marrom)}
+.cp-ini-safra{font-size:11.5px;color:var(--suave)}
+.cp-ini-card b{font-size:22px;line-height:1.2;margin-top:6px;color:var(--verde-esc)}
+.cp-ini-card small{font-size:11.5px;color:var(--suave)}
+
+/* ---- painel ---- */
+.cp-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cp-cab h2{margin:0}
+.cp-cab .dica{margin:4px 0 0}
+.cp-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.cp-kpis b{font-size:19px}
+.cp-duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:14px}
+@media (max-width:640px){ .cp-duas{grid-template-columns:1fr} }
+.cp-dests{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){ .cp-dests{grid-template-columns:1fr} }
+.cp-dest{border:1px solid var(--linha);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.cp-dest.bom{border-left:4px solid var(--verde);background:var(--verde-fundo)}
+.cp-dest.ruim{border-left:4px solid var(--marrom);background:rgba(116,79,40,.06)}
+.cp-dest span{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--suave)}
+.cp-dest b{font-size:16px;color:var(--marrom)}
+.cp-dest small{color:var(--suave);font-size:12px}
+.cp-dest div{margin-top:4px;font-size:12.5px}
+.cp-dest strong{font-size:18px;color:var(--verde-esc)}
+.cp-conf-faixa{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-2px 0 12px}
+.cp-faixa{display:flex;height:26px;border-radius:7px;overflow:hidden;margin:6px 0 8px;border:1px solid var(--linha)}
+.cp-faixa span{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cp-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px}
+.cp-legenda span{display:inline-flex;align-items:center;gap:6px}
+.cp-legenda i{width:10px;height:10px;border-radius:2px}
+.cp-legenda small{color:var(--suave)}
+.cp-tend{font-size:17px !important}
+
+/* gráficos SVG */
+.cp-graf{width:100%;height:auto;max-height:240px;display:block;margin:6px 0}
+.cp-graf .eixo{stroke:var(--linha);stroke-width:1}
+.cp-graf text{font-family:Arial,Helvetica,sans-serif;text-anchor:middle;fill:var(--suave)}
+.cp-graf .val{font-size:11px;font-weight:700;fill:var(--marrom)}
+.cp-graf .rot{font-size:11px}
+.cp-graf .rot2{font-size:9.5px;opacity:.8}
+
+/* tabelas */
+.cp-tab td, .cp-tab th{white-space:nowrap}
+.cp-tab td.cp-motivo{white-space:normal;min-width:200px;font-size:12px;color:var(--suave)}
+.cp-tab tr.cp-st-div td{background:rgba(192,57,43,.06) !important}
+.cp-obs{font-size:10.5px;font-weight:700;color:var(--marrom);border:1px solid currentColor;border-radius:4px;padding:0 4px;cursor:help}
+.cp-tab tfoot td{font-weight:700}
+
+/* conciliação */
+.cp-k-ok{border-left-color:var(--verde) !important}
+.cp-k-div{border-left-color:#c0392b !important}
+.cp-k-div b{color:#a5342a !important}
+.cp-k-pend{border-left-color:#c98a00 !important}
+.cp-k-pend b{color:#8a5f00 !important}
+.cp-aplicar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cp-imp-box{border:1px dashed var(--linha);border-radius:12px;padding:12px 14px}
+.cp-imp-box .cb-secao{margin-top:0}
+.cp-arq{cursor:pointer;display:inline-flex}
+.cp-previa-imp{margin-top:14px}
+
+/* formulário da carga */
+.cp-fs{border:1px solid var(--linha);border-radius:10px;padding:8px 12px 12px;margin:0}
+.cp-fs legend{font-size:11.5px;font-weight:700;color:var(--marrom);padding:0 6px;text-transform:uppercase;letter-spacing:.4px}
+.cp-grade-cl{grid-template-columns:repeat(auto-fit,minmax(90px,1fr))}
+#modal .caixa{width:min(760px,100vw)}
+
+/* parâmetros */
+.cp-cult-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.cp-cult{border:1px solid var(--linha);border-top:4px solid var(--cor);border-radius:12px;padding:10px 14px;background:var(--papel)}
+.cp-cult header{display:flex;align-items:center;gap:8px}
+.cp-cult header i{width:12px;height:12px;border-radius:50%;background:var(--cor)}
+.cp-cult header b{flex:1;font-size:15px;color:var(--marrom)}
+.cp-cult dl{display:grid;grid-template-columns:110px 1fr;gap:4px 10px;margin:10px 0 0;font-size:12.5px}
+.cp-cult dt{color:var(--suave);font-weight:700}
+.cp-cult dd{margin:0}
+#cpCuForm textarea{font:inherit;font-size:13px;padding:8px;border-radius:8px;border:1px solid var(--linha);background:var(--fundo);color:var(--texto);resize:vertical;text-transform:none;font-weight:400}
+
+/* ajustes de 20/10/2026 (teste): formulário do modal em colunas, faixa escondida de verdade */
+.cp-seletor[hidden]{display:none}
+#modal .caixa .grade{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+#modal .caixa .cp-fs .grade{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+#modal .caixa .cp-grade-cl{grid-template-columns:repeat(auto-fit,minmax(90px,1fr))}
+#modal .grade > .plena, #modal .grade > .cp-fs{grid-column:1/-1}
+.cp-fs{min-width:0}
+@media (max-width:640px){ #modal .caixa .grade{grid-template-columns:1fr 1fr} #modal .caixa .cp-fs .grade{grid-template-columns:1fr 1fr} }
+.cp-kpis{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+.cp-kpis b{font-size:18px}

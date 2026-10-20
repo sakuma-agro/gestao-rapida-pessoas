@@ -26,6 +26,8 @@ const VERSAO_PROG = '9';
 const VERSAO_EST = '5';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
 const VERSAO_CB = '11';
+/* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
+const VERSAO_CP = '1';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -57,6 +59,11 @@ export const AREAS = [
      Direcionador Mensal ADM". Mora em custobase/, numa moldura. */
   { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v2.svg',
     desc: 'Rateio mensal culturas · Hora-homem' },
+  /* Colheita e Produção (20/10/2026, pedido dele): as planilhas "Controle
+     Colheita" de cenoura, batata, café, milho, trigo e abacate numa área só.
+     Mora em colheita/, numa moldura. */
+  { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v1.svg',
+    desc: 'Painel da safra · Cargas · Conciliação balança/cooperativa · Cadastros · Financeiro' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
@@ -136,6 +143,8 @@ function liberada(id) {
   if (id === 'estoque') return acesso.admin || (acesso.modulos || []).includes('estoque');
   /* Custo Base (20/10/2026): administrador ou módulo 'custobase'. */
   if (id === 'custobase') return acesso.admin || (acesso.modulos || []).includes('custobase');
+  /* Colheita e Produção (20/10/2026): administrador ou módulo 'colheita'. */
+  if (id === 'colheita') return acesso.admin || (acesso.modulos || []).includes('colheita');
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -152,6 +161,7 @@ let molduraVistCarregada = false;
 let molduraProgCarregada = false;
 let molduraEstCarregada = false;
 let molduraCBCarregada = false;
+let molduraCPCarregada = false;
 
 export const areaAberta = () => areaAtual;
 
@@ -356,6 +366,24 @@ export function entrarNaArea(id, tela, extra) {
     }
     return;
   }
+  if (id === 'colheita') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('colheita');
+    medirTopo();
+    const moldura = $('molduraCP');
+    if (!molduraCPCarregada || extra) {
+      molduraCPCarregada = true;
+      moldura.src = 'colheita/?v=' + VERSAO_CP + (extra ? '&' + extra : '');
+    } else {
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'colheita/?v=' + VERSAO_CP + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
 
   if (id === 'manutencoes') {
     $('navModulos').hidden = true;
@@ -402,6 +430,7 @@ export function limparAreas() {
   molduraProgCarregada = false;
   molduraEstCarregada = false;
   molduraCBCarregada = false;
+  molduraCPCarregada = false;
   vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
@@ -413,6 +442,8 @@ export function limparAreas() {
   if (me) me.src = 'about:blank';
   const mc = $('molduraCB');
   if (mc) mc.src = 'about:blank';
+  const mcp = $('molduraCP');
+  if (mcp) mcp.src = 'about:blank';
   pintarEtiqueta();
 }
 

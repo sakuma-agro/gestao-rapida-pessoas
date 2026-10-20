@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Colheita e Produção · LOP - Gestão Rápida</title>
+<meta name="theme-color" content="#1B232B">
+<link rel="stylesheet" href="css/app.css?v=1">
+<link rel="stylesheet" href="css/base.css?v=1">
+<link rel="stylesheet" href="css/colheita.css?v=1">
+<!-- Área Colheita e Produção do LOP - Gestão Rápida (20/10/2026).
+     Substitui as planilhas "Controle Colheita - <cultura>" (cenoura, batata,
+     café, milho, trigo e abacate). Esta página não abre sozinha: mora dentro
+     do app principal (a pasta de cima), numa moldura, e usa o login de lá.
+     Quem abrir este endereço direto é levado para o app principal. -->
+<script>
+  (function () {
+    var dentro = false;
+    try { dentro = window.parent !== window && !!window.parent.grCliente; } catch (e) {}
+    if (!dentro) {
+      var q = location.search ? location.search.slice(1) + '&' : '';
+      location.replace('../?' + q + 'area=colheita');
+    }
+  })();
+</script>
+</head>
+<body class="embutido">
+
+<div id="app">
+  <header class="topo">
+    <!-- Nome, marcas, sair e instalar ficam no topo do LOP, acima da moldura. -->
+    <nav class="abas" role="tablist" id="navModulos"></nav>
+    <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
+    <nav class="aba3s" role="tablist" id="navSub" hidden></nav>
+  </header>
+
+  <main>
+    <div class="aviso info" id="avisoGlobal" hidden></div>
+    <div class="aviso erro" id="cbSemAcesso" hidden></div>
+    <div class="est-estado naoimprimir">
+      <span class="estado" id="estado-conexao"><span class="ponto" id="ponto-conexao"></span><span id="txt-conexao"></span></span>
+      <button type="button" id="btn-fila" class="fila oculto">0 aguardando envio</button>
+    </div>
+
+    <!-- Cultura e safra: valem para todas as telas da área -->
+    <div class="cp-seletor naoimprimir" id="cpSeletor" hidden></div>
+
+    <!-- ---- ENTRADA: nenhum módulo aberto ---- -->
+    <section class="tela inicio cb-inicio" id="telaInicio">
+      <div class="ini-lateral">
+        <nav class="ql naoimprimir" id="atalhosInicio" aria-label="Acesso rápido"></nav>
+        <div class="ini-centro">
+          <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
+          <h2>Gestão Rápida <span>Colheita e Produção</span></h2>
+          <div class="cp-ini-culturas" id="cpIniCulturas"></div>
+          <div class="lop-ass in-lop-escuro" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
+            <img src="img/lop-marca.png" alt=""><span class="lop-div"></span>
+            <span class="lop-txt"><b>DESENVOLVIDO POR LOP</b><span>INTELIGÊNCIA PARA O AGRONEGÓCIO</span></span>
+          </div>
+          <img class="in-lop in-lop-claro" src="img/lop-assinatura-laser-claro.png" alt="">
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== PAINEL =================== -->
+    <section class="tela" id="telaCpPainel" hidden>
+      <div id="cpPainelCorpo"></div>
+    </section>
+    <section class="tela" id="telaCpHistorico" hidden>
+      <div class="cartao">
+        <h2>Comparativo de safras</h2>
+        <p class="dica">Produtividade de cada safra, do histórico das planilhas até a safra em andamento (calculada pelas cargas lançadas).</p>
+        <div id="cpHistCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== CARGAS =================== -->
+    <section class="tela" id="telaCpCargas" hidden>
+      <div class="cartao">
+        <h2>Cargas</h2>
+        <p class="dica">Uma linha por carregamento, como a fichinha do campo. Carga com dois plantios: lance uma linha para cada um com o % da carga.</p>
+        <div id="cpCargasCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== CONCILIAÇÃO =================== -->
+    <section class="tela" id="telaCpConferencia" hidden>
+      <div class="cartao">
+        <h2>Conferência</h2>
+        <p class="dica">Cada carga do campo cruzada com o relatório da balança (e da cooperativa) pelo ticket. Ajuste as tolerâncias em Parâmetros.</p>
+        <div id="cpConfCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaCpImportar" hidden>
+      <div class="cartao">
+        <h2>Importar balança / cooperativa</h2>
+        <p class="dica">Exporte o relatório do sistema da balança ou da cooperativa (Excel ou CSV) e escolha o arquivo aqui. O app lê pelo nome das colunas, guarda por ticket (importar de novo só atualiza) e já cruza com as cargas.</p>
+        <div id="cpImpCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== CADASTROS =================== -->
+    <section class="tela" id="telaCpPlantios" hidden>
+      <div class="cartao">
+        <h2 id="cpPlTitulo">Plantios</h2>
+        <p class="dica">A unidade de comparação da cultura em cada safra: fazenda, pivô/talhão, área, variedade e datas de plantio. Início e fim da colheita saem das cargas.</p>
+        <div id="cpPlantiosCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaCpSafras" hidden>
+      <div class="cartao">
+        <h2>Safras</h2>
+        <p class="dica">Cada cultura tem as suas safras (Verão 25/26, Inverno 2026, 2025/2026…). A marcada como atual abre primeiro.</p>
+        <div id="cpSafrasCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaCpVeiculos" hidden>
+      <div class="cartao">
+        <h2>Placas e motoristas</h2>
+        <p class="dica">Ao digitar a placa na carga, o motorista vem sozinho.</p>
+        <div id="cpVeicCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaCpHistCad" hidden>
+      <div class="cartao">
+        <h2>Histórico de safras</h2>
+        <p class="dica">Safras antigas (antes do app): área, produção e produtividade. A safra em andamento não precisa entrar aqui — sai das cargas.</p>
+        <div id="cpHistCadCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== FINANCEIRO =================== -->
+    <section class="tela" id="telaCpFinanceiro" hidden>
+      <div class="cartao">
+        <h2>Custos da colheita por plantio</h2>
+        <p class="dica">O que foi lançado nas cargas (frete, arranquio, beneficiamento, embalagem, aluguel de caixa, MO) mais os custos lançados à parte por plantio.</p>
+        <div id="cpFinCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== PARÂMETROS =================== -->
+    <section class="tela" id="telaCpCulturas" hidden>
+      <div class="cartao">
+        <h2>Culturas</h2>
+        <p class="dica">O perfil de cada cultura: unidade, classificação da carga, conferência e tolerâncias. Mudar aqui muda as contas de todas as safras da cultura.</p>
+        <div id="cpCultCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaCpCargaInicial" hidden>
+      <div class="cartao">
+        <h2>Carga inicial das planilhas</h2>
+        <p class="dica">Uma vez só: traz as cargas, plantios e relatórios das planilhas "Controle Colheita" para o app. Escolha o arquivo <b>carga-inicial-colheita.json</b>. Pode repetir sem duplicar.</p>
+        <div id="cpCargaIniCorpo"></div>
+      </div>
+    </section>
+
+    <div class="previa" id="cpFolha"></div>
+  </main>
+</div>
+
+<div id="modal" class="modal oculto naoimprimir" role="dialog" aria-modal="true">
+  <div class="caixa">
+    <header><h2 id="modal-titulo"></h2>
+      <button type="button" id="modal-fechar" aria-label="Fechar">×</button></header>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
+<div id="aviso" class="est-toast oculto naoimprimir" role="status"></div>
+
+<script src="../vendor/supabase.js"></script>
+<script src="../vendor/jspdf.umd.min.js"></script>
+<script src="../vendor/jspdf.plugin.autotable.min.js"></script>
+<!-- Excel: a biblioteca entra aqui porque ../js/excel.js a carregaria por um caminho relativo ao app principal. -->
+<script src="../vendor/xlsx-js-style.min.js" defer></script>
+<script src="js/config.js?v=1"></script>
+<script src="../js/moldura-nucleo.js?v=4"></script>
+<script src="js/base.js?v=1"></script>
+<script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>
