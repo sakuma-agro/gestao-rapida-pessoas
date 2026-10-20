@@ -1620,7 +1620,9 @@ body.com-rodape .faixa-versao{bottom:72px}
    (#navModulos, com "Início") vira menu lateral estreito de ícones no
    computador e barra fixa embaixo no celular. --tv-topo-h é a altura da faixa
    de cima (medida em js/app.js). */
-@media (min-width:761px){
+/* 20/10/2026, pedido dele: nada fixo embaixo — os módulos ficam na lateral
+   também no celular (coluna mais estreita, logo abaixo). */
+@supports (display:flex){
   body.tv-lateral{padding-left:84px}
   body.tv-lateral #navModulos{position:fixed;left:0;top:0;bottom:0;width:84px;max-width:none;margin:0;z-index:21;
     padding:calc(var(--tv-topo-h,58px) + 10px) 6px 12px;display:flex;flex-direction:column;align-items:stretch;gap:4px;
@@ -1636,22 +1638,14 @@ body.com-rodape .faixa-versao{bottom:72px}
   body.tv-lateral #navModulos .aba.aba-fantasma svg{color:#C2C5BE}
 }
 @media (max-width:760px){
-  body.tv-lateral #navModulos{position:fixed;left:0;right:0;bottom:0;max-width:none;margin:0;z-index:17;
-    padding:4px 4px calc(4px + env(safe-area-inset-bottom));display:flex;gap:0;justify-content:space-around;overflow:visible;
-    background:var(--papel);border-top:1px solid var(--linha);box-shadow:0 -4px 14px rgba(0,0,0,.06)}
-  body.tv-lateral #navModulos .aba{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:2px;min-height:50px;padding:4px 2px;
-    border:0;border-radius:8px;background:transparent;color:var(--suave);font-size:10px;font-weight:700;line-height:1.1;
-    white-space:nowrap;overflow:hidden}
+  body.tv-lateral{padding-left:60px}
+  body.tv-lateral #navModulos{width:60px;padding-left:4px;padding-right:4px;gap:2px}
+  body.tv-lateral #navModulos .aba{min-height:54px;padding:6px 2px;font-size:9.5px;border-radius:8px;overflow:hidden}
   body.tv-lateral #navModulos .aba span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
-  body.tv-lateral #navModulos .aba svg{width:21px;height:21px;color:#744F28}
-  body.tv-lateral #navModulos .aba[aria-selected="true"]{background:var(--verde-fundo);color:var(--verde-esc)}
-  body.tv-lateral #navModulos .aba[aria-selected="true"] svg{color:var(--verde-esc)}
-  body.tv-lateral #navModulos .aba.aba-fantasma{background:transparent;color:#A9ACA5}
-  body.tv-lateral main{padding-bottom:96px}
-  body.tv-lateral.com-rodape main{padding-bottom:150px}
-  body.tv-lateral .tv-rodape{bottom:calc(59px + env(safe-area-inset-bottom));padding-bottom:0;box-shadow:none}
-  body.tv-lateral .faixa-versao{bottom:72px}
-  body.tv-lateral.com-rodape .faixa-versao{bottom:128px}
+  body.tv-lateral #navModulos .aba svg{width:20px;height:20px}
+  body.tv-lateral #navModulos .ab-longo{display:none}
+  body.tv-lateral #navModulos .ab-curto{display:inline}
+  body.tv-lateral main{padding-left:10px;padding-right:10px}
 }
 
 /* tela inicial do Pessoas em cartões (estilo TOTVS, 20/10/2026) */
@@ -1687,16 +1681,9 @@ body.com-rodape .faixa-versao{bottom:72px}
    lateral; o "Pergunte ao LOP" sobe para não cobrir o rodapé nem a barra de
    baixo; no celular o rodapé fica numa linha só (rola de lado) e o menu de
    ações abre fixo, por cima, sem ser cortado. */
-@media (min-width:761px){
-  body.tv-lateral .tv-rodape{left:84px}
-}
+body.tv-lateral .tv-rodape{left:84px}
 body.com-rodape .ia-botao{bottom:76px !important}
-@media (max-width:760px){
-  body.tv-lateral .ia-botao{bottom:72px !important}
-  body.tv-lateral.com-rodape .ia-botao{bottom:124px !important}
-  body.tv-lateral #navModulos .ab-longo{display:none}
-  body.tv-lateral #navModulos .ab-curto{display:inline}
-}
+
 .ab-curto{display:none}
 @media (max-width:640px){
   .tv-int{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
@@ -1709,4 +1696,4 @@ body.com-rodape .ia-botao{bottom:76px !important}
 body.tv-menu-aberto .ia-botao{display:none !important}
 /* molduras no estilo TOTVS (Máquinas, Estoque, Custo Base): o Pergunte ao LOP
    não cobre o rodapé de ações nem a barra de baixo de dentro da moldura */
-@media (max-width:760px){ body.tv-moldura .ia-botao{bottom:72px !important} }
+

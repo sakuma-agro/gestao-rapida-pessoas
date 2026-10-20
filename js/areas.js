@@ -19,13 +19,13 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '29';
+const VERSAO_AREA = '30';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
 const VERSAO_PROG = '9';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
-const VERSAO_EST = '6';
+const VERSAO_EST = '7';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
-const VERSAO_CB = '12';
+const VERSAO_CB = '13';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
 const VERSAO_CP = '1';
 

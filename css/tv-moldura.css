@@ -14,7 +14,7 @@
 }
 
 /* ---------- menu de módulos: lateral (computador) ---------- */
-@media (min-width:761px){
+@supports (display:flex){
   body.tv-lateral{padding-left:84px}
   body.tv-lateral .tv-mods{position:fixed !important;left:0;top:0;bottom:0;width:84px;max-width:none !important;margin:0 !important;z-index:30;
     padding:12px 6px !important;display:flex !important;flex-direction:column;align-items:stretch;gap:4px;
@@ -32,26 +32,16 @@
   body.tv-lateral .tv-mods > button.tv-on svg{color:var(--tv-verde-esc)}
   body.tv-lateral .tv-mods > button.fantasma{color:#A9ACA5 !important}
 }
-/* ---------- menu de módulos: barra de baixo (celular) ---------- */
+/* ---------- celular: a lateral continua, mais estreita (pedido dele,
+   20/10/2026: nada fixo embaixo) ---------- */
 @media (max-width:760px){
-  body.tv-lateral .tv-mods{position:fixed !important;left:0;right:0;bottom:0;top:auto;max-width:none !important;margin:0 !important;z-index:30;
-    padding:4px 4px calc(4px + env(safe-area-inset-bottom)) !important;display:flex !important;gap:0;justify-content:space-around;overflow:visible;
-    background:var(--tv-papel);border:0 !important;border-top:1px solid var(--tv-linha) !important;box-shadow:0 -4px 14px rgba(0,0,0,.06)}
-  body.tv-lateral .tv-mods > button{flex:1 1 0;min-width:0;display:flex !important;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    min-height:50px;padding:4px 2px !important;margin:0 !important;border:0 !important;border-radius:8px !important;background:transparent !important;
-    color:var(--tv-suave) !important;font:inherit;font-size:10px !important;font-weight:700 !important;line-height:1.1;white-space:nowrap;overflow:hidden}
+  body.tv-lateral{padding-left:60px}
+  body.tv-lateral .tv-mods{width:60px;padding:8px 4px !important;gap:2px}
+  body.tv-lateral .tv-mods > button{min-height:54px;padding:6px 2px !important;font-size:9.5px !important;border-radius:8px !important;overflow:hidden}
   body.tv-lateral .tv-mods > button span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
-  body.tv-lateral .tv-mods > button svg{width:21px !important;height:21px !important;color:var(--tv-marrom)}
-  body.tv-lateral .tv-mods > button[aria-selected="true"],
-  body.tv-lateral .tv-mods > button.ativo,
-  body.tv-lateral .tv-mods > button.tv-on{background:var(--tv-verde-fundo) !important;color:var(--tv-verde-esc) !important}
-  body.tv-lateral .tv-mods > button[aria-selected="true"] svg,
-  body.tv-lateral .tv-mods > button.ativo svg,
-  body.tv-lateral .tv-mods > button.tv-on svg{color:var(--tv-verde-esc)}
+  body.tv-lateral .tv-mods > button svg{width:20px !important;height:20px !important}
   body.tv-lateral .tv-mods .ab-longo{display:none}
   body.tv-lateral .tv-mods .ab-curto{display:inline}
-  body.tv-lateral main, body.tv-lateral .conteudo{padding-bottom:96px !important}
-  body.tv-lateral.com-rodape main, body.tv-lateral.com-rodape .conteudo{padding-bottom:150px !important}
 }
 .ab-curto{display:none}
 
