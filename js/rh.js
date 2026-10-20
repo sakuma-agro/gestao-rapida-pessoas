@@ -11,6 +11,7 @@
 // e isso é conferido no banco (política app_pode('rh')), não só na tela.
 import { montarMulti } from './multisel.js';
 import { estado, salvarFuncionario } from './store.js';
+import { aplicarReajustesVencidos } from './rh-reajuste-tabela.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -140,6 +141,8 @@ let propostaOriginal = null;   // como ela estava quando foi aberta, para compar
 
 export async function carregarRh() {
   const c = estado.cliente;
+  /* Reajuste anual com vigência vencida sobe a tabela antes de ler (20/10/2026). */
+  try { await aplicarReajustesVencidos(c); } catch (e) { console.warn('reajuste da tabela', e); }
   const [cg, md, pr] = await Promise.all([
     c.from('rh_cargos').select('*').order('ordem').order('nome'),
     c.from('rh_modelo').select('*').eq('id', 1).maybeSingle(),

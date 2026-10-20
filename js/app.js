@@ -38,6 +38,7 @@ import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
+import { abrirEnquadra, limparEnquadra, TELAS_ENQUADRA } from './rh-enquadramento.js';
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
 import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist } from './areas.js';
@@ -87,7 +88,7 @@ function limparPrevias() {
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
 const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
-  ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_SALARIO_DIGNO]);
+  ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
   $('avisoSoOnline').hidden = !(SO_ONLINE.has(nome) && !navigator.onLine);
 }
@@ -167,6 +168,8 @@ function abrirAba(nome) {
   if (TELAS_INDICADORES.includes(nome)) abrirIndicadores(nome);
   for (const t of TELAS_SALARIOS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_SALARIOS.includes(nome)) abrirSalarios(nome);
+  for (const t of TELAS_ENQUADRA) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_ENQUADRA.includes(nome)) abrirEnquadra(nome);
   for (const t of TELAS_SALARIO_DIGNO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_SALARIO_DIGNO.includes(nome)) abrirSalarioDigno(nome, { abrirFuncionario });
   $('telaRhQuadro').hidden   = nome !== 'rhQuadro';
@@ -249,7 +252,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparSalarioDigno(); limparReuniao();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao();
   mostrar('login');
 });
 

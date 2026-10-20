@@ -27,6 +27,7 @@
 import { estado, salvarFuncionario } from './store.js';
 import * as jd from './jornada-dados.js';
 import * as iv from './rh-ind-vinculos.js';
+import { aplicarReajustesVencidos } from './rh-reajuste-tabela.js';
 import { mostrar, imprimir } from './jornada-relatorios.js';
 
 const $ = id => document.getElementById(id);
@@ -102,6 +103,19 @@ const quebra = (base, peric, grat, fmt = brl, longo = false) => [
 const temAdicional = x => x.peric > 0 || x.grat > 0;
 /** Cargo de gerência (sugere a gratificação de função ao lançar o salário). */
 const ehGerencia = c => /gerente/i.test(c?.nome || '');
+/** Observação do enquadramento quando o total não bate exato com a faixa
+    (ex.: "R$ 41,73 abaixo da B"). Mesma regra usada no enquadramento de 20/10/2026. */
+export function obsFaixa(cargo, faixa, total) {
+  if (!cargo || total == null) return null;
+  const fmt = v => 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (!faixa) {
+    const a = valorFaixa(cargo, 'A');
+    return a && total < a - 0.005 ? `${fmt(a - total)} abaixo da A` : null;
+  }
+  const v = valorFaixa(cargo, faixa);
+  if (!v || Math.abs(v - total) < 0.01) return null;
+  return total < v ? `${fmt(v - total)} abaixo da ${faixa}` : `${fmt(total - v)} acima da ${faixa}`;
+}
 /* Insalubridade (ex.: quem pulveriza): só anotação, com tipo e valor. NÃO
    entra no total — fixa = todo mês; variável = só nos meses em que pulveriza. */
 export const INSAL = { fixa: 'fixa (todo mês)', variavel: 'variável (só quando pulveriza)' };
@@ -123,6 +137,7 @@ const PJ = { inicio: null, meses: 12, reajPct: '', reajMes: '', encargos: '', mo
 async function carregar() {
   const c = estado.cliente;
   if (!c) throw new Error('Sem conexão com o banco.');
+  try { await aplicarReajustesVencidos(c); } catch (e) { console.warn('reajuste da tabela', e); }
   const [cg] = await Promise.all([
     c.from('rh_cargos').select('*').order('ordem').order('nome'),
     jd.dados.carregado ? null : jd.carregar(),
@@ -194,7 +209,7 @@ export function situacao(f) {
   /* sal = TOTAL (base + periculosidade + gratificação): é o que se compara com o plano. */
   const sal = totalDe(s);
   return {
-    f, s, sal, base: s ? Number(s.valor) : null, peric: pericDe(s), grat: gratDe(s), insal: insalDe(s),
+    f, s, sal, base: s ? Number(s.valor) : null, peric: pericDe(s), grat: gratDe(s), insal: insalDe(s), faixaObs: s?.faixa_obs || '',
     v, ticket: v?.ticket_valor != null ? Number(v.ticket_valor) : null, ticketObs: v?.ticket_obs || '', contrato: v?.tipo_contrato || 'fixo',
     cargo, faixa: s?.faixa || v?.faixa || null, faixaCadastro: v?.faixa || null,
     pos: posicao(cargo, sal), prox: proxima(cargo, sal), futuros: futurosDe(f.id),
@@ -318,7 +333,7 @@ function desenharSalarios() {
       ${lista.map(x => `<tr>
         <td><b>${esc(x.f.nome)}</b><br><span class="dc-sem">${esc(x.f.fazenda || '')}</span></td>
         <td>${x.cargo ? esc(x.cargo.nome) : `<span class="dc-sem">${esc(x.f.cargo || '—')}</span><br><span class="tag neutra">fora do plano</span>`}</td>
-        <td class="ce">${x.faixa ? `<b>${x.faixa}</b>` : '—'}${x.faixaCadastro && x.s?.faixa && x.faixaCadastro !== x.s.faixa ? `<br><span class="tag alerta" title="O cadastro diz faixa ${x.faixaCadastro}">cadastro: ${x.faixaCadastro}</span>` : ''}</td>
+        <td class="ce">${x.faixa ? `<b>${x.faixa}</b>` : '—'}${x.faixaObs ? `<br><span class="dc-sem rs-fobs" title="Observação do enquadramento">${aberto ? esc(x.faixaObs) : esc(x.faixaObs.replace(/R\$ [\d.,]+/, 'R$ •••'))}</span>` : ''}${x.faixaCadastro && x.s?.faixa && x.faixaCadastro !== x.s.faixa ? `<br><span class="tag alerta" title="O cadastro diz faixa ${x.faixaCadastro}">cadastro: ${x.faixaCadastro}</span>` : ''}</td>
         <td class="ce">${x.sal != null ? `<b>${V(x.sal)}</b>${temAdicional(x) ? `<br><span class="dc-sem" title="Salário base + adicionais que somam no plano">${quebra(x.base, x.peric, x.grat, V)}</span>` : ''}<br><span class="dc-sem">desde ${br(x.s.desde)}</span>${x.insal ? `<br><span class="tag neutra" title="Só anotação — não entra na soma">insalubridade ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ': ' + V(x.insal.valor) : ''}</span>` : ''}` : '<span class="tag perigo">sem salário</span>'}
           ${x.futuros.length ? `<br><span class="tag ativo" title="Alteração já lançada com data futura">${br(x.futuros[0].desde)}: ${V(totalDe(x.futuros[0]))}</span>` : ''}</td>
         <td><span class="tag ${x.pos.cls}">${esc(x.pos.txt)}</span></td>
@@ -369,8 +384,8 @@ function relSalarios(lista) {
 }
 function csvSalarios(lista) {
   baixarCsv(`Salarios_${hoje()}.csv`, [
-    ['Funcionario', 'Fazenda', 'Cargo', 'Faixa', 'Salario base', 'Periculosidade', 'Gratificacao de funcao', 'Salario atual (total)', 'Insalubridade (tipo)', 'Insalubridade (valor, obs.)', 'Desde', 'Posicao na tabela', 'Proximo cargo', 'Proxima faixa', 'Valor', '% aumento'],
-    ...lista.map(x => [x.f.nome, x.f.fazenda || '', x.cargo?.nome || x.f.cargo || '', x.faixa || '', num2(x.base), x.peric > 0 ? num2(x.peric) : '', x.grat > 0 ? num2(x.grat) : '', num2(x.sal), x.insal ? INSAL[x.insal.tipo] : '', x.insal?.valor ? num2(x.insal.valor) : '', x.s ? br(x.s.desde) : '',
+    ['Funcionario', 'Fazenda', 'Cargo', 'Faixa', 'Obs. da faixa', 'Salario base', 'Periculosidade', 'Gratificacao de funcao', 'Salario atual (total)', 'Insalubridade (tipo)', 'Insalubridade (valor, obs.)', 'Desde', 'Posicao na tabela', 'Proximo cargo', 'Proxima faixa', 'Valor', '% aumento'],
+    ...lista.map(x => [x.f.nome, x.f.fazenda || '', x.cargo?.nome || x.f.cargo || '', x.faixa || '', x.faixaObs, num2(x.base), x.peric > 0 ? num2(x.peric) : '', x.grat > 0 ? num2(x.grat) : '', num2(x.sal), x.insal ? INSAL[x.insal.tipo] : '', x.insal?.valor ? num2(x.insal.valor) : '', x.s ? br(x.s.desde) : '',
       x.pos.txt, x.prox?.cargo?.nome || '', x.prox?.letra || (x.prox?.topo ? 'topo' : ''), num2(x.prox?.valor),
       x.prox?.pct != null ? (x.prox.pct * 100).toFixed(1).replace('.', ',') : '']),
   ]);
@@ -415,7 +430,7 @@ function abrirFicha(fid) {
   }).join('') : '';
 
   dialogo(`<h3>${esc(f.nome)}</h3>
-    <p class="dica" style="margin-top:-8px">${esc(x.cargo?.nome || f.cargo || 'sem cargo')}${x.faixa ? ` · faixa ${x.faixa}` : ''} ·
+    <p class="dica" style="margin-top:-8px">${esc(x.cargo?.nome || f.cargo || 'sem cargo')}${x.faixa ? ` · faixa ${x.faixa}` : ''}${x.faixaObs ? ` <span class="dc-sem">(${aberto ? esc(x.faixaObs) : 'obs. escondida'})</span>` : ''} ·
       ${x.sal != null ? `${V(x.sal)}${temAdicional(x) ? ` (${quebra(x.base, x.peric, x.grat, V, true)})` : ''} desde ${br(x.s.desde)}` : 'sem salário no app'} · <span class="tag ${x.pos.cls}">${esc(x.pos.txt)}</span>${x.insal ? `<br><span class="dc-sem">Insalubridade (só anotação): ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ' · ' + V(x.insal.valor) : ''}</span>` : ''}</p>
     <div class="rs-kpis rs-remun" style="margin-top:4px">
       <div><span>Salário base</span><strong>${x.sal != null ? V(x.base) : '—'}</strong><small>${x.s ? 'desde ' + br(x.s.desde) : 'sem salário'}</small></div>
@@ -607,6 +622,7 @@ function formAlteracao(fid, corrigirId = null) {
       const insalubridade_tipo = $('rsInsalTipo').value || null, insalubridade = insalubridade_tipo ? (lerValor($('rsInsalValor').value) || 0) : 0;
       const cargoId = $('rsCargo').value || null, faixa = $('rsFaixa').value || null;
       if (!valor) return erro('Informe o salário base.');
+      const faixa_obs = obsFaixa(cargoPorId(cargoId), faixa, r2(valor + periculosidade + gratificacao));
       if (comPeric() && !periculosidade) return erro('Informe o valor da periculosidade (ou desmarque a opção).');
       if (comGrat() && !gratificacao) return erro('Informe o valor da gratificação de função (ou desmarque a opção).');
       if (!desde) return erro('Informe a data a partir de quando vale.');
@@ -616,8 +632,8 @@ function formAlteracao(fid, corrigirId = null) {
       const b = $('rsGravar'); b.disabled = true;
       try {
         const reg = ed
-          ? { ...ed, valor, periculosidade, gratificacao, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value }
-          : { funcionario_id: fid, valor, periculosidade, gratificacao, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value,
+          ? { ...ed, valor, periculosidade, gratificacao, faixa_obs, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value }
+          : { funcionario_id: fid, valor, periculosidade, gratificacao, faixa_obs, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value,
               justificativa: obs || null, criado_por: estado.sessao?.user?.email || null, criado_em: new Date().toISOString() };
         const g = await jd.salvar('salarios', reg);
         await jd.registrar({ tabela: 'jor_salarios', registro_id: g.id, acao: ed ? 'update' : 'insert', antes: ed || null, depois: g, justificativa: ed ? obs : (obs || null) });
@@ -845,6 +861,18 @@ export function limparSalarios() {
   PJ.inicio = null; PJ.movs = []; PJ.reajPct = ''; PJ.reajMes = ''; PJ.encargos = '';
   aberto = false; fechar();
 }
+
+/* Para o Enquadramento e o Reajuste anual (js/rh-enquadramento.js), que usam
+   os mesmos dados, o mesmo olho e a mesma moldura de documento. */
+export const api = {
+  garantir: async () => { if (!S.carregado) await carregar(); },
+  recarregar: async () => { S.carregado = false; await carregar(); },
+  cargos: () => S.cargos, cargoPorId, ativos, situacao, salariosDe,
+  V: v => V(v), P: v => P(v), aberto: () => aberto, fecharOlho: () => { aberto = false; },
+  botaoOlho, ligarOlho, pedirSenha, documento, baixarCsv, dialogo, fechar, num2,
+  brl, pctTxt, br, hoje, addMeses, rotMes, mesSeguinte, esc, lerValor, r2,
+  abrirFicha: fid => abrirFicha(fid),
+};
 
 /* Para testes. */
 export const _sal = { S, PJ, abrirFicha, formAlteracao };

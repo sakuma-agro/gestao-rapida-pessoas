@@ -92,6 +92,9 @@ export const MODULOS = [
       /* Salários e projeção por pessoa (01/10/2026) — js/rh-salarios.js. */
       ['rhSalarios', 'Salários'],
       ['rhSalProj', 'Projeção'],
+      /* Enquadramento e Reajuste anual (20/10/2026) — js/rh-enquadramento.js. */
+      ['rhEnquadra', 'Enquadramento'],
+      ['rhReajuste', 'Reajuste anual'],
       ['rhProposta', 'Gerar proposta'],
     ] },
     /* Organograma (29/09/2026): hierarquia por função — js/organograma.js. */

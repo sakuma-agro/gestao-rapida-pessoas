@@ -64,7 +64,7 @@ const GRUPOS = [
   ['Acidentes e CAT', 'public', ['sst_acidentes']],
   ['DISC', 'public', ['disc_perfis', 'disc_combinacoes', 'disc_avaliacoes', 'disc_marcacoes',
     'disc_cargos_esperado', 'disc_acesso']],
-  ['RH', 'public', ['rh_cargos', 'rh_propostas', 'rh_modelo']],
+  ['RH', 'public', ['rh_cargos', 'rh_propostas', 'rh_modelo', 'rh_reajustes']],
   ['RH · Salário digno', 'public', ['rh_sd_parametros', 'rh_sd_planos', 'rh_sd_andamentos', 'rh_sd_fotos']],
   ['RH · Indicadores', 'public', ['rh_ind_vinculos', 'rh_ind_ausencias', 'rh_ind_jornada_mes',
     'rh_ind_lacunas', 'rh_ind_lotes', 'rh_ind_metas', 'rh_ind_tipos_deslig']],
