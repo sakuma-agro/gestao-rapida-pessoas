@@ -98,6 +98,7 @@ const GRUPOS = [
   ['Estoque', 'public', ['est_locais', 'est_itens', 'est_saldos_sistema', 'est_movimentos',
     'est_contagem_lotes', 'est_contagens', 'est_contagem_itens', 'est_compras', 'est_compra_itens',
     'est_compra_estoques']],
+  ['Custo Base', 'public', ['cb_culturas', 'cb_talhoes', 'cb_meses', 'cb_itens']],
   ['Reunião semanal', 'public', ['reu_config', 'reu_pessoas', 'reu_atividades', 'reu_semanas']],
   ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],

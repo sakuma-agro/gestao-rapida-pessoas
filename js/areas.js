@@ -24,6 +24,8 @@ const VERSAO_AREA = '28';
 const VERSAO_PROG = '9';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
 const VERSAO_EST = '5';
+/* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
+const VERSAO_CB = '1';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -50,6 +52,11 @@ export const AREAS = [
      acerto entre as fazendas e cadastros. Mora em estoque/, numa moldura. */
   { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v2.svg',
     desc: 'Contagem · Acerto entre fazendas · Cadastros' },
+  /* Custo Base (20/10/2026, pedido dele): o rateio mensal do custo
+     administrativo por cultura/plantio, que era a planilha "Rateio -
+     Direcionador Mensal ADM". Mora em custobase/, numa moldura. */
+  { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v1.svg',
+    desc: 'Rateio mensal culturas · Plantios · Culturas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
@@ -127,6 +134,8 @@ function liberada(id) {
   if (id === 'vistorias') return acesso.admin || (acesso.modulos || []).includes('vistorias');
   /* Estoque (15/10/2026): administrador ou módulo 'estoque'. */
   if (id === 'estoque') return acesso.admin || (acesso.modulos || []).includes('estoque');
+  /* Custo Base (20/10/2026): administrador ou módulo 'custobase'. */
+  if (id === 'custobase') return acesso.admin || (acesso.modulos || []).includes('custobase');
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -142,6 +151,7 @@ let molduraCarregada = false;
 let molduraVistCarregada = false;
 let molduraProgCarregada = false;
 let molduraEstCarregada = false;
+let molduraCBCarregada = false;
 
 export const areaAberta = () => areaAtual;
 
@@ -328,6 +338,25 @@ export function entrarNaArea(id, tela, extra) {
     return;
   }
 
+  if (id === 'custobase') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('custobase');
+    medirTopo();
+    const moldura = $('molduraCB');
+    if (!molduraCBCarregada || extra) {
+      molduraCBCarregada = true;
+      moldura.src = 'custobase/?v=' + VERSAO_CB + (extra ? '&' + extra : '');
+    } else {
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'custobase/?v=' + VERSAO_CB + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
+
   if (id === 'manutencoes') {
     $('navModulos').hidden = true;
     $('navTelas').hidden = true;
@@ -372,6 +401,7 @@ export function limparAreas() {
   molduraVistCarregada = false;
   molduraProgCarregada = false;
   molduraEstCarregada = false;
+  molduraCBCarregada = false;
   vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
@@ -381,6 +411,8 @@ export function limparAreas() {
   if (mp) mp.src = 'about:blank';
   const me = $('molduraEst');
   if (me) me.src = 'about:blank';
+  const mc = $('molduraCB');
+  if (mc) mc.src = 'about:blank';
   pintarEtiqueta();
 }
 

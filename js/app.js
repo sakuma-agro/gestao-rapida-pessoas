@@ -103,7 +103,8 @@ function abrirAba(nome) {
   $('telaVist').hidden = nome !== 'vistorias';
   $('telaProg').hidden = nome !== 'programacao';
   $('telaEst').hidden = nome !== 'estoque';
-  document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque'].includes(nome));
+  $('telaCB').hidden = nome !== 'custobase';
+  document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase'].includes(nome));
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
@@ -1696,7 +1697,7 @@ async function sincronizarTudo() {
     for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarAnexos()]) {
       try { await fn(); } catch {}
     }
-    for (const id of ['molduraManut', 'molduraProg', 'molduraEst']) {
+    for (const id of ['molduraManut', 'molduraProg', 'molduraEst', 'molduraCB']) {
       const m = $(id); try { if (m && m.src) m.contentWindow.postMessage({ tipo: 'gr-sincronizar' }, location.origin); } catch {}
     }
     try { await db.sincronizar(); } catch {}

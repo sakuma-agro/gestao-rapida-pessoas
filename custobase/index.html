@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Custo Base · LOP - Gestão Rápida</title>
+<meta name="theme-color" content="#1B232B">
+<link rel="stylesheet" href="css/app.css?v=1">
+<link rel="stylesheet" href="css/custobase.css?v=1">
+<!-- Área Custo Base do LOP - Gestão Rápida (20/10/2026).
+     Módulo Rateio mensal culturas: substitui a planilha "Rateio - Direcionador
+     Mensal ADM". Esta página não abre sozinha: mora dentro do app principal
+     (a pasta de cima), numa moldura, e usa o login de lá. Quem abrir este
+     endereço direto é levado para o app principal, que abre a área. -->
+<script>
+  (function () {
+    var dentro = false;
+    try { dentro = window.parent !== window && !!window.parent.grCliente; } catch (e) {}
+    if (!dentro) {
+      var q = location.search ? location.search.slice(1) + '&' : '';
+      location.replace('../?' + q + 'area=custobase');
+    }
+  })();
+</script>
+</head>
+<body class="embutido">
+
+<div id="app">
+  <header class="topo">
+    <!-- Nome, marcas, sair e instalar ficam no topo do LOP, acima da moldura. -->
+    <nav class="abas" role="tablist" id="navModulos"></nav>
+    <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
+  </header>
+
+  <main>
+    <div class="aviso info" id="avisoGlobal" hidden></div>
+    <div class="aviso erro" id="cbSemAcesso" hidden></div>
+    <div class="est-estado naoimprimir">
+      <span class="estado" id="estado-conexao"><span class="ponto" id="ponto-conexao"></span><span id="txt-conexao"></span></span>
+      <button type="button" id="btn-fila" class="fila oculto">0 aguardando envio</button>
+    </div>
+
+    <!-- ---- ENTRADA: nenhum módulo aberto ---- -->
+    <section class="tela inicio" id="telaInicio">
+      <h2>Custo Base <span>Rateio e direcionadores</span></h2>
+      <p class="in-dica">Módulo <strong>Rateio mensal culturas</strong>: o direcionador do custo administrativo por plantio, como na planilha, mês a mês.</p>
+      <div class="cb-atalhos naoimprimir">
+        <button type="button" class="cb-atalho prim" data-ir="rtMes"><b>Rateio do mês</b><small>criar o mês, ajustar plantios, % e R$</small></button>
+        <button type="button" class="cb-atalho" data-ir="rtHistorico"><b>Histórico</b><small>meses e linha do tempo dos plantios</small></button>
+        <button type="button" class="cb-atalho" data-ir="rtTalhoes"><b>Plantios</b><small>Cód. Agro, cultura, área</small></button>
+        <button type="button" class="cb-atalho" data-ir="rtCulturas"><b>Culturas</b><small>índice, ciclo e meses no rateio</small></button>
+      </div>
+    </section>
+
+    <!-- =================== RATEIO MENSAL CULTURAS =================== -->
+    <section class="tela" id="telaRtMes" hidden>
+      <div class="cartao">
+        <h2>Rateio do mês</h2>
+        <p class="dica">Escolha o mês. O mês novo nasce da cópia do anterior; quem completou o ciclo da cultura vem desmarcado. Lance o custo ADM para ver o R$ de cada plantio.</p>
+        <div id="cbMesCorpo"></div>
+      </div>
+      <div class="previa" id="cbMesFolha"></div>
+    </section>
+
+    <section class="tela" id="telaRtHistorico" hidden>
+      <div class="cartao">
+        <h2>Histórico</h2>
+        <p class="dica">Todos os meses já feitos e, embaixo, em quais meses cada plantio entrou no rateio — com o aviso de quem completou o ciclo.</p>
+        <div id="cbHistCorpo"></div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaRtTalhoes" hidden>
+      <div class="cartao">
+        <h2>Plantios</h2>
+        <p class="dica">Cada plantio com o Cód. Agro (o código do sistema agro, que muda a cada safra), a cultura, a fazenda e a área padrão. Encerrar um plantio tira-o dos próximos meses sem mexer no histórico.</p>
+        <div id="cbTalhoesCorpo"></div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaRtCulturas" hidden>
+      <div class="cartao">
+        <h2>Culturas</h2>
+        <p class="dica">Índice e ciclo de cada cultura, como na tabela lateral da planilha, e quantos meses um plantio fica no rateio antes de sair.</p>
+        <div id="cbCulturasCorpo"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal oculto naoimprimir" role="dialog" aria-modal="true">
+  <div class="caixa">
+    <header><h2 id="modal-titulo"></h2>
+      <button type="button" id="modal-fechar" aria-label="Fechar">×</button></header>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
+<div id="aviso" class="est-toast oculto naoimprimir" role="status"></div>
+
+<script src="../vendor/supabase.js"></script>
+<!-- Excel: a biblioteca entra aqui porque ../js/excel.js a carregaria por um caminho relativo ao app principal. -->
+<script src="../vendor/xlsx-js-style.min.js" defer></script>
+<script src="js/config.js?v=1"></script>
+<script src="../js/moldura-nucleo.js?v=4"></script>
+<script src="js/base.js?v=1"></script>
+<script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>
