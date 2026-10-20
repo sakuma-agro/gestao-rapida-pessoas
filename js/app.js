@@ -1900,7 +1900,17 @@ if ('serviceWorker' in navigator) {
     f.querySelector('button').onclick = () => location.reload();
     document.body.appendChild(f);
   });
+  /* Versão ao lado de "sincronizado" (20/10/2026, pedido dele): só o número,
+     o que o service worker deste aparelho está servindo — assim dá para ver
+     na hora se o app pegou a publicação nova. */
+  const mostrarVersao = () => navigator.serviceWorker.controller?.postMessage({ tipo: 'gr-versao' });
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if (ev.data?.tipo === 'gr-versao' && $('versaoApp')) $('versaoApp').textContent = ev.data.versao;
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', mostrarVersao);
+  mostrarVersao();
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
+    mostrarVersao();
     const conferir = () => reg.update().catch(() => {});
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') conferir(); });
     setInterval(conferir, 30 * 60 * 1000);

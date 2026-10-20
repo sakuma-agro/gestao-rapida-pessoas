@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v282';
+const VERSAO = 'gr-v283';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -84,6 +84,12 @@ self.addEventListener('install', ev => {
     // por 10 min; sem isso a versão nova nascia com o JS da anterior.
     .then(c => c.addAll(ARQUIVOS.map(u => new Request(u, { cache: 'reload' }))))
     .then(() => self.skipWaiting()));
+});
+
+/* Versão no topo do app (20/10/2026, pedido dele): a página pergunta e o
+   service worker responde com a VERSAO que está servindo. */
+self.addEventListener('message', ev => {
+  if (ev.data?.tipo === 'gr-versao') ev.source?.postMessage({ tipo: 'gr-versao', versao: VERSAO });
 });
 
 self.addEventListener('activate', ev => {

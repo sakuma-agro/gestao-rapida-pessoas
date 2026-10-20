@@ -1610,3 +1610,7 @@ body.com-rodape .faixa-versao{bottom:72px}
 .rs-legenda button[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-fundo);color:var(--verde-esc);font-weight:700}
 .rs-tab td:first-child{white-space:nowrap}
 .rs-tab td:first-child .tv-led{margin-right:7px}
+
+/* versão do app ao lado de "sincronizado" (20/10/2026): só o número, discreto */
+.versao-app{font-size:11px;font-weight:600;color:var(--suave);opacity:.8;white-space:nowrap}
+.versao-app:empty{display:none}
