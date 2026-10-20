@@ -1357,7 +1357,7 @@ function listaAniversarios() {
    não tem cadastro de foto) fica de fora e sai com as iniciais. */
 const comFotos = () => $('anFormato').value === 'fotos';
 async function fotosAniversarios(gente) {
-  const ids = gente.filter(a => !a.empregador).map(a => String(a.id));
+  const ids = gente.filter(a => !a.eEmpregador).map(a => String(a.id));
   const fotos = new Map();
   if (!ids.length) return fotos;
   try {

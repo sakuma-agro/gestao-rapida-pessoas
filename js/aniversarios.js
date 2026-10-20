@@ -25,7 +25,7 @@ const partes = iso => {
    que ele é empregador: na folha todo mundo é aniversariante do mês. */
 const comoPessoa = e => ({
   id: e.id,
-  empregador: true,                 // não tem foto no Drive; sai com as iniciais
+  eEmpregador: true,                // não tem foto no Drive; sai com as iniciais (não confundir com f.empregador, que é o nome do empregador do funcionário)
   nome: String(e.nome || '').toUpperCase(),
   nascimento: e.nascimento,
   situacao: e.ativo === false ? 'INATIVO' : 'ATIVO',
