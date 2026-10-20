@@ -8,13 +8,13 @@
    aviso…) e pelo evento 'custobase-dados', disparado quando a base local muda.
    ===================================================================== */
 
-const TABELAS_BASE = ['cb_culturas', 'cb_talhoes', 'cb_meses', 'cb_itens'];
+const TABELAS_BASE = ['cb_culturas', 'cb_talhoes', 'cb_meses', 'cb_itens', 'cb_hh_parametros', 'cb_hh_meses', 'cb_hh_itens'];
 const GERADAS_NO_BANCO = {};
 const CHAVE_PK = {};
 /* Mês e itens do mês têm chave de texto montada no aparelho ('2026-10',
    '2026-10:<talhao>'): o núcleo grava por upsert direto, sem conferir carimbo.
    Culturas e talhões continuam conferindo conflito. */
-const CHAVE_COMPOSTA = { cb_meses: ['id'], cb_itens: ['id'] };
+const CHAVE_COMPOSTA = { cb_meses: ['id'], cb_itens: ['id'], cb_hh_parametros: ['id'], cb_hh_meses: ['id'], cb_hh_itens: ['id'] };
 function chaveDrive(caminho) { return 'custobase/' + String(caminho).toLowerCase(); }
 
 /* Avisa as telas (módulos) que a base local mudou. */

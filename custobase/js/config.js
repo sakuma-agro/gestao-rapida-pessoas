@@ -14,5 +14,5 @@ window.CONFIG = {
   BASE_LOCAL: 'lop-gr-custobase',
 
   // Mudar este número força o app a baixar tudo de novo.
-  VERSAO_BASE: 1
+  VERSAO_BASE: 2
 };

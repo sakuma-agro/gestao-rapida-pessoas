@@ -25,7 +25,7 @@ const VERSAO_PROG = '9';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
 const VERSAO_EST = '5';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
-const VERSAO_CB = '1';
+const VERSAO_CB = '2';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -56,7 +56,7 @@ export const AREAS = [
      administrativo por cultura/plantio, que era a planilha "Rateio -
      Direcionador Mensal ADM". Mora em custobase/, numa moldura. */
   { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v2.svg',
-    desc: 'Rateio mensal culturas · Plantios · Culturas' },
+    desc: 'Rateio mensal culturas · Hora-homem' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */

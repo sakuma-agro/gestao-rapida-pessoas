@@ -6,7 +6,7 @@
 <title>Custo Base · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=1">
-<link rel="stylesheet" href="css/custobase.css?v=1">
+<link rel="stylesheet" href="css/custobase.css?v=2">
 <!-- Área Custo Base do LOP - Gestão Rápida (20/10/2026).
      Módulo Rateio mensal culturas: substitui a planilha "Rateio - Direcionador
      Mensal ADM". Esta página não abre sozinha: mora dentro do app principal
@@ -43,12 +43,14 @@
     <!-- ---- ENTRADA: nenhum módulo aberto ---- -->
     <section class="tela inicio" id="telaInicio">
       <h2>Custo Base <span>Rateio e direcionadores</span></h2>
-      <p class="in-dica">Módulo <strong>Rateio mensal culturas</strong>: o direcionador do custo administrativo por plantio, como na planilha, mês a mês.</p>
+      <p class="in-dica">Módulos <strong>Rateio mensal culturas</strong> (o direcionador do custo administrativo por plantio) e <strong>Hora-homem</strong> (o custo da hora de cada funcionário do campo, com as horas do Pessoas).</p>
       <div class="cb-atalhos naoimprimir">
         <button type="button" class="cb-atalho prim" data-ir="rtMes"><b>Rateio do mês</b><small>criar o mês, ajustar plantios, % e R$</small></button>
         <button type="button" class="cb-atalho" data-ir="rtHistorico"><b>Histórico</b><small>meses e linha do tempo dos plantios</small></button>
         <button type="button" class="cb-atalho" data-ir="rtTalhoes"><b>Plantios</b><small>Cód. Agro, cultura, área</small></button>
         <button type="button" class="cb-atalho" data-ir="rtCulturas"><b>Culturas</b><small>índice, ciclo e meses no rateio</small></button>
+        <button type="button" class="cb-atalho prim" data-ir="hhMes"><b>Hora-homem do mês</b><small>horas do Pessoas, salário e recibo, R$/h</small></button>
+        <button type="button" class="cb-atalho" data-ir="hhHistorico"><b>Hora-homem · histórico</b><small>R$/h por pessoa mês a mês</small></button>
       </div>
     </section>
 
@@ -85,6 +87,30 @@
         <div id="cbCulturasCorpo"></div>
       </div>
     </section>
+
+    <!-- =================== HORA-HOMEM =================== -->
+    <section class="tela" id="telaHhMes" hidden>
+      <div class="cartao">
+        <h2>Hora-homem do mês</h2>
+        <p class="dica">As horas trabalhadas vêm do Pessoas (DP › Gestão de jornada, pela competência). Digite o salário bruto e o recibo do holerite; o R$/h sai na hora.</p>
+        <div id="hhMesCorpo"></div>
+      </div>
+      <div class="previa" id="hhFolha"></div>
+    </section>
+    <section class="tela" id="telaHhHistorico" hidden>
+      <div class="cartao">
+        <h2>Hora-homem · histórico</h2>
+        <p class="dica">O custo médio da hora mês a mês e o R$/h de cada pessoa.</p>
+        <div id="hhHistCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaHhIndices" hidden>
+      <div class="cartao">
+        <h2>Índices</h2>
+        <p class="dica">Encargos trabalhistas e horas padrão de cada mês, como a aba "Indices" da planilha.</p>
+        <div id="hhIndCorpo"></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -100,9 +126,9 @@
 <script src="../vendor/supabase.js"></script>
 <!-- Excel: a biblioteca entra aqui porque ../js/excel.js a carregaria por um caminho relativo ao app principal. -->
 <script src="../vendor/xlsx-js-style.min.js" defer></script>
-<script src="js/config.js?v=1"></script>
+<script src="js/config.js?v=2"></script>
 <script src="../js/moldura-nucleo.js?v=4"></script>
-<script src="js/base.js?v=1"></script>
-<script type="module" src="js/app.js?v=1"></script>
+<script src="js/base.js?v=2"></script>
+<script type="module" src="js/app.js?v=2"></script>
 </body>
 </html>

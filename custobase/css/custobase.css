@@ -125,3 +125,14 @@ body.embutido .abas{padding-top:4px}
 .cb-rateio td:last-child{white-space:nowrap}
 .cb-rateio td:last-child .btn{margin-left:3px}
 .cb-rateio tfoot td{white-space:nowrap}
+
+/* ---- hora-homem (20/10/2026) ---- */
+.hh-tab .hh-num{width:96px;text-align:right}
+.hh-tab select.dc-mini{width:auto}
+.hh-orig{display:block;font-size:10.5px;margin-top:2px}
+.hh-o-pessoas{color:var(--verde-esc)}
+.hh-o-manual{color:var(--marrom)}
+.hh-o-padrao{color:#8a5f00}
+.hh-media{color:var(--marrom) !important}
+.hh-horas{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.hh-o-planilha{color:var(--suave)}

@@ -15,6 +15,9 @@ const ICONES = {
   mes: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M8 14h3M13 14h3M8 18h3"/>',
   historico: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',
   talhoes: '<path d="M3 11l9-7 9 7"/><path d="M4 11v9h16v-9"/><path d="M9 20v-5h6v5"/>',
+  horahomem: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/><path d="M12 2v3"/>',
+  pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.6c2.7.2 4.7 2 5.3 5"/>',
+  indices: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   culturas: '<path d="M12 22V12"/><path d="M12 12c-4 0-7-3-7-7 4 0 7 3 7 7z"/><path d="M12 15c0-4 3-7 7-7 0 4-3 7-7 7z"/>',
 };
 export const svgIcone = nome =>
@@ -29,6 +32,13 @@ export const MODULOS = [
     ['rtHistorico', 'Histórico',     'historico'],
     ['rtTalhoes',   'Plantios',      'talhoes'],
     ['rtCulturas',  'Culturas',      'culturas'],
+  ] },
+  /* Hora-homem (20/10/2026, pedido dele): a planilha "Controle Mensal -
+     Hora Homem - Campo", com as horas trabalhadas puxadas do Pessoas. */
+  { id: 'horahomem', nome: 'Hora-homem', icone: 'horahomem', telas: [
+    ['hhMes',       'Hora-homem do mês', 'pessoas'],
+    ['hhHistorico', 'Histórico',         'historico'],
+    ['hhIndices',   'Índices',           'indices'],
   ] },
 ];
 
