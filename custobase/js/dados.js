@@ -120,7 +120,9 @@ export const pesoDe = i => Number(i.indice || 0) * Number(i.area || 0) * (12 / N
 /** As linhas de um mês com peso, % e R$, na ordem cultura › nome. */
 export function calcularMes(mesId) {
   const m = mes(mesId);
-  const custo = m && m.custo_adm !== null && m.custo_adm !== undefined && m.custo_adm !== '' ? Number(m.custo_adm) : null;
+  // 20/10/2026, pedido dele: "isso de valor não precisa aparecer, somente a %".
+  // O rateio sai só em %; custo_adm fica ignorado.
+  const custo = null;
   const linhas = itensDoMes(mesId).map(i => {
     const t = talhao(i.talhao_id) || {};
     const c = cultura(i.cultura_id || t.cultura_id);

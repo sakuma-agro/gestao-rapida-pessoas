@@ -31,14 +31,13 @@ function desenhar() {
   alvo.innerHTML = `
     <h3 class="cb-secao">Meses</h3>
     <div class="cb-rolagem"><table class="dc-planilha cb-tab">
-      <thead><tr><th>Mês</th><th>Situação</th><th class="dir">Plantios</th><th class="dir">Área (ha)</th><th class="dir">Soma dos pesos</th><th class="dir">Custo ADM</th><th>Maior %</th><th></th></tr></thead>
+      <thead><tr><th>Mês</th><th>Situação</th><th class="dir">Plantios</th><th class="dir">Área (ha)</th><th class="dir">Soma dos pesos</th><th>Maior %</th><th></th></tr></thead>
       <tbody>${resumo.map(({ m, c }) => {
         const maior = c.linhas.filter(l => l.incluido !== false).sort((a, b) => b.pct - a.pct)[0];
         return `<tr>
           <td><b>${esc(nomeMes(m.id))}</b></td>
           <td>${m.status === 'fechado' ? `<span class="cb-cadeado">${CADEADO} Fechado</span>` : '<span class="tag alerta">aberto</span>'}</td>
           <td class="dir">${c.incluidos}</td><td class="dir">${esc(num(c.area))}</td><td class="dir">${esc(num(c.total, 0))}</td>
-          <td class="dir">${c.custo !== null ? esc(reais(c.custo)) : '—'}</td>
           <td>${maior ? esc(maior.talhao.nome) + ' · <b>' + esc(pct(maior.pct, 1)) + '</b>' : '—'}</td>
           <td class="dir"><button class="btn mini" type="button" data-abrir="${esc(m.id)}">Abrir</button></td>
         </tr>`; }).join('')}

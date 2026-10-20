@@ -115,9 +115,6 @@ function desenhar() {
       <div><span>Plantios no rateio</span><b>${c.incluidos}</b><small>pelo cadastro de plantios</small></div>
       <div><span>Área (ha)</span><b>${esc(num(c.area))}</b></div>
       <div><span>Lançados no Agro</span><b>${agro} / ${linhas.length}</b><small>${agro === linhas.length && linhas.length ? 'todos lançados' : 'falta lançar ' + (linhas.length - agro)}</small></div>
-      <div class="cb-kpi-custo"><span>Custo ADM do mês (R$)</span>
-        <input type="text" id="cbCusto" inputmode="decimal" placeholder="opcional" value="${c.custo !== null ? esc(num(c.custo)) : ''}"${fechado ? ' disabled' : ''}>
-        <small>${c.custo !== null ? 'rateado pelo %' : 'sem valor: sai só o %'}</small></div>
     </div>
     ${completaram.length ? `<div class="aviso info cb-aviso"><b>Último mês no rateio:</b> ${completaram.map(l => `${esc(l.talhao.nome)} (${l.meses}º de ${l.limite})`).join(', ')}. No próximo mês ${completaram.length === 1 ? 'ele sai' : 'eles saem'} sozinho${completaram.length === 1 ? '' : 's'}.</div>` : ''}
     <div class="barra entre naoimprimir">
@@ -227,7 +224,6 @@ function desenharFolha(c) {
       <div><span>Área (ha)</span><b>${esc(num(c.area))}</b></div>
       <div><span>Culturas</span><b>${Object.keys(porCultura).length}</b></div>
       <div><span>Soma dos pesos</span><b>${esc(num(c.total, 0))}</b></div>
-      <div><span>Custo ADM</span><b>${temRS ? esc(reais(c.custo)) : '—'}</b></div>
     </div>
     <p class="rel-secao">Por plantio</p>
     <table class="rel-tab"><thead><tr><th>Cód.</th><th>Plantio / talhão</th><th>Cultura</th><th class="dir">Área (ha)</th><th class="dir">Índice</th><th class="dir">Ciclo</th><th class="dir">Peso</th><th class="dir">%</th>${temRS ? '<th class="dir">R$</th>' : ''}<th class="ce">Mês</th></tr></thead>
@@ -287,7 +283,7 @@ function pdfRateio(c) {
     titulo: 'Rateio mensal por cultura · ' + nomeMes(mesSel),
     subtitulo: 'Direcionador do custo administrativo por plantio · peso = índice × área × (12 ÷ ciclo)' + (c.mes.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'),
     arquivo: 'Rateio ADM ' + mesSel,
-    kpis: [['Plantios', c.incluidos], ['Área (ha)', num(c.area)], ['Culturas', porCulturaDe(c).length], ['Soma dos pesos', num(c.total, 0)], ['Custo ADM', temRS ? reais(c.custo) : '—']],
+    kpis: [['Plantios', c.incluidos], ['Área (ha)', num(c.area)], ['Culturas', porCulturaDe(c).length], ['Soma dos pesos', num(c.total, 0)]],
     secoes: [
       { titulo: 'Por plantio', dir: temRS ? [3, 4, 5, 6, 7, 8, 9] : [3, 4, 5, 6, 7, 8],
         head: ['Cód.', 'Plantio / talhão', 'Cultura', 'Área (ha)', 'Índice', 'Ciclo', 'Peso', '%', ...(temRS ? ['R$'] : []), 'Mês'],
