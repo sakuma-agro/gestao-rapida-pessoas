@@ -51,7 +51,7 @@ const campo = (rotulo, valor) => {
  *   d.linhas       o vigente de cada tipo, já ordenado:
  *                  { nome, realizado, vence, sit:{chave,rotulo}, carga, instrutor,
  *                    conferencia:{feitos,total,completo}|null }
- *   d.pendencias   [{ nome }] — exigido pela função e nunca lançado (só exames)
+ *   d.pendencias   [{ nome }] — exigido pela função e nunca lançado (exames e treinamentos)
  *   d.funcaoSemLista  true quando a função da pessoa ainda não tem lista de exames
  */
 export function documentoFichaSst(d) {
@@ -120,22 +120,27 @@ export function documentoFichaSst(d) {
   /* As pendências não entram na tabela de cima: lá é o que existe, aqui é o
      que falta. Misturar as duas coisas numa tabela só faria a pessoa parecer
      ter lançamento onde não tem. */
-  const blocoPendencias = !ex ? '' : pend.length ? `
-    <h2 class="rel-unidade">Exames da função que nunca foram lançados
-      <small>${pend.length} exame(s) que a função ${esc(f.cargo || '—')} exige e não aparecem no
-        histórico desta pessoa — nem como lançamento próprio, nem marcados dentro de um ASO</small>
+  /* Treinamentos por função (20/10/2026): o mesmo bloco serve aos dois
+     documentos; muda só o nome das coisas e onde a lista é montada. */
+  const coisa = ex ? 'exame' : 'treinamento';
+  const ondeLista = ex ? 'SST · Exames · Exames por função' : 'SST · Treinamentos · Treinamentos por função';
+  const blocoPendencias = pend.length ? `
+    <h2 class="rel-unidade">${ex ? 'Exames' : 'Treinamentos'} da função que nunca foram lançados
+      <small>${pend.length} ${coisa}(s) que a função ${esc(f.cargo || '—')} exige e não aparecem no
+        histórico desta pessoa${ex ? ' — nem como lançamento próprio, nem marcados dentro de um ASO'
+          : ' — nem o treinamento, nem a reciclagem dele'}</small>
     </h2>
     <table class="rel-tabela">
-      <thead><tr><th>EXAME</th><th style="width:28%">SITUAÇÃO</th></tr></thead>
+      <thead><tr><th>${ex ? 'EXAME' : 'TREINAMENTO'}</th><th style="width:28%">SITUAÇÃO</th></tr></thead>
       <tbody>${pend.map(p => `<tr>
         <td><b>${esc(p.nome)}</b></td>
         <td class="sst-vencido">Nunca realizado</td>
       </tr>`).join('')}</tbody>
     </table>`
     : d.funcaoSemLista ? `
-    <p class="rel-nota">A função ${esc(f.cargo || '—')} ainda não tem lista de exames montada em
-      <b>SST · Exames · Exames por função</b>, então esta folha não consegue apontar o que falta.</p>`
-    : `<p class="rel-nota">Nenhuma pendência: todos os exames que a função
+    <p class="rel-nota">A função ${esc(f.cargo || '—')} ainda não tem lista de ${coisa}s montada em
+      <b>${ondeLista}</b>, então esta folha não consegue apontar o que falta.</p>`
+    : `<p class="rel-nota">Nenhuma pendência: todos os ${coisa}s que a função
       ${esc(f.cargo || '—')} exige já aparecem no histórico desta pessoa.</p>`;
 
   const nota = ex

@@ -18,11 +18,13 @@ import { abrirBoletins, fecharDocBoletins, fecharMenuBoletins } from './jornada-
 import { abrirDocumentos, fecharDocDocumentos, fecharMenuDocumentos } from './jornada-documentos.js';
 import { abrirTicket } from './jornada-ticket.js';
 import { desenharAtalhos, carregarAtalhos, ligarAtalhos, limparAtalhos } from './atalhos.js';
-import { ligarSst, abrirSst, limparSst, limparPreviaSst, enviarFilaSst, carregarSst } from './sst.js';
+import { ligarSst, abrirSst, limparSst, limparPreviaSst, enviarFilaSst, carregarSst, garantirSst, sstCarregado } from './sst.js';
+const sstPronto = () => sstCarregado() ? Promise.resolve() : garantirSst();
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
+import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
@@ -86,7 +88,7 @@ function limparPrevias() {
 
 /* Telas que só funcionam com internet (rodada C): sem cópia local nem fila.
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
-const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes',
+const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes', 'trFuncoes',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
   ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
@@ -145,6 +147,7 @@ function abrirAba(nome) {
   $('telaExFuncoes').hidden = nome !== 'exFuncoes';
   $('telaTrVenc').hidden  = nome !== 'trVenc';
   $('telaTrTipos').hidden = nome !== 'trTipos';
+  $('telaTrFuncoes').hidden = nome !== 'trFuncoes';
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
@@ -196,6 +199,7 @@ function abrirAba(nome) {
   if (nome === 'config') desenharConfig();
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
+  if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
   for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
   $('telaSstCal').hidden = nome !== 'sstCal';
@@ -927,10 +931,27 @@ function desenharPendentesPlano() {
 
 function mostrarNivel() {
   const fn = jd.dados.funcoes.find(x => x.id === $('fuCargo').value);
+  mostrarTreinos(fn);
   $('fuNivel').textContent = !fn ? ''
     : fn.ativo === false ? 'Função fora de uso — escolha a do plano de cargos.'
     : fn.rh_cargo_id ? `Nível ${fn.nivel || '—'}`
     : `Fora do plano de cargos${fn.nivel ? ' · nível ' + fn.nivel : ''}`;
+}
+
+/* Treinamentos da função (20/10/2026): ao escolher a função no cadastro, a
+   linha embaixo diz o que ela exige (SST › Treinamentos por função) e o que
+   essa pessoa ainda não fez. O SST carrega em segundo plano se preciso. */
+function mostrarTreinos(fn) {
+  const alvo = $('fuTreinos');
+  if (!alvo) return;
+  const nome = fn?.nome || '';
+  const id = editandoFunc?.id;
+  alvo.textContent = resumoCadastro(nome, id);
+  if (nome && !alvo.textContent) {
+    sstPronto().then(() => {
+      if (($('fuCargo').value || '') === (fn.id || '')) alvo.textContent = resumoCadastro(nome, id);
+    }).catch(() => {});
+  }
 }
 
 /* Funções agrupadas pelo nível, na ordem do plano de cargos. A função atual
@@ -1954,6 +1975,7 @@ ligar('DP', () => ligarJornada(irParaTela));
 ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
+ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('termos', () => ligarTermos(mostrarAviso));
 ligar('backup', () => ligarBackup(mostrarAviso));
 ligar('acesso rápido', () => ligarAtalhos(abrirModulo, mostrarAviso));

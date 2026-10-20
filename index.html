@@ -949,6 +949,44 @@ addEventListener('beforeinstallprompt', function (ev) {
     <section class="tela" id="telaAcPainel" hidden></section>
     <section class="tela" id="telaAcLista" hidden></section>
 
+    <!-- ---- SST · TREINAMENTOS: treinamentos por função (20/10/2026) ---- -->
+    <section class="tela" id="telaTrFuncoes" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Treinamentos por função</h2>
+            <p class="dica" style="margin:2px 0 0">
+              Marque o que cada função exige. O painel passa a cobrar só de quem a função pede,
+              o relatório do funcionário mostra o que falta e o cadastro avisa ao escolher a função.
+              Função sem lista continua sendo cobrada de tudo, como antes.
+            </p>
+          </div>
+          <span class="acoes">
+            <button class="btn" id="bPendTf">Quem está devendo</button>
+            <button class="btn" id="bQuadroTf">Quadro geral</button>
+          </span>
+        </div>
+
+        <div class="grade" style="margin-top:14px">
+          <label class="campo">Função <select id="tfFuncao"></select></label>
+        </div>
+        <div class="barra" style="margin:8px 0 0">
+          <button class="btn" type="button" id="bCopiarTf" hidden>Copiar de outra função</button>
+          <button class="btn perigo" type="button" id="bExcluirTf" hidden>Limpar a lista desta função</button>
+        </div>
+        <p class="dica" id="tfResumo" style="margin:10px 0 0"></p>
+        <div id="tfLista" style="margin-top:12px"></div>
+      </div>
+
+      <div class="previa-lista" id="tfSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirTf">Imprimir</button>
+        <span class="cresce"></span>
+        <span class="dc-sem">Gere o quadro ou a lista de quem está devendo para aparecer aqui.</span>
+      </div>
+    </section>
+
     <!-- ---- SST · TREINAMENTOS: tipos ---- -->
     <section class="tela" id="telaTrTipos" hidden>
       <div class="cartao">
@@ -1528,6 +1566,7 @@ addEventListener('beforeinstallprompt', function (ev) {
       <label class="campo">Função (plano de cargos)
         <select id="fuCargo"></select>
         <small class="dc-sem" id="fuNivel"></small>
+        <small class="dc-sem" id="fuTreinos"></small>
       </label>
       <label class="campo">Faixa do plano
         <select id="fuFaixa">
@@ -1674,6 +1713,20 @@ addEventListener('beforeinstallprompt', function (ev) {
 </dialog>
 
 <!-- ============ DIÁLOGO: GUIA DE EXAMES ============ -->
+<dialog id="dlgCopiarTf">
+  <form method="dialog" id="formCopiarTf">
+    <h3>Copiar lista de treinamentos</h3>
+    <p class="dica">Os treinamentos da função escolhida entram também em <b id="tfcDestino"></b>. O que já está marcado fica.</p>
+    <div class="grade">
+      <label class="campo plena">Copiar de <select id="tfcOrigem"></select></label>
+    </div>
+    <div class="barra fim">
+      <button class="btn" type="button" id="bCancelarCopiaTf">Cancelar</button>
+      <button class="btn principal" type="submit" id="bConfirmarCopiaTf">Copiar</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlgGuia">
   <form method="dialog" id="formGuia">
     <h3>Gerar guia de exames</h3>

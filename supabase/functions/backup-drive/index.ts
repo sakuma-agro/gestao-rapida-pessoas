@@ -13,7 +13,7 @@ const GRUPOS: [string, string, string[]][] = [
   ['Funcionários', 'public', ['funcionarios']],
   ['EPIs', 'public', ['epis', 'fichas', 'modelo']],
   ['Exames', 'public', ['sst_tipos_exame', 'sst_exames', 'sst_exames_funcao', 'sst_aso_itens']],
-  ['Treinamentos', 'public', ['sst_tipos_treinamento', 'sst_treinamentos']],
+  ['Treinamentos', 'public', ['sst_tipos_treinamento', 'sst_treinamentos', 'sst_treinamentos_funcao']],
   ['Acidentes e CAT', 'public', ['sst_acidentes']],
   ['DISC', 'public', ['disc_perfis', 'disc_combinacoes', 'disc_avaliacoes', 'disc_marcacoes', 'disc_cargos_esperado', 'disc_acesso']],
   ['RH', 'public', ['rh_cargos', 'rh_propostas', 'rh_modelo']],

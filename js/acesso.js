@@ -70,6 +70,7 @@ export const MODULOS = [
     { id: 'treinamentos', nome: 'Treinamentos', telas: [
       ['trPainel', 'Painel'],
       ['trVenc', 'Vencimentos'],
+      ['trFuncoes', 'Treinamentos por função'],
       ['trTipos', 'Tipos e periodicidade'],
     ] },
     /* Acidentes e CAT (08/10/2026): js/sst-acidentes.js, tabela sst_acidentes. */
@@ -246,7 +247,7 @@ export const MODULOS = [
    Para desfazer o estilo num submódulo, é só tirá-lo daqui. */
 const ACOES_TOTVS = {
   gente: [], certificacao: ['termoSindical', 'termoContrato'], relatoriosCad: ['rhQuadro', 'cadFerias'], estrutura: [],
-  epis: ['epis', 'modelo'], exames: ['exFuncoes', 'exTipos'], treinamentos: ['trTipos'], acidentes: [],
+  epis: ['epis', 'modelo'], exames: ['exFuncoes', 'exTipos'], treinamentos: ['trFuncoes', 'trTipos'], acidentes: [],
   salarioDigno: ['sdConfig'], indicadores: ['rhIndCert', 'rhIndMetas'],
   gestaoJornada: ['jorExtras', 'jorAbatimento', 'jorHistorico'], boletinsDiarios: ['bdMes'], docMensais: [],
   ticket: [], emprestimo: ['empHistorico'], ferias: ['ferPrev', 'ferAfast', 'ferRisco', 'ferIni'], dpConfig: [],

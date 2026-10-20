@@ -10,6 +10,8 @@ import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens, dadosAso, definirAso,
   conferenciaDo, pendenciasDe } from './aso.js';
+import { definirTiposTr, carregarTreinoFuncao, dadosTreinoFuncao, definirTreinoFuncao,
+  limparTreinoFuncao, funcaoExige, pendenciasTrDe } from './treino-funcao.js';
 import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
 import { abrirModulo, podeTela } from './acesso.js';
 
@@ -148,7 +150,8 @@ const COLECOES = { sst_exames: ['exame', 'regs'], sst_tipos_exame: ['exame', 'ti
   sst_treinamentos: ['treinamento', 'regs'], sst_tipos_treinamento: ['treinamento', 'tipos'] };
 const CHAVES = { sst_aso_itens: ['exame_id', 'tipo_id'] };
 function salvarCaixa() {
-  nucleo.gravarCaixa(CAIXA, { exame: S.exame, treinamento: S.treinamento, aso: dadosAso() });
+  nucleo.gravarCaixa(CAIXA, { exame: S.exame, treinamento: S.treinamento, aso: dadosAso(),
+    trFuncao: dadosTreinoFuncao() });
 }
 const CAMADA_DEF = {
   tabelaDe: c => c,
@@ -177,6 +180,7 @@ export async function carregarSst() {
   if (c0 && !S.carregado) {
     S.exame = c0.exame || S.exame; S.treinamento = c0.treinamento || S.treinamento;
     definirTipos(S.exame.tipos); definirAso(c0.aso || {});
+    definirTiposTr(() => S.treinamento.tipos, () => S.treinamento.regs); definirTreinoFuncao(c0.trFuncao);
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -205,12 +209,15 @@ export async function carregarSst() {
   S.treinamento.regs = comFila(tr.data, 'sst_treinamentos');
   S.carregado = true;
   definirTipos(S.exame.tipos);
+  definirTiposTr(() => S.treinamento.tipos, () => S.treinamento.regs);
   try { await carregarAso(); } catch { /* fica o que havia */ }
+  try { await carregarTreinoFuncao(); } catch { /* fica o que havia */ }
   salvarCaixa();
 }
 
 export function limparSst() {
   limparAso();
+  limparTreinoFuncao();
   limparPreviaSst();
   S.exame = { tipos: [], regs: [] };
   S.treinamento = { tipos: [], regs: [] };
@@ -612,10 +619,12 @@ function painelDoTipo(r, tipoId) {
   const ativos = estado.funcionarios.filter(f => f.situacao === 'ATIVO');
   const com = atuais(r).filter(x => grupoDe(r, x.tipo_id) === grupo);
   const temIds = new Set(com.map(x => x.funcionario_id));
-  // exame não se cobra de todo mundo (quem exige é a função): "sem" só no treinamento
-  const sem = r.id === 'treinamento'
-    ? ativos.filter(f => !temIds.has(f.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    : [];
+  // exame não se cobra de todo mundo (quem exige é a função): "sem" só no treinamento.
+  // Treinamentos por função (20/10/2026): quem tem função com lista montada só é
+  // cobrado se a lista pede este treinamento; função sem lista continua cobrada.
+  const cobrados = r.id === 'treinamento' ? ativos.filter(f => funcaoExige(f, grupo) !== false) : [];
+  const dispensados = ativos.length - cobrados.length;
+  const sem = cobrados.filter(f => !temIds.has(f.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   const c = ch => com.filter(x => x.sit.faixa === ch).length;
   const pct = ativos.length ? Math.round(com.length * 100 / ativos.length) : 0;
   const status = $(r.el.fStatus).value;
@@ -632,7 +641,8 @@ function painelDoTipo(r, tipoId) {
     <div class="sst-tp-tit">
       <h3>${esc(t.nome || '—')}</h3>
       <span>${r.id === 'treinamento'
-        ? `<b>${com.length}</b> de <b>${ativos.length}</b> funcionários ativos têm este treinamento (${pct}%)`
+        ? `<b>${com.length}</b> de <b>${ativos.length}</b> funcionários ativos têm este treinamento (${pct}%)${
+          dispensados ? ` · ${dispensados} com função que não exige` : ''}`
         : `<b>${com.length}</b> funcionário(s) ativo(s) com este exame lançado`}${
         reciclagens.length ? ` · conta junto: ${reciclagens.map(x => esc(x.nome)).join(', ')}` : ''}</span>
     </div>
@@ -648,10 +658,12 @@ function painelDoTipo(r, tipoId) {
     </div>
     ${vendoSem ? `<div class="sst-tp-falta">
       <h4>Ativos sem ${esc(t.nome || 'este treinamento')} (${sem.length})</h4>
+      ${dispensados ? `<p class="dica" style="margin:0 0 8px">Não entram aqui ${dispensados} pessoa(s) cuja função tem lista em Treinamentos por função e não pede este treinamento.</p>` : ''}
       ${sem.length ? `<table class="dc-planilha"><thead><tr>
         <th>Funcionário</th><th>Setor</th><th class="ce"></th></tr></thead><tbody>
         ${sem.map(f => `<tr>
-          <td><b>${esc(f.nome)}</b><br><span class="dc-sem">${esc(f.cargo || '—')}</span></td>
+          <td><b>${esc(f.nome)}</b><br><span class="dc-sem">${esc(f.cargo || '—')}${
+            funcaoExige(f, grupo) === null ? ' · função sem lista' : ' · a função exige'}</span></td>
           <td>${esc(f.setor || '—')}</td>
           <td class="ce"><button type="button" class="btn mini" data-lancar="${f.id}">Lançar</button></td>
         </tr>`).join('')}</tbody></table>`
@@ -913,8 +925,8 @@ function gerarFicha(r, funcionarioId) {
       conferencia: r.id === 'exame' ? conferenciaDo(x, f) : null,
     }));
 
-  // pendência é coisa de exame: treinamento não tem lista por função no app
-  const pend = r.id === 'exame' ? pendenciasDe(f, todos) : { lista: [], semLista: false };
+  // exame: lista do PCMSO; treinamento: Treinamentos por função (20/10/2026)
+  const pend = r.id === 'exame' ? pendenciasDe(f, todos) : pendenciasTrDe(f, todos);
 
   const html = documentoFichaSst({
     tipo: r.id,
@@ -961,7 +973,7 @@ function abrirEscolhaFicha(r) {
     ? 'Relatório de exames do funcionário' : 'Relatório de treinamentos do funcionário';
   $('fsDica').textContent = r.id === 'exame'
     ? 'Sai uma folha A4 com o exame mais recente de cada tipo, a situação de cada um e os exames que a função exige e nunca foram lançados.'
-    : 'Sai uma folha A4 com o treinamento mais recente de cada tipo, com carga horária, instrutor e a situação de cada um.';
+    : 'Sai uma folha A4 com o treinamento mais recente de cada tipo, com carga horária, instrutor e a situação de cada um, e os treinamentos que a função exige e nunca foram lançados.';
   $('dlgFichaSst').showModal();
 }
 
