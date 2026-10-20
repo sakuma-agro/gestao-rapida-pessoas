@@ -1571,3 +1571,8 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .mod-subs .aba-sub[aria-selected="true"] svg{color:var(--verde-esc)}
 @media (max-width:640px){ .mod-subs .aba-sub{font-size:12.5px;padding:6px 11px} }
 #navModulos.aberto > .aba.sem-fechar::after{content:none}
+
+/* Treinamentos da função nunca realizados (20/10/2026): paisagem, texto inteiro
+   (quebra linha em vez de cortar com reticências) e um fio separando pessoas. */
+.an-tab.tf-pend td{font-size:10pt;white-space:normal;overflow:visible;text-overflow:clip;padding:2mm 2.5mm}
+.an-tab.tf-pend tr.tf-nova td{border-top:.35mm solid #84BD00}

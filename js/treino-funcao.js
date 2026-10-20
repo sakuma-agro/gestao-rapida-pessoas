@@ -126,6 +126,7 @@ export async function abrirTreinoFuncao() {
     lista.map(f => `<option value="${esc(f)}">${esc(f)}${temListaTr(f) ? '' : ' · sem lista'}</option>`).join('');
   sel.value = lista.includes(antes) ? antes : (lista[0] || '');
   desenhar();
+  montarFiltro();
 }
 
 function desenhar() {
@@ -182,6 +183,7 @@ async function trocar(funcao, tipoId, ligar, caixa) {
     }
     desenhar();
     atualizarOpcao(funcao);
+    montarFiltro();
   } catch (e) {
     caixa.checked = !ligar;
     alert('Não deu para salvar: ' + (e.message || e));
@@ -295,30 +297,69 @@ export function documentoQuadroTr() {
     corpo, `${lista.length} função(ões)`, true);
 }
 
-/** Quem está devendo treinamento da função: uma linha por pessoa e treinamento. */
-export function documentoPendenciasTr() {
-  const ativos = estado.funcionarios.filter(f => f.situacao === 'ATIVO' && temListaTr(f.cargo))
+/** Todas as pendências dos ativos (função com lista): [{ f, t }], por função e nome. */
+export function pendenciasTodos(funcionarioId = '') {
+  const ativos = estado.funcionarios
+    .filter(f => f.situacao === 'ATIVO' && temListaTr(f.cargo) && (!funcionarioId || f.id === funcionarioId))
     .sort((a, b) => so(a.cargo).localeCompare(so(b.cargo), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
   const linhas = [];
   ativos.forEach(f => {
     const regs = REGS().filter(x => x.funcionario_id === f.id);
     pendenciasTrDe(f, regs).lista.forEach(t => linhas.push({ f, t }));
   });
-  const corpo = linhas.length ? `
-    <table class="an-tab sst-folha-tab">
-      <colgroup><col><col style="width:44mm"><col style="width:60mm"></colgroup>
-      <thead><tr><th>FUNCIONÁRIO</th><th>FUNÇÃO</th><th>TREINAMENTO NUNCA REALIZADO</th></tr></thead>
-      <tbody>${linhas.map(l => `<tr>
-        <td class="an-nome">${esc(l.f.nome)}</td>
-        <td>${esc(l.f.cargo || '—')}</td>
-        <td>${esc(l.t.nome)}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-    <div class="aso-nota">Só entram funções com lista montada. Treinamento feito e vencido aparece no painel de vencimentos, não aqui.</div>`
-    : '<p class="pn-nada">Ninguém devendo treinamento da função.</p>';
-  return folha('TREINAMENTOS DA FUNÇÃO NUNCA REALIZADOS', `Ativos · ${dataBr(hoje())}`,
-    corpo, `${linhas.length} pendência(s) · ${new Set(linhas.map(l => l.f.id)).size} pessoa(s)`);
+  return linhas;
 }
+
+/* Quem está devendo treinamento da função (20/10/2026: paisagem, a pedido
+   dele, para o nome do treinamento caber inteiro; filtro por funcionário).
+   O nome e a função saem só na primeira linha de cada pessoa em cada folha. */
+const POR_FOLHA_TF = 14;
+export function documentoPendenciasTr(funcionarioId = '') {
+  const linhas = pendenciasTodos(funcionarioId);
+  const pessoa = funcionarioId ? estado.funcionarios.find(f => f.id === funcionarioId) : null;
+  const subt = (pessoa ? `${pessoa.nome} · ` : 'Ativos · ') + dataBr(hoje());
+  const pe = `${linhas.length} pendência(s) · ${new Set(linhas.map(l => l.f.id)).size} pessoa(s)`;
+  if (!linhas.length) {
+    return folha('TREINAMENTOS DA FUNÇÃO NUNCA REALIZADOS', subt,
+      `<p class="pn-nada">${pessoa ? 'Nenhum treinamento da função pendente para esta pessoa.' : 'Ninguém devendo treinamento da função.'}</p>`,
+      pe, true);
+  }
+  const total = Math.ceil(linhas.length / POR_FOLHA_TF);
+  const folhas = [];
+  for (let p = 0; p < total; p++) {
+    const fatia = linhas.slice(p * POR_FOLHA_TF, (p + 1) * POR_FOLHA_TF);
+    const corpo = `
+    <table class="an-tab tf-pend">
+      <colgroup><col style="width:78mm"><col style="width:52mm"><col></colgroup>
+      <thead><tr><th>FUNCIONÁRIO</th><th>FUNÇÃO</th><th>TREINAMENTO NUNCA REALIZADO</th></tr></thead>
+      <tbody>${fatia.map((l, i) => {
+        const primeira = i === 0 || fatia[i - 1].f.id !== l.f.id;
+        return `<tr${primeira && i ? ' class="tf-nova"' : ''}>
+          <td class="an-nome">${primeira ? esc(l.f.nome) : ''}</td>
+          <td>${primeira ? esc(l.f.cargo || '—') : ''}</td>
+          <td>${esc(l.t.nome)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+    ${p === total - 1 ? '<div class="aso-nota">Só entram funções com lista montada. Treinamento feito e vencido aparece no painel de vencimentos, não aqui.</div>' : ''}`;
+    folhas.push(folha('TREINAMENTOS DA FUNÇÃO NUNCA REALIZADOS', subt, corpo,
+      pe + (total > 1 ? ` · folha ${p + 1} de ${total}` : ''), true));
+  }
+  return folhas.join('');
+}
+
+/* O filtro de funcionário do relatório: só quem tem alguma pendência. */
+function montarFiltro() {
+  const sel = $('tfFiltroFunc');
+  if (!sel) return;
+  const antes = sel.value;
+  const gente = [...new Map(pendenciasTodos().map(l => [l.f.id, l.f])).values()]
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  sel.innerHTML = `<option value="">Todos (${gente.length})</option>` +
+    gente.map(f => `<option value="${f.id}">${esc(f.nome)} — ${esc(f.cargo || '')}</option>`).join('');
+  sel.value = gente.some(f => f.id === antes) ? antes : '';
+}
+let saidaAtual = '';
 
 /* =============== ligações =============== */
 export function ligarTreinoFuncao() {
@@ -327,12 +368,15 @@ export function ligarTreinoFuncao() {
   $('bCopiarTf').addEventListener('click', copiarDe);
   $('formCopiarTf').addEventListener('submit', confirmarCopia);
   $('bCancelarCopiaTf').addEventListener('click', () => $('dlgCopiarTf').close());
-  const mostrar = html => {
+  const mostrar = (html, qual) => {
+    saidaAtual = qual;
     $('tfSaida').innerHTML = html;
     $('tfSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  $('bQuadroTf').addEventListener('click', () => mostrar(documentoQuadroTr()));
-  $('bPendTf').addEventListener('click', () => mostrar(documentoPendenciasTr()));
+  $('bQuadroTf').addEventListener('click', () => mostrar(documentoQuadroTr(), 'quadro'));
+  $('bPendTf').addEventListener('click', () => { montarFiltro(); mostrar(documentoPendenciasTr($('tfFiltroFunc').value), 'pend'); });
+  $('tfFiltroFunc').addEventListener('change', () =>
+    mostrar(documentoPendenciasTr($('tfFiltroFunc').value), 'pend'));
   $('bImprimirTf').addEventListener('click', () => {
     if (!so($('tfSaida').innerHTML)) return;
     window.print();

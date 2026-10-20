@@ -11,7 +11,7 @@ import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens, dadosAso, definirAso,
   conferenciaDo, pendenciasDe } from './aso.js';
 import { definirTiposTr, carregarTreinoFuncao, dadosTreinoFuncao, definirTreinoFuncao,
-  limparTreinoFuncao, funcaoExige, pendenciasTrDe } from './treino-funcao.js';
+  limparTreinoFuncao, funcaoExige, pendenciasTrDe, pendenciasTodos } from './treino-funcao.js';
 import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
 import { abrirModulo, podeTela } from './acesso.js';
 
@@ -457,6 +457,10 @@ function desenharPainel(r) {
   $(r.el.pCards).querySelectorAll('[data-faixa]').forEach(b =>
     b.addEventListener('click', () => irParaVencimentos(r, b.dataset.faixa)));
 
+  /* ---- Nunca feitos (20/10/2026, pedido dele): treinamento que a função exige
+     (Treinamentos por função) e a pessoa nunca fez. Abre a lista aqui mesmo. ---- */
+  if (r.id === 'treinamento') desenharNuncaFeitos(r);
+
   /* ---- a lista que precisa de ação: vencido + 90 dias ---- */
   const urgentes = linhas.filter(x => ['vencido', 'ate30', 'ate60', 'ate90'].includes(x.sit.faixa));
   $(r.el.pAlerta).innerHTML = urgentes.length ? `
@@ -516,6 +520,47 @@ function desenharPainel(r) {
   } else aviso.hidden = true;
 
   $(r.el.pSaida).innerHTML = folhaPainel(r, urgentes, faltando);
+}
+
+function desenharNuncaFeitos(r) {
+  const cards = $(r.el.pCards);
+  const caixa = $('trPnNunca');
+  if (!cards || !caixa) return;
+  const linhas = pendenciasTodos();
+  const pessoas = new Set(linhas.map(l => l.f.id)).size;
+  const aberto = caixa.dataset.aberto === '1';
+  cards.insertAdjacentHTML('beforeend', `
+    <button type="button" class="pv-card pv-falta${linhas.length ? '' : ' pv-zero'}" data-nunca aria-pressed="${aberto}">
+      <span>Nunca feitos</span><strong>${linhas.length}</strong>
+      <small>${linhas.length ? `${pessoas} pessoa(s) · exigidos pela função` : 'nada pendente da função'}</small>
+    </button>`);
+  cards.querySelector('[data-nunca]').addEventListener('click', () => {
+    caixa.dataset.aberto = caixa.dataset.aberto === '1' ? '' : '1';
+    desenharPainel(r);
+  });
+  if (!aberto) { caixa.hidden = true; caixa.innerHTML = ''; return; }
+  caixa.hidden = false;
+  caixa.innerHTML = `<div class="qp-bloco">
+    <h3>Nunca feitos (${linhas.length})</h3>
+    <p class="dica" style="margin:0 0 8px">Treinamentos que a função exige e a pessoa nunca fez — nem o curso, nem a
+      reciclagem dele. Só entram funções com lista em Treinamentos por função.</p>
+    ${linhas.length ? `<table class="dc-planilha"><thead><tr>
+      <th>Funcionário</th><th>Função</th><th>Treinamento</th><th class="ce"></th></tr></thead><tbody>
+      ${linhas.map(l => `<tr>
+        <td><b>${esc(l.f.nome)}</b></td>
+        <td>${esc(l.f.cargo || '—')}</td>
+        <td>${esc(l.t.nome)}</td>
+        <td class="ce"><button type="button" class="btn mini" data-lancar="${l.f.id}" data-tipo="${l.t.id}">Lançar</button></td>
+      </tr>`).join('')}</tbody></table>`
+      : '<div class="vazio">Ninguém devendo treinamento da função.</div>'}
+  </div>`;
+  caixa.querySelectorAll('[data-lancar]').forEach(b => b.addEventListener('click', () => {
+    abrirReg(r, null);
+    $(r.el.func).value = b.dataset.lancar;
+    $(r.el.tipo).value = b.dataset.tipo;
+    $(r.el.func).dispatchEvent(new Event('change'));
+    $(r.el.tipo).dispatchEvent(new Event('change'));
+  }));
 }
 
 /** Clicar no cartão leva para a lista já filtrada — o painel aponta, a outra tela resolve. */

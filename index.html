@@ -821,6 +821,7 @@ addEventListener('beforeinstallprompt', function (ev) {
           </div>
         </div>
         <div class="pv-cards" id="trPnCards" style="margin-top:14px"></div>
+        <div id="trPnNunca" hidden></div>
         <div class="aviso info" id="trPnSemNada" style="margin-top:12px" hidden></div>
 
         <div class="qp-bloco">
@@ -968,6 +969,9 @@ addEventListener('beforeinstallprompt', function (ev) {
 
         <div class="grade" style="margin-top:14px">
           <label class="campo">Função <select id="tfFuncao"></select></label>
+          <label class="campo">Funcionário (relatório "Quem está devendo")
+            <select id="tfFiltroFunc"><option value="">Todos</option></select>
+          </label>
         </div>
         <div class="barra" style="margin:8px 0 0">
           <button class="btn" type="button" id="bCopiarTf" hidden>Copiar de outra função</button>
