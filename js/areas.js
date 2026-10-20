@@ -55,7 +55,7 @@ export const AREAS = [
   /* Custo Base (20/10/2026, pedido dele): o rateio mensal do custo
      administrativo por cultura/plantio, que era a planilha "Rateio -
      Direcionador Mensal ADM". Mora em custobase/, numa moldura. */
-  { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v1.svg',
+  { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v2.svg',
     desc: 'Rateio mensal culturas · Plantios · Culturas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela

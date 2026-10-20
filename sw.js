@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v258';
+const VERSAO = 'gr-v259';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -58,7 +58,7 @@ const ARQUIVOS = [
   './estoque/js/contagem.js', './estoque/js/cadastros.js', './estoque/js/compra.js', './estoque/js/saldo.js', './estoque/js/qc.js', './estoque/js/qc-importar.js',
   './estoque/img/sakuma-logo.png', './estoque/img/lop-marca.png',
   // Custo Base (20/10/2026): rateio mensal por cultura, que era a planilha do ADM.
-  './icons/area-custobase.v1.svg',
+  './icons/area-custobase.v2.svg',
   './custobase/', './custobase/index.html', './custobase/css/app.css', './custobase/css/custobase.css',
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
   './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js',
