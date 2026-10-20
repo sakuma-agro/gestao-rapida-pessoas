@@ -62,7 +62,7 @@ export const AREAS = [
   /* Colheita e Produção (20/10/2026, pedido dele): as planilhas "Controle
      Colheita" de cenoura, batata, café, milho, trigo e abacate numa área só.
      Mora em colheita/, numa moldura. */
-  { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v1.svg',
+  { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v2.svg',
     desc: 'Painel da safra · Cargas · Conciliação balança/cooperativa · Cadastros · Financeiro' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
