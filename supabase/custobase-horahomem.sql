@@ -95,3 +95,13 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.cb_horas_mes(text) from public, anon;
 grant execute on function public.cb_horas_mes(text) to authenticated;
+
+-- Composição editável dos encargos (20/10/2026): encargo = 1 + Σ % dos itens.
+alter table public.cb_hh_parametros add column if not exists componentes jsonb;
+update public.cb_hh_parametros set componentes = '{
+  "fixo": [
+    {"nome":"Férias","pct":11.11},{"nome":"13º salário","pct":8.33},{"nome":"FGTS","pct":8},
+    {"nome":"Patronal","pct":0.2},{"nome":"Multa rescisória","pct":3.2},{"nome":"Aviso demissão","pct":8.33}],
+  "temporario": [
+    {"nome":"Encargos do temporário (total da planilha)","pct":57.05}]
+}'::jsonb where id = 'geral' and componentes is null;

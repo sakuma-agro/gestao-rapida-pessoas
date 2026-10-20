@@ -180,3 +180,8 @@ body.embutido .abas{padding-top:4px}
 :root[data-theme="light"] .lop-ass.in-lop-escuro{display:flex}
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]) .lop-ass.in-lop-escuro{display:none} }
 :root[data-theme="dark"] .lop-ass.in-lop-escuro{display:none}
+
+/* parâmetros: composição dos encargos (20/10/2026) */
+.hh-comps{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.hh-comp .dc-mini{width:100%}
+.hh-comp .hh-num{width:100px}

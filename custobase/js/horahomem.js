@@ -376,32 +376,74 @@ function desenharHistorico() {
 }
 
 /* ---------------- índices ---------------- */
+/* Parâmetros (20/10/2026, pedido dele: "férias, FGTS, patronal etc., quero
+   poder alterar"). O encargo é montado pelos itens: encargo = 1 + Σ %.
+   Dá para mudar o %, renomear, acrescentar e tirar item, no fixo e no
+   temporário. A composição fica em cb_hh_parametros.componentes. */
+const COMP_PADRAO = {
+  fixo: [{ nome: 'Férias', pct: 11.11 }, { nome: '13º salário', pct: 8.33 }, { nome: 'FGTS', pct: 8 },
+    { nome: 'Patronal', pct: 0.2 }, { nome: 'Multa rescisória', pct: 3.2 }, { nome: 'Aviso demissão', pct: 8.33 }],
+  temporario: [{ nome: 'Encargos do temporário (total da planilha)', pct: 57.05 }],
+};
+let rascunhoComp = null;
+const somaPct = l => l.reduce((s, c) => s + (Number(c.pct) || 0), 0);
+const encargoDe = l => Math.round((1 + somaPct(l) / 100) * 10000) / 10000;
+
 function desenharIndices() {
   const alvo = $('hhIndCorpo'); if (!alvo) return;
   if (!pronto() || carregando()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const p = parametros();
+  if (!rascunhoComp) rascunhoComp = JSON.parse(JSON.stringify(p.componentes || COMP_PADRAO));
   const NOMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const tabela = (tipo, titulo) => {
+    const l = rascunhoComp[tipo] || [];
+    return `<div class="hh-comp">
+      <h3 class="cb-secao">${titulo} <small>encargo = 1 + soma dos itens</small></h3>
+      <table class="dc-planilha cb-tab"><thead><tr><th>Item</th><th class="dir" style="width:130px">% sobre o salário</th><th style="width:44px"></th></tr></thead>
+      <tbody>${l.map((c, k) => `<tr>
+        <td><input class="dc-mini" data-nome="${tipo}:${k}" value="${esc(c.nome)}"></td>
+        <td class="dir"><input class="dc-mini hh-num" data-pct="${tipo}:${k}" inputmode="decimal" value="${esc(num(c.pct, 2))}"></td>
+        <td class="ce"><button class="btn mini perigo" type="button" data-tirar="${tipo}:${k}" title="tirar item">×</button></td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr class="dc-total"><td>Total dos encargos</td><td class="dir">${esc(num(somaPct(l), 2))}%</td><td></td></tr>
+        <tr class="dc-total"><td><b>Encargo ${tipo === 'fixo' ? 'fixo' : 'temporário'}</b> (salário × este número)</td><td class="dir"><b class="hh-media">${esc(num(encargoDe(l), 4))}</b></td><td></td></tr></tfoot></table>
+      <div class="barra" style="margin-top:8px"><button class="btn mini" type="button" data-mais="${tipo}">+ Item</button></div>
+    </div>`;
+  };
   alvo.innerHTML = `<p class="cb-param-aviso"><span class="cb-cadeado">${CADEADO} Cadeado</span> Estes parâmetros valem para os meses <b>abertos</b> e os próximos. Mês <b>fechado</b> guardou o encargo e a hora padrão do dia do fechamento e não muda.</p>
+  <div class="hh-comps">${tabela('fixo', 'Encargos trabalhistas · Fixo')}${tabela('temporario', 'Encargos trabalhistas · Temporário')}</div>
   <form id="hhIndForm" autocomplete="off">
-    <div class="grade">
-      <label class="campo">Encargo fixo <input type="text" name="fixo" inputmode="decimal" value="${esc(num(p.encargo_fixo, 4))}"></label>
-      <label class="campo">Encargo temporário <input type="text" name="temp" inputmode="decimal" value="${esc(num(p.encargo_temporario, 4))}"></label>
-    </div>
-    <p class="dc-sem">Fixo 1,3917 = salário + férias 11,11% + 13º 8,33% + FGTS 8% + patronal 0,2% + multa rescisória 3,2% + aviso 8,33% (como na planilha).</p>
     <h3 class="cb-secao">Horas padrão do mês <small>usadas quando a pessoa não tem horas no Pessoas</small></h3>
     <div class="grade hh-horas">${NOMES.map((n, i) => { const k = String(i + 1).padStart(2, '0'); return `<label class="campo">${n} <input type="text" name="h${k}" inputmode="numeric" value="${esc((p.horas_padrao || {})[k] ?? '')}"></label>`; }).join('')}</div>
-    <div class="barra fim"><button class="btn principal" type="submit">Salvar índices</button></div>
+    <div class="barra entre">
+      <span class="dc-sem">Hoje: fixo ${esc(num(p.encargo_fixo, 4))} · temporário ${esc(num(p.encargo_temporario, 4))}. Nada muda até salvar.</span>
+      <div class="barra" style="margin:0"><button class="btn" type="button" id="hhIndDesfazer">Desfazer</button>
+      <button class="btn principal" type="submit">Salvar parâmetros</button></div>
+    </div>
   </form>`;
+  const pos = a => { const [t, k] = a.split(':'); return [t, Number(k)]; };
+  alvo.querySelectorAll('[data-nome]').forEach(inp => inp.addEventListener('input', () => { const [t, k] = pos(inp.dataset.nome); rascunhoComp[t][k].nome = inp.value; }));
+  alvo.querySelectorAll('[data-pct]').forEach(inp => inp.addEventListener('change', () => {
+    const [t, k] = pos(inp.dataset.pct); const v = lerNumero(inp.value);
+    if (v === null || Number.isNaN(v)) { aviso('Use só números (ex.: 11,11).', true); return desenharIndices(); }
+    rascunhoComp[t][k].pct = v; desenharIndices();
+  }));
+  alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', () => { const [t, k] = pos(b.dataset.tirar); rascunhoComp[t].splice(k, 1); desenharIndices(); }));
+  alvo.querySelectorAll('[data-mais]').forEach(b => b.addEventListener('click', () => { rascunhoComp[b.dataset.mais].push({ nome: 'Novo item', pct: 0 }); desenharIndices(); }));
+  $('hhIndDesfazer').addEventListener('click', () => { rascunhoComp = null; desenharIndices(); });
   $('hhIndForm').addEventListener('submit', async e => {
     e.preventDefault();
     const f = new FormData(e.target);
-    const fixo = lerNumero(f.get('fixo')), temp = lerNumero(f.get('temp'));
-    if (!fixo || !temp || Number.isNaN(fixo) || Number.isNaN(temp)) { aviso('Encargos: números maiores que zero (ex.: 1,3917).', true); return; }
+    const limpa = l => l.map(c => ({ nome: String(c.nome || '').trim() || 'Item', pct: Number(c.pct) || 0 }));
+    const comp = { fixo: limpa(rascunhoComp.fixo || []), temporario: limpa(rascunhoComp.temporario || []) };
     const horas = {};
     for (let i = 1; i <= 12; i++) { const k = String(i).padStart(2, '0'); const v = lerNumero(f.get('h' + k)); if (v !== null && !Number.isNaN(v)) horas[k] = v; }
     const atual = todos('cb_hh_parametros').find(x => x.id === 'geral') || { id: 'geral' };
-    await gravar('cb_hh_parametros', { ...atual, id: 'geral', encargo_fixo: fixo, encargo_temporario: temp, horas_padrao: horas });
-    aviso('Parâmetros salvos. Valem para os meses abertos; os fechados (cadeado) não mudam.');
+    await gravar('cb_hh_parametros', { ...atual, id: 'geral', componentes: comp,
+      encargo_fixo: encargoDe(comp.fixo), encargo_temporario: encargoDe(comp.temporario), horas_padrao: horas });
+    rascunhoComp = null;
+    aviso(`Parâmetros salvos: fixo ${num(encargoDe(comp.fixo), 4)} · temporário ${num(encargoDe(comp.temporario), 4)}. Valem para os meses abertos; os fechados (cadeado) não mudam.`);
+    desenharIndices();
   });
 }
 
