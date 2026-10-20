@@ -16,6 +16,8 @@
 //    valor do plano. `valor` continua sendo o base (o Empréstimo usa no teto);
 //    `periculosidade` é o adicional em R$ (30% do base por padrão, editável).
 //    Posição na tabela, próxima faixa, folha e projeção usam o total.
+//    Gratificação de função (gerentes, 40% do base, coluna `gratificacao`)
+//    entra na soma do mesmo jeito: total = base + periculosidade + gratificação.
 //    Insalubridade (quem pulveriza) é só anotação — tipo fixa/variável e valor —
 //    e não entra em conta nenhuma.
 //  · A ficha mostra a remuneração inteira: salário, adicionais, ticket
@@ -86,17 +88,33 @@ const MOTIVOS = {
 export const PCT_PERIC = 0.30;
 const r2 = v => Math.round(v * 100) / 100;
 export const pericDe = s => s ? Number(s.periculosidade) || 0 : 0;
-export const totalDe = s => s ? r2(Number(s.valor) + pericDe(s)) : null;
+/* Gratificação de função (ex.: gerentes): 40% do salário base, soma com o
+   base como a periculosidade (20/10/2026). */
+export const PCT_GRAT = 0.40;
+export const gratDe = s => s ? Number(s.gratificacao) || 0 : 0;
+export const totalDe = s => s ? r2(Number(s.valor) + pericDe(s) + gratDe(s)) : null;
+/** "base X + peric. Y + grat. Z" — só as partes que a pessoa tem. */
+const quebra = (base, peric, grat, fmt = brl, longo = false) => [
+  `base ${fmt(base)}`,
+  peric > 0 ? `${longo ? 'periculosidade' : 'peric.'} ${fmt(peric)}` : '',
+  grat > 0 ? `${longo ? 'gratificação de função' : 'grat.'} ${fmt(grat)}` : '',
+].filter(Boolean).join(' + ');
+const temAdicional = x => x.peric > 0 || x.grat > 0;
+/** Cargo de gerência (sugere a gratificação de função ao lançar o salário). */
+const ehGerencia = c => /gerente/i.test(c?.nome || '');
 /* Insalubridade (ex.: quem pulveriza): só anotação, com tipo e valor. NÃO
    entra no total — fixa = todo mês; variável = só nos meses em que pulveriza. */
 export const INSAL = { fixa: 'fixa (todo mês)', variavel: 'variável (só quando pulveriza)' };
 export const insalDe = s => s?.insalubridade_tipo ? { tipo: s.insalubridade_tipo, valor: Number(s.insalubridade) || 0 } : null;
 const insalTxt = (s, fmt = brl) => { const i = insalDe(s); return i ? `${INSAL[i.tipo] || i.tipo}${i.valor ? ` · ${fmt(i.valor)}` : ''}` : ''; };
-/** Divide um total do plano em base + periculosidade (base = total ÷ 1,30). */
-export const dividir = (total, comPeric) => {
-  if (!comPeric) return { base: r2(total), peric: 0 };
-  const base = r2(total / (1 + PCT_PERIC));
-  return { base, peric: r2(total - base) };
+/** Divide um total do plano em base + adicionais: base = total ÷ (1 + 30% + 40%),
+    conforme o que a pessoa recebe. O centavo de arredondamento fica no último adicional. */
+export const dividir = (total, comPeric, comGrat = false) => {
+  const base = r2(total / (1 + (comPeric ? PCT_PERIC : 0) + (comGrat ? PCT_GRAT : 0)));
+  if (comPeric && comGrat) { const peric = r2(base * PCT_PERIC); return { base, peric, grat: r2(total - base - peric) }; }
+  if (comPeric) return { base, peric: r2(total - base), grat: 0 };
+  if (comGrat) return { base, peric: 0, grat: r2(total - base) };
+  return { base: r2(total), peric: 0, grat: 0 };
 };
 
 const S = { cargos: [], carregado: false, erro: '', busca: '', filtro: '', passo: 12 };
@@ -173,10 +191,10 @@ export function situacao(f) {
   const v = jd.vinculoDe(f.id), fn = jd.funcaoDe(v);
   const s = vigenteEm(f.id);
   const cargo = cargoPorId(s?.rh_cargo_id) || cargoPorId(fn?.rh_cargo_id);
-  /* sal = TOTAL (base + periculosidade): é o que se compara com o plano. */
+  /* sal = TOTAL (base + periculosidade + gratificação): é o que se compara com o plano. */
   const sal = totalDe(s);
   return {
-    f, s, sal, base: s ? Number(s.valor) : null, peric: pericDe(s), insal: insalDe(s),
+    f, s, sal, base: s ? Number(s.valor) : null, peric: pericDe(s), grat: gratDe(s), insal: insalDe(s),
     v, ticket: v?.ticket_valor != null ? Number(v.ticket_valor) : null, ticketObs: v?.ticket_obs || '', contrato: v?.tipo_contrato || 'fixo',
     cargo, faixa: s?.faixa || v?.faixa || null, faixaCadastro: v?.faixa || null,
     pos: posicao(cargo, sal), prox: proxima(cargo, sal), futuros: futurosDe(f.id),
@@ -271,7 +289,8 @@ function desenharSalarios() {
   const com = todos.filter(x => x.sal != null);
   const folha = com.reduce((t, x) => t + x.sal, 0);
   const folhaPeric = com.reduce((t, x) => t + x.peric, 0);
-  const comPeric = com.filter(x => x.peric > 0).length;
+  const folhaGrat = com.reduce((t, x) => t + x.grat, 0);
+  const comAdic = com.filter(temAdicional).length;
   const abaixo = todos.filter(x => x.pos.abaixo).length;
   const sem = todos.length - com.length;
 
@@ -285,7 +304,7 @@ function desenharSalarios() {
     </div>
     <div class="rs-kpis">
       <div><span>Pessoas ativas</span><strong>${todos.length}</strong><small>${com.length} com salário</small></div>
-      <div><span>Folha mensal (salários)</span><strong>${V(folha)}</strong><small>${comPeric ? `base ${V(folha - folhaPeric)} + periculosidade ${V(folhaPeric)} (${comPeric})` : 'base + periculosidade, sem encargos'}</small></div>
+      <div><span>Folha mensal (salários)</span><strong>${V(folha)}</strong><small>${comAdic ? quebra(folha - folhaPeric - folhaGrat, folhaPeric, folhaGrat, V) : 'base + adicionais, sem encargos'}</small></div>
       <div class="${abaixo ? 'rs-alerta' : ''}"><span>Abaixo da faixa A</span><strong>${abaixo}</strong><small>ganham menos que o início do cargo</small></div>
       <div class="${sem ? 'rs-alerta' : ''}"><span>Sem salário no app</span><strong>${sem}</strong><small>clique em Abrir para informar</small></div>
     </div>
@@ -300,14 +319,14 @@ function desenharSalarios() {
         <td><b>${esc(x.f.nome)}</b><br><span class="dc-sem">${esc(x.f.fazenda || '')}</span></td>
         <td>${x.cargo ? esc(x.cargo.nome) : `<span class="dc-sem">${esc(x.f.cargo || '—')}</span><br><span class="tag neutra">fora do plano</span>`}</td>
         <td class="ce">${x.faixa ? `<b>${x.faixa}</b>` : '—'}${x.faixaCadastro && x.s?.faixa && x.faixaCadastro !== x.s.faixa ? `<br><span class="tag alerta" title="O cadastro diz faixa ${x.faixaCadastro}">cadastro: ${x.faixaCadastro}</span>` : ''}</td>
-        <td class="ce">${x.sal != null ? `<b>${V(x.sal)}</b>${x.peric > 0 ? `<br><span class="dc-sem" title="Salário base + adicional de periculosidade">base ${V(x.base)} + peric. ${V(x.peric)}</span>` : ''}<br><span class="dc-sem">desde ${br(x.s.desde)}</span>${x.insal ? `<br><span class="tag neutra" title="Só anotação — não entra na soma">insalubridade ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ': ' + V(x.insal.valor) : ''}</span>` : ''}` : '<span class="tag perigo">sem salário</span>'}
+        <td class="ce">${x.sal != null ? `<b>${V(x.sal)}</b>${temAdicional(x) ? `<br><span class="dc-sem" title="Salário base + adicionais que somam no plano">${quebra(x.base, x.peric, x.grat, V)}</span>` : ''}<br><span class="dc-sem">desde ${br(x.s.desde)}</span>${x.insal ? `<br><span class="tag neutra" title="Só anotação — não entra na soma">insalubridade ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ': ' + V(x.insal.valor) : ''}</span>` : ''}` : '<span class="tag perigo">sem salário</span>'}
           ${x.futuros.length ? `<br><span class="tag ativo" title="Alteração já lançada com data futura">${br(x.futuros[0].desde)}: ${V(totalDe(x.futuros[0]))}</span>` : ''}</td>
         <td><span class="tag ${x.pos.cls}">${esc(x.pos.txt)}</span></td>
         <td>${proxTxt(x)}</td>
         <td class="ce"><button class="btn mini" type="button" data-rs-abrir="${x.f.id}">Abrir</button></td></tr>`).join('')
         || '<tr><td colspan="7" class="vazio">Ninguém neste filtro.</td></tr>'}
     </tbody></table></div>
-    <p class="dica" style="margin-top:10px">Salário atual = salário base + adicional de periculosidade (quando a pessoa recebe); é essa soma que se compara com o Plano de cargos.
+    <p class="dica" style="margin-top:10px">Salário atual = salário base + periculosidade + gratificação de função (quando a pessoa recebe); é essa soma que se compara com o Plano de cargos.
       A insalubridade (quem pulveriza) fica só anotada, fixa ou variável, e não entra na soma. Sem horas extras nem encargos. O Empréstimo usa só o salário base no teto de 40%.</p>
   </div>`;
 
@@ -332,25 +351,26 @@ function relSalarios(lista) {
   const total = com.reduce((t, x) => t + x.sal, 0);
   const totalBase = com.reduce((t, x) => t + x.base, 0);
   const totalPeric = com.reduce((t, x) => t + x.peric, 0);
+  const totalGrat = com.reduce((t, x) => t + x.grat, 0);
   return documento({
     titulo: 'Salários e enquadramento', subtitulo: 'Cargo, faixa e próximo passo de cada funcionário ativo',
     canto: `${lista.length} pessoa(s)`, paisagem: true,
     corpo: `<table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th>Cargo</th><th>Faixa</th>
-      <th class="rel-num">Base</th><th class="rel-num">Peric.</th><th class="rel-num">Salário</th><th>Insalubridade (obs.)</th><th>Desde</th><th>Posição</th><th>Próximo passo</th><th class="rel-num">Valor</th><th class="rel-num">%</th></tr></thead>
+      <th class="rel-num">Base</th><th class="rel-num">Peric.</th><th class="rel-num">Grat. função</th><th class="rel-num">Salário</th><th>Insalubridade (obs.)</th><th>Desde</th><th>Posição</th><th>Próximo passo</th><th class="rel-num">Valor</th><th class="rel-num">%</th></tr></thead>
       <tbody>${lista.map(x => `<tr><td>${esc(x.f.nome)}</td><td>${esc(x.f.fazenda || '—')}</td><td>${esc(x.cargo?.nome || x.f.cargo || '—')}</td>
-        <td>${x.faixa || '—'}</td><td class="rel-num">${x.sal != null ? brl(x.base) : '—'}</td><td class="rel-num">${x.peric > 0 ? brl(x.peric) : '—'}</td>
+        <td>${x.faixa || '—'}</td><td class="rel-num">${x.sal != null ? brl(x.base) : '—'}</td><td class="rel-num">${x.peric > 0 ? brl(x.peric) : '—'}</td><td class="rel-num">${x.grat > 0 ? brl(x.grat) : '—'}</td>
         <td class="rel-num"><b>${x.sal != null ? brl(x.sal) : '—'}</b></td><td>${esc(insalTxt(x.s)) || '—'}</td><td>${x.s ? br(x.s.desde) : '—'}</td>
         <td class="${x.pos.abaixo || x.sal == null ? 'rel-pend' : x.pos.letra ? 'rel-ok' : ''}">${esc(x.pos.txt)}</td>
         <td>${x.prox?.topo ? 'topo do cargo' : x.prox ? `${x.prox.vertical ? esc(x.prox.cargo.nome) + ' · ' : ''}faixa ${x.prox.letra}` : '—'}</td>
         <td class="rel-num">${x.prox?.valor ? brl(x.prox.valor) : '—'}</td><td class="rel-num">${x.prox?.pct != null ? pctTxt(x.prox.pct) : '—'}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="4">Folha mensal · ${com.length} com salário</td><td class="rel-num">${brl(totalBase)}</td><td class="rel-num">${totalPeric ? brl(totalPeric) : '—'}</td><td class="rel-num">${brl(total)}</td><td colspan="6"></td></tr></tfoot></table>
-      <p class="rel-nota">Régua: Plano de cargos do app (faixas A–E). Salário = base + adicional de periculosidade (30% do base, quando há); é a soma que se compara com a tabela. Insalubridade é só anotação (fixa ou variável) e não entra na soma. Sem horas extras nem encargos.</p>`,
+      <tfoot><tr><td colspan="4">Folha mensal · ${com.length} com salário</td><td class="rel-num">${brl(totalBase)}</td><td class="rel-num">${totalPeric ? brl(totalPeric) : '—'}</td><td class="rel-num">${totalGrat ? brl(totalGrat) : '—'}</td><td class="rel-num">${brl(total)}</td><td colspan="6"></td></tr></tfoot></table>
+      <p class="rel-nota">Régua: Plano de cargos do app (faixas A–E). Salário = base + periculosidade (30% do base) + gratificação de função (40% do base), quando há; é a soma que se compara com a tabela. Insalubridade é só anotação (fixa ou variável) e não entra na soma. Sem horas extras nem encargos.</p>`,
   });
 }
 function csvSalarios(lista) {
   baixarCsv(`Salarios_${hoje()}.csv`, [
-    ['Funcionario', 'Fazenda', 'Cargo', 'Faixa', 'Salario base', 'Periculosidade', 'Salario atual (total)', 'Insalubridade (tipo)', 'Insalubridade (valor, obs.)', 'Desde', 'Posicao na tabela', 'Proximo cargo', 'Proxima faixa', 'Valor', '% aumento'],
-    ...lista.map(x => [x.f.nome, x.f.fazenda || '', x.cargo?.nome || x.f.cargo || '', x.faixa || '', num2(x.base), x.peric > 0 ? num2(x.peric) : '', num2(x.sal), x.insal ? INSAL[x.insal.tipo] : '', x.insal?.valor ? num2(x.insal.valor) : '', x.s ? br(x.s.desde) : '',
+    ['Funcionario', 'Fazenda', 'Cargo', 'Faixa', 'Salario base', 'Periculosidade', 'Gratificacao de funcao', 'Salario atual (total)', 'Insalubridade (tipo)', 'Insalubridade (valor, obs.)', 'Desde', 'Posicao na tabela', 'Proximo cargo', 'Proxima faixa', 'Valor', '% aumento'],
+    ...lista.map(x => [x.f.nome, x.f.fazenda || '', x.cargo?.nome || x.f.cargo || '', x.faixa || '', num2(x.base), x.peric > 0 ? num2(x.peric) : '', x.grat > 0 ? num2(x.grat) : '', num2(x.sal), x.insal ? INSAL[x.insal.tipo] : '', x.insal?.valor ? num2(x.insal.valor) : '', x.s ? br(x.s.desde) : '',
       x.pos.txt, x.prox?.cargo?.nome || '', x.prox?.letra || (x.prox?.topo ? 'topo' : ''), num2(x.prox?.valor),
       x.prox?.pct != null ? (x.prox.pct * 100).toFixed(1).replace('.', ',') : '']),
   ]);
@@ -396,11 +416,12 @@ function abrirFicha(fid) {
 
   dialogo(`<h3>${esc(f.nome)}</h3>
     <p class="dica" style="margin-top:-8px">${esc(x.cargo?.nome || f.cargo || 'sem cargo')}${x.faixa ? ` · faixa ${x.faixa}` : ''} ·
-      ${x.sal != null ? `${V(x.sal)}${x.peric > 0 ? ` (base ${V(x.base)} + periculosidade ${V(x.peric)})` : ''} desde ${br(x.s.desde)}` : 'sem salário no app'} · <span class="tag ${x.pos.cls}">${esc(x.pos.txt)}</span>${x.insal ? `<br><span class="dc-sem">Insalubridade (só anotação): ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ' · ' + V(x.insal.valor) : ''}</span>` : ''}</p>
+      ${x.sal != null ? `${V(x.sal)}${temAdicional(x) ? ` (${quebra(x.base, x.peric, x.grat, V, true)})` : ''} desde ${br(x.s.desde)}` : 'sem salário no app'} · <span class="tag ${x.pos.cls}">${esc(x.pos.txt)}</span>${x.insal ? `<br><span class="dc-sem">Insalubridade (só anotação): ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ' · ' + V(x.insal.valor) : ''}</span>` : ''}</p>
     <div class="rs-kpis rs-remun" style="margin-top:4px">
       <div><span>Salário base</span><strong>${x.sal != null ? V(x.base) : '—'}</strong><small>${x.s ? 'desde ' + br(x.s.desde) : 'sem salário'}</small></div>
       <div><span>Periculosidade</span><strong>${x.peric > 0 ? V(x.peric) : '—'}</strong><small>${x.peric > 0 ? '30% do base' : 'não recebe'}</small></div>
-      <div><span>Salário do plano</span><strong>${x.sal != null ? V(x.sal) : '—'}</strong><small>base + periculosidade</small></div>
+      <div><span>Gratificação de função</span><strong>${x.grat > 0 ? V(x.grat) : '—'}</strong><small>${x.grat > 0 ? '40% do base' : 'não recebe'}</small></div>
+      <div><span>Salário do plano</span><strong>${x.sal != null ? V(x.sal) : '—'}</strong><small>base + adicionais</small></div>
       <div><span>Insalubridade</span><strong>${x.insal?.valor ? V(x.insal.valor) : x.insal ? 'sim' : '—'}</strong><small>${x.insal ? esc(INSAL[x.insal.tipo]) + ' · só anotação' : 'não recebe'}</small></div>
       <div><span>Ticket alimentação</span><strong>${x.ticket != null ? V(x.ticket) : '—'}</strong><small>${x.ticket != null ? 'por mês' : 'não recebe'}${x.ticketObs ? ' · ' + esc(x.ticketObs) : ''} <button class="btn mini" type="button" id="rsTicket" style="margin-left:4px">Editar</button></small></div>
       <div><span>Tipo de contrato</span><strong>${x.contrato === 'safra' ? 'Safra' : 'Fixo'}</strong><small>edita em Ticket › Editar</small></div>
@@ -419,16 +440,16 @@ function abrirFicha(fid) {
       </tbody></table>` : ''}
 
     <h4 class="rs-h4">Histórico</h4>
-    <div class="rolagem"><table class="dc-planilha rs-mini"><thead><tr><th>Desde</th><th>Cargo</th><th class="ce">Faixa</th><th class="ce">Base</th><th class="ce">Peric.</th><th class="ce">Salário</th><th class="ce">Variação</th><th>Motivo</th><th></th></tr></thead><tbody>
+    <div class="rolagem"><table class="dc-planilha rs-mini"><thead><tr><th>Desde</th><th>Cargo</th><th class="ce">Faixa</th><th class="ce">Base</th><th class="ce">Peric.</th><th class="ce">Grat.</th><th class="ce">Salário</th><th class="ce">Variação</th><th>Motivo</th><th></th></tr></thead><tbody>
       ${hist.map((h, i) => {
         const ant = hist[i + 1];
         return `<tr><td>${br(h.desde)}${h.desde > hoje() ? ' <span class="tag ativo">programado</span>' : ''}</td>
           <td>${esc(cargoPorId(h.rh_cargo_id)?.nome || '—')}</td><td class="ce">${h.faixa || '—'}</td>
-          <td class="ce">${V(Number(h.valor))}</td><td class="ce">${pericDe(h) > 0 ? V(pericDe(h)) : '—'}</td><td class="ce"><b>${V(totalDe(h))}</b></td>
+          <td class="ce">${V(Number(h.valor))}</td><td class="ce">${pericDe(h) > 0 ? V(pericDe(h)) : '—'}</td><td class="ce">${gratDe(h) > 0 ? V(gratDe(h)) : '—'}</td><td class="ce"><b>${V(totalDe(h))}</b></td>
           <td class="ce">${ant ? P(totalDe(h) / totalDe(ant) - 1) : '—'}</td>
           <td>${esc(MOTIVOS[h.motivo] || h.motivo || '—')}${h.justificativa ? `<br><span class="dc-sem">${esc(h.justificativa)}</span>` : ''}${insalDe(h) ? `<br><span class="dc-sem">insalubridade ${esc(insalTxt(h, V))}</span>` : ''}</td>
           <td class="ce"><button class="btn mini" type="button" data-rs-corrigir="${h.id}">Corrigir</button></td></tr>`;
-      }).join('') || '<tr><td colspan="9" class="vazio">Nenhum salário registrado ainda.</td></tr>'}
+      }).join('') || '<tr><td colspan="10" class="vazio">Nenhum salário registrado ainda.</td></tr>'}
     </tbody></table></div>
 
     <div class="barra fim"><button class="btn" type="button" data-fechar>Fechar</button>
@@ -485,13 +506,15 @@ function formAlteracao(fid, corrigirId = null) {
   const motivo0 = ed ? ed.motivo : x.sal == null ? 'inicial' : sugerido?.vertical ? 'vertical' : 'horizontal';
   /* Periculosidade: quem já recebe continua recebendo na alteração nova. */
   const peric0 = ed ? pericDe(ed) > 0 : x.peric > 0;
+  /* Gratificação de função: quem já recebe continua; cargo de gerente já vem marcado. */
+  const grat0 = ed ? gratDe(ed) > 0 : (x.grat > 0 || ehGerencia(cargoPorId(cargo0)));
   const total0 = ed ? totalDe(ed) : (sugerido?.valor || valorFaixa(cargoPorId(cargo0), faixa0) || null);
-  const div0 = ed ? { base: Number(ed.valor), peric: pericDe(ed) } : (total0 ? dividir(total0, peric0) : { base: '', peric: '' });
+  const div0 = ed ? { base: Number(ed.valor), peric: pericDe(ed), grat: gratDe(ed) } : (total0 ? dividir(total0, peric0, grat0) : { base: '', peric: '', grat: '' });
   const txt = v => v === '' || v == null ? '' : String(r2(v).toFixed(2)).replace('.', ',');
   const insal0 = ed ? insalDe(ed) : x.insal;   // a anotação acompanha a alteração nova
 
   dialogo(`<h3>${ed ? 'Corrigir registro' : 'Alterar salário'} — ${esc(f.nome)}</h3>
-    <p class="dica" style="margin-top:-8px">${x.sal != null ? `Hoje: ${brl(x.sal)}${x.peric > 0 ? ` (base ${brl(x.base)} + periculosidade ${brl(x.peric)})` : ''} desde ${br(x.s.desde)}` : 'Primeiro registro de salário desta pessoa.'}
+    <p class="dica" style="margin-top:-8px">${x.sal != null ? `Hoje: ${brl(x.sal)}${temAdicional(x) ? ` (${quebra(x.base, x.peric, x.grat, brl, true)})` : ''} desde ${br(x.s.desde)}` : 'Primeiro registro de salário desta pessoa.'}
       ${ed ? ' · Corrigir muda o registro escolhido e fica na auditoria.' : ' · Uma vigência nova; a anterior fica no histórico.'}</p>
     <div class="aviso erro" id="rsErro" hidden></div>
     <div class="grade">
@@ -500,11 +523,15 @@ function formAlteracao(fid, corrigirId = null) {
       <label class="campo">Cargo do plano<select id="rsCargo"><option value="">— sem cargo do plano —</option>
         ${S.cargos.map(c => `<option value="${c.id}" ${c.id === cargo0 ? 'selected' : ''}>${esc(c.nome)}</option>`).join('')}</select></label>
       <label class="campo">Faixa<select id="rsFaixa"><option value="">—</option>${LETRAS.map(L => `<option ${L === faixa0 ? 'selected' : ''}>${L}</option>`).join('')}</select></label>
-      <label class="campo plena rs-check"><input type="checkbox" id="rsPeric" ${peric0 ? 'checked' : ''}> Recebe adicional de periculosidade (30% do salário base) — a soma base + adicional é o valor do plano</label>
+      <label class="campo plena rs-check"><input type="checkbox" id="rsPeric" ${peric0 ? 'checked' : ''}> Recebe adicional de periculosidade (30% do salário base)</label>
+      <label class="campo plena rs-check"><input type="checkbox" id="rsGrat" ${grat0 ? 'checked' : ''}> Recebe gratificação de função (40% do salário base) — ex.: gerentes
+        <small class="dc-sem" style="margin-left:6px">a soma base + adicionais marcados é o valor do plano</small></label>
       <label class="campo">Salário base (R$)
         <input type="text" id="rsBase" inputmode="decimal" value="${txt(div0.base)}"></label>
       <label class="campo" id="rsPericCampo" ${peric0 ? '' : 'hidden'}>Periculosidade (R$) <small>30% do base; pode ajustar</small>
         <input type="text" id="rsPericValor" inputmode="decimal" value="${peric0 ? txt(div0.peric) : ''}"></label>
+      <label class="campo" id="rsGratCampo" ${grat0 ? '' : 'hidden'}>Gratificação de função (R$) <small>40% do base; pode ajustar</small>
+        <input type="text" id="rsGratValor" inputmode="decimal" value="${grat0 ? txt(div0.grat) : ''}"></label>
       <label class="campo">Salário do plano — total (R$) <small>a tabela preenche; pode alterar à mão</small>
         <input type="text" id="rsValor" inputmode="decimal" value="${total0 ? txt(total0) : ''}"></label>
       <div class="campo"><span>Conferência</span><span id="rsConf" class="rs-conf"></span></div>
@@ -518,28 +545,48 @@ function formAlteracao(fid, corrigirId = null) {
     <div class="barra fim"><button class="btn" type="button" id="rsVoltar">Voltar</button>
       <button class="btn principal" type="button" id="rsGravar">${ed ? 'Gravar correção' : 'Gravar'}</button></div>`, () => {
     const comPeric = () => $('rsPeric').checked;
-    const ler = () => ({ base: lerValor($('rsBase').value), peric: comPeric() ? (lerValor($('rsPericValor').value) || 0) : 0, total: lerValor($('rsValor').value) });
+    const comGrat = () => $('rsGrat').checked;
+    const ler = () => ({ base: lerValor($('rsBase').value),
+      peric: comPeric() ? (lerValor($('rsPericValor').value) || 0) : 0,
+      grat: comGrat() ? (lerValor($('rsGratValor').value) || 0) : 0,
+      total: lerValor($('rsValor').value) });
     const conf = () => {
-      const c = cargoPorId($('rsCargo').value), L = $('rsFaixa').value, { base, peric, total } = ler();
+      const c = cargoPorId($('rsCargo').value), L = $('rsFaixa').value, { base, peric, grat, total } = ler();
       const v = total;
       const tab = valorFaixa(c, L);
       const partesTxt = [];
-      if (comPeric() && base) partesTxt.push(`base ${brl(base)} + periculosidade ${brl(peric)}${Math.abs(peric - r2(base * PCT_PERIC)) > 0.011 ? ` <span class="tag alerta">não é 30% (seria ${brl(r2(base * PCT_PERIC))})</span>` : ''} = <b>${brl(r2(base + peric))}</b>`);
+      if ((comPeric() || comGrat()) && base) {
+        const avisoP = comPeric() && Math.abs(peric - r2(base * PCT_PERIC)) > 0.011 ? ` <span class="tag alerta">peric. não é 30% (seria ${brl(r2(base * PCT_PERIC))})</span>` : '';
+        const avisoG = comGrat() && Math.abs(grat - r2(base * PCT_GRAT)) > 0.011 ? ` <span class="tag alerta">grat. não é 40% (seria ${brl(r2(base * PCT_GRAT))})</span>` : '';
+        partesTxt.push(`${quebra(base, peric, grat, brl, true)} = <b>${brl(r2(base + peric + grat))}</b>${avisoP}${avisoG}`);
+      }
       if (v && x.sal && !ed) partesTxt.push(`<b>${pctTxt(v / x.sal - 1)}</b> sobre o atual (${brl(v - x.sal)})`);
       if (tab && v) partesTxt.push(Math.abs(tab - v) < 0.01 ? '<span class="tag ativo">igual à tabela</span>'
         : `<span class="tag alerta">tabela: ${brl(tab)}</span>`);
       if ($('rsData').value > hoje()) partesTxt.push('<span class="tag neutra">programado</span>');
       $('rsConf').innerHTML = partesTxt.join(' · ') || '—';
     };
-    /* Três campos amarrados: mexer no total reparte em base + 30%; mexer na
-       base ou no adicional refaz o total. */
-    const doTotal = () => { const t = lerValor($('rsValor').value); if (!t) return; const d = dividir(t, comPeric()); $('rsBase').value = txt(d.base); $('rsPericValor').value = comPeric() ? txt(d.peric) : ''; };
-    const daBase = () => { const b = lerValor($('rsBase').value); if (!b) return; if (comPeric()) $('rsPericValor').value = txt(b * PCT_PERIC); $('rsValor').value = txt(b + (comPeric() ? lerValor($('rsPericValor').value) || 0 : 0)); };
-    const doPeric = () => { const b = lerValor($('rsBase').value) || 0, p = lerValor($('rsPericValor').value) || 0; $('rsValor').value = txt(b + p); };
+    /* Campos amarrados: mexer no total reparte em base + 30% + 40% (o que
+       estiver marcado); mexer na base refaz os adicionais e o total; mexer
+       num adicional refaz só o total. */
+    const doTotal = () => { const t = lerValor($('rsValor').value); if (!t) return; const d = dividir(t, comPeric(), comGrat());
+      $('rsBase').value = txt(d.base); $('rsPericValor').value = comPeric() ? txt(d.peric) : ''; $('rsGratValor').value = comGrat() ? txt(d.grat) : ''; };
+    const somar = () => { const { base, peric, grat } = ler(); $('rsValor').value = txt((base || 0) + peric + grat); };
+    const daBase = () => { const b = lerValor($('rsBase').value); if (!b) return;
+      if (comPeric()) $('rsPericValor').value = txt(b * PCT_PERIC);
+      if (comGrat()) $('rsGratValor').value = txt(b * PCT_GRAT);
+      somar(); };
+    const doPeric = somar;
     const daTabela = () => { const v = valorFaixa(cargoPorId($('rsCargo').value), $('rsFaixa').value); if (v) { $('rsValor').value = txt(v); doTotal(); } conf(); };
-    $('rsCargo').addEventListener('change', daTabela);
+    $('rsCargo').addEventListener('change', () => {
+      /* Trocou para cargo de gerente: já marca a gratificação de função. */
+      if (ehGerencia(cargoPorId($('rsCargo').value)) && !comGrat()) { $('rsGrat').checked = true; $('rsGratCampo').hidden = false; }
+      daTabela();
+    });
     $('rsFaixa').addEventListener('change', daTabela);
     $('rsPeric').addEventListener('change', () => { $('rsPericCampo').hidden = !comPeric(); doTotal(); conf(); });
+    $('rsGrat').addEventListener('change', () => { $('rsGratCampo').hidden = !comGrat(); doTotal(); conf(); });
+    $('rsGratValor').addEventListener('input', () => { somar(); conf(); });
     $('rsValor').addEventListener('input', () => { doTotal(); conf(); });
     $('rsBase').addEventListener('input', () => { daBase(); conf(); });
     $('rsPericValor').addEventListener('input', () => { doPeric(); conf(); });
@@ -555,12 +602,13 @@ function formAlteracao(fid, corrigirId = null) {
     $('rsVoltar').addEventListener('click', () => abrirFicha(fid));
     $('rsGravar').addEventListener('click', async () => {
       const erro = t => { $('rsErro').textContent = t; $('rsErro').hidden = false; };
-      const { base: valor, peric: periculosidade } = ler();
+      const { base: valor, peric: periculosidade, grat: gratificacao } = ler();
       const desde = $('rsData').value, obs = $('rsObs').value.trim();
       const insalubridade_tipo = $('rsInsalTipo').value || null, insalubridade = insalubridade_tipo ? (lerValor($('rsInsalValor').value) || 0) : 0;
       const cargoId = $('rsCargo').value || null, faixa = $('rsFaixa').value || null;
       if (!valor) return erro('Informe o salário base.');
       if (comPeric() && !periculosidade) return erro('Informe o valor da periculosidade (ou desmarque a opção).');
+      if (comGrat() && !gratificacao) return erro('Informe o valor da gratificação de função (ou desmarque a opção).');
       if (!desde) return erro('Informe a data a partir de quando vale.');
       if (ed && !obs) return erro('Escreva o motivo da correção.');
       const mesmaData = salariosDe(fid).find(s => s.desde === desde && s.id !== ed?.id);
@@ -568,8 +616,8 @@ function formAlteracao(fid, corrigirId = null) {
       const b = $('rsGravar'); b.disabled = true;
       try {
         const reg = ed
-          ? { ...ed, valor, periculosidade, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value }
-          : { funcionario_id: fid, valor, periculosidade, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value,
+          ? { ...ed, valor, periculosidade, gratificacao, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value }
+          : { funcionario_id: fid, valor, periculosidade, gratificacao, insalubridade, insalubridade_tipo, desde, rh_cargo_id: cargoId, faixa, motivo: $('rsMotivo').value,
               justificativa: obs || null, criado_por: estado.sessao?.user?.email || null, criado_em: new Date().toISOString() };
         const g = await jd.salvar('salarios', reg);
         await jd.registrar({ tabela: 'jor_salarios', registro_id: g.id, acao: ed ? 'update' : 'insert', antes: ed || null, depois: g, justificativa: ed ? obs : (obs || null) });
@@ -747,7 +795,7 @@ function relProjecao(r) {
   const mudam = r.linhas.filter(l => l.valores[l.valores.length - 1] !== l.x.sal);
   return documento({
     titulo: 'Projeção da folha', subtitulo: `Salários de ${rotMes(r.meses[0])} a ${rotMes(r.meses[r.meses.length - 1])} — simulação`,
-    canto: r.encargos ? `com encargos de ${(r.encargos * 100).toLocaleString('pt-BR')}%` : 'base + periculosidade', paisagem: true,
+    canto: r.encargos ? `com encargos de ${(r.encargos * 100).toLocaleString('pt-BR')}%` : 'base + adicionais', paisagem: true,
     corpo: `<div class="rel-resumo"><b>Folha hoje:</b> ${brl(ce(r.hojeTotal))} · <b>no fim:</b> ${brl(ce(fim))} (${pctTxt(fim / r.hojeTotal - 1)}) ·
         <b>custo a mais no período:</b> ${brl(ce(adicional))}${PJ.reajPct && PJ.reajMes ? ` · <b>reajuste geral</b> ${esc(PJ.reajPct)}% em ${rotMes(PJ.reajMes)}` : ''}</div>
       <div class="rel-secao">Mês a mês</div>
@@ -763,7 +811,7 @@ function relProjecao(r) {
         <td>${l.eventos.filter(e => r.meses.includes(e.mes)).map(e => `${rotMes(e.mes)}: ${esc(e.cargo?.nome || '')} ${e.faixa || ''} ${brl(e.valor)}${e.origem === 'lançado' ? ' (lançado)' : ''}`).join('<br>') || (PJ.reajPct ? 'só o reajuste geral' : '—')}</td>
         <td class="rel-num">${brl(v)}</td><td class="rel-num">${pctTxt(v / l.x.sal - 1)}</td></tr>`; }).join('')
         || '<tr><td colspan="6" class="rel-vazio">Ninguém muda de salário no período.</td></tr>'}</tbody></table>
-      <p class="rel-nota">Simulação: nada foi gravado. Salário = base + periculosidade (quando há), sem insalubridade, horas extras${r.encargos ? '' : ' nem encargos'}.
+      <p class="rel-nota">Simulação: nada foi gravado. Salário = base + periculosidade + gratificação de função (quando há), sem insalubridade, horas extras${r.encargos ? '' : ' nem encargos'}.
         ${r.semSalario ? `${r.semSalario} pessoa(s) ativa(s) sem salário no app ficaram fora da conta.` : ''}</p>`,
   });
 }
