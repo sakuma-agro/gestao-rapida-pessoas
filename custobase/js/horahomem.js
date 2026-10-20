@@ -80,15 +80,19 @@ export function calcularMesHH(id) {
 const chaveItem = (mesId, func) => mesId + ':' + func;
 export const SETORES = ['Campo', 'ADM'];
 const ordemSetor = st => (st === 'ADM' ? 1 : 0);
-/** Setor do cadastro do Pessoas → 'Campo' ou 'ADM'. */
-const setorDe = st => /^ADM/i.test(String(st || '')) ? 'ADM' : 'Campo';
+/** Pessoa do Pessoas → 'Campo' ou 'ADM' (pedido dele, 20/10/2026):
+ *  Estratégico e Tático (nível da função, RH › Organograma) → ADM;
+ *  Operacional (ou sem nível) → pelo setor do cadastro. */
+const ehGestao = nv => /^(estrat|t[aá]tic)/i.test(String(nv || ''));
+const setorDe = r => ehGestao(r.nivel) || /^ADM/i.test(String(r.setor || '')) ? 'ADM' : 'Campo';
 let filtroSetor = '';
 const relacaoDe = tc => /temp/i.test(String(tc || '')) ? 'Temporário' : 'Fixo';
 
 /** Lê as horas do Pessoas para o mês (precisa de internet). */
 async function horasDoPessoas(mesId) {
   if (!window.App || !App.online || !App.sb) throw new Error('Sem internet: as horas do Pessoas só vêm com conexão.');
-  const r = await App.sb.rpc('cb_horas_mes', { p_mes: mesId });
+  let r = await App.sb.rpc('cb_horas_mes_v2', { p_mes: mesId });
+  if (r.error && /cb_horas_mes_v2|PGRST202|function/i.test(r.error.message + r.error.code)) r = await App.sb.rpc('cb_horas_mes', { p_mes: mesId });
   if (r.error) throw r.error;
   return r.data || [];
 }
@@ -140,7 +144,7 @@ function desenhar() {
   const linhaPessoa = l => `<tr class="${l.incluido === false ? 'cb-fora' : ''}">
         <td class="ce"><input type="checkbox" data-inc="${esc(l.id)}"${l.incluido !== false ? ' checked' : ''}${fechado ? ' disabled' : ''}></td>
         <td>${esc(l.cadastro || '')}</td>
-        <td><b>${esc(l.nome)}</b>${l.obs && l.obs !== 'da planilha' ? `<small class="dc-sem"> · ${esc(l.obs)}</small>` : ''}</td>
+        <td><b>${esc(l.nome)}</b>${ehGestao(l.nivel) ? ` <span class="tag neutra" title="${esc(l.funcao || '')} · nível ${esc(l.nivel)}: entra no custo hora ADM">${esc(l.nivel)}</span>` : ''}${l.obs && l.obs !== 'da planilha' ? `<small class="dc-sem"> · ${esc(l.obs)}</small>` : ''}</td>
         <td>${fechado ? esc(l.relacao) : `<select class="dc-mini" data-rel="${esc(l.id)}">${['Fixo', 'Temporário'].map(r => `<option${r === l.relacao ? ' selected' : ''}>${r}</option>`).join('')}</select>`}</td>
         <td class="dir">${fechado ? esc(num(l.horas, 1)) : `<input class="dc-mini hh-num" data-h="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.horas_manual) ? num(l.horas_manual, 1) : '')}" placeholder="${esc(num(l.horas, 1))}">`}
           <small class="hh-orig hh-o-${l.origemHoras}">${l.origemHoras === 'pessoas' ? 'Pessoas' : l.origemHoras === 'planilha' ? 'planilha' : l.origemHoras === 'manual' ? 'corrigido' + (temValor(l.horas_pessoas) ? ' (Pessoas ' + num(l.horas_pessoas, 1) + ')' : '') : 'padrão do mês'}</small></td>
@@ -259,7 +263,7 @@ async function criarMes(mesId, anterior) {
   for (const r of lista) {
     const prev = antes.find(a => a.funcionario_id === r.funcionario_id);
     await gravar('cb_hh_itens', { id: chaveItem(mesId, r.funcionario_id), mes: mesId, funcionario_id: r.funcionario_id,
-      cadastro: r.cadastro || null, nome: r.nome, setor: setorDe(r.setor), relacao: prev ? prev.relacao : relacaoDe(r.tipo_contrato),
+      cadastro: r.cadastro || null, nome: r.nome, setor: setorDe(r), nivel: r.nivel || null, funcao: r.funcao || null, relacao: prev ? prev.relacao : relacaoDe(r.tipo_contrato),
       horas_pessoas: horasDe_(r), horas_manual: null,
       salario_bruto: temValor(r.salario) ? Number(r.salario) : null, recibo: null,
       lancado_agro: false, incluido: true, obs: String(r.situacao || '').toUpperCase() === 'ATIVO' ? null : 'inativo, com boletim no mês' });
@@ -285,11 +289,11 @@ async function atualizarDoPessoas(mesId, sozinho) {
       if (!it) {
         novos++;
         await gravar('cb_hh_itens', { id, mes: mesId, funcionario_id: r.funcionario_id, cadastro: r.cadastro || null, nome: r.nome,
-          setor: setorDe(r.setor), relacao: relacaoDe(r.tipo_contrato), horas_pessoas: h, horas_manual: null,
+          setor: setorDe(r), nivel: r.nivel || null, funcao: r.funcao || null, relacao: relacaoDe(r.tipo_contrato), horas_pessoas: h, horas_manual: null,
           salario_bruto: temValor(r.salario) ? Number(r.salario) : null, recibo: null, lancado_agro: false, incluido: true });
-      } else if (Number(it.horas_pessoas || 0) !== h || it.nome !== r.nome || it.setor !== setorDe(r.setor) || it.incluido === false && it.obs === 'fora do cadastro de ativos') {
+      } else if (Number(it.horas_pessoas || 0) !== h || it.nome !== r.nome || it.setor !== setorDe(r) || (it.nivel || null) !== (r.nivel || null) || it.incluido === false && it.obs === 'fora do cadastro de ativos') {
         mudou++;
-        await gravar('cb_hh_itens', { ...it, horas_pessoas: h, nome: r.nome, setor: setorDe(r.setor), cadastro: r.cadastro || it.cadastro,
+        await gravar('cb_hh_itens', { ...it, horas_pessoas: h, nome: r.nome, setor: setorDe(r), nivel: r.nivel || null, funcao: r.funcao || it.funcao || null, cadastro: r.cadastro || it.cadastro,
           incluido: it.obs === 'fora do cadastro de ativos' ? true : it.incluido,
           obs: it.obs === 'fora do cadastro de ativos' ? null : it.obs });
       }
