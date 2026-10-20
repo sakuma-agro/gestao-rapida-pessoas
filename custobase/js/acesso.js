@@ -17,6 +17,7 @@ const ICONES = {
   talhoes: '<path d="M3 11l9-7 9 7"/><path d="M4 11v9h16v-9"/><path d="M9 20v-5h6v5"/>',
   horahomem: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/><path d="M12 2v3"/>',
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.6c2.7.2 4.7 2 5.3 5"/>',
+  param: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   indices: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   culturas: '<path d="M12 22V12"/><path d="M12 12c-4 0-7-3-7-7 4 0 7 3 7 7z"/><path d="M12 15c0-4 3-7 7-7 0 4-3 7-7 7z"/>',
 };
@@ -27,18 +28,28 @@ export const svgIcone = nome =>
    do Custo Base no futuro: mais um item aqui, as <section> no index.html e o
    arquivo de tela em js/. */
 export const MODULOS = [
-  { id: 'rateio', nome: 'Rateio mensal culturas', icone: 'rateio', telas: [
-    ['rtMes',       'Rateio do mês', 'mes'],
-    ['rtHistorico', 'Histórico',     'historico'],
-    ['rtTalhoes',   'Plantios',      'talhoes'],
-    ['rtCulturas',  'Culturas',      'culturas'],
+  /* 20/10/2026, pedido dele: cada módulo com um submódulo Parâmetros, onde
+     ele altera o que a conta usa. Faixas: módulo › submódulo › telas. */
+  { id: 'rateio', nome: 'Rateio mensal culturas', icone: 'rateio', subs: [
+    { id: 'rtSubRateio', nome: 'Rateio', icone: 'rateio', telas: [
+      ['rtMes',       'Rateio do mês', 'mes'],
+      ['rtHistorico', 'Histórico',     'historico'],
+      ['rtTalhoes',   'Plantios',      'talhoes'],
+    ] },
+    { id: 'rtSubParam', nome: 'Parâmetros', icone: 'param', telas: [
+      ['rtCulturas',  'Culturas (índice, ciclo e meses no rateio)', 'culturas'],
+    ] },
   ] },
   /* Hora-homem (20/10/2026, pedido dele): a planilha "Controle Mensal -
      Hora Homem - Campo", com as horas trabalhadas puxadas do Pessoas. */
-  { id: 'horahomem', nome: 'Hora-homem', icone: 'horahomem', telas: [
-    ['hhMes',       'Hora-homem do mês', 'pessoas'],
-    ['hhHistorico', 'Histórico',         'historico'],
-    ['hhIndices',   'Índices',           'indices'],
+  { id: 'horahomem', nome: 'Hora-homem', icone: 'horahomem', subs: [
+    { id: 'hhSubHH', nome: 'Hora-homem', icone: 'horahomem', telas: [
+      ['hhMes',       'Hora-homem do mês', 'pessoas'],
+      ['hhHistorico', 'Histórico',         'historico'],
+    ] },
+    { id: 'hhSubParam', nome: 'Parâmetros', icone: 'param', telas: [
+      ['hhIndices',   'Encargos e horas padrão', 'indices'],
+    ] },
   ] },
 ];
 
@@ -71,23 +82,37 @@ export function montarMenu(callback) {
 export function mostrarInicio() {
   $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
   $('navTelas').hidden = true;
+  $('navSub').hidden = true;
   aoTrocar('inicio');
 }
 
+const subsLiberados = id => {
+  const m = MODULOS.find(x => x.id === id);
+  return m ? subsDe(m).map(s => ({ ...s, telas: s.telas.filter(([t]) => podeTela(t)) })).filter(s => s.telas.length) : [];
+};
+
+/** Abre um módulo: faixa 2 = submódulos (Rateio · Parâmetros), faixa 3 = telas. */
 export function abrirModulo(id, tela) {
   if (!id) return;
   $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.setAttribute('aria-selected', String(b.dataset.modulo === id)));
-  const telas = telasLiberadas(id);
-  if (!telas.length) return;
-  const alvo = telas.some(([t]) => t === tela) ? tela : telas[0][0];
-  const faixa = $('navTelas');
-  faixa.hidden = telas.length < 2;
-  faixa.innerHTML = telas.map(([t, rot, ic]) =>
-    `<button class="aba2" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${svgIcone(ic)}<span>${esc(rot)}</span></button>`).join('');
-  faixa.querySelectorAll('[data-tela]').forEach(b =>
+  const subs = subsLiberados(id);
+  if (!subs.length) return;
+  const sub = subs.find(s => s.telas.some(([t]) => t === tela)) || subs[0];
+  const f2 = $('navTelas');
+  f2.hidden = subs.length < 2;
+  f2.innerHTML = subs.map(s =>
+    `<button class="aba2" role="tab" data-sub="${s.id}" aria-selected="${s.id === sub.id}">${svgIcone(s.icone)}<span>${esc(s.nome)}</span></button>`).join('');
+  f2.querySelectorAll('[data-sub]').forEach(b =>
+    b.addEventListener('click', () => abrirModulo(id, (subs.find(s => s.id === b.dataset.sub)?.telas[0] || [])[0])));
+  const alvo = sub.telas.some(([t]) => t === tela) ? tela : sub.telas[0][0];
+  const f3 = $('navSub');
+  f3.hidden = sub.telas.length < 2;
+  f3.innerHTML = sub.telas.map(([t, rot, ic]) =>
+    `<button class="aba3" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${svgIcone(ic)}<span>${esc(rot)}</span></button>`).join('');
+  f3.querySelectorAll('[data-tela]').forEach(b =>
     b.addEventListener('click', () => {
-      faixa.querySelectorAll('[data-tela]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+      f3.querySelectorAll('[data-tela]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
       aoTrocar(b.dataset.tela);
     }));
   aoTrocar(alvo);

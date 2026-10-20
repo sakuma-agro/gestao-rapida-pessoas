@@ -2,7 +2,17 @@
 // A tabela lateral da planilha: índice e ciclo de cada cultura. Permanente
 // (abacate, café) nunca sai do rateio por tempo; as outras ficam "meses no
 // rateio" meses (vazio = ciclo ÷ 30, arredondado) e depois saem sozinhas.
-import { $, esc, pronto, carregando, todos, culturas, gravar, aviso, lerNumero, num, mesesDaCultura, semAcento } from './dados.js';
+import { $, esc, pronto, carregando, todos, culturas, gravar, aviso, lerNumero, num, mesesDaCultura, semAcento, mesFechado, nomeMes, CADEADO } from './dados.js';
+
+/* Parâmetro alterado (pedido dele, 20/10/2026): vale para os meses ABERTOS —
+   as linhas deles recebem o índice e o ciclo novos — e nunca para os
+   fechados, que estão com cadeado e guardam os números da época. */
+async function levarAosMesesAbertos(c) {
+  const linhas = todos('cb_itens').filter(i => i.cultura_id === c.id && !mesFechado(i.mes)
+    && (Number(i.indice) !== Number(c.indice) || Number(i.ciclo) !== Number(c.ciclo)));
+  for (const i of linhas) await gravar('cb_itens', { ...i, indice: Number(c.indice), ciclo: Number(c.ciclo) });
+  return [...new Set(linhas.map(i => i.mes))].sort();
+}
 
 let ouvindo = false;
 let verInativas = false;
@@ -14,6 +24,7 @@ function desenhar() {
   const lista = todos('cb_culturas').filter(c => verInativas || c.ativo !== false)
     .sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   alvo.innerHTML = `
+    <p class="cb-param-aviso"><span class="cb-cadeado">${CADEADO} Cadeado</span> Mudar o índice ou o ciclo de uma cultura vale para os meses <b>abertos</b> e para os próximos. Os meses <b>fechados</b> ficam como foram fechados.</p>
     <form class="grade cad-novo" id="cbCultNova" autocomplete="off">
       <label class="campo">Cultura <input type="text" name="nome" required placeholder="ex.: Cebola"></label>
       <label class="campo">Índice <input type="text" name="indice" inputmode="decimal" required placeholder="ex.: 25000"></label>
@@ -23,7 +34,7 @@ function desenhar() {
       <div class="barra fim" style="align-self:end;margin:0"><button class="btn principal" type="submit">Adicionar</button></div>
     </form>
     <div class="barra entre">
-      <span class="dc-sem">Peso do plantio = índice × área × (12 ÷ ciclo). Mudar aqui vale para os meses novos; os já feitos guardam os números da época.</span>
+      <span class="dc-sem">Peso do plantio = índice × área × (12 ÷ ciclo).</span>
       <label class="cb-check"><input type="checkbox" id="cbCultInativas"${verInativas ? ' checked' : ''}> mostrar desativadas</label>
     </div>
     <div class="cb-rolagem"><table class="dc-planilha cb-tab">
@@ -83,9 +94,11 @@ function editar(id) {
       const f = new FormData(e.target);
       const r = lerCampos(f);
       if (!r) return;
-      await gravar('cb_culturas', { ...c, ...r, ativo: f.get('ativo') === 'on' });
+      const nova = await gravar('cb_culturas', { ...c, ...r, ativo: f.get('ativo') === 'on' });
       window.fecharModal();
-      aviso('Cultura salva.');
+      const mudou = Number(c.indice) !== Number(r.indice) || Number(c.ciclo) !== Number(r.ciclo);
+      const meses = mudou ? await levarAosMesesAbertos(nova) : [];
+      aviso('Cultura salva.' + (meses.length ? ' Atualizada nos meses abertos: ' + meses.map(nomeMes).join(', ') + '. Os fechados não mudaram.' : mudou ? ' Nenhum mês aberto usa esta cultura; os fechados não mudaram.' : ''));
       desenhar();
     });
   });

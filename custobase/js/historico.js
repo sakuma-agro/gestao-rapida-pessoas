@@ -3,7 +3,7 @@
 // linha do tempo dos plantios — em quais meses cada um entrou no rateio e
 // quantos meses já são, com o aviso de ciclo (pedido dele, 20/10/2026).
 import { $, esc, pronto, carregando, todos, meses, nomeMes, mesCurto, calcularMes, num, pct, reais,
-  talhoes, talhao, cultura, mesesDaCultura, nomeCurto, semAcento, souAdmin, mes } from './dados.js';
+  talhoes, talhao, cultura, mesesDaCultura, nomeCurto, semAcento, souAdmin, mes, CADEADO } from './dados.js';
 import { etiquetaMeses } from './talhoes.js';
 import { irParaMes } from './rateio.js';
 
@@ -36,7 +36,7 @@ function desenhar() {
         const maior = c.linhas.filter(l => l.incluido !== false).sort((a, b) => b.pct - a.pct)[0];
         return `<tr>
           <td><b>${esc(nomeMes(m.id))}</b></td>
-          <td>${m.status === 'fechado' ? '<span class="tag ativo">fechado</span>' : '<span class="tag alerta">aberto</span>'}</td>
+          <td>${m.status === 'fechado' ? `<span class="cb-cadeado">${CADEADO} Fechado</span>` : '<span class="tag alerta">aberto</span>'}</td>
           <td class="dir">${c.incluidos}</td><td class="dir">${esc(num(c.area))}</td><td class="dir">${esc(num(c.total, 0))}</td>
           <td class="dir">${c.custo !== null ? esc(reais(c.custo)) : '—'}</td>
           <td>${maior ? esc(maior.talhao.nome) + ' · <b>' + esc(pct(maior.pct, 1)) + '</b>' : '—'}</td>

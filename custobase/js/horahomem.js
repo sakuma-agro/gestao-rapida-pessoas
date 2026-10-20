@@ -11,7 +11,7 @@
 // Salário bruto e recibo vêm do holerite e são digitados; o salário chega
 // pré-preenchido com o salário vigente do RH para quem pode ver salários.
 import { $, esc, pronto, carregando, todos, gravar, aviso, souAdmin, meuNome, lerNumero, num, reais,
-  mesAtual, mesAnterior, mesSeguinte, nomeMes, mesCurto, dataHora, semAcento } from './dados.js';
+  mesAtual, mesAnterior, mesSeguinte, nomeMes, mesCurto, dataHora, semAcento, seloFechado, CADEADO } from './dados.js';
 import { baixarXlsx } from '../../js/excel.js';
 
 let ouvindo = false;
@@ -44,8 +44,17 @@ export function calcularLinha(i, p = parametros()) {
   return { ...i, encargo: enc, horas: h, origemHoras: origem, total: sal + rec, custo,
     rh: temPag && h > 0 ? custo / h : null };
 }
+/* Cadeado (20/10/2026): mês fechado usa o encargo e a hora padrão gravados
+   no fechamento; mês aberto usa os Parâmetros de agora. */
+export function parametrosDoMes(id) {
+  const m = mes(id);
+  if (m && m.status === 'fechado' && temValor(m.encargo_fixo))
+    return { encargo_fixo: Number(m.encargo_fixo), encargo_temporario: Number(m.encargo_temporario),
+      horas_padrao: { [String(id).slice(5, 7)]: Number(m.horas_padrao || 0) } };
+  return parametros();
+}
 export function calcularMesHH(id) {
-  const p = parametros();
+  const p = parametrosDoMes(id);
   const linhas = itensDoMes(id).map(i => calcularLinha(i, p))
     .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   const dentro = linhas.filter(l => l.incluido !== false);
@@ -78,7 +87,7 @@ function desenhar() {
   if (!mesSel) { const l = meses(); mesSel = l.length ? l[l.length - 1].id : mesAtual(); }
   const m = mes(mesSel);
   const fechado = m && m.status === 'fechado';
-  const p = parametros();
+  const p = parametrosDoMes(mesSel);
 
   const topo = `
     <div class="cb-mes-topo">
@@ -88,7 +97,7 @@ function desenhar() {
         <button class="btn mini" type="button" id="hhSeg" title="mês seguinte">▶</button>
       </div>
       <div class="cb-mes-estado">${m ? (fechado
-        ? `<span class="tag ativo">fechado</span> <span class="dc-sem">por ${esc(m.fechado_por || '—')} em ${esc(dataHora(m.fechado_em))}</span>`
+        ? seloFechado(m.fechado_por, m.fechado_em)
         : '<span class="tag alerta">aberto</span>') : '<span class="tag neutra">mês ainda não criado</span>'}</div>
     </div>`;
 
@@ -96,8 +105,8 @@ function desenhar() {
     const ant = meses().filter(x => x.id < mesSel).pop();
     alvo.innerHTML = topo + `<div class="cb-vazio-mes">
       <p><b>${esc(nomeMes(mesSel))}</b> ainda não tem hora-homem.</p>
-      <p class="dc-sem">Criar o mês traz do Pessoas todo mundo do setor CAMPO que tem boletim na competência, com as horas trabalhadas${ant ? `, e copia de ${esc(mesCurto(ant))} quem estava lá (relação e marcação de fora)` : ''}. Depois é só digitar salário bruto e recibo do holerite.</p>
-      <div class="barra"><button class="btn principal" type="button" id="hhCriar">Criar ${esc(mesCurto(mesSel))} com as horas do Pessoas</button></div>
+      <p class="dc-sem">Criar o mês traz do Pessoas o cadastro de <b>ativos do setor CAMPO</b> (e quem tem boletim na competência), com as horas trabalhadas. Depois é só digitar salário bruto e recibo do holerite.</p>
+      <div class="barra"><button class="btn principal" type="button" id="hhCriar">Criar ${esc(mesCurto(mesSel))} com o cadastro de ativos</button></div>
     </div>`;
     $('hhFolha').innerHTML = '';
     ligarNav();
@@ -118,7 +127,7 @@ function desenhar() {
     <div class="barra entre naoimprimir">
       <div class="barra" style="margin:0">
         <label class="campo" style="min-width:220px">Procurar <input type="text" id="hhBusca" value="${esc(busca)}" placeholder="nome ou nº"></label>
-        ${fechado ? '' : `<button class="btn" type="button" id="hhAtualizar">${lendoPessoas ? 'Lendo o Pessoas…' : '↻ Atualizar horas do Pessoas'}</button>
+        ${fechado ? '' : `<button class="btn" type="button" id="hhAtualizar">${lendoPessoas ? 'Lendo o Pessoas…' : '↻ Puxar do Pessoas (ativos e horas)'}</button>
         <button class="btn" type="button" id="hhAdd">+ Pessoa</button>`}
       </div>
       <div class="barra" style="margin:0">
@@ -179,13 +188,17 @@ function desenhar() {
   $('hhAdd')?.addEventListener('click', () => adicionarPessoa(mesSel));
   $('hhFechar')?.addEventListener('click', async () => {
     if (c.semValor && !confirm(`${c.semValor} pessoa(s) sem salário/recibo. Fechar mesmo assim?`)) return;
-    if (!c.semValor && !confirm(`Fechar a hora-homem de ${nomeMes(mesSel)}? Depois só o administrador reabre.`)) return;
-    await gravar('cb_hh_meses', { ...m, status: 'fechado', fechado_por: meuNome(), fechado_em: new Date().toISOString() });
+    if (!c.semValor && !confirm(`Fechar a hora-homem de ${nomeMes(mesSel)}?\n\nO mês fica com cadeado: guarda o encargo e a hora padrão de hoje, e mudar os Parâmetros depois não altera mais este mês. Só o administrador reabre.`)) return;
+    const pa = parametros();
+    await gravar('cb_hh_meses', { ...m, status: 'fechado', fechado_por: meuNome(), fechado_em: new Date().toISOString(),
+      encargo_fixo: Number(pa.encargo_fixo), encargo_temporario: Number(pa.encargo_temporario),
+      horas_padrao: Number((pa.horas_padrao || {})[mesSel.slice(5, 7)] || 0) });
     aviso('Mês fechado.'); desenhar();
   });
   $('hhReabrir')?.addEventListener('click', async () => {
-    if (!confirm(`Reabrir a hora-homem de ${nomeMes(mesSel)}?`)) return;
-    await gravar('cb_hh_meses', { ...m, status: 'aberto', fechado_por: null, fechado_em: null }); desenhar();
+    if (!confirm(`Reabrir a hora-homem de ${nomeMes(mesSel)}? O cadeado sai e o mês volta a usar os Parâmetros de agora.`)) return;
+    await gravar('cb_hh_meses', { ...m, status: 'aberto', fechado_por: null, fechado_em: null,
+      encargo_fixo: null, encargo_temporario: null, horas_padrao: null }); desenhar();
   });
   $('hhImprimir').addEventListener('click', () => { desenharFolha(c); setTimeout(() => window.print(), 150); });
   $('hhExcel').addEventListener('click', () => exportar(c).catch(e => aviso(e.message || 'Não consegui gerar o Excel.', true)));
@@ -198,56 +211,64 @@ function ligarNav() {
   $('hhMesInput').addEventListener('change', e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) irParaMesHH(e.target.value); });
 }
 
-/** Cria o mês: quem tem boletim no Pessoas (setor CAMPO) + quem estava no mês anterior. */
+/* Lista do mês = cadastro de ATIVOS do Pessoas, setor CAMPO (pedido dele,
+   20/10/2026), mais quem tem boletim na competência mesmo já inativo. */
+const doCampo = lista => lista.filter(r => String(r.setor || '').toUpperCase() === 'CAMPO');
+const horasDe_ = r => Math.round(Number(r.minutos || 0) / 6) / 10;
+
+/** Cria o mês com o cadastro de ativos do Pessoas e as horas da competência. */
 async function criarMes(mesId, anterior) {
-  let doPessoas = [];
-  try { doPessoas = await horasDoPessoas(mesId); }
-  catch (e) { if (!confirm((e.message || e) + '\n\nCriar o mês mesmo assim, só com a lista do mês anterior?')) return; }
+  let lista;
+  try { lista = doCampo(await horasDoPessoas(mesId)); }
+  catch (e) { aviso((e.message || e) + ' O mês precisa do Pessoas para nascer.', true); return; }
   await gravar('cb_hh_meses', { id: mesId, status: 'aberto' });
   const antes = anterior ? itensDoMes(anterior) : [];
-  const vistos = new Set();
-  for (const r of doPessoas.filter(r => String(r.setor || '').toUpperCase() === 'CAMPO')) {
+  for (const r of lista) {
     const prev = antes.find(a => a.funcionario_id === r.funcionario_id);
     await gravar('cb_hh_itens', { id: chaveItem(mesId, r.funcionario_id), mes: mesId, funcionario_id: r.funcionario_id,
       cadastro: r.cadastro || null, nome: r.nome, relacao: prev ? prev.relacao : relacaoDe(r.tipo_contrato),
-      horas_pessoas: Math.round(Number(r.minutos || 0) / 6) / 10, horas_manual: null,
+      horas_pessoas: horasDe_(r), horas_manual: null,
       salario_bruto: temValor(r.salario) ? Number(r.salario) : null, recibo: null,
-      lancado_agro: false, incluido: prev ? prev.incluido !== false : true });
-    vistos.add(r.funcionario_id);
+      lancado_agro: false, incluido: true, obs: String(r.situacao || '').toUpperCase() === 'ATIVO' ? null : 'inativo, com boletim no mês' });
   }
-  // quem estava no mês anterior e não tem boletim agora entra fora da conta, para conferir
-  for (const a of antes.filter(a => a.incluido !== false && (!a.funcionario_id || !vistos.has(a.funcionario_id)))) {
-    await gravar('cb_hh_itens', { id: chaveItem(mesId, a.funcionario_id || ('n-' + semAcento(a.nome).replace(/\W+/g, '-'))), mes: mesId,
-      funcionario_id: a.funcionario_id, cadastro: a.cadastro, nome: a.nome, relacao: a.relacao,
-      horas_pessoas: null, horas_manual: null, salario_bruto: null, recibo: null, lancado_agro: false, incluido: false,
-      obs: 'sem boletim na competência' });
-  }
-  aviso(`Mês criado: ${vistos.size} pessoa(s) com horas do Pessoas.`);
+  const comHoras = lista.filter(r => Number(r.minutos) > 0).length;
+  aviso(`Mês criado: ${lista.length} pessoa(s) do cadastro de ativos do campo, ${comHoras} com horas no Pessoas.`);
   desenhar();
 }
 
-/** Atualiza horas_pessoas de todo mundo e acrescenta quem apareceu no Pessoas. */
+/** Acerta o mês aberto com o Pessoas: entra quem é ativo e falta, horas
+ *  atualizadas, e quem saiu do cadastro de ativos (sem boletim) fica fora. */
 async function atualizarDoPessoas(mesId) {
   if (lendoPessoas) return;
   lendoPessoas = true; desenhar();
   try {
-    const lista = (await horasDoPessoas(mesId)).filter(r => String(r.setor || '').toUpperCase() === 'CAMPO');
-    let novos = 0, mudou = 0;
+    const lista = doCampo(await horasDoPessoas(mesId));
+    const ids = new Set(lista.map(r => r.funcionario_id));
+    let novos = 0, mudou = 0, sairam = 0;
     for (const r of lista) {
       const id = chaveItem(mesId, r.funcionario_id);
-      const h = Math.round(Number(r.minutos || 0) / 6) / 10;
-      const it = todos('cb_hh_itens').find(x => x.id === id);
+      const h = horasDe_(r);
+      const it = todos('cb_hh_itens').find(x => x.mes === mesId && (x.id === id || x.funcionario_id === r.funcionario_id));
       if (!it) {
         novos++;
         await gravar('cb_hh_itens', { id, mes: mesId, funcionario_id: r.funcionario_id, cadastro: r.cadastro || null, nome: r.nome,
           relacao: relacaoDe(r.tipo_contrato), horas_pessoas: h, horas_manual: null,
           salario_bruto: temValor(r.salario) ? Number(r.salario) : null, recibo: null, lancado_agro: false, incluido: true });
-      } else if (Number(it.horas_pessoas) !== h) {
+      } else if (Number(it.horas_pessoas || 0) !== h || it.nome !== r.nome || it.incluido === false && it.obs === 'fora do cadastro de ativos') {
         mudou++;
-        await gravar('cb_hh_itens', { ...it, horas_pessoas: h, obs: it.obs === 'sem boletim na competência' ? null : it.obs });
+        await gravar('cb_hh_itens', { ...it, horas_pessoas: h, nome: r.nome, cadastro: r.cadastro || it.cadastro,
+          incluido: it.obs === 'fora do cadastro de ativos' ? true : it.incluido,
+          obs: it.obs === 'fora do cadastro de ativos' ? null : it.obs });
       }
     }
-    aviso(`Horas do Pessoas atualizadas: ${mudou} alterada(s), ${novos} pessoa(s) nova(s).`);
+    // quem está no mês com cadastro do Pessoas mas não é mais ativo nem tem boletim
+    for (const it of itensDoMes(mesId)) {
+      if (it.funcionario_id && !ids.has(it.funcionario_id) && it.incluido !== false) {
+        sairam++;
+        await gravar('cb_hh_itens', { ...it, incluido: false, obs: 'fora do cadastro de ativos' });
+      }
+    }
+    aviso(`Pessoas: ${novos} entrou(aram), ${mudou} atualizado(s), ${sairam} fora por não estar(em) ativo(s).`);
   } catch (e) { aviso(e.message || 'Não consegui ler o Pessoas.', true); }
   finally { lendoPessoas = false; desenhar(); }
 }
@@ -301,7 +322,7 @@ function desenharFolha(c) {
       <td class="dir">${esc(num(l.horas, 1))}${l.origemHoras === 'padrao' ? '*' : ''}</td><td class="dir">${esc(num(l.salario_bruto))}</td><td class="dir">${esc(num(l.recibo))}</td>
       <td class="dir">${esc(num(l.total))}</td><td class="dir"><b>${l.rh !== null ? esc(num(l.rh)) : '—'}</b></td></tr>`).join('')}</tbody>
     <tfoot><tr class="rel-total"><td></td><td>Total</td><td>${c.pessoas} pessoas</td><td class="dir">${esc(num(c.horasTodas, 1))}</td><td></td><td></td><td class="dir">${esc(num(c.folha))}</td><td class="dir">${c.media !== null ? esc(num(c.media)) : '—'}</td></tr></tfoot></table>
-    <p class="dc-sem" style="font-size:7.5pt;color:#51534A">Encargos: fixo ${esc(num(parametros().encargo_fixo, 4))} · temporário ${esc(num(parametros().encargo_temporario, 4))}. * horas padrão do mês (sem boletim no Pessoas).</p>
+    <p class="dc-sem" style="font-size:7.5pt;color:#51534A">Encargos: fixo ${esc(num(parametrosDoMes(mesSel).encargo_fixo, 4))} · temporário ${esc(num(parametrosDoMes(mesSel).encargo_temporario, 4))}. * horas padrão do mês (sem boletim no Pessoas).</p>
     <div class="rel-pe"><small>Hora-homem · ${esc(nomeMes(mesSel))} · emitido em ${new Date().toLocaleDateString('pt-BR')}</small><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
 }
@@ -340,7 +361,7 @@ function desenharHistorico() {
     <div class="cb-rolagem"><table class="dc-planilha cb-tab">
       <thead><tr><th>Competência</th><th>Situação</th><th class="dir">Pessoas</th><th class="dir">Horas</th><th class="dir">Folha</th><th class="dir">Custo c/ encargos</th><th class="dir">R$/h médio</th><th></th></tr></thead>
       <tbody>${lista.slice().reverse().map(m => { const c = calcularMesHH(m.id); return `<tr>
-        <td><b>${esc(nomeMes(m.id))}</b></td><td>${m.status === 'fechado' ? '<span class="tag ativo">fechado</span>' : '<span class="tag alerta">aberto</span>'}</td>
+        <td><b>${esc(nomeMes(m.id))}</b></td><td>${m.status === 'fechado' ? `<span class="cb-cadeado">${CADEADO} Fechado</span>` : '<span class="tag alerta">aberto</span>'}</td>
         <td class="dir">${c.pessoas}</td><td class="dir">${esc(num(c.horasTodas, 1))}</td><td class="dir">${esc(num(c.folha))}</td>
         <td class="dir">${esc(num(c.custo))}</td><td class="dir"><b>${c.media !== null ? esc(num(c.media)) : '—'}</b></td>
         <td class="dir"><button class="btn mini" type="button" data-abrir="${esc(m.id)}">Abrir</button></td></tr>`; }).join('')}</tbody></table></div>
@@ -360,7 +381,8 @@ function desenharIndices() {
   if (!pronto() || carregando()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const p = parametros();
   const NOMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  alvo.innerHTML = `<form id="hhIndForm" autocomplete="off">
+  alvo.innerHTML = `<p class="cb-param-aviso"><span class="cb-cadeado">${CADEADO} Cadeado</span> Estes parâmetros valem para os meses <b>abertos</b> e os próximos. Mês <b>fechado</b> guardou o encargo e a hora padrão do dia do fechamento e não muda.</p>
+  <form id="hhIndForm" autocomplete="off">
     <div class="grade">
       <label class="campo">Encargo fixo <input type="text" name="fixo" inputmode="decimal" value="${esc(num(p.encargo_fixo, 4))}"></label>
       <label class="campo">Encargo temporário <input type="text" name="temp" inputmode="decimal" value="${esc(num(p.encargo_temporario, 4))}"></label>
@@ -379,7 +401,7 @@ function desenharIndices() {
     for (let i = 1; i <= 12; i++) { const k = String(i).padStart(2, '0'); const v = lerNumero(f.get('h' + k)); if (v !== null && !Number.isNaN(v)) horas[k] = v; }
     const atual = todos('cb_hh_parametros').find(x => x.id === 'geral') || { id: 'geral' };
     await gravar('cb_hh_parametros', { ...atual, id: 'geral', encargo_fixo: fixo, encargo_temporario: temp, horas_padrao: horas });
-    aviso('Índices salvos. Valem para todos os meses abertos e para a conta dos fechados.');
+    aviso('Parâmetros salvos. Valem para os meses abertos; os fechados (cadeado) não mudam.');
   });
 }
 

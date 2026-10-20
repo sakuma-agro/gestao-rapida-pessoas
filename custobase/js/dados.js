@@ -76,6 +76,13 @@ export const idItem = (mesId, talhaoId) => mesId + ':' + talhaoId;
 export const itensDoMes = mesId => todos('cb_itens').filter(i => i.mes === mesId);
 export const mesFechado = mesId => (mes(mesId) || {}).status === 'fechado';
 
+/* ---- cadeado do mês fechado (pedido dele, 20/10/2026) ----
+   Mês fechado fica travado: na tela não se edita e o banco recusa qualquer
+   mudança nas linhas dele (gatilho cb_trava_*). Parâmetro alterado depois
+   não mexe no que já foi fechado. */
+export const CADEADO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+export const seloFechado = (por, em) => `<span class="cb-cadeado" title="Mês fechado: travado. Mudança de parâmetro não altera este mês.">${CADEADO} Fechado</span>${por ? ` <span class="dc-sem">por ${esc(por)}${em ? ' em ' + esc(dataHora(em)) : ''}</span>` : ''}`;
+
 /* ---- a conta ---- */
 export const pesoDe = i => Number(i.indice || 0) * Number(i.area || 0) * (12 / Number(i.ciclo || 1));
 

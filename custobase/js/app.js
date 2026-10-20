@@ -3,7 +3,7 @@
 // Esta página mora numa moldura do app principal: quem entra, sai, instala e
 // troca senha é o LOP, e quem pode abrir a área é marcado em Usuários -
 // Acessos (módulo 'custobase'). Aqui não há login nem topo de marca.
-import { MODULOS, telasDe, montarMenu, mostrarInicio, abrirModulo } from './acesso.js';
+import { MODULOS, telasDe, subsDe, montarMenu, mostrarInicio, abrirModulo, svgIcone } from './acesso.js';
 import { abrirRateio } from './rateio.js';
 import { abrirHistorico } from './historico.js';
 import { abrirTalhoes } from './talhoes.js';
@@ -35,8 +35,19 @@ window.abrirTelaCustoBase = tela => {
   if (m) abrirModulo(m.id, tela);
 };
 
-/* Atalhos da tela de entrada. */
-document.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => window.abrirTelaCustoBase(b.dataset.ir)));
+/* Acesso rápido da tela inicial (lateral, como no Pessoas): as telas de cada
+   módulo, agrupadas pelo nome do módulo; a primeira em destaque. */
+function desenharAtalhos() {
+  const nav = $('atalhosInicio');
+  if (!nav) return;
+  let primeiro = true;
+  nav.innerHTML = MODULOS.map(m => `<div class="ql-grupo">${m.nome}</div>` + subsDe(m).flatMap(s => s.telas).map(([t, rot, ic]) => {
+    const b = `<button type="button" class="ql-item${primeiro ? ' prim' : ''}" data-ir="${t}">${svgIcone(ic)}<span>${rot.replace(/ \(.*\)$/, '')}</span></button>`;
+    primeiro = false; return b;
+  }).join('')).join('');
+  nav.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => window.abrirTelaCustoBase(b.dataset.ir)));
+}
+desenharAtalhos();
 
 montarMenu(abrirAba);
 

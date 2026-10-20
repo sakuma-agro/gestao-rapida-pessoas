@@ -6,7 +6,7 @@
 <title>Custo Base · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=1">
-<link rel="stylesheet" href="css/custobase.css?v=2">
+<link rel="stylesheet" href="css/custobase.css?v=4">
 <!-- Área Custo Base do LOP - Gestão Rápida (20/10/2026).
      Módulo Rateio mensal culturas: substitui a planilha "Rateio - Direcionador
      Mensal ADM". Esta página não abre sozinha: mora dentro do app principal
@@ -30,6 +30,7 @@
     <!-- Nome, marcas, sair e instalar ficam no topo do LOP, acima da moldura. -->
     <nav class="abas" role="tablist" id="navModulos"></nav>
     <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
+    <nav class="aba3s" role="tablist" id="navSub" hidden></nav>
   </header>
 
   <main>
@@ -41,16 +42,21 @@
     </div>
 
     <!-- ---- ENTRADA: nenhum módulo aberto ---- -->
-    <section class="tela inicio" id="telaInicio">
-      <h2>Custo Base <span>Rateio e direcionadores</span></h2>
-      <p class="in-dica">Módulos <strong>Rateio mensal culturas</strong> (o direcionador do custo administrativo por plantio) e <strong>Hora-homem</strong> (o custo da hora de cada funcionário do campo, com as horas do Pessoas).</p>
-      <div class="cb-atalhos naoimprimir">
-        <button type="button" class="cb-atalho prim" data-ir="rtMes"><b>Rateio do mês</b><small>criar o mês, ajustar plantios, % e R$</small></button>
-        <button type="button" class="cb-atalho" data-ir="rtHistorico"><b>Histórico</b><small>meses e linha do tempo dos plantios</small></button>
-        <button type="button" class="cb-atalho" data-ir="rtTalhoes"><b>Plantios</b><small>Cód. Agro, cultura, área</small></button>
-        <button type="button" class="cb-atalho" data-ir="rtCulturas"><b>Culturas</b><small>índice, ciclo e meses no rateio</small></button>
-        <button type="button" class="cb-atalho prim" data-ir="hhMes"><b>Hora-homem do mês</b><small>horas do Pessoas, salário e recibo, R$/h</small></button>
-        <button type="button" class="cb-atalho" data-ir="hhHistorico"><b>Hora-homem · histórico</b><small>R$/h por pessoa mês a mês</small></button>
+    <section class="tela inicio cb-inicio" id="telaInicio">
+      <!-- Tela inicial no mesmo desenho do Pessoas (pedido dele, 20/10/2026):
+           acesso rápido na lateral, marca SAKUMA ao centro, assinatura LOP. -->
+      <div class="ini-lateral">
+        <nav class="ql naoimprimir" id="atalhosInicio" aria-label="Acesso rápido"></nav>
+        <div class="ini-centro">
+          <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
+          <h2>Gestão Rápida <span>Custo Base</span></h2>
+          <p class="in-dica">Escolha um atalho ao lado ou um módulo no menu acima.</p>
+          <div class="lop-ass in-lop-escuro" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
+            <img src="img/lop-marca.png" alt=""><span class="lop-div"></span>
+            <span class="lop-txt"><b>DESENVOLVIDO POR LOP</b><span>INTELIGÊNCIA PARA O AGRONEGÓCIO</span></span>
+          </div>
+          <img class="in-lop in-lop-claro" src="img/lop-assinatura-laser-claro.png" alt="">
+        </div>
       </div>
     </section>
 
@@ -92,7 +98,7 @@
     <section class="tela" id="telaHhMes" hidden>
       <div class="cartao">
         <h2>Hora-homem do mês</h2>
-        <p class="dica">As horas trabalhadas vêm do Pessoas (DP › Gestão de jornada, pela competência). Digite o salário bruto e o recibo do holerite; o R$/h sai na hora.</p>
+        <p class="dica">A lista vem do cadastro de ativos do Pessoas (setor CAMPO) e as horas trabalhadas do DP › Gestão de jornada, pela competência. Digite o salário bruto e o recibo do holerite; o R$/h sai na hora.</p>
         <div id="hhMesCorpo"></div>
       </div>
       <div class="previa" id="hhFolha"></div>
@@ -128,7 +134,7 @@
 <script src="../vendor/xlsx-js-style.min.js" defer></script>
 <script src="js/config.js?v=2"></script>
 <script src="../js/moldura-nucleo.js?v=4"></script>
-<script src="js/base.js?v=2"></script>
-<script type="module" src="js/app.js?v=2"></script>
+<script src="js/base.js?v=3"></script>
+<script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>

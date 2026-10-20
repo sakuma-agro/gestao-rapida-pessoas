@@ -7,7 +7,7 @@
 // O custo ADM do mês é opcional: sem ele sai só o % (direcionador).
 import { $, esc, pronto, carregando, todos, gravar, aviso, souAdmin, meuNome, lerNumero, num, pct, reais,
   mes, meses, ultimoMes, mesAtual, mesAnterior, mesSeguinte, nomeMes, mesCurto, idItem, itensDoMes, mesFechado,
-  calcularMes, mesesParticipados, mesesDaCultura, situacaoCiclo, talhoes, talhao, cultura, culturas, nomeCurto, dataHora } from './dados.js';
+  calcularMes, mesesParticipados, mesesDaCultura, situacaoCiclo, talhoes, talhao, cultura, culturas, nomeCurto, dataHora, seloFechado } from './dados.js';
 import { etiquetaMeses, novoPlantioModal, editar as editarPlantio } from './talhoes.js';
 import { baixarXlsx } from '../../js/excel.js';
 
@@ -34,7 +34,7 @@ function desenhar() {
       </div>
       <div class="cb-mes-estado">${m
         ? (m.status === 'fechado'
-          ? `<span class="tag ativo">fechado</span> <span class="dc-sem">por ${esc(m.fechado_por || '—')} em ${esc(dataHora(m.fechado_em))}</span>`
+          ? seloFechado(m.fechado_por, m.fechado_em)
           : '<span class="tag alerta">aberto</span>')
         : '<span class="tag neutra">mês ainda não criado</span>'}</div>
     </div>`;
@@ -167,13 +167,13 @@ function desenhar() {
   }));
   alvo.querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', () => editarPlantio(b.dataset.ed, desenhar)));
   $('cbFechar')?.addEventListener('click', async () => {
-    if (!confirm(`Fechar o rateio de ${nomeMes(mesSel)}? Depois de fechado só o administrador reabre.`)) return;
+    if (!confirm(`Fechar o rateio de ${nomeMes(mesSel)}?\n\nO mês fica com cadeado: os números ficam travados e mudar o índice ou o ciclo de uma cultura não altera mais este mês. Só o administrador reabre.`)) return;
     await gravar('cb_meses', { ...m, status: 'fechado', fechado_por: meuNome(), fechado_em: new Date().toISOString() });
     aviso('Mês fechado.');
     desenhar();
   });
   $('cbReabrir')?.addEventListener('click', async () => {
-    if (!confirm(`Reabrir o rateio de ${nomeMes(mesSel)}?`)) return;
+    if (!confirm(`Reabrir o rateio de ${nomeMes(mesSel)}? O cadeado sai e o mês volta a aceitar mudanças.`)) return;
     await gravar('cb_meses', { ...m, status: 'aberto', fechado_por: null, fechado_em: null });
     desenhar();
   });

@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v260';
+const VERSAO = 'gr-v261';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -62,7 +62,7 @@ const ARQUIVOS = [
   './custobase/', './custobase/index.html', './custobase/css/app.css', './custobase/css/custobase.css',
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
   './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js',
-  './custobase/img/sakuma-logo.png', './custobase/img/lop-marca.png',
+  './custobase/img/sakuma-logo.png', './custobase/img/lop-marca.png', './custobase/img/sakuma-marca-vertical.png', './custobase/img/lop-assinatura-laser-claro.png',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
   './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v1.svg',
