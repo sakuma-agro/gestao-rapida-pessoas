@@ -327,11 +327,12 @@ function desenharSalarios() {
       <label class="campo" style="flex:1;min-width:200px">Buscar<input type="search" id="rsBusca" value="${esc(S.busca)}" placeholder="Nome, fazenda ou cargo"></label>
       <label class="campo">Mostrar<select id="rsFiltro">${FILTROS.map(([k, t]) => `<option value="${k}" ${k === S.filtro ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     </div>
-    <div class="rolagem" style="margin-top:12px">
+    ${legenda(todos)}
+    <div class="rolagem" style="margin-top:8px">
     <table class="dc-planilha rs-tab"><thead><tr><th>Funcionário</th><th>Cargo</th><th class="ce">Faixa</th>
       <th class="ce">Salário atual</th><th>Posição na tabela</th><th>Próximo passo</th><th></th></tr></thead><tbody>
       ${lista.map(x => `<tr>
-        <td><b>${esc(x.f.nome)}</b><br><span class="dc-sem">${esc(x.f.fazenda || '')}</span></td>
+        <td><span class="tv-led tv-${x.pos.cls}" title="${esc(x.pos.txt)}"></span><b>${esc(x.f.nome)}</b><br><span class="dc-sem" style="margin-left:18px">${esc(x.f.fazenda || '')}</span></td>
         <td>${x.cargo ? esc(x.cargo.nome) : `<span class="dc-sem">${esc(x.f.cargo || '—')}</span><br><span class="tag neutra">fora do plano</span>`}</td>
         <td class="ce">${x.faixa ? `<b>${x.faixa}</b>` : '—'}${x.faixaObs ? `<br><span class="dc-sem rs-fobs" title="Observação do enquadramento">${aberto ? esc(x.faixaObs) : esc(x.faixaObs.replace(/R\$ [\d.,]+/, 'R$ •••'))}</span>` : ''}${x.faixaCadastro && x.s?.faixa && x.faixaCadastro !== x.s.faixa ? `<br><span class="tag alerta" title="O cadastro diz faixa ${x.faixaCadastro}">cadastro: ${x.faixaCadastro}</span>` : ''}</td>
         <td class="ce">${x.sal != null ? `<b>${V(x.sal)}</b>${temAdicional(x) ? `<br><span class="dc-sem" title="Salário base + adicionais que somam no plano">${quebra(x.base, x.peric, x.grat, V)}</span>` : ''}<br><span class="dc-sem">desde ${br(x.s.desde)}</span>${x.insal ? `<br><span class="tag neutra" title="Só anotação — não entra na soma">insalubridade ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ': ' + V(x.insal.valor) : ''}</span>` : ''}` : '<span class="tag perigo">sem salário</span>'}
@@ -347,10 +348,27 @@ function desenharSalarios() {
 
   $('rsBusca').addEventListener('input', e => { S.busca = e.target.value; desenharSalarios(); const b = $('rsBusca'); b.focus(); b.setSelectionRange(b.value.length, b.value.length); });
   $('rsFiltro').addEventListener('change', e => { S.filtro = e.target.value; desenharSalarios(); });
+  tela.querySelectorAll('[data-rs-leg]').forEach(b => b.addEventListener('click', () => {
+    S.filtro = S.filtro === b.dataset.rsLeg ? '' : b.dataset.rsLeg; desenharSalarios(); }));
   ligarOlho('rsOlho', desenharSalarios);
   tela.querySelectorAll('[data-rs-abrir]').forEach(b => b.addEventListener('click', () => abrirFicha(b.dataset.rsAbrir)));
   $('rsRel').addEventListener('click', () => pedirSenha(() => { desenharSalarios(); mostrar(relSalarios(lista), { barra: true }); }));
   $('rsCsv').addEventListener('click', () => pedirSenha(() => { desenharSalarios(); csvSalarios(lista); }));
+}
+
+/* Legenda de cores (estilo TOTVS, 20/10/2026): o quadradinho de cada linha diz
+   a situação sem abrir nada; clicar numa cor filtra a lista (clicar de novo
+   desfaz). As cores são as mesmas das etiquetas de "Posição na tabela". */
+const LEGENDA = [
+  ['ativo',  'nafaixa', 'Na faixa',       x => x.pos.letra],
+  ['perigo', 'abaixo',  'Abaixo da faixa', x => x.pos.abaixo],
+  ['alerta', 'fora',    'Entre/acima',    x => x.pos.entre || x.pos.acima],
+  ['neutra', 'sem',     'Sem salário ou fora do plano', x => x.sal == null || !x.cargo],
+];
+function legenda(todos) {
+  return `<div class="rs-legenda" role="group" aria-label="Legenda"><b>Legenda</b>${LEGENDA.map(([cls, k, rot, teste]) => `
+    <button type="button" data-rs-leg="${k}" aria-pressed="${S.filtro === k}" title="Mostrar só ${rot.toLowerCase()}">
+      <span class="tv-led tv-${cls}"></span>${rot} <strong>${todos.filter(teste).length}</strong></button>`).join('')}</div>`;
 }
 
 function proxTxt(x) {

@@ -87,7 +87,13 @@ export const MODULOS = [
     { id: 'disc', nome: 'DISC', telas: [
       ['disc', 'Perfil comportamental'],
     ] },
-    { id: 'cargos', nome: 'Cargos e salários', telas: [
+    /* Piloto "estilo TOTVS" (20/10/2026, pedido dele — "vamos testar no
+       gestão de pessoas, o TOTVS"): a faixa de telas some e no lugar entra um
+       rodapé fixo de ações, sempre no mesmo lugar; as telas em `acoes` ficam
+       atrás de "Ações relacionadas ▾", como no Protheus. `inicial` é a tela
+       de trabalho que abre primeiro. Tirar `acoes` volta ao padrão. */
+    { id: 'cargos', nome: 'Cargos e salários', inicial: 'rhSalarios',
+      acoes: ['rhSalProj', 'rhEnquadra', 'rhReajuste', 'rhProposta'], telas: [
       ['rhCargos', 'Plano de cargos'],
       /* Salários e projeção por pessoa (01/10/2026) — js/rh-salarios.js. */
       ['rhSalarios', 'Salários'],
@@ -497,6 +503,7 @@ export function desmarcarModulos() {
   $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
   $('navTelas').hidden = true;
   $('navSub').hidden = true;
+  pintarRodape(null);
 }
 
 /** A tela aberta na faixa agora (null no início da área). */
@@ -512,6 +519,7 @@ export function mostrarInicio() {
   $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
   $('navTelas').hidden = true;
   $('navSub').hidden = true;
+  pintarRodape(null);
   aoTrocar('inicio');
 }
 
@@ -524,6 +532,7 @@ export function abrirModulo(id, tela) {
   if (id === 'config') {
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
+    pintarRodape(null);
     aoTrocar('config');
     return;
   }
@@ -595,6 +604,13 @@ function pintarFaixa(id, subs) {
       <button type="button" class="rb-btn rb-sub" data-sub="${s.id}" aria-selected="${s === atual}" title="${esc(s.nome)}">
         ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span>${s.telas.length > 1 ? `<small>${s.telas.length} telas</small>` : ''}</button>`).join('')}
     </div></section>`;
+  } else if (subs.find(x => x.id === faixaEstado.sub)?.acoes) {
+    // Submódulo no estilo TOTVS: a faixa some; as ações ficam no rodapé fixo.
+    faixa.hidden = true;
+    faixa.innerHTML = '';
+    pintarRodape(id, subs, subs.find(x => x.id === faixaEstado.sub));
+    aposFaixa(id);
+    return;
   } else {
     // Dentro de um submódulo: voltar + as telas dele.
     const s = subs.find(x => x.id === faixaEstado.sub);
@@ -605,6 +621,7 @@ function pintarFaixa(id, subs) {
         <div class="rb-botoes">${s.telas.map(([t, rot]) => botaoTela(t, rot)).join('')}</div>
         <div class="rb-rotulo">${esc(s.nome)}</div></section>`;
   }
+  pintarRodape(null);
 
   faixa.querySelectorAll('[data-tela]').forEach(b =>
     b.addEventListener('click', () => {
@@ -615,7 +632,8 @@ function pintarFaixa(id, subs) {
   faixa.querySelectorAll('[data-sub]').forEach(b =>
     b.addEventListener('click', () => {
       const s = subs.find(x => x.id === b.dataset.sub);
-      const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
+      const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id]
+        : (s.inicial && s.telas.some(([x]) => x === s.inicial)) ? s.inicial : s.telas[0][0];
       faixaEstado.tela = t;
       faixaEstado.sub = s.telas.length > 1 ? s.id : null;
       pintarFaixa(id, subs);
@@ -630,6 +648,66 @@ function pintarFaixa(id, subs) {
   faixa.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   sombraFaixa();
   requestAnimationFrame(sombraFaixa);
+}
+
+/* ---------- rodapé de ações, estilo TOTVS (20/10/2026, piloto) ----------
+   Para submódulo com `acoes`: uma barra fixa no pé da tela, sempre no mesmo
+   lugar, com as telas principais, "Ações relacionadas ▾" (as telas em
+   `acoes`, num menu que abre para cima) e "Sair" (volta aos submódulos).
+   No celular é a barra de baixo, ao alcance do polegar. `pintarRodape(null)`
+   esconde. O elemento é o #navRodape do index.html. */
+function pintarRodape(id, subs, s) {
+  const r = $('navRodape');
+  if (!r) return;
+  if (!id || !s) { r.hidden = true; r.innerHTML = ''; document.body.classList.remove('com-rodape'); return; }
+  const mod = modPorId(id);
+  const acoes = new Set(s.acoes || []);
+  const principais = s.telas.filter(([t]) => !acoes.has(t));
+  const relacionadas = s.telas.filter(([t]) => acoes.has(t));
+  const atualRel = relacionadas.find(([t]) => t === faixaEstado.tela);
+  const botao = ([t, rot]) => `<button type="button" class="tv-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}">
+      ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`;
+  r.innerHTML = `<div class="tv-int">
+      <span class="tv-rotulo">${esc(s.nome)}</span>
+      ${principais.map(botao).join('')}
+      ${relacionadas.length ? `<span class="tv-rel">
+        <button type="button" class="tv-btn tv-acoes" data-acoes aria-haspopup="menu" aria-expanded="false" aria-selected="${!!atualRel}">
+          ${svgIcone('lista')}${atualRel ? `<span>${esc(atualRel[1])}</span>` : '<span class="tv-longo">Ações relacionadas</span><span class="tv-curto">Ações</span>'}<i aria-hidden="true">▾</i></button>
+        <div class="tv-menu" role="menu" hidden>${relacionadas.map(([t, rot]) => `
+          <button type="button" role="menuitem" data-tela="${t}" aria-selected="${t === faixaEstado.tela}">${svgIcone(ICONE_TELA[t] || 'lista')}<span>${esc(rot)}</span></button>`).join('')}</div></span>` : ''}
+      <button type="button" class="tv-btn tv-sair" data-sair title="Voltar aos submódulos de ${esc(mod?.nome || '')}">
+        ${svgIcone('seta-esq')}<span>Sair</span></button>
+    </div>`;
+  r.hidden = false;
+  document.body.classList.add('com-rodape');
+
+  const menu = r.querySelector('.tv-menu');
+  const gatilho = r.querySelector('[data-acoes]');
+  const fechar = () => { if (menu) { menu.hidden = true; gatilho?.setAttribute('aria-expanded', 'false'); } };
+  gatilho?.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const abre = menu.hidden;
+    menu.hidden = !abre;
+    gatilho.setAttribute('aria-expanded', String(abre));
+  });
+  r.querySelectorAll('[data-tela]').forEach(b => b.addEventListener('click', () => {
+    fechar();
+    faixaEstado.tela = b.dataset.tela;
+    ultimaTela[s.id] = b.dataset.tela;
+    pintarRodape(id, subs, s);          // marca o botão/menu
+    marcarTela(id, subs, b.dataset.tela, true);
+  }));
+  r.querySelector('[data-sair]').addEventListener('click', () => {
+    fechar();
+    faixaEstado.sub = null;
+    pintarRodape(null);
+    pintarFaixa(id, subs);
+  });
+  if (!pintarRodape.ligado) {
+    pintarRodape.ligado = true;
+    document.addEventListener('click', ev => { if (!ev.target.closest?.('.tv-rel')) $('navRodape')?.querySelectorAll('.tv-menu').forEach(m => { m.hidden = true; }); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('navRodape')?.querySelectorAll('.tv-menu').forEach(m => { m.hidden = true; }); });
+  }
 }
 
 /* Faixa maior que a tela (o DP tem muitas telas): um esmaecido na borda avisa
