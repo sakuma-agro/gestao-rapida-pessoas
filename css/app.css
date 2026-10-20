@@ -1623,7 +1623,7 @@ body.com-rodape .faixa-versao{bottom:72px}
 @media (min-width:761px){
   body.tv-lateral{padding-left:84px}
   body.tv-lateral #navModulos{position:fixed;left:0;top:0;bottom:0;width:84px;max-width:none;margin:0;z-index:21;
-    padding:calc(var(--topo-h,58px) + 10px) 6px 12px;display:flex;flex-direction:column;align-items:stretch;gap:4px;
+    padding:calc(var(--tv-topo-h,58px) + 10px) 6px 12px;display:flex;flex-direction:column;align-items:stretch;gap:4px;
     overflow-y:auto;overflow-x:hidden;background:var(--papel);border-right:1px solid var(--linha)}
   body.tv-lateral #navModulos .aba{flex-direction:column;justify-content:center;gap:4px;width:100%;min-height:60px;padding:8px 4px;
     border:0;border-radius:10px;background:transparent;color:var(--suave);font-size:11px;font-weight:700;line-height:1.15;
