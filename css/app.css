@@ -1618,7 +1618,7 @@ body.com-rodape .faixa-versao{bottom:72px}
 /* ---------- estilo TOTVS na área Pessoas (20/10/2026) ----------
    body.tv-lateral (js/app.js abrirAba): a barra de módulos do Pessoas
    (#navModulos, com "Início") vira menu lateral estreito de ícones no
-   computador e barra fixa embaixo no celular. --topo-h é a altura da faixa
+   computador e barra fixa embaixo no celular. --tv-topo-h é a altura da faixa
    de cima (medida em js/app.js). */
 @media (min-width:761px){
   body.tv-lateral{padding-left:84px}
@@ -1707,3 +1707,7 @@ body.com-rodape .ia-botao{bottom:76px !important}
   .tv-sair{position:sticky;right:0;background:var(--papel)}
 }
 body.tv-menu-aberto .ia-botao{display:none !important}
+/* molduras no estilo TOTVS (Máquinas, Estoque, Custo Base): o Pergunte ao LOP
+   não cobre o rodapé de ações nem a barra de baixo de dentro da moldura */
+body.tv-moldura .ia-botao{bottom:76px !important}
+@media (max-width:760px){ body.tv-moldura .ia-botao{bottom:124px !important} }

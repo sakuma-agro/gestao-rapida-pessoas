@@ -4,7 +4,7 @@
 // dentro do LOP. Esta página mora numa moldura do app principal: quem entra,
 // sai, instala e troca senha é o LOP, e quem pode abrir a área é marcado em
 // Usuários - Acessos (módulo 'estoque'). Aqui não há login nem topo de marca.
-import { MODULOS, telasDe, montarMenu, mostrarInicio, abrirModulo } from './acesso.js';
+import { MODULOS, telasDe, montarMenu, mostrarInicio, abrirModulo, iconeTela, podeTela } from './acesso.js';
 import { ligarAcerto, abrirAcerto } from './acerto.js';
 import { abrirContagem, soltarContagem } from './contagem.js';
 import { abrirCadastro, soltarCadastro } from './cadastros.js';
@@ -19,7 +19,21 @@ const $ = id => document.getElementById(id);
 const TELAS = ['inicio', ...MODULOS.flatMap(m => telasDe(m).map(([t]) => t))];
 const idDaTela = t => 'tela' + t.charAt(0).toUpperCase() + t.slice(1);
 
+/* Atalhos da tela inicial (estilo TOTVS, 20/10/2026): as telas de uso do mês,
+   em cartões. Cada cartão abre a tela marcando o módulo no menu. */
+const ATALHOS = [['ctNova', 'Contar'], ['ctAndamento', 'Contagens do mês'], ['ctRepor', 'Reposição'],
+  ['ciLista', 'Compra inteligente'], ['qcVisao', 'Estoque Quebra Cocão'], ['acPainel', 'Acerto · Painel'],
+  ['acDivergencias', 'Divergências'], ['cadItens', 'Itens']];
+function desenharInicio() {
+  const nav = $('atalhosInicio');
+  if (!nav) return;
+  nav.innerHTML = ATALHOS.filter(([t]) => podeTela(t)).map(([t, rot]) =>
+    `<button type="button" class="ql-item" data-ir="${t}">${iconeTela(t)}<span>${rot}</span></button>`).join('');
+  nav.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => window.abrirTelaEstoque(b.dataset.ir)));
+}
+
 function abrirAba(nome) {
+  if (nome === 'inicio') desenharInicio();
   for (const t of TELAS) {
     const el = $(idDaTela(t));
     if (el) el.hidden = t !== nome;

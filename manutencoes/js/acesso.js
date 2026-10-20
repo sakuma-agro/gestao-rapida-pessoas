@@ -94,6 +94,12 @@ function montarMenu() {
     : `<button type="button" class="fantasma" disabled aria-disabled="true" title="Você não tem acesso a este módulo. Peça ao administrador.">${ic(m)}<span>${esc(m.nome)}</span></button>`).join('');
   $$('#menu button[data-modulo]').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
   $('#menu').hidden = false;
+  /* Estilo TOTVS (20/10/2026): menu lateral, rodapé de ações e início em
+     cartões — a pele compartilhada ../js/tv-moldura.js. */
+  if (window.TvMoldura && !montarMenu.tv) {
+    montarMenu.tv = true;
+    TvMoldura.ligar({ modulos: '#menu', telas: ['#menu2'], inicio: () => mostrarInicio() });
+  }
   mostrarInicio();
 }
 
@@ -201,7 +207,7 @@ TELAS.marca = el => {
       <section class="marca-inicio">
         <img class="mi-sakuma" src="../img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
         <h2>Gestão Rápida <span>Máquinas e Patrimônio</span></h2>
-        <p class="mi-dica">Escolha um atalho ao lado ou um módulo no menu acima.</p>
+        <p class="mi-dica">Escolha um cartão acima ou um módulo no menu.</p>
         <div class="lop-ass mi-lop" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
           <img src="../img/lop-marca.png" alt=""><span class="lop-div"></span>
           <span class="lop-txt"><b>DESENVOLVIDO POR LOP</b><span>INTELIGÊNCIA PARA O AGRONEGÓCIO</span></span>

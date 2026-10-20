@@ -12,7 +12,7 @@ import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
 import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
-  registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
+  registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa, montarLateral } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -264,7 +264,7 @@ export function entrarNaArea(id, tela, extra) {
 
   if (id === 'pessoas') {
     // a barra de módulos é de quem entrou por último: volta a ser a do Pessoas
-    if (barraVist()) montarMenu();
+    if (!$('navModulos').querySelector('[data-modulo="__inicio"]')) montarMenu();
     $('navModulos').hidden = false;
     if (tela === 'config') {
       abrirModulo('config');
@@ -283,8 +283,10 @@ export function entrarNaArea(id, tela, extra) {
   }
 
   if (id === 'certificacao') {
-    // O menu é a faixa do módulo 'cert'; a barra de módulos de Pessoas some.
-    $('navModulos').hidden = true;
+    /* Estilo TOTVS (20/10/2026): os submódulos da Certificação viram o menu
+       lateral (barra de baixo no celular), no lugar da barra do Pessoas. */
+    montarLateral('cert');
+    $('navModulos').hidden = false;
     abrirModulo('cert', tela && tela !== 'config' ? tela : undefined);
     return;
   }
