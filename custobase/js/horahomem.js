@@ -13,6 +13,7 @@
 import { $, esc, pronto, carregando, todos, gravar, aviso, souAdmin, meuNome, lerNumero, num, reais,
   mesAtual, mesAnterior, mesSeguinte, nomeMes, mesCurto, dataHora, semAcento, seloFechado, CADEADO } from './dados.js';
 import { baixarXlsx } from '../../js/excel.js';
+import { enviarWhatsapp, rodapeLop, botaoZap } from './pdf.js';
 
 let ouvindo = false;
 let mesSel = null;
@@ -131,8 +132,9 @@ function desenhar() {
         <button class="btn" type="button" id="hhAdd">+ Pessoa</button>`}
       </div>
       <div class="barra" style="margin:0">
+        ${botaoZap('hhZap')}
+        <button class="btn" type="button" id="hhImprimir">Imprimir</button>
         <button class="btn" type="button" id="hhExcel">Exportar Excel</button>
-        <button class="btn" type="button" id="hhImprimir">Imprimir / PDF</button>
         ${fechado ? (souAdmin() ? '<button class="btn" type="button" id="hhReabrir">Reabrir mês</button>' : '')
                   : '<button class="btn principal" type="button" id="hhFechar">Fechar mês</button>'}
       </div>
@@ -201,6 +203,7 @@ function desenhar() {
       encargo_fixo: null, encargo_temporario: null, horas_padrao: null }); desenhar();
   });
   $('hhImprimir').addEventListener('click', () => { desenharFolha(c); setTimeout(() => window.print(), 150); });
+  $('hhZap').addEventListener('click', e => enviarWhatsapp(pdfHH(c), resumoHH(c), e.currentTarget));
   $('hhExcel').addEventListener('click', () => exportar(c).catch(e => aviso(e.message || 'Não consegui gerar o Excel.', true)));
   desenharFolha(c);
 }
@@ -323,8 +326,28 @@ function desenharFolha(c) {
       <td class="dir">${esc(num(l.total))}</td><td class="dir"><b>${l.rh !== null ? esc(num(l.rh)) : '—'}</b></td></tr>`).join('')}</tbody>
     <tfoot><tr class="rel-total"><td></td><td>Total</td><td>${c.pessoas} pessoas</td><td class="dir">${esc(num(c.horasTodas, 1))}</td><td></td><td></td><td class="dir">${esc(num(c.folha))}</td><td class="dir">${c.media !== null ? esc(num(c.media)) : '—'}</td></tr></tfoot></table>
     <p class="dc-sem" style="font-size:7.5pt;color:#51534A">Encargos: fixo ${esc(num(parametrosDoMes(mesSel).encargo_fixo, 4))} · temporário ${esc(num(parametrosDoMes(mesSel).encargo_temporario, 4))}. * horas padrão do mês (sem boletim no Pessoas).</p>
-    <div class="rel-pe"><small>Hora-homem · ${esc(nomeMes(mesSel))} · emitido em ${new Date().toLocaleDateString('pt-BR')}</small><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+    ${rodapeLop()}
   </div>`;
+}
+
+function pdfHH(c) {
+  const m = mes(mesSel), p = parametrosDoMes(mesSel);
+  const linhas = c.linhas.filter(l => l.incluido !== false);
+  return {
+    titulo: 'Custo hora-homem · ' + nomeMes(mesSel),
+    subtitulo: `Funcionários do campo · R$/h = (salário bruto × encargo + recibo) ÷ horas · encargo fixo ${num(p.encargo_fixo, 4)}, temporário ${num(p.encargo_temporario, 4)}` + (m && m.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'),
+    arquivo: 'Hora-homem ' + mesSel,
+    kpis: [['Pessoas', c.pessoas], ['Horas', num(c.horasTodas, 1)], ['Folha', reais(c.folha)], ['Custo c/ encargos', reais(c.custo)], ['R$/h médio', c.media !== null ? reais(c.media) : '—']],
+    secoes: [{ titulo: 'Por funcionário', dir: [3, 4, 5, 6, 7],
+      head: ['Nº', 'Nome', 'Relação', 'Horas', 'Salário bruto', 'Recibo', 'Total', 'R$/h'],
+      body: linhas.map(l => [l.cadastro || '', l.nome, l.relacao, num(l.horas, 1) + (l.origemHoras === 'padrao' ? '*' : ''),
+        num(l.salario_bruto), num(l.recibo), num(l.total), l.rh !== null ? num(l.rh) : '—']),
+      total: ['', 'Total', c.pessoas + ' pessoas', num(c.horasTodas, 1), '', '', num(c.folha), c.media !== null ? num(c.media) : '—'] }],
+  };
+}
+function resumoHH(c) {
+  return `*Hora-homem · ${nomeMes(mesSel)}* — SAKUMA\n${c.pessoas} pessoas · ${num(c.horasTodas, 1)} h` +
+    `\nCusto c/ encargos ${reais(c.custo)} · R$/h médio ${c.media !== null ? reais(c.media) : '—'}`;
 }
 
 async function exportar(c) {

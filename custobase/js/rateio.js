@@ -15,6 +15,7 @@ import { $, esc, pronto, carregando, todos, gravar, aviso, souAdmin, meuNome, le
   entraNoMes, periodoDe, DIA_CORTE } from './dados.js';
 import { etiquetaMeses, editar as editarPlantio } from './talhoes.js';
 import { baixarXlsx } from '../../js/excel.js';
+import { enviarWhatsapp, rodapeLop, botaoZap } from './pdf.js';
 
 let ouvindo = false;
 let mesSel = null;
@@ -125,8 +126,9 @@ function desenhar() {
         <label class="cb-check"><input type="checkbox" id="cbAgroTodos"${agro === linhas.length && linhas.length ? ' checked' : ''}> marcar todos como lançados no Agro</label>
       </div>
       <div class="barra" style="margin:0">
+        ${botaoZap('cbZap')}
+        <button class="btn" type="button" id="cbImprimir">Imprimir</button>
         <button class="btn" type="button" id="cbExcel">Exportar Excel</button>
-        <button class="btn" type="button" id="cbImprimir">Imprimir / PDF</button>
         ${fechado ? (souAdmin() ? '<button class="btn" type="button" id="cbReabrir">Reabrir mês</button>' : '')
                   : '<button class="btn principal" type="button" id="cbFechar">Fechar mês</button>'}
       </div>
@@ -191,6 +193,7 @@ function desenhar() {
     desenhar();
   });
   $('cbImprimir').addEventListener('click', () => { desenharFolha(c); setTimeout(() => window.print(), 150); });
+  $('cbZap').addEventListener('click', e => enviarWhatsapp(pdfRateio(c), resumoRateio(c), e.currentTarget));
   $('cbExcel').addEventListener('click', () => exportarExcel(c).catch(e => aviso(e.message || 'Não consegui gerar o Excel.', true)));
   desenharFolha(c);
 }
@@ -236,7 +239,7 @@ function desenharFolha(c) {
     <p class="rel-secao">Por cultura</p>
     <table class="rel-tab rel-meia"><thead><tr><th>Cultura</th><th class="dir">Plantios</th><th class="dir">Área (ha)</th><th class="dir">%</th>${temRS ? '<th class="dir">R$</th>' : ''}</tr></thead>
     <tbody>${Object.entries(porCultura).sort((a, b) => b[1].pct - a[1].pct).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="dir">${v.n}</td><td class="dir">${esc(num(v.area))}</td><td class="dir"><b>${esc(pct(v.pct))}</b></td>${temRS ? `<td class="dir">${esc(num(v.valor))}</td>` : ''}</tr>`).join('')}</tbody></table>
-    <div class="rel-pe"><small>Rateio ADM · ${esc(nomeMes(mesSel))} · emitido em ${new Date().toLocaleDateString('pt-BR')}</small><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+    ${rodapeLop()}
   </div>`;
 }
 
@@ -266,6 +269,41 @@ async function exportarExcel(c) {
     linhas: culturas().map(x => [x.nome, Number(x.indice), Number(x.ciclo), x.permanente ? 'permanente' : String(mesesDaCultura(x))]),
   };
   await baixarXlsx('Rateio ADM ' + mesSel, [aba, abaCult]);
+}
+
+/* ---- PDF para o WhatsApp: o mesmo conteúdo da folha impressa ---- */
+function porCulturaDe(c) {
+  const g = {};
+  for (const l of c.linhas) {
+    const k = l.culturaNome;
+    g[k] = g[k] || { n: 0, area: 0, pct: 0, valor: 0 };
+    g[k].n++; g[k].area += Number(l.area || 0); g[k].pct += l.pct; g[k].valor += l.valor || 0;
+  }
+  return Object.entries(g).sort((a, b) => b[1].pct - a[1].pct);
+}
+function pdfRateio(c) {
+  const temRS = c.custo !== null;
+  return {
+    titulo: 'Rateio mensal por cultura · ' + nomeMes(mesSel),
+    subtitulo: 'Direcionador do custo administrativo por plantio · peso = índice × área × (12 ÷ ciclo)' + (c.mes.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'),
+    arquivo: 'Rateio ADM ' + mesSel,
+    kpis: [['Plantios', c.incluidos], ['Área (ha)', num(c.area)], ['Culturas', porCulturaDe(c).length], ['Soma dos pesos', num(c.total, 0)], ['Custo ADM', temRS ? reais(c.custo) : '—']],
+    secoes: [
+      { titulo: 'Por plantio', dir: temRS ? [3, 4, 5, 6, 7, 8, 9] : [3, 4, 5, 6, 7, 8],
+        head: ['Cód.', 'Plantio / talhão', 'Cultura', 'Área (ha)', 'Índice', 'Ciclo', 'Peso', '%', ...(temRS ? ['R$'] : []), 'Mês'],
+        body: c.linhas.map(l => [l.talhao.cod_agro || '', l.talhao.nome || '', l.culturaNome, num(l.area), num(l.indice, 0), String(l.ciclo),
+          num(l.peso, 0), pct(l.pct), ...(temRS ? [num(l.valor)] : []), l.meses + 'º' + (l.limite ? '/' + l.limite : '')]),
+        total: ['', 'Total', c.incluidos + ' plantios', num(c.area), '', '', num(c.total, 0), '100%', ...(temRS ? [num(c.custo)] : []), ''] },
+      { titulo: 'Por cultura', largura: 'meia', dir: temRS ? [1, 2, 3, 4] : [1, 2, 3],
+        head: ['Cultura', 'Plantios', 'Área (ha)', '%', ...(temRS ? ['R$'] : [])],
+        body: porCulturaDe(c).map(([k, v]) => [k, String(v.n), num(v.area), pct(v.pct), ...(temRS ? [num(v.valor)] : [])]) },
+    ],
+  };
+}
+function resumoRateio(c) {
+  const top = porCulturaDe(c).slice(0, 4).map(([k, v]) => `${k} ${pct(v.pct, 1)}`).join(' · ');
+  return `*Rateio ADM · ${nomeMes(mesSel)}* — SAKUMA\n${c.incluidos} plantios · ${num(c.area)} ha` +
+    (c.custo !== null ? ` · custo ADM ${reais(c.custo)}` : '') + `\n${top}`;
 }
 
 export function abrirRateio() {

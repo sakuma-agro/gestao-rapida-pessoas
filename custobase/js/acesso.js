@@ -34,15 +34,16 @@ export const MODULOS = [
      Parâmetros (a base) → Cadastro de plantios (data inicial e qtde de
      meses) → Rateio do mês (monta-se sozinho). Abre no Rateio do mês. */
   { id: 'rateio', nome: 'Rateio mensal culturas', icone: 'rateio', inicial: 'rtMes', subs: [
-    { id: 'rtSubParam', nome: '1 · Parâmetros', icone: 'param', telas: [
-      ['rtCulturas',  'Culturas (índice, ciclo e meses no rateio)', 'culturas'],
-    ] },
-    { id: 'rtSubCad', nome: '2 · Cadastro de plantios', icone: 'talhoes', telas: [
-      ['rtTalhoes',   'Plantios', 'talhoes'],
-    ] },
-    { id: 'rtSubRateio', nome: '3 · Rateio do mês', icone: 'rateio', telas: [
+    /* 20/10/2026, pedido dele: Rateio do mês em primeiro e Parâmetros em terceiro. */
+    { id: 'rtSubRateio', nome: 'Rateio do mês', icone: 'rateio', telas: [
       ['rtMes',       'Rateio do mês', 'mes'],
       ['rtHistorico', 'Histórico',     'historico'],
+    ] },
+    { id: 'rtSubCad', nome: 'Cadastro de plantios', icone: 'talhoes', telas: [
+      ['rtTalhoes',   'Plantios', 'talhoes'],
+    ] },
+    { id: 'rtSubParam', nome: 'Parâmetros', icone: 'param', telas: [
+      ['rtCulturas',  'Culturas (índice, ciclo e meses no rateio)', 'culturas'],
     ] },
   ] },
   /* Hora-homem (20/10/2026, pedido dele): a planilha "Controle Mensal -
