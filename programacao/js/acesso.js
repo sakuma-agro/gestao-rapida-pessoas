@@ -66,6 +66,9 @@ function montarMenu() {
     + (Acesso.admin ? `<button type="button" data-modulo="config">${ic('config')}<span>Configurações</span></button>` : fantasma('config', 'Configurações'));
   $$('#menu button[data-modulo]').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
   $('#menu').hidden = false;
+  /* Menu em categoria (20/10/2026, pedido dele): módulo aberto com os filhos
+     ao lado e as telas logo abaixo — ../js/categoria-moldura.js. */
+  if (window.CategoriaMoldura) window.CategoriaMoldura.ligar({ modulos: '#menu', filhos: '#menu2', inicio: () => mostrarInicio() });
   mostrarInicio();
 }
 

@@ -482,7 +482,7 @@ export function montarMenu(callback) {
 }
 
 /** A barra de módulos do topo. Cada área pinta a sua (Pessoas, Vistorias). */
-export function pintarModulos(itens) {
+export function pintarModulos(itens, op = {}) {
   moduloAberto = null;
   $('navModulos').innerHTML = itens.map(m => m.bloqueado
     ? `<button class="aba aba-fantasma${m.direita ? ' aba-config' : ''}" type="button" disabled aria-disabled="true" data-fantasma="${m.id}" title="Você não tem acesso a este módulo. Peça ao administrador.">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`
@@ -491,7 +491,10 @@ export function pintarModulos(itens) {
     b.addEventListener('click', () => {
       /* Categoria aberta (20/10/2026, pedido dele): clicar de novo no módulo
          fecha tudo e voltam os módulos principais. */
-      if ($('navModulos').classList.contains('aberto') && b.dataset.modulo === moduloAberto) return mostrarInicio();
+      if ($('navModulos').classList.contains('aberto') && b.dataset.modulo === moduloAberto) {
+        if (SEMPRE_ABERTO.has(b.dataset.modulo)) return;
+        return op.aoFechar ? op.aoFechar() : mostrarInicio();
+      }
       abrirModulo(b.dataset.modulo);
     }));
 }
@@ -599,7 +602,9 @@ function desenharFaixa(id, subs, tela) {
    submódulo, as telas dele aparecem LOGO ABAIXO. Clicar no módulo de novo
    fecha tudo. Vale para os módulos da barra do Pessoas; Certificação e
    Vistorias continuam como eram. */
-const emCategoria = id => !MENUS_AREA[id] && !!$('navModulos').querySelector(`.aba[data-modulo="${id}"]`);
+const emCategoria = id => !$('navModulos').hidden && !!$('navModulos').querySelector(`.aba[data-modulo="${id}"]`);
+/* Módulo que não fecha ao clicar de novo (Certificação: é o único da área). */
+const SEMPRE_ABERTO = new Set(['cert']);
 
 function pintarCategoria(id, subs) {
   const nav = $('navModulos');
@@ -611,7 +616,10 @@ function pintarCategoria(id, subs) {
   nav.classList.add('aberto');
   nav.querySelector('.mod-subs')?.remove();
   const mod = nav.querySelector(`.aba[data-modulo="${id}"]`);
-  if (mod) mod.title = 'Fechar ' + (modPorId(id)?.nome || '') + ' e voltar aos módulos';
+  if (mod) {
+    mod.classList.toggle('sem-fechar', SEMPRE_ABERTO.has(id));
+    mod.title = SEMPRE_ABERTO.has(id) ? (modPorId(id)?.nome || '') : 'Fechar ' + (modPorId(id)?.nome || '') + ' e voltar aos módulos';
+  }
   if (subs.length > 1 && mod) {
     const caixa = document.createElement('span');
     caixa.className = 'mod-subs';

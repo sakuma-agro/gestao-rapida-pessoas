@@ -1,0 +1,12 @@
+/* categoria-moldura.css — par do js/categoria-moldura.js (20/10/2026).
+   Módulo aberto: os outros principais somem, os filhos aparecem ao lado
+   (a faixa .cat-filhos vive dentro da barra) e o "✕" avisa que fecha. */
+[data-categoria]{display:flex;align-items:center;flex-wrap:nowrap;overflow-x:auto}
+[data-categoria].cat-aberto > button:not(.ativo):not([aria-selected="true"]){display:none !important}
+[data-categoria].cat-aberto > button.ativo::after,
+[data-categoria].cat-aberto > button[aria-selected="true"]::after{content:'✕';font-size:11px;margin-left:6px;opacity:.85}
+.cat-filhos{display:flex !important;align-items:center;gap:6px;flex:0 0 auto;width:auto !important;max-width:none !important;
+  margin:0 0 0 8px !important;padding:0 0 0 10px !important;border:0 !important;border-left:1px solid var(--linha, #dcdfd6) !important;
+  background:transparent !important;box-shadow:none !important;overflow:visible !important}
+.cat-filhos[hidden]{display:none !important}
+[data-categoria]:not(.cat-aberto) > .cat-filhos{display:none !important}

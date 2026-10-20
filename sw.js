@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v288';
+const VERSAO = 'gr-v289';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -31,6 +31,7 @@ const ARQUIVOS = [
   './icons/lop-gr-192.v1.png', './icons/lop-gr-512.v1.png',
   './icons/lop-gr-maskable-192.v1.png', './icons/lop-gr-maskable-512.v1.png',
   './icons/mod-manutencoes.v1.png', './icons/mod-certificacao.v1.png',
+  './js/categoria-moldura.js', './css/categoria-moldura.css',
   './manutencoes/', './manutencoes/index.html', './manutencoes/css/app.css',
   './manutencoes/js/config.js', './manutencoes/js/base.js', './manutencoes/js/comum.js',
   './manutencoes/js/acesso.js', './manutencoes/js/maquinas.js', './manutencoes/js/ordens.js',

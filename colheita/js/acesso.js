@@ -94,6 +94,9 @@ export function montarMenu(callback) {
     `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone)}<span>${esc(m.nome)}</span></button>`).join('');
   $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
+  /* Menu em categoria (20/10/2026, pedido dele): módulo aberto com os filhos
+     ao lado e as telas logo abaixo — ../js/categoria-moldura.js. */
+  if (window.CategoriaMoldura) window.CategoriaMoldura.ligar({ modulos: '#navModulos', filhos: '#navTelas', inicio: () => mostrarInicio() });
   mostrarInicio();
 }
 

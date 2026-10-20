@@ -1570,3 +1570,4 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .mod-subs .aba-sub[aria-selected="true"]{background:var(--verde-fundo);border-color:var(--verde);color:var(--verde-esc)}
 .mod-subs .aba-sub[aria-selected="true"] svg{color:var(--verde-esc)}
 @media (max-width:640px){ .mod-subs .aba-sub{font-size:12.5px;padding:6px 11px} }
+#navModulos.aberto > .aba.sem-fechar::after{content:none}

@@ -19,15 +19,15 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '31';
+const VERSAO_AREA = '32';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '9';
+const VERSAO_PROG = '10';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
-const VERSAO_EST = '8';
+const VERSAO_EST = '9';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
-const VERSAO_CB = '14';
+const VERSAO_CB = '15';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
-const VERSAO_CP = '1';
+const VERSAO_CP = '2';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -264,7 +264,8 @@ export function entrarNaArea(id, tela, extra) {
 
   if (id === 'pessoas') {
     // a barra de módulos é de quem entrou por último: volta a ser a do Pessoas
-    if (barraVist()) montarMenu();
+    // a barra é de quem entrou por último (Vistorias, Certificação): volta a ser a do Pessoas
+    if (!$('navModulos').querySelector('[data-modulo="pessoas"]')) montarMenu();
     $('navModulos').hidden = false;
     if (tela === 'config') {
       abrirModulo('config');
@@ -283,15 +284,19 @@ export function entrarNaArea(id, tela, extra) {
   }
 
   if (id === 'certificacao') {
-    // O menu é a faixa do módulo 'cert'; a barra de módulos de Pessoas some.
-    $('navModulos').hidden = true;
+    /* 20/10/2026, pedido dele (mesmo jeito em todas as áreas): na barra de
+       cima o módulo Certificação, com os submódulos ao lado e as telas do
+       submódulo logo abaixo. É o único módulo da área: não fecha. */
+    pintarModulos([{ id: 'cert', nome: 'Certificação', icone: 'check' }]);
+    $('navModulos').hidden = false;
     abrirModulo('cert', tela && tela !== 'config' ? tela : undefined);
     return;
   }
 
   if (id === 'vistorias') {
     if (!barraVist())
-      pintarModulos(VIST_MODULOS.map(m => ({ id: m.id, nome: m.nome, icone: m.icone, direita: m.direita })));
+      pintarModulos(VIST_MODULOS.map(m => ({ id: m.id, nome: m.nome, icone: m.icone, direita: m.direita })),
+        { aoFechar: () => entrarNaArea('vistorias') });
     $('navModulos').hidden = false;
     desmarcarModulos();
     vistPendente = null;
@@ -504,7 +509,7 @@ function pintarNumerosVist() {
   if (!faixa || !barraVist()) return;
   const porSub = {};
   VIST_MODULOS.forEach(m => m.subs.forEach(s => s.telas.forEach(([t]) => { porSub[s.id] = t; })));
-  faixa.querySelectorAll('[data-tela],[data-sub]').forEach(b => {
+  document.querySelectorAll('#navTelas [data-tela], #navTelas [data-sub], #navModulos .mod-subs [data-sub]').forEach(b => {
     const t = b.dataset.tela || porSub[b.dataset.sub];
     const n = vistNums[t];
     let el = b.querySelector('.rb-num');

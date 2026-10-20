@@ -94,6 +94,9 @@ function montarMenu() {
     : `<button type="button" class="fantasma" disabled aria-disabled="true" title="Você não tem acesso a este módulo. Peça ao administrador.">${ic(m)}<span>${esc(m.nome)}</span></button>`).join('');
   $$('#menu button[data-modulo]').forEach(b => b.onclick = () => abrirModulo(b.dataset.modulo));
   $('#menu').hidden = false;
+  /* Menu em categoria (20/10/2026, pedido dele): módulo aberto com os filhos
+     ao lado e as telas logo abaixo — ../js/categoria-moldura.js. */
+  if (window.CategoriaMoldura) window.CategoriaMoldura.ligar({ modulos: '#menu', filhos: '#menu2', inicio: () => mostrarInicio() });
   mostrarInicio();
 }
 

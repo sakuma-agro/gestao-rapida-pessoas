@@ -115,6 +115,9 @@ export function montarMenu(callback) {
     b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
+  /* Menu em categoria (20/10/2026, pedido dele): módulo aberto com os filhos
+     ao lado e as telas logo abaixo — ../js/categoria-moldura.js. */
+  if (window.CategoriaMoldura) window.CategoriaMoldura.ligar({ modulos: '#navModulos', filhos: '#navTelas', inicio: () => mostrarInicio() });
   mostrarInicio();
 }
 
