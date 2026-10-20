@@ -1552,65 +1552,6 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 @media (max-width:560px){.ar-grade{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
   .ar-cartao{padding:14px 6px 10px}.ar-cartao img{width:46px;height:46px}.ar-txt b{font-size:12.5px}}
 
-/* ---------- estilo TOTVS (20/10/2026, piloto em RH › Cargos e salários) ----------
-   Rodapé fixo de ações, sempre no mesmo lugar: telas principais, "Ações
-   relacionadas ▾" (menu que abre para cima) e "Sair". No celular vira a barra
-   de baixo, ao alcance do polegar. Legenda de cores na lista de Salários. */
-.tv-rodape{position:fixed;left:0;right:0;bottom:0;z-index:14;background:var(--papel);border-top:1px solid var(--linha);
-  box-shadow:0 -4px 16px rgba(0,0,0,.08);padding-bottom:env(safe-area-inset-bottom)}
-.tv-rodape[hidden]{display:none}
-.tv-int{max-width:1180px;margin:0 auto;padding:8px 16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.tv-rotulo{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--suave);
-  padding:0 10px 0 0;border-right:1px solid var(--linha);margin-right:4px;white-space:nowrap}
-.tv-btn{font:inherit;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:6px 12px;
-  border:1px solid var(--linha);border-radius:8px;background:var(--papel);color:var(--texto);cursor:pointer;white-space:nowrap;flex:0 0 auto}
-.tv-btn svg{width:17px;height:17px;color:#744F28}
-.tv-btn:hover{border-color:var(--verde);background:var(--verde-fundo)}
-.tv-btn:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
-.tv-btn[aria-selected="true"]{background:var(--verde-fundo);border-color:var(--verde);color:var(--verde-esc)}
-.tv-btn[aria-selected="true"] svg{color:var(--verde-esc)}
-.tv-acoes i{font-style:normal;font-size:11px;margin-left:2px}
-.tv-curto{display:none}
-@media (max-width:640px){ .tv-curto{display:inline} }
-.tv-sair{margin-left:auto;color:var(--suave)}
-.tv-sair svg{color:var(--suave)}
-.tv-rel{position:relative;flex:0 0 auto}
-.tv-menu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:220px;background:var(--papel);border:1px solid var(--linha);
-  border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:4px;display:flex;flex-direction:column;z-index:16}
-.tv-menu[hidden]{display:none}
-.tv-menu button{font:inherit;font-size:13px;display:flex;align-items:center;gap:8px;padding:9px 12px;border:0;border-radius:7px;
-  background:transparent;color:var(--texto);cursor:pointer;text-align:left;white-space:nowrap}
-.tv-menu button svg{width:16px;height:16px;color:#744F28}
-.tv-menu button:hover{background:var(--verde-fundo)}
-.tv-menu button[aria-selected="true"]{color:var(--verde-esc);font-weight:700}
-.tv-menu button[aria-selected="true"] svg{color:var(--verde-esc)}
-body.com-rodape main{padding-bottom:96px}
-body.com-rodape .faixa-versao{bottom:72px}
-@media (max-width:640px){
-  .tv-rotulo{display:none}
-  .tv-int{padding:6px 10px;gap:4px}
-  .tv-btn{font-size:12.5px;padding:6px 10px;min-height:40px}
-  .tv-sair span{display:none}
-  .tv-btn svg{display:none}
-  .tv-sair svg{display:inline}
-  .tv-longo{display:none}
-  .tv-menu{left:auto;right:0}
-}
-/* legenda de cores (como a legenda do Protheus): quadradinho por linha */
-.tv-led{display:inline-block;width:11px;height:11px;border-radius:2.5px;vertical-align:-1px;flex:none}
-.tv-ativo{background:#84BD00}
-.tv-alerta{background:#e0ac3a}
-.tv-perigo{background:#c0392b}
-.tv-neutra{background:#b4b8ad}
-.rs-legenda{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin:10px 0 0;font-size:12px;color:var(--suave)}
-.rs-legenda b{font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;margin-right:2px}
-.rs-legenda button{font:inherit;font-size:12px;display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid transparent;
-  border-radius:16px;background:transparent;color:var(--suave);cursor:pointer}
-.rs-legenda button:hover{border-color:var(--linha);color:var(--texto)}
-.rs-legenda button[aria-pressed="true"]{border-color:var(--verde);background:var(--verde-fundo);color:var(--verde-esc);font-weight:700}
-.rs-tab td:first-child{white-space:nowrap}
-.rs-tab td:first-child .tv-led{margin-right:7px}
-
 /* versão do app ao lado de "sincronizado" (20/10/2026): só o número, discreto */
 .versao-app{font-size:11px;font-weight:600;color:var(--suave);opacity:.8;white-space:nowrap}
 .versao-app:empty{display:none}
