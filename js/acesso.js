@@ -488,12 +488,26 @@ export function pintarModulos(itens) {
     ? `<button class="aba aba-fantasma${m.direita ? ' aba-config' : ''}" type="button" disabled aria-disabled="true" data-fantasma="${m.id}" title="Você não tem acesso a este módulo. Peça ao administrador.">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`
     : `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`).join('');
   $('navModulos').querySelectorAll('.aba[data-modulo]').forEach(b =>
-    b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
+    b.addEventListener('click', () => {
+      /* Categoria aberta (20/10/2026, pedido dele): clicar de novo no módulo
+         fecha tudo e voltam os módulos principais. */
+      if ($('navModulos').classList.contains('aberto') && b.dataset.modulo === moduloAberto) return mostrarInicio();
+      abrirModulo(b.dataset.modulo);
+    }));
+}
+
+/* Fecha a categoria aberta na barra de cima: some a lista de submódulos ao
+   lado do módulo e voltam todos os principais. */
+function fecharCategoria() {
+  const nav = $('navModulos');
+  nav.classList.remove('aberto');
+  nav.querySelector('.mod-subs')?.remove();
 }
 
 /** Nenhum módulo marcado e sem faixa: o início de uma área. */
 export function desmarcarModulos() {
   moduloAberto = null;
+  fecharCategoria();
   faixaEstado.modulo = null; faixaEstado.sub = null; faixaEstado.tela = null;
   $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
   $('navTelas').hidden = true;
@@ -510,6 +524,7 @@ export function aoPintarFaixa(fn) { aposFaixa = fn || (() => {}); }
 /** A tela de entrada: nenhum módulo aberto, só SAKUMA e LOP. */
 export function mostrarInicio() {
   moduloAberto = null;
+  fecharCategoria();
   $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
   $('navTelas').hidden = true;
   $('navSub').hidden = true;
@@ -523,6 +538,7 @@ export function abrirModulo(id, tela) {
     b.setAttribute('aria-selected', String(b.dataset.modulo === id)));
 
   if (id === 'config') {
+    fecharCategoria();
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
     aoTrocar('config');
@@ -577,7 +593,64 @@ function desenharFaixa(id, subs, tela) {
   marcarTela(id, subs, alvo, true);
 }
 
+/* Categoria na barra de cima (20/10/2026, pedido dele — "tudo em cima, nada
+   lateral ou embaixo"): ao clicar no módulo (ex.: Cadastros) os outros
+   principais somem e os submódulos aparecem AO LADO dele; ao clicar num
+   submódulo, as telas dele aparecem LOGO ABAIXO. Clicar no módulo de novo
+   fecha tudo. Vale para os módulos da barra do Pessoas; Certificação e
+   Vistorias continuam como eram. */
+const emCategoria = id => !MENUS_AREA[id] && !!$('navModulos').querySelector(`.aba[data-modulo="${id}"]`);
+
+function pintarCategoria(id, subs) {
+  const nav = $('navModulos');
+  const faixa = $('navTelas');
+  const atual = subs.find(s => s.telas.some(([t]) => t === faixaEstado.tela)) || subs[0];
+  faixaEstado.sub = atual.id;
+
+  // linha de cima: módulo aberto + submódulos ao lado
+  nav.classList.add('aberto');
+  nav.querySelector('.mod-subs')?.remove();
+  const mod = nav.querySelector(`.aba[data-modulo="${id}"]`);
+  if (mod) mod.title = 'Fechar ' + (modPorId(id)?.nome || '') + ' e voltar aos módulos';
+  if (subs.length > 1 && mod) {
+    const caixa = document.createElement('span');
+    caixa.className = 'mod-subs';
+    caixa.innerHTML = subs.map(s => `<button type="button" class="aba aba-sub" data-sub="${s.id}" aria-selected="${s === atual}" title="${esc(s.nome)}">
+      ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span></button>`).join('');
+    mod.after(caixa);
+    caixa.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => {
+      const s = subs.find(x => x.id === b.dataset.sub);
+      const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
+      faixaEstado.tela = t;
+      pintarCategoria(id, subs);
+      marcarTela(id, subs, t, true);
+    }));
+  }
+
+  // linha de baixo: as telas do submódulo (só quando tem mais de uma)
+  if (atual.telas.length < 2) {
+    faixa.hidden = true;
+    faixa.innerHTML = '';
+  } else {
+    faixa.hidden = false;
+    faixa.classList.add('rb');
+    faixa.innerHTML = `<section class="rb-grupo ${CORES_GRUPO[subs.indexOf(atual) % CORES_GRUPO.length]}" aria-label="${esc(atual.nome)}">
+      <div class="rb-botoes">${atual.telas.map(([t, rot]) => `<button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}" title="${esc(rot)}">
+        ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`).join('')}</div>
+      ${subs.length > 1 ? `<div class="rb-rotulo">${esc(atual.nome)}</div>` : ''}</section>`;
+    faixa.querySelectorAll('[data-tela]').forEach(b => b.addEventListener('click', () => {
+      faixaEstado.tela = b.dataset.tela;
+      ultimaTela[atual.id] = b.dataset.tela;
+      marcarTela(id, subs, b.dataset.tela, true);
+    }));
+  }
+  aposFaixa(id);
+  nav.querySelector('.aba-sub[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  sombraFaixa();
+}
+
 function pintarFaixa(id, subs) {
+  if (emCategoria(id)) return pintarCategoria(id, subs);
   const faixa = $('navTelas');
   faixa.hidden = false;
   faixa.classList.add('rb');
@@ -648,7 +721,7 @@ function marcarTela(id, subs, tela, abrir) {
   $('navTelas').querySelectorAll('[data-tela]').forEach(x =>
     x.setAttribute('aria-selected', String(x.dataset.tela === tela)));
   const subDaTela = subs.find(s => s.telas.some(([t]) => t === tela));
-  $('navTelas').querySelectorAll('[data-sub]').forEach(x =>
+  document.querySelectorAll('#navTelas [data-sub], #navModulos [data-sub]').forEach(x =>
     x.setAttribute('aria-selected', String(x.dataset.sub === subDaTela?.id)));
   const mod = modPorId(id);
   const sub = subs.find(s => s.telas.some(([t]) => t === tela));

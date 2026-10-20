@@ -1555,3 +1555,18 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 /* versão do app ao lado de "sincronizado" (20/10/2026): só o número, discreto */
 .versao-app{font-size:11px;font-weight:600;color:var(--suave);opacity:.8;white-space:nowrap}
 .versao-app:empty{display:none}
+
+/* ---------- categoria na barra de cima (20/10/2026, pedido dele) ----------
+   Módulo aberto: os outros principais somem e os submódulos aparecem ao lado
+   dele (.mod-subs); as telas do submódulo ficam na faixa logo abaixo. O "✕"
+   no módulo aberto avisa que clicar nele fecha a categoria. */
+#navModulos.aberto > .aba[data-modulo]:not([aria-selected="true"]),
+#navModulos.aberto > .aba-fantasma{display:none}
+#navModulos.aberto > .aba[aria-selected="true"]::after{content:'✕';font-size:11px;margin-left:4px;opacity:.85}
+.mod-subs{display:flex;align-items:center;gap:6px;padding-left:8px;margin-left:2px;border-left:1px solid var(--linha);flex:0 0 auto}
+.mod-subs .aba-sub{font-size:13px;font-weight:600;padding:7px 13px;background:var(--papel);color:var(--texto);border:1px solid var(--linha)}
+.mod-subs .aba-sub svg{width:17px;height:17px;color:#744F28}
+.mod-subs .aba-sub:hover{border-color:var(--verde);background:var(--verde-fundo)}
+.mod-subs .aba-sub[aria-selected="true"]{background:var(--verde-fundo);border-color:var(--verde);color:var(--verde-esc)}
+.mod-subs .aba-sub[aria-selected="true"] svg{color:var(--verde-esc)}
+@media (max-width:640px){ .mod-subs .aba-sub{font-size:12.5px;padding:6px 11px} }
