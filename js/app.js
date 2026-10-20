@@ -97,7 +97,7 @@ addEventListener('online', () => { $('avisoSoOnline').hidden = true; });
 /* Altura da faixa de cima, para o menu lateral começar logo abaixo dela. */
 function medirTopoTv() {
   const t = document.querySelector('.topo-int');
-  if (t) document.documentElement.style.setProperty('--topo-h', t.offsetHeight + 'px');
+  if (t) document.documentElement.style.setProperty('--tv-topo-h', t.offsetHeight + 'px');
 }
 addEventListener('resize', medirTopoTv);
 
@@ -120,7 +120,9 @@ function abrirAba(nome) {
      à vista e é a do Pessoas (tem "Início"); Vistorias usa a mesma barra e
      continua como era. */
   const nav = $('navModulos');
-  document.body.classList.toggle('tv-lateral', !!nav && !nav.hidden && !!nav.querySelector('[data-modulo="__inicio"]'));
+  document.body.classList.toggle('tv-lateral', !!nav && !nav.hidden && nav.dataset.tv === '1');
+  // Molduras com a pele TOTVS (../js/tv-moldura.js): o Pergunte ao LOP sobe.
+  document.body.classList.toggle('tv-moldura', ['manutencoes', 'estoque', 'custobase'].includes(nome));
   medirTopoTv();
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';

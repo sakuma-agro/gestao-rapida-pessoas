@@ -198,7 +198,8 @@ export const MODULOS = [
   ] },
   /* Área Certificação (13/10/2026): o módulo mora na área dela (`area`), não
      no menu de Pessoas. js/certificacao.js; tabelas cert_*; permissão 'cert'. */
-  { id: 'cert', nome: 'Certificação', area: 'certificacao', subs: [
+  /* lateral (20/10/2026, estilo TOTVS): os submódulos viram o menu lateral. */
+  { id: 'cert', nome: 'Certificação', area: 'certificacao', lateral: true, subs: [
     { id: 'cePainelSub', nome: 'Painel', telas: [
       ['cePainel', 'Painel'],
     ] },
@@ -251,8 +252,9 @@ const ACOES_TOTVS = {
   gestaoJornada: ['jorExtras', 'jorAbatimento', 'jorHistorico'], boletinsDiarios: ['bdMes'], docMensais: [],
   ticket: [], emprestimo: ['empHistorico'], ferias: ['ferPrev', 'ferAfast', 'ferRisco', 'ferIni'], dpConfig: [],
   reuSub: ['reuFrases', 'reuResp', 'reuAtiv'],
+  ceCadSub: ['ccInsumos', 'ccAnalises', 'ccCalibracoes', 'ccRelatorios'], ceCrono: [], ceIndSub: ['ceIndRh', 'ceIndMetas'],
 };
-MODULOS.filter(m => !m.area).forEach(m => (m.subs || []).forEach(s => {
+MODULOS.forEach(m => (m.subs || []).forEach(s => {
   if (!s.acoes && ACOES_TOTVS[s.id]) s.acoes = ACOES_TOTVS[s.id];
 }));
 
@@ -500,20 +502,23 @@ export function montarMenu(callback) {
   /* Estilo TOTVS (20/10/2026): "Início" abre a barra, que vira menu lateral
      no computador e barra de baixo no celular (CSS body.tv-lateral). */
   pintarModulos([{ id: INICIO, nome: 'Início', icone: 'inicio' }, ...MODULOS.filter(m => !m.area).map(m =>
-    ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista', bloqueado: !libs.has(m.id) }))]);
+    ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista', bloqueado: !libs.has(m.id) }))], { tv: true });
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   mostrarInicio();
 }
 
 /** A barra de módulos do topo. Cada área pinta a sua (Pessoas, Vistorias). */
-export function pintarModulos(itens) {
+export function pintarModulos(itens, op = {}) {
   moduloAberto = null;
+  /* data-tv = estilo TOTVS (menu lateral / barra de baixo): Pessoas e Certificação. */
+  $('navModulos').dataset.tv = op.tv ? '1' : '';
   $('navModulos').innerHTML = itens.map(m => m.bloqueado
     ? `<button class="aba aba-fantasma${m.direita ? ' aba-config' : ''}" type="button" disabled aria-disabled="true" data-fantasma="${m.id}" title="Você não tem acesso a este módulo. Peça ao administrador.">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`
     : `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false" title="${esc(m.nome)}">${svgIcone(m.icone || 'lista')}${nomeAba(m.nome)}</button>`).join('');
   $('navModulos').querySelectorAll('.aba[data-modulo]').forEach(b =>
-    b.addEventListener('click', () => b.dataset.modulo === INICIO ? mostrarInicio() : abrirModulo(b.dataset.modulo)));
+    b.addEventListener('click', () => op.aoClicar ? op.aoClicar(b.dataset.modulo)
+      : b.dataset.modulo === INICIO ? mostrarInicio() : abrirModulo(b.dataset.modulo)));
 }
 const INICIO = '__inicio';
 /* Nome da aba; na barra de baixo do celular (estilo TOTVS) vale só a 1ª palavra
@@ -521,6 +526,22 @@ const INICIO = '__inicio';
 const nomeAba = nome => nome.includes(' ')
   ? `<span class="ab-longo">${esc(nome)}</span><span class="ab-curto">${esc(nome.split(' ')[0])}</span>`
   : `<span>${esc(nome)}</span>`;
+
+/** Menu lateral feito dos submódulos de um módulo `lateral` (Certificação,
+    20/10/2026): cada submódulo é um item; abre na última tela usada dele. */
+export function montarLateral(id) {
+  const subs = subsLiberados(id);
+  pintarModulos(subs.map(s => ({ id: 'sub:' + s.id, nome: s.nome, icone: iconeSub(s, id) })), {
+    tv: true,
+    aoClicar: chave => {
+      const s = subsLiberados(id).find(x => 'sub:' + x.id === chave);
+      if (!s) return;
+      const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id]
+        : (s.inicial && s.telas.some(([x]) => x === s.inicial)) ? s.inicial : s.telas[0][0];
+      abrirModulo(id, t);
+    },
+  });
+}
 
 /** Nenhum módulo marcado e sem faixa: o início de uma área. */
 export function desmarcarModulos() {
@@ -552,7 +573,7 @@ export function mostrarInicio() {
 export function abrirModulo(id, tela) {
   if (!id) return;
   moduloAberto = id;
-  $('navModulos').querySelectorAll('.aba').forEach(b =>
+  if (!modPorId(id)?.lateral) $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.setAttribute('aria-selected', String(b.dataset.modulo === id)));
 
   if (id === 'config') {
@@ -631,6 +652,13 @@ function pintarFaixa(id, subs) {
     // Um submódulo só: as telas direto, como sempre foi.
     faixa.innerHTML = `<section class="rb-grupo ${CORES_GRUPO[0]}" aria-label="${esc(subs[0].nome)}">
       <div class="rb-botoes">${subs[0].telas.map(([t, rot]) => botaoTela(t, rot)).join('')}</div></section>`;
+  } else if (!faixaEstado.sub && mod?.lateral) {
+    // Módulo lateral: os submódulos estão no menu lateral; tela de uma só, sem faixa.
+    faixa.hidden = true;
+    faixa.innerHTML = '';
+    pintarRodape(null);
+    aposFaixa(id);
+    return;
   } else if (!faixaEstado.sub) {
     // Nível dos submódulos: um ícone por submódulo.
     faixa.innerHTML = `<section class="rb-grupo rb-subs" aria-label="${esc(mod?.nome || '')}"><div class="rb-botoes">${subs.map(s => `
@@ -743,6 +771,7 @@ function pintarRodape(id, subs, s, sairInicio = false) {
   r.querySelector('[data-sair]').addEventListener('click', () => {
     fechar();
     if (sairInicio) { mostrarInicio(); return; }
+    if (mod?.lateral) { faixaEstado.sub = null; abrirModulo(id); return; }
     faixaEstado.sub = null;
     pintarRodape(null);
     pintarFaixa(id, subs);
@@ -770,6 +799,8 @@ function marcarTela(id, subs, tela, abrir) {
   $('navTelas').querySelectorAll('[data-tela]').forEach(x =>
     x.setAttribute('aria-selected', String(x.dataset.tela === tela)));
   const subDaTela = subs.find(s => s.telas.some(([t]) => t === tela));
+  if (modPorId(id)?.lateral) $('navModulos').querySelectorAll('.aba[data-modulo]').forEach(x =>
+    x.setAttribute('aria-selected', String(x.dataset.modulo === 'sub:' + subDaTela?.id)));
   $('navTelas').querySelectorAll('[data-sub]').forEach(x =>
     x.setAttribute('aria-selected', String(x.dataset.sub === subDaTela?.id)));
   const mod = modPorId(id);

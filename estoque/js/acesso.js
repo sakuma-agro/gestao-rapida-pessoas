@@ -96,6 +96,32 @@ const subsLiberados = id => {
     .filter(s => s.telas.length);
 };
 
+/* Ícones dos módulos e das telas (estilo TOTVS, 20/10/2026: menu lateral e
+   rodapé com ícone, como nas outras áreas). */
+const ICONES = {
+  contagem: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/>',
+  compra: '<path d="M3 4h2l2.4 11h11.2L21 7H6.2"/><circle cx="9" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/>',
+  qc: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+  acerto: '<path d="M12 4v16M7 20h10M5 7h14"/><path d="M5 7l-3 6a3 3 0 006 0zM19 7l-3 6a3 3 0 006 0z"/>',
+  cadastros: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  lista: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  painel: '<path d="M5 20V10M11 20V4M17 20v-7"/>',
+  historico: '<path d="M3 12a9 9 0 103-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  alerta: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.01"/>',
+  entrada: '<path d="M12 4v12M6 10l6 6 6-6M4 20h16"/>',
+  saida: '<path d="M12 20V8M6 14l6-6 6 6M4 4h16"/>',
+  mov: '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
+  doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+  mais: '<path d="M12 5v14M5 12h14"/>',
+};
+const ICONE_TELA = { ctNova: 'mais', ctAndamento: 'contagem', ctRepor: 'alerta', ctHistorico: 'historico', ciLista: 'compra',
+  qcVisao: 'qc', qcPainel: 'mov', qcEntrada: 'entrada', qcSaida: 'saida',
+  acSaldo: 'doc', acPainel: 'painel', acDivergencias: 'alerta', acTransferencias: 'mov', acRelatorio: 'doc',
+  cadItens: 'lista', cadGrupos: 'lista', cadLocais: 'qc', cadSaldos: 'doc' };
+const svgIcone = n => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[n] || ICONES.lista}</svg>`;
+export const iconeTela = t => svgIcone(ICONE_TELA[t]);
+export const iconeModulo = id => svgIcone(id);
+
 /* =============== menu =============== */
 let aoTrocar = () => {};
 
@@ -108,12 +134,17 @@ export function montarMenu(callback) {
   const libs = modulosLiberados();
 
   $('navModulos').innerHTML = libs.map(m =>
-    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${esc(m.nome)}</button>`).join('')
+    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.id)}<span>${esc(m.nome)}</span></button>`).join('')
 ;   // quem entra e o que vê fica em Usuários - Acessos, no LOP
 
   $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
 
+  // Estilo TOTVS (20/10/2026): a pele compartilhada ../js/tv-moldura.js.
+  if (window.TvMoldura && !montarMenu.tv) {
+    montarMenu.tv = true;
+    window.TvMoldura.ligar({ modulos: '#navModulos', telas: ['#navTelas', '#navSub'], inicio: () => mostrarInicio() });
+  }
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   mostrarInicio();
 }
@@ -157,7 +188,7 @@ function desenharTelas(faixa, classe, telas, tela) {
   const alvo = telas.some(([t]) => t === tela) ? tela : telas[0][0];
   faixa.hidden = telas.length < 2;
   faixa.innerHTML = telas.map(([t, rot]) =>
-    `<button class="${classe}" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${esc(rot)}</button>`).join('');
+    `<button class="${classe}" role="tab" data-tela="${t}" aria-selected="${t === alvo}">${svgIcone(ICONE_TELA[t])}<span>${esc(rot)}</span></button>`).join('');
   faixa.querySelectorAll('[data-tela]').forEach(b =>
     b.addEventListener('click', () => {
       faixa.querySelectorAll('[data-tela]').forEach(x =>
