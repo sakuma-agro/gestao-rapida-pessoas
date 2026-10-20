@@ -18,9 +18,13 @@
 //    Posição na tabela, próxima faixa, folha e projeção usam o total.
 //    Insalubridade (quem pulveriza) é só anotação — tipo fixa/variável e valor —
 //    e não entra em conta nenhuma.
+//  · A ficha mostra a remuneração inteira: salário, adicionais, ticket
+//    alimentação e tipo de contrato. Ticket e contrato moram no vínculo
+//    (jor_vinculos, os mesmos campos do Cadastro Nível 2) — editar aqui grava lá.
 
 import { estado, salvarFuncionario } from './store.js';
 import * as jd from './jornada-dados.js';
+import * as iv from './rh-ind-vinculos.js';
 import { mostrar, imprimir } from './jornada-relatorios.js';
 
 const $ = id => document.getElementById(id);
@@ -173,6 +177,7 @@ export function situacao(f) {
   const sal = totalDe(s);
   return {
     f, s, sal, base: s ? Number(s.valor) : null, peric: pericDe(s), insal: insalDe(s),
+    v, ticket: v?.ticket_valor != null ? Number(v.ticket_valor) : null, ticketObs: v?.ticket_obs || '', contrato: v?.tipo_contrato || 'fixo',
     cargo, faixa: s?.faixa || v?.faixa || null, faixaCadastro: v?.faixa || null,
     pos: posicao(cargo, sal), prox: proxima(cargo, sal), futuros: futurosDe(f.id),
   };
@@ -392,6 +397,14 @@ function abrirFicha(fid) {
   dialogo(`<h3>${esc(f.nome)}</h3>
     <p class="dica" style="margin-top:-8px">${esc(x.cargo?.nome || f.cargo || 'sem cargo')}${x.faixa ? ` · faixa ${x.faixa}` : ''} ·
       ${x.sal != null ? `${V(x.sal)}${x.peric > 0 ? ` (base ${V(x.base)} + periculosidade ${V(x.peric)})` : ''} desde ${br(x.s.desde)}` : 'sem salário no app'} · <span class="tag ${x.pos.cls}">${esc(x.pos.txt)}</span>${x.insal ? `<br><span class="dc-sem">Insalubridade (só anotação): ${esc(INSAL[x.insal.tipo])}${x.insal.valor ? ' · ' + V(x.insal.valor) : ''}</span>` : ''}</p>
+    <div class="rs-kpis rs-remun" style="margin-top:4px">
+      <div><span>Salário base</span><strong>${x.sal != null ? V(x.base) : '—'}</strong><small>${x.s ? 'desde ' + br(x.s.desde) : 'sem salário'}</small></div>
+      <div><span>Periculosidade</span><strong>${x.peric > 0 ? V(x.peric) : '—'}</strong><small>${x.peric > 0 ? '30% do base' : 'não recebe'}</small></div>
+      <div><span>Salário do plano</span><strong>${x.sal != null ? V(x.sal) : '—'}</strong><small>base + periculosidade</small></div>
+      <div><span>Insalubridade</span><strong>${x.insal?.valor ? V(x.insal.valor) : x.insal ? 'sim' : '—'}</strong><small>${x.insal ? esc(INSAL[x.insal.tipo]) + ' · só anotação' : 'não recebe'}</small></div>
+      <div><span>Ticket alimentação</span><strong>${x.ticket != null ? V(x.ticket) : '—'}</strong><small>${x.ticket != null ? 'por mês' : 'não recebe'}${x.ticketObs ? ' · ' + esc(x.ticketObs) : ''} <button class="btn mini" type="button" id="rsTicket" style="margin-left:4px">Editar</button></small></div>
+      <div><span>Tipo de contrato</span><strong>${x.contrato === 'safra' ? 'Safra' : 'Fixo'}</strong><small>Cadastro Nível 2</small></div>
+    </div>
     ${x.cargo ? `<div class="rolagem"><table class="dc-planilha rs-mini"><thead><tr><th>${esc(x.cargo.nome)}</th>${LETRAS.map(L => `<th class="ce">${L}</th>`).join('')}</tr></thead>
       <tbody><tr><td>Tabela</td>${linhaTabela}</tr></tbody></table></div>` : '<div class="aviso info">A função desta pessoa não está ligada a um cargo do plano. Escolha o cargo ao registrar o salário.</div>'}
 
@@ -422,10 +435,42 @@ function abrirFicha(fid) {
       <button class="btn principal" type="button" id="rsNovo">${x.sal != null ? 'Registrar alteração de salário' : 'Informar salário'}</button></div>`, () => {
     $('rsPasso')?.addEventListener('change', e => { S.passo = +e.target.value; abrirFicha(fid); });
     $('rsNovo').addEventListener('click', () => pedirSenha(() => formAlteracao(fid)));
+    $('rsTicket').addEventListener('click', () => formTicket(fid));
     document.querySelectorAll('[data-rs-corrigir]').forEach(b => b.addEventListener('click', () => pedirSenha(() => formAlteracao(fid, b.dataset.rsCorrigir))));
     if (!aberto) document.querySelector('#dlgRhSal h3').insertAdjacentHTML('afterend',
       '<p class="dica"><button class="btn mini olho" type="button" id="rsOlhoFicha">Mostrar valores</button></p>');
     $('rsOlhoFicha')?.addEventListener('click', () => pedirSenha(() => { abrirFicha(fid); desenharSalarios(); }));
+  }, true);
+}
+
+/** Ticket alimentação e tipo de contrato — os mesmos campos do Cadastro Nível 2,
+    gravados no vínculo (jor_vinculos). */
+function formTicket(fid) {
+  const f = pessoa(fid);
+  const x = situacao(f);
+  dialogo(`<h3>Ticket alimentação — ${esc(f.nome)}</h3>
+    <p class="dica" style="margin-top:-8px">Mesmos campos do Cadastro Nível 2: o que gravar aqui vale lá e no relatório de ticket.</p>
+    <div class="aviso erro" id="rsTkErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Tipo de contrato<select id="rsTkContrato"><option value="fixo" ${x.contrato !== 'safra' ? 'selected' : ''}>Fixo</option><option value="safra" ${x.contrato === 'safra' ? 'selected' : ''}>Safra</option></select></label>
+      <label class="campo">Ticket alimentação (R$/mês) <small>em branco = não recebe</small>
+        <input type="text" id="rsTkValor" inputmode="decimal" placeholder="0,00" value="${x.ticket != null ? x.ticket.toFixed(2).replace('.', ',') : ''}"></label>
+      <label class="campo plena">Observação do ticket<input type="text" id="rsTkObs" maxlength="60" placeholder="Ex.: Pedir cartão" value="${esc(x.ticketObs)}"></label>
+    </div>
+    <div class="barra fim"><button class="btn" type="button" id="rsTkVoltar">Voltar</button>
+      <button class="btn principal" type="button" id="rsTkGravar">Salvar</button></div>`, () => {
+    $('rsTkVoltar').addEventListener('click', () => abrirFicha(fid));
+    $('rsTkGravar').addEventListener('click', async () => {
+      const t = $('rsTkValor').value.trim();
+      const ticket_valor = t ? lerValor(t) : null;
+      if (t && ticket_valor == null) { $('rsTkErro').textContent = 'Valor do ticket inválido.'; $('rsTkErro').hidden = false; return; }
+      const b = $('rsTkGravar'); b.disabled = true;
+      try {
+        await jd.salvarVinculo(fid, { tipo_contrato: $('rsTkContrato').value, ticket_valor, ticket_obs: $('rsTkObs').value.trim() || null });
+        try { await iv.sincronizar(f); } catch (e) { console.warn('vínculo dos indicadores', e); }   // tipo de contrato também vai para os indicadores
+        abrirFicha(fid);
+      } catch (e) { b.disabled = false; $('rsTkErro').textContent = 'Não consegui gravar: ' + (e.message || e); $('rsTkErro').hidden = false; }
+    });
   }, true);
 }
 
@@ -468,7 +513,7 @@ function formAlteracao(fid, corrigirId = null) {
       <label class="campo" id="rsInsalCampo" ${insal0 ? '' : 'hidden'}>Valor da insalubridade (R$) <small>ex.: quando pulveriza</small>
         <input type="text" id="rsInsalValor" inputmode="decimal" value="${insal0?.valor ? txt(insal0.valor) : ''}"></label>
       <label class="campo plena">${ed ? 'Justificativa da correção (obrigatória)' : 'Observação (opcional)'}<input type="text" id="rsObs" maxlength="200" value=""></label>
-      ${ed ? '' : `<label class="campo plena rs-check"><input type="checkbox" id="rsCad" checked> Atualizar também a função e a faixa no cadastro do funcionário (vale para a data de hoje em diante)</label>`}
+      ${ed ? '' : `<label class="campo plena rs-check"><input type="checkbox" id="rsCad" checked> Atualizar também o cadastro do funcionário: função, faixa e as marcações de periculosidade e insalubridade do Nível 2 (vale para a data de hoje em diante)</label>`}
     </div>
     <div class="barra fim"><button class="btn" type="button" id="rsVoltar">Voltar</button>
       <button class="btn principal" type="button" id="rsGravar">${ed ? 'Gravar correção' : 'Gravar'}</button></div>`, () => {
@@ -528,7 +573,12 @@ function formAlteracao(fid, corrigirId = null) {
               justificativa: obs || null, criado_por: estado.sessao?.user?.email || null, criado_em: new Date().toISOString() };
         const g = await jd.salvar('salarios', reg);
         await jd.registrar({ tabela: 'jor_salarios', registro_id: g.id, acao: ed ? 'update' : 'insert', antes: ed || null, depois: g, justificativa: ed ? obs : (obs || null) });
-        if (!ed && $('rsCad')?.checked && desde <= hoje()) await atualizarCadastro(f, cargoId, faixa);
+        /* As marcações do Nível 2 (periculosidade e insalubridade) acompanham o
+           salário, para o fechamento do DP enxergar a mesma coisa. */
+        if (!ed && $('rsCad')?.checked && desde <= hoje()) await atualizarCadastro(f, cargoId, faixa, {
+          periculosidade: periculosidade > 0,
+          insalubridade: insalubridade_tipo === 'fixa' ? 'permanente' : insalubridade_tipo === 'variavel' ? 'eventual' : 'nao',
+        });
         abrirFicha(fid); desenharSalarios();
       } catch (e) { b.disabled = false; erro('Não consegui gravar: ' + (e.message || e)); }
     });
@@ -538,8 +588,8 @@ function formAlteracao(fid, corrigirId = null) {
 /* Promoção vale também no cadastro: a faixa (Cadastro Nível 1) e, se mudou
    de cargo, a função ligada a ele — com o texto do cargo em maiúsculas, como
    o cadastro grava. Data futura não mexe no cadastro (ainda não vale). */
-async function atualizarCadastro(f, cargoId, faixa) {
-  const parcial = {};
+async function atualizarCadastro(f, cargoId, faixa, extras = {}) {
+  const parcial = { ...extras };
   if (faixa) parcial.faixa = faixa;
   const fn = cargoId && (jd.dados.funcoes || []).find(x => x.rh_cargo_id === cargoId && x.ativo !== false);
   if (fn && jd.vinculoDe(f.id)?.funcao_id !== fn.id) parcial.funcao_id = fn.id;
