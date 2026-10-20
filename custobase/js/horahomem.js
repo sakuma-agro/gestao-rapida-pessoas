@@ -57,17 +57,29 @@ export function parametrosDoMes(id) {
 export function calcularMesHH(id) {
   const p = parametrosDoMes(id);
   const linhas = itensDoMes(id).map(i => calcularLinha(i, p))
-    .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+    .sort((a, b) => ordemSetor(a.setor) - ordemSetor(b.setor) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   const dentro = linhas.filter(l => l.incluido !== false);
   const comValor = dentro.filter(l => l.rh !== null);
   const horas = comValor.reduce((s, l) => s + l.horas, 0);
   const custo = comValor.reduce((s, l) => s + l.custo, 0);
-  return { linhas, pessoas: dentro.length, comValor: comValor.length,
+  /* Custo hora Campo e custo hora ADM (pedido dele, 20/10/2026). */
+  const grupo = nome => {
+    const d = dentro.filter(l => (l.setor || 'Campo') === nome), cv = d.filter(l => l.rh !== null);
+    const h = cv.reduce((x, l) => x + l.horas, 0), cu = cv.reduce((x, l) => x + l.custo, 0);
+    return { pessoas: d.length, semValor: d.length - cv.length, horasTodas: d.filter(l => l.origemHoras !== 'padrao').reduce((x, l) => x + l.horas, 0),
+      horas: h, custo: cu, folha: cv.reduce((x, l) => x + l.total, 0), media: h > 0 ? cu / h : null };
+  };
+  return { linhas, campo: grupo('Campo'), adm: grupo('ADM'), pessoas: dentro.length, comValor: comValor.length,
     semValor: dentro.filter(l => l.rh === null).length,
     horasTodas: dentro.filter(l => l.origemHoras !== 'padrao').reduce((s, l) => s + l.horas, 0),   // só horas lançadas, sem a padrão
     horas, custo, folha: comValor.reduce((s, l) => s + l.total, 0), media: horas > 0 ? custo / horas : null };
 }
 const chaveItem = (mesId, func) => mesId + ':' + func;
+export const SETORES = ['Campo', 'ADM'];
+const ordemSetor = st => (st === 'ADM' ? 1 : 0);
+/** Setor do cadastro do Pessoas → 'Campo' ou 'ADM'. */
+const setorDe = st => /^ADM/i.test(String(st || '')) ? 'ADM' : 'Campo';
+let filtroSetor = '';
 const relacaoDe = tc => /temp/i.test(String(tc || '')) ? 'Temporário' : 'Fixo';
 
 /** Lê as horas do Pessoas para o mês (precisa de internet). */
@@ -106,7 +118,7 @@ function desenhar() {
     const ant = meses().filter(x => x.id < mesSel).pop();
     alvo.innerHTML = topo + `<div class="cb-vazio-mes">
       <p><b>${esc(nomeMes(mesSel))}</b> ainda não tem hora-homem.</p>
-      <p class="dc-sem">Criar o mês traz do Pessoas o cadastro de <b>ativos do setor CAMPO</b> (e quem tem boletim na competência), com as horas trabalhadas. Depois é só digitar salário bruto e recibo do holerite.</p>
+      <p class="dc-sem">Criar o mês traz do Pessoas o cadastro de <b>ativos do Campo e do Administrativo</b> (e quem tem boletim na competência), com as horas trabalhadas. Depois é só digitar salário bruto e recibo do holerite.</p>
       <div class="barra"><button class="btn principal" type="button" id="hhCriar">Criar ${esc(mesCurto(mesSel))} com o cadastro de ativos</button></div>
     </div>`;
     $('hhFolha').innerHTML = '';
@@ -117,17 +129,32 @@ function desenhar() {
 
   const c = calcularMesHH(mesSel);
   const b = semAcento(busca);
-  const linhas = c.linhas.filter(l => !b || semAcento(l.nome + ' ' + (l.cadastro || '')).includes(b));
+  const linhas = c.linhas.filter(l => (!b || semAcento(l.nome + ' ' + (l.cadastro || '')).includes(b)) && (!filtroSetor || (l.setor || 'Campo') === filtroSetor));
+  const linhaPessoa = l => `<tr class="${l.incluido === false ? 'cb-fora' : ''}">
+        <td class="ce"><input type="checkbox" data-inc="${esc(l.id)}"${l.incluido !== false ? ' checked' : ''}${fechado ? ' disabled' : ''}></td>
+        <td>${esc(l.cadastro || '')}</td>
+        <td><b>${esc(l.nome)}</b>${l.obs && l.obs !== 'da planilha' ? `<small class="dc-sem"> · ${esc(l.obs)}</small>` : ''}</td>
+        <td>${fechado ? esc(l.relacao) : `<select class="dc-mini" data-rel="${esc(l.id)}">${['Fixo', 'Temporário'].map(r => `<option${r === l.relacao ? ' selected' : ''}>${r}</option>`).join('')}</select>`}</td>
+        <td class="dir">${fechado ? esc(num(l.horas, 1)) : `<input class="dc-mini hh-num" data-h="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.horas_manual) ? num(l.horas_manual, 1) : '')}" placeholder="${esc(num(l.horas, 1))}">`}
+          <small class="hh-orig hh-o-${l.origemHoras}">${l.origemHoras === 'pessoas' ? 'Pessoas' : l.origemHoras === 'planilha' ? 'planilha' : l.origemHoras === 'manual' ? 'corrigido' + (temValor(l.horas_pessoas) ? ' (Pessoas ' + num(l.horas_pessoas, 1) + ')' : '') : 'padrão do mês'}</small></td>
+        <td class="dir">${fechado ? esc(num(l.salario_bruto)) : `<input class="dc-mini hh-num" data-sal="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.salario_bruto) ? num(l.salario_bruto) : '')}">`}</td>
+        <td class="dir">${fechado ? esc(num(l.recibo)) : `<input class="dc-mini hh-num" data-rec="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.recibo) ? num(l.recibo) : '')}">`}</td>
+        <td class="dir">${esc(num(l.total))}</td>
+        <td class="dir">${esc(num(l.encargo, 4))}</td>
+        <td class="dir"><b>${l.rh !== null ? esc(num(l.rh)) : '—'}</b></td>
+        <td class="ce"><input type="checkbox" data-agro="${esc(l.id)}"${l.lancado_agro ? ' checked' : ''}></td>
+      </tr>`;
   alvo.innerHTML = topo + `
     <div class="cb-kpis">
-      <div><span>Pessoas</span><b>${c.pessoas}</b><small>${c.semValor ? c.semValor + ' sem salário/recibo' : 'todas com valor'}</small></div>
-      <div><span>Horas trabalhadas</span><b>${esc(num(c.horasTodas, 1))}</b><small>do Pessoas, com correções</small></div>
-      <div><span>Custo c/ encargos</span><b>${esc(reais(c.custo))}</b><small>folha ${esc(reais(c.folha))}</small></div>
-      <div class="cb-kpi-custo"><span>R$/h médio</span><b class="hh-media">${c.media !== null ? esc(reais(c.media)) : '—'}</b><small>custo ÷ horas de quem tem valor</small></div>
+      <div><span>Pessoas</span><b>${c.pessoas}</b><small>Campo ${c.campo.pessoas} · ADM ${c.adm.pessoas}${c.semValor ? ' · ' + c.semValor + ' sem salário/recibo' : ''}</small></div>
+      <div><span>Custo c/ encargos</span><b>${esc(reais(c.custo))}</b><small>folha ${esc(reais(c.folha))} · ${esc(num(c.horasTodas, 1))} h lançadas</small></div>
+      <div class="cb-kpi-custo"><span>Custo hora Campo</span><b class="hh-media">${c.campo.media !== null ? esc(reais(c.campo.media)) : '—'}</b><small>${esc(reais(c.campo.custo))} ÷ ${esc(num(c.campo.horas, 1))} h</small></div>
+      <div class="cb-kpi-custo"><span>Custo hora ADM</span><b class="hh-media">${c.adm.media !== null ? esc(reais(c.adm.media)) : '—'}</b><small>${c.adm.pessoas ? esc(reais(c.adm.custo)) + ' ÷ ' + esc(num(c.adm.horas, 1)) + ' h' : 'ninguém do ADM no mês'}</small></div>
     </div>
     <div class="barra entre naoimprimir">
       <div class="barra" style="margin:0">
-        <label class="campo" style="min-width:220px">Procurar <input type="text" id="hhBusca" value="${esc(busca)}" placeholder="nome ou nº"></label>
+        <label class="campo" style="min-width:200px">Procurar <input type="text" id="hhBusca" value="${esc(busca)}" placeholder="nome ou nº"></label>
+        <label class="campo">Setor <select id="hhSetor"><option value="">Campo e ADM</option>${SETORES.map(x => `<option${x === filtroSetor ? ' selected' : ''}>${x}</option>`).join('')}</select></label>
         ${fechado ? '' : `<button class="btn" type="button" id="hhAtualizar">${lendoPessoas ? 'Lendo o Pessoas…' : '↻ Puxar do Pessoas (ativos e horas)'}</button>
         <button class="btn" type="button" id="hhAdd">+ Pessoa</button>`}
       </div>
@@ -145,20 +172,14 @@ function desenhar() {
         <th class="dir">Horas</th><th class="dir">Salário bruto</th><th class="dir">Recibo (R$)</th>
         <th class="dir">Total</th><th class="dir">Encargo</th><th class="dir">R$/h</th><th class="ce" title="já lançado no sistema agro">Agro</th>
       </tr></thead>
-      <tbody>${linhas.map(l => `<tr class="${l.incluido === false ? 'cb-fora' : ''}">
-        <td class="ce"><input type="checkbox" data-inc="${esc(l.id)}"${l.incluido !== false ? ' checked' : ''}${fechado ? ' disabled' : ''}></td>
-        <td>${esc(l.cadastro || '')}</td>
-        <td><b>${esc(l.nome)}</b>${l.obs && l.obs !== 'da planilha' ? `<small class="dc-sem"> · ${esc(l.obs)}</small>` : ''}</td>
-        <td>${fechado ? esc(l.relacao) : `<select class="dc-mini" data-rel="${esc(l.id)}">${['Fixo', 'Temporário'].map(r => `<option${r === l.relacao ? ' selected' : ''}>${r}</option>`).join('')}</select>`}</td>
-        <td class="dir">${fechado ? esc(num(l.horas, 1)) : `<input class="dc-mini hh-num" data-h="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.horas_manual) ? num(l.horas_manual, 1) : '')}" placeholder="${esc(num(l.horas, 1))}">`}
-          <small class="hh-orig hh-o-${l.origemHoras}">${l.origemHoras === 'pessoas' ? 'Pessoas' : l.origemHoras === 'planilha' ? 'planilha' : l.origemHoras === 'manual' ? 'corrigido' + (temValor(l.horas_pessoas) ? ' (Pessoas ' + num(l.horas_pessoas, 1) + ')' : '') : 'padrão do mês'}</small></td>
-        <td class="dir">${fechado ? esc(num(l.salario_bruto)) : `<input class="dc-mini hh-num" data-sal="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.salario_bruto) ? num(l.salario_bruto) : '')}">`}</td>
-        <td class="dir">${fechado ? esc(num(l.recibo)) : `<input class="dc-mini hh-num" data-rec="${esc(l.id)}" inputmode="decimal" value="${esc(temValor(l.recibo) ? num(l.recibo) : '')}">`}</td>
-        <td class="dir">${esc(num(l.total))}</td>
-        <td class="dir">${esc(num(l.encargo, 4))}</td>
-        <td class="dir"><b>${l.rh !== null ? esc(num(l.rh)) : '—'}</b></td>
-        <td class="ce"><input type="checkbox" data-agro="${esc(l.id)}"${l.lancado_agro ? ' checked' : ''}></td>
-      </tr>`).join('') || '<tr><td colspan="11" class="vazio">Ninguém neste mês.</td></tr>'}
+      <tbody>${SETORES.map(st => {
+        const ls = linhas.filter(l => (l.setor || 'Campo') === st);
+        if (!ls.length) return '';
+        const g = st === 'ADM' ? c.adm : c.campo;
+        return `<tr class="hh-grupo"><td colspan="11">${st === 'ADM' ? 'Administrativo (ADM)' : 'Campo'} · ${g.pessoas} ${g.pessoas === 1 ? 'pessoa' : 'pessoas'}</td></tr>`
+          + ls.map(linhaPessoa).join('')
+          + `<tr class="dc-total hh-sub"><td></td><td></td><td>Custo hora ${st}</td><td></td><td class="dir">${esc(num(g.horasTodas, 1))}</td><td></td><td></td><td class="dir">${esc(num(g.folha))}</td><td></td><td class="dir">${g.media !== null ? esc(num(g.media)) : '—'}</td><td></td></tr>`;
+      }).join('') || '<tr><td colspan="11" class="vazio">Ninguém neste mês.</td></tr>'}
       </tbody>
       <tfoot><tr class="dc-total"><td></td><td></td><td>Total · ${c.pessoas} pessoas</td><td></td>
         <td class="dir">${esc(num(c.horasTodas, 1))}</td><td></td><td></td><td class="dir">${esc(num(c.folha))}</td><td></td>
@@ -167,6 +188,7 @@ function desenhar() {
     <p class="dc-sem" style="margin-top:8px">Horas em branco = vale a do Pessoas (ou a padrão do mês, ${esc(num((p.horas_padrao || {})[mesSel.slice(5)] || 0, 0))} h, se não houver). Digite um número para corrigir. R$/h = (salário × encargo + recibo) ÷ horas. Desmarcar o ✓ tira a pessoa da média do mês.</p>`;
 
   ligarNav();
+  $('hhSetor').addEventListener('change', e => { filtroSetor = e.target.value; desenhar(); });
   $('hhBusca').addEventListener('input', e => { busca = e.target.value; const pos = e.target.selectionStart; desenhar(); const el = $('hhBusca'); el.focus(); el.setSelectionRange(pos, pos); });
   const item = id => todos('cb_hh_itens').find(x => x.id === id);
   const salvarNum = (sel, campo) => alvo.querySelectorAll(`[${sel}]`).forEach(inp => inp.addEventListener('change', async () => {
@@ -216,7 +238,8 @@ function ligarNav() {
 
 /* Lista do mês = cadastro de ATIVOS do Pessoas, setor CAMPO (pedido dele,
    20/10/2026), mais quem tem boletim na competência mesmo já inativo. */
-const doCampo = lista => lista.filter(r => String(r.setor || '').toUpperCase() === 'CAMPO');
+/* 20/10/2026: Campo e Administrativo (custo hora de cada um). */
+const doCampo = lista => lista.filter(r => /^(CAMPO|ADM)/i.test(String(r.setor || '')));
 const horasDe_ = r => Math.round(Number(r.minutos || 0) / 6) / 10;
 
 /** Cria o mês com o cadastro de ativos do Pessoas e as horas da competência. */
@@ -229,7 +252,7 @@ async function criarMes(mesId, anterior) {
   for (const r of lista) {
     const prev = antes.find(a => a.funcionario_id === r.funcionario_id);
     await gravar('cb_hh_itens', { id: chaveItem(mesId, r.funcionario_id), mes: mesId, funcionario_id: r.funcionario_id,
-      cadastro: r.cadastro || null, nome: r.nome, relacao: prev ? prev.relacao : relacaoDe(r.tipo_contrato),
+      cadastro: r.cadastro || null, nome: r.nome, setor: setorDe(r.setor), relacao: prev ? prev.relacao : relacaoDe(r.tipo_contrato),
       horas_pessoas: horasDe_(r), horas_manual: null,
       salario_bruto: temValor(r.salario) ? Number(r.salario) : null, recibo: null,
       lancado_agro: false, incluido: true, obs: String(r.situacao || '').toUpperCase() === 'ATIVO' ? null : 'inativo, com boletim no mês' });
@@ -255,11 +278,11 @@ async function atualizarDoPessoas(mesId) {
       if (!it) {
         novos++;
         await gravar('cb_hh_itens', { id, mes: mesId, funcionario_id: r.funcionario_id, cadastro: r.cadastro || null, nome: r.nome,
-          relacao: relacaoDe(r.tipo_contrato), horas_pessoas: h, horas_manual: null,
+          setor: setorDe(r.setor), relacao: relacaoDe(r.tipo_contrato), horas_pessoas: h, horas_manual: null,
           salario_bruto: temValor(r.salario) ? Number(r.salario) : null, recibo: null, lancado_agro: false, incluido: true });
-      } else if (Number(it.horas_pessoas || 0) !== h || it.nome !== r.nome || it.incluido === false && it.obs === 'fora do cadastro de ativos') {
+      } else if (Number(it.horas_pessoas || 0) !== h || it.nome !== r.nome || it.setor !== setorDe(r.setor) || it.incluido === false && it.obs === 'fora do cadastro de ativos') {
         mudou++;
-        await gravar('cb_hh_itens', { ...it, horas_pessoas: h, nome: r.nome, cadastro: r.cadastro || it.cadastro,
+        await gravar('cb_hh_itens', { ...it, horas_pessoas: h, nome: r.nome, setor: setorDe(r.setor), cadastro: r.cadastro || it.cadastro,
           incluido: it.obs === 'fora do cadastro de ativos' ? true : it.incluido,
           obs: it.obs === 'fora do cadastro de ativos' ? null : it.obs });
       }
@@ -281,6 +304,7 @@ function adicionarPessoa(mesId) {
     <form class="grade" id="hhNova" autocomplete="off">
       <label class="campo">Nº <input type="text" name="cad" inputmode="numeric"></label>
       <label class="campo">Relação <select name="rel"><option>Fixo</option><option>Temporário</option></select></label>
+      <label class="campo">Setor <select name="setor">${SETORES.map(x => `<option${x === (filtroSetor || 'Campo') ? ' selected' : ''}>${x}</option>`).join('')}</select></label>
       <label class="campo plena">Nome <input type="text" name="nome" required></label>
       <label class="campo">Horas <input type="text" name="h" inputmode="decimal" placeholder="vazio = padrão do mês"></label>
       <label class="campo">Salário bruto <input type="text" name="sal" inputmode="decimal"></label>
@@ -296,7 +320,7 @@ function adicionarPessoa(mesId) {
       const nums = ['h', 'sal', 'rec'].map(k => lerNumero(f.get(k)));
       if (nums.some(Number.isNaN)) { aviso('Horas, salário e recibo: só números.', true); return; }
       await gravar('cb_hh_itens', { id: chaveItem(mesId, 'n-' + semAcento(nome).replace(/\W+/g, '-')), mes: mesId, funcionario_id: null,
-        cadastro: String(f.get('cad') || '').trim() || null, nome, relacao: f.get('rel'),
+        cadastro: String(f.get('cad') || '').trim() || null, nome, setor: f.get('setor') || 'Campo', relacao: f.get('rel'),
         horas_pessoas: null, horas_manual: nums[0], salario_bruto: nums[1], recibo: nums[2], lancado_agro: false, incluido: true });
       window.fecharModal(); desenhar();
     });
@@ -311,20 +335,24 @@ function desenharFolha(c) {
   el.innerHTML = `<div class="rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA">
       <div class="rel-tit"><h1>Custo hora-homem · ${esc(nomeMes(mesSel))}</h1>
-        <p>Funcionários do campo · R$/h = (salário bruto × encargo + recibo) ÷ horas trabalhadas${m && m.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'}</p></div></div>
+        <p>Campo e Administrativo · R$/h = (salário bruto × encargo + recibo) ÷ horas trabalhadas${m && m.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'}</p></div></div>
     <div class="rel-kpis">
       <div><span>Pessoas</span><b>${c.pessoas}</b></div>
-      <div><span>Horas</span><b>${esc(num(c.horasTodas, 1))}</b></div>
       <div><span>Folha</span><b>${esc(num(c.folha))}</b></div>
       <div><span>Custo c/ encargos</span><b>${esc(num(c.custo))}</b></div>
-      <div><span>R$/h médio</span><b>${c.media !== null ? esc(num(c.media)) : '—'}</b></div>
+      <div><span>Custo hora Campo</span><b>${c.campo.media !== null ? esc(num(c.campo.media)) : '—'}</b></div>
+      <div><span>Custo hora ADM</span><b>${c.adm.media !== null ? esc(num(c.adm.media)) : '—'}</b></div>
     </div>
-    <p class="rel-secao">Por funcionário</p>
+    ${SETORES.map(st => {
+      const ls = linhas.filter(l => (l.setor || 'Campo') === st); if (!ls.length) return '';
+      const g = st === 'ADM' ? c.adm : c.campo;
+      return `<p class="rel-secao">${st === 'ADM' ? 'Administrativo (ADM)' : 'Campo'}</p>
     <table class="rel-tab"><thead><tr><th>Nº</th><th>Nome</th><th>Relação</th><th class="dir">Horas</th><th class="dir">Salário bruto</th><th class="dir">Recibo</th><th class="dir">Total</th><th class="dir">R$/h</th></tr></thead>
-    <tbody>${linhas.map(l => `<tr><td>${esc(l.cadastro || '')}</td><td>${esc(l.nome)}</td><td>${esc(l.relacao)}</td>
+    <tbody>${ls.map(l => `<tr><td>${esc(l.cadastro || '')}</td><td>${esc(l.nome)}</td><td>${esc(l.relacao)}</td>
       <td class="dir">${esc(num(l.horas, 1))}${l.origemHoras === 'padrao' ? '*' : ''}</td><td class="dir">${esc(num(l.salario_bruto))}</td><td class="dir">${esc(num(l.recibo))}</td>
       <td class="dir">${esc(num(l.total))}</td><td class="dir"><b>${l.rh !== null ? esc(num(l.rh)) : '—'}</b></td></tr>`).join('')}</tbody>
-    <tfoot><tr class="rel-total"><td></td><td>Total</td><td>${c.pessoas} pessoas</td><td class="dir">${esc(num(c.horasTodas, 1))}</td><td></td><td></td><td class="dir">${esc(num(c.folha))}</td><td class="dir">${c.media !== null ? esc(num(c.media)) : '—'}</td></tr></tfoot></table>
+    <tfoot><tr class="rel-total"><td></td><td>Custo hora ${st}</td><td>${g.pessoas} pessoas</td><td class="dir">${esc(num(g.horasTodas, 1))}</td><td></td><td></td><td class="dir">${esc(num(g.folha))}</td><td class="dir">${g.media !== null ? esc(num(g.media)) : '—'}</td></tr></tfoot></table>`;
+    }).join('')}
     <p class="dc-sem" style="font-size:7.5pt;color:#51534A">Encargos: fixo ${esc(num(parametrosDoMes(mesSel).encargo_fixo, 4))} · temporário ${esc(num(parametrosDoMes(mesSel).encargo_temporario, 4))}. * horas padrão do mês (sem boletim no Pessoas).</p>
     ${rodapeLop()}
   </div>`;
@@ -333,21 +361,27 @@ function desenharFolha(c) {
 function pdfHH(c) {
   const m = mes(mesSel), p = parametrosDoMes(mesSel);
   const linhas = c.linhas.filter(l => l.incluido !== false);
+  const secao = st => {
+    const ls = linhas.filter(l => (l.setor || 'Campo') === st); if (!ls.length) return null;
+    const g = st === 'ADM' ? c.adm : c.campo;
+    return { titulo: st === 'ADM' ? 'Administrativo (ADM)' : 'Campo', dir: [3, 4, 5, 6, 7],
+      head: ['Nº', 'Nome', 'Relação', 'Horas', 'Salário bruto', 'Recibo', 'Total', 'R$/h'],
+      body: ls.map(l => [l.cadastro || '', l.nome, l.relacao, num(l.horas, 1) + (l.origemHoras === 'padrao' ? '*' : ''),
+        num(l.salario_bruto), num(l.recibo), num(l.total), l.rh !== null ? num(l.rh) : '—']),
+      total: ['', 'Custo hora ' + st, g.pessoas + ' pessoas', num(g.horasTodas, 1), '', '', num(g.folha), g.media !== null ? num(g.media) : '—'] };
+  };
   return {
     titulo: 'Custo hora-homem · ' + nomeMes(mesSel),
-    subtitulo: `Funcionários do campo · R$/h = (salário bruto × encargo + recibo) ÷ horas · encargo fixo ${num(p.encargo_fixo, 4)}, temporário ${num(p.encargo_temporario, 4)}` + (m && m.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'),
+    subtitulo: `Campo e Administrativo · R$/h = (salário bruto × encargo + recibo) ÷ horas · encargo fixo ${num(p.encargo_fixo, 4)}, temporário ${num(p.encargo_temporario, 4)}` + (m && m.status === 'fechado' ? ' · mês fechado' : ' · rascunho (mês aberto)'),
     arquivo: 'Hora-homem ' + mesSel,
-    kpis: [['Pessoas', c.pessoas], ['Horas', num(c.horasTodas, 1)], ['Folha', reais(c.folha)], ['Custo c/ encargos', reais(c.custo)], ['R$/h médio', c.media !== null ? reais(c.media) : '—']],
-    secoes: [{ titulo: 'Por funcionário', dir: [3, 4, 5, 6, 7],
-      head: ['Nº', 'Nome', 'Relação', 'Horas', 'Salário bruto', 'Recibo', 'Total', 'R$/h'],
-      body: linhas.map(l => [l.cadastro || '', l.nome, l.relacao, num(l.horas, 1) + (l.origemHoras === 'padrao' ? '*' : ''),
-        num(l.salario_bruto), num(l.recibo), num(l.total), l.rh !== null ? num(l.rh) : '—']),
-      total: ['', 'Total', c.pessoas + ' pessoas', num(c.horasTodas, 1), '', '', num(c.folha), c.media !== null ? num(c.media) : '—'] }],
+    kpis: [['Pessoas', c.pessoas], ['Folha', reais(c.folha)], ['Custo c/ encargos', reais(c.custo)],
+      ['Custo hora Campo', c.campo.media !== null ? reais(c.campo.media) : '—'], ['Custo hora ADM', c.adm.media !== null ? reais(c.adm.media) : '—']],
+    secoes: SETORES.map(secao).filter(Boolean),
   };
 }
 function resumoHH(c) {
-  return `*Hora-homem · ${nomeMes(mesSel)}* — SAKUMA\n${c.pessoas} pessoas · ${num(c.horasTodas, 1)} h` +
-    `\nCusto c/ encargos ${reais(c.custo)} · R$/h médio ${c.media !== null ? reais(c.media) : '—'}`;
+  return `*Hora-homem · ${nomeMes(mesSel)}* — SAKUMA\n${c.pessoas} pessoas · custo c/ encargos ${reais(c.custo)}` +
+    `\nCusto hora Campo ${c.campo.media !== null ? reais(c.campo.media) : '—'} · Custo hora ADM ${c.adm.media !== null ? reais(c.adm.media) : '—'}`;
 }
 
 async function exportar(c) {
@@ -355,12 +389,14 @@ async function exportar(c) {
   await baixarXlsx('Hora-homem ' + mesSel, [{
     nome: nomeMes(mesSel), titulo: 'Custo Hora Homem · ' + nomeMes(mesSel),
     subtitulo: 'SAKUMA Agronegócios · R$/h = (salário bruto × encargo + recibo) ÷ horas trabalhadas',
-    colunas: [{ rot: 'Agro', larg: 6 }, { rot: 'Num', larg: 6 }, { rot: 'Nome', larg: 36 }, { rot: 'H Trab Total', tipo: 'num', casas: 1, larg: 11 },
+    colunas: [{ rot: 'Agro', larg: 6 }, { rot: 'Setor', larg: 8 }, { rot: 'Num', larg: 6 }, { rot: 'Nome', larg: 36 }, { rot: 'H Trab Total', tipo: 'num', casas: 1, larg: 11 },
       { rot: 'Salário Bruto', tipo: 'num', casas: 2, larg: 13 }, { rot: 'Horas Recibo', tipo: 'num', casas: 2, larg: 13 },
       { rot: 'Total', tipo: 'num', casas: 2, larg: 13 }, { rot: 'Relação', larg: 11 }, { rot: 'Origem das horas', larg: 14 }, { rot: 'R$/H', tipo: 'num', casas: 2, larg: 10 }],
-    linhas: linhas.map(l => [l.lancado_agro ? 'sim' : '', l.cadastro || '', l.nome, l.horas, Number(l.salario_bruto || 0), Number(l.recibo || 0), l.total, l.relacao,
+    linhas: linhas.map(l => [l.lancado_agro ? 'sim' : '', l.setor || 'Campo', l.cadastro || '', l.nome, l.horas, Number(l.salario_bruto || 0), Number(l.recibo || 0), l.total, l.relacao,
       ({ pessoas: 'Pessoas', planilha: 'planilha', manual: 'corrigido' })[l.origemHoras] || 'padrão do mês', l.rh]),
-    total: ['', '', 'Total', c.horasTodas, '', '', c.folha, '', '', c.media],
+    total: ['', '', '', 'Total', c.horasTodas, '', '', c.folha, '', '', c.media],
+    notas: [`Custo hora Campo: ${c.campo.media !== null ? num(c.campo.media) : '—'} (${num(c.campo.custo)} ÷ ${num(c.campo.horas, 1)} h)`,
+      `Custo hora ADM: ${c.adm.media !== null ? num(c.adm.media) : '—'} (${num(c.adm.custo)} ÷ ${num(c.adm.horas, 1)} h)`],
   }]);
 }
 
@@ -376,24 +412,25 @@ function desenharHistorico() {
   for (const id of ult) for (const l of porMes[id].linhas) {
     if (l.incluido === false) continue;
     const k = l.funcionario_id || l.nome;
-    if (!pessoas.has(k)) pessoas.set(k, { nome: l.nome, cadastro: l.cadastro, v: {} });
+    if (!pessoas.has(k)) pessoas.set(k, { nome: l.nome, cadastro: l.cadastro, setor: l.setor || 'Campo', v: {} });
     pessoas.get(k).v[id] = l.rh;
   }
   alvo.innerHTML = `
     <h3 class="cb-secao">Meses</h3>
     <div class="cb-rolagem"><table class="dc-planilha cb-tab">
-      <thead><tr><th>Competência</th><th>Situação</th><th class="dir">Pessoas</th><th class="dir">Horas</th><th class="dir">Folha</th><th class="dir">Custo c/ encargos</th><th class="dir">R$/h médio</th><th></th></tr></thead>
+      <thead><tr><th>Competência</th><th>Situação</th><th class="dir">Pessoas</th><th class="dir">Horas</th><th class="dir">Folha</th><th class="dir">Custo c/ encargos</th><th class="dir">Custo hora Campo</th><th class="dir">Custo hora ADM</th><th></th></tr></thead>
       <tbody>${lista.slice().reverse().map(m => { const c = calcularMesHH(m.id); return `<tr>
         <td><b>${esc(nomeMes(m.id))}</b></td><td>${m.status === 'fechado' ? `<span class="cb-cadeado">${CADEADO} Fechado</span>` : '<span class="tag alerta">aberto</span>'}</td>
         <td class="dir">${c.pessoas}</td><td class="dir">${esc(num(c.horasTodas, 1))}</td><td class="dir">${esc(num(c.folha))}</td>
-        <td class="dir">${esc(num(c.custo))}</td><td class="dir"><b>${c.media !== null ? esc(num(c.media)) : '—'}</b></td>
+        <td class="dir">${esc(num(c.custo))}</td><td class="dir"><b>${c.campo.media !== null ? esc(num(c.campo.media)) : '—'}</b></td><td class="dir"><b>${c.adm.media !== null ? esc(num(c.adm.media)) : '—'}</b></td>
         <td class="dir"><button class="btn mini" type="button" data-abrir="${esc(m.id)}">Abrir</button></td></tr>`; }).join('')}</tbody></table></div>
     <h3 class="cb-secao">R$/h por pessoa <small>últimos ${ult.length} meses</small></h3>
     <div class="cb-rolagem"><table class="dc-planilha cb-tab">
-      <thead><tr><th>Nº</th><th>Nome</th>${ult.map(m => `<th class="dir">${esc(mesCurto(m))}</th>`).join('')}</tr></thead>
-      <tbody>${[...pessoas.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map(p => `<tr><td>${esc(p.cadastro || '')}</td><td><b>${esc(p.nome)}</b></td>${ult.map(m =>
+      <thead><tr><th>Nº</th><th>Nome</th><th>Setor</th>${ult.map(m => `<th class="dir">${esc(mesCurto(m))}</th>`).join('')}</tr></thead>
+      <tbody>${[...pessoas.values()].sort((a, b) => a.setor.localeCompare(b.setor) * -1 || a.nome.localeCompare(b.nome, 'pt-BR')).map(p => `<tr><td>${esc(p.cadastro || '')}</td><td><b>${esc(p.nome)}</b></td><td>${esc(p.setor)}</td>${ult.map(m =>
         `<td class="dir">${p.v[m] === undefined ? '' : p.v[m] === null ? '—' : esc(num(p.v[m]))}</td>`).join('')}</tr>`).join('')}</tbody>
-      <tfoot><tr class="dc-total"><td></td><td>Média do mês</td>${ult.map(m => `<td class="dir">${porMes[m].media !== null ? esc(num(porMes[m].media)) : '—'}</td>`).join('')}</tr></tfoot>
+      <tfoot><tr class="dc-total"><td></td><td>Custo hora Campo</td><td></td>${ult.map(m => `<td class="dir">${porMes[m].campo.media !== null ? esc(num(porMes[m].campo.media)) : '—'}</td>`).join('')}</tr>
+        <tr class="dc-total"><td></td><td>Custo hora ADM</td><td></td>${ult.map(m => `<td class="dir">${porMes[m].adm.media !== null ? esc(num(porMes[m].adm.media)) : '—'}</td>`).join('')}</tr></tfoot>
     </table></div>`;
   alvo.querySelectorAll('[data-abrir]').forEach(b => b.addEventListener('click', () => { irParaMesHH(b.dataset.abrir); window.abrirTelaCustoBase('hhMes'); }));
 }

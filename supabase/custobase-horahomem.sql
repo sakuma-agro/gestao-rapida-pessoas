@@ -105,3 +105,38 @@ update public.cb_hh_parametros set componentes = '{
   "temporario": [
     {"nome":"Encargos do temporário (total da planilha)","pct":57.05}]
 }'::jsonb where id = 'geral' and componentes is null;
+
+-- 20/10/2026 (já rodado no banco): a lista vem do cadastro ATIVO do Pessoas
+-- (mais quem tem boletim na competência), não só de quem tem boletim.
+create or replace function public.cb_horas_mes(p_mes text)
+returns table (funcionario_id uuid, cadastro text, nome text, setor text, situacao text,
+               tipo_contrato text, minutos bigint, boletins bigint, salario numeric)
+language sql stable security definer set search_path = public as $$
+  with h as (
+    select b.funcionario_id, coalesce(sum(a.min_trabalhados), 0)::bigint minutos, count(b.id)::bigint boletins
+      from public.jor_boletins b
+      left join public.jor_apuracoes a on a.boletim_id = b.id
+     where p_mes ~ '^\d{4}-\d{2}$'
+       and to_char(b.competencia, 'YYYY-MM') = p_mes
+       and coalesce(b.situacao, '') <> 'cancelado'
+     group by b.funcionario_id)
+  select f.id, f.cadastro, f.nome, f.setor, f.situacao, v.tipo_contrato,
+         coalesce(h.minutos, 0), coalesce(h.boletins, 0),
+         case when public.app_pode('ver_salarios') or public.app_pode('rh') then
+           (select s.valor from public.jor_salarios s
+             where s.funcionario_id = f.id
+               and s.desde <= ((p_mes || '-01')::date + interval '1 month' - interval '1 day')::date
+             order by s.desde desc limit 1)
+         end
+    from public.funcionarios f
+    left join h on h.funcionario_id = f.id
+    left join public.jor_vinculos v on v.funcionario_id = f.id
+   where public.app_pode('custobase')
+     and (upper(coalesce(f.situacao, '')) = 'ATIVO' or h.funcionario_id is not null)
+$$;
+revoke all on function public.cb_horas_mes(text) from public, anon;
+grant execute on function public.cb_horas_mes(text) to authenticated;
+
+-- 20/10/2026 (já rodado): custo hora separado por setor (Campo e ADM).
+alter table public.cb_hh_itens add column if not exists setor text;
+update public.cb_hh_itens set setor = 'Campo' where setor is null;

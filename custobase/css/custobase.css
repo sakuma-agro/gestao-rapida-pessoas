@@ -200,3 +200,7 @@ body.embutido .abas{padding-top:4px}
 .btn.btn-zap:hover{background:#1EBE5A;border-color:#1EBE5A;color:#fff}
 .btn.btn-zap:disabled{opacity:.6;cursor:wait}
 .btn.btn-zap .ic-zap{width:20px;height:20px;flex:none;border-radius:5px;background:#fff;display:block}
+
+/* hora-homem: grupos Campo e ADM (20/10/2026) */
+.hh-tab tr.hh-grupo td{background:rgba(116,79,40,.10) !important;color:var(--marrom);font-weight:700;font-size:12px;letter-spacing:.3px;text-transform:uppercase}
+.hh-tab tr.hh-sub td{background:var(--fundo) !important}

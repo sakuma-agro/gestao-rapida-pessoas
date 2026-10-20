@@ -102,3 +102,10 @@ select v.nome, v.indice, v.ciclo, v.perm, v.ordem from (values
   ('Trigo',     2000, 120, false, 10),
   ('Triticale', 2000, 120, false, 11)) v(nome, indice, ciclo, perm, ordem)
 where not exists (select 1 from public.cb_culturas c where lower(c.nome) = lower(v.nome));
+
+-- 20/10/2026 (já rodado): cadastro de plantios com data inicial + qtde de
+-- meses (data do dia 16 ao 31 entra no mês seguinte) e marca "Lançado no Agro".
+alter table public.cb_talhoes add column if not exists data_inicial date;
+alter table public.cb_talhoes add column if not exists qtde_meses integer;
+alter table public.cb_itens add column if not exists lancado_agro boolean default false;
+alter table public.cb_hh_itens add column if not exists lancado_agro boolean default false;
