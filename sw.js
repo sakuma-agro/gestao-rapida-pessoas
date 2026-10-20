@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v266';
+const VERSAO = 'gr-v267';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -38,10 +38,10 @@ const ARQUIVOS = [
   // Vistorias e Segurança (14/10/2026): abre sem sinal no campo, como o app avulso abria.
   './icons/mod-vistorias.v1.png',
   /* ícones das áreas (14/10/2026): uma família, cor e símbolo por área */
-  './icons/area-pessoas.v2.svg', './icons/area-manutencoes.v2.svg',
-  './icons/area-certificacao.v2.svg', './icons/area-vistorias.v2.svg', './icons/area-usuarios.v2.svg',
+  './icons/area-pessoas.v1.svg', './icons/area-manutencoes.v1.svg',
+  './icons/area-certificacao.v1.svg', './icons/area-vistorias.v1.svg', './icons/area-usuarios.v1.svg',
   // Programação Campo (15/10/2026): abre sem sinal no campo, como o app avulso abria.
-  './icons/area-programacao.v2.svg',
+  './icons/area-programacao.v1.svg',
   './vendor/jspdf.umd.min.js', './vendor/jspdf.plugin.autotable.min.js',
   './programacao/', './programacao/index.html', './programacao/css/app.css', './programacao/css/programacao.css',
   './programacao/js/config.js', './programacao/js/base.js', './programacao/js/comum.js', './programacao/js/acesso.js',
@@ -50,7 +50,7 @@ const ARQUIVOS = [
   './programacao/img/sakuma-logo.png', './programacao/img/lop-marca.png',
   './programacao/img/whatsapp.png',
   // Estoque (15/10/2026): conta-se no almoxarifado, muitas vezes sem sinal.
-  './icons/area-estoque.v3.svg',
+  './icons/area-estoque.v2.svg',
   './estoque/', './estoque/index.html', './estoque/css/app.css', './estoque/css/estoque.css',
   './estoque/js/app.js', './estoque/js/acesso.js', './estoque/js/acerto.js',
   './estoque/js/acerto-motor.js', './estoque/js/planilha.js',
@@ -58,7 +58,7 @@ const ARQUIVOS = [
   './estoque/js/contagem.js', './estoque/js/cadastros.js', './estoque/js/compra.js', './estoque/js/saldo.js', './estoque/js/qc.js', './estoque/js/qc-importar.js',
   './estoque/img/sakuma-logo.png', './estoque/img/lop-marca.png',
   // Custo Base (20/10/2026): rateio mensal por cultura, que era a planilha do ADM.
-  './icons/area-custobase.v3.svg',
+  './icons/area-custobase.v2.svg',
   './custobase/', './custobase/index.html', './custobase/css/app.css', './custobase/css/custobase.css',
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
   './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
