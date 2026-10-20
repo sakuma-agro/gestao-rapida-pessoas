@@ -603,7 +603,7 @@
 #jorFormBoletim:is([data-dia="domingo"], [data-dia="feriado"]) :is(#bIni, #bFim, #bInterv) { background: #FDE3E3; border-color: #E39A9A; color: #8E1F1F; }
 
 /* Próximo boletim já preparado */
-.jor-prox { margin: 0 0 10px; padding: 7px 10px; border-left: 3px solid #744F28; background: #F7F1EA; color: #5a3d1f;
+.jor-prox { margin: 0 0 10px; padding: 7px 10px; border: 1px solid #F2B705; border-left: 3px solid #F2B705; background: #FFF9E0; color: #51534A;
   font-size: 12.5px; line-height: 1.45; border-radius: 4px; }
 .jor-prox[hidden] { display: none; }
 #jorFormBoletim .jor-sugerido { background: #FFF9E0; border-color: #F2B705; }
