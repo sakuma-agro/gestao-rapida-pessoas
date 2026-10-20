@@ -60,7 +60,7 @@ export const AREAS = [
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
-  { id: 'usuarios', nome: 'Usuários - Acessos', icone: 'icons/area-usuarios.v1.svg',
+  { id: 'usuarios', nome: 'Usuários - Acessos', icone: 'icons/area-usuarios.v2.svg',
     desc: 'Quem acessa o quê · Senhas · Backup dos dados' },
 ];
 
@@ -223,7 +223,7 @@ export function mostrarAreas({ direto = false } = {}) {
     const ok = !a.emBreve && liberada(a.id);
     const fantasma = !ok && !a.emBreve;
     return `<button type="button" class="ar-cartao${a.emBreve ? ' ar-embreve' : ''}${fantasma ? ' ar-fantasma' : ''}" data-area="${a.id}"
-        ${ok ? '' : 'disabled aria-disabled="true"'} ${fantasma ? 'title="Você não tem acesso a esta área. Peça ao administrador."' : ''}>
+        ${ok ? '' : 'disabled aria-disabled="true"'} title="${fantasma ? 'Você não tem acesso a esta área. Peça ao administrador.' : esc(a.desc)}">
       <img src="${a.icone}" alt="">
       <span class="ar-txt"><b>${esc(a.nome)}</b><small>${esc(a.desc)}</small></span>
       <span class="ar-ir">${a.emBreve ? 'Em breve' : fantasma ? 'Sem acesso' : 'Entrar →'}</span>

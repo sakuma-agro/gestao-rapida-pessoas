@@ -1502,3 +1502,20 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .cc-cults{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px}
 .cc-cults label{font-weight:400}
 .cc-cults .cc-carc{width:84px;margin:0 0 0 4px;padding:2px 6px;font-size:11px}
+
+/* ---- Tela das áreas em grade de ícones (layout B, pedido dele 20/10/2026) ----
+   Antes: cartões grandes em 3 colunas (~410 px de altura). Agora: as áreas
+   lado a lado, só ícone e nome; os módulos ficam no title (passar o mouse).
+   "Entrar →" some; "Sem acesso"/"Em breve" continuam, pequenos, sob o nome. */
+.ar-grade{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:12px}
+.ar-cartao{flex-direction:column;justify-content:flex-start;gap:10px;padding:18px 8px 14px;
+  text-align:center;border-radius:14px;transition:border-color .15s,box-shadow .15s,transform .15s}
+.ar-cartao:not([disabled]):hover{transform:translateY(-2px)}
+.ar-cartao img{width:52px;height:52px;border-radius:13px}
+.ar-txt{flex:none;align-items:center;width:100%}
+.ar-txt b{font-size:13.5px;letter-spacing:0;line-height:1.25}
+.ar-txt small{display:none}
+.ar-cartao:not(.ar-fantasma):not(.ar-embreve) .ar-ir{display:none}
+.ar-cartao.ar-fantasma .ar-ir,.ar-cartao.ar-embreve .ar-ir{font-size:11px;margin-top:-4px}
+@media (max-width:560px){.ar-grade{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+  .ar-cartao{padding:14px 6px 10px}.ar-cartao img{width:46px;height:46px}.ar-txt b{font-size:12.5px}}
