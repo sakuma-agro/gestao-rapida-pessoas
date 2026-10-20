@@ -41,7 +41,7 @@ let filtroMaq = { busca: '', local: '', tipo: '' };
 
 TELAS.maquinas = el => {
   el.innerHTML = `
-    <h1>Máquinas${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
+    <h1>Cadastros${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
     <p class="sub">Cadastro das máquinas e dos itens de manutenção de cada uma — a cada quantas
        horas ou dias, e qual óleo e filtro ela usa.</p>
     <div class="acoes">

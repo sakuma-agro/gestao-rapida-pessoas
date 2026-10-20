@@ -19,7 +19,7 @@ const MODULOS = [
      Manutenções guarda tudo o que a área já tinha; Patrimônio é o novo.
      Os ids das telas não mudaram — atalhos e links de WhatsApp continuam. */
   { id: 'manutencoes', nome: 'Manutenções', telas: [
-    ['painel', 'Painel'], ['maquinas', 'Máquinas'], ['vencimentos', 'Vencimentos'],
+    ['painel', 'Painel'], ['maquinas', 'Cadastros'], ['vencimentos', 'Vencimentos'],
     ['calendario', 'Calendário'], ['ordens', 'Ordens de serviço'], ['checklist', 'Check list'],
   ] },
   { id: 'patrimonio', nome: 'Patrimônio', telas: [
@@ -183,7 +183,7 @@ const ATALHOS_INICIO = [
   ['vencimentos', 'venc', 'Vencimentos'],
   ['calendario', 'venc', 'Calendário'],
   ['ordens', 'os', 'Ordens de serviço'],
-  ['maquinas', 'bens', 'Máquinas'],
+  ['maquinas', 'bens', 'Cadastros'],
   ['checklist', 'check', 'Check list'],
   ['patrimonio', 'patrimonio', 'Patrimônio'],
   ['patrimonio_mov', 'mov', 'Movimentações'],
