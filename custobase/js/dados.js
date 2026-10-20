@@ -83,6 +83,37 @@ export const mesFechado = mesId => (mes(mesId) || {}).status === 'fechado';
 export const CADEADO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
 export const seloFechado = (por, em) => `<span class="cb-cadeado" title="Mês fechado: travado. Mudança de parâmetro não altera este mês.">${CADEADO} Fechado</span>${por ? ` <span class="dc-sem">por ${esc(por)}${em ? ' em ' + esc(dataHora(em)) : ''}</span>` : ''}`;
 
+/* ---- período do plantio no rateio (pedido dele, 20/10/2026) ----
+   "ADM mensal funciona assim: o que tem data inicial do dia 16 ao 31 não
+   entra no mês." Data inicial até o dia 15 → entra naquele mês; do 16 em
+   diante → entra no mês seguinte. Fica no rateio a qtde de meses do
+   cadastro (vazio = a da cultura; cultura permanente = sempre). */
+export const DIA_CORTE = 15;
+export function mesDeEntrada(dataISO) {
+  if (!dataISO) return null;
+  const [a, m, d] = String(dataISO).slice(0, 10).split('-').map(Number);
+  const base = a + '-' + String(m).padStart(2, '0');
+  return d <= DIA_CORTE ? base : mesSeguinte(base);
+}
+export const somaMeses = (mesId, n) => { let x = mesId; for (let i = 0; i < n; i++) x = mesSeguinte(x); return x; };
+/** Qtde de meses que o plantio fica no rateio (null = sem fim). */
+export function qtdeDe(t) {
+  if (t && t.qtde_meses) return Number(t.qtde_meses);
+  return mesesDaCultura(cultura(t && t.cultura_id));
+}
+/** { ini, fim } em 'AAAA-MM'; fim null = sem fim (permanente). */
+export function periodoDe(t) {
+  const ini = mesDeEntrada(t && t.data_inicial);
+  if (!ini) return { ini: null, fim: null };
+  const q = qtdeDe(t);
+  return { ini, fim: q ? somaMeses(ini, q - 1) : null };
+}
+export function entraNoMes(t, mesId) {
+  if (!t || t.ativo === false) return false;
+  const { ini, fim } = periodoDe(t);
+  return !!ini && mesId >= ini && (!fim || mesId <= fim);
+}
+
 /* ---- a conta ---- */
 export const pesoDe = i => Number(i.indice || 0) * Number(i.area || 0) * (12 / Number(i.ciclo || 1));
 
@@ -100,7 +131,7 @@ export function calcularMes(mesId) {
     l.pct = total > 0 && l.incluido !== false ? l.peso / total : 0;
     l.valor = custo !== null ? custo * l.pct : null;
     l.meses = mesesParticipados(l.talhao_id, mesId);
-    l.limite = mesesDaCultura(l.culturaObj);
+    l.limite = l.talhao && l.talhao.id ? qtdeDe(l.talhao) : mesesDaCultura(l.culturaObj);
   }
   linhas.sort((a, b) => a.culturaNome.localeCompare(b.culturaNome, 'pt-BR')
     || String(a.talhao.nome || '').localeCompare(String(b.talhao.nome || ''), 'pt-BR', { numeric: true }));

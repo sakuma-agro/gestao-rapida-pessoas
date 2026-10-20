@@ -30,14 +30,19 @@ export const svgIcone = nome =>
 export const MODULOS = [
   /* 20/10/2026, pedido dele: cada módulo com um submódulo Parâmetros, onde
      ele altera o que a conta usa. Faixas: módulo › submódulo › telas. */
-  { id: 'rateio', nome: 'Rateio mensal culturas', icone: 'rateio', subs: [
-    { id: 'rtSubRateio', nome: 'Rateio', icone: 'rateio', telas: [
+  /* 20/10/2026, pedido dele: processo independente, na ordem —
+     Parâmetros (a base) → Cadastro de plantios (data inicial e qtde de
+     meses) → Rateio do mês (monta-se sozinho). Abre no Rateio do mês. */
+  { id: 'rateio', nome: 'Rateio mensal culturas', icone: 'rateio', inicial: 'rtMes', subs: [
+    { id: 'rtSubParam', nome: '1 · Parâmetros', icone: 'param', telas: [
+      ['rtCulturas',  'Culturas (índice, ciclo e meses no rateio)', 'culturas'],
+    ] },
+    { id: 'rtSubCad', nome: '2 · Cadastro de plantios', icone: 'talhoes', telas: [
+      ['rtTalhoes',   'Plantios', 'talhoes'],
+    ] },
+    { id: 'rtSubRateio', nome: '3 · Rateio do mês', icone: 'rateio', telas: [
       ['rtMes',       'Rateio do mês', 'mes'],
       ['rtHistorico', 'Histórico',     'historico'],
-      ['rtTalhoes',   'Plantios',      'talhoes'],
-    ] },
-    { id: 'rtSubParam', nome: 'Parâmetros', icone: 'param', telas: [
-      ['rtCulturas',  'Culturas (índice, ciclo e meses no rateio)', 'culturas'],
     ] },
   ] },
   /* Hora-homem (20/10/2026, pedido dele): a planilha "Controle Mensal -
@@ -98,6 +103,7 @@ export function abrirModulo(id, tela) {
     b.setAttribute('aria-selected', String(b.dataset.modulo === id)));
   const subs = subsLiberados(id);
   if (!subs.length) return;
+  if (!tela) tela = (MODULOS.find(x => x.id === id) || {}).inicial;
   const sub = subs.find(s => s.telas.some(([t]) => t === tela)) || subs[0];
   const f2 = $('navTelas');
   f2.hidden = subs.length < 2;

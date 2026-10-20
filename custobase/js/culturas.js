@@ -98,6 +98,7 @@ function editar(id) {
       window.fecharModal();
       const mudou = Number(c.indice) !== Number(r.indice) || Number(c.ciclo) !== Number(r.ciclo);
       const meses = mudou ? await levarAosMesesAbertos(nova) : [];
+      try { if (window.cbSincronizarAbertos) await window.cbSincronizarAbertos(); } catch (e) { /* segue */ }
       aviso('Cultura salva.' + (meses.length ? ' Atualizada nos meses abertos: ' + meses.map(nomeMes).join(', ') + '. Os fechados não mudaram.' : mudou ? ' Nenhum mês aberto usa esta cultura; os fechados não mudaram.' : ''));
       desenhar();
     });

@@ -6,7 +6,7 @@
 <title>Custo Base · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=1">
-<link rel="stylesheet" href="css/custobase.css?v=5">
+<link rel="stylesheet" href="css/custobase.css?v=6">
 <!-- Área Custo Base do LOP - Gestão Rápida (20/10/2026).
      Módulo Rateio mensal culturas: substitui a planilha "Rateio - Direcionador
      Mensal ADM". Esta página não abre sozinha: mora dentro do app principal
@@ -64,7 +64,7 @@
     <section class="tela" id="telaRtMes" hidden>
       <div class="cartao">
         <h2>Rateio do mês</h2>
-        <p class="dica">Escolha o mês. O mês novo nasce da cópia do anterior; quem completou o ciclo da cultura vem desmarcado. Lance o custo ADM para ver o R$ de cada plantio.</p>
+        <p class="dica">O mês se monta sozinho pelo cadastro de plantios (data inicial e qtde de meses). Marque o que já foi lançado no Agro. Lance o custo ADM para ver o R$ de cada plantio.</p>
         <div id="cbMesCorpo"></div>
       </div>
       <div class="previa" id="cbMesFolha"></div>
@@ -80,8 +80,8 @@
 
     <section class="tela" id="telaRtTalhoes" hidden>
       <div class="cartao">
-        <h2>Plantios</h2>
-        <p class="dica">Cada plantio com o Cód. Agro (o código do sistema agro, que muda a cada safra), a cultura, a fazenda e a área padrão. Encerrar um plantio tira-o dos próximos meses sem mexer no histórico.</p>
+        <h2>Cadastro de plantios</h2>
+        <p class="dica">Cada plantio com o Cód. Agro, a cultura, a fazenda, a área, a <b>data inicial</b> e <b>quantos meses</b> ele fica no rateio. É isso que monta o Rateio do mês. Encerrar um plantio tira-o dos meses abertos sem mexer nos fechados.</p>
         <div id="cbTalhoesCorpo"></div>
       </div>
     </section>
@@ -132,9 +132,9 @@
 <script src="../vendor/supabase.js"></script>
 <!-- Excel: a biblioteca entra aqui porque ../js/excel.js a carregaria por um caminho relativo ao app principal. -->
 <script src="../vendor/xlsx-js-style.min.js" defer></script>
-<script src="js/config.js?v=2"></script>
+<script src="js/config.js?v=3"></script>
 <script src="../js/moldura-nucleo.js?v=4"></script>
-<script src="js/base.js?v=3"></script>
-<script type="module" src="js/app.js?v=5"></script>
+<script src="js/base.js?v=4"></script>
+<script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

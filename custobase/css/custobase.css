@@ -185,3 +185,9 @@ body.embutido .abas{padding-top:4px}
 .hh-comps{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
 .hh-comp .dc-mini{width:100%}
 .hh-comp .hh-num{width:100px}
+
+/* cadastro de plantios: prévia do período (20/10/2026) */
+.cb-previa-periodo{display:flex;flex-direction:column;justify-content:flex-end;gap:2px}
+.cb-previa-periodo span{font-size:11.5px;font-weight:700;color:var(--suave);text-transform:uppercase;letter-spacing:.5px}
+.cb-previa-periodo b{font-size:14px;color:var(--marrom);padding:9px 0}
+.cb-rateio .cb-agro{width:18px;height:18px}
