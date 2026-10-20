@@ -946,7 +946,7 @@ function abrirFuncionario(id) {
   $('fuSexo').value = editandoFunc.sexo || '';
   $('fuTelefone').value = editandoFunc.telefone || '';
   $('fuAdmissao').value = (editandoFunc.admissao || '').slice(0, 10);
-  $('fuCpf').value = editandoFunc.cpf || '';
+  $('fuCpf').value = mascaraCpf(editandoFunc.cpf || '');
   montarListasDoCadastro(editandoFunc);
   $('fuCalcado').value = editandoFunc.tam_calcado || '';
   $('fuCamisa').value = editandoFunc.tam_camisa || '';
@@ -1156,7 +1156,7 @@ $('formFunc').addEventListener('submit', async ev => {
     sexo: $('fuSexo').value || null,
     telefone: $('fuTelefone').value.trim(),
     admissao: $('fuAdmissao').value || null,
-    cpf: $('fuCpf').value.trim(),
+    cpf: mascaraCpf($('fuCpf').value),
     tam_calcado: $('fuCalcado').value.trim(),
     tam_camisa: $('fuCamisa').value.trim(),
     situacao: $('fuSituacao').value,
@@ -1340,6 +1340,21 @@ function mostrarAviso(texto) {
   a.textContent = texto; a.className = 'aviso ok'; a.hidden = false;
   setTimeout(() => { a.hidden = true; a.className = 'aviso info'; }, 6000);
 }
+
+/* CPF com pontos e traço ao digitar (pedido dele, 20/10/2026): ele digita só os
+   números e a máscara 000.000.000-00 entra sozinha. Vale ao digitar, ao colar e
+   ao abrir um cadastro antigo gravado só com dígitos. Até 11 dígitos. */
+function mascaraCpf(v) {
+  const d = String(v || '').replace(/\D/g, '').slice(0, 11);
+  return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3}\.\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3}\.\d{3}\.\d{3})(\d)/, '$1-$2');
+}
+$('fuCpf').addEventListener('input', ev => {
+  const el = ev.target;
+  const noFim = el.selectionStart === el.value.length;
+  el.value = mascaraCpf(el.value);
+  if (noFim) el.setSelectionRange(el.value.length, el.value.length);
+});
 
 /* =============== aba ANIVERSARIANTES =============== */
 function listaAniversarios() {
