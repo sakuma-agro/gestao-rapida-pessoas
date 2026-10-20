@@ -1576,3 +1576,18 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
    (quebra linha em vez de cortar com reticências) e um fio separando pessoas. */
 .an-tab.tf-pend td{font-size:10pt;white-space:normal;overflow:visible;text-overflow:clip;padding:2mm 2.5mm}
 .an-tab.tf-pend tr.tf-nova td{border-top:.35mm solid #84BD00}
+
+/* Backup como ícone pequeno, no mesmo desenho dos ícones das áreas (20/10/2026) */
+.arb-mini{display:flex;flex-direction:column;align-items:center;gap:4px}
+.ar-cartao.arb-tile{width:92px;gap:6px;padding:12px 6px 9px;border-radius:12px;flex-direction:column;
+  text-align:center;justify-content:flex-start}
+.ar-cartao.arb-tile img{width:38px;height:38px;border-radius:10px}
+.ar-cartao.arb-tile .ar-txt{flex:none;align-items:center;width:100%}
+.ar-cartao.arb-tile .ar-txt b{font-size:12px;letter-spacing:0}
+.arb-quando{font-size:10.5px;color:var(--suave);line-height:1.2}
+.ar-cartao.arb-tile.arb-fazendo{opacity:.7;cursor:progress}
+.ar-cartao.arb-tile.arb-fazendo img{animation:arb-pulsa 1s ease-in-out infinite}
+@keyframes arb-pulsa{50%{transform:scale(.88)}}
+.arb-link{background:none;border:0;padding:0;font:inherit;font-size:11px;color:var(--suave);
+  text-decoration:underline;cursor:pointer}
+.arb-link:hover{color:var(--marrom)}

@@ -536,27 +536,31 @@ async function textoPasta() {
  */
 export async function desenharBackupInicio(alvo, avisar = () => {}) {
   if (!alvo) return;
+  /* 20/10/2026, pedido dele: o backup vira um ícone igual aos das áreas, só
+     que menor. Tocar no ícone faz o backup; "trocar pasta" fica embaixo, em
+     letra pequena, e o detalhe completo do último backup vai no title. */
   alvo.innerHTML = `
-    <div class="ar-backup" role="group" aria-label="Backup de todo o app">
-      <span class="arb-icone" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/>
-          <path d="M5 21h14a2 2 0 0 0 2-2v-3"/><path d="M3 16v3a2 2 0 0 0 2 2"/></svg>
-      </span>
-      <div class="arb-txt">
-        <b>Backup de todo o app</b>
-        <small id="arbPastaTxt"></small>
-        <small id="arbStatus"></small>
-      </div>
-      <div class="arb-botoes">
-        ${temPastaFixa() ? '<button type="button" class="btn" id="arbPasta">Trocar pasta</button>' : ''}
-        <button type="button" class="btn principal" id="arbFazer">Fazer backup</button>
-      </div>
+    <div class="arb-mini" role="group" aria-label="Backup de todo o app">
+      <button type="button" class="ar-cartao arb-tile" id="arbFazer">
+        <img src="icons/area-backup.v1.svg" alt="">
+        <span class="ar-txt"><b>Backup</b></span>
+        <small class="arb-quando" id="arbStatus"></small>
+      </button>
+      ${temPastaFixa() ? '<button type="button" class="arb-link" id="arbPasta">trocar pasta</button>' : ''}
     </div>`;
   const status = $('arbStatus');
+  const botao = $('arbFazer');
+  const curto = () => {
+    const u = lerUltimo();
+    if (!u) return 'nunca feito';
+    const d = new Date(u.quando);
+    const dd = String(d.getDate()).padStart(2, '0'), mm = String(d.getMonth() + 1).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm} ${hh}:${mi}`;
+  };
   const atualizar = async () => {
-    $('arbPastaTxt').textContent = await textoPasta();
-    status.textContent = textoUltimo();
+    botao.title = `Fazer backup de todo o app\n${await textoPasta()}\n${textoUltimo()}`;
+    status.textContent = curto();
   };
   await atualizar();
 
@@ -565,19 +569,19 @@ export async function desenharBackupInicio(alvo, avisar = () => {}) {
     catch (e) { if (e.name !== 'AbortError') avisar(`Não deu para escolher a pasta: ${e.message || e}`); }
   });
 
-  const botao = $('arbFazer');
   botao.addEventListener('click', async () => {
+    if (botao.disabled) return;
     botao.disabled = true;
-    const rotulo = botao.textContent;
-    botao.textContent = 'Fazendo…';
+    botao.classList.add('arb-fazendo');
+    status.textContent = 'fazendo…';
     try {
-      const r = await gerarBackup(t => { status.textContent = t; });
+      const r = await gerarBackup(() => { status.textContent = 'fazendo…'; });
       await atualizar();
       avisar(frasePronto(r));
     } catch (e) {
-      status.textContent = textoUltimo();
+      await atualizar();
       avisar(`Não deu para gerar o backup: ${e.message || e}`);
-    } finally { botao.disabled = false; botao.textContent = rotulo; }
+    } finally { botao.disabled = false; botao.classList.remove('arb-fazendo'); }
   });
 }
 
