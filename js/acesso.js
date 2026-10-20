@@ -27,8 +27,7 @@ export const MODULOS = [
      `admin: true` no submódulo deixa a faixa só para administrador. */
   { id: 'pessoas', nome: 'Cadastros', subs: [
     { id: 'gente', nome: 'Funcionários', telas: [
-      ['funcionarios', 'Cadastro · Nível 1'],
-      ['funcionariosN2', 'Cadastro · Nível 2'],
+      ['funcionarios', 'Cadastro'],
       ['aniversarios', 'Aniversariantes'],
     ] },
     /* Folha de ponto (28/09/2026): imprime empregador, nome, mês e ano na
@@ -147,7 +146,7 @@ export const MODULOS = [
       ['dmScan',          'Escanear'],
     ] },
     /* Ticket alimentação (14/10/2026): relatório mensal "Ticket início" por
-       empregador e fazenda; valor no Cadastro Nível 2, abatimento só do mês.
+       empregador e fazenda; valor no RH › Salários (ficha da pessoa), abatimento só do mês.
        js/jornada-ticket.js. */
     { id: 'ticket', nome: 'Ticket alimentação', telas: [
       ['tkMes',           'Mês'],

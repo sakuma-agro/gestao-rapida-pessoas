@@ -23,7 +23,6 @@ import { ICONES } from './icones.js';
 /* Ícone e nome curto das telas mais usadas; o resto sai do MODULOS. */
 const PROPRIOS = {
   funcionarios:  ['pessoa', 'Funcionários'],
-  funcionariosN2:['pessoas', 'Funcionários nível 2'],
   aniversarios:  ['bolo', 'Aniversariantes'],
   fichas:        ['escudo', 'Fichas de EPI'],
   epis:          ['escudo', 'Tipos de EPI'],

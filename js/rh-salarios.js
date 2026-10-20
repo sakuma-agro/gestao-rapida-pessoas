@@ -20,7 +20,7 @@
 //    e não entra em conta nenhuma.
 //  · A ficha mostra a remuneração inteira: salário, adicionais, ticket
 //    alimentação e tipo de contrato. Ticket e contrato moram no vínculo
-//    (jor_vinculos, os mesmos campos do Cadastro Nível 2) — editar aqui grava lá.
+//    (jor_vinculos). O antigo Cadastro Nível 2 foi desligado em 20/10/2026: só aqui.
 
 import { estado, salvarFuncionario } from './store.js';
 import * as jd from './jornada-dados.js';
@@ -403,7 +403,7 @@ function abrirFicha(fid) {
       <div><span>Salário do plano</span><strong>${x.sal != null ? V(x.sal) : '—'}</strong><small>base + periculosidade</small></div>
       <div><span>Insalubridade</span><strong>${x.insal?.valor ? V(x.insal.valor) : x.insal ? 'sim' : '—'}</strong><small>${x.insal ? esc(INSAL[x.insal.tipo]) + ' · só anotação' : 'não recebe'}</small></div>
       <div><span>Ticket alimentação</span><strong>${x.ticket != null ? V(x.ticket) : '—'}</strong><small>${x.ticket != null ? 'por mês' : 'não recebe'}${x.ticketObs ? ' · ' + esc(x.ticketObs) : ''} <button class="btn mini" type="button" id="rsTicket" style="margin-left:4px">Editar</button></small></div>
-      <div><span>Tipo de contrato</span><strong>${x.contrato === 'safra' ? 'Safra' : 'Fixo'}</strong><small>Cadastro Nível 2</small></div>
+      <div><span>Tipo de contrato</span><strong>${x.contrato === 'safra' ? 'Safra' : 'Fixo'}</strong><small>edita em Ticket › Editar</small></div>
     </div>
     ${x.cargo ? `<div class="rolagem"><table class="dc-planilha rs-mini"><thead><tr><th>${esc(x.cargo.nome)}</th>${LETRAS.map(L => `<th class="ce">${L}</th>`).join('')}</tr></thead>
       <tbody><tr><td>Tabela</td>${linhaTabela}</tr></tbody></table></div>` : '<div class="aviso info">A função desta pessoa não está ligada a um cargo do plano. Escolha o cargo ao registrar o salário.</div>'}
@@ -443,13 +443,13 @@ function abrirFicha(fid) {
   }, true);
 }
 
-/** Ticket alimentação e tipo de contrato — os mesmos campos do Cadastro Nível 2,
+/** Ticket alimentação e tipo de contrato — campos do vínculo (ex-Nível 2),
     gravados no vínculo (jor_vinculos). */
 function formTicket(fid) {
   const f = pessoa(fid);
   const x = situacao(f);
   dialogo(`<h3>Ticket alimentação — ${esc(f.nome)}</h3>
-    <p class="dica" style="margin-top:-8px">Mesmos campos do Cadastro Nível 2: o que gravar aqui vale lá e no relatório de ticket.</p>
+    <p class="dica" style="margin-top:-8px">O que gravar aqui vale no relatório de ticket e nos indicadores (tipo de contrato).</p>
     <div class="aviso erro" id="rsTkErro" hidden></div>
     <div class="grade">
       <label class="campo">Tipo de contrato<select id="rsTkContrato"><option value="fixo" ${x.contrato !== 'safra' ? 'selected' : ''}>Fixo</option><option value="safra" ${x.contrato === 'safra' ? 'selected' : ''}>Safra</option></select></label>
@@ -513,7 +513,7 @@ function formAlteracao(fid, corrigirId = null) {
       <label class="campo" id="rsInsalCampo" ${insal0 ? '' : 'hidden'}>Valor da insalubridade (R$) <small>ex.: quando pulveriza</small>
         <input type="text" id="rsInsalValor" inputmode="decimal" value="${insal0?.valor ? txt(insal0.valor) : ''}"></label>
       <label class="campo plena">${ed ? 'Justificativa da correção (obrigatória)' : 'Observação (opcional)'}<input type="text" id="rsObs" maxlength="200" value=""></label>
-      ${ed ? '' : `<label class="campo plena rs-check"><input type="checkbox" id="rsCad" checked> Atualizar também o cadastro do funcionário: função, faixa e as marcações de periculosidade e insalubridade do Nível 2 (vale para a data de hoje em diante)</label>`}
+      ${ed ? '' : `<label class="campo plena rs-check"><input type="checkbox" id="rsCad" checked> Atualizar também o cadastro do funcionário: função, faixa e as marcações de periculosidade e insalubridade que o fechamento do DP usa (vale para a data de hoje em diante)</label>`}
     </div>
     <div class="barra fim"><button class="btn" type="button" id="rsVoltar">Voltar</button>
       <button class="btn principal" type="button" id="rsGravar">${ed ? 'Gravar correção' : 'Gravar'}</button></div>`, () => {
@@ -573,7 +573,7 @@ function formAlteracao(fid, corrigirId = null) {
               justificativa: obs || null, criado_por: estado.sessao?.user?.email || null, criado_em: new Date().toISOString() };
         const g = await jd.salvar('salarios', reg);
         await jd.registrar({ tabela: 'jor_salarios', registro_id: g.id, acao: ed ? 'update' : 'insert', antes: ed || null, depois: g, justificativa: ed ? obs : (obs || null) });
-        /* As marcações do Nível 2 (periculosidade e insalubridade) acompanham o
+        /* As marcações do vínculo (periculosidade e insalubridade) acompanham o
            salário, para o fechamento do DP enxergar a mesma coisa. */
         if (!ed && $('rsCad')?.checked && desde <= hoje()) await atualizarCadastro(f, cargoId, faixa, {
           periculosidade: periculosidade > 0,

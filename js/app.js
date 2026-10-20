@@ -113,7 +113,6 @@ function abrirAba(nome) {
   $('telaTermoSindical').hidden = nome !== 'termoSindical';
   $('telaTermoContrato').hidden = nome !== 'termoContrato';
   $('telaFuncionarios').hidden = nome !== 'funcionarios';
-  $('telaFuncionariosN2').hidden = nome !== 'funcionariosN2';
   $('telaAniversarios').hidden = nome !== 'aniversarios';
   $('telaCadFuncoes').hidden = nome !== 'cadFuncoes';
   $('telaCadEstrutura').hidden = nome !== 'cadEstrutura';
@@ -152,7 +151,6 @@ function abrirAba(nome) {
   if (nome === 'termoSindical' || nome === 'termoContrato') abrirTermos(nome);
   if (nome === 'aniversarios') atualizarAniversarios();
   if (nome === 'funcionarios') desenharFuncionarios();
-  if (nome === 'funcionariosN2') desenharFuncN2();
   /* Os cadastros estruturais desenham a partir da mesma receita do DP; cada
      tela escolhe o seu punhado. Depois de salvar, as listas do cadastro de
      funcionário são remontadas, senão a função nova só aparece ao recarregar. */
@@ -1021,7 +1019,7 @@ function lerFichaCompleta() {
    faz o cadastro do funcionário servir todos os módulos, sem digitar
    empregador e fazenda na mão em cada tela. */
 function montarListasDoCadastro(f) {
-  const temDP = pode('jornada') || podeTela('funcionariosN2');
+  const temDP = pode('jornada') || pode('pessoas');
   const v = jd.vinculoDe(f.id);
   const opcoes = (lista, sel, rotulo = x => x.nome) =>
     '<option value=""></option>' + lista
@@ -1033,6 +1031,14 @@ function montarListasDoCadastro(f) {
   $('fuSetor').innerHTML   = opcoes(jd.dados.setores, v?.setor_id);
   $('fuCargo').innerHTML   = opcoesFuncao(v?.funcao_id);
   $('fuFaixa').value = v?.faixa || '';
+  /* Jornada e matrícula vieram do antigo Nível 2 (20/10/2026). Em branco, a
+     jornada é a da função (ou do setor) — a dica diz qual. */
+  $('fuJornada').innerHTML = opcoes(jd.dados.jornadas, v?.jornada_id);
+  const jf = jd.dados.jornadas.find(j => j.id === jd.funcaoDe(v)?.jornada_id);
+  const js = jd.dados.jornadas.find(j => j.id === jd.setorDe(v)?.jornada_id);
+  $('fuJornadaDica').textContent = jf ? `Em branco = usa a jornada da função: ${jf.nome}.`
+    : js ? `Em branco = usa a jornada do setor: ${js.nome}.` : 'Em branco = sem jornada (a função e o setor não têm).';
+  $('fuMatricula').value = v?.matricula || f.cadastro || '';
   mostrarNivel();
 
   // Ainda sem vínculo: mostra o que estava escrito, para não parecer que sumiu.
@@ -1043,102 +1049,9 @@ function montarListasDoCadastro(f) {
 
 }
 
-/* =============== cadastro nível 2 =============== */
-
-let editandoN2 = null;
-
-function desenharFuncN2() {
-  const q = $('buscaFuncN2').value.trim().toLowerCase();
-  const lista = estado.funcionarios
-    .filter(f => (f.situacao || 'ATIVO') === 'ATIVO')
-    .filter(f => !q || String(f.nome || '').toLowerCase().includes(q));
-
-  $('listaFuncN2').innerHTML = lista.length ? lista.map(f => {
-    const v = jd.vinculoDe(f.id);
-    const jornada = jd.jornadaDe(v);
-    const origem = jd.origemJornada(v);
-    const setor = jd.dados.setores.find(s => s.id === v?.setor_id);
-    const funcao = jd.funcaoDe(v);
-    const riscos = [
-      v?.periculosidade ? 'periculosidade 30%' : null,
-      v?.insalubridade && v.insalubridade !== 'nao' ? 'insalubridade ' + v.insalubridade : null,
-    ].filter(Boolean).join(' · ');
-    return `<div class="item" data-id="${f.id}" style="grid-template-columns:1fr auto auto">
-      <span>
-        <span class="nome">${esc(f.nome)}</span><br>
-        <span class="sub">${esc(!jornada ? 'sem jornada definida'
-          : origem === 'funcao' ? `${jornada.nome} (da função ${funcao?.nome || ''})`
-          : origem === 'setor' ? `${jornada.nome} (do setor ${setor?.nome || ''})`
-          : `${jornada.nome} (própria)`)}${riscos ? ' · ' + esc(riscos) : ''}${v?.matricula ? ' · matr. ' + esc(v.matricula) : ''}${v?.ticket_valor != null ? ' · ticket ' + Number(v.ticket_valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}</span>
-      </span>
-      <span class="tag ${riscos ? 'inativo' : 'ativo'}">${riscos ? 'com adicional' : 'sem adicional'}</span>
-      <span class="acoes"><button class="btn mini" data-n2="${f.id}">Editar</button></span>
-    </div>`;
-  }).join('') : '<div class="vazio">Nenhum funcionário encontrado.</div>';
-
-  $('listaFuncN2').querySelectorAll('[data-n2]').forEach(b =>
-    b.addEventListener('click', () => abrirFuncN2(b.dataset.n2)));
-}
-
-/* "1.035,86" / "1035,86" / "1035.86" → 1035.86; vazio → null (sem ticket). */
-function lerTicket(t) {
-  t = String(t || '').trim().replace(/[R$\s]/g, '');
-  if (!t) return null;
-  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
-  const n = Number(t);
-  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
-}
-
-function abrirFuncN2(id) {
-  const f = estado.funcionarios.find(x => x.id === id);
-  if (!f) return;
-  const v = jd.vinculoDe(id) || {};
-  editandoN2 = { id, nome: f.nome };
-
-  const opcoes = (lista, sel) => '<option value=""></option>' + lista
-    .filter(x => x.ativo !== false)
-    .map(x => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>${esc(x.nome)}</option>`).join('');
-
-  const unidade = jd.unidadeDe(v);
-  $('tituloFuncN2').textContent = f.nome;
-  $('subFuncN2').textContent = unidade
-    ? jd.nomeUnidade(unidade)
-    : 'Sem unidade no Nível 1 — a apuração precisa dela para saber o destino de DP.';
-  $('n2Jornada').innerHTML = opcoes(jd.dados.jornadas, v.jornada_id);
-  /* Em branco vale a jornada da função (29/09/2026) — a dica diz qual é. */
-  const jf = jd.dados.jornadas.find(j => j.id === jd.funcaoDe(v)?.jornada_id);
-  const js = jd.dados.jornadas.find(j => j.id === jd.setorDe(v)?.jornada_id);
-  $('n2JornadaDica').textContent = jf ? `Em branco = usa a jornada da função: ${jf.nome}.`
-    : js ? `Em branco = usa a jornada do setor: ${js.nome}.` : 'Em branco = sem jornada (a função e o setor não têm).';
-  $('n2Matricula').value = v.matricula || f.cadastro || '';
-  $('n2Insal').value = v.insalubridade || 'nao';
-  $('n2Peric').checked = !!v.periculosidade;
-  $('n2Contrato').value = v.tipo_contrato || 'fixo';
-  $('n2Ticket').value = v.ticket_valor != null ? Number(v.ticket_valor).toFixed(2).replace('.', ',') : '';
-  $('n2TicketObs').value = v.ticket_obs || '';
-  $('dlgFuncN2').showModal();
-}
-
-$('buscaFuncN2').addEventListener('input', desenharFuncN2);
-
-$('formFuncN2').addEventListener('submit', async ev => {
-  ev.preventDefault();
-  if (!editandoN2) return;
-  await jd.salvarVinculo(editandoN2.id, {
-    jornada_id: $('n2Jornada').value || null,
-    matricula: $('n2Matricula').value.trim() || null,
-    periculosidade: $('n2Peric').checked,
-    insalubridade: $('n2Insal').value,
-    tipo_contrato: $('n2Contrato').value,
-    ticket_valor: lerTicket($('n2Ticket').value),
-    ticket_obs: $('n2TicketObs').value.trim() || null,
-  });
-  // O tipo de contrato também vai para o vínculo dos indicadores (D-24).
-  const fN2 = estado.funcionarios.find(x => x.id === editandoN2.id);
-  if (fN2) try { await iv.sincronizar(fN2); } catch (e) { console.warn('vínculo dos indicadores', e); }
-  $('dlgFuncN2').close();
-  desenharFuncN2();
-});
+/* O Cadastro Nível 2 (jornada e riscos) foi desligado em 20/10/2026: jornada e
+   matrícula vieram para o Nível 1; periculosidade, insalubridade, contrato e
+   ticket foram para RH › Salários, na ficha da pessoa. */
 
 $('bNovoFunc').addEventListener('click', () => abrirFuncionario(null));
 $('bImprimirFichaCad').addEventListener('click', imprimirFichaCadastral);
@@ -1218,12 +1131,15 @@ $('formFunc').addEventListener('submit', async ev => {
   try { await fotoFunc().salvar(f.id); } catch (e) { alert('O cadastro foi salvo, mas a foto não: ' + e.message); }
 
   if (temDP) {
-    // Só os campos do Nível 1. Jornada e riscos ficam como estão.
+    /* Periculosidade, insalubridade, contrato e ticket NÃO passam por aqui:
+       moram no RH › Salários (ficha da pessoa), desde 20/10/2026. */
     await jd.salvarVinculo(f.id, {
       unidade_id: $('fuUnidade').value || null,
       setor_id: $('fuSetor').value || null,
       funcao_id: $('fuCargo').value || null,
       faixa: $('fuFaixa').value || null,
+      jornada_id: $('fuJornada').value || null,
+      matricula: $('fuMatricula').value.trim() || null,
       admissao: f.admissao,
       ativo: f.situacao === 'ATIVO',
     });
