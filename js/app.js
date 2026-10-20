@@ -96,13 +96,6 @@ function avisarSoOnline(nome) {
 }
 addEventListener('online', () => { $('avisoSoOnline').hidden = true; });
 
-/* Altura da faixa de cima, para o menu lateral começar logo abaixo dela. */
-function medirTopoTv() {
-  const t = document.querySelector('.topo-int');
-  if (t) document.documentElement.style.setProperty('--tv-topo-h', t.offsetHeight + 'px');
-}
-addEventListener('resize', medirTopoTv);
-
 function abrirAba(nome) {
   // telas do menu do Vistorias: moram na moldura (js/areas.js)
   if (ehTelaVist(nome)) return abrirTelaVist(nome);
@@ -117,15 +110,6 @@ function abrirAba(nome) {
   $('telaCB').hidden = nome !== 'custobase';
   $('telaCP').hidden = nome !== 'colheita';
   document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita'].includes(nome));
-  /* Estilo TOTVS (20/10/2026): na área Pessoas a barra de módulos vira menu
-     lateral (computador) e barra de baixo (celular). Vale quando a barra está
-     à vista e é a do Pessoas (tem "Início"); Vistorias usa a mesma barra e
-     continua como era. */
-  const nav = $('navModulos');
-  document.body.classList.toggle('tv-lateral', !!nav && !nav.hidden && nav.dataset.tv === '1');
-  // Molduras com a pele TOTVS (../js/tv-moldura.js): o Pergunte ao LOP sobe.
-  document.body.classList.toggle('tv-moldura', ['manutencoes', 'estoque', 'custobase'].includes(nome));
-  medirTopoTv();
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';

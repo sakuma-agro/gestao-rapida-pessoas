@@ -3,12 +3,12 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v286';
+const VERSAO = 'gr-v284';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
   './js/planilha.js', './js/aniversarios.js', './js/seed.js', './js/sst.js', './js/sst-ficha.js', './js/sst-acidentes.js', './js/sst-calendario.js', './js/reuniao.js', './js/ca.js', './js/rh.js', './js/aso.js', './js/treino-funcao.js',
-  './js/acesso.js', './js/atalhos.js', './js/inicio-numeros.js', './js/termos.js', './js/backup.js', './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
+  './js/acesso.js', './js/atalhos.js', './js/termos.js', './js/backup.js', './js/disc.js', './js/disc-dados.js', './js/disc-ficha.js',
   './js/jornada.js', './js/jornada-dados.js', './js/jornada-motor.js',
   './js/jornada-fechamento.js', './js/jornada-relatorios.js', './js/jornada-cadastros.js', './js/jornada-emprestimos.js', './js/jornada-ferias.js', './js/jornada-boletins.js', './js/jornada-documentos.js', './js/jornada-ticket.js', './js/jornada-folhaponto.js', './js/multisel.js', './js/cad-relatorios.js', './js/organograma.js', './js/rh-ind-vinculos.js', './js/rh-indicadores.js', './js/rh-salarios.js', './js/rh-enquadramento.js', './js/rh-reajuste-tabela.js', './js/rh-salario-digno.js', './js/excel.js', './js/icones.js',
   './css/jornada.css', './css/jornada-marca.css', './css/jornada-impressao.css',
@@ -31,7 +31,6 @@ const ARQUIVOS = [
   './icons/lop-gr-192.v1.png', './icons/lop-gr-512.v1.png',
   './icons/lop-gr-maskable-192.v1.png', './icons/lop-gr-maskable-512.v1.png',
   './icons/mod-manutencoes.v1.png', './icons/mod-certificacao.v1.png',
-  './js/tv-moldura.js', './css/tv-moldura.css',
   './manutencoes/', './manutencoes/index.html', './manutencoes/css/app.css',
   './manutencoes/js/config.js', './manutencoes/js/base.js', './manutencoes/js/comum.js',
   './manutencoes/js/acesso.js', './manutencoes/js/maquinas.js', './manutencoes/js/ordens.js',

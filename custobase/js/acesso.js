@@ -82,11 +82,6 @@ export function montarMenu(callback) {
     `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone)}<span>${esc(m.nome)}</span></button>`).join('');
   $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
-  // Estilo TOTVS (20/10/2026): a pele compartilhada ../js/tv-moldura.js.
-  if (window.TvMoldura && !montarMenu.tv) {
-    montarMenu.tv = true;
-    window.TvMoldura.ligar({ modulos: '#navModulos', telas: ['#navTelas', '#navSub'], inicio: () => mostrarInicio() });
-  }
   mostrarInicio();
 }
 

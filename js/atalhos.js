@@ -10,7 +10,7 @@
 // quem manda continua sendo a aba Configurações.
 
 import { estado } from './store.js';
-import { MODULOS, subsDe, podeTela, moduloDe, acesso } from './acesso.js';
+import { MODULOS, subsDe, podeTela, moduloDe } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -130,33 +130,21 @@ export function limparAtalhos() { escolhidos = null; }
 let abrir = () => {};
 let avisar = () => {};
 
-/* Estilo TOTVS (20/10/2026, aprovado por ele): os atalhos viram cartões em
-   grade, cada um com o caminho (Módulo › Submódulo) e um número do que pede
-   atenção (js/inicio-numeros.js). A escolha continua sendo a de cada login. */
 export function desenharAtalhos() {
   const nav = $('atalhosInicio');
   if (!nav) return;
   const lista = (escolhidos || PADRAO).map(itemDe).filter(x => x && podeTela(x.tela));
-  const topo = $('tvIniTopo');
-  if (topo) {
-    const nome = (acesso.nome || '').split(' ')[0];
-    const h = new Date().getHours();
-    topo.innerHTML = `<div><small>${h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'}${nome ? ', ' + esc(nome) : ''}</small>
-        <h2>Pessoas</h2><p>O que precisa de atenção hoje. Os módulos ficam no menu.</p></div>
-      <button type="button" class="btn mini" id="qlEditar" title="Escolher os cartões desta tela">${lista.length ? 'Editar atalhos' : 'Escolher atalhos'}</button>`;
-  }
   nav.hidden = false;
-  nav.innerHTML = lista.map(x => `
-    <button type="button" class="tv-card" data-atalho="${x.tela}" title="${esc(x.modulo + ' › ' + x.sub + ' › ' + x.rot)}">
-      <span class="tv-card-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[x.icone]}</svg></span>
-      <span class="tv-card-txt"><b>${esc(x.nome)}</b><small>${esc(x.modulo)} › ${esc(x.sub)}</small>
-        <em class="tv-num" data-num="${x.tela}" hidden></em></span>
-      <span class="tv-card-ir" aria-hidden="true">›</span></button>`).join('')
-    || '<p class="dica">Nenhum atalho escolhido. Use “Escolher atalhos”.</p>';
+  nav.innerHTML = lista.map((x, i) => `
+    <button type="button" class="ql-item ${i === 0 ? 'prim' : ''}" data-atalho="${x.tela}" title="${esc(x.modulo + ' › ' + x.sub + ' › ' + x.rot)}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES[x.icone]}</svg>
+      <span>${esc(x.nome)}</span></button>`).join('') + `
+    <button type="button" class="ql-item ql-editar" id="qlEditar" title="Escolher os atalhos desta tela">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES.lapis}</svg>
+      <span>${lista.length ? 'Editar atalhos' : 'Escolher atalhos'}</span></button>`;
   nav.querySelectorAll('[data-atalho]').forEach(b => b.addEventListener('click', () =>
     abrir(moduloDe(b.dataset.atalho), b.dataset.atalho)));
-  $('qlEditar')?.addEventListener('click', editarAtalhos);
-  import('./inicio-numeros.js').then(m => m.preencherNumeros(nav)).catch(() => {});
+  $('qlEditar').addEventListener('click', editarAtalhos);
 }
 
 /* ---------------- editar ---------------- */

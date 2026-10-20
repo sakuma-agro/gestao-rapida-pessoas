@@ -195,14 +195,13 @@ addEventListener('beforeinstallprompt', function (ev) {
          abrir o app, com a marca SAKUMA e "Gestão Rápida Pessoas", até a tela
          das áreas carregar. Quem mostra é o abrirAba('inicio'). -->
     <section class="tela inicio" id="telaInicio" hidden>
-      <div class="ini-lateral tv-ini">
-        <!-- Estilo TOTVS (20/10/2026): saudação + atalhos em cartões com número (js/atalhos.js) -->
-        <div class="tv-ini-topo" id="tvIniTopo"></div>
-        <nav class="tv-cartoes" id="atalhosInicio" aria-label="Acesso rápido"></nav>
+      <div class="ini-lateral">
+        <!-- acesso rápido na lateral (mesmo modelo do Programação Campo) -->
+        <nav class="ql" id="atalhosInicio" aria-label="Acesso rápido"></nav>
         <div class="ini-centro">
           <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
           <h2>Gestão Rápida <span>Pessoas</span></h2>
-          <p class="in-dica">Escolha um cartão acima ou um módulo no menu.</p>
+          <p class="in-dica">Escolha um atalho ao lado ou um módulo no menu acima.</p>
           <button class="btn instalar" type="button" id="bInstalarInicio" data-instalar hidden>
             <span aria-hidden="true">⬇</span> Instalar o aplicativo
           </button>

@@ -12,20 +12,20 @@ import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
 import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
-  registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa, montarLateral } from './acesso.js';
+  registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '29';
+const VERSAO_AREA = '28';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
 const VERSAO_PROG = '9';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
-const VERSAO_EST = '6';
+const VERSAO_EST = '5';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
-const VERSAO_CB = '12';
+const VERSAO_CB = '11';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
 const VERSAO_CP = '1';
 
@@ -264,7 +264,7 @@ export function entrarNaArea(id, tela, extra) {
 
   if (id === 'pessoas') {
     // a barra de módulos é de quem entrou por último: volta a ser a do Pessoas
-    if (!$('navModulos').querySelector('[data-modulo="__inicio"]')) montarMenu();
+    if (barraVist()) montarMenu();
     $('navModulos').hidden = false;
     if (tela === 'config') {
       abrirModulo('config');
@@ -283,10 +283,8 @@ export function entrarNaArea(id, tela, extra) {
   }
 
   if (id === 'certificacao') {
-    /* Estilo TOTVS (20/10/2026): os submódulos da Certificação viram o menu
-       lateral (barra de baixo no celular), no lugar da barra do Pessoas. */
-    montarLateral('cert');
-    $('navModulos').hidden = false;
+    // O menu é a faixa do módulo 'cert'; a barra de módulos de Pessoas some.
+    $('navModulos').hidden = true;
     abrirModulo('cert', tela && tela !== 'config' ? tela : undefined);
     return;
   }
