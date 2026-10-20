@@ -436,6 +436,18 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .an-nome{font-weight:bold;color:#51534A}
 .an-apelido{font-weight:normal;color:#7d8175}
 .an-vazio{text-align:center;color:#7d8175;padding:10mm 0;white-space:normal}
+/* Formato com fotos (20/10/2026): cartões 3 × 3 por folha, foto redonda com
+   borda verde; quem não tem foto sai com as iniciais. */
+.an-cartoes{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin-top:7mm}
+.an-cartao{border:.3mm solid #dfe2d8;border-radius:2.5mm;padding:4mm 3mm 3.5mm;text-align:center;background:#fff}
+.an-foto{width:36mm;height:36mm;border-radius:50%;margin:0 auto 3mm;overflow:hidden;background:#f3f8e8;
+  border:1mm solid #84BD00;display:flex;align-items:center;justify-content:center;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.an-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.an-foto span{font-size:16pt;font-weight:bold;color:#84BD00;letter-spacing:.5pt}
+.an-cdia{font-size:9pt;font-weight:bold;color:#744F28;letter-spacing:.6pt}
+.an-cnome{font-size:10.5pt;font-weight:bold;color:#51534A;margin-top:1mm;line-height:1.25;min-height:9mm;
+  white-space:normal;overflow-wrap:anywhere}
 .an-saudacao{margin-top:10mm;border:.5mm solid #84BD00;border-radius:2mm;
   padding:6mm 8mm;text-align:center}
 .an-saudacao strong{display:block;font-size:13pt;color:#744F28;letter-spacing:.8pt}

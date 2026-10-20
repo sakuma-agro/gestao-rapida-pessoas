@@ -189,6 +189,33 @@ export async function listarArquivos(area, tipo, dono) {
   return lista;
 }
 
+/** Chave da foto de cada dono, num pedido só (para a folha de aniversariantes
+    com foto). Devolve Map dono_id → chave; quem não tem foto não entra.
+    Sem internet, vale o que ficou guardado da última vez mais a fila local. */
+export async function fotosDe(area, tipo, ids) {
+  const k = `fotos:${area}/${tipo}`;
+  const mapa = lerCacheLista()[k] || {};
+  const pedidos = [...new Set(ids.map(String))];
+  if (navigator.onLine && estado.cliente && pedidos.length) {
+    const { data, error } = await estado.cliente.from('arquivos').select('dono_id,chave')
+      .eq('area', area).eq('tipo', tipo).in('dono_id', pedidos);
+    if (!error) {
+      pedidos.forEach(id => { delete mapa[id]; });      // foto tirada some do cache
+      (data || []).forEach(x => { mapa[x.dono_id] = x.chave; });
+      gravarCacheLista(k, mapa);
+    }
+  }
+  const fila = await pendentes();
+  const apagando = new Set(fila.filter(x => x.acao === 'apagar').map(x => x.chave));
+  const saida = new Map();
+  pedidos.forEach(id => {
+    const naFila = fila.find(x => x.acao !== 'apagar' && x.chave.startsWith(`${area}/${tipo}/${id}/`));
+    const chave = naFila ? naFila.chave : mapa[id];
+    if (chave && !apagando.has(chave)) saida.set(id, chave);
+  });
+  return saida;
+}
+
 /** Donos (ids) que têm pelo menos um arquivo — para marcar 📎 nas listas. */
 export async function donosComArquivo(area, tipo) {
   const k = `donos:${area}/${tipo}`;

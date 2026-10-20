@@ -25,6 +25,7 @@ const partes = iso => {
    que ele é empregador: na folha todo mundo é aniversariante do mês. */
 const comoPessoa = e => ({
   id: e.id,
+  empregador: true,                 // não tem foto no Drive; sai com as iniciais
   nome: String(e.nome || '').toUpperCase(),
   nascimento: e.nascimento,
   situacao: e.ativo === false ? 'INATIVO' : 'ATIVO',
@@ -51,20 +52,52 @@ export const semNascimento = (funcionarios, soAtivos = true, empregadores = []) 
   [...funcionarios, ...empregadores.map(comoPessoa)]
     .filter(f => (!soAtivos || f.situacao === 'ATIVO') && !partes(f.nascimento)).length;
 
-/* ---------------- folha impressa ---------------- */
-export function montarAniversarios(lista, mes, ano) {
+/* ---------------- folha impressa ----------------
+   Dois formatos (pedido dele, 20/10/2026): a lista de sempre (dia e nome) e os
+   cartões com foto. `fotos` é um Map id → endereço da foto (blob:); quem não
+   tem foto, ou é empregador, sai com as iniciais num círculo verde.
+   Cartões: 9 por folha (3 × 3), que é o que cabe com o recado de parabéns.   */
+const CARTOES_POR_FOLHA = 9;
+
+/** Iniciais do nome (primeiro e último), para o círculo de quem não tem foto. */
+export const iniciais = nome => {
+  const p = String(nome || '').trim().split(/\s+/)
+    .filter(x => x && !['DE', 'DA', 'DO', 'DOS', 'DAS', 'E'].includes(x.toUpperCase()));
+  if (!p.length) return '';
+  return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+};
+
+const cartao = (a, fotos) => {
+  const url = fotos && fotos.get(String(a.id));
+  return `<div class="an-cartao">
+    <div class="an-foto">${url ? `<img src="${esc(url)}" alt="">` : `<span>${esc(iniciais(a.nome))}</span>`}</div>
+    <div class="an-cdia">DIA ${String(a.dia).padStart(2, '0')}</div>
+    <div class="an-cnome">${esc(a.nome)}${a.apelido ? ` <span class="an-apelido">(${esc(a.apelido)})</span>` : ''}</div>
+  </div>`;
+};
+
+export function montarAniversarios(lista, mes, ano, fotos = null) {
   const titulo = `ANIVERSARIANTES DE ${MESES[mes].toUpperCase()}`;
-  const total = Math.max(1, Math.ceil(lista.length / LINHAS_POR_FOLHA));
+  const porFolha = fotos ? CARTOES_POR_FOLHA : LINHAS_POR_FOLHA;
+  const total = Math.max(1, Math.ceil(lista.length / porFolha));
   const folhas = [];
 
   for (let p = 0; p < total; p++) {
-    const fatia = lista.slice(p * LINHAS_POR_FOLHA, (p + 1) * LINHAS_POR_FOLHA);
-    const linhas = fatia.length
-      ? fatia.map(a => `<tr>
+    const fatia = lista.slice(p * porFolha, (p + 1) * porFolha);
+    const miolo = fotos
+      ? (fatia.length
+        ? `<div class="an-cartoes">${fatia.map(a => cartao(a, fotos)).join('')}</div>`
+        : `<div class="an-vazio">Nenhum aniversariante neste mês.</div>`)
+      : `<table class="an-tab">
+        <colgroup><col style="width:18mm"><col></colgroup>
+        <thead><tr><th>DIA</th><th>NOME</th></tr></thead>
+        <tbody>${fatia.length
+          ? fatia.map(a => `<tr>
           <td class="an-dia">${String(a.dia).padStart(2, '0')}</td>
           <td class="an-nome">${esc(a.nome)}${a.apelido ? ` <span class="an-apelido">(${esc(a.apelido)})</span>` : ''}</td>
         </tr>`).join('')
-      : `<tr><td colspan="2" class="an-vazio">Nenhum aniversariante neste mês.</td></tr>`;
+          : `<tr><td colspan="2" class="an-vazio">Nenhum aniversariante neste mês.</td></tr>`}</tbody>
+      </table>`;
 
     folhas.push(`<div class="an-folha">
       <div class="an-topo">
@@ -74,11 +107,7 @@ export function montarAniversarios(lista, mes, ano) {
           <p>${ano} · SAKUMA Agronegócios</p>
         </div>
       </div>
-      <table class="an-tab">
-        <colgroup><col style="width:18mm"><col></colgroup>
-        <thead><tr><th>DIA</th><th>NOME</th></tr></thead>
-        <tbody>${linhas}</tbody>
-      </table>
+      ${miolo}
       ${lista.length && p === total - 1 ? `<div class="an-saudacao">
         <strong>${SAUDACAO_TITULO}</strong>
         <p>${SAUDACAO}</p>
@@ -134,21 +163,41 @@ function quebrar(g, texto, largura) {
  * Desenha a folha do mês e devolve um PNG (Blob).
  * Mesmas cores e mesma ordem da versão impressa.
  */
-export function imagemAniversarios(lista, mes, ano) {
-  return new Promise(pronto => {
-    const marca = new Image();
-    marca.onload = () => pronto(desenhar(marca, lista, mes, ano));
-    marca.onerror = () => pronto(desenhar(null, lista, mes, ano));
-    marca.src = LOGO;
-  });
+const carregarImagem = src => new Promise(pronto => {
+  if (!src) return pronto(null);
+  const i = new Image();
+  i.onload = () => pronto(i);
+  i.onerror = () => pronto(null);
+  i.src = src;
+});
+
+/** @param fotos Map id → endereço da foto; com ele a imagem sai em cartões */
+export async function imagemAniversarios(lista, mes, ano, fotos = null) {
+  const marca = await carregarImagem(LOGO);
+  let imagens = null;
+  if (fotos) {
+    imagens = new Map();
+    await Promise.all(lista.map(async a => {
+      const i = await carregarImagem(fotos.get(String(a.id)));
+      if (i) imagens.set(String(a.id), i);
+    }));
+  }
+  return desenhar(marca, lista, mes, ano, imagens);
 }
 
-function desenhar(marca, lista, mes, ano) {
+// cartões da imagem: 3 por linha
+const CW = 300, CG = 26, CH = 350, FOTO_D = 184;
+
+function desenhar(marca, lista, mes, ano, imagens) {
   const L = 1080, m = 64;                       // largura e margem
   const hTopo = 250, hTh = 78, hLin = 74;
   const temRecado = lista.length > 0;
   const alturaRecado = temRecado ? 250 : 0;
-  const A = hTopo + hTh + Math.max(lista.length, 1) * hLin + alturaRecado + 130;
+  const linhasCartoes = Math.ceil(Math.max(lista.length, 1) / 3);
+  const alturaMiolo = imagens
+    ? (lista.length ? linhasCartoes * (CH + CG) : hLin)
+    : hTh + Math.max(lista.length, 1) * hLin;
+  const A = hTopo + alturaMiolo + alturaRecado + 130;
 
   const tela = document.createElement('canvas');
   tela.width = L; tela.height = A;
@@ -171,41 +220,23 @@ function desenhar(marca, lista, mes, ano) {
   g.fillStyle = CORES.verde;
   g.fillRect(m, 200, L - 2 * m, 6);
 
-  // cabeçalho da tabela
   let y = hTopo;
-  g.fillStyle = CORES.verde;
-  g.fillRect(m, y, L - 2 * m, hTh);
-  g.fillStyle = '#fff';
-  g.font = 'bold 26px Arial, Helvetica, sans-serif';
-  g.fillText('DIA', m + 26, y + 50);
-  g.fillText('NOME', m + 150, y + 50);
-  y += hTh;
-
-  // linhas
   if (!lista.length) {
+    if (!imagens) {
+      g.fillStyle = CORES.verde; g.fillRect(m, y, L - 2 * m, hTh);
+      g.fillStyle = '#fff'; g.font = 'bold 26px Arial, Helvetica, sans-serif';
+      g.fillText('DIA', m + 26, y + 50); g.fillText('NOME', m + 150, y + 50);
+      y += hTh;
+    }
     g.fillStyle = CORES.suave;
     g.font = '28px Arial, Helvetica, sans-serif';
     g.fillText('Nenhum aniversariante neste mês.', m + 26, y + 46);
     y += hLin;
+  } else if (imagens) {
+    y = desenharCartoes(g, lista, imagens, m, y);
+  } else {
+    y = desenharLinhas(g, lista, L, m, y, hTh, hLin);
   }
-  lista.forEach((a, i) => {
-    if (i % 2 === 1) { g.fillStyle = CORES.faixa; g.fillRect(m, y, L - 2 * m, hLin); }
-    g.fillStyle = CORES.linha;
-    g.fillRect(m, y + hLin - 1, L - 2 * m, 1);
-    g.fillStyle = CORES.marrom;
-    g.font = 'bold 30px Arial, Helvetica, sans-serif';
-    g.fillText(String(a.dia).padStart(2, '0'), m + 26, y + 48);
-    g.fillStyle = CORES.cinza;
-    g.font = 'bold 30px Arial, Helvetica, sans-serif';
-    g.fillText(a.nome, m + 150, y + 48);
-    if (a.apelido) {
-      const larg = g.measureText(a.nome).width;
-      g.fillStyle = CORES.suave;
-      g.font = '30px Arial, Helvetica, sans-serif';
-      g.fillText(` (${a.apelido})`, m + 150 + larg, y + 48);
-    }
-    y += hLin;
-  });
 
   // recado de parabéns
   if (temRecado) {
@@ -234,6 +265,86 @@ function desenhar(marca, lista, mes, ano) {
   g.fillText('SAKUMA Agronegócios', m, A - 34);
 
   return new Promise(pronto => tela.toBlob(pronto, 'image/png'));
+}
+
+/** Lista de sempre: cabeçalho verde e uma linha por pessoa. Devolve o y final. */
+function desenharLinhas(g, lista, L, m, y, hTh, hLin) {
+  g.fillStyle = CORES.verde;
+  g.fillRect(m, y, L - 2 * m, hTh);
+  g.fillStyle = '#fff';
+  g.font = 'bold 26px Arial, Helvetica, sans-serif';
+  g.fillText('DIA', m + 26, y + 50);
+  g.fillText('NOME', m + 150, y + 50);
+  y += hTh;
+  lista.forEach((a, i) => {
+    if (i % 2 === 1) { g.fillStyle = CORES.faixa; g.fillRect(m, y, L - 2 * m, hLin); }
+    g.fillStyle = CORES.linha;
+    g.fillRect(m, y + hLin - 1, L - 2 * m, 1);
+    g.fillStyle = CORES.marrom;
+    g.font = 'bold 30px Arial, Helvetica, sans-serif';
+    g.fillText(String(a.dia).padStart(2, '0'), m + 26, y + 48);
+    g.fillStyle = CORES.cinza;
+    g.font = 'bold 30px Arial, Helvetica, sans-serif';
+    g.fillText(a.nome, m + 150, y + 48);
+    if (a.apelido) {
+      const larg = g.measureText(a.nome).width;
+      g.fillStyle = CORES.suave;
+      g.font = '30px Arial, Helvetica, sans-serif';
+      g.fillText(` (${a.apelido})`, m + 150 + larg, y + 48);
+    }
+    y += hLin;
+  });
+  return y;
+}
+
+/** Cartões com foto, 3 por linha. Devolve o y final. */
+function desenharCartoes(g, lista, imagens, m, y) {
+  lista.forEach((a, i) => {
+    const x = m + (i % 3) * (CW + CG);
+    const yc = y + Math.floor(i / 3) * (CH + CG);
+    // moldura do cartão
+    g.fillStyle = '#fff'; g.strokeStyle = CORES.linha; g.lineWidth = 2;
+    arredondado(g, x, yc, CW, CH, 14); g.fill(); g.stroke();
+    // foto redonda (ou iniciais)
+    const cx = x + CW / 2, cy = yc + 24 + FOTO_D / 2, r = FOTO_D / 2;
+    const img = imagens.get(String(a.id));
+    g.save();
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.closePath(); g.clip();
+    if (img) {
+      const esc = Math.max(FOTO_D / img.naturalWidth, FOTO_D / img.naturalHeight);
+      const w = img.naturalWidth * esc, h = img.naturalHeight * esc;
+      g.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+    } else {
+      g.fillStyle = CORES.faixa; g.fillRect(cx - r, cy - r, FOTO_D, FOTO_D);
+      g.fillStyle = CORES.verde; g.textAlign = 'center';
+      g.font = 'bold 64px Arial, Helvetica, sans-serif';
+      g.fillText(iniciais(a.nome), cx, cy + 23);
+    }
+    g.restore();
+    g.strokeStyle = CORES.verde; g.lineWidth = 5;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    // dia e nome
+    g.textAlign = 'center';
+    g.fillStyle = CORES.marrom;
+    g.font = 'bold 22px Arial, Helvetica, sans-serif';
+    g.fillText(`DIA ${String(a.dia).padStart(2, '0')}`, cx, yc + 24 + FOTO_D + 40);
+    g.fillStyle = CORES.cinza;
+    g.font = 'bold 23px Arial, Helvetica, sans-serif';
+    const nome = a.apelido ? `${a.nome} (${a.apelido})` : a.nome;
+    quebrar(g, nome, CW - 28).slice(0, 3).forEach((l, k) => {
+      g.fillText(l, cx, yc + 24 + FOTO_D + 74 + k * 29);
+    });
+    g.textAlign = 'left';
+  });
+  return y + Math.ceil(lista.length / 3) * (CH + CG) - CG;
+}
+
+function arredondado(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r);
+  g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r);
+  g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath();
 }
 
 /** Nome do arquivo da imagem do mês. */

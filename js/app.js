@@ -32,7 +32,8 @@ import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
 import { pode, podeTela } from './acesso.js';
 import { ligarBackup } from './backup.js';
-import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as enviarAnexos } from './arquivos.js';
+import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as enviarAnexos,
+  fotosDe, urlDoArquivo } from './arquivos.js';
 import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
@@ -1350,8 +1351,28 @@ function listaAniversarios() {
     gente: aniversariantes(estado.funcionarios, mes, soAtivos, patroes) };
 }
 
-function atualizarAniversarios() {
+/* Formato "Com fotos" (20/10/2026): a foto de cada funcionário vem do Drive
+   (chave pessoas/funcionario/<id>/foto.*), num pedido só para a lista toda.
+   Devolve Map id → endereço blob:; quem não tem foto (ou é empregador, que
+   não tem cadastro de foto) fica de fora e sai com as iniciais. */
+const comFotos = () => $('anFormato').value === 'fotos';
+async function fotosAniversarios(gente) {
+  const ids = gente.filter(a => !a.empregador).map(a => String(a.id));
+  const fotos = new Map();
+  if (!ids.length) return fotos;
+  try {
+    const chaves = await fotosDe('pessoas', 'funcionario', ids);
+    await Promise.all([...chaves].map(async ([id, chave]) => {
+      try { fotos.set(id, await urlDoArquivo(chave)); } catch { /* sem internet: iniciais */ }
+    }));
+  } catch { /* sem banco: iniciais */ }
+  return fotos;
+}
+
+let vezAniv = 0;
+async function atualizarAniversarios() {
   const { mes, ano, soAtivos, gente, patroes } = listaAniversarios();
+  const vez = ++vezAniv;
 
   $('anLista').innerHTML = gente.length ? gente.map(a => `
     <div class="item" style="grid-template-columns:auto 1fr">
@@ -1369,10 +1390,17 @@ function atualizarAniversarios() {
     aviso.hidden = false;
   } else aviso.hidden = true;
 
-  $('saidaAniversarios').innerHTML = montarAniversarios(gente, mes, ano);
+  // sem fotos sai na hora; com fotos sai primeiro com as iniciais e, quando as
+  // fotos chegam do Drive, a folha é redesenhada (se ele não mudou o filtro)
+  const fotos = comFotos() ? new Map() : null;
+  $('saidaAniversarios').innerHTML = montarAniversarios(gente, mes, ano, fotos);
+  if (fotos) {
+    const prontas = await fotosAniversarios(gente);
+    if (vez === vezAniv && prontas.size) $('saidaAniversarios').innerHTML = montarAniversarios(gente, mes, ano, prontas);
+  }
 }
 
-['anMes', 'anAno', 'anSit'].forEach(id => $(id).addEventListener('input', atualizarAniversarios));
+['anMes', 'anAno', 'anSit', 'anFormato'].forEach(id => $(id).addEventListener('input', atualizarAniversarios));
 $('bImprimirAniv').addEventListener('click', () => window.print());
 $('zoomAniv').addEventListener('input', () => {
   const z = $('zoomAniv').value;
@@ -1399,7 +1427,7 @@ $('bWhatsapp').addEventListener('click', async ev => {
   const texto = textoWhatsapp(gente, mes, ano);
   botao.disabled = true; botao.textContent = 'Preparando...';
   try {
-    const png = await imagemAniversarios(gente, mes, ano);
+    const png = await imagemAniversarios(gente, mes, ano, comFotos() ? await fotosAniversarios(gente) : null);
     const arquivo = new File([png], nomeImagem(mes, ano), { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
       await navigator.share({ files: [arquivo], text: texto });
@@ -1423,7 +1451,7 @@ $('bBaixarAniv').addEventListener('click', async ev => {
   const { mes, ano, gente } = listaAniversarios();
   botao.disabled = true;
   try {
-    baixar(await imagemAniversarios(gente, mes, ano), nomeImagem(mes, ano));
+    baixar(await imagemAniversarios(gente, mes, ano, comFotos() ? await fotosAniversarios(gente) : null), nomeImagem(mes, ano));
   } finally { botao.disabled = false; }
 });
 
