@@ -238,6 +238,24 @@ export const MODULOS = [
   ] },
 ];
 
+/* Estilo TOTVS na área Pessoas inteira (20/10/2026, aprovado por ele depois
+   do piloto em Cargos e salários). Para cada submódulo de várias telas: as
+   telas listadas aqui vão para "Ações relacionadas ▾" no rodapé fixo; as
+   outras viram botões do rodapé. Lista vazia = todas viram botões (rodapé
+   sem menu). Submódulo fora deste mapa continua com a faixa de telas antiga.
+   Para desfazer o estilo num submódulo, é só tirá-lo daqui. */
+const ACOES_TOTVS = {
+  gente: [], certificacao: ['termoSindical', 'termoContrato'], relatoriosCad: ['rhQuadro', 'cadFerias'], estrutura: [],
+  epis: ['epis', 'modelo'], exames: ['exFuncoes', 'exTipos'], treinamentos: ['trTipos'], acidentes: [],
+  salarioDigno: ['sdConfig'], indicadores: ['rhIndCert', 'rhIndMetas'],
+  gestaoJornada: ['jorExtras', 'jorAbatimento', 'jorHistorico'], boletinsDiarios: ['bdMes'], docMensais: [],
+  ticket: [], emprestimo: ['empHistorico'], ferias: ['ferPrev', 'ferAfast', 'ferRisco', 'ferIni'], dpConfig: [],
+  reuSub: ['reuFrases', 'reuResp', 'reuAtiv'],
+};
+MODULOS.filter(m => !m.area).forEach(m => (m.subs || []).forEach(s => {
+  if (!s.acoes && ACOES_TOTVS[s.id]) s.acoes = ACOES_TOTVS[s.id];
+}));
+
 /* Um módulo sem submódulo se comporta como se tivesse um só, com o nome dele.
    Assim o resto do código não precisa saber qual é qual. */
 export const subsDe = m => m.subs || [{ id: m.id, nome: m.nome, telas: m.telas || [] }];
@@ -479,8 +497,10 @@ export function montarMenu(callback) {
   /* 15/10/2026, pedido dele: todos os módulos da área aparecem; os que a
      pessoa não tem ficam em cinza (fantasma) e não abrem. */
   const libs = new Set(modulosLiberados().map(m => m.id));
-  pintarModulos(MODULOS.filter(m => !m.area).map(m =>
-    ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista', bloqueado: !libs.has(m.id) })));
+  /* Estilo TOTVS (20/10/2026): "Início" abre a barra, que vira menu lateral
+     no computador e barra de baixo no celular (CSS body.tv-lateral). */
+  pintarModulos([{ id: INICIO, nome: 'Início', icone: 'inicio' }, ...MODULOS.filter(m => !m.area).map(m =>
+    ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista', bloqueado: !libs.has(m.id) }))]);
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   mostrarInicio();
@@ -491,10 +511,16 @@ export function pintarModulos(itens) {
   moduloAberto = null;
   $('navModulos').innerHTML = itens.map(m => m.bloqueado
     ? `<button class="aba aba-fantasma${m.direita ? ' aba-config' : ''}" type="button" disabled aria-disabled="true" data-fantasma="${m.id}" title="Você não tem acesso a este módulo. Peça ao administrador.">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`
-    : `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone || 'lista')}<span>${esc(m.nome)}</span></button>`).join('');
+    : `<button class="aba${m.direita ? ' aba-config' : ''}" role="tab" data-modulo="${m.id}" aria-selected="false" title="${esc(m.nome)}">${svgIcone(m.icone || 'lista')}${nomeAba(m.nome)}</button>`).join('');
   $('navModulos').querySelectorAll('.aba[data-modulo]').forEach(b =>
-    b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
+    b.addEventListener('click', () => b.dataset.modulo === INICIO ? mostrarInicio() : abrirModulo(b.dataset.modulo)));
 }
+const INICIO = '__inicio';
+/* Nome da aba; na barra de baixo do celular (estilo TOTVS) vale só a 1ª palavra
+   — "Reunião semanal" vira "Reunião". O CSS escolhe qual mostrar. */
+const nomeAba = nome => nome.includes(' ')
+  ? `<span class="ab-longo">${esc(nome)}</span><span class="ab-curto">${esc(nome.split(' ')[0])}</span>`
+  : `<span>${esc(nome)}</span>`;
 
 /** Nenhum módulo marcado e sem faixa: o início de uma área. */
 export function desmarcarModulos() {
@@ -516,7 +542,7 @@ export function aoPintarFaixa(fn) { aposFaixa = fn || (() => {}); }
 /** A tela de entrada: nenhum módulo aberto, só SAKUMA e LOP. */
 export function mostrarInicio() {
   moduloAberto = null;
-  $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', 'false'));
+  $('navModulos').querySelectorAll('.aba').forEach(b => b.setAttribute('aria-selected', String(b.dataset.modulo === INICIO)));
   $('navTelas').hidden = true;
   $('navSub').hidden = true;
   pintarRodape(null);
@@ -594,7 +620,14 @@ function pintarFaixa(id, subs) {
   const botaoTela = (t, rot) => `<button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}" title="${esc(rot)}">
           ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`;
 
-  if (subs.length === 1) {
+  if (subs.length === 1 && subs[0].acoes && subs[0].telas.length > 1) {
+    // Um submódulo só, no estilo TOTVS: rodapé de ações; Sair volta ao início da área.
+    faixa.hidden = true;
+    faixa.innerHTML = '';
+    pintarRodape(id, subs, subs[0], true);
+    aposFaixa(id);
+    return;
+  } else if (subs.length === 1) {
     // Um submódulo só: as telas direto, como sempre foi.
     faixa.innerHTML = `<section class="rb-grupo ${CORES_GRUPO[0]}" aria-label="${esc(subs[0].nome)}">
       <div class="rb-botoes">${subs[0].telas.map(([t, rot]) => botaoTela(t, rot)).join('')}</div></section>`;
@@ -656,13 +689,22 @@ function pintarFaixa(id, subs) {
    `acoes`, num menu que abre para cima) e "Sair" (volta aos submódulos).
    No celular é a barra de baixo, ao alcance do polegar. `pintarRodape(null)`
    esconde. O elemento é o #navRodape do index.html. */
-function pintarRodape(id, subs, s) {
+function pintarRodape(id, subs, s, sairInicio = false) {
   const r = $('navRodape');
   if (!r) return;
   if (!id || !s) { r.hidden = true; r.innerHTML = ''; document.body.classList.remove('com-rodape'); return; }
   const mod = modPorId(id);
   const acoes = new Set(s.acoes || []);
-  const principais = s.telas.filter(([t]) => !acoes.has(t));
+  let principais = s.telas.filter(([t]) => !acoes.has(t));
+  /* Celular: no máximo 2 botões (a tela aberta fica entre eles); o resto vai
+     para Ações, para o rodapé caber numa linha sem cortar nome. */
+  if (matchMedia('(max-width:640px)').matches && principais.length > 2) {
+    const fica = principais.slice(0, 2);
+    const aberta = principais.find(([t]) => t === faixaEstado.tela);
+    if (aberta && !fica.includes(aberta)) fica[1] = aberta;
+    principais.filter(x => !fica.includes(x)).forEach(([t]) => acoes.add(t));
+    principais = fica;
+  }
   const relacionadas = s.telas.filter(([t]) => acoes.has(t));
   const atualRel = relacionadas.find(([t]) => t === faixaEstado.tela);
   const botao = ([t, rot]) => `<button type="button" class="tv-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}">
@@ -675,7 +717,7 @@ function pintarRodape(id, subs, s) {
           ${svgIcone('lista')}${atualRel ? `<span>${esc(atualRel[1])}</span>` : '<span class="tv-longo">Ações relacionadas</span><span class="tv-curto">Ações</span>'}<i aria-hidden="true">▾</i></button>
         <div class="tv-menu" role="menu" hidden>${relacionadas.map(([t, rot]) => `
           <button type="button" role="menuitem" data-tela="${t}" aria-selected="${t === faixaEstado.tela}">${svgIcone(ICONE_TELA[t] || 'lista')}<span>${esc(rot)}</span></button>`).join('')}</div></span>` : ''}
-      <button type="button" class="tv-btn tv-sair" data-sair title="Voltar aos submódulos de ${esc(mod?.nome || '')}">
+      <button type="button" class="tv-btn tv-sair" data-sair title="${sairInicio ? 'Voltar ao início' : 'Voltar aos submódulos de ' + esc(mod?.nome || '')}">
         ${svgIcone('seta-esq')}<span>Sair</span></button>
     </div>`;
   r.hidden = false;
@@ -683,30 +725,33 @@ function pintarRodape(id, subs, s) {
 
   const menu = r.querySelector('.tv-menu');
   const gatilho = r.querySelector('[data-acoes]');
-  const fechar = () => { if (menu) { menu.hidden = true; gatilho?.setAttribute('aria-expanded', 'false'); } };
+  const fechar = () => { if (menu) { menu.hidden = true; gatilho?.setAttribute('aria-expanded', 'false'); } document.body.classList.remove('tv-menu-aberto'); };
   gatilho?.addEventListener('click', ev => {
     ev.stopPropagation();
     const abre = menu.hidden;
     menu.hidden = !abre;
     gatilho.setAttribute('aria-expanded', String(abre));
+    document.body.classList.toggle('tv-menu-aberto', abre);
   });
   r.querySelectorAll('[data-tela]').forEach(b => b.addEventListener('click', () => {
     fechar();
     faixaEstado.tela = b.dataset.tela;
     ultimaTela[s.id] = b.dataset.tela;
-    pintarRodape(id, subs, s);          // marca o botão/menu
+    pintarRodape(id, subs, s, sairInicio);   // marca o botão/menu
     marcarTela(id, subs, b.dataset.tela, true);
   }));
   r.querySelector('[data-sair]').addEventListener('click', () => {
     fechar();
+    if (sairInicio) { mostrarInicio(); return; }
     faixaEstado.sub = null;
     pintarRodape(null);
     pintarFaixa(id, subs);
   });
   if (!pintarRodape.ligado) {
     pintarRodape.ligado = true;
-    document.addEventListener('click', ev => { if (!ev.target.closest?.('.tv-rel')) $('navRodape')?.querySelectorAll('.tv-menu').forEach(m => { m.hidden = true; }); });
-    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') $('navRodape')?.querySelectorAll('.tv-menu').forEach(m => { m.hidden = true; }); });
+    const fecharTodos = () => { $('navRodape')?.querySelectorAll('.tv-menu').forEach(m => { m.hidden = true; }); document.body.classList.remove('tv-menu-aberto'); };
+    document.addEventListener('click', ev => { if (!ev.target.closest?.('.tv-rel')) fecharTodos(); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') fecharTodos(); });
   }
 }
 

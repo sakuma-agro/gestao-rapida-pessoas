@@ -1153,6 +1153,11 @@ async function verAnexo(r, id, botao) {
 /* Para o Calendário do SST (js/sst-calendario.js). */
 export { carregarSst as garantirSst };
 export const sstCarregado = () => S.carregado;
+/** Para os cartões da tela inicial (20/10/2026): vencidos e vencendo em 30 dias. */
+export function resumoSst(kind) {
+  const l = atuais(RECEITAS[kind]);
+  return { vencido: l.filter(x => x.sit.faixa === 'vencido').length, ate30: l.filter(x => x.sit.faixa === 'ate30').length };
+}
 export const lancamentosSst = () => ({ exame: S.exame, treinamento: S.treinamento });
 export const grupoSst = (kind, tipoId) => grupoDe(RECEITAS[kind], tipoId);
 export const anexoSst = (kind, id) => donos[kind].has(String(id));

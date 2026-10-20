@@ -191,6 +191,31 @@ export function posicao(cargo, sal) {
   return { txt: `entre ${v[i - 1][0]} e ${v[i][0]}`, cls: 'alerta', entre: [v[i - 1][0], v[i][0]] };
 }
 
+/** Para o cartão da tela inicial (20/10/2026): quantos abaixo da faixa e sem
+    salário. Só lê — não aplica reajuste nem marca a tela como carregada,
+    para Salários continuar fazendo isso ao ser aberta. */
+export async function resumoSalarios() {
+  let cargos = S.cargos, sals = jd.dados.salarios || [];
+  if (!S.carregado) {
+    const c = estado.cliente;
+    if (!c) return null;
+    const [cg, sl] = await Promise.all([c.from('rh_cargos').select('*'), c.from('jor_salarios').select('*')]);
+    if (cg.error || sl.error) return null;
+    cargos = cg.data || []; sals = sl.data || [];
+  }
+  const h = hoje();
+  let abaixo = 0, sem = 0;
+  for (const f of ativos()) {
+    const s = sals.filter(x => x.funcionario_id === f.id && x.desde <= h).sort((a, b) => b.desde.localeCompare(a.desde))[0] || null;
+    const fn = jd.funcaoDe(jd.vinculoDe(f.id));
+    const cargo = cargos.find(c => c.id === s?.rh_cargo_id) || cargos.find(c => c.id === fn?.rh_cargo_id) || null;
+    const sal = totalDe(s);
+    if (sal == null) { sem++; continue; }
+    if (posicao(cargo, sal).abaixo) abaixo++;
+  }
+  return { abaixo, sem };
+}
+
 /** A próxima faixa: a primeira da tabela que paga mais do que o salário de hoje. */
 export function proxima(cargo, sal) {
   if (!cargo || sal == null) return null;
