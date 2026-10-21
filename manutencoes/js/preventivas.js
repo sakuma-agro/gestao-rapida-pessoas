@@ -50,6 +50,14 @@ function textoSituacao(c) {
   return t;
 }
 
+/* "última: 21/04/2026 · 4.195 h" embaixo do item (21/10/2026) */
+function ultimaTxt(p, e) {
+  const partes = [];
+  if (p.ultima_troca_data) partes.push(formatarData(p.ultima_troca_data));
+  if (p.ultima_troca_leitura != null) partes.push(nHoras(p.ultima_troca_leitura) + ' ' + unidadeDe(e));
+  return partes.length ? '<small class="pv-ult">última: ' + esc(partes.join(' · ')) + '</small>' : '';
+}
+
 TELAS.painel = el => {
   document.body.classList.remove('modo-quadro');
   const planos = planosDaFrota();
@@ -108,8 +116,9 @@ TELAS.painel = el => {
     const casa = (e, nomeItem) => (!filtroPrev.local || (e && e.local_id === filtroPrev.local))
       && (!b || ((e ? e.codigo + ' ' + e.descricao : '') + ' ' + nomeItem).toLowerCase().includes(b));
     const nomeTipo = id => q.nome('tipos_manutencao', id);
-    const maq = e => `<span class="pv-cod">${esc(e.codigo)}</span>
-      <span class="pv-nm"><b>${esc(e.descricao)}</b><small>${esc(q.nome('locais', e.local_id))}${leituraDe(e) != null ? ' · agora ' + nHoras(leituraDe(e)) + ' ' + unidadeDe(e) : ''}</small></span>`;
+    // Tocar no código ou no nome abre a ficha da máquina (21/10/2026).
+    const maq = e => `<button type="button" class="pv-cod" data-maq="${esc(e.id)}" title="Abrir a ficha">${esc(e.codigo)}</button>
+      <span class="pv-nm"><b class="pv-abre" data-maq="${esc(e.id)}">${esc(e.descricao)}</b><small>${esc(q.nome('locais', e.local_id))}${leituraDe(e) != null ? ' · agora ' + nHoras(leituraDe(e)) + ' ' + unidadeDe(e) : ''}</small></span>`;
     let html = '';
 
     if (abaPrev === 'fazer' || abaPrev === 'semdado') {
@@ -118,12 +127,13 @@ TELAS.painel = el => {
       const linha = ({ p, c }) => {
         const cls = c.status === 'VENCIDO' ? 'pv-r' : c.status === 'ATENCAO' ? 'pv-y' : 'pv-n';
         return `<div class="pv-linha ${cls}">${maq(c.equipamento)}
-          <span class="pv-item">${esc(nomeTipo(p.tipo_manutencao_id))}</span>
+          <span class="pv-item">${esc(nomeTipo(p.tipo_manutencao_id))}${ultimaTxt(p, c.equipamento)}</span>
           <span class="pv-sit">${abaPrev === 'fazer'
             ? `<b>${esc(textoSituacao(c))}</b><i class="pv-barra"><i style="width:${usoDoIntervalo(p, c)}%"></i></i>`
-            : `<b>${esc(maiuscula(c.motivo))}</b><small>lance a última troca na ficha da máquina</small>`}</span>
+            : `<b>${esc(maiuscula(c.motivo))}</b><small>informe a última ou a próxima troca</small>`}</span>
           <span class="pv-acao">${abaPrev === 'fazer'
             ? `<button type="button" class="btn" data-abrir="${esc(p.id)}">Abrir OS</button>`
+            : ehAdmin() ? `<button type="button" class="btn" data-prox="${esc(p.id)}">Informar troca</button>`
             : `<button type="button" class="btn neutro" data-maq="${esc(c.equipamento.id)}">Abrir ficha</button>`}</span>
         </div>`;
       };
@@ -176,6 +186,10 @@ TELAS.painel = el => {
       if (os) formFeita(os);
     });
     $$('#pv-lista [data-maq]').forEach(x => x.onclick = () => fichaMaquina(x.dataset.maq));
+    $$('#pv-lista [data-prox]').forEach(x => x.onclick = () => {
+      const p = q.por_id('planos_manutencao', x.dataset.prox);
+      formItem(q.por_id('equipamentos', p.equipamento_id), p, { modo: 'proxima', depois: () => TELAS.painel(el) });
+    });
   };
 
   $$('.pv-aba').forEach(x => x.onclick = () => {

@@ -285,7 +285,13 @@ function formMaquina(e, modelo) {
 /* ---------------------------------------------------------------- item de manutenção */
 
 /* Ex.: Óleo e filtro de motor — a cada 500 h ou 180 dias — usa 15W40 12 L + filtro RE504836 */
-function formItem(e, p) {
+/* 21/10/2026 (pedido dele): máquina recém-cadastrada não tem "última troca",
+   mas ele sabe quando é a próxima ("no horímetro tal ou na data tal"). O item
+   aceita os dois jeitos: informar a ÚLTIMA troca ou a PRÓXIMA. Na próxima, o
+   app guarda a última troca como próxima − intervalo, que é a mesma conta ao
+   contrário — o vencimento sai igual. opcoes.modo = 'proxima' já abre assim;
+   opcoes.depois é chamado no lugar de reabrir a ficha. */
+function formItem(e, p, opcoes = {}) {
   const novo = !p;
   p = p || {};
   const u = unidadeDe(e);
@@ -310,14 +316,24 @@ function formItem(e, p) {
     ${campoArea('O que usa', 'materiais', p.materiais,
       'Tipo de óleo e litragem, número do filtro… Ex.: Óleo 15W40 — 12 L · Filtro RE504836. Sai impresso na OS.')}
 
-    <fieldset><legend>Última troca</legend>
-      <div class="colunas">
-        ${campoTexto('Data', 'ultima_troca_data', p.ultima_troca_data, 'date')}
-        ${e.unidade_controle === 'CALENDARIO' ? '' :
-          campoTexto((u === 'km' ? 'Km' : 'Horímetro') + ' na troca', 'ultima_troca_leitura', p.ultima_troca_leitura, 'number')}
+    <fieldset><legend>Quando é a troca</legend>
+      <div class="fi-modo" role="radiogroup">
+        <label><input type="radio" name="fi-modo" value="ultima"> Sei a <b>última</b> troca</label>
+        <label><input type="radio" name="fi-modo" value="proxima"> Sei a <b>próxima</b> troca</label>
       </div>
-      <p class="ajuda">É daqui que sai a conta do vencimento. Depois de cada OS concluída o app
-         atualiza sozinho.</p>
+      <div class="colunas" id="fi-ultima">
+        ${campoTexto('Data da última troca', 'ultima_troca_data', p.ultima_troca_data, 'date')}
+        ${e.unidade_controle === 'CALENDARIO' ? '' :
+          campoTexto((u === 'km' ? 'Km' : 'Horímetro') + ' na última troca', 'ultima_troca_leitura', p.ultima_troca_leitura, 'number')}
+      </div>
+      <div class="colunas oculto" id="fi-proxima">
+        ${e.unidade_controle === 'CALENDARIO' ? '' :
+          campoTexto('Próxima troca no ' + (u === 'km' ? 'km' : 'horímetro'), 'prox_leitura', '', 'number',
+            leituraDe(e) != null ? 'Agora a máquina está em ' + nHoras(leituraDe(e)) + ' ' + u : '')}
+        ${campoTexto('Próxima troca na data', 'prox_data', '', 'date')}
+      </div>
+      <p class="fi-previa" id="fi-previa"></p>
+      <p class="ajuda">Depois de cada OS concluída o app atualiza sozinho.</p>
     </fieldset>
     ${!novo ? campoTexto('Motivo da alteração', 'motivo', '', 'text', 'Obrigatório se mexer na última troca') : ''}
 
@@ -327,8 +343,40 @@ function formItem(e, p) {
       ${!novo ? '<button type="button" class="btn-fantasma" id="fi-remover" style="margin-left:auto">Parar de controlar</button>' : ''}
     </div>`, corpo => {
     const sel = corpo.querySelector('#f-tipo_manutencao_id');
+    const campo = n => corpo.querySelector('[name="' + n + '"]');
+    const semUltima = !p.ultima_troca_data && p.ultima_troca_leitura == null;
+    const modo = () => (corpo.querySelector('[name="fi-modo"]:checked') || {}).value;
+    // Converte o que está na tela para a "última troca" que o banco guarda.
+    const ultimaDaTela = () => {
+      const ph = num(campo('periodicidade_horas') && campo('periodicidade_horas').value);
+      const pd = num(campo('periodicidade_dias').value);
+      if (modo() !== 'proxima') return { data: campo('ultima_troca_data').value || null,
+        leitura: num(campo('ultima_troca_leitura') && campo('ultima_troca_leitura').value), ph, pd };
+      const pl = num(campo('prox_leitura') && campo('prox_leitura').value), pdt = campo('prox_data').value || null;
+      return { ph, pd, pl, pdt,
+        leitura: pl != null && ph != null ? pl - ph : null,
+        data: pdt && pd != null ? somarDias(pdt, -Math.round(pd)) : null };
+    };
+    const previa = () => {
+      const x = ultimaDaTela();
+      const partes = [];
+      if (x.leitura != null && x.ph != null) partes.push(nHoras(x.leitura + x.ph) + ' ' + u);
+      if (x.data && x.pd != null) partes.push(formatarData(somarDias(x.data, Math.round(x.pd))));
+      corpo.querySelector('#fi-previa').innerHTML = partes.length
+        ? 'Próxima troca: <b>' + partes.join(' ou ') + '</b> — o que chegar primeiro' : '';
+    };
+    const trocarModo = m => {
+      corpo.querySelector('[name="fi-modo"][value="' + m + '"]').checked = true;
+      corpo.querySelector('#fi-ultima').classList.toggle('oculto', m === 'proxima');
+      corpo.querySelector('#fi-proxima').classList.toggle('oculto', m !== 'proxima');
+      previa();
+    };
+    corpo.querySelectorAll('[name="fi-modo"]').forEach(r => r.onchange = () => trocarModo(r.value));
+    corpo.querySelectorAll('input').forEach(i => i.addEventListener('input', previa));
+    trocarModo(opcoes.modo || (semUltima ? 'proxima' : 'ultima'));
     sel.onchange = () => corpo.querySelector('#fi-novo-campo').classList.toggle('oculto', sel.value !== '__novo');
-    corpo.querySelector('#fi-cancelar').onclick = () => fichaMaquina(e.id);
+    const depois = () => opcoes.depois ? (fecharModal(), opcoes.depois()) : fichaMaquina(e.id);
+    corpo.querySelector('#fi-cancelar').onclick = depois;
 
     corpo.querySelector('#fi-salvar').onclick = async () => {
       const d = lerForm(corpo);
@@ -348,8 +396,15 @@ function formItem(e, p) {
       const horas = num(d.periodicidade_horas), dias = num(d.periodicidade_dias);
       if (horas == null && dias == null) return aviso('Informe a cada quantas horas e/ou dias.', true);
 
-      const ultData = d.ultima_troca_data || null, ultLeit = num(d.ultima_troca_leitura);
-      const mexeuUltima = !novo && (ultData !== (p.ultima_troca_data || null) ||
+      const ul = ultimaDaTela();
+      if (modo() === 'proxima') {
+        if (ul.pl == null && !ul.pdt) return aviso('Informe a próxima troca: o horímetro, a data ou os dois.', true);
+        if (ul.pl != null && horas == null) return aviso('Para usar o horímetro, informe também a cada quantas horas.', true);
+        if (ul.pdt && dias == null) return aviso('Para usar a data, informe também a cada quantos dias.', true);
+      }
+      const ultData = ul.data, ultLeit = ul.leitura;
+      // Preencher pela primeira vez não é correção: só pede motivo quando já havia última troca.
+      const mexeuUltima = !novo && !semUltima && (ultData !== (p.ultima_troca_data || null) ||
                                     ultLeit !== (p.ultima_troca_leitura == null ? null : Number(p.ultima_troca_leitura)));
       if (mexeuUltima && !d.motivo) return aviso('Diga o motivo de mudar a última troca.', true);
       // A correção fica auditada no servidor — por isso esta mudança pede internet.
@@ -375,7 +430,7 @@ function formItem(e, p) {
         if (error) console.warn('auditoria não gravou:', error.message);
       }
       aviso('Item salvo.');
-      fichaMaquina(e.id);
+      depois();
     };
 
     const br = corpo.querySelector('#fi-remover');
