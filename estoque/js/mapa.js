@@ -86,13 +86,16 @@ function svgPlanta(mapa, oc, opc = {}) {
     const frac = pq.cap ? Math.min(1, pq.bags / pq.cap) : 0;
     const passou = pq.cap && pq.bags > pq.cap;
     const temDestaque = destaque && pq.itens.some(i => i.item.id === destaque);
-    // faixas por produto, de baixo para cima, na proporção da capacidade
-    let yy = y + h;
+    // faixas por produto, enchendo de lado (da esquerda para a direita, coluna
+    // por coluna, como os bags entram na quadra — pedido dele, 21/10/2026),
+    // na proporção da capacidade
+    let xx = x;
     const faixas = pq.itens.map(i => {
-      const hh = pq.cap ? h * Math.min(1, i.bags / pq.cap) : 0;
-      yy -= hh;
+      const ww = pq.cap ? Math.min(w * Math.min(1, i.bags / pq.cap), x + w - xx) : 0;
       const op = destaque && i.item.id !== destaque ? .25 : .55;
-      return `<rect x="${x}" y="${Math.max(y, yy)}" width="${w}" height="${Math.min(hh, h)}" fill="${oc.cores.get(i.item.id)}" opacity="${op}"/>`;
+      const r = `<rect x="${xx}" y="${y}" width="${Math.max(0, ww)}" height="${h}" fill="${oc.cores.get(i.item.id)}" opacity="${op}"/>`;
+      xx += Math.max(0, ww);
+      return r;
     }).join('');
     const nomes = pq.itens.slice(0, 2).map((i, k) => `<text x="${x + w / 2}" y="${y + 2.55 + k * .78}" class="mp-t3">${esc(curto(i.item.nome, 16))} · ${esc(mostrarNumero(i.bags))}</text>`).join('')
       + (pq.itens.length > 2 ? `<text x="${x + w / 2}" y="${y + 2.55 + 2 * .78}" class="mp-t3">+ ${pq.itens.length - 2} produto(s)</text>` : '');
@@ -375,7 +378,7 @@ async function abrir3D(mapa, oc) {
       const c = it.item.id === destaque || !destaque ? oc.cores.get(it.item.id) : '#E4E2DA';
       for (let b = 0; b < Math.round(it.bags); b++, pos++) {
         const chao = Math.floor(pos / hp), nivel = pos % hp;
-        const i = chao % nl, j = Math.floor(chao / nl) % np;
+        const j = chao % np, i = Math.floor(chao / np) % nl;   // enche de lado: coluna inteira (muro → corredor) e passa para a próxima
         d.position.set(x0 + med / 2 + i * med, .48 + nivel * .97, z0 + med / 2 + j * med);
         d.updateMatrix(); inst.setMatrixAt(k, d.matrix); inst.setColorAt(k, cor.set(c)); k++;
       }
