@@ -192,3 +192,7 @@ where not exists (select 1 from public.est_locais l where lower(l.nome) = lower(
 -- Quebra Cocão tem acerto independente: não troca transferência com as outras.
 update public.est_locais set acerto_grupo = 'Quebra Cocão'
  where lower(nome) = lower('Faz. Quebra Cocão') and acerto_grupo is null;
+
+-- Valor por unidade nas entradas do Estoque Quebra Cocão (21/10/2026, pedido dele).
+-- A saída não guarda valor: o app calcula pelo custo médio das entradas.
+alter table public.est_movimentos add column if not exists valor_unitario numeric;

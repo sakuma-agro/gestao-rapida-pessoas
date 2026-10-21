@@ -53,6 +53,42 @@ function saldos() {
   for (const [k, v] of m) m.set(k, Math.round(v * 1000) / 1000 || 0);
   return m;
 }
+/* ---- valor (21/10/2026, pedido dele) ----
+   Na entrada, cada produto leva o valor por unidade (R$/kg, R$/L, R$/un).
+   Na saída o valor sai sozinho pelo CUSTO MÉDIO: o app percorre os lançamentos
+   do item em ordem de data (entradas antes das saídas no mesmo dia); cada
+   entrada com valor entra no custo médio, cada saída sai pelo custo médio do
+   momento. Entrada sem valor (planilha antiga, ajuste) entra pelo custo médio
+   que já existia. `ate` (AAAA-MM-DD) para o custo numa data. */
+const brl = v => vazio(v) || !isFinite(v) ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const brlU = v => vazio(v) || !isFinite(v) ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+function custos(ate) {
+  const itens = new Map(), mov = new Map();
+  const lista = movimentos().filter(m => !ate || String(m.data).slice(0, 10) <= ate).sort((a, b) =>
+    String(a.data).localeCompare(String(b.data))
+    || (a.sentido === b.sentido ? 0 : a.sentido === 'entrada' ? -1 : 1)
+    || String(a.atualizado_em || '').localeCompare(String(b.atualizado_em || '')));
+  for (const m of lista) {
+    let st = itens.get(m.item_id);
+    if (!st) itens.set(m.item_id, st = { qtd: 0, qv: 0, valor: 0, medio: null });
+    const q = Number(m.quantidade) || 0;
+    if (m.sentido === 'entrada') {
+      const vu = !vazio(m.valor_unitario) ? Number(m.valor_unitario) : st.medio;
+      if (vu !== null) { st.valor += q * vu; st.qv += q; }
+      st.qtd += q;
+      if (st.qv > 1e-9) st.medio = st.valor / st.qv;
+      mov.set(m.id, { vu, total: vu === null ? null : q * vu, digitado: !vazio(m.valor_unitario) });
+    } else {
+      const vu = st.medio;
+      if (vu !== null) { st.valor -= q * vu; st.qv -= q; }
+      st.qtd -= q;
+      if (st.qv <= 1e-9) { st.qv = 0; st.valor = 0; }
+      mov.set(m.id, { vu, total: vu === null ? null : q * vu });
+    }
+  }
+  for (const st of itens.values()) st.emEstoque = st.medio === null ? null : Math.max(0, st.qtd) * st.medio;
+  return { itens, mov };
+}
 const unicos = campo => [...new Set(movimentos().map(m => m[campo]).filter(v => !vazio(v)))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
 
 function semLocal(alvo) {
@@ -69,6 +105,7 @@ function desenharVisao() {
   if (!localQc()) return semLocal(alvo);
   $('qcFolha').innerHTML = '';
   const sd = saldos();
+  const cu = custos();
   const itens = itensOrdenados().filter(i => sd.has(i.id));
   const b = semAcento(busca);
   const grupos = [...new Set(itens.map(i => i.grupo || 'Outros'))];
@@ -84,7 +121,7 @@ function desenharVisao() {
     <p class="dica">Saldo de cada item = entradas − saídas lançadas aqui. Não tem ligação com a contagem do mês nem com o acerto.</p>
     <div class="es-cards">
       <div class="es-card es-ok"><span>Itens com movimento</span><strong>${itens.length}</strong><small>${grupos.length} categoria(s)</small></div>
-      <div class="es-card es-transf"><span>Lançamentos</span><strong>${movimentos().length}</strong><small>entradas e saídas</small></div>
+      <div class="es-card es-transf"><span>Valor em estoque</span><strong class="qc-rs">${esc(brl(vistosValor(itens, cu)))}</strong><small>pelo custo médio${semValor(itens, cu, sd) ? ` · ${semValor(itens, cu, sd)} sem valor` : ''}</small></div>
       <div class="es-card es-falta"><span>Saldo negativo</span><strong>${negativos}</strong><small>saiu mais do que entrou</small></div>
       <div class="es-card es-sobra"><span>No estoque mínimo</span><strong>${repor}</strong><small>pelo cadastro do item</small></div>
     </div>
@@ -108,8 +145,9 @@ function desenharVisao() {
       return cab + `<div class="item qc-item" data-extrato="${esc(i.id)}"><span></span>
         <div><div class="nome">${esc(i.nome)}${v < -0.0001 ? ' <span class="tag perigo">negativo</span>'
           : precisaRepor(i, v) ? ' <span class="tag alerta">no mínimo</span>' : ''}</div>
-          <div class="sub">${esc(i.unidade || '')}${temMinimo(i) ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}` : ''} · toque para ver o extrato</div></div>
-        <div class="acoes"><strong class="qc-saldo${v < -0.0001 ? ' neg' : ''}">${esc(mostrarNumero(Math.round(v * 1000) / 1000))}</strong></div>
+          <div class="sub">${esc(i.unidade || '')}${temMinimo(i) ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}` : ''}${(cu.itens.get(i.id) || {}).medio != null ? ` · custo médio ${esc(brlU(cu.itens.get(i.id).medio))}` : ' · sem valor'} · toque para ver o extrato</div></div>
+        <div class="acoes" style="text-align:right"><strong class="qc-saldo${v < -0.0001 ? ' neg' : ''}">${esc(mostrarNumero(Math.round(v * 1000) / 1000))}</strong>
+          ${(cu.itens.get(i.id) || {}).emEstoque != null && v > 0.0005 ? `<div class="sub">${esc(brl(cu.itens.get(i.id).emEstoque))}</div>` : ''}</div>
       </div>`;
     }).join('') || `<div class="vazio">${movimentos().length ? 'Nada com esse filtro.' : 'Nenhuma entrada ainda. Comece por <strong>Entradas</strong> (use "Saldo inicial" para o que já está no estoque hoje).'}</div>`}</div>
   </div>`;
@@ -119,11 +157,14 @@ function desenharVisao() {
     desenharVisao(); const el = $('qcBusca'); el.focus(); el.setSelectionRange(pos, pos);
   });
   alvo.querySelectorAll('[data-extrato]').forEach(el => el.addEventListener('click', () => extrato(el.dataset.extrato)));
-  $('qcImprimir')?.addEventListener('click', () => { montarPosicao(vistos, sd); setTimeout(() => window.print(), 50); });
+  $('qcImprimir')?.addEventListener('click', () => { montarPosicao(vistos, sd, cu); setTimeout(() => window.print(), 50); });
   $('qcRelatorio')?.addEventListener('click', abrirRelatorio);
   $('qcZerados').addEventListener('change', e => { esconderZerados = e.target.checked; desenharVisao(); });
   $('qcImpArq')?.addEventListener('change', e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) prepararImportacao(fs); });
 }
+
+const vistosValor = (itens, cu) => itens.reduce((t, i) => t + ((cu.itens.get(i.id) || {}).emEstoque || 0), 0);
+const semValor = (itens, cu, sd) => itens.filter(i => sd.get(i.id) > 0.0005 && (cu.itens.get(i.id) || {}).medio == null).length;
 
 /** Extrato do item: cada entrada e saída, com o saldo correndo. */
 function extrato(itemId) {
@@ -131,18 +172,22 @@ function extrato(itemId) {
   const mvs = movimentos().filter(m => m.item_id === itemId)
     .sort((a, b) => String(a.data).localeCompare(String(b.data)) || String(a.atualizado_em).localeCompare(String(b.atualizado_em)));
   let saldo = 0;
+  const cu = custos();
+  const st = cu.itens.get(itemId);
   const linhas = mvs.map(m => {
     const q = Number(m.quantidade) || 0;
     saldo += m.sentido === 'entrada' ? q : -q;
     return { m, q, saldo };
   }).reverse();
   window.abrirModal(`Extrato · ${i.nome}`, `
-    <p class="dica">Saldo atual: <strong>${esc(mostrarNumero(Math.round(saldo * 1000) / 1000))} ${esc(i.unidade || '')}</strong></p>
+    <p class="dica">Saldo atual: <strong>${esc(mostrarNumero(Math.round(saldo * 1000) / 1000))} ${esc(i.unidade || '')}</strong>${st && st.medio != null
+      ? ` · custo médio <strong>${esc(brlU(st.medio))}</strong> · em estoque <strong>${esc(brl(st.emEstoque))}</strong>` : ' · sem valor lançado'}</p>
     <div class="lista">${linhas.map(({ m, q, saldo: s }) => `<div class="item"><span></span>
       <div><div class="nome">${dataBR(m.data)} · ${m.sentido === 'entrada' ? 'Entrada' : 'Saída'} — ${esc((m.sentido === 'entrada' ? TIPOS_ENTRADA : TIPOS_SAIDA)[m.tipo] || m.tipo)}</div>
         <div class="sub">${detalhe(m)}</div></div>
       <div class="acoes" style="text-align:right"><strong class="${m.sentido === 'entrada' ? 'qc-ent' : 'qc-sai'}">${m.sentido === 'entrada' ? '+' : '−'}${esc(mostrarNumero(q))}</strong>
-        <div class="sub">saldo ${esc(mostrarNumero(Math.round(s * 1000) / 1000))}</div></div>
+        <div class="sub">saldo ${esc(mostrarNumero(Math.round(s * 1000) / 1000))}</div>
+        ${(cu.mov.get(m.id) || {}).vu != null ? `<div class="sub">${esc(brlU(cu.mov.get(m.id).vu))}${m.sentido === 'saida' || !cu.mov.get(m.id).digitado ? ' (médio)' : ''} · ${esc(brl(cu.mov.get(m.id).total))}</div>` : ''}</div>
     </div>`).join('') || '<div class="vazio">Sem lançamentos.</div>'}</div>`);
 }
 
@@ -155,20 +200,24 @@ const detalhe = m => [
   m.obs ? esc(m.obs) : '',
 ].filter(Boolean).join(' · ') || '—';
 
-function montarPosicao(itens, sd) {
+function montarPosicao(itens, sd, cu) {
   const grupos = [];
   for (const i of itens) {
     let g = grupos[grupos.length - 1];
-    if (!g || g.nome !== (i.grupo || 'Outros')) grupos.push(g = { nome: i.grupo || 'Outros', linhas: [] });
-    g.linhas.push([i.nome, i.unidade || '', mostrarNumero(Math.round(sd.get(i.id) * 1000) / 1000)]);
+    if (!g || g.nome !== (i.grupo || 'Outros')) grupos.push(g = { nome: i.grupo || 'Outros', linhas: [], valor: 0 });
+    const st = cu.itens.get(i.id) || {};
+    g.valor += st.emEstoque || 0;
+    g.linhas.push([i.nome, i.unidade || '', mostrarNumero(Math.round(sd.get(i.id) * 1000) / 1000), brlU(st.medio), brl(st.emEstoque)]);
   }
+  const total = grupos.reduce((t, g) => t + g.valor, 0);
   $('qcFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Posição do Estoque — Faz. Quebra Cocão</h1>
-        <p>${itens.length} itens${grupoVisao ? ' · ' + esc(grupoVisao) : ''} · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
+        <p>${itens.length} itens${grupoVisao ? ' · ' + esc(grupoVisao) : ''} · valor em estoque ${esc(brl(total))} · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     ${grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
-      <table class="rel-tab"><thead><tr><th>Item</th><th class="ce">Unidade</th><th class="ce">Saldo</th></tr></thead>
-      <tbody>${g.linhas.map(l => `<tr><td>${esc(l[0])}</td><td class="ce">${esc(l[1])}</td><td class="ce">${esc(l[2])}</td></tr>`).join('')}</tbody></table>`).join('')}
+      <table class="rel-tab"><thead><tr><th>Item</th><th class="ce">Unidade</th><th class="ce">Saldo</th><th class="ce">Custo médio</th><th class="ce">Valor</th></tr></thead>
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l[0])}</td><td class="ce">${esc(l[1])}</td><td class="ce">${esc(l[2])}</td><td class="ce">${esc(l[3])}</td><td class="ce">${esc(l[4])}</td></tr>`).join('')}
+      <tr class="rel-total"><td colspan="4">Total ${esc(g.nome)}</td><td class="ce">${esc(brl(g.valor))}</td></tr></tbody></table>`).join('')}
     <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
@@ -188,6 +237,8 @@ const r3 = v => Math.round((Number(v) || 0) * 1000) / 1000;
 function dadosRelatorio(o) {
   const mvs = movimentos();
   const doGrupo = i => !o.grupo || (i.grupo || 'Outros') === o.grupo;
+  const cuTodos = custos();
+  const valorDe = m => { const c = cuTodos.mov.get(m.id); return c && c.total !== null ? c.total : 0; };
   if (o.tipo === 'consumo') {
     const mapa = new Map();
     for (const m of mvs) {
@@ -195,24 +246,33 @@ function dadosRelatorio(o) {
       const i = itemDe(m.item_id); if (!doGrupo(i)) continue;
       const d = (m.plantio || '(sem direcionador)').trim();
       if (!mapa.has(d)) mapa.set(d, new Map());
-      const g = mapa.get(d); g.set(m.item_id, (g.get(m.item_id) || 0) + (Number(m.quantidade) || 0));
+      const g = mapa.get(d);
+      const x = g.get(m.item_id) || { q: 0, v: 0 };
+      x.q += Number(m.quantidade) || 0; x.v += valorDe(m);
+      g.set(m.item_id, x);
     }
     return [...mapa.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
-      .map(([dir, its]) => ({ dir, linhas: [...its.entries()].map(([id, q]) => ({ i: itemDe(id), q: r3(q) }))
-        .sort((a, b) => a.i.nome.localeCompare(b.i.nome, 'pt-BR')) }));
+      .map(([dir, its]) => {
+        const linhas = [...its.entries()].map(([id, x]) => ({ i: itemDe(id), q: r3(x.q), v: x.v }))
+          .sort((a, b) => a.i.nome.localeCompare(b.i.nome, 'pt-BR'));
+        return { dir, linhas, v: linhas.reduce((t, l) => t + l.v, 0) };
+      });
   }
+  const cuFim = o.tipo === 'posicao' ? cuTodos : custos(o.ate);
   const ids = new Set(mvs.map(m => m.item_id));
   const linhas = itensOrdenados().filter(i => ids.has(i.id) && doGrupo(i)).map(i => {
-    let ini = 0, ent = 0, sai = 0, fim = 0;
+    let ini = 0, ent = 0, sai = 0, fim = 0, vEnt = 0, vSai = 0;
     for (const m of mvs) {
       if (m.item_id !== i.id) continue;
       const q = (Number(m.quantidade) || 0) * (m.sentido === 'entrada' ? 1 : -1);
       fim += q;
       if (m.data < o.de) ini += q;
-      else if (m.data <= o.ate) { if (q > 0) ent += q; else sai -= q; }
+      else if (m.data <= o.ate) { if (q > 0) { ent += q; vEnt += valorDe(m); } else { sai -= q; vSai += valorDe(m); } }
     }
     const finalPer = ini + ent - sai;
-    return { i, ini: r3(ini), ent: r3(ent), sai: r3(sai), fim: r3(o.tipo === 'posicao' ? fim : finalPer) };
+    const st = cuFim.itens.get(i.id) || {};
+    return { i, ini: r3(ini), ent: r3(ent), sai: r3(sai), fim: r3(o.tipo === 'posicao' ? fim : finalPer),
+      vEnt, vSai, medio: st.medio ?? null, vFim: st.emEstoque ?? null };
   });
   return o.zerados ? linhas : linhas.filter(l => o.tipo === 'posicao' ? Math.abs(l.fim) > 0.0005
     : (Math.abs(l.ini) > 0.0005 || l.ent || l.sai || Math.abs(l.fim) > 0.0005));
@@ -243,9 +303,9 @@ function abrirRelatorio() {
       relOpc = { tipo: corpo.querySelector('[name=relTipo]:checked').value, de: $('relDe').value, ate: $('relAte').value,
         grupo: $('relGrupo').value, zerados: $('relZer').checked };
       corpo.querySelectorAll('.rel-per').forEach(el => { el.hidden = relOpc.tipo === 'posicao'; });
-      $('relDica').textContent = relOpc.tipo === 'resumo' ? 'Por produto: estoque no início do período, entradas, saídas e estoque no fim — como a aba ESTOQUE das planilhas.'
-        : relOpc.tipo === 'consumo' ? 'Saídas do tipo Uso no período, somadas por direcionador (plantio/destino) e produto.'
-        : 'Saldo de hoje de cada produto (entradas − saídas).';
+      $('relDica').textContent = relOpc.tipo === 'resumo' ? 'Por produto: estoque no início do período, entradas, saídas e estoque no fim — como a aba ESTOQUE das planilhas — com o valor das saídas e o valor no fim (custo médio).'
+        : relOpc.tipo === 'consumo' ? 'Saídas do tipo Uso no período, somadas por direcionador (plantio/destino) e produto, com o valor pelo custo médio.'
+        : 'Saldo de hoje de cada produto (entradas − saídas), com o custo médio e o valor em estoque.';
       return relOpc;
     };
     corpo.querySelectorAll('input,select').forEach(el => el.addEventListener('change', ler));
@@ -265,21 +325,29 @@ function montarRelatorio(o) {
   const n = v => esc(mostrarNumero(v));
   let corpo = '';
   if (o.tipo === 'consumo') {
-    corpo = d.length ? d.map(g => `<h3 class="rel-secao">${esc(g.dir)}</h3>
-      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Categoria</th><th class="ce">Quantidade</th><th class="ce">Unid.</th></tr></thead>
-      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.grupo || '')}</td><td class="ce">${n(l.q)}</td><td class="ce">${esc(l.i.unidade || '')}</td></tr>`).join('')}</tbody></table>`).join('')
+    const totalGeral = d.reduce((t, g) => t + g.v, 0);
+    corpo = d.length ? `<div class="rel-kpis" style="grid-template-columns:repeat(2,1fr)"><div><span>Direcionadores</span><b>${d.length}</b></div>
+        <div><span>Valor consumido</span><b>${esc(brl(totalGeral))}</b></div></div>` + d.map(g => `<h3 class="rel-secao">${esc(g.dir)}</h3>
+      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Categoria</th><th class="ce">Quantidade</th><th class="ce">Unid.</th><th class="ce">Valor</th></tr></thead>
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.grupo || '')}</td><td class="ce">${n(l.q)}</td><td class="ce">${esc(l.i.unidade || '')}</td><td class="ce">${esc(brl(l.v))}</td></tr>`).join('')}
+      <tr class="rel-total"><td colspan="4">Total ${esc(g.dir)}</td><td class="ce">${esc(brl(g.v))}</td></tr></tbody></table>`).join('')
       : '<p>Nenhuma saída de uso no período.</p>';
   } else {
     const grupos = [];
     for (const l of d) { let g = grupos[grupos.length - 1]; if (!g || g.nome !== (l.i.grupo || 'Outros')) grupos.push(g = { nome: l.i.grupo || 'Outros', linhas: [] }); g.linhas.push(l); }
     const res = o.tipo === 'resumo';
-    corpo = (res ? `<div class="rel-kpis" style="grid-template-columns:repeat(3,1fr)"><div><span>Produtos</span><b>${d.length}</b></div>
-        <div><span>Com entrada no período</span><b>${d.filter(l => l.ent).length}</b></div><div><span>Com saída no período</span><b>${d.filter(l => l.sai).length}</b></div></div>` : '')
+    const soma = (ls, k) => ls.reduce((t, l) => t + (l[k] || 0), 0);
+    corpo = (res ? `<div class="rel-kpis" style="grid-template-columns:repeat(4,1fr)"><div><span>Produtos</span><b>${d.length}</b></div>
+        <div><span>Valor das entradas</span><b>${esc(brl(soma(d, 'vEnt')))}</b></div><div><span>Valor das saídas</span><b>${esc(brl(soma(d, 'vSai')))}</b></div>
+        <div><span>Valor no fim do período</span><b>${esc(brl(soma(d, 'vFim')))}</b></div></div>`
+      : `<div class="rel-kpis" style="grid-template-columns:repeat(2,1fr)"><div><span>Produtos</span><b>${d.length}</b></div>
+        <div><span>Valor em estoque</span><b>${esc(brl(soma(d, 'vFim')))}</b></div></div>`)
       + (grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
-      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Unid.</th>${res ? '<th class="ce">Estoque inicial</th><th class="ce">Entradas</th><th class="ce">Saídas</th><th class="ce">Estoque final</th>' : '<th class="ce">Saldo</th>'}</tr></thead>
+      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Unid.</th>${res ? '<th class="ce">Estoque inicial</th><th class="ce">Entradas</th><th class="ce">Saídas</th><th class="ce">Estoque final</th><th class="ce">Valor saídas</th><th class="ce">Valor final</th>' : '<th class="ce">Saldo</th><th class="ce">Custo médio</th><th class="ce">Valor</th>'}</tr></thead>
       <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.unidade || '')}</td>${res
-        ? `<td class="ce">${n(l.ini)}</td><td class="ce">${l.ent ? n(l.ent) : '—'}</td><td class="ce">${l.sai ? n(l.sai) : '—'}</td><td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td>`
-        : `<td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td>`}</tr>`).join('')}</tbody></table>`).join('') || '<p>Nada nesse filtro.</p>');
+        ? `<td class="ce">${n(l.ini)}</td><td class="ce">${l.ent ? n(l.ent) : '—'}</td><td class="ce">${l.sai ? n(l.sai) : '—'}</td><td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td><td class="ce">${l.sai && l.medio != null ? esc(brl(l.vSai)) : '—'}</td><td class="ce">${esc(brl(l.vFim))}</td>`
+        : `<td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td><td class="ce">${esc(brlU(l.medio))}</td><td class="ce">${esc(brl(l.vFim))}</td>`}</tr>`).join('')}
+      <tr class="rel-total"><td colspan="${res ? 6 : 4}">Total ${esc(g.nome)}</td>${res ? `<td class="ce">${esc(brl(soma(g.linhas, 'vSai')))}</td>` : ''}<td class="ce">${esc(brl(soma(g.linhas, 'vFim')))}</td></tr></tbody></table>`).join('') || '<p>Nada nesse filtro.</p>');
   }
   $('qcFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
@@ -293,17 +361,18 @@ function montarRelatorio(o) {
 function baixarRelatorio(o) {
   const d = dadosRelatorio(o);
   const num = v => String(v).replace('.', ',');
+  const rs = v => v == null || !isFinite(v) ? '' : (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   let linhas;
   if (o.tipo === 'consumo') {
-    linhas = [['Direcionador', 'Produto', 'Categoria', 'Quantidade', 'Unidade']];
-    d.forEach(g => g.linhas.forEach(l => linhas.push([g.dir, l.i.nome, l.i.grupo || '', num(l.q), l.i.unidade || ''])));
+    linhas = [['Direcionador', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Valor (R$)']];
+    d.forEach(g => g.linhas.forEach(l => linhas.push([g.dir, l.i.nome, l.i.grupo || '', num(l.q), l.i.unidade || '', rs(l.v)])));
   } else if (o.tipo === 'resumo') {
-    linhas = [['Categoria', 'Produto', 'Unidade', 'Estoque inicial', 'Entradas', 'Saídas', 'Estoque final']];
-    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.ini), num(l.ent), num(l.sai), num(l.fim)]));
+    linhas = [['Categoria', 'Produto', 'Unidade', 'Estoque inicial', 'Entradas', 'Saídas', 'Estoque final', 'Valor entradas (R$)', 'Valor saídas (R$)', 'Valor final (R$)']];
+    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.ini), num(l.ent), num(l.sai), num(l.fim), rs(l.vEnt), rs(l.vSai), rs(l.vFim)]));
   } else {
-    linhas = [['Categoria', 'Produto', 'Unidade', 'Saldo']];
-    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.fim)]));
+    linhas = [['Categoria', 'Produto', 'Unidade', 'Saldo', 'Custo médio (R$)', 'Valor (R$)']];
+    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.fim), rs(l.medio), rs(l.vFim)]));
   }
   const csv = '\ufeff' + [[tituloRel(o) + ' — Faz. Quebra Cocão'], [subRel(o)], [], ...linhas].map(r => r.map(q).join(';')).join('\r\n');
   const a = document.createElement('a');
@@ -326,10 +395,12 @@ const itemPorNome = nome => itensOrdenados().find(i => semAcento(i.nome) === sem
 const LINHAS_INICIAIS = 6;
 let abertos = new Set();     // lançamentos expandidos na lista do mês
 
-function linhaProduto() {
-  return `<div class="qc-lin">
+function linhaProduto(sentido) {
+  const ent = sentido === 'entrada';
+  return `<div class="qc-lin${ent ? ' com-valor' : ''}">
     <input type="text" class="qc-prod" list="qcProdutos" placeholder="produto" autocomplete="off" enterkeyhint="next">
     <input type="text" class="qc-qtd" inputmode="decimal" placeholder="qtd" autocomplete="off" enterkeyhint="next">
+    ${ent ? '<input type="text" class="qc-vu" inputmode="decimal" placeholder="R$ por unid." autocomplete="off" enterkeyhint="next" aria-label="Valor por unidade">' : ''}
     <button type="button" class="cl-tirar qc-x" title="Tirar a linha" aria-label="Tirar a linha">×</button>
     <small class="qc-info"></small>
   </div>`;
@@ -364,10 +435,11 @@ function desenharMov(sentido) {
         <label class="campo plena">Observação <input type="text" name="obs"></label>
       </div>
       <div class="barra entre qc-prod-cab">
-        <h3 class="es-secao" style="margin:0">Produtos <small id="qcConta">0</small></h3>
+        <h3 class="es-secao" style="margin:0">Produtos <small id="qcConta">0</small> <small id="qcTotal" class="qc-total"></small></h3>
         <button type="button" class="btn mini" id="qcColar">Colar lista</button>
       </div>
-      <div class="qc-lins" id="qcLins">${Array.from({ length: LINHAS_INICIAIS }, linhaProduto).join('')}</div>
+      ${ent ? '<p class="dc-sem qc-vu-dica">Valor por unidade: R$ por kg, por litro ou por peça, como está na nota. Na compra é obrigatório.</p>' : '<p class="dc-sem qc-vu-dica">O valor da saída sai sozinho pelo custo médio das entradas.</p>'}
+      <div class="qc-lins" id="qcLins">${Array.from({ length: LINHAS_INICIAIS }, () => linhaProduto(sentido)).join('')}</div>
       <div class="barra entre">
         <button type="button" class="btn mini" id="qcMais">+ linha</button>
         <button class="btn principal" type="submit" id="qcEnviar">Lançar ${ent ? 'entrada' : 'saída'}</button>
@@ -388,7 +460,7 @@ function desenharMov(sentido) {
   form.querySelectorAll('[name=tipo]').forEach(r => r.addEventListener('change', mostrarTipo));
   mostrarTipo();
   ligarLinhas(sentido);
-  $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto()); ligarLinhas(sentido); };
+  $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); };
   $('qcColar').onclick = () => colarLista(sentido);
   form.addEventListener('submit', e => { e.preventDefault(); lancar(sentido, form); });
   desenharListaMes(sentido);
@@ -397,35 +469,58 @@ function desenharMov(sentido) {
 /** Liga as linhas de produto (as novas também): Enter pula, saldo aparece, linha nova sozinha. */
 function ligarLinhas(sentido) {
   const sd = saldos();
+  const cu = custos();
   document.querySelectorAll('#qcLins .qc-lin:not([data-ok])').forEach(lin => {
     lin.dataset.ok = '1';
     const prod = lin.querySelector('.qc-prod'), qtd = lin.querySelector('.qc-qtd'), info = lin.querySelector('.qc-info');
-    const atualizar = () => {
+    const vuInp = lin.querySelector('.qc-vu');
+    const escreverInfo = () => {
       const it = itemPorNome(prod.value);
       lin.classList.toggle('desconhecido', !!prod.value.trim() && !it);
-      info.textContent = !prod.value.trim() ? '' : it
-        ? `${it.unidade || ''} · saldo ${mostrarNumero(Math.round((sd.get(it.id) || 0) * 1000) / 1000)}`
-        : 'não está no cadastro';
+      if (!prod.value.trim()) { info.textContent = ''; return; }
+      if (!it) { info.textContent = 'não está no cadastro'; return; }
+      const st = cu.itens.get(it.id);
+      const medio = st && st.medio !== null ? st.medio : null;
+      const q = lerNumero(qtd.value), vu = vuInp ? lerNumero(vuInp.value) : null;
+      const partes = [`${it.unidade || ''} · saldo ${mostrarNumero(Math.round((sd.get(it.id) || 0) * 1000) / 1000)}`];
+      if (sentido === 'entrada') {
+        if (medio !== null) partes.push('custo médio ' + brlU(medio));
+        if (q > 0 && vu > 0) partes.push('total ' + brl(q * vu));
+      } else if (medio !== null) {
+        partes.push('custo médio ' + brlU(medio) + (q > 0 ? ' · ' + brl(q * medio) : ''));
+      } else partes.push('sem custo médio ainda');
+      info.textContent = partes.join(' · ');
+    };
+    const atualizar = () => {
+      escreverInfo();
       contar();
       // a última linha preenchida abre uma nova
       const todas = [...document.querySelectorAll('#qcLins .qc-lin')];
       if (todas[todas.length - 1] === lin && prod.value.trim()) {
-        $('qcLins').insertAdjacentHTML('beforeend', linhaProduto()); ligarLinhas(sentido);
+        $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido);
       }
     };
     prod.addEventListener('input', atualizar);
     prod.addEventListener('change', atualizar);
-    qtd.addEventListener('input', contar);
-    prod.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); qtd.focus(); } });
-    qtd.addEventListener('keydown', e => {
+    qtd.addEventListener('input', () => { escreverInfo(); contar(); });
+    if (vuInp) vuInp.addEventListener('input', () => { escreverInfo(); contar(); });
+    if (vuInp) vuInp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       const prox = lin.nextElementSibling;
       if (prox) prox.querySelector('.qc-prod').focus();
     });
+    prod.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); qtd.focus(); } });
+    qtd.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (vuInp) { vuInp.focus(); return; }
+      const prox = lin.nextElementSibling;
+      if (prox) prox.querySelector('.qc-prod').focus();
+    });
     lin.querySelector('.qc-x').onclick = () => {
       if (document.querySelectorAll('#qcLins .qc-lin').length > 1) lin.remove();
-      else { prod.value = ''; qtd.value = ''; info.textContent = ''; }
+      else { prod.value = ''; qtd.value = ''; if (vuInp) vuInp.value = ''; info.textContent = ''; }
       contar();
     };
   });
@@ -434,7 +529,8 @@ function ligarLinhas(sentido) {
 
 function linhasPreenchidas() {
   return [...document.querySelectorAll('#qcLins .qc-lin')]
-    .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim() }))
+    .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim(),
+      vuTxt: lin.querySelector('.qc-vu') ? lin.querySelector('.qc-vu').value.trim() : '' }))
     .filter(x => x.nome || x.txt);
 }
 function contar() {
@@ -443,13 +539,22 @@ function contar() {
   if (el) el.textContent = n;
   const b = $('qcEnviar');
   if (b) b.textContent = b.textContent.replace(/ \(\d+\)$/, '') + (n ? ` (${n})` : '');
+  const tot = $('qcTotal');
+  if (tot) {
+    let soma = 0, algum = false;
+    for (const x of linhasPreenchidas()) {
+      const q = lerNumero(x.txt), v = lerNumero(x.vuTxt);
+      if (q > 0 && v > 0) { soma += q * v; algum = true; }
+    }
+    tot.textContent = algum ? '· total ' + brl(soma) : '';
+  }
 }
 
 /** Cola a lista (da NF, de uma planilha): "produto ; quantidade" ou produto[tab]quantidade, uma por linha. */
 function colarLista(sentido) {
   window.abrirModal('Colar lista de produtos', `
-    <p class="dica">Uma linha por produto: o nome e a quantidade, separados por ponto e vírgula ou colados de duas colunas
-      da planilha.</p>
+    <p class="dica">Uma linha por produto: o nome e a quantidade${sentido === 'entrada' ? ' (e, se quiser, o valor por unidade)' : ''},
+      separados por ponto e vírgula ou colados das colunas da planilha.</p>
     <pre class="cad-exemplo">Afalon ; 20
 Atrazina ; 15,5
 Luva nitrílica ; 30</pre>
@@ -463,12 +568,13 @@ Luva nitrílica ; 30</pre>
         if (!lin.querySelector('.qc-prod').value.trim() && !lin.querySelector('.qc-qtd').value.trim()) lin.remove();
       });
       for (const p of linhas) {
-        $('qcLins').insertAdjacentHTML('beforeend', linhaProduto());
+        $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido));
         const lin = $('qcLins').lastElementChild;
         lin.querySelector('.qc-prod').value = p[0].trim().replace(/\s+/g, ' ');
         lin.querySelector('.qc-qtd').value = (p[1] || '').trim();
+        if (lin.querySelector('.qc-vu')) lin.querySelector('.qc-vu').value = (p[2] || '').replace(/R\$\s*/i, '').trim();
       }
-      $('qcLins').insertAdjacentHTML('beforeend', linhaProduto());
+      $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido));
       window.fecharModal();
       ligarLinhas(sentido);
       document.querySelectorAll('#qcLins .qc-prod').forEach(i => i.dispatchEvent(new Event('change')));
@@ -492,13 +598,18 @@ async function lancar(sentido, form) {
     x.lin.classList.remove('erro');
     const item = itemPorNome(x.nome);
     const qtd = lerNumero(x.txt);
+    const vu = sentido === 'entrada' ? lerNumero(x.vuTxt) : null;
     if (!x.nome) { x.lin.classList.add('erro'); erros.push('linha sem produto'); continue; }
     if (!item) { desconhecidos.set(semAcento(x.nome), x.nome); continue; }
     if (Number.isNaN(qtd) || !qtd || qtd <= 0) { x.lin.classList.add('erro'); erros.push(`${item.nome}: quantidade`); continue; }
-    linhas.push({ item, qtd });
+    if (Number.isNaN(vu) || (sentido === 'entrada' && tipo === 'compra' && !(vu > 0))) { x.lin.classList.add('erro'); erros.push(`${item.nome}: valor`); continue; }
+    linhas.push({ item, qtd, vu: vu > 0 ? vu : null });
   }
   if (desconhecidos.size) return cadastrarNaHora([...desconhecidos.values()], sentido, form);
-  if (erros.length) { aviso(`Confira as linhas em vermelho (${erros.length}): quantidade maior que zero.`, true); return; }
+  if (erros.length) {
+    aviso(`Confira as linhas em vermelho (${erros.length}): quantidade maior que zero${sentido === 'entrada' && tipo === 'compra' ? ' e valor por unidade (obrigatório na compra)' : ''}.`, true);
+    return;
+  }
   if (sentido === 'saida') {
     if (!txt('documento')) { aviso('Informe o nº do documento.', true); return; }
     if (!txt('operador')) { aviso('Informe o operador.', true); return; }
@@ -525,7 +636,8 @@ async function lancar(sentido, form) {
     fornecedor: sentido === 'entrada' && tipo === 'compra' ? txt('fornecedor') : null,
     obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
   };
-  for (const l of linhas) await gravar('est_movimentos', Object.assign({}, base, { item_id: l.item.id, quantidade: l.qtd }));
+  for (const l of linhas) await gravar('est_movimentos', Object.assign({}, base, { item_id: l.item.id, quantidade: l.qtd,
+    valor_unitario: sentido === 'entrada' ? l.vu : null }));
   aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.length} produto(s).`);
   mesLista = String(base.data).slice(0, 7);
   abertos.add(lancamento);
@@ -569,6 +681,8 @@ function desenharListaMes(sentido) {
   }
   const lista = [...grupos.entries()].sort((a, b) => String(b[1][0].data).localeCompare(String(a[1][0].data))
     || String(b[1][0].atualizado_em).localeCompare(String(a[1][0].atualizado_em)));
+  const cu = custos();
+  const totalDe = ms => { let t = 0, ok = false; for (const x of ms) { const c = cu.mov.get(x.id); if (c && c.total !== null) { t += c.total; ok = true; } } return ok ? t : null; };
   alvo.innerHTML = `
     <div class="barra entre">
       <h2 style="margin:0">${ent ? 'Entradas' : 'Saídas'} do mês</h2>
@@ -579,12 +693,17 @@ function desenharListaMes(sentido) {
       const aberto = abertos.has(k);
       return `<div class="qc-lanc">
         <button type="button" class="qc-lanc-cab" data-abre="${esc(k)}" aria-expanded="${aberto}">
-          <span><b>${dataBR(m.data)} · ${esc(tipos[m.tipo] || m.tipo)}</b> · ${ms.length} produto(s)
+          <span><b>${dataBR(m.data)} · ${esc(tipos[m.tipo] || m.tipo)}</b> · ${ms.length} produto(s)${totalDe(ms) !== null ? ' · <b>' + esc(brl(totalDe(ms))) + '</b>' : ''}
             <small>${detalhe(m)}${m.criado_por ? ' · lançado por ' + esc(m.criado_por) : ''}</small></span>
           <span class="qc-seta">${aberto ? '▾' : '▸'}</span>
         </button>
-        <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); return `<div class="qc-lanc-item">
+        <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); const c = cu.mov.get(x.id) || {}; return `<div class="qc-lanc-item${ent ? ' com-valor' : ''}">
           <span>${esc(i.nome)}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
+          ${ent ? `<label class="qc-vu-ed" title="Valor por unidade (R$)">R$/${esc(i.unidade || 'un')} <input type="text" inputmode="decimal" data-vu="${esc(x.id)}"
+            value="${vazio(x.valor_unitario) ? '' : esc(Number(x.valor_unitario).toLocaleString('pt-BR', { maximumFractionDigits: 4 }))}"
+            placeholder="${c.vu !== null && c.vu !== undefined ? esc(Number(c.vu).toLocaleString('pt-BR', { maximumFractionDigits: 2 })) + ' (médio)' : '—'}"></label>
+            <small class="qc-vu-tot">${c.total !== null && c.total !== undefined ? esc(brl(c.total)) : ''}</small>`
+          : `<small class="qc-vu-tot" title="Custo médio na data">${c.vu !== null && c.vu !== undefined ? esc(brlU(c.vu)) + ' · ' + esc(brl(c.total)) : 'sem custo médio'}</small>`}
           <button class="btn mini" type="button" data-tirar="${esc(x.id)}">Tirar</button></div>`; }).join('')}
           ${ms.length > 1 ? `<div class="barra fim"><button class="btn mini" type="button" data-tirar-tudo="${esc(k)}">Tirar o lançamento inteiro</button></div>` : ''}
         </div>
@@ -594,6 +713,14 @@ function desenharListaMes(sentido) {
   alvo.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.abre;
     if (abertos.has(k)) abertos.delete(k); else abertos.add(k);
+    desenharListaMes(sentido);
+  }));
+  alvo.querySelectorAll('[data-vu]').forEach(inp => inp.addEventListener('change', async () => {
+    const m = movimentos().find(x => x.id === inp.dataset.vu);
+    const v = lerNumero(inp.value);
+    if (!m || Number.isNaN(v)) { aviso('Esse valor não deu para entender. Ex.: 3,85', true); return; }
+    await gravar('est_movimentos', Object.assign({}, m, { valor_unitario: v > 0 ? v : null }));
+    aviso('Valor guardado.');
     desenharListaMes(sentido);
   }));
   alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', async () => {
@@ -642,6 +769,8 @@ function desenharPainel() {
   $('qcPainelFolha').innerHTML = '';
   const lista = filtrados();
   const ent = lista.filter(m => m.sentido === 'entrada'), sai = lista.filter(m => m.sentido === 'saida');
+  const cu = custos();
+  const vt = l => l.reduce((t, m) => t + ((cu.mov.get(m.id) || {}).total || 0), 0);
   const lancs = l => new Set(l.map(m => m.lancamento_id || m.id)).size;
   const grupos = [...new Set(itensOrdenados().map(i => i.grupo || 'Outros'))];
   const tipos = pf.sentido === 'entrada' ? TIPOS_ENTRADA : pf.sentido === 'saida' ? TIPOS_SAIDA
@@ -668,8 +797,8 @@ function desenharPainel() {
         `<button type="button" class="ct-chip" data-periodo="${k}">${v}</button>`).join('')}
     </div>
     <div class="es-cards">
-      <div class="es-card es-ok"><span>Entradas</span><strong>${ent.length}</strong><small>itens em ${lancs(ent)} lançamento(s)</small></div>
-      <div class="es-card es-sobra"><span>Saídas</span><strong>${sai.length}</strong><small>itens em ${lancs(sai)} lançamento(s)</small></div>
+      <div class="es-card es-ok"><span>Entradas</span><strong>${ent.length}</strong><small>itens em ${lancs(ent)} lançamento(s) · ${esc(brl(vt(ent)))}</small></div>
+      <div class="es-card es-sobra"><span>Saídas</span><strong>${sai.length}</strong><small>itens em ${lancs(sai)} lançamento(s) · ${esc(brl(vt(sai)))}</small></div>
       <div class="es-card es-transf"><span>Transferências</span><strong>${lista.filter(m => m.tipo === 'transferencia').length}</strong><small>entrando e saindo</small></div>
       <div class="es-card"><span>Produtos diferentes</span><strong>${new Set(lista.map(m => m.item_id)).size}</strong><small>no período</small></div>
     </div>
@@ -688,7 +817,8 @@ function desenharPainel() {
         <span class="qc-mov-sinal">${e ? 'E' : 'S'}</span>
         <div class="qc-mov-txt"><b>${esc(i.nome)}</b> <span class="tag ${e ? 'ativo' : 'alerta'}">${esc(nomeTipo(m))}</span>
           <small>${detalhe(m)}</small></div>
-        <strong class="${e ? 'qc-ent' : 'qc-sai'}">${e ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</strong>
+        <strong class="${e ? 'qc-ent' : 'qc-sai'}">${e ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}
+          ${(cu.mov.get(m.id) || {}).total != null ? `<small class="qc-mov-rs">${esc(brl(cu.mov.get(m.id).total))}</small>` : ''}</strong>
       </div>`;
     }).join('') || '<div class="vazio">Nenhuma movimentação com esses filtros.</div>'}</div>
   </div>`;
@@ -711,18 +841,19 @@ function desenharPainel() {
     if (b.dataset.periodo === 'tudo') { pf.de = ''; pf.ate = ''; }
     refaz();
   });
-  $('pfCsv')?.addEventListener('click', () => baixarCsv(lista));
-  $('pfImprimir')?.addEventListener('click', () => { montarFolhaMov(lista); setTimeout(() => window.print(), 50); });
+  $('pfCsv')?.addEventListener('click', () => baixarCsv(lista, cu));
+  $('pfImprimir')?.addEventListener('click', () => { montarFolhaMov(lista, cu); setTimeout(() => window.print(), 50); });
 }
 
 const periodoTxt = () => pf.de || pf.ate ? `${pf.de ? dataBR(pf.de) : 'início'} a ${pf.ate ? dataBR(pf.ate) : 'hoje'}` : 'todo o período';
 
-function baixarCsv(lista) {
+function baixarCsv(lista, cu) {
   const c = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const linhas = [['Data', 'Entrada/Saída', 'Tipo', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Documento',
+  const rs = (v, casas = 2) => v == null || !isFinite(v) ? '' : Number(v).toFixed(casas).replace('.', ',');
+  const linhas = [['Data', 'Entrada/Saída', 'Tipo', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Valor unitário (R$)', 'Valor total (R$)', 'Documento',
     'Plantio', 'Operador', 'Fazenda (origem/destino)', 'Fornecedor', 'Observação', 'Lançado por']]
-    .concat(lista.map(m => { const i = itemDe(m.item_id); return [dataBR(m.data), m.sentido === 'entrada' ? 'Entrada' : 'Saída',
-      nomeTipo(m), i.nome, i.grupo || '', String(m.quantidade).replace('.', ','), i.unidade || '', m.documento, m.plantio,
+    .concat(lista.map(m => { const i = itemDe(m.item_id); const k = cu.mov.get(m.id) || {}; return [dataBR(m.data), m.sentido === 'entrada' ? 'Entrada' : 'Saída',
+      nomeTipo(m), i.nome, i.grupo || '', String(m.quantidade).replace('.', ','), i.unidade || '', rs(k.vu, 4), rs(k.total), m.documento, m.plantio,
       m.operador, m.outra_fazenda, m.fornecedor, m.obs, m.criado_por]; }));
   const blob = new Blob(['﻿' + linhas.map(l => l.map(c).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -732,16 +863,17 @@ function baixarCsv(lista) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-function montarFolhaMov(lista) {
+function montarFolhaMov(lista, cu) {
   $('qcPainelFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Movimentações do Estoque — Faz. Quebra Cocão</h1>
         <p>${esc(periodoTxt())} · ${lista.length} lançamento(s) · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     <table class="rel-tab rel-mov" style="margin-top:6mm"><thead><tr><th class="ce">Data</th><th class="ce">E/S</th><th>Tipo</th><th>Produto</th>
-      <th class="ce">Qtd.</th><th>Documento</th><th>Plantio / Operador / Fazenda</th></tr></thead>
+      <th class="ce">Qtd.</th><th class="ce">Valor</th><th>Documento</th><th>Plantio / Operador / Fazenda</th></tr></thead>
     <tbody>${lista.map(m => { const i = itemDe(m.item_id); return `<tr><td class="ce">${esc(dataBR(m.data))}</td>
       <td class="ce">${m.sentido === 'entrada' ? 'E' : 'S'}</td><td>${esc(nomeTipo(m))}</td><td>${esc(i.nome)}</td>
       <td class="ce">${m.sentido === 'entrada' ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</td>
+      <td class="ce">${esc(brl((cu.mov.get(m.id) || {}).total))}</td>
       <td>${esc(m.documento || '')}</td><td>${esc([m.plantio, m.operador, m.outra_fazenda, m.fornecedor].filter(Boolean).join(' · '))}</td></tr>`; }).join('')}</tbody></table>
     <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
