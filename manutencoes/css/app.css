@@ -1365,3 +1365,4 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 /* 21/10/2026: próxima troca na OS */
 .os-tab td.os-prox b{color:var(--verde-lop);font-weight:bold;white-space:normal}
 .os-tab th.os-prox{min-width:110px}
+.pv-cab-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}

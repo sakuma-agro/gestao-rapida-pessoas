@@ -107,7 +107,8 @@ TELAS.painel = el => {
     <div class="pn-cabeca">
       <div><h1>Preventivas${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
         <p class="sub">Cada linha é uma troca: <b>A fazer</b> → abriu a OS → <b>Em andamento</b> → fechou a OS → <b>Feita</b>.</p></div>
-      <button type="button" class="btn neutro" id="pv-atualizar">Atualizar</button>
+      <span class="pv-cab-acoes"><button type="button" class="btn oculto" id="pv-hm">+ Hora máquina</button>
+      <button type="button" class="btn neutro" id="pv-atualizar">Atualizar</button></span>
     </div>
     <div class="pv-abas">
       ${aba('fazer', 'pv-a-fazer', fazer.length, 'A fazer', 'vencido ou perto, sem OS')}
@@ -278,6 +279,12 @@ TELAS.painel = el => {
   ['pv-busca', 'pv-item', 'pv-local'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
   const bh = $('#pv-hor'); if (bh) bh.onclick = () => listaHorimetroVelho(velhas, () => TELAS.painel(el));
   const ck = $('#pv-ck'); if (ck) ck.onclick = () => { abaChecklist = 'agenda'; irPara('checklist'); };
+  // + Hora máquina (Quebra Cocão): mesmo painel do DP › Lançar jornada
+  if (window.HoraMaquina && App.sb) window.HoraMaquina.disponivel(App.sb).then(ok => {
+    const bhm = $('#pv-hm'); if (!bhm) return;
+    bhm.classList.toggle('oculto', !ok);
+    bhm.onclick = () => window.HoraMaquina.abrir({ cliente: App.sb, aoSalvar: () => { baixarBase().then(() => { if (document.querySelector('#pv-lista')) TELAS.painel(el); }).catch(() => {}); } });
+  });
   $('#pv-atualizar').onclick = async () => {
     if (!App.online) return aviso('Sem internet: a tela mostra o que está guardado neste aparelho.', true);
     aviso('Atualizando…');

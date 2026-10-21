@@ -349,7 +349,8 @@ function desenharLancar() {
      linhas de campos; Enter percorre o caminho comum e Ctrl+Enter lança. */
   $('telaJorLancar').innerHTML = `
     <header class="jor-cab-lancar"><b>Lançar jornada</b>
-      <span>digite o nº do cadastro · <kbd>Enter</kbd> passa de campo · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> lança</span></header>
+      <span>digite o nº do cadastro · <kbd>Enter</kbd> passa de campo · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> lança</span>
+      <button type="button" class="btn mini jor-hm" id="bHoraMaquina" hidden title="Lançar horímetro da máquina e implementos (Quebra Cocão)">+ Hora máquina</button></header>
     <div class="jor-corpo jor-duas jor-lancar">
       <form id="jorFormBoletim" class="jor-form jor-compacta" data-dia="">
         <div class="jor-prox" id="bProximo" hidden></div>
@@ -452,6 +453,17 @@ function desenharLancar() {
     mostrarDiaAuto(); mostrarMotivo(); mostrarMarcado(); mostrarApurado();
   });
   $('jorFormBoletim').addEventListener('submit', gravarBoletim);
+  /* + Hora máquina (21/10/2026): só aparece para quem enxerga as máquinas da
+     Quebra Cocão em Manutenções. Abre o painel de js/hora-maquina.js com o
+     operador, a data e o boletim que já estão no formulário. */
+  if (window.HoraMaquina) window.HoraMaquina.disponivel(estado.cliente).then(ok => {
+    const b = $('bHoraMaquina'); if (!b) return;
+    b.hidden = !ok;
+    b.onclick = () => {
+      const f = $('bFunc'); const nome = f && f.value ? f.options[f.selectedIndex].text.split(' · ')[0] : '';
+      window.HoraMaquina.abrir({ cliente: estado.cliente, data: $('bData').value, operador: nome, boletim: $('bNumero').value.trim() });
+    };
+  });
   $('bNumero').addEventListener('input', () => $('bNumero').classList.remove('jor-falta'));
   ['bNumero', 'bData'].forEach(id => $(id).addEventListener('input', () => $(id).classList.remove('jor-sugerido')));
   $('bCadastro').addEventListener('input', esconderProximo);
