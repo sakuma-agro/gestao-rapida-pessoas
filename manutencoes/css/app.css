@@ -1355,3 +1355,10 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
   .pv-linha.pv-maq{grid-template-columns:62px 1fr}
   .pv-itens{grid-column:2}.pv-subitem{grid-template-columns:1fr;gap:4px}
 }
+/* 21/10/2026: lista vazia explica o porquê */
+.pv-alerta{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:18px 20px;background:#F2F7FC;border-left:6px solid var(--andamento)}
+.pv-alerta b{font-size:15px;color:var(--grafite)}
+.pv-alerta span{font-size:14px}
+.pv-alerta-forte{background:#FFF6DD;border-left-color:var(--atencao)}
+.pv-ir{background:var(--branco);border:1px solid var(--linha);border-radius:16px;padding:6px 12px;margin:2px 4px 2px 0;font:inherit;font-size:13px;font-weight:bold;cursor:pointer;color:var(--andamento)}
+.pv-ir:hover{border-color:var(--andamento)}

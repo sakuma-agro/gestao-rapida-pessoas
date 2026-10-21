@@ -135,6 +135,34 @@ TELAS.painel = el => {
     const casa = (e, nomeItem) => (!filtroPrev.local || (e && e.local_id === filtroPrev.local))
       && (!b || ((e ? e.codigo + ' ' + e.descricao : '') + ' ' + nomeItem).toLowerCase().includes(b));
     const nomeTipo = id => q.nome('tipos_manutencao', id);
+    /* 21/10/2026: os números das abas seguem os filtros (fazenda, item, busca).
+       Antes contavam a frota toda e, filtrando uma fazenda, a lista vinha em
+       branco com "118" no alto. */
+    const passaPlano = ({ p, c }) => (!filtroPrev.item || p.tipo_manutencao_id === filtroPrev.item) && casa(c.equipamento, nomeTipo(p.tipo_manutencao_id));
+    const F = {
+      fazer: fazer.filter(passaPlano),
+      semdado: semDado.filter(passaPlano),
+      andamento: osAbertas.filter(o => (!filtroPrev.item || itensDaOS(o.id).some(i => i.tipo_manutencao_id === filtroPrev.item))
+        && casa(q.por_id('equipamentos', o.equipamento_id), resumoOS(o))),
+      feitas: feitas.filter(m => (!filtroPrev.item || m.tipo_manutencao_id === filtroPrev.item)
+        && casa(q.por_id('equipamentos', m.equipamento_id), nomeTipo(m.tipo_manutencao_id))),
+    };
+    Object.keys(F).forEach(k => { const n = document.querySelector(`.pv-aba[data-aba="${k}"] strong`); if (n) n.textContent = F[k].length; });
+    const filtrando = !!(filtroPrev.local || filtroPrev.item || b);
+    const recorte = [filtroPrev.local && q.nome('locais', filtroPrev.local), filtroPrev.item && nomeTipo(filtroPrev.item), b && '"' + filtroPrev.busca + '"']
+      .filter(Boolean).join(' · ');
+    /* Lista vazia nunca fica em branco: diz o porquê e mostra o que há nas outras abas. */
+    const vazio = msg => {
+      const maqsNoLocal = filtroPrev.local
+        ? q.ativos('equipamentos').filter(e => e.local_id === filtroPrev.local && !['VENDIDO', 'BAIXADO'].includes(e.status) && noGrupo(e)).length : null;
+      if (maqsNoLocal === 0) return `<div class="pv-alerta pv-alerta-forte"><b>Nenhuma máquina cadastrada em ${esc(q.nome('locais', filtroPrev.local))}${grupoAtual ? ' no grupo ' + esc(nomeGrupo(grupoAtual)) : ''}.</b>
+        <span>Confira em Cadastros se as máquinas dessa fazenda estão com o local certo.</span></div>`;
+      const rot = { fazer: 'a fazer', andamento: 'em andamento', feitas: 'feitas no mês', semdado: 'falta cadastrar' };
+      const outras = Object.keys(F).filter(k => k !== abaPrev && F[k].length);
+      return `<div class="pv-alerta"><b>${esc(msg)}${filtrando ? ' — em ' + esc(recorte) : ''}.</b>
+        ${outras.length ? `<span>Nas outras abas: ${outras.map(k => `<button type="button" class="pv-ir" data-ir-aba="${k}">${F[k].length} ${rot[k]}</button>`).join(' ')}</span>` : ''}
+        ${filtrando ? '<button type="button" class="btn-fantasma" id="pv-limpar">Limpar filtros</button>' : ''}</div>`;
+    };
     // Tocar no código ou no nome abre a ficha da máquina (21/10/2026).
     const maq = e => `<button type="button" class="pv-cod" data-maq="${esc(e.id)}" title="Abrir a ficha">${esc(e.codigo)}</button>
       <span class="pv-nm"><b class="pv-abre" data-maq="${esc(e.id)}">${esc(e.descricao)}</b><small>${esc(q.nome('locais', e.local_id))}${leituraDe(e) != null ? ' · agora ' + nHoras(leituraDe(e)) + ' ' + unidadeDe(e) : ''}${(() => {
@@ -143,8 +171,7 @@ TELAS.painel = el => {
     let html = '';
 
     if (abaPrev === 'fazer' || abaPrev === 'semdado') {
-      const base = (abaPrev === 'fazer' ? fazer : semDado)
-        .filter(({ p, c }) => (!filtroPrev.item || p.tipo_manutencao_id === filtroPrev.item) && casa(c.equipamento, nomeTipo(p.tipo_manutencao_id)));
+      const base = abaPrev === 'fazer' ? F.fazer : F.semdado;
       const linha = ({ p, c }) => {
         const cls = c.status === 'VENCIDO' ? 'pv-r' : c.status === 'ATENCAO' ? 'pv-y' : 'pv-n';
         return `<div class="pv-linha ${cls}">${maq(c.equipamento)}
@@ -178,16 +205,12 @@ TELAS.painel = el => {
         const venc = maqs.filter(m => m.vencida), perto = maqs.filter(m => !m.vencida);
         html = (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
              + (perto.length ? `<div class="pv-grupo">Perto de vencer · ${perto.length} máquina(s)</div>` + perto.map(linhaMaq).join('') : '');
-        if (!html) html = '<div class="vazio"><p>Nada a fazer. Todas as trocas estão em dia ou já têm OS aberta.</p></div>';
+        if (!html) html = vazio('Nada a fazer: as trocas estão em dia ou já têm OS aberta');
       } else {
-        html = base.map(linha).join('') || '<div class="vazio"><p>Todos os itens têm última troca lançada.</p></div>';
+        html = base.map(linha).join('') || vazio('Todos os itens têm a troca lançada');
       }
     } else if (abaPrev === 'andamento') {
-      html = osAbertas.filter(o => {
-        const e = q.por_id('equipamentos', o.equipamento_id);
-        const its = itensDaOS(o.id);
-        return (!filtroPrev.item || its.some(i => i.tipo_manutencao_id === filtroPrev.item)) && casa(e, resumoOS(o));
-      }).map(o => {
+      html = F.andamento.map(o => {
         const e = q.por_id('equipamentos', o.equipamento_id) || { codigo: '—', descricao: '' };
         const d = diasDesde(o.data_emissao);
         return `<div class="pv-linha pv-b">${maq(e)}
@@ -197,10 +220,9 @@ TELAS.painel = el => {
           <span class="pv-acao"><button type="button" class="btn neutro" data-os="${esc(o.id)}">Ver OS</button>
             <button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}">✓ Fechar OS</button></span>
         </div>`;
-      }).join('') || '<div class="vazio"><p>Nenhuma OS preventiva aberta.</p></div>';
+      }).join('') || vazio('Nenhuma OS preventiva aberta');
     } else {
-      html = feitas.filter(m => (!filtroPrev.item || m.tipo_manutencao_id === filtroPrev.item)
-          && casa(q.por_id('equipamentos', m.equipamento_id), nomeTipo(m.tipo_manutencao_id)))
+      html = F.feitas
         .map(m => {
           const e = q.por_id('equipamentos', m.equipamento_id);
           const os = m.os_id ? q.por_id('ordens_servico', m.os_id) : null;
@@ -209,10 +231,18 @@ TELAS.painel = el => {
             <span class="pv-sit"><b>Feita em ${esc(formatarData(m.data_manutencao))}</b><small>${m.leitura != null ? nHoras(m.leitura) + ' ' + unidadeDe(e) + ' · ' : ''}${esc(m.observacao || '')}</small></span>
             <span class="pv-acao">${os ? `<button type="button" class="btn neutro" data-os="${esc(os.id)}">OS ${esc(numeroOS(os))}</button>` : ''}</span>
           </div>`;
-        }).join('') || '<div class="vazio"><p>Nenhuma troca registrada neste mês ainda.</p></div>';
+        }).join('') || vazio('Nenhuma troca registrada neste mês');
     }
 
     $('#pv-lista').innerHTML = `<div class="pv-lista">${html}</div>`;
+    $$('#pv-lista [data-ir-aba]').forEach(x => x.onclick = () => {
+      abaPrev = x.dataset.irAba;
+      $$('.pv-aba').forEach(y => y.classList.toggle('ativa', y.dataset.aba === abaPrev));
+      desenhar();
+    });
+    const lf = $('#pv-limpar'); if (lf) lf.onclick = () => {
+      $('#pv-busca').value = ''; $('#pv-item').value = ''; $('#pv-local').value = ''; desenhar();
+    };
     $$('#pv-lista [data-abrir]').forEach(x => x.onclick = async () => {
       await abrirOSPreventiva(x.dataset.abrir);
       if (document.querySelector('#pv-lista')) TELAS.painel(el);
