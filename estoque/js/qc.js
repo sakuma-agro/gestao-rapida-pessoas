@@ -97,6 +97,7 @@ function desenharVisao() {
       <label class="campo" style="flex:1;min-width:200px">Procurar item
         <input type="text" id="qcBusca" placeholder="Digite parte do nome..." value="${esc(busca)}"></label>
       <label class="es-check"><input type="checkbox" id="qcZerados"${esconderZerados ? ' checked' : ''}> esconder os zerados (${zerados})</label>
+      <button class="btn principal" type="button" id="qcRelatorio"${itens.length ? '' : ' disabled'}>Emitir relatório</button>
       <button class="btn" type="button" id="qcImprimir"${vistos.length ? '' : ' disabled'}>Imprimir posição</button>
       ${souAdmin() ? `<label class="btn" for="qcImpArq">Importar planilhas antigas</label>
       <input type="file" id="qcImpArq" accept=".xlsx,.xlsm" multiple hidden>` : ''}
@@ -119,6 +120,7 @@ function desenharVisao() {
   });
   alvo.querySelectorAll('[data-extrato]').forEach(el => el.addEventListener('click', () => extrato(el.dataset.extrato)));
   $('qcImprimir')?.addEventListener('click', () => { montarPosicao(vistos, sd); setTimeout(() => window.print(), 50); });
+  $('qcRelatorio')?.addEventListener('click', abrirRelatorio);
   $('qcZerados').addEventListener('change', e => { esconderZerados = e.target.checked; desenharVisao(); });
   $('qcImpArq')?.addEventListener('change', e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) prepararImportacao(fs); });
 }
@@ -170,6 +172,145 @@ function montarPosicao(itens, sd) {
     <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
+}
+
+/* ===================================================================
+   Emitir relatório (21/10/2026, pedido dele) — três modelos, com período
+   e categoria, para imprimir/PDF ou baixar em planilha (CSV):
+     resumo   — por produto: estoque inicial, entradas, saídas e final no
+                período (o mesmo desenho da aba ESTOQUE das planilhas antigas)
+     consumo  — saídas de uso por direcionador (plantio/destino) e produto
+     posicao  — saldo atual de cada produto
+   =================================================================== */
+let relOpc = null;
+const r3 = v => Math.round((Number(v) || 0) * 1000) / 1000;
+
+function dadosRelatorio(o) {
+  const mvs = movimentos();
+  const doGrupo = i => !o.grupo || (i.grupo || 'Outros') === o.grupo;
+  if (o.tipo === 'consumo') {
+    const mapa = new Map();
+    for (const m of mvs) {
+      if (m.sentido !== 'saida' || m.tipo !== 'uso' || m.data < o.de || m.data > o.ate) continue;
+      const i = itemDe(m.item_id); if (!doGrupo(i)) continue;
+      const d = (m.plantio || '(sem direcionador)').trim();
+      if (!mapa.has(d)) mapa.set(d, new Map());
+      const g = mapa.get(d); g.set(m.item_id, (g.get(m.item_id) || 0) + (Number(m.quantidade) || 0));
+    }
+    return [...mapa.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+      .map(([dir, its]) => ({ dir, linhas: [...its.entries()].map(([id, q]) => ({ i: itemDe(id), q: r3(q) }))
+        .sort((a, b) => a.i.nome.localeCompare(b.i.nome, 'pt-BR')) }));
+  }
+  const ids = new Set(mvs.map(m => m.item_id));
+  const linhas = itensOrdenados().filter(i => ids.has(i.id) && doGrupo(i)).map(i => {
+    let ini = 0, ent = 0, sai = 0, fim = 0;
+    for (const m of mvs) {
+      if (m.item_id !== i.id) continue;
+      const q = (Number(m.quantidade) || 0) * (m.sentido === 'entrada' ? 1 : -1);
+      fim += q;
+      if (m.data < o.de) ini += q;
+      else if (m.data <= o.ate) { if (q > 0) ent += q; else sai -= q; }
+    }
+    const finalPer = ini + ent - sai;
+    return { i, ini: r3(ini), ent: r3(ent), sai: r3(sai), fim: r3(o.tipo === 'posicao' ? fim : finalPer) };
+  });
+  return o.zerados ? linhas : linhas.filter(l => o.tipo === 'posicao' ? Math.abs(l.fim) > 0.0005
+    : (Math.abs(l.ini) > 0.0005 || l.ent || l.sai || Math.abs(l.fim) > 0.0005));
+}
+
+function abrirRelatorio() {
+  const hoje = hojeISO();
+  if (!relOpc) relOpc = { tipo: 'resumo', de: hoje.slice(0, 8) + '01', ate: hoje, grupo: grupoVisao || '', zerados: false };
+  const grupos = [...new Set(itensOrdenados().map(i => i.grupo || 'Outros'))];
+  window.abrirModal('Emitir relatório do estoque', `
+    <div class="qc-tipos">
+      ${[['resumo', 'Entradas e saídas do período'], ['consumo', 'Consumo por direcionador'], ['posicao', 'Posição atual (saldo)']]
+        .map(([v, t]) => `<label class="qc-tipo"><input type="radio" name="relTipo" value="${v}"${relOpc.tipo === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}
+    </div>
+    <div class="grade">
+      <label class="campo rel-per">De <input type="date" id="relDe" value="${esc(relOpc.de)}" max="${hoje}"></label>
+      <label class="campo rel-per">Até <input type="date" id="relAte" value="${esc(relOpc.ate)}" max="${hoje}"></label>
+      <label class="campo">Categoria <select id="relGrupo"><option value="">Todas</option>
+        ${grupos.map(g => `<option${relOpc.grupo === g ? ' selected' : ''}>${esc(g)}</option>`).join('')}</select></label>
+    </div>
+    <label class="es-check"><input type="checkbox" id="relZer"${relOpc.zerados ? ' checked' : ''}> incluir produtos sem movimento / zerados</label>
+    <p class="dica" id="relDica"></p>
+    <div class="barra fim">
+      <button class="btn" type="button" id="relCsv">Baixar planilha</button>
+      <button class="btn principal" type="button" id="relImp">Imprimir / PDF</button>
+    </div>`, corpo => {
+    const ler = () => {
+      relOpc = { tipo: corpo.querySelector('[name=relTipo]:checked').value, de: $('relDe').value, ate: $('relAte').value,
+        grupo: $('relGrupo').value, zerados: $('relZer').checked };
+      corpo.querySelectorAll('.rel-per').forEach(el => { el.hidden = relOpc.tipo === 'posicao'; });
+      $('relDica').textContent = relOpc.tipo === 'resumo' ? 'Por produto: estoque no início do período, entradas, saídas e estoque no fim — como a aba ESTOQUE das planilhas.'
+        : relOpc.tipo === 'consumo' ? 'Saídas do tipo Uso no período, somadas por direcionador (plantio/destino) e produto.'
+        : 'Saldo de hoje de cada produto (entradas − saídas).';
+      return relOpc;
+    };
+    corpo.querySelectorAll('input,select').forEach(el => el.addEventListener('change', ler));
+    ler();
+    const valido = o => o.tipo === 'posicao' || (o.de && o.ate && o.de <= o.ate) || (aviso('Confira o período.', true), false);
+    $('relImp').onclick = () => { const o = ler(); if (!valido(o)) return; window.fecharModal(); montarRelatorio(o); setTimeout(() => window.print(), 80); };
+    $('relCsv').onclick = () => { const o = ler(); if (valido(o)) baixarRelatorio(o); };
+  });
+}
+
+const tituloRel = o => o.tipo === 'resumo' ? 'Entradas e Saídas do Estoque' : o.tipo === 'consumo' ? 'Consumo por Direcionador' : 'Posição do Estoque';
+const subRel = o => [o.tipo === 'posicao' ? 'saldo em ' + dataBR(hojeISO()) : dataBR(o.de) + ' a ' + dataBR(o.ate), o.grupo || 'todas as categorias']
+  .join(' · ') + ' · emitido em ' + new Date().toLocaleDateString('pt-BR');
+
+function montarRelatorio(o) {
+  const d = dadosRelatorio(o);
+  const n = v => esc(mostrarNumero(v));
+  let corpo = '';
+  if (o.tipo === 'consumo') {
+    corpo = d.length ? d.map(g => `<h3 class="rel-secao">${esc(g.dir)}</h3>
+      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Categoria</th><th class="ce">Quantidade</th><th class="ce">Unid.</th></tr></thead>
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.grupo || '')}</td><td class="ce">${n(l.q)}</td><td class="ce">${esc(l.i.unidade || '')}</td></tr>`).join('')}</tbody></table>`).join('')
+      : '<p>Nenhuma saída de uso no período.</p>';
+  } else {
+    const grupos = [];
+    for (const l of d) { let g = grupos[grupos.length - 1]; if (!g || g.nome !== (l.i.grupo || 'Outros')) grupos.push(g = { nome: l.i.grupo || 'Outros', linhas: [] }); g.linhas.push(l); }
+    const res = o.tipo === 'resumo';
+    corpo = (res ? `<div class="rel-kpis" style="grid-template-columns:repeat(3,1fr)"><div><span>Produtos</span><b>${d.length}</b></div>
+        <div><span>Com entrada no período</span><b>${d.filter(l => l.ent).length}</b></div><div><span>Com saída no período</span><b>${d.filter(l => l.sai).length}</b></div></div>` : '')
+      + (grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
+      <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Unid.</th>${res ? '<th class="ce">Estoque inicial</th><th class="ce">Entradas</th><th class="ce">Saídas</th><th class="ce">Estoque final</th>' : '<th class="ce">Saldo</th>'}</tr></thead>
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.unidade || '')}</td>${res
+        ? `<td class="ce">${n(l.ini)}</td><td class="ce">${l.ent ? n(l.ent) : '—'}</td><td class="ce">${l.sai ? n(l.sai) : '—'}</td><td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td>`
+        : `<td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td>`}</tr>`).join('')}</tbody></table>`).join('') || '<p>Nada nesse filtro.</p>');
+  }
+  $('qcFolha').innerHTML = `<div class="folha rel">
+    <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit"><h1>${esc(tituloRel(o))} — Faz. Quebra Cocão</h1><p>${esc(subRel(o))}</p></div></div>
+    ${corpo}
+    <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
+      <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+  </div>`;
+}
+
+function baixarRelatorio(o) {
+  const d = dadosRelatorio(o);
+  const num = v => String(v).replace('.', ',');
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  let linhas;
+  if (o.tipo === 'consumo') {
+    linhas = [['Direcionador', 'Produto', 'Categoria', 'Quantidade', 'Unidade']];
+    d.forEach(g => g.linhas.forEach(l => linhas.push([g.dir, l.i.nome, l.i.grupo || '', num(l.q), l.i.unidade || ''])));
+  } else if (o.tipo === 'resumo') {
+    linhas = [['Categoria', 'Produto', 'Unidade', 'Estoque inicial', 'Entradas', 'Saídas', 'Estoque final']];
+    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.ini), num(l.ent), num(l.sai), num(l.fim)]));
+  } else {
+    linhas = [['Categoria', 'Produto', 'Unidade', 'Saldo']];
+    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.fim)]));
+  }
+  const csv = '\ufeff' + [[tituloRel(o) + ' — Faz. Quebra Cocão'], [subRel(o)], [], ...linhas].map(r => r.map(q).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `Estoque QC - ${tituloRel(o)} - ${o.tipo === 'posicao' ? hojeISO() : o.de + ' a ' + o.ate}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
 /* ===================================================================
