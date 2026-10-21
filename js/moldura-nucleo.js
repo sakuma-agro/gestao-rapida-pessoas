@@ -395,6 +395,8 @@ async function inativar(tabela, id) {
    no sinal fraco deixava a tela em "Baixando os cadastros…" para sempre. */
 const PRAZO_CONSULTA_MS = 20000;
 
+/* tabelas/visões sem a coluna atualizado_em (descobertas na primeira leitura) */
+const SEM_CARIMBO = new Set();
 async function baixarTabela(t, desde = null) {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), PRAZO_CONSULTA_MS);
@@ -403,16 +405,33 @@ async function baixarTabela(t, desde = null) {
     // 1.000 linhas por resposta e antes a tabela vinha cortada — e a cópia
     // local era apagada antes de receber o resultado cortado.
     // `desde` (rodada C): só o que mudou depois desse carimbo (leitura incremental).
-    let data = [];
-    for (let de = 0; ; de += 1000) {
-      let q = App.sb.from(t).select('*');
-      if (desde) q = q.gt('atualizado_em', desde);
-      const r = await q.order('atualizado_em').range(de, de + 999).abortSignal(ctl.signal);
-      if (r.error) throw r.error;
-      data = data.concat(r.data || []);
-      if (!r.data || r.data.length < 1000) break;
+    // Visões que espelham cadastros do LOP (fazendas, operadores, máquinas…)
+    // não têm atualizado_em: pedir ordem por ela fazia o servidor recusar e o
+    // aparelho novo ficava sem essas listas (caso do Matheus, 21/10/2026).
+    // Sem a coluna, a tabela vem inteira, ordenada pela chave.
+    const ler = async (comCarimbo) => {
+      let data = [];
+      for (let de = 0; ; de += 1000) {
+        let q = App.sb.from(t).select('*');
+        if (comCarimbo && desde) q = q.gt('atualizado_em', desde);
+        const ordem = comCarimbo ? 'atualizado_em' : (CHAVE_COMPOSTA[t] ? CHAVE_COMPOSTA[t][0] : pk(t));
+        const r = await q.order(ordem).range(de, de + 999).abortSignal(ctl.signal);
+        if (r.error) throw r.error;
+        data = data.concat(r.data || []);
+        if (!r.data || r.data.length < 1000) break;
+      }
+      return data;
+    };
+    if (SEM_CARIMBO.has(t)) return await ler(false);
+    try { return await ler(true); }
+    catch (e) {
+      const msg = String((e && (e.message || e.details)) || '');
+      if ((e && e.code === '42703') || /atualizado_em/.test(msg)) {
+        SEM_CARIMBO.add(t);
+        return await ler(false);
+      }
+      throw e;
     }
-    return data;
   } finally { clearTimeout(timer); }
 }
 
