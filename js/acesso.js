@@ -83,6 +83,14 @@ export const MODULOS = [
     { id: 'sstCalendario', nome: 'Calendário', telas: [
       ['sstCal', 'Calendário'],
     ] },
+    /* Campanhas de segurança e saúde (21/10/2026): js/sst-campanhas.js,
+       tabelas sst_campanhas, sst_campanha_atividades, sst_campanha_temas. */
+    { id: 'campanhas', nome: 'Campanhas', telas: [
+      ['camPainel', 'Painel'],
+      ['camLista', 'Campanhas'],
+      ['camCal', 'Calendário anual'],
+      ['camTemas', 'Catálogo de temas'],
+    ] },
   ] },
   { id: 'rh', nome: 'RH', subs: [
     { id: 'disc', nome: 'DISC', telas: [
@@ -569,7 +577,7 @@ const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
    Módulo de um submódulo só continua mostrando as telas. */
 const ICONE_SUB = {
   gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
-  epis: 'escudo', exames: 'exame', treinamentos: 'treino',
+  epis: 'escudo', exames: 'exame', treinamentos: 'treino', campanhas: 'megafone',
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo', ticket: 'cartao',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',

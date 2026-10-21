@@ -22,6 +22,7 @@ import { ligarSst, abrirSst, limparSst, limparPreviaSst, enviarFilaSst, carregar
 const sstPronto = () => sstCarregado() ? Promise.resolve() : garantirSst();
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
+import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanhas.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
@@ -91,7 +92,7 @@ function limparPrevias() {
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
 const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes', 'trFuncoes',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
-  ...TELAS_ACIDENTES, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
+  ...TELAS_ACIDENTES, ...TELAS_CAMPANHAS, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
   $('avisoSoOnline').hidden = !(SO_ONLINE.has(nome) && !navigator.onLine);
 }
@@ -189,6 +190,9 @@ function abrirAba(nome) {
   if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
   for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
+  // SST › Campanhas (21/10/2026) — js/sst-campanhas.js
+  for (const t of TELAS_CAMPANHAS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_CAMPANHAS.includes(nome)) abrirCampanhas(nome);
   $('telaSstCal').hidden = nome !== 'sstCal';
   if (nome === 'sstCal') abrirCalendarioSst();
   // Reunião semanal (15/10/2026) — js/reuniao.js
@@ -257,7 +261,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao();
   mostrar('login');
 });
 
@@ -828,6 +832,16 @@ $('bNenhumLista').addEventListener('click', ev => {
   desenharSelecaoLista();
 });
 $('bImprimirLista').addEventListener('click', () => window.print());
+
+/* Campanhas (21/10/2026): "Gerar lista" chega aqui com tema, horário,
+   ministrante e os funcionários já marcados. */
+window.prepararListaPresenca = ({ tema = '', horario = '', ministrante = '', ids = [] } = {}) => {
+  $('lpTema').value = tema; $('lpHorario').value = horario; $('lpMinistrante').value = ministrante;
+  naLista.clear(); naListaEmp.clear();
+  ids.forEach(id => naLista.add(id));
+  $('fSitLista').value = ''; $('buscaLista').value = '';
+  desenharSelecaoLista();
+};
 $('zoomLista').addEventListener('input', () => {
   const z = $('zoomLista').value;
   $('zoomVLista').textContent = z + '%';

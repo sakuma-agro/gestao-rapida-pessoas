@@ -45,6 +45,7 @@ export const ICONES = {
   aspas: '<path d="M10 7H6a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/><path d="M20 7h-4a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/>',
   vassoura: '<path d="M14 3l-4.5 9"/><path d="M6.5 12h7l2 9h-11z"/><path d="M8 16.5v4M11 16.5v4"/>',
   lapis: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  megafone: '<path d="M3 10v4a1 1 0 001 1h3l8 4V5L7 9H4a1 1 0 00-1 1z"/><path d="M18 9a4 4 0 010 6"/><path d="M7 15l1 5h3l-1-5"/>',
 };
 
 /** Ícone de cada tela da faixa do menu. Tela sem ícone aqui usa o do módulo. */
@@ -55,6 +56,7 @@ export const ICONE_TELA = {
   fichas: 'escudo', epis: 'lista', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exFuncoes: 'cargo', exTipos: 'ajuste',
   trPainel: 'painel', trVenc: 'treino', trTipos: 'ajuste', trFuncoes: 'cargo', sstCal: 'calendario',
+  camPainel: 'painel', camLista: 'megafone', camCal: 'calendario', camTemas: 'ajuste',
   disc: 'disc', rhCargos: 'cargo', sdQuadro: 'balanca', sdPlanos: 'check', sdConfig: 'config', rhProposta: 'documento', rhOrganograma: 'organograma',
   jorPainel: 'painel', jorLancar: 'relogio', jorBoletins: 'lista', jorExtras: 'grafico', jorAbatimento: 'ajuste',
   jorFechamento: 'calendario', jorHistorico: 'historico',

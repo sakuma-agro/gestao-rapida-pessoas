@@ -1591,3 +1591,20 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .arb-link{background:none;border:0;padding:0;font:inherit;font-size:11px;color:var(--suave);
   text-decoration:underline;cursor:pointer}
 .arb-link:hover{color:var(--marrom)}
+
+/* ---------- SST · Campanhas (21/10/2026) — js/sst-campanhas.js ---------- */
+.cm-barra{display:inline-block;width:70px;height:7px;border-radius:5px;background:#e6e8e1;overflow:hidden;vertical-align:middle;margin-right:6px}
+.cm-barra i{display:block;height:100%;background:var(--verde)}
+.cm-atrasada td{background:rgba(192,57,43,.06)}
+.cm-inativo td{opacity:.55}
+.cm-chks{display:flex;flex-wrap:wrap;gap:6px 12px;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;max-height:120px;overflow:auto;font-weight:400}
+.cm-chk{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:400;color:var(--texto)}
+.cm-meses{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.cm-mes{border:1px solid var(--linha);border-radius:10px;padding:10px 12px;min-height:92px;background:var(--papel);border-left:4px solid var(--marrom)}
+.cm-mes.cm-mes-ok{border-left-color:var(--verde)}
+.cm-mes.cm-mes-atual{background:var(--verde-fundo)}
+.cm-mes h3{margin:0 0 6px;font-size:12.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.3px}
+.cm-mes-camp{display:block;width:100%;text-align:left;font:inherit;border:1px solid var(--linha);background:var(--papel);border-radius:8px;padding:6px 8px;margin-bottom:6px;cursor:pointer;color:var(--texto)}
+.cm-mes-camp:hover{border-color:var(--verde)}
+.cm-mes-sug{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;padding:4px 0}
+.cm-mes-sug b{flex:1}
