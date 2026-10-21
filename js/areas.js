@@ -21,7 +21,7 @@ const esc = s => String(s == null ? '' : s)
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
 const VERSAO_AREA = '43';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '11';
+const VERSAO_PROG = '12';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
 const VERSAO_EST = '14';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */

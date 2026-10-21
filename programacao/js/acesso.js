@@ -22,8 +22,8 @@ const MODULOS = [
   { id: 'relatorio', nome: 'Relatórios', telas: [
     ['relatorio', 'Relatório em PDF'],
   ] },
-  /* Cadastro muda o app para todo mundo — só administrador. */
-  { id: 'cadastros', nome: 'Cadastros', admin: true, telas: [
+  /* Cadastros liberados a quem tem a área (pedido do Guilherme, 21/10/2026). */
+  { id: 'cadastros', nome: 'Cadastros', telas: [
     ['cadastros', 'Cadastros'],
   ] },
 ];
@@ -31,7 +31,7 @@ const MODULOS = [
 const Acesso = { admin: false, carregado: false };
 
 const soAdmin = new Set(MODULOS.filter(m => m.admin).flatMap(m => m.telas.map(([t]) => t)));
-soAdmin.add('diario-config');   // a mensagem padrão vale para todos: só administrador muda
+// 21/10/2026: a mensagem padrão do diário também foi liberada a quem tem a área.
 const moduloDe = tela => MODULOS.find(m => m.telas.some(([t]) => t === tela))?.id || null;
 
 function podeTela(tela) {
