@@ -54,6 +54,7 @@ const so = v => String(v == null ? '' : v).trim();
 
 const marcados = new Set();     // ids de funcionários selecionados (fichas)
 const naLista = new Set();      // ids de funcionários na lista de presença
+const naListaEmp = new Set();   // ids de empregadores na lista (saem como "Proprietário")
 const rascunhos = new Map();    // chave -> {linhas:[], id}
 let editandoFunc = null;
 let editandoEpi = null;
@@ -749,7 +750,20 @@ function visiveisLista() {
 
 function desenharSelecaoLista() {
   const vs = visiveisLista(), box = $('listaSelLista');
-  box.innerHTML = vs.length ? vs.map(f => `
+  // empregadores (21/10/2026): entram na lista com a função "Proprietário"
+  const emps = (jd.dados.empregadores || []).filter(e => e.ativo !== false)
+    .slice().sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+  const q = $('buscaLista').value.trim().toLowerCase();
+  const blocoEmp = emps.filter(e => !q || (e.nome || '').toLowerCase().includes(q)).map(e => `
+    <label class="item" for="le_${e.id}">
+      <input type="checkbox" id="le_${e.id}" data-emp="${e.id}" ${naListaEmp.has(String(e.id)) ? 'checked' : ''}>
+      <span>
+        <span class="nome">${esc(e.nome)}</span><br>
+        <span class="sub">Proprietário · empregador</span>
+      </span>
+      <span class="tag ativo">EMPREGADOR</span>
+    </label>`).join('');
+  box.innerHTML = blocoEmp + (vs.length ? vs.map(f => `
     <label class="item" for="l_${f.id}">
       <input type="checkbox" id="l_${f.id}" data-id="${f.id}" ${naLista.has(f.id) ? 'checked' : ''}>
       <span>
@@ -760,9 +774,14 @@ function desenharSelecaoLista() {
     </label>`).join('')
     : '<div class="vazio">Nenhum funcionário encontrado.</div>';
 
-  box.querySelectorAll('input[type=checkbox]').forEach(cb =>
+  box.querySelectorAll('input[type=checkbox][data-id]').forEach(cb =>
     cb.addEventListener('change', () => {
       cb.checked ? naLista.add(cb.dataset.id) : naLista.delete(cb.dataset.id);
+      atualizarLista();
+    }));
+  box.querySelectorAll('input[type=checkbox][data-emp]').forEach(cb =>
+    cb.addEventListener('change', () => {
+      cb.checked ? naListaEmp.add(cb.dataset.emp) : naListaEmp.delete(cb.dataset.emp);
       atualizarLista();
     }));
   atualizarLista();
@@ -780,7 +799,11 @@ const cabecalhoLista = () => ({
 });
 
 function atualizarLista() {
-  const gente = estado.funcionarios.filter(f => naLista.has(f.id));
+  // empregadores marcados vêm primeiro, como "Proprietário"
+  const patroes = (jd.dados.empregadores || [])
+    .filter(e => naListaEmp.has(String(e.id)))
+    .map(e => ({ nome: e.nome, cargo: 'Proprietário' }));
+  const gente = [...patroes, ...estado.funcionarios.filter(f => naLista.has(f.id))];
   $('cntLista').textContent = gente.length;
   $('saidaLista').innerHTML = montarLista(gente, cabecalhoLista(), {
     tema: $('lpTema').value, horario: $('lpHorario').value, ministrante: $('lpMinistrante').value,
@@ -801,7 +824,7 @@ $('bTodosLista').addEventListener('click', ev => {
 });
 $('bNenhumLista').addEventListener('click', ev => {
   ev.preventDefault();
-  naLista.clear();
+  naLista.clear(); naListaEmp.clear();
   desenharSelecaoLista();
 });
 $('bImprimirLista').addEventListener('click', () => window.print());
