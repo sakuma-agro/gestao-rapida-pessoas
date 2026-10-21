@@ -50,6 +50,7 @@ TELAS.horimetros = async el => {
         ${q.ordenado('locais').map(l => `<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</select>
       <select id="hl-maq"><option value="">Todas as máquinas</option>
         ${maquinas.map(e => `<option value="${esc(e.id)}">${esc(e.codigo)} — ${esc(e.descricao)}</option>`).join('')}</select>
+      <input type="search" id="hl-busca" placeholder="Nº boletim ou operador" value="${esc(filtroHL.busca || '')}">
       <select id="hl-origem"><option value="">Todas as origens</option>
         ${Object.entries(ORIGEM_HL).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
     </div>
@@ -63,7 +64,7 @@ TELAS.horimetros = async el => {
   });
 
   async function carregar() {
-    filtroHL = { de: $('#hl-de').value, ate: $('#hl-ate').value, local: $('#hl-local').value, maq: $('#hl-maq').value, origem: $('#hl-origem').value };
+    filtroHL = { de: $('#hl-de').value, ate: $('#hl-ate').value, local: $('#hl-local').value, maq: $('#hl-maq').value, origem: $('#hl-origem').value, busca: $('#hl-busca').value.trim() };
     const alvo = $('#hl-lista');
     if (!App.online || !App.sb) { alvo.innerHTML = '<div class="pv-alerta pv-alerta-forte"><b>Sem internet.</b><span>Os horímetros lançados são lidos do servidor. Abra de novo quando a conexão voltar.</span></div>'; return; }
     if (!filtroHL.de || !filtroHL.ate || filtroHL.de > filtroHL.ate) { alvo.innerHTML = '<div class="pv-alerta"><b>Confira o período.</b></div>'; return; }
@@ -92,6 +93,10 @@ TELAS.horimetros = async el => {
       if (l.data_leitura < filtroHL.de) continue;
       const origem = hora ? 'HORA' : l.origem;
       if (filtroHL.origem && filtroHL.origem !== origem) continue;
+      if (filtroHL.busca) {
+        const b = filtroHL.busca.toLowerCase();
+        if (!o || !((o.boletim || '').toLowerCase().includes(b) || (o.operador || '').toLowerCase().includes(b))) continue;
+      }
       linhas.push({ l, o, origem, inicio, fim: Number(l.valor), horas: inicio != null ? Number(l.valor) - inicio : null });
     }
     linhas.reverse();   // mais recente primeiro
@@ -120,7 +125,7 @@ TELAS.horimetros = async el => {
             <td class="num">${x.horas == null ? '—' : x.horas < 0 ? '<span class="pv-atraso">' + nHoras(x.horas) + '</span>' : nHoras(x.horas) + ' ' + u}</td>
             <td>${esc(x.o ? x.o.impl : '') || '—'}</td>
             <td>${esc(x.o ? x.o.operador : '') || '—'}</td>
-            <td>${esc(x.o ? x.o.boletim : '') || '—'}</td>
+            <td>${x.o && x.o.boletim ? '<b class="hl-bol">nº ' + esc(x.o.boletim) + '</b>' : '—'}</td>
             <td><span class="hl-origem hl-o-${x.origem.toLowerCase()}">${esc(ORIGEM_HL[x.origem] || x.origem)}</span></td>
           </tr>`; }).join('')}</tbody></table></div>`
         : '<div class="pv-alerta"><b>Nenhum horímetro lançado nesse período.</b></div>'}
@@ -144,6 +149,6 @@ TELAS.horimetros = async el => {
     alvo.querySelectorAll('[data-maq]').forEach(b => b.onclick = () => fichaMaquina(b.dataset.maq));
   }
 
-  ['hl-de', 'hl-ate', 'hl-local', 'hl-maq', 'hl-origem'].forEach(id => { $('#' + id).onchange = carregar; });
+  ['hl-de', 'hl-ate', 'hl-local', 'hl-maq', 'hl-origem', 'hl-busca'].forEach(id => { $('#' + id).onchange = carregar; });
   carregar();
 };

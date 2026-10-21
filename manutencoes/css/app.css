@@ -1374,3 +1374,4 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .hl-origem{display:inline-block;font-size:12px;font-weight:bold;padding:3px 8px;border-radius:10px;background:#EEF0EA;color:var(--cinza);white-space:nowrap}
 .hl-o-hora{background:#F1F7E3;color:var(--verde-lop)}
 .hl-o-importacao{background:#EAF2FB;color:#2E6DA4}
+.hl-bol{color:var(--marrom);white-space:nowrap}

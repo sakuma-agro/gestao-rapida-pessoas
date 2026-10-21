@@ -68,6 +68,7 @@
 .hm-corpo{padding:16px 18px 18px}
 .hm-l{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-bottom:10px}
 .hm-l.um{grid-template-columns:1fr}
+.hm-l.hm-tres{grid-template-columns:1.2fr .8fr 1.6fr}
 .hm-c label{display:block;font-size:12px;font-weight:bold;margin-bottom:4px}
 .hm-c input,.hm-c select{width:100%;box-sizing:border-box;border:1px solid #D5D7CF;border-radius:8px;padding:10px 11px;font:inherit;font-size:15px;background:#fff;color:#51534A;min-height:44px}
 .hm-c small{display:block;font-size:12px;color:#8A8C83;margin-top:3px}
@@ -83,7 +84,7 @@
 .hm-dia ul{list-style:none;margin:0;padding:0}
 .hm-dia li{font-size:13px;padding:6px 0;border-bottom:1px dashed #E3E5DE}
 .hm-dia li:last-child{border-bottom:0}
-@media(max-width:560px){.hm-l{grid-template-columns:1fr}}`;
+@media(max-width:560px){.hm-l,.hm-l.hm-tres{grid-template-columns:1fr}}`;
     document.head.appendChild(st);
   }
 
@@ -124,8 +125,9 @@
     const optsImp = '<option value="">— nenhum —</option>' + c.implementos.map(i => `<option value="${esc(i.id)}">${esc(i.codigo)} — ${esc(i.descricao)}</option>`).join('');
     corpo.innerHTML = `
       <div class="hm-erro" id="hm-erro" hidden></div>
-      <div class="hm-l">
+      <div class="hm-l hm-tres">
         <div class="hm-c"><label for="hm-data">Data</label><input type="date" id="hm-data" value="${esc(op.data || hojeISO())}"></div>
+        <div class="hm-c"><label for="hm-bol">Nº boletim</label><input type="text" id="hm-bol" inputmode="numeric" autocomplete="off" value="${esc(op.boletim || '')}" maxlength="20"></div>
         <div class="hm-c"><label for="hm-oper">Operador</label><input type="text" id="hm-oper" value="${esc(op.operador || '')}" maxlength="80"></div>
       </div>
       <div class="hm-l um"><div class="hm-c"><label for="hm-maq">Máquina</label>
@@ -182,6 +184,7 @@
       erro('');
       const m = maq(), data = $('hm-data').value, oper = $('hm-oper').value.trim();
       const ini = num($('hm-ini').value), fim = num($('hm-fim').value);
+      const boletim = $('hm-bol').value.trim();
       if (!data) return erro('Informe a data.');
       if (data > hojeISO()) return erro('A data não pode ser no futuro.');
       if (!m) return erro('Escolha a máquina.');
@@ -196,7 +199,7 @@
       const agora = new Date().toISOString();
       const nomesImp = imps.map(id => (c.implementos.find(i => i.id === id) || {}).codigo).filter(Boolean);
       const obs = ['Hora máquina', oper || null, `${fmt(ini)} → ${fmt(fim)} ${un(m)} (${fmt(fim - ini)})`,
-        nomesImp.length ? 'impl. ' + nomesImp.join(', ') : null, op.boletim ? 'boletim ' + op.boletim : null].filter(Boolean).join(' · ');
+        nomesImp.length ? 'impl. ' + nomesImp.join(', ') : null, boletim ? 'boletim ' + boletim : null].filter(Boolean).join(' · ');
       try {
         const r1 = await sc.from('leituras').insert({
           id: uuid(), uuid_dispositivo: uuid(), equipamento_id: m.id, data_leitura: data, valor: fim,
@@ -204,7 +207,7 @@
         });
         if (r1.error) throw new Error(r1.error.message);
         if (imps.length && fim > ini) {
-          const doc = 'HORA-MAQUINA' + (op.boletim ? ' ' + op.boletim : '');
+          const doc = 'HORA-MAQUINA' + (boletim ? ' ' + boletim : '');
           const r2 = await sc.from('usos_implemento').insert(imps.map(id => ({
             id: uuid(), implemento_id: id, equipamento_pai_id: m.id, data_uso: data, documento: doc,
             inicio: ini, fim, quantidade: Math.round((fim - ini) * 100) / 100, unidade: m.unidade_controle,
