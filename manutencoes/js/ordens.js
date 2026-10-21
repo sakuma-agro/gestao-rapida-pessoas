@@ -266,11 +266,28 @@ function abrirOS(idOS) {
   const marcaModelo = [q.nome('marcas', e.marca_id), e.modelo].filter(Boolean).join(' ');
   const serie = [(e.dados_tecnicos || {}).placa, e.numero_serie, e.patrimonio ? 'Pat. ' + e.patrimonio : ''].filter(Boolean).join(' · ');
 
+  /* Próxima troca de cada serviço (21/10/2026, pedido dele): na OS feita, a
+     conta é com a troca registrada; na aberta, uma previsão "se feita hoje"
+     com o horímetro atual — o mecânico confirma no adesivo. */
+  const proximaDaOS = (it, p) => {
+    if (!p) return '—';
+    const ph = p.periodicidade_horas != null ? Number(p.periodicidade_horas) : null;
+    const pd = p.periodicidade_dias != null ? Number(p.periodicidade_dias) : null;
+    const baseL = feita && it.feito ? it.leitura_troca : (leituraDe(e) ?? os.leitura_emissao);
+    const baseD = feita && it.feito ? it.data_troca : hoje();
+    const partes = [];
+    if (ph != null && baseL != null && e.unidade_controle !== 'CALENDARIO') partes.push(nHoras(Number(baseL) + ph) + ' ' + u);
+    if (pd != null && baseD) partes.push(formatarData(somarDias(String(baseD).slice(0, 10), Math.round(pd))));
+    if (!partes.length) return '—';
+    return '<b>' + partes.join(' ou ') + '</b>' + (feita && it.feito ? ''
+      : '<small>se feita hoje' + (baseL != null && ph != null && e.unidade_controle !== 'CALENDARIO' ? ' com ' + nHoras(baseL) + ' ' + u : '') + '</small>');
+  };
+
   const blocoPreventiva = `
     <section class="os-bloco">
       <h3>Serviços a executar <small>marque o quadrado do que for feito</small></h3>
       <table class="os-tab"><thead><tr>
-        <th class="os-ok">Feito</th><th>Serviço</th><th>A cada</th><th>Material a usar</th><th>Última troca</th><th>Por que entrou</th>
+        <th class="os-ok">Feito</th><th>Serviço</th><th>A cada</th><th>Material a usar</th><th>Última troca</th><th class="os-prox">Próxima troca</th><th>Por que entrou</th>
       </tr></thead><tbody>` + itens.map(it => {
         const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
         return `<tr>
@@ -281,10 +298,11 @@ function abrirOS(idOS) {
           <td>${feita && it.data_troca ? 'trocado em ' + formatarData(it.data_troca)
                : (p && p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '—') +
                  (p && p.ultima_troca_leitura != null ? '<small>' + nHoras(p.ultima_troca_leitura) + ' ' + u + '</small>' : '')}</td>
+          <td class="os-prox">${proximaDaOS(it, p)}</td>
           <td class="os-motivo">${esc(it.motivo || '')}</td>
         </tr>`;
       }).join('') + `
-        <tr class="os-extra"><td class="os-ok"><span class="os-quad"></span></td><td colspan="5">Outro serviço: ${linhaBranca}</td></tr>
+        <tr class="os-extra"><td class="os-ok"><span class="os-quad"></span></td><td colspan="6">Outro serviço: ${linhaBranca}</td></tr>
       </tbody></table>
     </section>`;
 

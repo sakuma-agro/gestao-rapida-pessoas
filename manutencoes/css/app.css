@@ -1362,3 +1362,6 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .pv-alerta-forte{background:#FFF6DD;border-left-color:var(--atencao)}
 .pv-ir{background:var(--branco);border:1px solid var(--linha);border-radius:16px;padding:6px 12px;margin:2px 4px 2px 0;font:inherit;font-size:13px;font-weight:bold;cursor:pointer;color:var(--andamento)}
 .pv-ir:hover{border-color:var(--andamento)}
+/* 21/10/2026: próxima troca na OS */
+.os-tab td.os-prox b{color:var(--verde-lop);font-weight:bold;white-space:normal}
+.os-tab th.os-prox{min-width:110px}
