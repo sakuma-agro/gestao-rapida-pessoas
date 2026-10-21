@@ -19,8 +19,12 @@ const MODULOS = [
      Manutenções guarda tudo o que a área já tinha; Patrimônio é o novo.
      Os ids das telas não mudaram — atalhos e links de WhatsApp continuam. */
   { id: 'manutencoes', nome: 'Manutenções', telas: [
-    ['painel', 'Painel'], ['maquinas', 'Cadastros'], ['vencimentos', 'Vencimentos'],
+    /* 21/10/2026: o Painel virou "Preventivas" (A fazer / Em andamento /
+       Feitas) e Vencimentos virou "Planilha", no fim — pedido dele, a tela
+       antiga estava pesada de ler. Os ids não mudaram. */
+    ['painel', 'Preventivas'], ['maquinas', 'Cadastros'],
     ['calendario', 'Calendário'], ['ordens', 'Ordens de serviço'], ['checklist', 'Check list'],
+    ['vencimentos', 'Planilha'],
   ] },
   { id: 'patrimonio', nome: 'Patrimônio', telas: [
     ['patrimonio', 'Bens'], ['patrimonio_mov', 'Movimentações'],
@@ -174,13 +178,15 @@ const ICONE_MODULO_M = { manutencoes: 'manut', patrimonio: 'patrimonio' };
 /* Ícone de cada tela na segunda faixa (15/10/2026, pedido dele: "que todas
    tenham um ícone"). */
 ICONE_ATALHO.cal = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0M8 18h2M12 18h2"/>';
-const ICONE_TELA_M = { painel: 'painel', maquinas: 'bens', vencimentos: 'venc', calendario: 'cal',
+ICONE_ATALHO.prev = '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
+ICONE_ATALHO.planilha = '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>';
+const ICONE_TELA_M = { painel: 'prev', maquinas: 'bens', vencimentos: 'planilha', calendario: 'cal',
   ordens: 'os', checklist: 'check', patrimonio: 'patrimonio', patrimonio_mov: 'mov' };
 const botaoTela = ([t, rot]) =>
   `<button type="button" data-tela="${t}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_TELA_M[t]] || ''}</svg><span>${esc(rot)}</span></button>`;
 const ATALHOS_INICIO = [
-  ['painel', 'painel', 'Painel', 'prim'],
-  ['vencimentos', 'venc', 'Vencimentos'],
+  ['painel', 'prev', 'Preventivas', 'prim'],
+  ['vencimentos', 'planilha', 'Planilha'],
   ['calendario', 'venc', 'Calendário'],
   ['ordens', 'os', 'Ordens de serviço'],
   ['maquinas', 'bens', 'Cadastros'],

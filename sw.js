@@ -35,7 +35,7 @@ const ARQUIVOS = [
   './manutencoes/', './manutencoes/index.html', './manutencoes/css/app.css',
   './manutencoes/js/config.js', './manutencoes/js/base.js', './manutencoes/js/comum.js',
   './manutencoes/js/acesso.js', './manutencoes/js/maquinas.js', './manutencoes/js/ordens.js',
-  './manutencoes/js/horimetro.js', './manutencoes/js/checklist.js', './manutencoes/js/painel.js', './manutencoes/js/vencimentos.js', './manutencoes/js/grupos.js', './manutencoes/js/modelos_ck.js', './manutencoes/js/patrimonio.js',
+  './manutencoes/js/horimetro.js', './manutencoes/js/checklist.js', './manutencoes/js/painel.js', './manutencoes/js/preventivas.js', './manutencoes/js/vencimentos.js', './manutencoes/js/grupos.js', './manutencoes/js/modelos_ck.js', './manutencoes/js/patrimonio.js',
   // Vistorias e Segurança (14/10/2026): abre sem sinal no campo, como o app avulso abria.
   './icons/mod-vistorias.v1.png',
   /* ícones das áreas (14/10/2026): uma família, cor e símbolo por área */

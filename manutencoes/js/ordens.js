@@ -392,7 +392,8 @@ function abrirOS(idOS) {
 
 /* Redesenha a tela aberta, para a lista refletir o que mudou */
 function recarregarTela() {
-  const ativo = document.querySelector('#vc-lista') ? ((typeof modoVenc !== 'undefined' && modoVenc === 'calendario') ? 'calendario' : 'vencimentos')
+  const ativo = document.querySelector('#pv-lista') ? 'painel'
+              : document.querySelector('#vc-lista') ? ((typeof modoVenc !== 'undefined' && modoVenc === 'calendario') ? 'calendario' : 'vencimentos')
               : document.querySelector('#os-lista') ? 'ordens'
               : document.querySelector('#mq-lista') ? 'maquinas' : null;
   if (ativo) irPara(ativo);
