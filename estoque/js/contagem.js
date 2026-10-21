@@ -10,7 +10,9 @@ import {
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
   temMinimo, precisaRepor, textoPedido,
+  mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
 } from './dados.js';
+import { desenharMapa, soltarMapa } from './mapa.js';
 import { gravar as gravarDireto } from './dados.js';
 
 /* Gravações uma de cada vez (15/10/2026): dois campos do mesmo lote salvos
@@ -32,6 +34,7 @@ const abertos = new Set();   // itens com a lista de lotes aberta (sobrevive ao 
 let soFalta = false;
 let grupoFiltro = '';   // '' = todos os grupos
 let busca = '';
+let mapa = null;        // mapa do barracão do estoque escolhido (só fertilizantes)
 
 /* ===================================================================
    Tela Contar
@@ -69,6 +72,8 @@ function desenharContar() {
       <div class="vazio">Nenhum almoxarifado cadastrado. Cadastre em <strong>Cadastros › Almoxarifados</strong>.</div></div>`;
     return;
   }
+  // o almoxarifado escolhido precisa existir antes de montar a lista (nome, mapa)
+  if (!locais().some(l => l.id === sel.localId)) sel.localId = locais()[0].id;
   const itens = itensDoLocal(sel.localId);
   if (!itens.length) {
     alvo.innerHTML = cabecalhoEscolha() + (itensOrdenados().length ? `<div class="cartao">
@@ -86,6 +91,7 @@ function desenharContar() {
   const p = c ? progresso(c.id) : { feitos: 0, total: itens.length };
   const pct = p.total ? Math.round(100 * p.feitos / p.total) : 0;
   const local = locais().find(l => l.id === sel.localId);
+  mapa = mapaDoLocal(sel.localId);
 
   const estado = !c
     ? `<span class="tag neutra">não começada</span>`
@@ -98,6 +104,8 @@ function desenharContar() {
     const l = linhas.get(i.id);
     const valor = l ? mostrarNumero(l.quantidade) : '';
     const lotes = c ? lotesDe(c.id, i.id) : [];
+    const comMapa = !!mapa && i.grupo === 'Fertilizantes';
+    const quads = comMapa && c ? quadrasDe(c.id, i.id) : [];
     let cab = '';
     if (i.grupo !== grupoAtual) {
       grupoAtual = i.grupo;
@@ -108,15 +116,15 @@ function desenharContar() {
     return cab + `<div class="ct-item${repor ? ' repor' : ''}" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}" data-grupo="${esc(i.grupo || 'Outros')}">
       <div class="ct-linha${valor !== '' ? ' feito' : ''}">
         <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${esc(i.unidade || '')}${lotes.length
-          ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}</small>
+          ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}${textoQuadras(quads)}</small>
           <span class="ct-alerta">${repor ? textoAlerta(i, l.quantidade) : ''}</span></label>
         <input class="ct-qtd" id="q-${esc(i.id)}" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next"
-          data-item="${esc(i.id)}" value="${esc(valor)}" placeholder="—"${fechada || lotes.length ? ' disabled' : ''}
-          title="${lotes.length ? 'Soma dos lotes' : ''}" aria-label="Total de ${esc(i.nome)}">
+          data-item="${esc(i.id)}" value="${esc(valor)}" placeholder="—"${fechada || lotes.length || quads.length ? ' disabled' : ''}
+          title="${lotes.length ? 'Soma dos lotes' : quads.length ? 'Soma das quadras (bags × peso do bag)' : ''}" aria-label="Total de ${esc(i.nome)}">
         <button class="ct-mais${abertos.has(i.id) ? ' aberto' : ''}" type="button" data-mais="${esc(i.id)}"
-          aria-expanded="${abertos.has(i.id)}" title="Lotes e vencimentos">${abertos.has(i.id) ? '−' : '+'}</button>
+          aria-expanded="${abertos.has(i.id)}" title="${comMapa ? 'Lotes e quadras do barracão' : 'Lotes e vencimentos'}">${abertos.has(i.id) ? '−' : '+'}</button>
       </div>
-      <div class="ct-lotes"${abertos.has(i.id) ? '' : ' hidden'}>${desenharLotes(i, lotes, fechada)}</div>
+      <div class="ct-lotes"${abertos.has(i.id) ? '' : ' hidden'}>${desenharLotes(i, lotes, fechada)}${comMapa ? desenharQuadras(i, c, quads, fechada) : ''}</div>
     </div>`;
   }).join('');
 
@@ -158,6 +166,7 @@ function desenharContar() {
 
   alvo.querySelectorAll('[data-mais]').forEach(b => b.addEventListener('click', () => alternarLotes(b.dataset.mais)));
   ligarLotes(alvo);
+  ligarQuadras(alvo);
 
   const campos = [...alvo.querySelectorAll('.ct-qtd')];
   campos.forEach((inp, k) => {
@@ -284,7 +293,7 @@ function alternarLotes(itemId) {
   b.classList.toggle('aberto', abrir);
   b.setAttribute('aria-expanded', String(abrir));
   // sem lote nenhum ainda: já abre o primeiro para preencher
-  if (abrir && !bloco.querySelector('.ct-lote') && bloco.querySelector('[data-novo-lote]')) novoLote(itemId);
+  if (abrir && !bloco.querySelector('.ct-quadras') && !bloco.querySelector('.ct-lote') && bloco.querySelector('[data-novo-lote]')) novoLote(itemId);
 }
 
 function ligarLotes(raiz) {
@@ -370,16 +379,223 @@ async function somarLotes(c, itemId) {
     if (inp) { inp.value = mostrarNumero(total); inp.disabled = true; inp.title = 'Soma dos lotes'; }
     marcarMinimo(itemId, total);
     if (bloco) bloco.querySelector('.ct-linha').classList.toggle('feito', total !== null);
-  } else if (inp) { inp.disabled = false; inp.title = ''; }
+  } else if (await somarQuadras(c, itemId, true)) { /* o total veio das quadras */ }
+  else if (inp) { inp.disabled = false; inp.title = ''; }
   if (bloco) {
     const small = bloco.querySelector('.ct-nome small');
     const item = todos('est_itens').find(i => i.id === itemId);
     small.innerHTML = esc(item && item.unidade || '') + (lotes.length
-      ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : '');
+      ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : '')
+      + (mapa && item && item.grupo === 'Fertilizantes' ? textoQuadras(quadrasDe(c.id, itemId)) : '');
     const msg = bloco.querySelector('.ct-lotes-pe .dc-sem');
     if (msg) msg.textContent = lotes.length ? 'O total do item é a soma dos lotes.' : 'Use quando o produto tiver lotes ou vencimentos diferentes.';
   }
   atualizarConta();
+}
+
+
+/* ===================================================================
+   Quadras do barracão (21/10/2026, pedido dele): nos fertilizantes de um
+   estoque com mapa, o "+" mostra também em quais quadras o produto está e
+   quantos bags tem em cada uma. Sem lotes, o total do item (kg) passa a ser
+   bags × peso do bag (1 t). A posição do mês anterior pode ser repetida.
+   =================================================================== */
+const textoQuadras = quads => quads.length
+  ? ' · <span class="ct-onde">' + quads.map(q => esc(q.quadra) + (q.bags !== null && q.bags !== undefined && q.bags !== '' ? ' (' + esc(mostrarNumero(q.bags)) + ')' : '')).join(', ') + '</span>'
+  : '';
+
+/** Bags já lançados numa quadra nesta contagem (todos os produtos). */
+function ocupacao(contagemId, codigo) {
+  return quadrasDe(contagemId).filter(q => q.quadra === codigo)
+    .reduce((t, q) => t + (Number(q.bags) || 0), 0);
+}
+
+function opcoesQuadra(atual) {
+  return mapa.layout.quadras.map(q => `<option value="${esc(q.codigo)}"${q.codigo === atual ? ' selected' : ''}>${esc(q.codigo)}</option>`).join('');
+}
+
+function linhaQuadra(q, fechada, contagemId) {
+  const quadra = mapa.layout.quadras.find(x => x.codigo === q.quadra);
+  const cap = quadra ? capacidadeQuadra(quadra, mapa.layout) : 0;
+  const ocup = contagemId ? ocupacao(contagemId, q.quadra) : Number(q.bags) || 0;
+  const passou = cap && ocup > cap;
+  const peso = (Number(q.bags) || 0) * pesoBag(mapa.layout);
+  if (fechada) return `<div class="ct-quad fixo"><span>Quadra <b>${esc(q.quadra)}</b></span>
+      <span>${esc(mostrarNumero(q.bags))} bags</span><strong>${esc(mostrarNumero(peso))} kg</strong></div>`;
+  return `<div class="ct-quad${passou ? ' cheia' : ''}" data-quad="${esc(q.quadra)}">
+      <label>Quadra <select class="cq-q">${opcoesQuadra(q.quadra)}</select></label>
+      <label>Bags <input type="text" class="cq-bags" inputmode="decimal" value="${esc(mostrarNumero(q.bags))}" placeholder="—" autocomplete="off"></label>
+      <span class="cq-info">${peso ? esc(mostrarNumero(peso)) + ' kg' : ''}<small>${cap ? `quadra com ${esc(mostrarNumero(ocup))} de ${cap} bags${passou ? ' · passou da capacidade' : ''}` : ''}</small></span>
+      <button type="button" class="cq-tirar" title="Tirar esta quadra" aria-label="Tirar esta quadra">×</button>
+    </div>`;
+}
+
+function desenharQuadras(item, c, quads, fechada) {
+  const ant = !fechada && !quads.length ? contagem(sel.localId, mesAnterior(sel.mes)) : null;
+  const antQ = ant ? quadrasDe(ant.id, item.id).filter(q => Number(q.bags) > 0) : [];
+  const totalBags = quads.reduce((t, q) => t + (Number(q.bags) || 0), 0);
+  return `<div class="ct-quadras" data-item-q="${esc(item.id)}">
+    <h4>Onde está no barracão <small>${esc(mapa.nome || '')}</small></h4>
+    ${quads.map(q => linhaQuadra(q, fechada, c && c.id)).join('') || (fechada ? '<p class="dc-sem">Sem quadra marcada.</p>' : '')}
+    ${fechada ? '' : `<div class="ct-quadras-pe">
+      <button type="button" class="btn mini" data-nova-quadra="${esc(item.id)}">+ Adicionar quadra</button>
+      ${antQ.length ? `<button type="button" class="btn mini" data-repetir="${esc(item.id)}">Repetir ${esc(nomeMes(ant.mes))}: ${esc(antQ.map(q => q.quadra + ' (' + mostrarNumero(q.bags) + ')').join(', '))}</button>` : ''}
+      <span class="dc-sem">${quads.length ? `${esc(mostrarNumero(totalBags))} bags = ${esc(mostrarNumero(totalBags * pesoBag(mapa.layout)))} kg${lotesDe(c.id, item.id).length ? ' (o total do item vem dos lotes)' : ''}` : '1 bag = ' + esc(mostrarNumero(pesoBag(mapa.layout))) + ' kg. Marque a quadra e quantos bags tem nela.'}</span>
+    </div>`}
+  </div>`;
+}
+
+function ligarQuadras(raiz) {
+  raiz.querySelectorAll('[data-nova-quadra]').forEach(b => b.onclick = () => novaQuadra(b.dataset.novaQuadra));
+  raiz.querySelectorAll('[data-repetir]').forEach(b => b.onclick = () => repetirQuadras(b.dataset.repetir));
+  raiz.querySelectorAll('.ct-quad[data-quad]').forEach(ligarLinhaQuadra);
+}
+
+function ligarLinhaQuadra(div) {
+  div.querySelector('.cq-bags').addEventListener('change', () => salvarQuadra(div));
+  div.querySelector('.cq-bags').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+  div.querySelector('.cq-q').addEventListener('change', () => trocarQuadra(div));
+  div.querySelector('.cq-tirar').addEventListener('click', () => tirarQuadra(div));
+}
+
+/** Próxima quadra ainda não usada pelo item (para a linha nova já vir escolhida). */
+function quadraLivre(itemId) {
+  const c = contagem(sel.localId, sel.mes);
+  const usadas = new Set(c ? quadrasDe(c.id, itemId).map(q => q.quadra) : []);
+  const bloco = document.querySelector(`.ct-quadras[data-item-q="${CSS.escape(itemId)}"]`);
+  if (bloco) bloco.querySelectorAll('.ct-quad[data-quad]').forEach(d => usadas.add(d.dataset.quad));
+  const q = mapa.layout.quadras.find(x => !usadas.has(x.codigo));
+  return q ? q.codigo : null;
+}
+
+function novaQuadra(itemId) {
+  const bloco = document.querySelector(`.ct-quadras[data-item-q="${CSS.escape(itemId)}"]`);
+  const cod = quadraLivre(itemId);
+  if (!bloco || !cod) { aviso('Este produto já está em todas as quadras do mapa.', true); return; }
+  const tmp = document.createElement('div');
+  tmp.innerHTML = linhaQuadra({ quadra: cod, bags: null }, false, null);
+  const div = tmp.firstElementChild;
+  bloco.querySelector('.ct-quadras-pe').before(div);
+  ligarLinhaQuadra(div);
+  div.querySelector('.cq-q').focus();
+}
+
+async function salvarQuadra(div) {
+  const itemId = div.closest('.ct-quadras').dataset.itemQ;
+  const inp = div.querySelector('.cq-bags');
+  const n = lerNumero(inp.value);
+  if (Number.isNaN(n)) {
+    div.classList.add('erro');
+    aviso('Esse número de bags não deu para entender. Use só algarismos, ex.: 12', true);
+    return;
+  }
+  div.classList.remove('erro');
+  try {
+    const c = await garantirContagem();
+    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
+    const codigo = div.querySelector('.cq-q').value;
+    const outra = [...div.parentElement.querySelectorAll('.ct-quad[data-quad]')].find(d => d !== div && d.dataset.quad === codigo);
+    if (outra) { aviso('Esta quadra já está na lista deste produto. Some os bags na mesma linha.', true); return; }
+    await gravar('est_contagem_quadras', {
+      id: idQuadraLinha(c.id, itemId, codigo), contagem_id: c.id, item_id: itemId,
+      quadra: codigo, bags: n, contado_por: meuNome(), ativo: true,
+    });
+    div.dataset.quad = codigo;
+    await somarQuadras(c, itemId);
+    redesenharQuadras(itemId);
+  } catch (e) {
+    console.error(e);
+    aviso('Não consegui guardar essa quadra (' + (e.message || e) + ').', true);
+  }
+}
+
+/** Trocou a quadra no seletor: a linha antiga sai e a nova entra com os mesmos bags. */
+async function trocarQuadra(div) {
+  const itemId = div.closest('.ct-quadras').dataset.itemQ;
+  const antiga = div.dataset.quad;
+  const c = contagem(sel.localId, sel.mes);
+  const salvo = c && todos('est_contagem_quadras').find(q => q.id === idQuadraLinha(c.id, itemId, antiga));
+  if (salvo && salvo.ativo !== false) await gravar('est_contagem_quadras', Object.assign({}, salvo, { ativo: false }));
+  if (lerNumero(div.querySelector('.cq-bags').value) !== null) await salvarQuadra(div);
+  else div.dataset.quad = div.querySelector('.cq-q').value;
+}
+
+async function tirarQuadra(div) {
+  const itemId = div.closest('.ct-quadras').dataset.itemQ;
+  const c = contagem(sel.localId, sel.mes);
+  const salvo = c && todos('est_contagem_quadras').find(q => q.id === idQuadraLinha(c.id, itemId, div.dataset.quad));
+  div.remove();
+  if (!salvo) return;
+  await gravar('est_contagem_quadras', Object.assign({}, salvo, { ativo: false }));
+  await somarQuadras(c, itemId);
+  redesenharQuadras(itemId);
+}
+
+async function repetirQuadras(itemId) {
+  const ant = contagem(sel.localId, mesAnterior(sel.mes));
+  if (!ant) return;
+  try {
+    const c = await garantirContagem();
+    for (const q of quadrasDe(ant.id, itemId).filter(x => Number(x.bags) > 0)) {
+      await gravar('est_contagem_quadras', {
+        id: idQuadraLinha(c.id, itemId, q.quadra), contagem_id: c.id, item_id: itemId,
+        quadra: q.quadra, bags: q.bags, contado_por: meuNome(), ativo: true,
+      });
+    }
+    await somarQuadras(c, itemId);
+    redesenharQuadras(itemId);
+    aviso('Posição do mês passado copiada. Confira os bags de cada quadra.');
+  } catch (e) {
+    console.error(e);
+    aviso('Não consegui copiar (' + (e.message || e) + ').', true);
+  }
+}
+
+/** Sem lotes, o total do item (kg) = bags das quadras × peso do bag.
+    Devolve true quando o total veio das quadras. */
+async function somarQuadras(c, itemId, soSeSemLotes) {
+  if (!mapa) return false;
+  const item = todos('est_itens').find(i => i.id === itemId);
+  if (!item || item.grupo !== 'Fertilizantes') return false;
+  if (lotesDe(c.id, itemId).length) return false;
+  const quads = quadrasDe(c.id, itemId);
+  const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
+  const inp = bloco && bloco.querySelector('.ct-qtd');
+  if (!quads.length) {
+    if (inp && !soSeSemLotes) { inp.disabled = false; inp.title = ''; }
+    return false;
+  }
+  const comBags = quads.filter(q => q.bags !== null && q.bags !== undefined && q.bags !== '');
+  const total = comBags.length ? comBags.reduce((t, q) => t + Number(q.bags), 0) * pesoBag(mapa.layout) : null;
+  await gravar('est_contagem_itens', {
+    id: idLinha(c.id, itemId), contagem_id: c.id, item_id: itemId, quantidade: total, contado_por: meuNome(),
+  });
+  if (inp) { inp.value = mostrarNumero(total); inp.disabled = true; inp.title = 'Soma das quadras (bags × peso do bag)'; }
+  marcarMinimo(itemId, total);
+  if (bloco) bloco.querySelector('.ct-linha').classList.toggle('feito', total !== null);
+  atualizarConta();
+  return true;
+}
+
+/** Redesenha só o quadro de quadras (e o resumo no nome) de um item. */
+function redesenharQuadras(itemId) {
+  const c = contagem(sel.localId, sel.mes);
+  const item = todos('est_itens').find(i => i.id === itemId);
+  const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
+  if (!c || !item || !bloco || !mapa) return;
+  const quads = quadrasDe(c.id, itemId);
+  const caixa = bloco.querySelector('.ct-quadras');
+  if (caixa) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = desenharQuadras(item, c, quads, c.status === 'fechada');
+    caixa.replaceWith(tmp.firstElementChild);
+    ligarQuadras(bloco);
+  }
+  const lotes = lotesDe(c.id, itemId);
+  const small = bloco.querySelector('.ct-nome small');
+  if (small) small.innerHTML = esc(item.unidade || '') + (lotes.length
+    ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : '')
+    + textoQuadras(quads);
 }
 
 /** A contagem do mês nasce no primeiro número digitado. */
@@ -708,7 +924,7 @@ function montarFolhaRepor(lista) {
 /* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico };
+const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico, ctMapa: desenharMapa };
 
 export function abrirContagem(tela) {
   telaAberta = tela;
@@ -720,10 +936,10 @@ export function abrirContagem(tela) {
 window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;
-  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca' || foco.closest && foco.closest('.ct-lote'))) return;
+  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca' || foco.closest && (foco.closest('.ct-lote') || foco.closest('.ct-quad') || foco.closest('.mp-sel')))) return;
   if (!document.querySelector('#modal.oculto') && document.querySelector('#modal')) return;
   DESENHOS[telaAberta]();
 });
 
 export const telaAtualDaContagem = () => telaAberta;
-export function soltarContagem() { telaAberta = null; }
+export function soltarContagem() { telaAberta = null; soltarMapa(); }

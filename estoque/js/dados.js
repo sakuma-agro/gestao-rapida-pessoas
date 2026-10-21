@@ -103,3 +103,35 @@ export const precisaRepor = (item, qtd) => temMinimo(item) && qtd !== null && qt
   && Number(qtd) <= Number(item.estoque_minimo);
 export const textoPedido = item => item.pedido_reposicao !== null && item.pedido_reposicao !== undefined && item.pedido_reposicao !== ''
   ? 'pedir ' + mostrarNumero(item.pedido_reposicao) + ' ' + (item.unidade || '') : 'definir quanto pedir';
+
+/* ---- mapa do barracão (21/10/2026, pedido dele) ----
+   Um estoque pode ter um mapa (est_mapas, id = local_id): as quadras, as áreas
+   reservadas e os pilares do barracão. Na contagem dos fertilizantes, cada
+   item diz em quais quadras está e quantos bags tem em cada uma
+   (est_contagem_quadras, id contagem_id:item_id:quadra). */
+export const mapaDoLocal = localId => {
+  const m = todos('est_mapas').find(x => x.id === String(localId) && x.ativo !== false);
+  return m && m.layout && Array.isArray(m.layout.quadras) && m.layout.quadras.length ? m : null;
+};
+export const idQuadraLinha = (contagemId, itemId, quadra) => contagemId + ':' + itemId + ':' + quadra;
+/** Quadras de um item numa contagem (só as com bags ou ativas), na ordem do mapa. */
+export const quadrasDe = (contagemId, itemId) => [...new Map(todos('est_contagem_quadras')
+  .filter(l => l.contagem_id === contagemId && (!itemId || l.item_id === itemId))
+  .map(l => [l.id, l])).values()].filter(l => l.ativo !== false)
+  .sort((a, b) => String(a.quadra).localeCompare(String(b.quadra), 'pt-BR', { numeric: true }));
+/** Quantos bags cabem numa quadra: posições no chão × altura da pilha.
+    A largura desconta a folga do pilar; capacidade digitada no mapa vale mais. */
+export function capacidadeQuadra(q, layout) {
+  if (q.capacidade !== undefined && q.capacidade !== null && q.capacidade !== '') return Number(q.capacidade);
+  const m = Number(layout.medida_bag) || 1.2, f = Number(layout.folga) || 0, h = Number(layout.altura_pilha) || 3;
+  const nl = Math.max(0, Math.floor((Number(q.l) - f) / m + 1e-9));
+  const np = Math.max(0, Math.floor(Number(q.p) / m + 1e-9));
+  return nl * np * h;
+}
+export const pesoBag = layout => Number(layout && layout.peso_bag_kg) || 1000;
+/** Mês anterior a 'AAAA-MM'. */
+export const mesAnterior = m => {
+  const [a, mm] = String(m).split('-').map(Number);
+  const d = new Date(a, mm - 2, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+};

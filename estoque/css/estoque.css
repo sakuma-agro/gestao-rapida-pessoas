@@ -311,3 +311,59 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 /* Cadastros › Itens: "Contado em" (estoques em que o item aparece na contagem) */
 .cad-locais{border:1px solid var(--linha,#dfe3e6);border-radius:8px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:6px 16px;margin:0;grid-column:1/-1}
 .cad-locais legend{font-size:12px;color:var(--suave);padding:0 4px}
+
+/* ================= Mapa do barracão (21/10/2026) ================= */
+.ct-quadras{margin-top:10px;padding-top:8px;border-top:1px dashed #CFE3A0}
+.ct-quadras h4{margin:0 0 6px;font-size:13px;color:var(--verde-esc)}
+.ct-quadras h4 small{font-weight:400;color:var(--suave)}
+.ct-quad{display:grid;grid-template-columns:110px 110px 1fr 34px;gap:8px;align-items:end;padding:6px 0;border-bottom:1px solid var(--linha)}
+.ct-quad label{display:block;font-size:11px;font-weight:600;color:var(--suave);text-transform:uppercase;letter-spacing:.3px}
+.ct-quad select,.ct-quad input{width:100%;margin-top:3px;min-height:42px;font-size:15px}
+.ct-quad .cq-bags{text-align:right;font-weight:700}
+.ct-quad .cq-info{font-weight:700;font-size:13.5px;align-self:center}
+.ct-quad .cq-info small{display:block;font-weight:400;font-size:11.5px;color:var(--suave)}
+.ct-quad.cheia .cq-info small{color:#c0392b;font-weight:600}
+.ct-quad.erro .cq-bags{border-color:#c0392b}
+.ct-quad.fixo{grid-template-columns:1fr 1fr auto;font-size:13.5px;align-items:center}
+.ct-quadras-pe{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-top:8px}
+.ct-onde{color:var(--verde-esc);font-weight:600}
+@media (max-width:560px){.ct-quad{grid-template-columns:1fr 1fr 34px}.ct-quad .cq-info{grid-column:1/-1;order:5}}
+.mp-botoes{display:flex;gap:6px;flex-wrap:wrap}
+.mp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.mp-kpis div{border:1px solid var(--linha);border-left:4px solid var(--verde);border-radius:8px;padding:8px 10px}
+.mp-kpis span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.3px;color:var(--suave)}
+.mp-kpis b{display:block;font-size:22px;line-height:1.2}
+.mp-kpis small{color:var(--suave);font-size:11.5px}
+@media (max-width:560px){.mp-kpis{grid-template-columns:repeat(2,1fr)}}
+.mp-desenho{background:#fff;border:1px solid var(--linha);border-radius:10px;padding:6px;overflow:hidden}
+.mp-svg{display:block;width:100%;height:auto}
+.mp-3d{min-height:360px}
+.mp-3d canvas{display:block;width:100%;cursor:grab;border-radius:8px}
+.mp-leg{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.mp-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);
+  border-radius:999px;padding:4px 10px;font:500 12.5px/1.3 inherit;cursor:pointer}
+.mp-chip i,.mp-cor{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.mp-chip.on{border-color:#744F28;box-shadow:0 0 0 2px rgba(116,79,40,.25)}
+.mp-chip small{color:var(--suave)}
+.mp-tab{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0 10px}
+.mp-tab th{background:var(--verde);color:#fff;text-align:left;padding:6px 8px;font-weight:600}
+.mp-tab td{border-bottom:1px solid var(--linha);padding:6px 8px;vertical-align:top}
+.mp-tab tbody tr:nth-child(even) td{background:var(--verde-fundo)}
+.mp-tab .nu{text-align:right;white-space:nowrap}
+.mp-tab tr[data-dest]{cursor:pointer}
+.mp-tab tr.on td{background:rgba(116,79,40,.12) !important}
+.mp-tab tr.passou td{color:#c0392b}
+.mp-tab input{width:90px;min-height:34px;text-align:right}
+.mp-folha{width:296.8mm;min-height:210mm;page:paisagem;padding:9mm 11mm 7mm}
+.mp-folha .rel-topo img{height:15mm}
+.mp-folha-planta{margin:4mm 0 2mm;border:.3mm solid #dfe2d8;border-radius:1.5mm;padding:2mm}
+.mp-folha-planta .mp-svg{max-height:112mm}
+@media print{
+  .mp-folha{min-height:0;margin:0 auto !important;padding:8mm 11mm 6mm}
+  .mp-folha-planta .mp-svg{max-height:100mm}
+}
+@media print{
+  #mpCorpo{display:none}
+  .mp-folha .rel-pe{padding-top:3mm}
+  .mp-folha-planta .mp-svg{max-height:90mm}
+}

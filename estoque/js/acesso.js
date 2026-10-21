@@ -20,6 +20,7 @@ export const MODULOS = [
     ['ctNova',       'Contar'],
     ['ctAndamento',  'Em andamento'],
     ['ctRepor',      'Reposição'],
+    ['ctMapa',       'Mapa do barracão'],
     ['ctHistorico',  'Histórico'],
   ] },
   { id: 'compra', nome: 'Compra inteligente', telas: [

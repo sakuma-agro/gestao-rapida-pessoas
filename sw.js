@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v305';
+const VERSAO = 'gr-v306';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -56,7 +56,8 @@ const ARQUIVOS = [
   './estoque/js/app.js', './estoque/js/acesso.js', './estoque/js/acerto.js',
   './estoque/js/acerto-motor.js', './estoque/js/planilha.js',
   './estoque/js/config.js', './estoque/js/base.js', './estoque/js/dados.js',
-  './estoque/js/contagem.js', './estoque/js/cadastros.js', './estoque/js/compra.js', './estoque/js/saldo.js', './estoque/js/qc.js', './estoque/js/qc-importar.js',
+  './estoque/js/contagem.js', './estoque/js/cadastros.js', './estoque/js/compra.js', './estoque/js/saldo.js', './estoque/js/qc.js', './estoque/js/qc-importar.js', './estoque/js/mapa.js',
+  './vendor/three.min.js', './vendor/three-orbit.js',
   './estoque/img/sakuma-logo.png', './estoque/img/lop-marca.png',
   // Custo Base (20/10/2026): rateio mensal por cultura, que era a planilha do ADM.
   './icons/area-custobase.v2.svg',

@@ -1,0 +1,45 @@
+-- Estoque › Mapa do barracão (21/10/2026, pedido do Guilherme).
+-- Na contagem dos fertilizantes, quem conta marca em qual quadra está cada
+-- produto e quantos bags tem ali. O app desenha o mapa do barracão com a
+-- ocupação de cada quadra. Layout aprovado do barracão do Lote 35 PADAP.
+create table if not exists public.est_mapas (
+  id text primary key,                         -- = local_id (um mapa por estoque)
+  local_id uuid not null unique references public.est_locais(id),
+  nome text,
+  layout jsonb not null,                       -- quadras, áreas reservadas, pilares, medidas
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create table if not exists public.est_contagem_quadras (
+  id text primary key,                         -- contagem_id:item_id:quadra
+  contagem_id text not null references public.est_contagens(id) on delete cascade,
+  item_id uuid not null references public.est_itens(id),
+  quadra text not null,                        -- código da quadra (A1, B3...)
+  bags numeric,
+  contado_por text,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists est_cq_contagem on public.est_contagem_quadras(contagem_id);
+
+do $$ declare t text; begin
+  foreach t in array array['est_mapas','est_contagem_quadras'] loop
+    execute format('drop trigger if exists marcar_atualizacao on public.%I', t);
+    execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists est_ler on public.%I', t);
+    execute format('drop policy if exists est_gravar on public.%I', t);
+    execute format('drop policy if exists est_trocar on public.%I', t);
+    execute format('create policy est_ler on public.%I for select to authenticated using (public.app_pode(''estoque''))', t);
+    execute format('create policy est_gravar on public.%I for insert to authenticated with check (public.app_pode(''estoque''))', t);
+    execute format('create policy est_trocar on public.%I for update to authenticated using (public.app_pode(''estoque'')) with check (public.app_pode(''estoque''))', t);
+    execute format('revoke all on public.%I from anon', t);
+    execute format('grant select, insert, update on public.%I to authenticated', t);
+  end loop;
+end $$;
+
+-- Barracão de fertilizantes do Lote 35 PADAP (layout de 21/10/2026).
+insert into public.est_mapas (id, local_id, nome, layout)
+select l.id::text, l.id, 'Barracão de fertilizantes', '{"versao":1,"comprimento":36.2,"largura":29.5,"frente":"esquerda","medida_bag":1.2,"folga":0.6,"altura_pilha":3,"peso_bag_kg":1000,"quadras":[{"codigo":"A1","fileira":"A","x":0,"y":7.8,"l":6.033,"p":5.2},{"codigo":"A2","fileira":"A","x":6.033,"y":7.8,"l":6.033,"p":5.2},{"codigo":"A3","fileira":"A","x":12.066,"y":7.8,"l":6.033,"p":5.2},{"codigo":"A4","fileira":"A","x":18.099,"y":7.8,"l":6.033,"p":5.2},{"codigo":"A5","fileira":"A","x":24.132,"y":7.8,"l":6.033,"p":5.2},{"codigo":"A6","fileira":"A","x":30.165,"y":7.8,"l":6.033,"p":5.2},{"codigo":"B1","fileira":"B","x":12.066,"y":17.5,"l":6.033,"p":4.4},{"codigo":"B2","fileira":"B","x":18.099,"y":17.5,"l":6.033,"p":4.4},{"codigo":"B3","fileira":"B","x":24.132,"y":17.5,"l":6.033,"p":4.4},{"codigo":"B4","fileira":"B","x":30.165,"y":17.5,"l":6.033,"p":4.4}],"areas":[{"nome":"Meia-água · tratores","tipo":"reservada","x":0,"y":0,"l":36.2,"p":7.7,"obs":"JD 5090, 5080, 6125 e NH TT3880"},{"nome":"Colheitadeiras","tipo":"reservada","x":0,"y":13,"l":12.066,"p":8.9,"obs":"John Deere e Jacto K3"},{"nome":"Corredor","tipo":"corredor","x":12.066,"y":13,"l":24.134,"p":4.5},{"nome":"Oficina","tipo":"reservada","x":0,"y":21.9,"l":12.066,"p":3.2},{"nome":"Faixa livre · sem adubo","tipo":"reservada","x":12.066,"y":21.9,"l":24.134,"p":3.2},{"nome":"Meia-água · implementos","tipo":"reservada","x":0,"y":25.1,"l":36.2,"p":4.4,"obs":"Plantadeiras Jumil e colhedora de batata"}],"muros":[7.7,25.1],"pilares":[[0,7.7],[0,25.1],[6.033,7.7],[6.033,25.1],[12.066,7.7],[12.066,25.1],[18.099,7.7],[18.099,25.1],[24.132,7.7],[24.132,25.1],[30.165,7.7],[30.165,25.1],[36.198,7.7],[36.198,25.1],[6.033,13],[6.033,21.9],[12.066,13],[12.066,21.9],[18.099,13],[18.099,21.9],[24.132,13],[24.132,21.9],[30.165,13],[30.165,21.9],[36.198,13],[36.198,21.9]]}'::jsonb
+from public.est_locais l where l.nome = 'Lote 35 PADAP'
+on conflict (id) do nothing;
