@@ -21,7 +21,20 @@
 
 let abaPrev = 'fazer';
 let filtroPrev = { busca: '', item: '', local: '' };
-const OS_ATRASADA_DIAS = 15;   // OS aberta há mais que isso fica com os dias em vermelho
+const OS_ATRASADA_DIAS = 15;
+const HORIMETRO_VELHO_DIAS = 7;  // leitura mais antiga que isso: o "faltam X h" pode estar errado
+
+/* Dias desde a última leitura do mostrador (só máquina com horímetro/hodômetro;
+   implemento soma pelo uso do trator e não entra aqui). */
+function idadeLeitura(e) {
+  if (!e || !['HORIMETRO', 'HODOMETRO'].includes(e.unidade_controle)) return null;
+  return e.leitura_data ? Math.max(0, diasEntre(String(e.leitura_data).slice(0, 10), hoje())) : Infinity;
+}
+function txtIdade(d) {
+  if (d == null) return '';
+  if (d === Infinity) return 'nunca lançado';
+  return d === 0 ? 'lido hoje' : d === 1 ? 'lido ontem' : 'lido há ' + d + ' dias';
+}   // OS aberta há mais que isso fica com os dias em vermelho
 
 function planosDaFrota() {
   return q.ativos('planos_manutencao')
@@ -78,6 +91,11 @@ TELAS.painel = el => {
     .filter(m => String(m.data_manutencao || '').slice(0, 7) === mes && noGrupoId(m.equipamento_id)
       && q.por_id('equipamentos', m.equipamento_id))
     .sort((a, b) => String(b.data_manutencao).localeCompare(String(a.data_manutencao)));
+  // Máquinas cujo vencimento depende de horas e o mostrador está velho
+  const velhas = [...new Map(planos
+    .filter(x => x.p.periodicidade_horas != null && idadeLeitura(x.c.equipamento) >= HORIMETRO_VELHO_DIAS)
+    .map(x => [x.c.equipamento.id, x.c.equipamento])).values()]
+    .sort((a, b) => idadeLeitura(b) - idadeLeitura(a) || porCodigo(a, b));
   const ckAtraso = (typeof agendaChecklists === 'function' ? agendaChecklists() : [])
     .filter(a => a.status === 'atrasado' || a.status === 'nunca').length;
 
@@ -97,6 +115,7 @@ TELAS.painel = el => {
       ${aba('feitas', 'pv-a-feita', feitas.length, 'Feitas no mês', 'OS fechada, troca registrada')}
       ${aba('semdado', 'pv-a-sem', semDado.length, 'Falta cadastrar', 'sem última troca ou horímetro')}
     </div>
+    ${velhas.length ? `<p class="pv-ck"><button type="button" class="pv-hor" id="pv-hor">⏱ ${velhas.length} máquina(s) com horímetro sem leitura há mais de ${HORIMETRO_VELHO_DIAS} dias — o "faltam X h" delas pode estar errado. Lançar →</button></p>` : ''}
     ${ckAtraso ? `<p class="pv-ck"><button type="button" class="btn-fantasma" id="pv-ck">${ckAtraso} máquina(s) com check list atrasado →</button></p>` : ''}
     <div class="filtros">
       <input type="search" id="pv-busca" placeholder="Buscar máquina ou item" value="${esc(filtroPrev.busca)}">
@@ -118,7 +137,9 @@ TELAS.painel = el => {
     const nomeTipo = id => q.nome('tipos_manutencao', id);
     // Tocar no código ou no nome abre a ficha da máquina (21/10/2026).
     const maq = e => `<button type="button" class="pv-cod" data-maq="${esc(e.id)}" title="Abrir a ficha">${esc(e.codigo)}</button>
-      <span class="pv-nm"><b class="pv-abre" data-maq="${esc(e.id)}">${esc(e.descricao)}</b><small>${esc(q.nome('locais', e.local_id))}${leituraDe(e) != null ? ' · agora ' + nHoras(leituraDe(e)) + ' ' + unidadeDe(e) : ''}</small></span>`;
+      <span class="pv-nm"><b class="pv-abre" data-maq="${esc(e.id)}">${esc(e.descricao)}</b><small>${esc(q.nome('locais', e.local_id))}${leituraDe(e) != null ? ' · agora ' + nHoras(leituraDe(e)) + ' ' + unidadeDe(e) : ''}${(() => {
+        const d = idadeLeitura(e);
+        return d == null ? '' : ` <em class="pv-idade${d >= HORIMETRO_VELHO_DIAS ? ' velho' : ''}">(${txtIdade(d)})</em>`; })()}</small></span>`;
     let html = '';
 
     if (abaPrev === 'fazer' || abaPrev === 'semdado') {
@@ -138,9 +159,25 @@ TELAS.painel = el => {
         </div>`;
       };
       if (abaPrev === 'fazer') {
-        const venc = base.filter(x => x.c.status === 'VENCIDO'), perto = base.filter(x => x.c.status === 'ATENCAO');
-        html = (venc.length ? `<div class="pv-grupo">Vencidas · ${venc.length}</div>` + venc.map(linha).join('') : '')
-             + (perto.length ? `<div class="pv-grupo">Perto de vencer · ${perto.length}</div>` + perto.map(linha).join('') : '');
+        /* Uma linha por máquina, com todos os itens dela e um botão só
+           (21/10/2026): o mecânico faz tudo numa ida e a lista encolhe. */
+        const porMaq = new Map();
+        for (const x of base) {
+          const id = x.c.equipamento.id;
+          if (!porMaq.has(id)) porMaq.set(id, { e: x.c.equipamento, itens: [] });
+          porMaq.get(id).itens.push(x);
+        }
+        const maqs = [...porMaq.values()].map(m => Object.assign(m, { vencida: m.itens.some(x => x.c.status === 'VENCIDO') }));
+        const linhaMaq = m => `<div class="pv-linha pv-maq ${m.vencida ? 'pv-r' : 'pv-y'}">${maq(m.e)}
+          <span class="pv-itens">${m.itens.map(({ p, c }) => `<span class="pv-subitem ${c.status === 'VENCIDO' ? 'pv-r' : 'pv-y'}">
+            <span class="pv-item">${esc(nomeTipo(p.tipo_manutencao_id))}${ultimaTxt(p, c.equipamento)}</span>
+            <span class="pv-sit"><b>${esc(textoSituacao(c))}</b><i class="pv-barra"><i style="width:${usoDoIntervalo(p, c)}%"></i></i></span>
+          </span>`).join('')}</span>
+          <span class="pv-acao"><button type="button" class="btn" data-abrir-maq="${esc(m.itens.map(x => x.p.id).join(','))}">Abrir OS${m.itens.length > 1 ? ' (' + m.itens.length + ' itens)' : ''}</button></span>
+        </div>`;
+        const venc = maqs.filter(m => m.vencida), perto = maqs.filter(m => !m.vencida);
+        html = (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
+             + (perto.length ? `<div class="pv-grupo">Perto de vencer · ${perto.length} máquina(s)</div>` + perto.map(linhaMaq).join('') : '');
         if (!html) html = '<div class="vazio"><p>Nada a fazer. Todas as trocas estão em dia ou já têm OS aberta.</p></div>';
       } else {
         html = base.map(linha).join('') || '<div class="vazio"><p>Todos os itens têm última troca lançada.</p></div>';
@@ -180,6 +217,17 @@ TELAS.painel = el => {
       await abrirOSPreventiva(x.dataset.abrir);
       if (document.querySelector('#pv-lista')) TELAS.painel(el);
     });
+    // Uma OS com todos os itens da máquina
+    $$('#pv-lista [data-abrir-maq]').forEach(x => x.onclick = async () => {
+      x.disabled = true;
+      const ids = x.dataset.abrirMaq.split(',');
+      let os = null;
+      for (const id of ids) os = await abrirOSPreventiva(id, { silencioso: true });
+      const e = os && q.por_id('equipamentos', os.equipamento_id);
+      aviso(`OS ${numeroOS(os)} aberta para o ${e ? e.codigo : ''} com ${ids.length} ${ids.length === 1 ? 'item' : 'itens'}.`);
+      TELAS.painel(el);
+      if (os) abrirOS(os.id);
+    });
     $$('#pv-lista [data-os]').forEach(x => x.onclick = () => abrirOS(x.dataset.os));
     $$('#pv-lista [data-fechar]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.fechar);
@@ -198,6 +246,7 @@ TELAS.painel = el => {
     desenhar();
   });
   ['pv-busca', 'pv-item', 'pv-local'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
+  const bh = $('#pv-hor'); if (bh) bh.onclick = () => listaHorimetroVelho(velhas, () => TELAS.painel(el));
   const ck = $('#pv-ck'); if (ck) ck.onclick = () => { abaChecklist = 'agenda'; irPara('checklist'); };
   $('#pv-atualizar').onclick = async () => {
     if (!App.online) return aviso('Sem internet: a tela mostra o que está guardado neste aparelho.', true);
@@ -207,3 +256,18 @@ TELAS.painel = el => {
   };
   desenhar();
 };
+
+/* Lista das máquinas com o horímetro velho, cada uma com "Lançar" (21/10/2026). */
+function listaHorimetroVelho(velhas, depois) {
+  abrirModal('Horímetro sem leitura recente', `
+    <p class="sub">O vencimento por horas usa a última leitura. Se ela é antiga, o app pode dizer
+      "faltam 300 h" quando a troca já passou. Lance a leitura do mostrador.</p>
+    <ul class="lista">${velhas.map(e => `<li><div class="info"><strong>${esc(e.codigo)} — ${esc(e.descricao)}</strong>
+      <small>${leituraDe(e) != null ? nHoras(leituraDe(e)) + ' ' + unidadeDe(e) + ' · ' : ''}${esc(txtIdade(idadeLeitura(e)))}${e.leitura_data ? ' (' + formatarData(e.leitura_data) + ')' : ''}</small></div>
+      <button type="button" class="btn" data-lancar="${esc(e.id)}">Lançar</button></li>`).join('')}</ul>`, corpo => {
+    corpo.querySelectorAll('[data-lancar]').forEach(b => b.onclick = () => {
+      const e = q.por_id('equipamentos', b.dataset.lancar);
+      formLeitura(e, () => { fecharModal(); depois(); });
+    });
+  });
+}

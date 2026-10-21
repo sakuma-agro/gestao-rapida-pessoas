@@ -401,6 +401,19 @@ function recarregarTela() {
 
 /* ---------------------------------------------------------------- registrar como feita */
 
+/* Quem fez (21/10/2026): os nomes já usados nas OS viram uma lista, e o
+   último nome usado neste aparelho já vem preenchido. Dá para escrever outro. */
+function mecanicos() {
+  const vistos = new Map();
+  q.todos('ordens_servico').filter(o => o.executado_por)
+    .sort((a, b) => String(b.data_execucao || '').localeCompare(String(a.data_execucao || '')))
+    .forEach(o => { const n = String(o.executado_por).trim(); const k = n.toUpperCase(); if (n && !vistos.has(k)) vistos.set(k, n); });
+  return [...vistos.values()];
+}
+function ultimoMecanico() {
+  try { return localStorage.getItem('gr.manut.ultimoMecanico') || ''; } catch (e) { return ''; }
+}
+
 function formFeita(os) {
   const e = q.por_id('equipamentos', os.equipamento_id);
   const u = unidadeDe(e);
@@ -421,7 +434,11 @@ function formFeita(os) {
           e.unidade_controle === 'ACUMULADO' ? (leituraDe(e) ?? '') : '', 'number',
           e.unidade_controle === 'ACUMULADO' ? 'Implemento: o contador acumulado de agora'
             : 'Valor exato do mostrador — nunca estimado. Atual no app: ' + nHoras(leituraDe(e)) + ' ' + u) : ''}
-      ${campoTexto('Quem fez', 'executado_por', '')}
+      <div class="campo"><label for="f-executado_por">Quem fez</label>
+        <input type="text" id="f-executado_por" name="executado_por" list="ff-mecanicos" autocomplete="off"
+          value="${esc(ultimoMecanico())}" placeholder="Escolha ou escreva o nome">
+        <datalist id="ff-mecanicos">${mecanicos().map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+        <p class="ajuda">Toque para ver os nomes já usados.</p></div>
     </div>
     ${campoArea(corretiva ? 'O que foi feito' : 'Observação', 'observacao', '')}
     <div class="campo"><label>${corretiva ? 'Foto (opcional)' : 'Foto do adesivo de troca (obrigatória)'}</label>
@@ -456,6 +473,7 @@ function formFeita(os) {
           !confirm(`O ${u === 'km' ? 'km' : 'horímetro'} informado (${nHoras(leitura)}) é menor que o atual da máquina (${nHoras(atual)}). ` +
                    'Ele fica na OS, mas não muda o horímetro da máquina. Continuar?')) return;
 
+      try { localStorage.setItem('gr.manut.ultimoMecanico', d.executado_por.trim()); } catch (e) {}
       const b = corpo.querySelector('#ff-salvar'); b.disabled = true; b.textContent = 'Salvando…';
       const agora = new Date().toISOString();
       const caminho = foto ? await guardarFoto(foto, 'manutencao-ordens-servico', 'os/' + e.codigo.replace(/[^\w.-]/g, '_')) : null;
