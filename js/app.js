@@ -772,7 +772,7 @@ function desenharSelecaoLista() {
       </span>
       <span class="tag ${f.situacao === 'ATIVO' ? 'ativo' : 'inativo'}">${esc(f.situacao || '—')}</span>
     </label>`).join('')
-    : '<div class="vazio">Nenhum funcionário encontrado.</div>';
+    : '<div class="vazio">Nenhum funcionário encontrado.</div>');
 
   box.querySelectorAll('input[type=checkbox][data-id]').forEach(cb =>
     cb.addEventListener('change', () => {
