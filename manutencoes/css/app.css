@@ -1366,3 +1366,11 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .os-tab td.os-prox b{color:var(--verde-lop);font-weight:bold;white-space:normal}
 .os-tab th.os-prox{min-width:110px}
 .pv-cab-acoes{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+/* 21/10/2026: Horímetros lançados */
+.hl-per{display:flex;align-items:center;gap:6px;font-size:14px}
+.hl-tab td.num{text-align:right;white-space:nowrap}
+.hl-tab td small{display:block;color:var(--cinza-claro);font-size:12px}
+.pv-link-maq{background:none;border:0;padding:0;font:inherit;color:var(--grafite);cursor:pointer;text-decoration:underline;text-decoration-color:var(--linha)}
+.hl-origem{display:inline-block;font-size:12px;font-weight:bold;padding:3px 8px;border-radius:10px;background:#EEF0EA;color:var(--cinza);white-space:nowrap}
+.hl-o-hora{background:#F1F7E3;color:var(--verde-lop)}
+.hl-o-importacao{background:#EAF2FB;color:#2E6DA4}
