@@ -350,7 +350,8 @@ function desenharLancar() {
   $('telaJorLancar').innerHTML = `
     <header class="jor-cab-lancar"><b>Lançar jornada</b>
       <span>digite o nº do cadastro · <kbd>Enter</kbd> passa de campo · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> lança</span>
-      <button type="button" class="btn mini jor-hm" id="bHoraMaquina" hidden title="Lançar horímetro da máquina e implementos (Quebra Cocão)">+ Hora máquina</button></header>
+      <button type="button" class="btn mini jor-hm" id="bHoraMaquina" hidden title="Lançar horímetro da máquina e implementos (Quebra Cocão)">+ Hora máquina</button>
+      <button type="button" class="btn mini jor-hm jor-ins" id="bInsumo" hidden title="Dar saída de produto do estoque da Quebra Cocão">+ Insumo</button></header>
     <div class="jor-corpo jor-duas jor-lancar">
       <form id="jorFormBoletim" class="jor-form jor-compacta" data-dia="">
         <div class="jor-prox" id="bProximo" hidden></div>
@@ -462,6 +463,17 @@ function desenharLancar() {
     b.onclick = () => {
       const f = $('bFunc'); const nome = f && f.value ? f.options[f.selectedIndex].text.split(' · ')[0] : '';
       window.HoraMaquina.abrir({ cliente: estado.cliente, data: $('bData').value, operador: nome, boletim: $('bNumero').value.trim() });
+    };
+  });
+  /* + Insumo (21/10/2026): saída de produto do Estoque Faz. Quebra Cocão
+     (js/insumo-qc.js) — direcionador, produto e quantidade, com o mesmo
+     operador, data e boletim do formulário. */
+  if (window.Insumo) window.Insumo.disponivel(estado.cliente).then(ok => {
+    const b = $('bInsumo'); if (!b) return;
+    b.hidden = !ok;
+    b.onclick = () => {
+      const f = $('bFunc'); const nome = f && f.value ? f.options[f.selectedIndex].text.split(' · ')[0] : '';
+      window.Insumo.abrir({ cliente: estado.cliente, data: $('bData').value, operador: nome, boletim: $('bNumero').value.trim() });
     };
   });
   $('bNumero').addEventListener('input', () => $('bNumero').classList.remove('jor-falta'));

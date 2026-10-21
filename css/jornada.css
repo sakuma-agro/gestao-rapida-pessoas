@@ -674,3 +674,4 @@
 .bd-lote-envio { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 8px 0 0; max-height: 300px; overflow: auto; }
 .bd-lote-envio .btn-zap { justify-content: flex-start; text-align: left; white-space: normal; }
 .jor-cab-lancar .jor-hm { margin-left: auto; align-self: center; }
+.jor-cab-lancar .jor-ins { margin-left: 0; }

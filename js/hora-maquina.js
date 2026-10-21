@@ -233,5 +233,5 @@
     };
   }
 
-  window.HoraMaquina = { abrir, disponivel };
+  window.HoraMaquina = { abrir, disponivel, estilo };
 })();
