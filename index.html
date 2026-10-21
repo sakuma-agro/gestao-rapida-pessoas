@@ -294,6 +294,22 @@ addEventListener('beforeinstallprompt', function (ev) {
       </form>
 
       <div class="cartao naoimprimir">
+        <h2>Dados do treinamento</h2>
+        <p class="dica">Sai impresso nas linhas da folha. Não fica salvo: é só desta lista.</p>
+        <div class="grade larga">
+          <label class="campo plena">Tema(s)
+            <textarea id="lpTema" rows="3" placeholder="Um tema por linha (até 3 linhas)"></textarea>
+          </label>
+          <label class="campo">Horário
+            <input type="text" id="lpHorario" placeholder="08:00 às 10:00">
+          </label>
+          <label class="campo">Ministrante
+            <input type="text" id="lpMinistrante" placeholder="Nome de quem ministra">
+          </label>
+        </div>
+      </div>
+
+      <div class="cartao naoimprimir">
         <h2>Quem vai assinar</h2>
         <p class="dica">Cada um marcado vira uma linha, com o cargo do cadastro. As linhas que sobram na última folha saem em branco.</p>
         <div class="grade larga">

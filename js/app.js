@@ -782,11 +782,14 @@ const cabecalhoLista = () => ({
 function atualizarLista() {
   const gente = estado.funcionarios.filter(f => naLista.has(f.id));
   $('cntLista').textContent = gente.length;
-  $('saidaLista').innerHTML = montarLista(gente, cabecalhoLista());
+  $('saidaLista').innerHTML = montarLista(gente, cabecalhoLista(), {
+    tema: $('lpTema').value, horario: $('lpHorario').value, ministrante: $('lpMinistrante').value,
+  });
   $('cntFolhas').textContent = $('saidaLista').children.length;
 }
 
-['lpTitulo', 'lpCodigo', 'lpData', 'lpRevisao', 'lpElaboracao', 'lpAprovacao']
+['lpTitulo', 'lpCodigo', 'lpData', 'lpRevisao', 'lpElaboracao', 'lpAprovacao',
+ 'lpTema', 'lpHorario', 'lpMinistrante']
   .forEach(id => $(id).addEventListener('input', atualizarLista));
 
 ['buscaLista', 'fSitLista'].forEach(id =>

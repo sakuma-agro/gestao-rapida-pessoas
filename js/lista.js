@@ -86,8 +86,20 @@ function cabecalho(cfg, pagina, total) {
 }
 
 /* ---------- miolo em branco: data, propriedade, temas, horário, ministrante ---------- */
-function miolo() {
+function miolo(d = {}) {
   const sub = t => `<span class="lp-sub">${t}</span>`;   // palavra sublinhada
+  // texto digitado em cima do traço de preencher à mão (baseline 1,4 mm acima)
+  const sobre = (x, y, v) => v ? txt(x, y - 1.4, 11, esc(v)) : '';
+  // temas: até 3 linhas; quebra em espaço quando a linha passa de ~80 letras
+  const temas = [];
+  String(d.tema || '').split(/\r?\n/).forEach(l => {
+    let r = l.trim();
+    while (r.length > 80) {
+      let i = r.lastIndexOf(' ', 80); if (i < 40) i = 80;
+      temas.push(r.slice(0, i)); r = r.slice(i).trim();
+    }
+    if (r) temas.push(r);
+  });
   return [
     // Data: ___/___/___   Nome/Assinatura: __________
     txt(18.2, 81.2, 12, 'Data:'),
@@ -105,17 +117,20 @@ function miolo() {
     txt(21.4, 116.5, 11, 'I.', 'font-weight:bold'),
     txt(34.1, 116.5, 11, sub('TEMAS'), 'font-weight:bold'),
     reg(27.7, 187.9, 124.6), reg(27.7, 187.9, 132.3), reg(27.7, 187.9, 140.1),
+    sobre(28.5, 124.6, temas[0]), sobre(28.5, 132.3, temas[1]), sobre(28.5, 140.1, temas[2]),
 
     // II. HORÁRIO
     txt(21.4, 154.0, 11, 'II.', 'font-weight:bold'),
     txt(35.0, 154.0, 11, sub('HORÁRIO'), 'font-weight:bold'),
     reg(27.7, 187.9, 169.8),
+    sobre(28.5, 169.8, d.horario),
 
     // III. MINISTRANTE
     txt(21.4, 183.7, 11, 'III.', 'font-weight:bold'),
     txt(35.0, 183.7, 11, sub('MINISTRANTE'), 'font-weight:bold'),
     txt(20.3, 198.0, 11, 'Nome:', 'font-weight:bold'),
     reg(32.0, 109.0, 198.4),
+    sobre(32.8, 198.4, d.ministrante),
     txt(109.0, 198.0, 11, 'Assinatura:', 'font-weight:bold'),
     reg(128.1, 190.6, 198.4),
 
@@ -152,8 +167,9 @@ function faixa(cfg, pagina, total) {
  * Monta as folhas da lista de presença.
  * @param {Array} participantes  funcionários marcados ({nome, cargo})
  * @param {Object} cfg           textos do cabeçalho (listaAtual(modelo))
+ * @param {Object} dados         {tema, horario, ministrante} digitados para esta lista
  */
-export function montarLista(participantes, cfg) {
+export function montarLista(participantes, cfg, dados = {}) {
   const gente = participantes.slice();
 
   // as sobras completam a última página com linhas em branco
@@ -169,7 +185,7 @@ export function montarLista(participantes, cfg) {
     // 1ª folha: moldura da marca + campos em branco. Seguintes: só a faixa de
     // continuação e a tabela, igual ao arquivo do Word.
     folhas.push('<div class="lp-folha">' +
-      (p === 1 ? cabecalho(cfg, 1, total) + miolo() : faixa(cfg, p, total)) +
+      (p === 1 ? cabecalho(cfg, 1, total) + miolo(dados) : faixa(cfg, p, total)) +
       tabela(p === 1 ? TAB1_TOPO : TAB_TOPO, itens, p === 1) +
       '</div>');
   }
