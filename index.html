@@ -1410,6 +1410,9 @@ addEventListener('beforeinstallprompt', function (ev) {
     <!-- ---- CONFIGURAÇÕES ---- -->
     <section class="tela" id="telaConfig" hidden>
       <div class="aviso erro" id="cfAviso" hidden></div>
+      <!-- LOP - Principal (21/10/2026): os dois ícones da área — js/areas.js -->
+      <div class="cf-hub" id="cfHub"></div>
+      <div id="cfConteudo">
 
       <div class="cartao">
         <div class="barra entre" style="margin:0">
@@ -1434,7 +1437,7 @@ addEventListener('beforeinstallprompt', function (ev) {
             <h2 style="margin:0">Backup dos dados</h2>
             <p class="dica" style="margin:2px 0 0">Copia tudo o que está no banco, de todas as áreas: Pessoas
               (Cadastros, SST, RH, DP), Certificação, Máquinas e Patrimônio, Vistorias e Segurança e os acessos.
-              O mesmo botão está na tela inicial, como <b>Fazer backup</b>.</p>
+              O mesmo backup está no ícone <b>Backup</b>, logo acima.</p>
           </div>
           <button class="btn principal" id="cfBackup">Gerar backup</button>
         </div>
@@ -1458,6 +1461,7 @@ addEventListener('beforeinstallprompt', function (ev) {
           Guarde os dois juntos, fora do computador. O arquivo traz nome, CPF e data de nascimento das
           pessoas: trate como documento de RH, não deixe em pasta compartilhada.
         </p>
+      </div>
       </div>
     </section>
 

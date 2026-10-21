@@ -1608,3 +1608,9 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .cm-mes-camp:hover{border-color:var(--verde)}
 .cm-mes-sug{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;padding:4px 0}
 .cm-mes-sug b{flex:1}
+
+/* LOP - Principal (21/10/2026): os ícones Usuários - Acessos e Backup lado a lado */
+.cf-hub{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px;margin:4px 0 18px}
+.cf-hub:empty{display:none}
+.cf-hub>.arb-tile,.cf-hub .arb-tile{width:112px}
+.ar-cartao.arb-tile.cf-hub-ativo{border-color:var(--verde);box-shadow:0 6px 18px rgba(79,115,0,.14)}

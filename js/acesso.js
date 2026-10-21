@@ -553,6 +553,8 @@ export function abrirModulo(id, tela) {
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
     aoTrocar('config');
+    // vindo daqui (não do ícone de LOP - Principal): a lista de acessos aberta
+    if ($('cfConteudo')) $('cfConteudo').hidden = false;
     return;
   }
 

@@ -67,8 +67,11 @@ export const AREAS = [
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
-  { id: 'usuarios', nome: 'Usuários - Acessos', icone: 'icons/area-usuarios.v2.svg',
-    desc: 'Quem acessa o quê · Senhas · Backup dos dados' },
+  /* 21/10/2026, pedido dele: o cartão virou "LOP - Principal", com o ícone da
+     LOP, juntando Usuários - Acessos e o Backup (que saiu da tela inicial).
+     O id continua 'usuarios' (é o que o resto do app e os acessos conhecem). */
+  { id: 'usuarios', nome: 'LOP - Principal', icone: 'icons/lop-gr-maskable-192.v1.png',
+    desc: 'Usuários - Acessos · Backup' },
 ];
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
@@ -245,12 +248,8 @@ export function mostrarAreas({ direto = false } = {}) {
   // "Configurações · quem entra e o que vê" virou o cartão Usuários - Acessos.
   /* Backup de todo o app (14/10/2026, pedido dele): faixa na tela inicial,
      só para administrador. Salva direto na pasta escolhida (js/backup.js). */
+  /* 21/10/2026: o ícone do Backup foi para dentro de LOP - Principal. */
   $('arPe').innerHTML = '';
-  if (acesso.admin) {
-    desenharBackupInicio($('arPe'), avisarInicio).catch(e => {
-      $('arPe').innerHTML = `<p class="dica">Backup indisponível: ${esc(e.message || e)}</p>`;
-    });
-  }
 
   aoTrocar('areas');
 }
@@ -280,6 +279,7 @@ export function entrarNaArea(id, tela, extra) {
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
     aoTrocar('config');
+    desenharPrincipal();
     return;
   }
 
@@ -520,3 +520,26 @@ function pintarNumerosVist() {
   });
 }
 aoPintarFaixa(pintarNumerosVist);
+
+/* LOP - Principal (21/10/2026, pedido dele): ao entrar, dois ícones —
+   Usuários - Acessos (abre a lista de quem acessa o quê, logo abaixo) e
+   Backup (toca e faz o backup, como era na tela inicial, com "trocar pasta"). */
+function desenharPrincipal() {
+  const hub = $('cfHub'), conteudo = $('cfConteudo');
+  if (!hub || !conteudo) return;
+  conteudo.hidden = true;
+  hub.innerHTML = `
+    <button type="button" class="ar-cartao arb-tile" id="cfHubUsuarios" title="Quem acessa o quê · Senhas">
+      <img src="icons/area-usuarios.v2.svg" alt="">
+      <span class="ar-txt"><b>Usuários - Acessos</b></span>
+    </button>
+    <div id="cfHubBackup"></div>`;
+  $('cfHubUsuarios').addEventListener('click', () => {
+    conteudo.hidden = !conteudo.hidden;
+    $('cfHubUsuarios').classList.toggle('cf-hub-ativo', !conteudo.hidden);
+    if (!conteudo.hidden) dispatchEvent(new Event('gr:tela-config'));
+  });
+  desenharBackupInicio($('cfHubBackup'), avisarInicio).catch(e => {
+    $('cfHubBackup').innerHTML = `<p class="dica">Backup indisponível: ${esc(e.message || e)}</p>`;
+  });
+}
