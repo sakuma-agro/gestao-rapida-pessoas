@@ -4,12 +4,13 @@
 // precisa ter e, se sair um funcionário e faltar gente, o app avisar.
 // Decisões dele (22/10/2026):
 //  · o mínimo é digitado por ele (tela Mínimos), um número para a empresa toda;
-//  · conta quem está ATIVO, DESIGNADO e com o TREINAMENTO EM DIA.
+//  · conta quem está ATIVO, DESIGNADO e JÁ FEZ o treinamento. Vencido CONTA
+//    (pedido dele, 22/10/2026 à tarde), mas aparece em vermelho para reciclar.
 // Designar = marcar a pessoa na atividade "Brigada de incêndio" ou "Primeiros
 // socorros" (SST › Atividades, tabela sst_atividade_funcionarios). Assim a
 // pessoa passa a ser cobrada do curso pelo resto do app, sem regra nova.
 // O curso que vale é o que a atividade exige (sst_atividade_treinamentos),
-// com a reciclagem contando pelo inicial (grupoTr). Vencido não conta; quem
+// com a reciclagem contando pelo inicial (grupoTr). Vencido conta (vermelho); quem
 // vence dentro do prazo de aviso (60 dias) aparece em amarelo.
 // Configuração: sst_brigada_config (uma linha: mínimos, aviso_dias e qual
 // atividade é qual). Banco trancado por app_pode_algum('{sst,epis}').
@@ -91,7 +92,7 @@ function cursoDaPessoa(funcionarioId, g) {
     if (!ult) s = { conta: false, logo: false, rotulo: 'nunca fez o curso — não conta', cor: 'perigo', vence: null, ordem: 0, curso: nomeTipo(grupo) };
     else {
       const sit = situacaoDe(ult.vence);
-      if (sit.chave === 'vencido') s = { conta: false, logo: false, rotulo: `curso vencido em ${br(ult.vence)} — não conta`, cor: 'perigo', vence: ult.vence, ordem: 1 };
+      if (sit.chave === 'vencido') s = { conta: true, logo: false, venc: true, rotulo: `curso vencido em ${br(ult.vence)} — reciclar`, cor: 'perigo', vence: ult.vence, ordem: 1 };
       else if (sit.dias != null && sit.dias <= avisoDias()) s = { conta: true, logo: true, rotulo: sit.dias === 0 ? 'curso vence hoje' : `curso vence em ${sit.dias} dia${sit.dias > 1 ? 's' : ''} (${br(ult.vence)})`, cor: 'alerta', vence: ult.vence, ordem: 2 };
       else s = { conta: true, logo: false, rotulo: ult.vence ? `em dia até ${br(ult.vence)}` : 'em dia (sem validade)', cor: 'ativo', vence: ult.vence, ordem: 3 };
     }
@@ -113,21 +114,24 @@ function retrato(g, { semId = null } = {}) {
     .sort((a, b) => (b.c.conta - a.c.conta) || a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
   const tem = gente.filter(x => x.c.conta).length;
   const logo = gente.filter(x => x.c.logo).length;
+  const vencidos = gente.filter(x => x.c.venc).length;
   const precisa = Number(B.cfg?.[g.min] || 0);
   const candidatos = ativos().filter(f => !ids.has(f.id) && f.id !== semId)
     .map(f => ({ f, c: cursoDaPessoa(f.id, g) }))
     .filter(x => x.c.conta && cursosDe(B.cfg?.[g.atv]).length)
     .sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
   const desligados = (estado.funcionarios || []).filter(f => f.situacao !== 'ATIVO' && ids.has(f.id)).length;
-  return { g, gente, tem, logo, precisa, falta: Math.max(0, precisa - tem), depois: Math.max(0, precisa - (tem - logo)), candidatos, desligados };
+  return { g, gente, tem, logo, vencidos, precisa, falta: Math.max(0, precisa - tem), depois: Math.max(0, precisa - (tem - logo)), candidatos, desligados };
 }
 
 /** Frases de alerta para o painel. */
 function alertas(r) {
   const out = [];
+  if (r.vencidos) out.push({ cor: 'info', txt: `${r.g.nome}: ${r.vencidos} designado(s) com o curso vencido — contam, mas precisam reciclar.` });
+  if (r.logo) out.push({ cor: 'info', txt: `${r.g.nome}: ${r.logo} curso(s) vencem nos próximos ${avisoDias()} dias — agendar reciclagem.` });
   if (!r.precisa) return out;
   if (r.falta) out.push({ cor: 'erro', txt: `${r.g.nome} abaixo do mínimo: tem ${r.tem} de ${r.precisa} — falta${r.falta > 1 ? 'm' : ''} ${r.falta} ${r.falta > 1 ? r.g.papeis : r.g.papel}.` });
-  else if (r.logo && r.tem - r.logo < r.precisa) out.push({ cor: 'info', txt: `${r.g.nome}: ${r.logo} curso(s) vencem nos próximos ${avisoDias()} dias. Sem reciclagem, fica com ${r.tem - r.logo} de ${r.precisa}.` });
+
   return out;
 }
 
@@ -155,7 +159,7 @@ export async function avisoDesligamentoBrigada(funcionarioId) {
       if (depois.falta && contava) t += ` — FALTA${depois.falta > 1 ? 'M' : ''} ${depois.falta}`;
     }
     t += '.';
-    if (depois.falta && depois.candidatos.length) t += ` Com o curso em dia e ainda não designados: ${depois.candidatos.slice(0, 4).map(x => x.f.nome.split(' ')[0]).join(', ')}${depois.candidatos.length > 4 ? '…' : ''}.`;
+    if (depois.falta && depois.candidatos.length) t += ` Já fizeram o curso e ainda não estão designados: ${depois.candidatos.slice(0, 4).map(x => x.f.nome.split(' ')[0]).join(', ')}${depois.candidatos.length > 4 ? '…' : ''}.`;
     linhas.push(t);
   }
   return linhas.length
@@ -192,21 +196,21 @@ async function salvarMinimos(valores) {
 const chip = (cor, txt) => `<span class="tag ${cor}">${esc(txt)}</span>`;
 
 function cartaoGrupo(r) {
-  const corFalta = r.precisa ? (r.falta ? 'perigo' : r.logo && r.tem - r.logo < r.precisa ? 'atencao' : 'ok') : 'calma';
+  const corFalta = r.precisa ? (r.falta ? 'perigo' : 'ok') : 'calma';
   return `<div class="cartao br-grupo">
     <div class="barra entre" style="margin:0"><h3 style="margin:0">${esc(r.g.nome)}</h3>
       <button class="btn mini" type="button" data-br-ir="brMembros">Designar</button></div>
     <div class="pv-cards" style="margin-top:10px">
-      <div class="pv-card pv-${r.tem ? 'calma' : 'perigo'}"><span>Tem</span><strong>${r.tem}</strong><small>designados com curso em dia</small></div>
+      <div class="pv-card pv-${r.tem ? 'calma' : 'perigo'}"><span>Tem</span><strong>${r.tem}</strong><small>designados com o curso feito</small></div>
       <div class="pv-card pv-calma${r.precisa ? '' : ' pv-zero'}"><span>Precisa</span><strong>${r.precisa || '—'}</strong><small>${r.precisa ? 'mínimo definido' : 'defina em Mínimos'}</small></div>
-      <div class="pv-card pv-${corFalta}${r.falta ? '' : ' pv-zero'}"><span>Falta</span><strong>${r.precisa ? r.falta : '—'}</strong><small>${r.logo ? `${r.logo} vence(m) em até ${avisoDias()} dias` : 'nenhum vencendo'}</small></div>
+      <div class="pv-card pv-${corFalta}${r.falta ? '' : ' pv-zero'}"><span>Falta</span><strong>${r.precisa ? r.falta : '—'}</strong><small>${[r.vencidos ? `${r.vencidos} vencido(s)` : '', r.logo ? `${r.logo} vence(m) em até ${avisoDias()} dias` : ''].filter(Boolean).join(' · ') || 'nenhum vencendo'}</small></div>
     </div>
     <table class="dc-planilha" style="margin-top:10px"><thead><tr><th>${esc(r.g.papeis[0].toUpperCase() + r.g.papeis.slice(1))} designados</th><th style="width:22%">Fazenda</th><th style="width:36%">Curso</th></tr></thead><tbody>
       ${r.gente.length ? r.gente.map(x => `<tr><td>${esc(x.f.nome)}<br><span class="dc-sem">${esc(x.f.cargo || '')}</span></td><td>${esc(x.f.fazenda || '—')}</td><td>${chip(x.c.cor, x.c.rotulo)}</td></tr>`).join('')
         : `<tr><td colspan="3" class="dc-sem">Ninguém designado ainda. Use "Designar".</td></tr>`}
     </tbody></table>
     ${r.desligados ? `<p class="dica" style="margin:6px 0 0">${r.desligados} designado(s) já desligado(s) — não entram na conta.</p>` : ''}
-    ${r.candidatos.length ? `<div class="br-cand"><b>Podem entrar</b> <span class="dica">(curso em dia, não designados):</span>
+    ${r.candidatos.length ? `<div class="br-cand"><b>Podem entrar</b> <span class="dica">(já fizeram o curso, não designados):</span>
       ${r.candidatos.map(x => `<button class="btn mini" type="button" data-br-add="${r.g.chave}" data-f="${x.f.id}" title="${esc(x.c.rotulo)}">+ ${esc(x.f.nome)}</button>`).join(' ')}</div>` : ''}
   </div>`;
 }
@@ -219,7 +223,7 @@ function desenharPainel() {
   tela.innerHTML = `<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">Brigada e primeiros socorros</h2>
-        <p class="dica" style="margin:2px 0 0">Conta quem está ativo, designado e com o curso em dia. Vencido não conta.</p></div>
+        <p class="dica" style="margin:2px 0 0">Conta quem está ativo, designado e já fez o curso. Vencido conta, mas aparece em vermelho para reciclar.</p></div>
       <span class="barra"><button class="btn" type="button" id="brPdf">Relatório PDF</button></span>
     </div>
     ${semMin ? '<div class="aviso info" style="margin-top:10px">Os mínimos ainda não foram definidos. Informe quantos brigadistas e socorristas a SAKUMA precisa em <a href="#" data-br-ir="brMinimos">Mínimos</a>.</div>' : ''}
@@ -286,7 +290,7 @@ function desenharMinimos() {
       <div class="barra" style="margin-top:12px"><button class="btn principal" type="submit">Salvar</button><span class="dica" id="brMinMsg"></span></div>
     </form>
     <p class="dica" style="margin:14px 0 0">Quem conta: designado na atividade <b>${esc(atvNome(cfg.atividade_brigada_id) || 'Brigada de incêndio — não encontrada')}</b> ou
-      <b>${esc(atvNome(cfg.atividade_socorros_id) || 'Primeiros socorros — não encontrada')}</b>, ativo e com o curso que a atividade exige em dia.
+      <b>${esc(atvNome(cfg.atividade_socorros_id) || 'Primeiros socorros — não encontrada')}</b>, ativo e que já fez o curso que a atividade exige (vencido conta, marcado para reciclar).
       Os cursos de cada atividade se ajustam em SST › Atividades.</p>
     ${cfg.atualizado_em ? `<p class="dica" style="margin:6px 0 0">Última alteração: ${br(String(cfg.atualizado_em).slice(0, 10))}</p>` : ''}
   </div>`;
@@ -310,7 +314,7 @@ function documentoBrigada(rs) {
     <h2 class="rel-secao">${esc(r.g.nome)} — tem ${r.tem}${r.precisa ? ` de ${r.precisa}` : ''}${r.precisa && r.falta ? ` · faltam ${r.falta}` : ''}</h2>
     <table class="rel-tabela"><thead><tr><th>Nome</th><th>Função</th><th>Fazenda</th><th>Telefone</th><th>Curso</th></tr></thead>
     <tbody>${r.gente.length ? r.gente.map(x => `<tr><td>${esc(x.f.nome)}</td><td>${esc(x.f.cargo || '—')}</td><td>${esc(x.f.fazenda || '—')}</td>
-      <td>${esc(x.f.telefone || '—')}</td><td>${esc(x.c.conta ? (x.c.vence ? 'Em dia até ' + br(x.c.vence) : 'Em dia') : 'Não conta: ' + x.c.rotulo.replace(' — não conta', ''))}</td></tr>`).join('')
+      <td>${esc(x.f.telefone || '—')}</td><td>${esc(x.c.conta ? (x.c.venc ? 'Vencido em ' + br(x.c.vence) + ' — reciclar' : x.c.vence ? 'Em dia até ' + br(x.c.vence) : 'Em dia') : 'Não conta: ' + x.c.rotulo.replace(' — não conta', ''))}</td></tr>`).join('')
       : '<tr><td colspan="5" class="rel-vazio">Ninguém designado.</td></tr>'}</tbody></table>`;
   return `<article class="rel">
     <header class="rel-cabecalho">
@@ -319,7 +323,7 @@ function documentoBrigada(rs) {
       <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span></span></div>
     </header>
     ${rs.map(bloco).join('')}
-    <p class="rel-nota">Conta quem está ativo, designado e com o curso em dia. Mínimos definidos pela SAKUMA para a empresa toda.</p>
+    <p class="rel-nota">Conta quem está ativo, designado e já fez o curso (vencido conta, marcado para reciclar). Mínimos definidos pela SAKUMA para a empresa toda.</p>
     <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>
   </article>`;
 }
