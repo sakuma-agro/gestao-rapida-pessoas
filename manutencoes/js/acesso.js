@@ -81,6 +81,14 @@ function carregarAcesso(u) {
   Acesso.gestor = !!(u && (u.admin || u.gestor));   // 22/10/2026: cadastra só nas fazendas dele
   Acesso.modulos = [...MODULOS_PADRAO];
   Acesso.telas = [];
+  /* 22/10/2026: telas marcadas em Usuários - Acessos › Máquinas e Patrimônio.
+     Marcou alguma: só as marcadas aparecem e o módulo sem tela marcada fica
+     em cinza. Administrador do sistema vê tudo. */
+  const marcadas = (u && !u.sistema && u.telasArea) || [];
+  if (marcadas.length) {
+    Acesso.telas = marcadas.map(t => (moduloDe(t) || '') + ':' + t).filter(x => !x.startsWith(':'));
+    Acesso.modulos = MODULOS_PADRAO.filter(m => Acesso.telas.some(x => x.startsWith(m + ':')));
+  }
   Acesso.carregado = true;
   return Acesso;
 }

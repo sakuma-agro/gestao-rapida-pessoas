@@ -1086,12 +1086,23 @@ function desenharPermissoes() {
   $('usDestinos')?.addEventListener('change', ev => { e.destinos = ev.target.value ? [ev.target.value] : []; });
   $('usManut')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
-    if (ev.target.checked) mods.add('manutencoes'); else mods.delete('manutencoes');
+    if (ev.target.checked) mods.add('manutencoes');
+    else { mods.delete('manutencoes'); e.telas = (e.telas || []).filter(x => !x.startsWith(MQ_TELA)); }
     e.modulos = [...mods];
     desenharPermissoes();
   });
-  $('usManutAdmin')?.addEventListener('change', ev => { e.manut.admin = ev.target.checked; desenharPermissoes(); });
-  $('usManutRestrito')?.addEventListener('change', ev => { e.manut.restrito = ev.target.checked; desenharPermissoes(); });
+  raiz.querySelectorAll('input[name="usManutNivel"]').forEach(r => r.addEventListener('change', () => {
+    e.manut.admin = r.value !== 'uso';
+    e.manut.restrito = r.value === 'fazenda';
+    desenharPermissoes();
+  }));
+  raiz.querySelectorAll('input[data-mq-tela]').forEach(cx => cx.addEventListener('change', () => {
+    const t = new Set(e.telas || []);
+    if (cx.checked) t.add(MQ_TELA + cx.dataset.mqTela); else t.delete(MQ_TELA + cx.dataset.mqTela);
+    e.telas = [...t];
+    desenharPermissoes();
+  }));
+  $('usMqTodas')?.addEventListener('click', () => { e.telas = (e.telas || []).filter(x => !x.startsWith(MQ_TELA)); desenharPermissoes(); });
   $('usSal')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add(PERM_SALARIOS); else mods.delete(PERM_SALARIOS);
@@ -1139,6 +1150,7 @@ function desenharPermissoes() {
   raiz.querySelectorAll('input[data-fazenda]').forEach(cx => cx.addEventListener('change', () => {
     const id = cx.dataset.fazenda;
     e.manut.fazendas = cx.checked ? [...new Set([...e.manut.fazendas, id])] : e.manut.fazendas.filter(x => x !== id);
+    desenharPermissoes();
   }));
   $('usCopiar')?.addEventListener('change', ev => {
     const o = usuarios.find(u => u.email === ev.target.value);
@@ -1261,27 +1273,64 @@ function blocoSal(e) {
   </div>`;
 }
 
-/* Bloco "Área Manutenções" na ficha da pessoa: entra ou não, é administradora
-   da área ou não, e quais fazendas enxerga. */
+/* Bloco "Área Máquinas e Patrimônio" na ficha da pessoa (refeito 22/10/2026,
+   pedido dele: "quero decidir esse acesso em Usuários e acesso"). Três
+   decisões, de cima para baixo:
+   1) Nível — usa no dia a dia / administra as fazendas marcadas / administra
+      todas (manutencao.administradores, coluna todas_fazendas);
+   2) Fazendas que enxerga (manutencao.usuario_fazendas);
+   3) Telas da área — em app_usuarios.telas com o prefixo 'maquinas.tela:'
+      (nada marcado = todas), lido por manutencoes/js/acesso.js. */
+const MQ_TELA = 'maquinas.tela:';
+const MQ_MODULOS = [
+  ['Manutenções', [['painel', 'Preventivas'], ['maquinas', 'Cadastros'], ['calendario', 'Calendário'],
+    ['ordens', 'Ordens de serviço'], ['checklist', 'Check list'], ['horimetros', 'Horímetros lançados'], ['vencimentos', 'Planilha']]],
+  ['Patrimônio', [['patrimonio', 'Bens'], ['patrimonio_mov', 'Movimentações']]],
+];
+const MQ_NIVEIS = [
+  ['uso', 'Usa no dia a dia', 'lança horímetro, abre e fecha OS, faz check list e movimenta bens — não mexe nos cadastros'],
+  ['fazenda', 'Administra as fazendas marcadas', 'também cadastra e edita máquinas, itens de manutenção, trocas e bens — só nas fazendas marcadas abaixo'],
+  ['total', 'Administra todas as fazendas', 'mexe em tudo da área, inclusive nas listas gerais (itens, tipos de máquina, modelos de check list)'],
+];
+const nivelManut = m => !m.admin ? 'uso' : m.restrito ? 'fazenda' : 'total';
+
 function blocoManut(e) {
   const tem = temManut(e);
   const m = e.manut || { fazendas: [], admin: false, restrito: false };
-  const total = m.admin && !m.restrito;
+  const nivel = nivelManut(m);
+  const telas = estMarcados(e, MQ_TELA);
+  const nomeF = id => manut.locais.find(l => l.id === id)?.nome || '';
+  const fz = m.fazendas.map(nomeF).filter(Boolean);
+  const resumo = !tem ? 'não entra'
+    : e.admin ? 'administrador do sistema · vê tudo'
+    : `${MQ_NIVEIS.find(n => n[0] === nivel)[1].toLowerCase()} · ${nivel === 'total' ? 'todas as fazendas' : fz.length ? fz.join(', ') : 'nenhuma fazenda'} · ${telas.length ? telas.length + (telas.length === 1 ? ' tela' : ' telas') : 'todas as telas'}`;
+
+  let detalhe = '';
+  if (tem && !e.admin) {
+    detalhe = manut.erro ? `<p class="dc-sem">${esc(manut.erro)}</p>` : `
+    <div class="us-est"><div class="us-est__topo"><b>1. O que pode fazer</b></div>
+      <div class="us-niveis">${MQ_NIVEIS.map(([id, nome, txt]) => `
+        <label class="us-nivel ${nivel === id ? 'ativo' : ''}"><input type="radio" name="usManutNivel" value="${id}" ${nivel === id ? 'checked' : ''}>
+          <span><b>${esc(nome)}</b><small>${esc(txt)}</small></span></label>`).join('')}</div></div>
+    <div class="us-est"><div class="us-est__topo"><b>2. Fazendas que enxerga</b>
+      ${nivel === 'total' ? '<span class="dc-sem">todas — quem administra todas vê todas</span>' : '<span class="dc-sem">só as máquinas e bens destas fazendas aparecem para ela</span>'}</div>
+      ${nivel === 'total' ? '' : `<div class="us-telas">${manut.locais.map(l => `
+        <label class="us-tela"><input type="checkbox" data-fazenda="${l.id}" ${m.fazendas.includes(l.id) ? 'checked' : ''}>
+          <span>${esc(l.nome)}</span></label>`).join('') || '<span class="dc-sem">Nenhuma fazenda cadastrada.</span>'}</div>
+        ${m.fazendas.length ? '' : '<p class="us-alerta">Marque pelo menos uma fazenda — sem fazenda a pessoa entra e não vê nenhuma máquina.</p>'}`}</div>
+    <div class="us-est"><div class="us-est__topo"><b>3. Telas que abre</b> <span class="dc-sem">nada marcado = todas</span>
+      ${telas.length ? '<button type="button" class="btn-fantasma us-mq-limpar" id="usMqTodas">Liberar todas</button>' : ''}</div>
+      ${MQ_MODULOS.map(([mod, ts]) => `<div class="us-mq-grupo"><span class="us-sub">${esc(mod)}</span>
+        <div class="us-telas">${ts.map(([t, nome]) => `
+          <label class="us-tela"><input type="checkbox" data-mq-tela="${t}" ${telas.includes(t) ? 'checked' : ''}><span>${esc(nome)}</span></label>`).join('')}</div></div>`).join('')}
+      <p class="dc-sem">Marcando uma tela, só as marcadas aparecem; o módulo sem nenhuma tela marcada fica em cinza.</p></div>`;
+  }
   return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="manutencoes">
     <label class="us-mod__topo">
-      <input type="checkbox" id="usManut" ${tem ? 'checked' : ''}>
+      <input type="checkbox" id="usManut" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Máquinas e Patrimônio</b>
-      <span class="dc-sem">${!tem ? 'não entra' : total ? 'administra a área · todas as fazendas' : m.admin ? `administra · ${m.fazendas.length} fazenda(s)` : `${m.fazendas.length} fazenda(s)`}</span>
-    </label>
-    ${!tem ? '' : manut.erro ? `<p class="dc-sem">${esc(manut.erro)}</p>` : `
-    <label class="us-tela"><input type="checkbox" id="usManutAdmin" ${m.admin ? 'checked' : ''}>
-      <span>Administrador da área<small>mexe nos cadastros de máquinas, patrimônio, planos e check lists; vê todas as fazendas</small></span></label>
-    ${m.admin ? `<label class="us-tela"><input type="checkbox" id="usManutRestrito" ${m.restrito ? 'checked' : ''}>
-      <span>Só nas fazendas marcadas abaixo<small>cadastra máquinas, itens, trocas e bens só delas; listas gerais (itens, tipos, modelos de check list) ficam com o administrador de todas</small></span></label>` : ''}
-    ${total ? '' : `<div class="us-subbloco"><span class="us-sub">Fazendas que enxerga</span>
-      <div class="us-telas">${manut.locais.map(l => `
-        <label class="us-tela"><input type="checkbox" data-fazenda="${l.id}" ${m.fazendas.includes(l.id) ? 'checked' : ''}>
-          <span>${esc(l.nome)}</span></label>`).join('') || '<span class="dc-sem">Nenhuma fazenda cadastrada.</span>'}</div></div>`}`}
+      <span class="dc-sem">${esc(resumo)}</span>
+    </label>${detalhe}
   </div>`;
 }
 

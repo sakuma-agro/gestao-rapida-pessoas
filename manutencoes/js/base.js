@@ -52,7 +52,7 @@ async function quemSou(sessao) {
   if (App.online) {
     try {
       const { data } = await App.sb.schema('public').from('app_usuarios')
-        .select('nome, usuario, admin, modulos').eq('email', email).maybeSingle();
+        .select('nome, usuario, admin, modulos, telas').eq('email', email).maybeSingle();
       const { data: adm } = await App.sb.rpc('eh_administrador');
       /* 22/10/2026: administrador só das fazendas marcadas (ex.: Laís na
          Quebra Cocão) — mexe nos cadastros, mas só enxerga as fazendas dela. */
@@ -64,9 +64,12 @@ async function quemSou(sessao) {
         nome: data.nome || data.usuario || email,
         usuario: data.usuario || null,
         admin: !!adm,
+        sistema: !!data.admin,   // administrador do app inteiro
         gestor: !!adm || gest,
         pode: !!(data.admin || (data.modulos || []).includes('manutencoes')),
         locais: (ul || []).map(x => x.local_id),
+        // 22/10/2026: telas marcadas em Usuários - Acessos (nada marcado = todas)
+        telasArea: (data.telas || []).filter(x => x.startsWith('maquinas.tela:')).map(x => x.slice(14)),
       };
     } catch (e) { console.warn('não li o usuário', e); }
   }
