@@ -26,6 +26,7 @@ import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanha
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
+import { ligarConsolidado, abrirConsolidado } from './treino-consolidado.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
@@ -136,6 +137,7 @@ function abrirAba(nome) {
   $('telaTrVenc').hidden  = nome !== 'trVenc';
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaTrFuncoes').hidden = nome !== 'trFuncoes';
+  $('telaTrConsol').hidden = nome !== 'trConsol';
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
@@ -188,6 +190,7 @@ function abrirAba(nome) {
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
   if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
+  if (nome === 'trConsol') abrirConsolidado();
   for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
   // SST › Campanhas (21/10/2026) — js/sst-campanhas.js
@@ -2002,6 +2005,7 @@ ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
 ligar('treinamentos por função', ligarTreinoFuncao);
+ligar('treinamentos consolidados', ligarConsolidado);
 ligar('termos', () => ligarTermos(mostrarAviso));
 ligar('backup', () => ligarBackup(mostrarAviso));
 ligar('acesso rápido', () => ligarAtalhos(abrirModulo, mostrarAviso));

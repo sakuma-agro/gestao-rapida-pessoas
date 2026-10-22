@@ -971,6 +971,44 @@ addEventListener('beforeinstallprompt', function (ev) {
     <section class="tela" id="telaCamTemas" hidden></section>
 
     <!-- ---- SST · TREINAMENTOS: treinamentos por função (20/10/2026) ---- -->
+    <!-- ---- SST · TREINAMENTOS: consolidado (22/10/2026) — js/treino-consolidado.js ---- -->
+    <section class="tela" id="telaTrConsol" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Treinamentos consolidados</h2>
+            <p class="dica" style="margin:2px 0 0">Todos os treinamentos já realizados, com as reciclagens. Sem situação de vencimento.</p>
+          </div>
+          <span class="barra">
+            <button class="btn principal" type="button" id="bLancarTc">Lançar treinamento</button>
+          </span>
+        </div>
+        <div class="grade larga" style="margin-top:14px">
+          <label class="campo tc-destaque">Funcionário <select id="tcFunc"><option value="">Todos</option></select></label>
+          <label class="campo">Treinamento <select id="tcTipo"><option value="">Todos</option></select></label>
+          <label class="campo">NR <select id="tcNr"><option value="">Todas</option></select></label>
+          <label class="campo">Realizado de <input type="date" id="tcDe"></label>
+          <label class="campo">até <input type="date" id="tcAte"></label>
+          <label class="campo">Funcionários
+            <select id="tcSit">
+              <option value="ATIVO">Somente ativos</option>
+              <option value="">Todos</option>
+            </select>
+          </label>
+        </div>
+        <div id="tcResumo" style="margin-top:14px"></div>
+        <div id="tcTabela" class="tc-rolo" style="margin-top:12px"></div>
+      </div>
+
+      <div class="previa-lista" id="tcSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirTc">Imprimir</button>
+        <span class="dc-sem" id="tcDicaImp">Imprime a lista filtrada (A4 deitada).</span>
+        <span class="cresce"></span>
+      </div>
+    </section>
+
     <section class="tela" id="telaTrFuncoes" hidden>
       <div class="cartao naoimprimir">
         <div class="barra entre" style="margin:0">

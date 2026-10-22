@@ -70,6 +70,7 @@ export const MODULOS = [
     { id: 'treinamentos', nome: 'Treinamentos', telas: [
       ['trPainel', 'Painel'],
       ['trVenc', 'Vencimentos'],
+      ['trConsol', 'Consolidado'],
       ['trFuncoes', 'Treinamentos por função'],
       ['trTipos', 'Tipos e periodicidade'],
     ] },

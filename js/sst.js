@@ -1115,6 +1115,7 @@ function ligarReceita(r, avisar) {
     desenharPainel(r);
     lerDonos(r).then(() => { if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r); });
     avisar(`${r.id === 'exame' ? 'Exame' : 'Treinamento'} salvo.`);
+    dispatchEvent(new Event('gr:sst-mudou'));
   });
 
   $(r.el.apagar).addEventListener('click', async () => {
@@ -1128,6 +1129,7 @@ function ligarReceita(r, avisar) {
     desenharVenc(r);
     desenharPainel(r);
     lerDonos(r).then(() => { if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r); });
+    dispatchEvent(new Event('gr:sst-mudou'));
   });
 
   /* ---- salvar tipo ---- */
@@ -1186,7 +1188,10 @@ function mostrarErro(id, texto) {
 export function ligarSst(avisar = () => {}) {
   Object.values(RECEITAS).forEach(r => ligarReceita(r, avisar));
   aoMudarArquivos(() => Object.values(RECEITAS).forEach(r =>
-    lerDonos(r).then(() => { if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r); })));
+    lerDonos(r).then(() => {
+      if (!$(r.el.tabela).closest('.tela')?.hidden) desenharVenc(r);
+      dispatchEvent(new Event('gr:sst-mudou'));
+    })));
 
   // o diálogo de escolher a pessoa é um só para as duas telas
   $('formFichaSst').addEventListener('submit', ev => {
