@@ -1,0 +1,9 @@
+-- SST › Atividades (22/10/2026, gr-v319). Já aplicado (migração sst_atividades).
+-- A pessoa é cobrada do que a função exige + o que as atividades que ela faz exigem.
+-- sst_atividades(id, nome, descricao, ativo, ordem)
+-- sst_atividade_treinamentos(atividade_id, tipo_id -> sst_tipos_treinamento)
+-- sst_atividade_exames(atividade_id, tipo_id -> sst_tipos_exame)
+-- sst_atividade_funcionarios(atividade_id, funcionario_id)
+-- RLS: logados leem; grava quem tem sst/epis (app_pode_algum), igual às listas por função.
+-- 16 atividades padrão cadastradas (pulverização, trator, colhedora, altura,
+-- transporte, drone, secador de café com audiometria etc.).

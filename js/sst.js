@@ -12,6 +12,7 @@ import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens, dados
   conferenciaDo, pendenciasDe } from './aso.js';
 import { definirTiposTr, carregarTreinoFuncao, dadosTreinoFuncao, definirTreinoFuncao,
   limparTreinoFuncao, funcaoExige, pendenciasTrDe, pendenciasTodos } from './treino-funcao.js';
+import { carregarAtividades, dadosAtividades, definirAtividades, limparAtividades } from './atividades-dados.js';
 import { documentoFichaSst, verFichaSst, fecharFichaSst, imprimirFichaSst } from './sst-ficha.js';
 import { abrirModulo, podeTela } from './acesso.js';
 
@@ -151,7 +152,7 @@ const COLECOES = { sst_exames: ['exame', 'regs'], sst_tipos_exame: ['exame', 'ti
 const CHAVES = { sst_aso_itens: ['exame_id', 'tipo_id'] };
 function salvarCaixa() {
   nucleo.gravarCaixa(CAIXA, { exame: S.exame, treinamento: S.treinamento, aso: dadosAso(),
-    trFuncao: dadosTreinoFuncao() });
+    trFuncao: dadosTreinoFuncao(), atividades: dadosAtividades() });
 }
 const CAMADA_DEF = {
   tabelaDe: c => c,
@@ -181,6 +182,7 @@ export async function carregarSst() {
     S.exame = c0.exame || S.exame; S.treinamento = c0.treinamento || S.treinamento;
     definirTipos(S.exame.tipos); definirAso(c0.aso || {});
     definirTiposTr(() => S.treinamento.tipos, () => S.treinamento.regs); definirTreinoFuncao(c0.trFuncao);
+    definirAtividades(c0.atividades);
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -212,12 +214,14 @@ export async function carregarSst() {
   definirTiposTr(() => S.treinamento.tipos, () => S.treinamento.regs);
   try { await carregarAso(); } catch { /* fica o que havia */ }
   try { await carregarTreinoFuncao(); } catch { /* fica o que havia */ }
+  try { await carregarAtividades(); } catch { /* fica o que havia */ }
   salvarCaixa();
 }
 
 export function limparSst() {
   limparAso();
   limparTreinoFuncao();
+  limparAtividades();
   limparPreviaSst();
   S.exame = { tipos: [], regs: [] };
   S.treinamento = { tipos: [], regs: [] };
@@ -742,7 +746,7 @@ function painelDoTipo(r, tipoId) {
         <th>Funcionário</th><th>Setor</th><th class="ce"></th></tr></thead><tbody>
         ${sem.map(f => `<tr>
           <td><b>${esc(f.nome)}</b><br><span class="dc-sem">${esc(f.cargo || '—')}${
-            funcaoExige(f, grupo) === null ? ' · função sem lista' : ' · a função exige'}</span></td>
+            funcaoExige(f, grupo) === null ? ' · sem lista na função nem atividade' : ' · exigido pela função ou atividade'}</span></td>
           <td>${esc(f.setor || '—')}</td>
           <td class="ce"><button type="button" class="btn mini" data-lancar="${f.id}">Lançar</button></td>
         </tr>`).join('')}</tbody></table>`
@@ -1267,6 +1271,7 @@ async function verAnexo(r, id, botao) {
 /* Para o Calendário do SST (js/sst-calendario.js). */
 export { carregarSst as garantirSst };
 export const sstCarregado = () => S.carregado;
+export const guardarCopiaSst = () => salvarCaixa();
 export const lancamentosSst = () => ({ exame: S.exame, treinamento: S.treinamento });
 export const grupoSst = (kind, tipoId) => grupoDe(RECEITAS[kind], tipoId);
 export const anexoSst = (kind, id) => donos[kind].has(String(id));

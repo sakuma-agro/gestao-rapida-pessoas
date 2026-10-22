@@ -1636,3 +1636,25 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 @media (max-width:640px){.tc-pessoa{grid-template-columns:auto minmax(0,1fr)}.tc-nums{grid-column:1/-1;text-align:left}}
 #dlgTipoTr .grade > p.plena{grid-column:1/-1}
 #ttDocAviso[hidden]{display:none}
+
+/* SST › Atividades (22/10/2026) — js/sst-atividades.js */
+.atv-chips{display:flex;flex-wrap:wrap;gap:4px}
+.atv-chip{font-size:11px;border-radius:4px;padding:2px 6px;line-height:1.35;font-weight:700}
+.atv-chip.tr{background:var(--verde-fundo);color:var(--verde-esc)}
+.atv-chip.ex{background:rgba(42,143,166,.14);color:#0E4E60}
+:root[data-theme="dark"] .atv-chip.ex{color:#7cc7d8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .atv-chip.ex{color:#7cc7d8}}
+.atv-legenda{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:12px}
+#dlgAtv{width:min(920px,calc(100vw - 24px))}
+.atv-duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:12px}
+.atv-caixa{border:1px solid var(--linha);border-radius:10px;padding:10px 12px;display:grid;gap:8px;align-content:start;min-width:0;margin-top:12px}
+.atv-duas .atv-caixa{margin-top:0}
+.atv-caixa h4{margin:0;font-size:13px}
+.atv-caixa h4.tr{color:var(--verde-esc)}
+.atv-caixa h4.ex{color:#2A8FA6}
+#atvTreinos,#atvExames{max-height:260px;overflow:auto}
+.atv-pessoas{max-height:220px;overflow:auto}
+.fu-atv{display:grid;gap:6px}
+.atv-marcas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:4px 14px;margin-top:4px}
+.atv-marca{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--texto)}
+.fu-atv.plena{grid-column:1/-1}

@@ -61,6 +61,7 @@ const GRUPOS = [
   ['EPIs', 'public', ['epis', 'fichas', 'modelo']],
   ['Exames', 'public', ['sst_tipos_exame', 'sst_exames', 'sst_exames_funcao', 'sst_aso_itens']],
   ['Treinamentos', 'public', ['sst_tipos_treinamento', 'sst_treinamentos', 'sst_treinamentos_funcao']],
+  ['Atividades SST', 'public', ['sst_atividades', 'sst_atividade_treinamentos', 'sst_atividade_exames', 'sst_atividade_funcionarios']],
   ['Acidentes e CAT', 'public', ['sst_acidentes']],
   ['DISC', 'public', ['disc_perfis', 'disc_combinacoes', 'disc_avaliacoes', 'disc_marcacoes',
     'disc_cargos_esperado', 'disc_acesso']],

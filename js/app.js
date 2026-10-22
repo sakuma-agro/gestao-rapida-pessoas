@@ -27,6 +27,7 @@ import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincroniz
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
 import { ligarConsolidado, abrirConsolidado } from './treino-consolidado.js';
+import { ligarAtividades, abrirAtividades, desenharAtvFuncionario } from './sst-atividades.js';
 import { ligarTermos, abrirTermos } from './termos.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
@@ -91,7 +92,7 @@ function limparPrevias() {
 
 /* Telas que só funcionam com internet (rodada C): sem cópia local nem fila.
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
-const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes', 'trFuncoes',
+const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes', 'trFuncoes', 'sstAtv',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
   ...TELAS_ACIDENTES, ...TELAS_CAMPANHAS, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
@@ -138,6 +139,7 @@ function abrirAba(nome) {
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaTrFuncoes').hidden = nome !== 'trFuncoes';
   $('telaTrConsol').hidden = nome !== 'trConsol';
+  $('telaSstAtv').hidden = nome !== 'sstAtv';
   $('telaJorPainel').hidden       = nome !== 'jorPainel';
   $('telaJorLancar').hidden       = nome !== 'jorLancar';
   $('telaJorBoletins').hidden     = nome !== 'jorBoletins';
@@ -191,6 +193,7 @@ function abrirAba(nome) {
   if (nome === 'exFuncoes') abrirFuncoes();
   if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
   if (nome === 'trConsol') abrirConsolidado();
+  if (nome === 'sstAtv') abrirAtividades();
   for (const t of TELAS_ACIDENTES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_ACIDENTES.includes(nome)) abrirAcidentes(nome);
   // SST › Campanhas (21/10/2026) — js/sst-campanhas.js
@@ -976,6 +979,8 @@ function mostrarTreinos(fn) {
   const nome = fn?.nome || '';
   const id = editandoFunc?.id;
   alvo.textContent = resumoCadastro(nome, id);
+  // Atividades que a pessoa faz (22/10/2026): marcar muda o que ela é cobrada
+  desenharAtvFuncionario(id, () => { alvo.textContent = resumoCadastro(nome, id); });
   if (nome && !alvo.textContent) {
     sstPronto().then(() => {
       if (($('fuCargo').value || '') === (fn.id || '')) alvo.textContent = resumoCadastro(nome, id);
@@ -2006,6 +2011,7 @@ ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
 ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);
+ligar('atividades do sst', ligarAtividades);
 ligar('termos', () => ligarTermos(mostrarAviso));
 ligar('backup', () => ligarBackup(mostrarAviso));
 ligar('acesso rápido', () => ligarAtalhos(abrirModulo, mostrarAviso));

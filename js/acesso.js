@@ -74,6 +74,11 @@ export const MODULOS = [
       ['trFuncoes', 'Treinamentos por função'],
       ['trTipos', 'Tipos e periodicidade'],
     ] },
+    /* Atividades (22/10/2026): o que a pessoa faz e exige treinamento/exame
+       além da função — js/sst-atividades.js e js/atividades-dados.js. */
+    { id: 'atividades', nome: 'Atividades', telas: [
+      ['sstAtv', 'Atividades e exigências'],
+    ] },
     /* Acidentes e CAT (08/10/2026): js/sst-acidentes.js, tabela sst_acidentes. */
     { id: 'acidentes', nome: 'Acidentes', telas: [
       ['acPainel', 'Painel'],

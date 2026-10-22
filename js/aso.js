@@ -10,6 +10,7 @@
 import { estado, novoId } from './store.js';
 import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
+import { examesDaPessoa } from './atividades-dados.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -51,6 +52,12 @@ export function exigidosDe(funcao) {
   return TIPOS.filter(t => ids.includes(t.id));
 }
 
+/** Atividades (22/10/2026): o que a função exige MAIS o que as atividades da pessoa exigem. */
+export function exigidosPessoa(funcionario) {
+  const ids = new Set([...exigidosDe(funcionario?.cargo).map(t => t.id), ...examesDaPessoa(funcionario?.id)]);
+  return TIPOS.filter(t => ids.has(t.id));
+}
+
 export async function carregarAso() {
   const c = estado.cliente;
   const [pf, it] = await Promise.all([
@@ -87,7 +94,7 @@ export function limparAso() {
 export function conferenciaDo(exame, funcionario) {
   const t = tipo(exame?.tipo_id);
   if (!t || t.categoria !== 'aso') return null;
-  const exigidos = exigidosDe(funcionario?.cargo);
+  const exigidos = exigidosPessoa(funcionario);
   if (!exigidos.length) return null;
   const marcados = A.itens.get(exame.id) || [];
   const feitos = exigidos.filter(e => marcados.some(m => m.tipo_id === e.id && m.feito)).length;
@@ -107,7 +114,7 @@ export function conferenciaDo(exame, funcionario) {
  * @returns {{ lista: Array, semLista: boolean }}
  */
 export function pendenciasDe(funcionario, regs) {
-  const exigidos = exigidosDe(funcionario?.cargo);
+  const exigidos = exigidosPessoa(funcionario);
   if (!exigidos.length) return { lista: [], semLista: true };
 
   const feitos = new Set((regs || []).map(x => x.tipo_id));
@@ -139,12 +146,12 @@ export function desenharItens(exameId, funcionarioId, tipoId) {
     pendentes = null; return;
   }
 
-  const exigidos = exigidosDe(f.cargo);
+  const exigidos = exigidosPessoa(f);
   if (!exigidos.length) {
     caixa.hidden = false;
     caixa.innerHTML = `<p class="dica" style="margin:0">
-      A função <b>${esc(f.cargo || '—')}</b> ainda não tem exames cadastrados.
-      Monte a lista em <b>Exames por função</b>.</p>`;
+      A função <b>${esc(f.cargo || '—')}</b> ainda não tem exames cadastrados, nem as atividades dessa pessoa.
+      Monte a lista em <b>Exames por função</b> ou em <b>SST › Atividades</b>.</p>`;
     pendentes = null; return;
   }
 
@@ -158,7 +165,7 @@ export function desenharItens(exameId, funcionarioId, tipoId) {
   caixa.hidden = false;
   caixa.innerHTML = `
     <div class="aso-cab">
-      <b>Exames da função ${esc(f.cargo || '—')}</b>
+      <b>Exames da função ${esc(f.cargo || '—')}${examesDaPessoa(f.id).length ? ' e das atividades' : ''}</b>
       <span class="dc-sem" id="exItensConta"></span>
     </div>
     <div class="lista" id="exItensLista">

@@ -13,6 +13,7 @@
 // Tabela: sst_treinamentos_funcao (funcao, tipo_id).
 import { estado } from './store.js';
 import { LOGO, PE_LOP } from './seed.js';
+import { treinosDaPessoa } from './atividades-dados.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -70,10 +71,21 @@ export function exigidosTrDe(funcao) {
   return TIPOS_().filter(t => ids.includes(t.id));
 }
 
-/** A função dessa pessoa exige esse assunto (grupo)? null = função sem lista. */
+/* Atividades (22/10/2026): a pessoa é cobrada do que a função exige MAIS o
+   que as atividades que ela faz exigem (js/atividades-dados.js). */
+/** Tudo o que essa pessoa precisa ter: função + atividades, na ordem do catálogo. */
+export function exigidosTrPessoa(funcionario) {
+  const ids = new Set([...exigidosTrDe(funcionario?.cargo).map(t => t.id), ...treinosDaPessoa(funcionario?.id)]);
+  return TIPOS_().filter(t => ids.has(t.id));
+}
+/** Tem alguma exigência montada (lista da função ou atividade com treinamento)? */
+export const temListaPessoa = funcionario =>
+  temListaTr(funcionario?.cargo) || treinosDaPessoa(funcionario?.id).length > 0;
+
+/** Essa pessoa precisa desse assunto (grupo)? null = nem função nem atividade com lista. */
 export function funcaoExige(funcionario, grupo) {
-  if (!temListaTr(funcionario?.cargo)) return null;
-  return exigidosTrDe(funcionario.cargo).some(t => grupoTr(t.id) === grupo);
+  if (!temListaPessoa(funcionario)) return null;
+  return exigidosTrPessoa(funcionario).some(t => grupoTr(t.id) === grupo);
 }
 
 /**
@@ -81,7 +93,7 @@ export function funcaoExige(funcionario, grupo) {
  * Treinamento feito e vencido não entra aqui: esse aparece na tabela, como vencido.
  */
 export function pendenciasTrDe(funcionario, regs) {
-  const exigidos = exigidosTrDe(funcionario?.cargo);
+  const exigidos = exigidosTrPessoa(funcionario);
   if (!exigidos.length) return { lista: [], semLista: true };
   const feitos = new Set((regs || []).map(x => grupoTr(x.tipo_id)));
   return { lista: exigidos.filter(t => !feitos.has(grupoTr(t.id))), semLista: false };
@@ -89,14 +101,19 @@ export function pendenciasTrDe(funcionario, regs) {
 
 /** A linha do cadastro do funcionário: o que a função pede e o que falta. */
 export function resumoCadastro(funcao, funcionarioId) {
-  if (!so(funcao)) return '';
   if (!T.carregado) return '';
-  const exigidos = exigidosTrDe(funcao);
-  if (!exigidos.length) return `Treinamentos: a função ${funcao} ainda não tem lista em SST › Treinamentos por função.`;
+  const daFuncao = so(funcao) ? exigidosTrDe(funcao) : [];
+  const idsAtv = treinosDaPessoa(funcionarioId);
+  const daAtv = TIPOS_().filter(t => idsAtv.includes(t.id) && !daFuncao.some(d => d.id === t.id));
+  if (!daFuncao.length && !daAtv.length) {
+    return so(funcao) ? `Treinamentos: a função ${funcao} ainda não tem lista em SST › Treinamentos por função.` : '';
+  }
   const regs = REGS().filter(x => x.funcionario_id === funcionarioId);
-  const { lista } = pendenciasTrDe({ cargo: funcao }, regs);
-  const nomes = exigidos.map(t => t.nome).join(', ');
-  return `Treinamentos da função (${exigidos.length}): ${nomes}.` +
+  const { lista } = pendenciasTrDe({ cargo: funcao, id: funcionarioId }, regs);
+  const partes = [];
+  if (daFuncao.length) partes.push(`Treinamentos da função (${daFuncao.length}): ${daFuncao.map(t => t.nome).join(', ')}.`);
+  if (daAtv.length) partes.push(`Pelas atividades (${daAtv.length}): ${daAtv.map(t => t.nome).join(', ')}.`);
+  return partes.join(' ') +
     (lista.length ? ` Falta(m) ${lista.length}: ${lista.map(t => t.nome).join(', ')}.` : ' Todos já lançados.');
 }
 
@@ -300,7 +317,7 @@ export function documentoQuadroTr() {
 /** Todas as pendências dos ativos (função com lista): [{ f, t }], por função e nome. */
 export function pendenciasTodos(funcionarioId = '') {
   const ativos = estado.funcionarios
-    .filter(f => f.situacao === 'ATIVO' && temListaTr(f.cargo) && (!funcionarioId || f.id === funcionarioId))
+    .filter(f => f.situacao === 'ATIVO' && temListaPessoa(f) && (!funcionarioId || f.id === funcionarioId))
     .sort((a, b) => so(a.cargo).localeCompare(so(b.cargo), 'pt-BR') || a.nome.localeCompare(b.nome, 'pt-BR'));
   const linhas = [];
   ativos.forEach(f => {
@@ -341,7 +358,7 @@ export function documentoPendenciasTr(funcionarioId = '') {
         </tr>`;
       }).join('')}</tbody>
     </table>
-    ${p === total - 1 ? '<div class="aso-nota">Só entram funções com lista montada. Treinamento feito e vencido aparece no painel de vencimentos, não aqui.</div>' : ''}`;
+    ${p === total - 1 ? '<div class="aso-nota">Entram funções com lista montada e as atividades de cada pessoa. Treinamento feito e vencido aparece no painel de vencimentos, não aqui.</div>' : ''}`;
     folhas.push(folha('TREINAMENTOS DA FUNÇÃO NUNCA REALIZADOS', subt, corpo,
       pe + (total > 1 ? ` · folha ${p + 1} de ${total}` : ''), true));
   }

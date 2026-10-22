@@ -971,6 +971,24 @@ addEventListener('beforeinstallprompt', function (ev) {
     <section class="tela" id="telaCamTemas" hidden></section>
 
     <!-- ---- SST · TREINAMENTOS: treinamentos por função (20/10/2026) ---- -->
+    <!-- ---- SST · ATIVIDADES (22/10/2026) — js/sst-atividades.js ---- -->
+    <section class="tela" id="telaSstAtv" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Atividades e exigências</h2>
+            <p class="dica" style="margin:2px 0 0">O que a pessoa faz no dia a dia e que exige treinamento ou exame, independente da função.
+              O app cobra o que a função exige mais o que as atividades da pessoa exigem.</p>
+          </div>
+          <span class="barra"><button class="btn principal" type="button" id="bNovaAtv">Nova atividade</button></span>
+        </div>
+        <p class="dica" id="atvResumo" style="margin:10px 0 0"></p>
+        <div class="atv-legenda"><span class="atv-chip tr">Treinamento</span><span class="atv-chip ex">Exame</span>
+          <span class="dc-sem">Os exames de cada atividade devem bater com o PCMSO.</span></div>
+        <div id="atvTabela" class="tc-rolo" style="margin-top:10px"></div>
+      </div>
+    </section>
+
     <!-- ---- SST · TREINAMENTOS: consolidado (22/10/2026) — js/treino-consolidado.js ---- -->
     <section class="tela" id="telaTrConsol" hidden>
       <div class="cartao naoimprimir">
@@ -1632,6 +1650,9 @@ addEventListener('beforeinstallprompt', function (ev) {
         <small class="dc-sem" id="fuNivel"></small>
         <small class="dc-sem" id="fuTreinos"></small>
       </label>
+      <div class="campo plena fu-atv">Atividades que faz <small class="dc-sem">(SST › Atividades: o que exige treinamento ou exame além da função)</small>
+        <div id="fuAtividades"></div>
+      </div>
       <label class="campo">Faixa do plano
         <select id="fuFaixa">
           <option value="">—</option>
@@ -2088,6 +2109,38 @@ addEventListener('beforeinstallprompt', function (ev) {
     <div id="trAnexos"></div>
     <div class="barra entre">
       <button class="btn perigo" type="button" id="bApagarTreino">Apagar</button>
+      <span>
+        <button class="btn" type="button" data-fechar>Cancelar</button>
+        <button class="btn principal" type="submit">Salvar</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ DIÁLOGO: ATIVIDADE DO SST (22/10/2026) ============ -->
+<dialog id="dlgAtv" class="dlg-largo">
+  <form method="dialog" id="formAtv">
+    <h3 id="tituloAtv">Editar atividade</h3>
+    <div class="aviso erro" id="erroAtv" hidden></div>
+    <div class="grade">
+      <label class="campo">Nome da atividade <input type="text" id="atvNome" maxlength="120" required></label>
+      <label class="campo">Situação
+        <select id="atvAtivo"><option value="1">Em uso</option><option value="0">Desativada</option></select>
+      </label>
+      <label class="campo plena">Descrição (opcional) <input type="text" id="atvDesc" maxlength="200"></label>
+    </div>
+    <div class="atv-duas">
+      <div class="atv-caixa"><h4 class="tr">Treinamentos que exige</h4><div class="lista" id="atvTreinos"></div></div>
+      <div class="atv-caixa"><h4 class="ex">Exames que exige</h4><div class="lista" id="atvExames"></div></div>
+    </div>
+    <div class="atv-caixa">
+      <h4>Quem faz esta atividade <span id="atvQuemConta"></span></h4>
+      <label class="campo">Buscar <input type="text" id="atvBusca" placeholder="Nome ou função"></label>
+      <div class="lista atv-pessoas" id="atvPessoas"></div>
+      <p class="dica" style="margin:0">Também dá para marcar no cadastro do funcionário. Os dois lugares mostram a mesma lista.</p>
+    </div>
+    <div class="barra entre">
+      <button class="btn perigo" type="button" id="bApagarAtv">Apagar</button>
       <span>
         <button class="btn" type="button" data-fechar>Cancelar</button>
         <button class="btn principal" type="submit">Salvar</button>
