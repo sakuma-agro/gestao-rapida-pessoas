@@ -400,3 +400,12 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 /* cada folha da lista ocupa exatamente uma página A4 (o pé fica na mesma folha) */
 .lp-folha{box-sizing:border-box}
 @media print{ .lp-folha{margin:0 auto !important;height:296mm;min-height:0;overflow:hidden} }
+
+/* Saída de uso: destino por produto — máquina/implemento ou funcionário (22/10/2026) */
+.qc-dest{grid-column:1 / -1;display:flex;align-items:center;gap:8px;margin:-2px 0 4px}
+.qc-dest[hidden]{display:none}
+.qc-dest-rot{font-size:12px;font-weight:700;color:var(--marrom);white-space:nowrap}
+.qc-dest-inp{flex:1;min-width:0}
+.qc-lin.erro .qc-dest-inp{border-color:#c0392b}
+.qc-dest-txt{display:block;font-size:11.5px;color:var(--suave)}
+@media (max-width:560px){.qc-dest{flex-direction:column;align-items:stretch;gap:3px}}

@@ -215,3 +215,20 @@ alter table public.est_itens add column if not exists codigo text, add column if
 
 -- Data do dia em que se contou (22/10/2026): nasce com o dia de hoje e pode ser trocada com a contagem aberta.
 alter table public.est_contagens add column if not exists data_contagem date;
+
+-- Saída de uso com destino por produto (22/10/2026): lubrificante → máquina/implemento; EPI → funcionário.
+alter table public.est_movimentos add column if not exists equipamento_id uuid, add column if not exists equipamento text,
+  add column if not exists funcionario_id uuid, add column if not exists funcionario text;
+-- Lista de máquinas e implementos para quem tem a área Estoque (o catálogo de Manutenções tem RLS por fazenda).
+create or replace function public.est_destinos_equipamentos()
+returns table(id uuid, codigo text, nome text, tipo text, local text)
+language sql stable security definer set search_path = public, manutencao as $$
+  select e.id, e.codigo::text, coalesce(nullif(e.apelido,''), e.descricao)::text, t.nome::text, l.nome::text
+  from manutencao.equipamentos e
+  left join manutencao.tipos_equipamento t on t.id = e.tipo_equipamento_id
+  left join manutencao.locais l on l.id = e.local_id
+  where e.ativo is not false and public.app_pode('estoque')
+  order by (l.nome ilike '%quebra%') desc, t.nome, e.codigo;
+$$;
+revoke all on function public.est_destinos_equipamentos() from public, anon;
+grant execute on function public.est_destinos_equipamentos() to authenticated;

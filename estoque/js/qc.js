@@ -194,6 +194,8 @@ function extrato(itemId) {
 const detalhe = m => [
   m.documento ? 'doc. ' + esc(m.documento) : '',
   m.plantio ? esc(m.plantio) : '',
+  m.equipamento ? 'máquina ' + esc(m.equipamento) : '',
+  m.funcionario ? 'para ' + esc(m.funcionario) : '',
   m.operador ? esc(m.operador) : '',
   m.outra_fazenda ? (m.sentido === 'entrada' ? 'de ' : 'para ') + esc(m.outra_fazenda) : '',
   m.fornecedor ? esc(m.fornecedor) : '',
@@ -395,6 +397,54 @@ const itemPorNome = nome => itensOrdenados().find(i => semAcento(i.nome) === sem
 const LINHAS_INICIAIS = 6;
 let abertos = new Set();     // lançamentos expandidos na lista do mês
 
+/* Destino por produto na saída de uso (pedido dele, 22/10/2026):
+   lubrificante sai para uma MÁQUINA ou IMPLEMENTO (catálogo de Máquinas e
+   Patrimônio, pela função est_destinos_equipamentos) e EPI sai para um
+   FUNCIONÁRIO (cadastro de Pessoas, só os ativos). Gravado em
+   est_movimentos.equipamento_id/equipamento e funcionario_id/funcionario.
+   As listas ficam guardadas no aparelho para servir sem sinal. */
+const DEST = { equip: null, func: null };
+const CHAVE_DEST = 'estoque.qc.destinos';
+try { Object.assign(DEST, JSON.parse(localStorage.getItem(CHAVE_DEST) || '{}')); } catch { /* sem cache */ }
+const destinoDe = item => {
+  const g = semAcento(item && item.grupo);
+  if (g === 'LUBRIFICANTES') return 'equip';
+  if (g === 'EPIS') return 'func';
+  return null;
+};
+const rotuloEquip = e => [e.codigo, e.nome].filter(Boolean).join(' - ') + (e.tipo ? ` (${e.tipo}${e.local ? ' · ' + e.local : ''})` : '');
+const rotuloFunc = f => f.nome + (f.cadastro ? ` (${f.cadastro})` : '') + (f.fazenda ? ` · ${f.fazenda}` : '');
+function achaDestino(tipo, texto) {
+  const t = semAcento(texto);
+  if (!t) return null;
+  if (tipo === 'equip') {
+    const e = (DEST.equip || []).find(x => semAcento(rotuloEquip(x)) === t)
+      || (DEST.equip || []).find(x => semAcento(x.codigo) === t) || null;
+    return e ? { id: e.id, nome: [e.codigo, e.nome].filter(Boolean).join(' - ') } : null;
+  }
+  const f = (DEST.func || []).find(x => semAcento(rotuloFunc(x)) === t) || (DEST.func || []).find(x => semAcento(x.nome) === t) || null;
+  return f ? { id: f.id, nome: f.nome } : null;
+}
+function opcoesDestino() {
+  return `<datalist id="qcEquip">${(DEST.equip || []).map(e => `<option value="${esc(rotuloEquip(e))}">`).join('')}</datalist>
+    <datalist id="qcFunc">${(DEST.func || []).map(f => `<option value="${esc(rotuloFunc(f))}">`).join('')}</datalist>`;
+}
+async function carregarDestinos() {
+  const sb = window.App && window.App.sb;
+  if (!sb || !(window.App.online !== false)) return;
+  try {
+    const [e, f] = await Promise.all([
+      sb.schema('public').rpc('est_destinos_equipamentos'),
+      sb.schema('public').from('funcionarios').select('id,nome,cadastro,fazenda,situacao').order('nome'),
+    ]);
+    if (!e.error) DEST.equip = e.data || [];
+    if (!f.error) DEST.func = (f.data || []).filter(x => semAcento(x.situacao || 'ATIVO') === 'ATIVO');
+    try { localStorage.setItem(CHAVE_DEST, JSON.stringify(DEST)); } catch { /* cheio */ }
+    const lugar = $('qcDestinos');
+    if (lugar) lugar.innerHTML = opcoesDestino();
+  } catch (err) { console.warn('não li máquinas/funcionários', err); }
+}
+
 function linhaProduto(sentido) {
   const ent = sentido === 'entrada';
   return `<div class="qc-lin${ent ? ' com-valor' : ''}">
@@ -403,6 +453,8 @@ function linhaProduto(sentido) {
     ${ent ? '<input type="text" class="qc-vu" inputmode="decimal" placeholder="R$ por unid." autocomplete="off" enterkeyhint="next" aria-label="Valor por unidade">' : ''}
     <button type="button" class="cl-tirar qc-x" title="Tirar a linha" aria-label="Tirar a linha">×</button>
     <small class="qc-info"></small>
+    ${ent ? '' : `<label class="qc-dest" hidden><span class="qc-dest-rot"></span>
+      <input type="text" class="qc-dest-inp" autocomplete="off" enterkeyhint="next"></label>`}
   </div>`;
 }
 
@@ -428,7 +480,7 @@ function desenharMov(sentido) {
         <label class="campo qc-so" data-so="transferencia">Fazenda de origem *
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`
         : `
-        <label class="campo qc-so" data-so="uso">Plantio / destino * <input type="text" name="plantio" list="qcPlantios" placeholder="plantio, área, máquina ou local"></label>
+        <label class="campo qc-so" data-so="uso">Plantio / destino <small class="dc-sem">(lubrificante e EPI: destino na linha)</small> <input type="text" name="plantio" list="qcPlantios" placeholder="plantio, área, máquina ou local"></label>
         <label class="campo">Operador * <input type="text" name="operador" list="qcOperadores"></label>
         <label class="campo qc-so" data-so="transferencia">Fazenda de destino *
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`}
@@ -448,6 +500,7 @@ function desenharMov(sentido) {
       <datalist id="qcFornec">${unicos('fornecedor').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcPlantios">${unicos('plantio').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcOperadores">${unicos('operador').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
+      <div id="qcDestinos">${ent ? '' : opcoesDestino()}</div>
     </form>
   </div>
   <div class="cartao" id="qcListaCartao"></div>`;
@@ -457,9 +510,13 @@ function desenharMov(sentido) {
     const t = form.querySelector('[name=tipo]:checked').value;
     form.querySelectorAll('.qc-so').forEach(el => { el.hidden = el.dataset.so !== t; });
   };
-  form.querySelectorAll('[name=tipo]').forEach(r => r.addEventListener('change', mostrarTipo));
+  form.querySelectorAll('[name=tipo]').forEach(r => r.addEventListener('change', () => {
+    mostrarTipo();
+    document.querySelectorAll('#qcLins .qc-prod').forEach(i => i.dispatchEvent(new Event('input')));
+  }));
   mostrarTipo();
   ligarLinhas(sentido);
+  if (!ent) carregarDestinos();
   $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); };
   $('qcColar').onclick = () => colarLista(sentido);
   form.addEventListener('submit', e => { e.preventDefault(); lancar(sentido, form); });
@@ -474,8 +531,21 @@ function ligarLinhas(sentido) {
     lin.dataset.ok = '1';
     const prod = lin.querySelector('.qc-prod'), qtd = lin.querySelector('.qc-qtd'), info = lin.querySelector('.qc-info');
     const vuInp = lin.querySelector('.qc-vu');
+    const destEl = lin.querySelector('.qc-dest');
+    const mostrarDestino = it => {
+      if (!destEl) return;
+      const uso = (document.querySelector('#qcForm [name=tipo]:checked') || {}).value === 'uso';
+      const d = uso ? destinoDe(it) : null;
+      destEl.hidden = !d;
+      const inp = destEl.querySelector('.qc-dest-inp');
+      if (!d) { inp.value = ''; return; }
+      destEl.querySelector('.qc-dest-rot').textContent = d === 'equip' ? 'Máquina / implemento *' : 'Funcionário *';
+      inp.setAttribute('list', d === 'equip' ? 'qcEquip' : 'qcFunc');
+      inp.placeholder = d === 'equip' ? 'código ou nome da máquina/implemento' : 'nome do funcionário';
+    };
     const escreverInfo = () => {
       const it = itemPorNome(prod.value);
+      mostrarDestino(it);
       lin.classList.toggle('desconhecido', !!prod.value.trim() && !it);
       if (!prod.value.trim()) { info.textContent = ''; return; }
       if (!it) { info.textContent = 'não está no cadastro'; return; }
@@ -515,6 +585,13 @@ function ligarLinhas(sentido) {
       if (e.key !== 'Enter') return;
       e.preventDefault();
       if (vuInp) { vuInp.focus(); return; }
+      if (destEl && !destEl.hidden) { destEl.querySelector('.qc-dest-inp').focus(); return; }
+      const prox = lin.nextElementSibling;
+      if (prox) prox.querySelector('.qc-prod').focus();
+    });
+    if (destEl) destEl.querySelector('.qc-dest-inp').addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
       const prox = lin.nextElementSibling;
       if (prox) prox.querySelector('.qc-prod').focus();
     });
@@ -530,7 +607,8 @@ function ligarLinhas(sentido) {
 function linhasPreenchidas() {
   return [...document.querySelectorAll('#qcLins .qc-lin')]
     .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim(),
-      vuTxt: lin.querySelector('.qc-vu') ? lin.querySelector('.qc-vu').value.trim() : '' }))
+      vuTxt: lin.querySelector('.qc-vu') ? lin.querySelector('.qc-vu').value.trim() : '',
+      destTxt: lin.querySelector('.qc-dest-inp') ? lin.querySelector('.qc-dest-inp').value.trim() : '' }))
     .filter(x => x.nome || x.txt);
 }
 function contar() {
@@ -603,17 +681,26 @@ async function lancar(sentido, form) {
     if (!item) { desconhecidos.set(semAcento(x.nome), x.nome); continue; }
     if (Number.isNaN(qtd) || !qtd || qtd <= 0) { x.lin.classList.add('erro'); erros.push(`${item.nome}: quantidade`); continue; }
     if (Number.isNaN(vu) || (sentido === 'entrada' && tipo === 'compra' && !(vu > 0))) { x.lin.classList.add('erro'); erros.push(`${item.nome}: valor`); continue; }
-    linhas.push({ item, qtd, vu: vu > 0 ? vu : null });
+    let dest = null;
+    const dt = sentido === 'saida' && tipo === 'uso' ? destinoDe(item) : null;
+    if (dt) {
+      const lista = dt === 'equip' ? DEST.equip : DEST.func;
+      dest = achaDestino(dt, x.destTxt);
+      // sem a lista (aparelho nunca abriu com sinal) vale o texto digitado
+      if (!dest && x.destTxt && !(lista && lista.length)) dest = { id: null, nome: x.destTxt };
+      if (!dest) { x.lin.classList.add('erro'); erros.push(`${item.nome}: ${dt === 'equip' ? 'máquina/implemento' : 'funcionário'}`); continue; }
+    }
+    linhas.push({ item, qtd, vu: vu > 0 ? vu : null, dt, dest });
   }
   if (desconhecidos.size) return cadastrarNaHora([...desconhecidos.values()], sentido, form);
   if (erros.length) {
-    aviso(`Confira as linhas em vermelho (${erros.length}): quantidade maior que zero${sentido === 'entrada' && tipo === 'compra' ? ' e valor por unidade (obrigatório na compra)' : ''}.`, true);
+    aviso(`Confira as linhas em vermelho (${erros.length}): quantidade maior que zero${sentido === 'entrada' && tipo === 'compra' ? ' e valor por unidade (obrigatório na compra)' : ''}${sentido === 'saida' && tipo === 'uso' ? '; lubrificante pede a máquina/implemento e EPI pede o funcionário, escolhidos da lista' : ''}.`, true);
     return;
   }
   if (sentido === 'saida') {
     if (!txt('documento')) { aviso('Informe o nº do documento.', true); return; }
     if (!txt('operador')) { aviso('Informe o operador.', true); return; }
-    if (tipo === 'uso' && !txt('plantio')) { aviso('Informe o plantio ou destino.', true); return; }
+    if (tipo === 'uso' && !txt('plantio') && linhas.some(l => !l.dest)) { aviso('Informe o plantio ou destino.', true); return; }
   }
   if (tipo === 'transferencia' && !txt('outra')) { aviso(sentido === 'saida' ? 'Escolha a fazenda de destino.' : 'Escolha a fazenda de origem.', true); return; }
 
@@ -637,7 +724,9 @@ async function lancar(sentido, form) {
     obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
   };
   for (const l of linhas) await gravar('est_movimentos', Object.assign({}, base, { item_id: l.item.id, quantidade: l.qtd,
-    valor_unitario: sentido === 'entrada' ? l.vu : null }));
+    valor_unitario: sentido === 'entrada' ? l.vu : null,
+    equipamento_id: l.dt === 'equip' ? l.dest.id : null, equipamento: l.dt === 'equip' ? l.dest.nome : null,
+    funcionario_id: l.dt === 'func' ? l.dest.id : null, funcionario: l.dt === 'func' ? l.dest.nome : null }));
   aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.length} produto(s).`);
   mesLista = String(base.data).slice(0, 7);
   abertos.add(lancamento);
@@ -698,7 +787,7 @@ function desenharListaMes(sentido) {
           <span class="qc-seta">${aberto ? '▾' : '▸'}</span>
         </button>
         <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); const c = cu.mov.get(x.id) || {}; return `<div class="qc-lanc-item${ent ? ' com-valor' : ''}">
-          <span>${esc(i.nome)}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
+          <span>${esc(i.nome)}${x.equipamento || x.funcionario ? `<small class="qc-dest-txt">→ ${esc(x.equipamento || x.funcionario)}</small>` : ''}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
           ${ent ? `<label class="qc-vu-ed" title="Valor por unidade (R$)">R$/${esc(i.unidade || 'un')} <input type="text" inputmode="decimal" data-vu="${esc(x.id)}"
             value="${vazio(x.valor_unitario) ? '' : esc(Number(x.valor_unitario).toLocaleString('pt-BR', { maximumFractionDigits: 4 }))}"
             placeholder="${c.vu !== null && c.vu !== undefined ? esc(Number(c.vu).toLocaleString('pt-BR', { maximumFractionDigits: 2 })) + ' (médio)' : '—'}"></label>
@@ -753,7 +842,7 @@ function filtrados() {
     if (pf.tipo && m.tipo !== pf.tipo) return false;
     const i = itemDe(m.item_id);
     if (pf.grupo && (i.grupo || 'Outros') !== pf.grupo) return false;
-    if (t && ![i.nome, m.documento, m.plantio, m.operador, m.outra_fazenda, m.fornecedor, m.obs]
+    if (t && ![i.nome, m.documento, m.plantio, m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor, m.obs]
       .some(v => semAcento(v).includes(t))) return false;
     return true;
   }).sort((a, b) => String(b.data).localeCompare(String(a.data))
@@ -851,10 +940,10 @@ function baixarCsv(lista, cu) {
   const c = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rs = (v, casas = 2) => v == null || !isFinite(v) ? '' : Number(v).toFixed(casas).replace('.', ',');
   const linhas = [['Data', 'Entrada/Saída', 'Tipo', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Valor unitário (R$)', 'Valor total (R$)', 'Documento',
-    'Plantio', 'Operador', 'Fazenda (origem/destino)', 'Fornecedor', 'Observação', 'Lançado por']]
+    'Plantio', 'Máquina / implemento', 'Funcionário', 'Operador', 'Fazenda (origem/destino)', 'Fornecedor', 'Observação', 'Lançado por']]
     .concat(lista.map(m => { const i = itemDe(m.item_id); const k = cu.mov.get(m.id) || {}; return [dataBR(m.data), m.sentido === 'entrada' ? 'Entrada' : 'Saída',
       nomeTipo(m), i.nome, i.grupo || '', String(m.quantidade).replace('.', ','), i.unidade || '', rs(k.vu, 4), rs(k.total), m.documento, m.plantio,
-      m.operador, m.outra_fazenda, m.fornecedor, m.obs, m.criado_por]; }));
+      m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor, m.obs, m.criado_por]; }));
   const blob = new Blob(['﻿' + linhas.map(l => l.map(c).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -869,12 +958,12 @@ function montarFolhaMov(lista, cu) {
       <div class="rel-tit"><h1>Movimentações do Estoque — Faz. Quebra Cocão</h1>
         <p>${esc(periodoTxt())} · ${lista.length} lançamento(s) · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     <table class="rel-tab rel-mov" style="margin-top:6mm"><thead><tr><th class="ce">Data</th><th class="ce">E/S</th><th>Tipo</th><th>Produto</th>
-      <th class="ce">Qtd.</th><th class="ce">Valor</th><th>Documento</th><th>Plantio / Operador / Fazenda</th></tr></thead>
+      <th class="ce">Qtd.</th><th class="ce">Valor</th><th>Documento</th><th>Destino / Operador / Fazenda</th></tr></thead>
     <tbody>${lista.map(m => { const i = itemDe(m.item_id); return `<tr><td class="ce">${esc(dataBR(m.data))}</td>
       <td class="ce">${m.sentido === 'entrada' ? 'E' : 'S'}</td><td>${esc(nomeTipo(m))}</td><td>${esc(i.nome)}</td>
       <td class="ce">${m.sentido === 'entrada' ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</td>
       <td class="ce">${esc(brl((cu.mov.get(m.id) || {}).total))}</td>
-      <td>${esc(m.documento || '')}</td><td>${esc([m.plantio, m.operador, m.outra_fazenda, m.fornecedor].filter(Boolean).join(' · '))}</td></tr>`; }).join('')}</tbody></table>
+      <td>${esc(m.documento || '')}</td><td>${esc([m.plantio, m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor].filter(Boolean).join(' · '))}</td></tr>`; }).join('')}</tbody></table>
     <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
