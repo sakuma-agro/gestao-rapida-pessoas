@@ -189,7 +189,7 @@ function desenharContar() {
     const repor = l && precisaRepor(i, l.quantidade);
     return cab + `<div class="ct-item${repor ? ' repor' : ''}" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}" data-grupo="${esc(i.grupo || 'Outros')}">
       <div class="ct-linha${valor !== '' ? ' feito' : ''}">
-        <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${esc(i.unidade || '')}${lotes.length
+        <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${i.localizacao ? `📍 ${esc(i.localizacao)} · ` : ''}${esc(i.unidade || '')}${lotes.length
           ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}${textoQuadras(quads)}</small>
           <span class="ct-alerta">${repor ? textoAlerta(i, l.quantidade) : ''}</span></label>
         <input class="ct-qtd" id="q-${esc(i.id)}" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next"
@@ -1008,13 +1008,14 @@ function escolherImpressao() {
       <label class="es-check"><input type="checkbox" name="valores"${fechada ? ' checked' : ''}> Levar as quantidades já digitadas</label>
       <label class="es-check"><input type="checkbox" name="lotes"> Colunas para lote e validade</label>
       <label class="es-check"><input type="checkbox" name="faltam"> Só os itens que faltam contar</label>
+      <label class="es-check"><input type="checkbox" name="porLocal" checked> Na ordem da prateleira (localização)</label>
       <p class="dc-sem">Sai em folhas A4 no padrão SAKUMA, ${LINHAS_POR_FOLHA} linhas por folha, com espaço para escrever.</p>
       <div class="barra fim"><button class="btn principal" type="submit">Imprimir</button></div>
     </form>`, corpo => {
     corpo.querySelector('#ctImpForm').addEventListener('submit', ev => {
       ev.preventDefault();
       const f = new FormData(ev.target);
-      montarListaImpressao({ grupo: f.get('grupo') || '', valores: !!f.get('valores'), lotes: !!f.get('lotes'), faltam: !!f.get('faltam') });
+      montarListaImpressao({ grupo: f.get('grupo') || '', valores: !!f.get('valores'), lotes: !!f.get('lotes'), faltam: !!f.get('faltam'), porLocal: !!f.get('porLocal') });
       window.fecharModal();
       setTimeout(() => window.print(), 80);
     });
@@ -1029,6 +1030,11 @@ function montarListaImpressao(op) {
   const itens = itensDoLocal(sel.localId)
     .filter(i => !op.grupo || (i.grupo || 'Outros') === op.grupo)
     .filter(i => !op.faltam || !tem(i));
+  const gsOrdem = [...new Set(itens.map(i => i.grupo || 'Outros'))];
+  const GRUPOS_ORDEM = i => gsOrdem.indexOf(i.grupo || 'Outros');
+  // na ordem da prateleira (22/10/2026): A.1, A.2 … B.1; sem localização vai para o fim do grupo
+  const chaveLoc = i => String(i.localizacao || '').toUpperCase().replace(/\d+/g, d => d.padStart(4, '0')) || '\uffff';
+  if (op.porLocal) itens.sort((a, b) => (GRUPOS_ORDEM(a) - GRUPOS_ORDEM(b)) || chaveLoc(a).localeCompare(chaveLoc(b)) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const cgImp = op.grupo ? cgDe(c, op.grupo) : null;
   const data = cgImp && cgImp.data_contagem ? dataBR(cgImp.data_contagem)
     : c && c.data_contagem && (!op.grupo || grupoFechado(c, op.grupo)) ? dataBR(c.data_contagem) : (op.valores ? dataBR(dataEscolhida()) : '');
@@ -1053,8 +1059,9 @@ function montarListaImpressao(op) {
   }
   if (atual.length || !folhas.length) folhas.push(atual);
 
-  const ncol = 3 + (op.lotes ? 2 : 0) + 1;
-  const cab = `<tr><th>Item</th><th class="ce">Un.</th><th class="ce lp-qtd">Quantidade</th>${op.lotes
+  const temLoc = itens.some(i => i.localizacao);
+  const ncol = 3 + (op.lotes ? 2 : 0) + 1 + (temLoc ? 1 : 0);
+  const cab = `<tr>${temLoc ? '<th class="ce">Local</th>' : ''}<th>Item</th><th class="ce">Un.</th><th class="ce lp-qtd">Quantidade</th>${op.lotes
     ? '<th class="ce">Lote</th><th class="ce">Validade</th>' : ''}<th>Obs.</th></tr>`;
   const sub = [local.nome || '', nomeMes(sel.mes), op.grupo || 'todos os grupos', itens.length + (itens.length === 1 ? ' item' : ' itens')]
     .filter(Boolean).join(' · ');
@@ -1072,7 +1079,7 @@ function montarListaImpressao(op) {
     </div>
     <table class="rel-tab lp-tab"><thead>${cab}</thead><tbody>${fl.map(r => r.grupo
       ? `<tr class="lp-grupo"><td colspan="${ncol}">${esc(r.grupo)}${r.cont ? ' (continuação)' : ''}</td></tr>`
-      : `<tr><td>${esc(r.i.nome)}${r.i.codigo ? ` <small>cód. ${esc(r.i.codigo)}</small>` : ''}</td><td class="ce">${esc(r.i.unidade || '')}</td><td class="ce lp-qtd">${esc(r.qtd)}</td>${op.lotes
+      : `<tr>${temLoc ? `<td class="ce lp-loc">${esc(r.i.localizacao || '')}</td>` : ''}<td>${esc(r.i.nome)}${r.i.codigo ? ` <small>cód. ${esc(r.i.codigo)}</small>` : ''}</td><td class="ce">${esc(r.i.unidade || '')}</td><td class="ce lp-qtd">${esc(r.qtd)}</td>${op.lotes
         ? '<td></td><td></td>' : ''}<td></td></tr>`).join('') || `<tr><td colspan="${ncol}">Nenhum item para contar.</td></tr>`}</tbody></table>
     <div class="rel-pe">
       <div class="rel-assina"><span></span><small>Responsável pela contagem</small></div>

@@ -244,3 +244,6 @@ create table if not exists public.est_minimos (
   atualizado_em timestamptz not null default now()
 );
 -- (trigger marcar_atualizacao, RLS app_pode('estoque') e grants iguais às outras est_*)
+
+-- Localização (prateleira) do item (22/10/2026): EPIs e limpeza receberam o "A.1", "L.5"… que estava no começo do nome.
+alter table public.est_itens add column if not exists localizacao text;

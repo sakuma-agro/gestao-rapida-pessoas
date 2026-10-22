@@ -428,3 +428,7 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .cad-minfaz-tab th{text-align:left;font-size:11px;color:var(--suave);padding:2px 4px}
 .cad-minfaz-tab td{padding:3px 4px}
 .cad-minfaz-tab input{width:100%;min-width:60px}
+
+/* Localização (prateleira) — 22/10/2026 */
+.cad-loc{color:var(--marrom)}
+.lp-tab .lp-loc{width:16mm;font-weight:bold;color:#744F28}

@@ -114,7 +114,7 @@ function desenharItens() {
   const b = semAcento(buscaItens);
   const meus = meusLocais();
   const doUsuario = lista.filter(i => !meus.length || meus.some(l => contaNoLocal(i, l)));
-  const porTexto = doUsuario.filter(i => (!b || semAcento(i.nome).includes(b) || semAcento(i.codigo).includes(b) || semAcento(i.ca).includes(b)) && (!filtroLocal || contaNoLocal(i, filtroLocal)));
+  const porTexto = doUsuario.filter(i => (!b || semAcento(i.nome).includes(b) || semAcento(i.codigo).includes(b) || semAcento(i.ca).includes(b) || semAcento(i.localizacao).includes(b)) && (!filtroLocal || contaNoLocal(i, filtroLocal)));
   const gruposVistos = [...new Set(porTexto.map(i => i.grupo || 'Outros'))];
   if (filtroGrupo && !gruposVistos.includes(filtroGrupo)) filtroGrupo = '';
   const vistos = porTexto.filter(i => !filtroGrupo || (i.grupo || 'Outros') === filtroGrupo);
@@ -132,6 +132,7 @@ function desenharItens() {
       <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal" placeholder="quanto pedir"></label>
       <label class="campo">Código <input type="text" name="codigo" placeholder="código do sistema"></label>
       <label class="campo">CA (EPI) <input type="text" name="ca" placeholder="ex.: 42291"></label>
+      <label class="campo">Localização (prateleira) <input type="text" name="localizacao" placeholder="ex.: A.1"></label>
       ${caixasLocais(null)}
       <div class="barra fim" style="align-self:end"><button class="btn principal" type="submit">Adicionar</button></div>
     </form>
@@ -141,7 +142,7 @@ function desenharItens() {
     </div>
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Procurar
-        <input type="text" id="cadBusca" placeholder="Nome, código ou CA..." value="${esc(buscaItens)}"></label>
+        <input type="text" id="cadBusca" placeholder="Nome, código, CA ou prateleira..." value="${esc(buscaItens)}"></label>
       <label class="campo">Contado em <select id="cadFiltroLocal"><option value="">Todos os estoques</option>${locais().filter(l => podeLocal(l.id)).map(l =>
         `<option value="${esc(l.id)}"${l.id === filtroLocal ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
       <label class="es-check"><input type="checkbox" id="cadInativos"${verInativos ? ' checked' : ''}> mostrar desativados</label>
@@ -151,7 +152,7 @@ function desenharItens() {
       const cab = i.grupo !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo)}</h3>` : '';
       return cab + `<div class="item"><span></span>
         <div><div class="nome">${esc(i.nome)}${i.ativo === false ? ' <span class="tag inativo">desativado</span>' : ''}</div>
-          <div class="sub">${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${i.ca ? ` · CA ${esc(i.ca)}` : ''}${temMinimo(i)
+          <div class="sub">${i.localizacao ? `<b class="cad-loc">📍 ${esc(i.localizacao)}</b> · ` : ''}${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${i.ca ? ` · CA ${esc(i.ca)}` : ''}${temMinimo(i)
             ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
               ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
             : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoMinFazendas(i)}${textoLocais(i)}${resumoAgrofit(i)}</div></div>
@@ -173,7 +174,8 @@ function desenharItens() {
     if (onde && !onde.length) { aviso('Marque pelo menos um estoque em "Contado em".', true); return; }
     await gravar('est_itens', { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
       estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde, ativo: true,
-      codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null });
+      codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null,
+      localizacao: String(f.get('localizacao') || '').trim() || null });
     aviso('Item adicionado.');
     desenharItens();
     $('cadItemNovo').querySelector('[name=nome]').focus();
@@ -209,6 +211,7 @@ function editarItem(id) {
           value="${esc(mostrarNumero(i.pedido_reposicao))}" placeholder="quanto pedir"></label>
         <label class="campo">Código <input type="text" name="codigo" value="${esc(i.codigo || '')}" placeholder="código do sistema"></label>
         <label class="campo">CA (EPI) <input type="text" name="ca" value="${esc(i.ca || '')}" placeholder="ex.: 42291"></label>
+        <label class="campo">Localização (prateleira) <input type="text" name="localizacao" value="${esc(i.localizacao || '')}" placeholder="ex.: A.1"></label>
       </div>
       ${caixasLocais(i.locais_contagem)}
       ${quadroMinimos(i)}
@@ -234,7 +237,8 @@ function editarItem(id) {
       if (!(await gravarMinimos(e.target, id))) { aviso('Mínimo por fazenda: use só números (ex.: 10 ou 2,5).', true); return; }
       await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
         estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde,
-        codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null }));
+        codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null,
+        localizacao: String(f.get('localizacao') || '').trim() || null }));
       window.fecharModal(); desenharItens();
     });
     corpo.querySelector('#cadAtivo').addEventListener('click', async () => {
