@@ -36,7 +36,7 @@ import * as jd from './jornada-dados.js';
 import * as nucleo from './nucleo.js';
 import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
-import { pode, podeTela } from './acesso.js';
+import { pode, podeTela, acesso } from './acesso.js';
 import { ligarBackup } from './backup.js';
 import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as enviarAnexos,
   fotosDe, urlDoArquivo } from './arquivos.js';
@@ -47,7 +47,7 @@ import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js'
 import { abrirEnquadra, limparEnquadra, TELAS_ENQUADRA } from './rh-enquadramento.js';
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
-import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist } from './areas.js';
+import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist, mostrarAreas, areaAberta } from './areas.js';
 import { abrirCertificacao, limparCertificacao, TELAS_CERT, enviarFilaCert } from './certificacao.js';
 import { abrirCaderno, limparCaderno, TELAS_CADERNO, enviarFilaCaderno, recarregarCaderno } from './cert-caderno.js';
 
@@ -413,6 +413,17 @@ async function carregarTudo() {
      que a pessoa vá direto para Funcionários, sem abrir o DP. */
   /* Quem tem só Cadastros também precisa delas: sem isso as listas de
      unidade, setor e função do cadastro de funcionário abrem vazias. */
+  /* 22/10/2026 (Vinícius: "loga e fica sem aparecer os ícones"): a tela
+     das áreas sobe logo depois das permissões. Antes ela esperava também a
+     sincronização dos cadastros, a fila e o DP — com sinal fraco ou muita
+     coisa para baixar, a pessoa ficava olhando a tela vazia. As telas
+     abrem com os dados guardados no aparelho e se atualizam quando a
+     sincronização terminar. */
+  montarMenu(abrirAba);
+  abrirPrimeiraTela();
+  if (acesso.provisorio) tentarAcessoDeNovo();
+  try { preencherControles(); desenharSelecao(); } catch { /* refeito depois da sincronização */ }
+
   await Promise.all([
     basicos,
     carregarAtalhos().catch(e => {
@@ -423,9 +434,8 @@ async function carregarTudo() {
       : null,
   ]);
 
-  montarMenu(abrirAba);
-  // Primeira tela: a escolha das áreas (ou a área pedida no endereço).
-  abrirPrimeiraTela();
+  // Ainda na escolha das áreas: redesenha (frase da semana e alertas usam os dados).
+  if (!areaAberta() && !$('telaAreas').hidden) mostrarAreas();
 
   try {
     preencherControles();
@@ -437,6 +447,20 @@ async function carregarTudo() {
   const aviso = $('avisoGlobal');
   aviso.innerHTML = recado.map(esc).join('<br>');
   aviso.hidden = !recado.length;
+}
+
+/* Permissões não chegaram e não havia cópia neste aparelho: o app abriu
+   só com o padrão (Pessoas). Tenta de novo algumas vezes e, quando vier,
+   remonta o menu e as áreas — sem a pessoa precisar sair e entrar. */
+function tentarAcessoDeNovo(vez = 1) {
+  if (vez > 6) return;
+  setTimeout(async () => {
+    if (!estado.sessao) return;
+    await carregarAcesso().catch(() => {});
+    if (acesso.provisorio) return tentarAcessoDeNovo(vez + 1);
+    if (!areaAberta()) { montarMenu(abrirAba); mostrarAreas(); }
+    else mostrarAviso('Suas permissões chegaram. Volte à tela das áreas para ver tudo o que você acessa.');
+  }, 4000 * vez);
 }
 
 function preencherControles() {

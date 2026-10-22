@@ -466,10 +466,24 @@ function acessoGuardado() {
 
 export async function carregarAcesso() {
   acesso.email = (estado.sessao?.user?.email || '').toLowerCase();
+  acesso.provisorio = false;
   try {
-    const { data, error } = await estado.cliente
-      .from('app_usuarios').select('*').order('email');
+    if (!acesso.email) throw new Error('sessão ainda sem e-mail');
+    /* 22/10/2026 (Vinícius ficava sem os ícones ou só com Pessoas): a
+       leitura das permissões não pode ficar pendurada com sinal fraco.
+       10 segundos; se não vier, usa o último acesso guardado e tenta de
+       novo por trás (carregarTudo, em app.js). */
+    const { data, error } = await Promise.race([
+      estado.cliente.from('app_usuarios').select('*').order('email'),
+      new Promise((_, nao) => setTimeout(() => nao(new Error('demorou')), 10000)),
+    ]);
     if (error) throw error;
+    if (!(data || []).some(u => (u.email || '').toLowerCase() === acesso.email)) {
+      /* Veio a lista mas sem a própria linha (resposta incompleta): não
+         rebaixa a pessoa para o padrão — trata como falha e tenta de novo. */
+      const salvo0 = acessoGuardado();
+      if (salvo0 || (data || []).length === 0) throw new Error('sem a linha do próprio login');
+    }
     usuarios = data || [];
     const meu = usuarios.find(u => (u.email || '').toLowerCase() === acesso.email);
     acesso.admin = !!meu?.admin;
@@ -492,6 +506,9 @@ export async function carregarAcesso() {
        neste aparelho, em vez de cair no padrão e sumir com DP, RH e
        Usuários - Acessos. É só o menu: quem protege os dados é o RLS. */
     const salvo = acessoGuardado();
+    /* Sem nada guardado neste aparelho, o padrão é só provisório: o app
+       tenta de novo e redesenha as áreas quando a resposta chegar. */
+    acesso.provisorio = !salvo;
     acesso.admin = !!salvo?.admin;
     acesso.nome = salvo?.nome || '';
     acesso.modulos = salvo?.modulos || [...PADRAO];
