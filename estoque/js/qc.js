@@ -8,7 +8,7 @@
 //   Estoque: a posição por categoria (grupo do item), com o extrato de cada um.
 import {
   $, esc, pronto, todos, aviso, meuNome, locais, itensOrdenados, GRUPOS, UNIDADES,
-  lerNumero, mostrarNumero, dataBR, hojeISO, temMinimo as temMinimoGeral, precisaRepor as precisaReporGeral, souAdmin, comMinimoDo, podeLocal, meusLocais,
+  lerNumero, mostrarNumero, dataBR, hojeISO, temMinimo as temMinimoGeral, precisaRepor as precisaReporGeral, souAdmin, comMinimoDo, podeLocal, meusLocais, contaNoLocal,
 } from './dados.js';
 import { lerPlanilhaQc, unidadeDe } from './qc-importar.js';
 import { gravar as gravarDireto } from './dados.js';
@@ -401,6 +401,19 @@ const itemPorNome = nome => itensOrdenados().find(i => semAcento(i.nome) === sem
 const LINHAS_INICIAIS = 6;
 let abertos = new Set();     // lançamentos expandidos na lista do mês
 
+/* Categoria do lançamento (pedido dele, 22/10/2026): escolhe "EPIs" e a lista
+   de produtos mostra só os EPIs. Vazio = todas. Quem só vê alguns estoques vê
+   só os produtos contados neles. */
+const CHAVE_CAT = 'estoque.qc.categoria';
+let catMov = '';
+try { catMov = localStorage.getItem(CHAVE_CAT) || ''; } catch { /* sem localStorage */ }
+function produtosDoForm() {
+  const meus = meusLocais();
+  return itensOrdenados().filter(i => (!catMov || (i.grupo || 'Outros') === catMov)
+    && (!meus.length || meus.some(l => contaNoLocal(i, l))));
+}
+const listaProdutos = () => produtosDoForm().map(i => `<option value="${esc(i.nome)}">${esc(i.unidade || '')} · ${esc(i.grupo || '')}</option>`).join('');
+
 /* Destino por produto na saída de uso (pedido dele, 22/10/2026):
    lubrificante sai para uma MÁQUINA ou IMPLEMENTO (catálogo de Máquinas e
    Patrimônio, pela função est_destinos_equipamentos) e EPI sai para um
@@ -503,6 +516,8 @@ function desenharMov(sentido) {
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`}
         <label class="campo plena">Observação <input type="text" name="obs"></label>
       </div>
+      <div class="ct-chips qc-cats">${[['', 'Todas'], ...GRUPOS.filter(g => itensOrdenados().some(i => i.grupo === g)).map(g => [g, g])]
+        .map(([id, rot]) => `<button type="button" class="ct-chip" data-qccat="${esc(id)}" aria-pressed="${catMov === id}">${esc(rot)}</button>`).join('')}</div>
       <div class="barra entre qc-prod-cab">
         <h3 class="es-secao" style="margin:0">Produtos <small id="qcConta">0</small> <small id="qcTotal" class="qc-total"></small></h3>
         <button type="button" class="btn mini" id="qcColar">Colar lista</button>
@@ -513,7 +528,7 @@ function desenharMov(sentido) {
         <button type="button" class="btn mini" id="qcMais">+ linha</button>
         <button class="btn principal" type="submit" id="qcEnviar">Lançar ${ent ? 'entrada' : 'saída'}</button>
       </div>
-      <datalist id="qcProdutos">${itensOrdenados().map(i => `<option value="${esc(i.nome)}">${esc(i.unidade || '')} · ${esc(i.grupo || '')}</option>`).join('')}</datalist>
+      <datalist id="qcProdutos">${listaProdutos()}</datalist>
       <datalist id="qcFornec">${unicos('fornecedor').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcPlantios">${unicos('plantio').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcOperadores">${unicos('operador').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
@@ -536,6 +551,13 @@ function desenharMov(sentido) {
   if (!ent) carregarDestinos();
   $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); };
   $('qcColar').onclick = () => colarLista(sentido);
+  form.querySelectorAll('[data-qccat]').forEach(b => b.addEventListener('click', () => {
+    catMov = b.dataset.qccat;
+    try { localStorage.setItem(CHAVE_CAT, catMov); } catch { /* sem localStorage */ }
+    form.querySelectorAll('[data-qccat]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    $('qcProdutos').innerHTML = listaProdutos();
+    document.querySelectorAll('#qcLins .qc-prod').forEach(i => { if (i.value) i.dispatchEvent(new Event('input')); });
+  }));
   form.addEventListener('submit', e => { e.preventDefault(); lancar(sentido, form); });
   desenharListaMes(sentido);
 }
@@ -566,6 +588,7 @@ function ligarLinhas(sentido) {
       lin.classList.toggle('desconhecido', !!prod.value.trim() && !it);
       if (!prod.value.trim()) { info.textContent = ''; return; }
       if (!it) { info.textContent = 'não está no cadastro'; return; }
+      if (catMov && (it.grupo || 'Outros') !== catMov) { lin.classList.add('desconhecido'); info.textContent = `é de ${it.grupo || 'Outros'}, não de ${catMov}`; return; }
       const st = cu.itens.get(it.id);
       const medio = st && st.medio !== null ? st.medio : null;
       const q = lerNumero(qtd.value), vu = vuInp ? lerNumero(vuInp.value) : null;
@@ -696,6 +719,7 @@ async function lancar(sentido, form) {
     const vu = sentido === 'entrada' ? lerNumero(x.vuTxt) : null;
     if (!x.nome) { x.lin.classList.add('erro'); erros.push('linha sem produto'); continue; }
     if (!item) { desconhecidos.set(semAcento(x.nome), x.nome); continue; }
+    if (catMov && (item.grupo || 'Outros') !== catMov) { x.lin.classList.add('erro'); erros.push(`${item.nome}: não é ${catMov}`); continue; }
     if (Number.isNaN(qtd) || !qtd || qtd <= 0) { x.lin.classList.add('erro'); erros.push(`${item.nome}: quantidade`); continue; }
     if (Number.isNaN(vu) || (sentido === 'entrada' && tipo === 'compra' && !(vu > 0))) { x.lin.classList.add('erro'); erros.push(`${item.nome}: valor`); continue; }
     let dest = null;
@@ -711,7 +735,7 @@ async function lancar(sentido, form) {
   }
   if (desconhecidos.size) return cadastrarNaHora([...desconhecidos.values()], sentido, form);
   if (erros.length) {
-    aviso(`Confira as linhas em vermelho (${erros.length}): quantidade maior que zero${sentido === 'entrada' && tipo === 'compra' ? ' e valor por unidade (obrigatório na compra)' : ''}${sentido === 'saida' && tipo === 'uso' ? '; lubrificante pede a máquina/implemento e EPI pede o funcionário, escolhidos da lista' : ''}.`, true);
+    aviso(`Confira as linhas em vermelho (${erros.length}: ${erros.slice(0, 3).join('; ')}${erros.length > 3 ? '…' : ''}). Precisa de quantidade maior que zero${sentido === 'entrada' && tipo === 'compra' ? ' e valor por unidade (obrigatório na compra)' : ''}${sentido === 'saida' && tipo === 'uso' ? '; lubrificante pede a máquina/implemento e EPI pede o funcionário, escolhidos da lista' : ''}.`, true);
     return;
   }
   if (sentido === 'saida') {
@@ -757,7 +781,7 @@ function cadastrarNaHora(nomes, sentido, form) {
     <ul class="ct-branco">${nomes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
     <div class="grade">
       <label class="campo">Unidade <select id="qnUni">${UNIDADES.map(u => `<option>${u}</option>`).join('')}</select></label>
-      <label class="campo">Categoria <select id="qnGrupo">${GRUPOS.map(g => `<option>${g}</option>`).join('')}</select></label>
+      <label class="campo">Categoria <select id="qnGrupo">${GRUPOS.map(g => `<option${g === catMov ? ' selected' : ''}>${g}</option>`).join('')}</select></label>
     </div>
     <p class="dc-sem">Se for erro de digitação, volte e corrija o nome na linha.</p>
     <div class="barra fim"><button class="btn" type="button" id="qnNao">Corrigir os nomes</button>
