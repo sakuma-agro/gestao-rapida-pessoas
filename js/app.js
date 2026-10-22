@@ -23,6 +23,7 @@ const sstPronto = () => sstCarregado() ? Promise.resolve() : garantirSst();
 import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidentes.js';
 import { abrirCalendarioSst } from './sst-calendario.js';
 import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanhas.js';
+import { abrirBrigada, limparBrigada, ligarBrigada, avisoDesligamentoBrigada, TELAS_BRIGADA } from './sst-brigada.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
@@ -94,7 +95,7 @@ function limparPrevias() {
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
 const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes', 'trFuncoes', 'sstAtv',
   'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
-  ...TELAS_ACIDENTES, ...TELAS_CAMPANHAS, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
+  ...TELAS_ACIDENTES, ...TELAS_CAMPANHAS, ...TELAS_BRIGADA, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
   $('avisoSoOnline').hidden = !(SO_ONLINE.has(nome) && !navigator.onLine);
 }
@@ -199,6 +200,9 @@ function abrirAba(nome) {
   // SST › Campanhas (21/10/2026) — js/sst-campanhas.js
   for (const t of TELAS_CAMPANHAS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_CAMPANHAS.includes(nome)) abrirCampanhas(nome);
+  // SST › Brigada e primeiros socorros (22/10/2026) — js/sst-brigada.js
+  for (const t of TELAS_BRIGADA) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_BRIGADA.includes(nome)) abrirBrigada(nome);
   $('telaSstCal').hidden = nome !== 'sstCal';
   if (nome === 'sstCal') abrirCalendarioSst();
   // Reunião semanal (15/10/2026) — js/reuniao.js
@@ -267,7 +271,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao();
   mostrar('login');
 });
 
@@ -1229,6 +1233,13 @@ $('formFunc').addEventListener('submit', async ev => {
 
   $('dlgFunc').close();
   preencherControles(); desenharFuncionarios(); desenharSelecao();
+
+  /* Brigada e primeiros socorros (22/10/2026): se quem saiu era brigadista ou
+     socorrista designado, avisa como fica a conta e quem pode repor. */
+  if (mov?.modo === 'desligar') {
+    const aviso = await avisoDesligamentoBrigada(f.id).catch(() => '');
+    if (aviso) alert(aviso);
+  }
 });
 
 $('bApagarFunc').addEventListener('click', async () => {
@@ -2012,6 +2023,7 @@ ligar('exames por função', ligarAso);
 ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);
 ligar('atividades do sst', ligarAtividades);
+ligar('brigada e socorros', () => ligarBrigada({ abrir: irParaTela }));
 ligar('termos', () => ligarTermos(mostrarAviso));
 ligar('backup', () => ligarBackup(mostrarAviso));
 ligar('acesso rápido', () => ligarAtalhos(abrirModulo, mostrarAviso));

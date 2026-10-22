@@ -1658,3 +1658,13 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .atv-marcas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:4px 14px;margin-top:4px}
 .atv-marca{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--texto)}
 .fu-atv.plena{grid-column:1/-1}
+
+/* SST › Brigada e primeiros socorros (22/10/2026, gr-v325) — js/sst-brigada.js */
+.br-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;margin-top:14px}
+.br-grade .cartao{margin:0}
+.br-grupo .pv-card{cursor:default}
+.br-grupo .pv-card:hover{transform:none}
+.br-grupo .tag{white-space:normal;display:inline-block;line-height:1.35}
+.br-cand{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.br-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.br-marca{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;margin-bottom:4px}

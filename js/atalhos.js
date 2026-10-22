@@ -65,6 +65,7 @@ const PROPRIOS = {
   trFuncoes:     ['treino', 'Treinamentos por função'],
   trConsol:      ['lista', 'Treinamentos consolidados'],
   sstAtv:        ['check', 'Atividades e exigências'],
+  brPainel:      ['chama', 'Brigada e socorros'],
   ferPrev:       ['sol', 'Previsão de férias'],
   ferLanc:       ['sol', 'Lançar férias'],
   ferAfast:      ['sol', 'Afastamentos'],

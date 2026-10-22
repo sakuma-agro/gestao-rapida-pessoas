@@ -91,6 +91,13 @@ export const MODULOS = [
     ] },
     /* Campanhas de segurança e saúde (21/10/2026): js/sst-campanhas.js,
        tabelas sst_campanhas, sst_campanha_atividades, sst_campanha_temas. */
+    /* Brigada e primeiros socorros (22/10/2026): tem × precisa × falta —
+       js/sst-brigada.js, tabela sst_brigada_config + atividades do SST. */
+    { id: 'brigada', nome: 'Brigada e socorros', telas: [
+      ['brPainel', 'Painel'],
+      ['brMembros', 'Membros'],
+      ['brMinimos', 'Mínimos'],
+    ] },
     { id: 'campanhas', nome: 'Campanhas', telas: [
       ['camPainel', 'Painel'],
       ['camLista', 'Campanhas'],
@@ -585,7 +592,7 @@ const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
    Módulo de um submódulo só continua mostrando as telas. */
 const ICONE_SUB = {
   gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
-  epis: 'escudo', exames: 'exame', treinamentos: 'treino', campanhas: 'megafone',
+  epis: 'escudo', exames: 'exame', treinamentos: 'treino', campanhas: 'megafone', brigada: 'chama',
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo', ticket: 'cartao',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
