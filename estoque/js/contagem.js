@@ -9,7 +9,7 @@ import {
   $, esc, pronto, todos, aviso, souAdmin, meuNome, locais as todosLocais, podeLocal, itensOrdenados, itensDoLocal,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
-  temMinimo, precisaRepor, textoPedido,
+  temMinimo, precisaRepor as precisaReporGeral, textoPedido, comMinimoDo,
   mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
 } from './dados.js';
 /* Só os estoques liberados para esta pessoa (22/10/2026). */
@@ -37,6 +37,9 @@ const CHAVE_LOCAL = 'estoque.contarLocal';
 const CHAVE_GRUPO = 'estoque.contarGrupo';
 const sel = { localId: null, mes: mesAtual(), grupo: null };
 try { sel.localId = localStorage.getItem(CHAVE_LOCAL); sel.grupo = localStorage.getItem(CHAVE_GRUPO); } catch { /* sem localStorage */ }
+
+/* Mínimo da fazenda escolhida na tela (22/10/2026). */
+const precisaRepor = (item, qtd, localId = sel.localId) => precisaReporGeral(comMinimoDo(item, localId), qtd);
 
 /* Contagem por TIPO (pedido dele, 22/10/2026): cada grupo — Defensivos, EPIs,
    Fertilizantes… — tem data, quem contou e fechamento próprios, gravados em
@@ -309,7 +312,7 @@ function ligarChips() {
 }
 
 /** O aviso embaixo do nome quando a contagem chegou no estoque mínimo. */
-const textoAlerta = (item, qtd) => `${Number(qtd) < Number(item.estoque_minimo) ? 'Abaixo do mínimo' : 'No mínimo'} (${esc(mostrarNumero(item.estoque_minimo))}) · ${esc(textoPedido(item))}`;
+const textoAlerta = (item0, qtd) => { const item = comMinimoDo(item0, sel.localId); return `${Number(qtd) < Number(item.estoque_minimo) ? 'Abaixo do mínimo' : 'No mínimo'} (${esc(mostrarNumero(item.estoque_minimo))}) · ${esc(textoPedido(item))}`; };
 
 /** Depois de gravar um total: liga ou desliga o aviso de reposição do item. */
 function marcarMinimo(itemId, qtd) {
@@ -1094,8 +1097,8 @@ function listaRepor() {
     const c = contagem(l.id, mesRepor);
     if (!c) continue;
     for (const ln of linhasDe(c.id)) {
-      const item = itens.get(ln.item_id);
-      if (!item || !precisaRepor(item, ln.quantidade)) continue;
+      const item = comMinimoDo(itens.get(ln.item_id), l.id);
+      if (!item || !precisaReporGeral(item, ln.quantidade)) continue;
       if (grupoRepor && item.grupo !== grupoRepor) continue;
       res.push({ local: l, contagem: c, item, qtd: ln.quantidade });
     }

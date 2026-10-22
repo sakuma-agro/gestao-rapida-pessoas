@@ -420,3 +420,11 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ct-tipo-selo small{opacity:.8}
 .ct-tipo-selo.and{border-color:var(--alerta);color:#8a5f00}
 .ct-tipo-selo.ok{background:var(--tagA-bg);color:var(--tagA-tx);border-color:transparent;font-weight:700}
+
+/* Cadastros: filtro por tipo e mínimo por fazenda (22/10/2026) */
+.cad-tipos{margin:4px 0 8px}
+.cad-min-faz{color:var(--marrom)}
+.cad-minfaz-tab{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+.cad-minfaz-tab th{text-align:left;font-size:11px;color:var(--suave);padding:2px 4px}
+.cad-minfaz-tab td{padding:3px 4px}
+.cad-minfaz-tab input{width:100%;min-width:60px}

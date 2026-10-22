@@ -110,6 +110,25 @@ export const hojeISO = () => new Date().toISOString().slice(0, 10);
 /* ---- estoque mínimo (pedido dele, 15/10/2026) ----
    Cada item pode ter um estoque mínimo e a quantidade a pedir. Contou e deu
    igual ou abaixo do mínimo → o item entra na reposição. */
+/* Estoque mínimo por fazenda (pedido dele, 22/10/2026): est_minimos guarda,
+   por item e almoxarifado (id item_id:local_id), o mínimo e o pedido daquela
+   fazenda. Vazio = vale o mínimo geral do item. comMinimoDo devolve uma cópia
+   do item com os números da fazenda, e o resto (precisaRepor, textoPedido…)
+   segue igual. */
+export const idMinimo = (itemId, localId) => itemId + ':' + localId;
+export const minimoDaFazenda = (itemId, localId) =>
+  todos('est_minimos').filter(m => m.id === idMinimo(itemId, localId) && m.ativo !== false).pop() || null;
+const temValor = v => v !== null && v !== undefined && v !== '';
+export function comMinimoDo(item, localId) {
+  if (!item || !localId) return item;
+  const m = minimoDaFazenda(item.id, localId);
+  if (!m || (!temValor(m.estoque_minimo) && !temValor(m.pedido_reposicao))) return item;
+  return Object.assign({}, item, {
+    estoque_minimo: temValor(m.estoque_minimo) ? m.estoque_minimo : item.estoque_minimo,
+    pedido_reposicao: temValor(m.pedido_reposicao) ? m.pedido_reposicao : item.pedido_reposicao,
+    minimo_da_fazenda: true,
+  });
+}
 export const temMinimo = item => item && item.estoque_minimo !== null && item.estoque_minimo !== undefined && item.estoque_minimo !== '';
 export const precisaRepor = (item, qtd) => temMinimo(item) && qtd !== null && qtd !== undefined && qtd !== ''
   && Number(qtd) <= Number(item.estoque_minimo);

@@ -850,7 +850,7 @@ export function desenharConfig() {
   }
 
   if (!manut.carregado) carregarManut().then(() => desenharConfig());
-  if (!estq.carregado) carregarEstoques().then(() => { if (editando) desenharPermissoes(); });
+  if (!estq.carregado) carregarEstoques().then(() => { desenharConfig(); if (editando) desenharPermissoes(); });
 
   $('cfTabela').innerHTML = usuarios.length ? `
     <table class="dc-planilha cf-tab"><thead><tr>
@@ -865,6 +865,9 @@ export function desenharConfig() {
             return r ? `<button type="button" class="cf-chip ${dp ? 'cf-parte' : r.cls}" data-editar-us="${esc(u.email)}" data-foco="${m.id}">${esc(m.nome)} · ${esc(dp || r.txt)}</button>` : ''; })
             .concat([resumoManut(u)].filter(Boolean).map(t =>
               `<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="manutencoes">Máquinas e Patrimônio · ${esc(t)}</button>`))
+            .concat(!u.admin && (u.modulos || []).includes('estoque') && (u.telas || []).some(x => x.startsWith(EST_LOCAL))
+              ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="estoque">Estoque · ${esc((u.telas || []).filter(x => x.startsWith(EST_LOCAL))
+                .map(x => (estq.locais.find(l => l.id === x.slice(EST_LOCAL.length)) || {}).nome || '1 estoque').join(', '))}</button>`] : [])
             .concat((u.modulos || []).includes(PERM_SALARIOS)
               ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="salarios">Vê salários</button>`] : [])
             .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';

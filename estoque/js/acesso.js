@@ -74,9 +74,22 @@ export function aplicarUsuario(u) {
   if (!u) return;
   const mods = u.admin ? [] : (u.telas || []).filter(x => String(x).startsWith(PREFIXO_MODULO))
     .map(x => String(x).slice(PREFIXO_MODULO.length)).filter(id => MODULOS.some(m => m.id === id));
+  const locs = u.admin ? [] : (u.telas || []).filter(x => String(x).startsWith('estoque.local:'));
   acesso.email = u.email || '';
-  acesso.admin = !!u.admin || !mods.length;   // sem recorte = enxerga a área toda, como antes
-  acesso.modulos = mods.length ? mods : MODULOS.map(m => m.id);
+  if (mods.length) { acesso.admin = false; acesso.modulos = mods; return; }
+  if (locs.length) {
+    /* Só alguns estoques e nenhum módulo marcado (22/10/2026): Acerto e Compra
+       inteligente comparam todas as fazendas, então ficam de fora; o Estoque
+       Quebra Cocão só entra se a Quebra Cocão estiver entre os estoques dele. */
+    const nomes = ((window.App && window.App.dados && window.App.dados.est_locais) || [])
+      .filter(l => locs.includes('estoque.local:' + l.id)).map(l => String(l.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase());
+    const temQc = !nomes.length || nomes.some(n => n.includes('QUEBRA COCAO'));
+    acesso.admin = false;
+    acesso.modulos = ['contagem', ...(temQc ? ['qc'] : []), 'cadastros'];
+    return;
+  }
+  acesso.admin = true;   // sem recorte = enxerga a área toda, como antes
+  acesso.modulos = MODULOS.map(m => m.id);
 }
 
 export const pode = m => acesso.admin || acesso.modulos.includes(m);

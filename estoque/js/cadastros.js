@@ -5,35 +5,77 @@
 // todos). Nada se apaga: desativa-se, e o item some das
 // contagens novas sem sumir das que já foram fechadas.
 import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados, lerNumero, mostrarNumero, temMinimo,
-  locais, contaNoLocal } from './dados.js';
+  locais, contaNoLocal, meusLocais, podeLocal, idMinimo, minimoDaFazenda } from './dados.js';
 
 /** Campo de número opcional: vazio = null; texto que não é número = NaN. */
 const numOpc = v => lerNumero(v);
 
 let buscaItens = '';
 let filtroLocal = '';
+let filtroGrupo = '';   // chips por tipo (pedido dele, 22/10/2026): só EPIs, só limpeza…
 const nomeCurto = n => String(n || '').replace(/^Faz(enda)?\.?\s+/i, '');
 
 /** Caixinhas "Contado em": todas marcadas = conta em todos os estoques. */
 function caixasLocais(marcados) {
   const todosMarcados = !Array.isArray(marcados) || !marcados.length;
   return `<fieldset class="campo plena cad-locais"><legend>Contado em</legend>
-    ${locais().map(l => `<label class="es-check"><input type="checkbox" data-local="${esc(l.id)}"${
+    ${locais().filter(l => podeLocal(l.id)).map(l => `<label class="es-check"><input type="checkbox" data-local="${esc(l.id)}"${
       todosMarcados || marcados.includes(l.id) ? ' checked' : ''}> ${esc(l.nome)}</label>`).join('')}
   </fieldset>`;
 }
 /** null = todos; [] = nenhum (não pode); [ids] = só esses. */
-function lerLocais(raiz) {
+function lerLocais(raiz, atuais) {
   const cx = [...raiz.querySelectorAll('.cad-locais [data-local]')];
   const ids = cx.filter(c => c.checked).map(c => c.dataset.local);
-  return ids.length === cx.length ? null : ids;
+  // quem só vê alguns estoques não mexe nos outros: o que ele não vê fica como estava
+  const visiveis = new Set(cx.map(c => c.dataset.local));
+  const todosIds = locais().map(l => l.id);
+  const escondidos = todosIds.filter(id => !visiveis.has(id) && (atuais === undefined
+    ? false : !Array.isArray(atuais) || !atuais.length || atuais.includes(id)));
+  const final = [...new Set([...ids, ...escondidos])];
+  if (!ids.length) return [];
+  return todosIds.every(id => final.includes(id)) ? null : final;
 }
 function textoLocais(i) {
   const l = i.locais_contagem;
   if (!Array.isArray(l) || !l.length) return '';
-  const nomes = locais().filter(x => l.includes(x.id)).map(x => nomeCurto(x.nome));
+  const nomes = locais().filter(x => l.includes(x.id) && podeLocal(x.id)).map(x => nomeCurto(x.nome));
   return ` · contado em ${esc(nomes.join(', ') || '—')}`;
 }
+/* Mínimo por fazenda (22/10/2026): resumo na lista e quadro no Editar. */
+function minimosDoItem(i) {
+  return locais().map(l => ({ l, m: minimoDaFazenda(i.id, l.id) }))
+    .filter(x => x.m && (x.m.estoque_minimo !== null && x.m.estoque_minimo !== undefined && x.m.estoque_minimo !== ''));
+}
+function textoMinFazendas(i) {
+  const ms = minimosDoItem(i).filter(x => podeLocal(x.l.id));
+  return ms.length ? ` · <span class="cad-min-faz">${esc(ms.map(x => nomeCurto(x.l.nome) + ' ' + mostrarNumero(x.m.estoque_minimo)).join(', '))}</span>` : '';
+}
+function quadroMinimos(i) {
+  const ls = locais().filter(l => podeLocal(l.id) && contaNoLocal(i, l.id));
+  if (!ls.length) return '';
+  return `<fieldset class="campo plena cad-minfaz"><legend>Estoque mínimo por fazenda</legend>
+    <p class="dc-sem">Em branco = vale o mínimo geral acima${i.estoque_minimo !== null && i.estoque_minimo !== undefined && i.estoque_minimo !== '' ? ` (${esc(mostrarNumero(i.estoque_minimo))})` : ''}.</p>
+    <table class="cad-minfaz-tab"><thead><tr><th>Estoque</th><th>Mínimo</th><th>Pedir</th></tr></thead><tbody>
+    ${ls.map(l => { const m = minimoDaFazenda(i.id, l.id) || {}; return `<tr data-minlocal="${esc(l.id)}"><td>${esc(l.nome)}</td>
+      <td><input type="text" inputmode="decimal" class="mf-min" value="${esc(mostrarNumero(m.estoque_minimo))}" placeholder="${esc(mostrarNumero(i.estoque_minimo)) || '—'}"></td>
+      <td><input type="text" inputmode="decimal" class="mf-ped" value="${esc(mostrarNumero(m.pedido_reposicao))}" placeholder="${esc(mostrarNumero(i.pedido_reposicao)) || '—'}"></td></tr>`; }).join('')}
+    </tbody></table></fieldset>`;
+}
+async function gravarMinimos(raiz, itemId) {
+  for (const tr of raiz.querySelectorAll('[data-minlocal]')) {
+    const localId = tr.dataset.minlocal;
+    const min = numOpc(tr.querySelector('.mf-min').value), ped = numOpc(tr.querySelector('.mf-ped').value);
+    if (Number.isNaN(min) || Number.isNaN(ped)) return false;
+    const atual = minimoDaFazenda(itemId, localId);
+    if (!atual && min === null && ped === null) continue;
+    if (atual && atual.estoque_minimo === min && atual.pedido_reposicao === ped) continue;
+    await gravar('est_minimos', Object.assign({}, atual || {}, { id: idMinimo(itemId, localId), item_id: itemId, local_id: localId,
+      estoque_minimo: min, pedido_reposicao: ped, ativo: true }));
+  }
+  return true;
+}
+
 let verInativos = false;
 const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 
@@ -70,7 +112,14 @@ function desenharItens() {
   const todosItens = todos('est_itens');
   const lista = itensOrdenados(todosItens.filter(i => verInativos || i.ativo !== false));
   const b = semAcento(buscaItens);
-  const vistos = lista.filter(i => (!b || semAcento(i.nome).includes(b) || semAcento(i.codigo).includes(b) || semAcento(i.ca).includes(b)) && (!filtroLocal || contaNoLocal(i, filtroLocal)));
+  const meus = meusLocais();
+  const doUsuario = lista.filter(i => !meus.length || meus.some(l => contaNoLocal(i, l)));
+  const porTexto = doUsuario.filter(i => (!b || semAcento(i.nome).includes(b) || semAcento(i.codigo).includes(b) || semAcento(i.ca).includes(b)) && (!filtroLocal || contaNoLocal(i, filtroLocal)));
+  const gruposVistos = [...new Set(porTexto.map(i => i.grupo || 'Outros'))];
+  if (filtroGrupo && !gruposVistos.includes(filtroGrupo)) filtroGrupo = '';
+  const vistos = porTexto.filter(i => !filtroGrupo || (i.grupo || 'Outros') === filtroGrupo);
+  const chipsTipo = `<div class="ct-chips cad-tipos">${[['', 'Todos', porTexto.length], ...gruposVistos.map(g => [g, g, porTexto.filter(i => (i.grupo || 'Outros') === g).length])]
+    .map(([id, rot, n]) => `<button type="button" class="ct-chip" data-cadgrupo="${esc(id)}" aria-pressed="${filtroGrupo === id}">${esc(rot)} <small>${n}</small></button>`).join('')}</div>`;
   const nAtivos = todosItens.filter(i => i.ativo !== false).length;
 
   let grupo = null;
@@ -93,10 +142,11 @@ function desenharItens() {
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Procurar
         <input type="text" id="cadBusca" placeholder="Nome, código ou CA..." value="${esc(buscaItens)}"></label>
-      <label class="campo">Contado em <select id="cadFiltroLocal"><option value="">Todos os estoques</option>${locais().map(l =>
+      <label class="campo">Contado em <select id="cadFiltroLocal"><option value="">Todos os estoques</option>${locais().filter(l => podeLocal(l.id)).map(l =>
         `<option value="${esc(l.id)}"${l.id === filtroLocal ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
       <label class="es-check"><input type="checkbox" id="cadInativos"${verInativos ? ' checked' : ''}> mostrar desativados</label>
     </div>
+    ${chipsTipo}
     <div class="lista">${vistos.map(i => {
       const cab = i.grupo !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo)}</h3>` : '';
       return cab + `<div class="item"><span></span>
@@ -104,7 +154,7 @@ function desenharItens() {
           <div class="sub">${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${i.ca ? ` · CA ${esc(i.ca)}` : ''}${temMinimo(i)
             ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
               ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
-            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoLocais(i)}${resumoAgrofit(i)}</div></div>
+            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoMinFazendas(i)}${textoLocais(i)}${resumoAgrofit(i)}</div></div>
         <div class="acoes"><button class="btn mini" type="button" data-editar="${esc(i.id)}">Editar</button></div>
       </div>`;
     }).join('') || `<div class="vazio">${todosItens.length ? 'Nenhum item com esse nome.' : 'Nenhum item cadastrado ainda.'}</div>`}</div>`;
@@ -135,6 +185,7 @@ function desenharItens() {
     const el = $('cadBusca'); el.focus(); el.setSelectionRange(pos, pos);
   });
   $('cadFiltroLocal').addEventListener('change', e => { filtroLocal = e.target.value; desenharItens(); });
+  alvo.querySelectorAll('[data-cadgrupo]').forEach(b => b.addEventListener('click', () => { filtroGrupo = b.dataset.cadgrupo; desenharItens(); }));
   $('cadInativos').addEventListener('change', e => { verInativos = e.target.checked; desenharItens(); });
   $('cadColar').addEventListener('click', colarLista);
   alvo.querySelectorAll('[data-editar]').forEach(b => b.addEventListener('click', () => editarItem(b.dataset.editar)));
@@ -160,6 +211,7 @@ function editarItem(id) {
         <label class="campo">CA (EPI) <input type="text" name="ca" value="${esc(i.ca || '')}" placeholder="ex.: 42291"></label>
       </div>
       ${caixasLocais(i.locais_contagem)}
+      ${quadroMinimos(i)}
       ${blocoAgrofit(i)}
       <p class="dc-sem">Quando a contagem der igual ou abaixo do mínimo, o item aparece na Reposição com a quantidade a pedir.</p>
       <div class="barra entre">
@@ -177,8 +229,9 @@ function editarItem(id) {
       }
       const minimo = numOpc(f.get('minimo')), pedido = numOpc(f.get('pedido'));
       if (Number.isNaN(minimo) || Number.isNaN(pedido)) { aviso('Estoque mínimo e pedido: use só números (ex.: 10 ou 2,5).', true); return; }
-      const onde = lerLocais(e.target);
+      const onde = lerLocais(e.target, i.locais_contagem);
       if (onde && !onde.length) { aviso('Marque pelo menos um estoque em "Contado em".', true); return; }
+      if (!(await gravarMinimos(e.target, id))) { aviso('Mínimo por fazenda: use só números (ex.: 10 ou 2,5).', true); return; }
       await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
         estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde,
         codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null }));

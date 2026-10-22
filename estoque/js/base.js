@@ -11,7 +11,7 @@
 /* Tudo o que a contagem precisa para funcionar sem sinal no almoxarifado. */
 const TABELAS_BASE = ['est_locais', 'est_itens', 'est_contagens', 'est_contagem_itens', 'est_contagem_lotes',
   'est_compras', 'est_compra_itens', 'est_compra_estoques', 'est_saldos_sistema',
-  'est_movimentos', 'est_mapas', 'est_contagem_quadras', 'est_contagem_grupos'];
+  'est_movimentos', 'est_mapas', 'est_contagem_quadras', 'est_contagem_grupos', 'est_minimos'];
 const GERADAS_NO_BANCO = {};
 const CHAVE_PK = {};
 /* Na contagem vale a última gravação (15/10/2026). Com a conferência de
@@ -21,7 +21,7 @@ const CHAVE_PK = {};
    upsert direto, sem o carimbo. Itens e almoxarifados continuam conferindo. */
 const CHAVE_COMPOSTA = { est_contagens: ['id'], est_contagem_itens: ['id'], est_contagem_lotes: ['id'],
   est_compras: ['id'], est_compra_itens: ['id'], est_compra_estoques: ['id'], est_saldos_sistema: ['id'], est_movimentos: ['id'],
-  est_mapas: ['id'], est_contagem_quadras: ['id'], est_contagem_grupos: ['id'] };
+  est_mapas: ['id'], est_contagem_quadras: ['id'], est_contagem_grupos: ['id'], est_minimos: ['id'] };
 function chaveDrive(caminho) { return 'estoque/' + String(caminho).toLowerCase(); }
 
 /* Avisa as telas (módulos) que a base local mudou. */

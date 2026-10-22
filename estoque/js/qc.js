@@ -8,7 +8,7 @@
 //   Estoque: a posição por categoria (grupo do item), com o extrato de cada um.
 import {
   $, esc, pronto, todos, aviso, meuNome, locais, itensOrdenados, GRUPOS, UNIDADES,
-  lerNumero, mostrarNumero, dataBR, hojeISO, temMinimo, precisaRepor, souAdmin,
+  lerNumero, mostrarNumero, dataBR, hojeISO, temMinimo as temMinimoGeral, precisaRepor as precisaReporGeral, souAdmin, comMinimoDo, podeLocal, meusLocais,
 } from './dados.js';
 import { lerPlanilhaQc, unidadeDe } from './qc-importar.js';
 import { gravar as gravarDireto } from './dados.js';
@@ -32,7 +32,8 @@ let esconderZerados = true;
 let mesLista = hojeISO().slice(0, 7);
 
 /** O estoque da Quebra Cocão no cadastro de almoxarifados. */
-const localQc = () => todos('est_locais').find(l => l.ativo !== false && semAcento(l.nome).includes('QUEBRA COCAO')) || null;
+const localQc = () => { const l = todos('est_locais').find(x => x.ativo !== false && semAcento(x.nome).includes('QUEBRA COCAO')) || null;
+  return l && podeLocal(l.id) ? l : null; };   // quem não tem a Quebra Cocão liberada não vê este módulo
 /** Produto novo criado aqui só aparece na contagem mensal da Quebra Cocão. */
 const soQc = () => { const l = localQc(); return l ? [l.id] : null; };
 const movimentos = () => {
@@ -40,6 +41,9 @@ const movimentos = () => {
   return lc ? [...new Map(todos('est_movimentos').filter(m => m.local_id === lc.id).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false) : [];
 };
+/* Mínimo da Quebra Cocão, quando ela tem o seu (22/10/2026). */
+const precisaRepor = (item, qtd) => precisaReporGeral(comMinimoDo(item, (localQc() || {}).id), qtd);
+const temMinimo = item => temMinimoGeral(comMinimoDo(item, (localQc() || {}).id));
 const itemDe = id => todos('est_itens').find(i => i.id === id) || { nome: '(item apagado)', unidade: '', grupo: 'Outros' };
 
 /** Saldo de cada item (Map item_id → número). */
@@ -145,7 +149,7 @@ function desenharVisao() {
       return cab + `<div class="item qc-item" data-extrato="${esc(i.id)}"><span></span>
         <div><div class="nome">${esc(i.nome)}${v < -0.0001 ? ' <span class="tag perigo">negativo</span>'
           : precisaRepor(i, v) ? ' <span class="tag alerta">no mínimo</span>' : ''}</div>
-          <div class="sub">${esc(i.unidade || '')}${temMinimo(i) ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}` : ''}${(cu.itens.get(i.id) || {}).medio != null ? ` · custo médio ${esc(brlU(cu.itens.get(i.id).medio))}` : ' · sem valor'} · toque para ver o extrato</div></div>
+          <div class="sub">${esc(i.unidade || '')}${temMinimo(i) ? ` · mínimo ${esc(mostrarNumero(comMinimoDo(i, localQc().id).estoque_minimo))}` : ''}${(cu.itens.get(i.id) || {}).medio != null ? ` · custo médio ${esc(brlU(cu.itens.get(i.id).medio))}` : ' · sem valor'} · toque para ver o extrato</div></div>
         <div class="acoes" style="text-align:right"><strong class="qc-saldo${v < -0.0001 ? ' neg' : ''}">${esc(mostrarNumero(Math.round(v * 1000) / 1000))}</strong>
           ${(cu.itens.get(i.id) || {}).emEstoque != null && v > 0.0005 ? `<div class="sub">${esc(brl(cu.itens.get(i.id).emEstoque))}</div>` : ''}</div>
       </div>`;
@@ -418,16 +422,29 @@ function achaDestino(tipo, texto) {
   const t = semAcento(texto);
   if (!t) return null;
   if (tipo === 'equip') {
-    const e = (DEST.equip || []).find(x => semAcento(rotuloEquip(x)) === t)
-      || (DEST.equip || []).find(x => semAcento(x.codigo) === t) || null;
+    const e = equipVisiveis().find(x => semAcento(rotuloEquip(x)) === t)
+      || equipVisiveis().find(x => semAcento(x.codigo) === t) || null;
     return e ? { id: e.id, nome: [e.codigo, e.nome].filter(Boolean).join(' - ') } : null;
   }
-  const f = (DEST.func || []).find(x => semAcento(rotuloFunc(x)) === t) || (DEST.func || []).find(x => semAcento(x.nome) === t) || null;
+  const f = funcVisiveis().find(x => semAcento(rotuloFunc(x)) === t) || funcVisiveis().find(x => semAcento(x.nome) === t) || null;
   return f ? { id: f.id, nome: f.nome } : null;
 }
+/* Quem só vê alguns estoques (ex.: Laís, só Quebra Cocão) vê só as máquinas e
+   as pessoas daquelas fazendas (22/10/2026). Compara o nome da fazenda sem
+   "Faz.", "Fazenda", "Reunidas" e acentos. */
+const chaveFaz = t => semAcento(t).replace(/\b(FAZ|FAZENDA|FAZENDAS|REUNIDAS)\b\.?/g, ' ').replace(/[^A-Z0-9]+/g, ' ').trim();
+function minhasFazendas() {
+  const meus = meusLocais();
+  if (!meus.length) return null;
+  return todos('est_locais').filter(l => meus.includes(l.id)).map(l => chaveFaz(l.nome)).filter(Boolean);
+}
+const daFazenda = (texto, faz) => { const k = chaveFaz(texto); return !!k && faz.some(f => k.includes(f) || f.includes(k)); };
+const equipVisiveis = () => { const faz = minhasFazendas(); return (DEST.equip || []).filter(e => !faz || daFazenda(e.local, faz)); };
+const funcVisiveis = () => { const faz = minhasFazendas(); return (DEST.func || []).filter(f => !faz || daFazenda(f.fazenda, faz)); };
+
 function opcoesDestino() {
-  return `<datalist id="qcEquip">${(DEST.equip || []).map(e => `<option value="${esc(rotuloEquip(e))}">`).join('')}</datalist>
-    <datalist id="qcFunc">${(DEST.func || []).map(f => `<option value="${esc(rotuloFunc(f))}">`).join('')}</datalist>`;
+  return `<datalist id="qcEquip">${equipVisiveis().map(e => `<option value="${esc(rotuloEquip(e))}">`).join('')}</datalist>
+    <datalist id="qcFunc">${funcVisiveis().map(f => `<option value="${esc(rotuloFunc(f))}">`).join('')}</datalist>`;
 }
 async function carregarDestinos() {
   const sb = window.App && window.App.sb;

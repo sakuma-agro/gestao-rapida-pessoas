@@ -232,3 +232,15 @@ language sql stable security definer set search_path = public, manutencao as $$
 $$;
 revoke all on function public.est_destinos_equipamentos() from public, anon;
 grant execute on function public.est_destinos_equipamentos() to authenticated;
+
+-- Estoque mínimo por fazenda (22/10/2026): vazio = vale o mínimo geral do item (est_itens).
+create table if not exists public.est_minimos (
+  id text primary key,                          -- item_id:local_id
+  item_id uuid not null references public.est_itens(id),
+  local_id uuid not null references public.est_locais(id),
+  estoque_minimo numeric,
+  pedido_reposicao numeric,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+-- (trigger marcar_atualizacao, RLS app_pode('estoque') e grants iguais às outras est_*)
