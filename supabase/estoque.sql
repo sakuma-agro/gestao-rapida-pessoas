@@ -209,3 +209,6 @@ alter table public.est_itens
   add column if not exists agrofit_ambiental text,
   add column if not exists agrofit_titular text,
   add column if not exists agrofit_culturas text;
+
+-- Código do sistema e CA dos EPIs (22/10/2026, planilha Suprimentos_Sakuma.xlsx)
+alter table public.est_itens add column if not exists codigo text, add column if not exists ca text;
