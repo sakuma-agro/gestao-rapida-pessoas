@@ -12,10 +12,24 @@
     try { return window.parent && window.parent !== window ? window.parent.grCliente : null; }
     catch (e) { return null; }
   };
-  async function sessaoDoLop(){
-    const c = principal(); if (!c) return null;
-    try { const { data } = await c.auth.getSession(); return data ? data.session : null; }
+  /* Sem sinal o getSession() pode falhar ou ficar pendurado (token vencido
+     tentando renovar). Até 4 s; senão, a sessão que o LOP está usando —
+     inclusive a guardada no aparelho (22/10/2026: "Novo apontamento" offline
+     mostrava "Entre pelo LOP"). */
+  function sessaoGuardada(){
+    try { return window.parent && window.parent !== window && window.parent.grSessao ? window.parent.grSessao() : null; }
     catch (e) { return null; }
+  }
+  async function sessaoDoLop(){
+    const c = principal();
+    let s = null;
+    if (c && navigator.onLine !== false) {
+      try {
+        const r = await Promise.race([c.auth.getSession(), new Promise(ok => setTimeout(() => ok(null), 4000))]);
+        s = (r && r.data && r.data.session) || null;
+      } catch (e) { s = null; }
+    }
+    return s || sessaoGuardada();
   }
 
   /* ─── login emprestado ─── */

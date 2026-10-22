@@ -659,20 +659,28 @@ function clientePrincipal() {
   catch (e) { return null; }
 }
 
-async function tokenDoPrincipal() {
-  const c = clientePrincipal();
-  if (!c) return null;
-  try {
-    const { data } = await c.auth.getSession();
-    return (data && data.session && data.session.access_token) || null;
-  } catch (e) { return null; }
+/* Sessão do LOP. Sem sinal o getSession() pode falhar ou ficar pendurado
+   (token vencido tentando renovar); então até 4 s, e se não vier usa a sessão
+   que o próprio LOP está usando (inclusive a guardada no aparelho). 22/10/2026. */
+function sessaoGuardadaDoPrincipal() {
+  try { return (window.parent && window.parent !== window && window.parent.grSessao) ? window.parent.grSessao() : null; }
+  catch (e) { return null; }
 }
-
 async function sessaoDoPrincipal() {
   const c = clientePrincipal();
-  if (!c) return null;
-  try { const { data } = await c.auth.getSession(); return data ? data.session : null; }
-  catch (e) { return null; }
+  let s = null;
+  if (c && navigator.onLine !== false) {
+    try {
+      const r = await Promise.race([c.auth.getSession(), new Promise(ok => setTimeout(() => ok(null), 4000))]);
+      s = (r && r.data && r.data.session) || null;
+    } catch (e) { s = null; }
+  }
+  return s || sessaoGuardadaDoPrincipal();
+}
+
+async function tokenDoPrincipal() {
+  const s = await sessaoDoPrincipal();
+  return (s && s.access_token) || null;
 }
 
 function telaSemAcesso(texto) {

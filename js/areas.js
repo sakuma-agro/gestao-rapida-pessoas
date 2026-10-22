@@ -19,15 +19,15 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '43';
+const VERSAO_AREA = '44';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '12';
+const VERSAO_PROG = '13';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
-const VERSAO_EST = '16';
+const VERSAO_EST = '17';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
-const VERSAO_CB = '16';
+const VERSAO_CB = '17';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
-const VERSAO_CP = '3';
+const VERSAO_CP = '4';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -76,7 +76,7 @@ export const AREAS = [
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '16';
+const VERSAO_VIST = '17';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
@@ -177,6 +177,10 @@ export function ligarAreas(callback) {
   addEventListener('resize', medirTopo);
   // A moldura pede o login por aqui.
   window.grCliente = estado.cliente;
+  /* 22/10/2026: sem sinal, getSession() do cliente falha ou fica pendurado
+     (token vencido, renovação não chega). As molduras perguntam então pela
+     sessão que o LOP já usa — que inclui a guardada no aparelho. */
+  window.grSessao = () => estado.sessao || null;
 }
 
 /* A moldura ocupa a tela inteira abaixo do topo. A altura do topo muda com a
