@@ -409,3 +409,14 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .qc-lin.erro .qc-dest-inp{border-color:#c0392b}
 .qc-dest-txt{display:block;font-size:11.5px;color:var(--suave)}
 @media (max-width:560px){.qc-dest{flex-direction:column;align-items:stretch;gap:3px}}
+
+/* Imprimir lista no alto da tela Contar (22/10/2026) */
+.ct-topo-dir{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+
+/* Contagem por tipo (22/10/2026) */
+.ct-tipos{margin-bottom:6px}
+.ct-tipos-and{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.ct-tipo-selo{border:1px solid var(--linha);background:var(--papel);color:var(--suave);border-radius:14px;padding:3px 9px;font-size:11.5px;cursor:pointer}
+.ct-tipo-selo small{opacity:.8}
+.ct-tipo-selo.and{border-color:var(--alerta);color:#8a5f00}
+.ct-tipo-selo.ok{background:var(--tagA-bg);color:var(--tagA-tx);border-color:transparent;font-weight:700}

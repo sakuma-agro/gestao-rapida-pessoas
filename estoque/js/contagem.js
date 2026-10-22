@@ -34,8 +34,63 @@ const textoData = c => c && c.data_contagem ? 'contada em ' + dataBR(c.data_cont
 
 /* O que está escolhido na tela Contar. */
 const CHAVE_LOCAL = 'estoque.contarLocal';
-const sel = { localId: null, mes: mesAtual() };
-try { sel.localId = localStorage.getItem(CHAVE_LOCAL); } catch { /* sem localStorage */ }
+const CHAVE_GRUPO = 'estoque.contarGrupo';
+const sel = { localId: null, mes: mesAtual(), grupo: null };
+try { sel.localId = localStorage.getItem(CHAVE_LOCAL); sel.grupo = localStorage.getItem(CHAVE_GRUPO); } catch { /* sem localStorage */ }
+
+/* Contagem por TIPO (pedido dele, 22/10/2026): cada grupo — Defensivos, EPIs,
+   Fertilizantes… — tem data, quem contou e fechamento próprios, gravados em
+   est_contagem_grupos (id contagem_id:grupo). A contagem do mês
+   (est_contagens) só fica "fechada" — e entra no Acerto — quando todos os
+   tipos do almoxarifado fecharem. Contagem fechada antes disso existir vale
+   como todos os tipos fechados. */
+const idGrupoC = (cid, g) => cid + ':' + g;
+const grupoDe = i => (i && i.grupo) || 'Outros';
+const gruposDoLocal = localId => [...new Set(itensDoLocal(localId).map(grupoDe))];
+const cgDe = (c, g) => c ? (todos('est_contagem_grupos').filter(x => x.id === idGrupoC(c.id, g)).pop() || null) : null;
+function grupoFechado(c, g) {
+  if (!c) return false;
+  const cg = cgDe(c, g);
+  return cg ? cg.status === 'fechada' : c.status === 'fechada';
+}
+function progressoGrupo(c, localId, g) {
+  const itens = itensDoLocal(localId).filter(i => grupoDe(i) === g);
+  const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
+  const feitos = itens.filter(i => { const l = linhas.get(i.id); return l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== ''; }).length;
+  return { feitos, total: itens.length };
+}
+/** Situação de cada tipo de um almoxarifado no mês. */
+function situacaoTipos(localId, mes) {
+  const c = contagem(localId, mes);
+  return gruposDoLocal(localId).map(g => {
+    const cg = cgDe(c, g);
+    const p = progressoGrupo(c, localId, g);
+    const fechado = grupoFechado(c, g);
+    return { g, cg, p, fechado, comecado: fechado || !!cg || p.feitos > 0 };
+  });
+}
+/** O registro do tipo nesta contagem (nasce na primeira gravação). */
+async function garantirGrupo(c, g) {
+  const cg = cgDe(c, g);
+  if (cg) return cg;
+  return gravar('est_contagem_grupos', { id: idGrupoC(c.id, g), contagem_id: c.id, grupo: g, status: 'aberta',
+    data_contagem: dataEscolhida(), responsavel: meuNome(), ativo: true });
+}
+/** Quando todos os tipos fecham, a contagem do mês fecha (e entra no Acerto). */
+async function conferirFechamentoMes(c) {
+  const tipos = gruposDoLocal(c.local_id);
+  const todosFechados = tipos.every(g => grupoFechado(c, g));
+  const datas = tipos.map(g => (cgDe(c, g) || {}).data_contagem).filter(Boolean).sort();
+  if (todosFechados && c.status !== 'fechada') {
+    await gravar('est_contagens', Object.assign({}, c, { status: 'fechada', fechada_por: meuNome(),
+      fechada_em: new Date().toISOString(), data_contagem: datas[datas.length - 1] || c.data_contagem || dataEscolhida() }));
+    return true;
+  }
+  if (!todosFechados && c.status === 'fechada') {
+    await gravar('est_contagens', Object.assign({}, c, { status: 'aberta', fechada_por: null, fechada_em: null }));
+  }
+  return false;
+}
 
 let telaAberta = null;
 const abertos = new Set();   // itens com a lista de lotes aberta (sobrevive ao redesenho)
@@ -82,7 +137,7 @@ function desenharContar() {
   }
   // o almoxarifado escolhido precisa existir antes de montar a lista (nome, mapa)
   if (!locais().some(l => l.id === sel.localId)) sel.localId = locais()[0].id;
-  const itens = itensDoLocal(sel.localId);
+  let itens = itensDoLocal(sel.localId);
   if (!itens.length) {
     alvo.innerHTML = cabecalhoEscolha() + (itensOrdenados().length ? `<div class="cartao">
       <div class="vazio">Nenhum item marcado para ser contado neste estoque. Marque em
@@ -94,18 +149,26 @@ function desenharContar() {
   }
 
   const c = contagem(sel.localId, sel.mes);
-  const fechada = c && c.status === 'fechada';
+  const tipos = situacaoTipos(sel.localId, sel.mes);
+  if (!tipos.some(t => t.g === sel.grupo)) sel.grupo = tipos[0].g;
+  const tipo = tipos.find(t => t.g === sel.grupo);
+  const cg = tipo.cg;
+  const fechada = tipo.fechado;
+  const itensTodos = itens;
+  itens = itensTodos.filter(i => grupoDe(i) === sel.grupo);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
-  const p = c ? progresso(c.id) : { feitos: 0, total: itens.length };
+  const p = tipo.p;
   const pct = p.total ? Math.round(100 * p.feitos / p.total) : 0;
   const local = locais().find(l => l.id === sel.localId);
   mapa = mapaDoLocal(sel.localId);
+  const dataTipo = (cg && cg.data_contagem) || (fechada && c && c.data_contagem) || '';
 
-  const estado = !c
+  const estado = !tipo.comecado
     ? `<span class="tag neutra">não começada</span>`
     : fechada
-      ? `<span class="tag ativo">fechada</span> <small>por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}</small>`
-      : `<span class="tag alerta">em andamento</span>${c.responsavel ? ` <small>começada por ${esc(c.responsavel)}</small>` : ''}`;
+      ? `<span class="tag ativo">fechada</span> <small>por ${esc((cg || c).fechada_por || '—')} em ${esc(dataHora((cg || c).fechada_em))}</small>`
+      : `<span class="tag alerta">em andamento</span>${(cg || c || {}).responsavel ? ` <small>começada por ${esc((cg || c).responsavel)}</small>` : ''}`;
+  const nTiposFechados = tipos.filter(t => t.fechado).length;
 
   let grupoAtual = null;
   const corpo = itens.map(i => {
@@ -139,13 +202,17 @@ function desenharContar() {
   alvo.innerHTML = cabecalhoEscolha() + `
   <div class="cartao">
     <div class="ct-topo">
-      <div><h2>${esc(local ? local.nome : '')} · ${esc(nomeMes(sel.mes))}</h2>
+      <div><h2>${esc(local ? local.nome : '')} · ${esc(nomeMes(sel.mes))} · ${esc(sel.grupo)}</h2>
         <div class="ct-estado">${estado}</div>
         <label class="campo ct-data">Data da contagem
-          <input type="date" id="ctData" value="${esc(c && c.data_contagem ? c.data_contagem : hojeLocal())}" max="${hojeLocal()}"${fechada ? ' disabled' : ''}></label></div>
-      <div class="ct-conta"><strong>${p.feitos}</strong> de ${p.total} contados</div>
+          <input type="date" id="ctData" value="${esc(dataTipo || hojeLocal())}" max="${hojeLocal()}"${fechada ? ' disabled' : ''}></label></div>
+      <div class="ct-topo-dir">
+        <button class="btn" type="button" id="ctImprimirLista">🖨 Imprimir lista</button>
+        <div class="ct-conta"><strong>${p.feitos}</strong> de ${p.total} contados</div>
+      </div>
     </div>
     <div class="ct-barra"><span style="width:${pct}%"></span></div>
+    ${abasTipos(tipos)}
     ${chipsGrupos(itens, linhas)}
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Procurar item
@@ -155,13 +222,12 @@ function desenharContar() {
     <div class="ct-lista${soFalta ? ' so-falta' : ''}" id="ctLista">${corpo}</div>
     <div class="barra entre ct-pe">
       <span class="dc-sem">${fechada
-        ? 'Contagem fechada: já está valendo no Acerto.'
+        ? `${esc(sel.grupo)} fechado. ${c && c.status === 'fechada' ? 'Todos os tipos fecharam: a contagem já vale no Acerto.' : `Faltam ${tipos.length - nTiposFechados} tipo(s) para a contagem do mês entrar no Acerto.`}`
         : 'Pode parar e continuar depois: o que foi digitado fica guardado.'}</span>
       <span class="barra">
-      <button class="btn" type="button" id="ctImprimirLista">Imprimir lista</button>
       ${fechada
-        ? (souAdmin() ? `<button class="btn" type="button" id="ctReabrir">Reabrir a contagem</button>` : '')
-        : `<button class="btn principal" type="button" id="ctFechar">Fechar a contagem</button>`}
+        ? (souAdmin() ? `<button class="btn" type="button" id="ctReabrir">Reabrir ${esc(sel.grupo)}</button>` : '')
+        : `<button class="btn principal" type="button" id="ctFechar">Fechar ${esc(sel.grupo)}</button>`}
       </span>
     </div>
   </div>`;
@@ -170,6 +236,12 @@ function desenharContar() {
   filtrar();
   $('ctBusca').addEventListener('input', e => { busca = e.target.value; filtrar(); });
   ligarChips();
+  document.querySelectorAll('.ct-tipos [data-tipo]').forEach(b => b.addEventListener('click', () => {
+    sel.grupo = b.dataset.tipo;
+    try { localStorage.setItem(CHAVE_GRUPO, sel.grupo); } catch { /* sem localStorage */ }
+    grupoFiltro = '';
+    desenharContar();
+  }));
   $('ctSoFalta').addEventListener('change', e => {
     soFalta = e.target.checked;
     $('ctLista').classList.toggle('so-falta', soFalta);
@@ -211,14 +283,21 @@ function chipsGrupos(itens, linhas) {
     if (l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '') r.feitos++;
   }
   const nRepor = itens.filter(i => { const l = linhas.get(i.id); return l && precisaRepor(i, l.quantidade); }).length;
-  if (grupos.length < 2 && !nRepor) return '';
+  if (!nRepor) return '';
   if (grupoFiltro === '__repor' && !nRepor) grupoFiltro = '';
   if (grupoFiltro && grupoFiltro !== '__repor' && !grupos.some(g => g.nome === grupoFiltro)) grupoFiltro = '';
   const chip = (id, rot, f, t) => `<button type="button" class="ct-chip${t && f === t ? ' completo' : ''}" data-chip="${esc(id)}"
     aria-pressed="${grupoFiltro === id}">${esc(rot)}${t ? ` <small>${f}/${t}</small>` : ''}</button>`;
   const repor = nRepor ? `<button type="button" class="ct-chip ct-chip-repor" data-chip="__repor"
     aria-pressed="${grupoFiltro === '__repor'}">A repor <small>${nRepor}</small></button>` : '';
-  return `<div class="ct-chips">${chip('', 'Todos', 0, 0)}${repor}${grupos.length > 1 ? grupos.map(g => chip(g.nome, g.nome, g.feitos, g.total)).join('') : ''}</div>`;
+  return `<div class="ct-chips">${chip('', 'Todos', 0, 0)}${repor}</div>`;
+}
+
+/* As abas dos tipos: um botão por grupo, com quantos foram contados e ✓ quando fechado. */
+function abasTipos(tipos) {
+  return `<div class="ct-chips ct-tipos" role="tablist">${tipos.map(t => `<button type="button" role="tab"
+    class="ct-chip${t.fechado ? ' completo' : ''}" data-tipo="${esc(t.g)}" aria-pressed="${t.g === sel.grupo}">${t.fechado ? '✓ ' : ''}${esc(t.g)}
+    <small>${t.p.feitos}/${t.p.total}</small></button>`).join('')}</div>`;
 }
 
 function ligarChips() {
@@ -353,7 +432,7 @@ async function salvarLote(div) {
   div.classList.remove('erro');
   try {
     const c = await garantirContagem();
-    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
+    if (grupoFechado(c, sel.grupo)) { aviso('A contagem de ' + sel.grupo + ' já foi fechada.', true); return; }
     const validade = div.querySelector('.cl-val').value || null;
     await gravar('est_contagem_lotes', {
       id: div.dataset.lote, contagem_id: c.id, item_id: itemId,
@@ -507,7 +586,7 @@ async function salvarQuadra(div) {
   div.classList.remove('erro');
   try {
     const c = await garantirContagem();
-    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
+    if (grupoFechado(c, sel.grupo)) { aviso('A contagem de ' + sel.grupo + ' já foi fechada.', true); return; }
     const codigo = div.querySelector('.cq-q').value;
     const outra = [...div.parentElement.querySelectorAll('.ct-quad[data-quad]')].find(d => d !== div && d.dataset.quad === codigo);
     if (outra) { aviso('Esta quadra já está na lista deste produto. Some os bags na mesma linha.', true); return; }
@@ -602,7 +681,7 @@ function redesenharQuadras(itemId) {
   const caixa = bloco.querySelector('.ct-quadras');
   if (caixa) {
     const tmp = document.createElement('div');
-    tmp.innerHTML = desenharQuadras(item, c, quads, c.status === 'fechada');
+    tmp.innerHTML = desenharQuadras(item, c, quads, grupoFechado(c, sel.grupo));
     caixa.replaceWith(tmp.firstElementChild);
     ligarQuadras(bloco);
   }
@@ -615,14 +694,16 @@ function redesenharQuadras(itemId) {
 
 /** A contagem do mês nasce no primeiro número digitado. */
 async function garantirContagem() {
-  const existente = contagem(sel.localId, sel.mes);
-  if (existente) return existente;
-  return gravar('est_contagens', {
+  let c = contagem(sel.localId, sel.mes);
+  if (!c) c = await gravar('est_contagens', {
     id: idContagem(sel.localId, sel.mes),
     local_id: sel.localId, mes: sel.mes, status: 'aberta',
     responsavel: meuNome(), aberta_por: meuNome(),
     data_contagem: dataEscolhida(),
   });
+  // o tipo que está na tela também ganha o seu registro (data, quem começou)
+  if (sel.grupo && !grupoFechado(c, sel.grupo)) await garantirGrupo(c, sel.grupo);
+  return c;
 }
 
 /** A data que está no campo (ou hoje, se o campo estiver vazio ou estranho). */
@@ -638,9 +719,10 @@ async function salvarData() {
   if (inp.value > hojeLocal()) { aviso('A data da contagem não pode ser depois de hoje.', true); inp.value = hojeLocal(); return; }
   try {
     const c = await garantirContagem();
-    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
-    if (c.data_contagem !== inp.value) await gravar('est_contagens', Object.assign({}, c, { data_contagem: inp.value }));
-    aviso('Data da contagem: ' + dataBR(inp.value) + '.');
+    if (grupoFechado(c, sel.grupo)) { aviso('A contagem de ' + sel.grupo + ' já foi fechada.', true); return; }
+    const cg = await garantirGrupo(c, sel.grupo);
+    if (cg.data_contagem !== inp.value) await gravar('est_contagem_grupos', Object.assign({}, cg, { data_contagem: inp.value }));
+    aviso(`Data da contagem de ${sel.grupo}: ${dataBR(inp.value)}.`);
   } catch (e) {
     console.error(e);
     aviso('Não consegui guardar a data (' + (e.message || e) + ').', true);
@@ -659,7 +741,7 @@ async function salvarCampo(inp) {
   linha.classList.remove('erro');
   try {
     const c = await garantirContagem();
-    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
+    if (grupoFechado(c, sel.grupo)) { aviso('A contagem de ' + sel.grupo + ' já foi fechada.', true); return; }
     await gravar('est_contagem_itens', {
       id: idLinha(c.id, inp.dataset.item), contagem_id: c.id, item_id: inp.dataset.item,
       quantidade: n, contado_por: meuNome(),
@@ -677,18 +759,20 @@ async function salvarCampo(inp) {
 function atualizarConta() {
   const c = contagem(sel.localId, sel.mes);
   if (!c) return;
-  const chips = document.querySelector('.ct-chips');
+  const chips = document.querySelector('.ct-chips:not(.ct-tipos)');
   const lugar = chips || document.querySelector('.ct-barra');
   if (lugar) {
     const linhas = new Map(linhasDe(c.id).map(l => [l.item_id, l]));
     const novo = document.createElement('div');
-    novo.innerHTML = chipsGrupos(itensDoLocal(sel.localId), linhas);
+    novo.innerHTML = chipsGrupos(itensDoLocal(sel.localId).filter(i => grupoDe(i) === sel.grupo), linhas);
     const n = novo.firstElementChild;
     const rolagem = chips ? chips.scrollLeft : 0;
     if (chips) chips.remove();
-    if (n) { document.querySelector('.ct-barra').after(n); n.scrollLeft = rolagem; ligarChips(); }
+    if (n) { (document.querySelector('.ct-tipos') || document.querySelector('.ct-barra')).after(n); n.scrollLeft = rolagem; ligarChips(); }
+    const aba = document.querySelector(`.ct-tipos [data-tipo="${CSS.escape(sel.grupo)}"] small`);
+    if (aba) { const pg = progressoGrupo(c, sel.localId, sel.grupo); aba.textContent = pg.feitos + '/' + pg.total; }
   }
-  const p = progresso(c.id);
+  const p = progressoGrupo(c, sel.localId, sel.grupo);
   const el = document.querySelector('.ct-conta');
   if (el) el.innerHTML = `<strong>${p.feitos}</strong> de ${p.total} contados`;
   const barra = document.querySelector('.ct-barra span');
@@ -702,26 +786,29 @@ function confirmarFechar() {
   // o que estiver no campo e ainda não saiu dele também vale
   if (document.activeElement && document.activeElement.classList.contains('ct-qtd')) document.activeElement.blur();
   const c = contagem(sel.localId, sel.mes);
-  const itens = itensDoLocal(sel.localId);
+  const itens = itensDoLocal(sel.localId).filter(i => grupoDe(i) === sel.grupo);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const branco = itens.filter(i => {
     const l = linhas.get(i.id);
     return !l || l.quantidade === null || l.quantidade === undefined || l.quantidade === '';
   });
   const local = locais().find(l => l.id === sel.localId);
-  window.abrirModal('Fechar a contagem', `
-    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong> · contada em <strong>${esc(dataBR(dataEscolhida()))}</strong></p>
+  const faltam = gruposDoLocal(sel.localId).filter(g => g !== sel.grupo && !grupoFechado(c, g));
+  window.abrirModal('Fechar ' + sel.grupo, `
+    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong> · <strong>${esc(sel.grupo)}</strong> · contada em <strong>${esc(dataBR(dataEscolhida()))}</strong></p>
     ${branco.length
       ? `<p><strong>${branco.length}</strong> ${branco.length === 1 ? 'item ficou' : 'itens ficaram'} em branco e
          ${branco.length === 1 ? 'vai entrar' : 'vão entrar'} como <strong>zero</strong> (não tem na prateleira):</p>
          <ul class="ct-branco">${branco.slice(0, 12).map(i => `<li>${esc(i.nome)}</li>`).join('')}${branco.length > 12
            ? `<li>… e mais ${branco.length - 12}</li>` : ''}</ul>`
       : '<p>Todos os itens foram contados.</p>'}
-    <p class="dc-sem">Depois de fechada, a contagem entra no Acerto e não pode mais ser alterada${souAdmin()
-      ? ' (o administrador pode reabrir)' : ''}.</p>
+    <p class="dc-sem">Depois de fechado, ${esc(sel.grupo)} não pode mais ser alterado${souAdmin()
+      ? ' (o administrador pode reabrir)' : ''}. ${faltam.length
+      ? `A contagem do mês entra no Acerto quando os outros tipos fecharem (faltam: ${esc(faltam.join(', '))}).`
+      : 'É o último tipo: com ele fechado, a contagem do mês entra no Acerto.'}</p>
     <div class="barra fim">
       <button class="btn" type="button" id="ctVoltar">Voltar e contar</button>
-      <button class="btn principal" type="button" id="ctConfirmar">Fechar a contagem</button>
+      <button class="btn principal" type="button" id="ctConfirmar">Fechar ${esc(sel.grupo)}</button>
     </div>`, corpo => {
     corpo.querySelector('#ctVoltar').onclick = window.fecharModal;
     corpo.querySelector('#ctConfirmar').onclick = async () => {
@@ -733,12 +820,14 @@ function confirmarFechar() {
             id: idLinha(ct.id, i.id), contagem_id: ct.id, item_id: i.id, quantidade: 0, contado_por: meuNome(),
           });
         }
-        await gravar('est_contagens', Object.assign({}, ct, {
+        const cg = await garantirGrupo(ct, sel.grupo);
+        await gravar('est_contagem_grupos', Object.assign({}, cg, {
           status: 'fechada', fechada_por: meuNome(), fechada_em: new Date().toISOString(),
-          data_contagem: ct.data_contagem || dataEscolhida(),
+          data_contagem: cg.data_contagem || dataEscolhida(),
         }));
+        const mesFechou = await conferirFechamentoMes(contagem(sel.localId, sel.mes) || ct);
         window.fecharModal();
-        aviso('Contagem fechada. Ela já entra no Acerto.');
+        aviso(mesFechou ? `${sel.grupo} fechado. Todos os tipos fecharam: a contagem já entra no Acerto.` : `${sel.grupo} fechado.`);
         desenharContar();
       } catch (e) {
         console.error(e);
@@ -752,9 +841,18 @@ function confirmarFechar() {
 async function reabrir() {
   const c = contagem(sel.localId, sel.mes);
   if (!c || !souAdmin()) return;
-  if (!confirm('Reabrir a contagem de ' + nomeMes(sel.mes) + '? Ela sai do Acerto até ser fechada de novo.')) return;
-  await gravar('est_contagens', Object.assign({}, c, { status: 'aberta', fechada_por: null, fechada_em: null }));
-  aviso('Contagem reaberta.');
+  if (!confirm(`Reabrir ${sel.grupo} de ${nomeMes(sel.mes)}?${c.status === 'fechada' ? ' A contagem do mês sai do Acerto até fechar de novo.' : ''}`)) return;
+  // contagem fechada de antes dos tipos: os outros tipos continuam fechados
+  for (const g of gruposDoLocal(sel.localId)) {
+    if (g !== sel.grupo && !cgDe(c, g) && c.status === 'fechada') {
+      await gravar('est_contagem_grupos', { id: idGrupoC(c.id, g), contagem_id: c.id, grupo: g, status: 'fechada',
+        data_contagem: c.data_contagem || null, fechada_por: c.fechada_por || null, fechada_em: c.fechada_em || null, ativo: true });
+    }
+  }
+  const cg = cgDe(c, sel.grupo) || { id: idGrupoC(c.id, sel.grupo), contagem_id: c.id, grupo: sel.grupo, data_contagem: c.data_contagem || null, ativo: true };
+  await gravar('est_contagem_grupos', Object.assign({}, cg, { status: 'aberta', fechada_por: null, fechada_em: null }));
+  if (c.status === 'fechada') await gravar('est_contagens', Object.assign({}, c, { status: 'aberta', fechada_por: null, fechada_em: null }));
+  aviso(`${sel.grupo} reaberto.`);
   desenharContar();
 }
 
@@ -774,13 +872,17 @@ function desenharAndamento() {
     const situ = !c ? '<span class="tag neutra">não começada</span>'
       : c.status === 'fechada' ? '<span class="tag ativo">fechada</span>'
         : '<span class="tag alerta">em andamento</span>';
+    // um selo por tipo: ✓ fechado (com a data), em andamento ou não começado
+    const tiposTxt = situacaoTipos(l.id, mesAndamento).map(t => `<button type="button" class="ct-tipo-selo ${t.fechado ? 'ok' : t.comecado ? 'and' : ''}"
+      data-contar="${esc(l.id)}" data-tipo="${esc(t.g)}" title="${t.fechado ? 'fechado' : t.comecado ? 'em andamento' : 'não começado'}">${t.fechado ? '✓ ' : ''}${esc(t.g)} <small>${t.p.feitos}/${t.p.total}${t.cg && t.cg.data_contagem ? ' · ' + esc(dataBR(t.cg.data_contagem).slice(0, 5)) : ''}</small></button>`).join('');
     const quem = !c ? '' : c.status === 'fechada'
       ? `${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}`
       : `${textoData(c) ? esc(textoData(c)) + ' · ' : ''}começada por ${esc(c.responsavel || '—')}`;
     return `<div class="item">
       <span></span>
       <div><div class="nome">${esc(l.nome)} ${situ}</div>
-        <div class="sub">${p.feitos} de ${p.total} itens${quem ? ' · ' + quem : ''}</div></div>
+        <div class="sub">${p.feitos} de ${p.total} itens${quem ? ' · ' + quem : ''}</div>
+        <div class="ct-tipos-and">${tiposTxt}</div></div>
       <div class="acoes"><button class="btn mini${c && c.status === 'fechada' ? '' : ' principal'}" type="button"
         data-contar="${esc(l.id)}">${c && c.status === 'fechada' ? 'Ver' : 'Contar'}</button></div>
     </div>`;
@@ -797,6 +899,7 @@ function desenharAndamento() {
   });
   alvo.querySelectorAll('[data-contar]').forEach(b => b.addEventListener('click', () => {
     sel.localId = b.dataset.contar; sel.mes = mesAndamento;
+    if (b.dataset.tipo) sel.grupo = b.dataset.tipo;
     window.abrirTelaEstoque('ctNova');
   }));
 }
@@ -822,7 +925,9 @@ function desenharHistorico() {
     const n = linhasDe(c.id).length;
     return cab + `<div class="item"><span></span>
       <div><div class="nome">${esc(nomeLocal(c.local_id))}</div>
-        <div class="sub">${n} itens · ${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}</div></div>
+        <div class="sub">${n} itens · ${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}</div>
+        ${(() => { const gs = todos('est_contagem_grupos').filter(x => x.contagem_id === c.id && x.status === 'fechada');
+          return gs.length ? `<div class="sub">${gs.map(x => `${esc(x.grupo)}${x.data_contagem ? ' ' + esc(dataBR(x.data_contagem)) : ''}${x.fechada_por ? ' (' + esc(x.fechada_por) + ')' : ''}`).join(' · ')}</div>` : ''; })()}</div>
       <div class="acoes">
         <button class="btn mini" type="button" data-ver="${esc(c.id)}">Ver</button>
         <button class="btn mini" type="button" data-imprimir="${esc(c.id)}">Imprimir</button>
@@ -888,13 +993,13 @@ function escolherImpressao() {
   const c = contagem(sel.localId, sel.mes);
   const itens = itensDoLocal(sel.localId);
   const grupos = [...new Set(itens.map(i => i.grupo || 'Outros'))];
-  const fechada = c && c.status === 'fechada';
+  const fechada = grupoFechado(c, sel.grupo);
   window.abrirModal('Imprimir lista da contagem', `
     <form id="ctImpForm">
       <div class="grade">
         <label class="campo">Grupo <select name="grupo">
           <option value="">Todos os grupos (${itens.length} itens)</option>
-          ${grupos.map(g => `<option${g === grupoFiltro ? ' selected' : ''}>${esc(g)}</option>`).join('')}
+          ${grupos.map(g => `<option${g === sel.grupo ? ' selected' : ''}>${esc(g)}</option>`).join('')}
         </select></label>
       </div>
       <label class="es-check"><input type="checkbox" name="valores"${fechada ? ' checked' : ''}> Levar as quantidades já digitadas</label>
@@ -921,7 +1026,9 @@ function montarListaImpressao(op) {
   const itens = itensDoLocal(sel.localId)
     .filter(i => !op.grupo || (i.grupo || 'Outros') === op.grupo)
     .filter(i => !op.faltam || !tem(i));
-  const data = c && c.data_contagem ? dataBR(c.data_contagem) : (op.valores ? dataBR(dataEscolhida()) : '');
+  const cgImp = op.grupo ? cgDe(c, op.grupo) : null;
+  const data = cgImp && cgImp.data_contagem ? dataBR(cgImp.data_contagem)
+    : c && c.data_contagem && (!op.grupo || grupoFechado(c, op.grupo)) ? dataBR(c.data_contagem) : (op.valores ? dataBR(dataEscolhida()) : '');
 
   // linhas da folha: cabeçalho de grupo + itens (o cabeçalho se repete ao virar a folha)
   const corpo = [];
