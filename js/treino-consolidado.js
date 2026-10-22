@@ -47,7 +47,8 @@ function linhas() {
     if (de && (x.realizado || '') < de) return false;
     if (ate && (x.realizado || '') > ate) return false;
     return true;
-  }).sort((a, b) => so(b.realizado || b.vence).localeCompare(so(a.realizado || a.vence)) ||
+  }).sort((a, b) => (a.realizado ? 1 : 0) - (b.realizado ? 1 : 0) ||
+    so(b.realizado || b.vence).localeCompare(so(a.realizado || a.vence)) ||
     so(pessoa(a.funcionario_id)?.nome).localeCompare(so(pessoa(b.funcionario_id)?.nome), 'pt-BR'));
 }
 
@@ -79,6 +80,9 @@ function montarFiltros() {
 
 /* =============== tela =============== */
 const tagRec = t => t.recicla_tipo_id ? '<br><span class="tag tc-rec">RECICLAGEM</span>' : '';
+/* Sem data de realização: mostra até quando vale o documento. */
+const celData = x => x.realizado ? dataBr(x.realizado)
+  : (x.vence ? `<span class="dc-sem">não informado<br>válido até ${dataBr(x.vence)}</span>` : '—');
 const celNr = t => t.nr ? `<b>${esc(t.nr)}</b>` : '<span class="dc-sem">—</span>';
 const celCert = x => anexoSst('treinamento', x.id)
   ? `<button class="btn mini principal" type="button" data-cert="${x.id}">Visualizar</button>`
@@ -126,14 +130,15 @@ function desenhar() {
       </tr></thead><tbody>
       ${lista.map(x => {
         const t = tipoDe(x.tipo_id), p = pessoa(x.funcionario_id) || {};
-        const a = so(x.realizado || x.vence).slice(0, 4);
-        const grupo = f && a !== ano ? `<tr class="tc-ano"><td colspan="8">${esc(a || 'Sem data')}</td></tr>` : '';
+        // sem data de realização (vence pelo documento) fica num grupo próprio, não no ano da validade
+        const a = x.realizado ? so(x.realizado).slice(0, 4) : '';
+        const grupo = f && a !== ano ? `<tr class="tc-ano"><td colspan="8">${esc(a || 'Sem data de realização')}</td></tr>` : '';
         ano = a;
         return grupo + `<tr>
           ${f ? '' : `<td><b>${esc(p.nome)}</b><br><span class="dc-sem">${esc(p.cargo || '—')}</span></td>`}
           <td>${esc(t.nome || '—')}${tagRec(t)}</td>
-          <td class="ce">${celNr(t)}</td>
-          <td class="ce tc-n">${dataBr(x.realizado)}</td>
+          <td class="ce tc-n">${celNr(t)}</td>
+          <td class="ce tc-n">${celData(x)}</td>
           <td class="ce tc-n">${horas(x.carga_horaria)}</td>
           <td>${esc(x.instrutor || '—')}</td>
           ${f ? `<td class="tc-n">${esc(nCert(x) || '—')}</td>` : ''}
@@ -184,7 +189,7 @@ function documento(lista, f, totH) {
         const t = tipoDe(x.tipo_id), pz = pessoa(x.funcionario_id) || {};
         return `<tr>${f ? '' : `<td class="an-nome">${esc(pz.nome)}</td>`}
           <td>${esc(t.nome || '—')}${t.recicla_tipo_id ? ' <b>(reciclagem)</b>' : ''}</td>
-          <td class="ce">${esc(t.nr || '—')}</td><td class="ce">${dataBr(x.realizado)}</td>
+          <td class="ce">${esc(t.nr || '—')}</td><td class="ce">${x.realizado ? dataBr(x.realizado) : (x.vence ? 'válido até ' + dataBr(x.vence) : '—')}</td>
           <td class="ce">${horas(x.carga_horaria)}</td><td>${esc(x.instrutor || '—')}</td></tr>`;
       }).join('')}</tbody></table>`;
     out.push(folha(titulo, subt, corpo, pe + (total > 1 ? ` · folha ${p + 1} de ${total}` : ''), deitada));
