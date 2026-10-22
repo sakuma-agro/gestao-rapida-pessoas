@@ -212,3 +212,6 @@ alter table public.est_itens
 
 -- Código do sistema e CA dos EPIs (22/10/2026, planilha Suprimentos_Sakuma.xlsx)
 alter table public.est_itens add column if not exists codigo text, add column if not exists ca text;
+
+-- Data do dia em que se contou (22/10/2026): nasce com o dia de hoje e pode ser trocada com a contagem aberta.
+alter table public.est_contagens add column if not exists data_contagem date;

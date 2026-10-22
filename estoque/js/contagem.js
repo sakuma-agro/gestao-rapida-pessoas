@@ -24,6 +24,12 @@ const gravar = (t, r) => {
   return p;
 };
 
+/* Data do dia em que se contou (pedido dele, 22/10/2026): fica na contagem
+   (est_contagens.data_contagem), nasce com o dia de hoje do aparelho e pode
+   ser trocada enquanto a contagem está aberta. */
+const hojeLocal = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const textoData = c => c && c.data_contagem ? 'contada em ' + dataBR(c.data_contagem) : '';
+
 /* O que está escolhido na tela Contar. */
 const CHAVE_LOCAL = 'estoque.contarLocal';
 const sel = { localId: null, mes: mesAtual() };
@@ -132,7 +138,9 @@ function desenharContar() {
   <div class="cartao">
     <div class="ct-topo">
       <div><h2>${esc(local ? local.nome : '')} · ${esc(nomeMes(sel.mes))}</h2>
-        <div class="ct-estado">${estado}</div></div>
+        <div class="ct-estado">${estado}</div>
+        <label class="campo ct-data">Data da contagem
+          <input type="date" id="ctData" value="${esc(c && c.data_contagem ? c.data_contagem : hojeLocal())}" max="${hojeLocal()}"${fechada ? ' disabled' : ''}></label></div>
       <div class="ct-conta"><strong>${p.feitos}</strong> de ${p.total} contados</div>
     </div>
     <div class="ct-barra"><span style="width:${pct}%"></span></div>
@@ -163,6 +171,7 @@ function desenharContar() {
   });
   $('ctFechar')?.addEventListener('click', confirmarFechar);
   $('ctReabrir')?.addEventListener('click', reabrir);
+  $('ctData')?.addEventListener('change', salvarData);
 
   alvo.querySelectorAll('[data-mais]').forEach(b => b.addEventListener('click', () => alternarLotes(b.dataset.mais)));
   ligarLotes(alvo);
@@ -606,7 +615,30 @@ async function garantirContagem() {
     id: idContagem(sel.localId, sel.mes),
     local_id: sel.localId, mes: sel.mes, status: 'aberta',
     responsavel: meuNome(), aberta_por: meuNome(),
+    data_contagem: dataEscolhida(),
   });
+}
+
+/** A data que está no campo (ou hoje, se o campo estiver vazio ou estranho). */
+function dataEscolhida() {
+  const v = ($('ctData') || {}).value || '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : hojeLocal();
+}
+
+async function salvarData() {
+  const inp = $('ctData');
+  if (!inp) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inp.value)) { aviso('Escolha a data do dia da contagem.', true); return; }
+  if (inp.value > hojeLocal()) { aviso('A data da contagem não pode ser depois de hoje.', true); inp.value = hojeLocal(); return; }
+  try {
+    const c = await garantirContagem();
+    if (c.status === 'fechada') { aviso('Esta contagem já foi fechada.', true); return; }
+    if (c.data_contagem !== inp.value) await gravar('est_contagens', Object.assign({}, c, { data_contagem: inp.value }));
+    aviso('Data da contagem: ' + dataBR(inp.value) + '.');
+  } catch (e) {
+    console.error(e);
+    aviso('Não consegui guardar a data (' + (e.message || e) + ').', true);
+  }
 }
 
 async function salvarCampo(inp) {
@@ -672,7 +704,7 @@ function confirmarFechar() {
   });
   const local = locais().find(l => l.id === sel.localId);
   window.abrirModal('Fechar a contagem', `
-    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong></p>
+    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong> · contada em <strong>${esc(dataBR(dataEscolhida()))}</strong></p>
     ${branco.length
       ? `<p><strong>${branco.length}</strong> ${branco.length === 1 ? 'item ficou' : 'itens ficaram'} em branco e
          ${branco.length === 1 ? 'vai entrar' : 'vão entrar'} como <strong>zero</strong> (não tem na prateleira):</p>
@@ -697,6 +729,7 @@ function confirmarFechar() {
         }
         await gravar('est_contagens', Object.assign({}, ct, {
           status: 'fechada', fechada_por: meuNome(), fechada_em: new Date().toISOString(),
+          data_contagem: ct.data_contagem || dataEscolhida(),
         }));
         window.fecharModal();
         aviso('Contagem fechada. Ela já entra no Acerto.');
@@ -736,8 +769,8 @@ function desenharAndamento() {
       : c.status === 'fechada' ? '<span class="tag ativo">fechada</span>'
         : '<span class="tag alerta">em andamento</span>';
     const quem = !c ? '' : c.status === 'fechada'
-      ? `fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}`
-      : `começada por ${esc(c.responsavel || '—')}`;
+      ? `${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}`
+      : `${textoData(c) ? esc(textoData(c)) + ' · ' : ''}começada por ${esc(c.responsavel || '—')}`;
     return `<div class="item">
       <span></span>
       <div><div class="nome">${esc(l.nome)} ${situ}</div>
@@ -783,7 +816,7 @@ function desenharHistorico() {
     const n = linhasDe(c.id).length;
     return cab + `<div class="item"><span></span>
       <div><div class="nome">${esc(nomeLocal(c.local_id))}</div>
-        <div class="sub">${n} itens · fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}</div></div>
+        <div class="sub">${n} itens · ${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}</div></div>
       <div class="acoes">
         <button class="btn mini" type="button" data-ver="${esc(c.id)}">Ver</button>
         <button class="btn mini" type="button" data-imprimir="${esc(c.id)}">Imprimir</button>
@@ -825,7 +858,7 @@ function montarFolha(contagemId) {
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit">
         <h1>Contagem de Estoque — ${esc(local.nome || '')}</h1>
-        <p>${esc(nomeMes(c.mes))} · fechada em ${esc(dataHora(c.fechada_em))} · ${linhas.length} itens</p>
+        <p>${esc(nomeMes(c.mes))}${c.data_contagem ? ' · contada em ' + esc(dataBR(c.data_contagem)) : ''} · fechada em ${esc(dataHora(c.fechada_em))} · ${linhas.length} itens</p>
       </div>
     </div>
     ${grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>

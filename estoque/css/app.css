@@ -258,3 +258,6 @@ dialog h3{margin:0 0 14px;font-size:16px}
 .cad-agro-cult{margin-top:8px;font-size:13px}
 .cad-agro-cult p{margin:6px 0 0;line-height:1.45}
 @media (max-width:520px){.cad-agro-bloco dl{grid-template-columns:1fr}.cad-agro-bloco dt{margin-top:6px}}
+
+/* Data da contagem (22/10/2026) */
+.ct-data{margin-top:8px;max-width:190px}
