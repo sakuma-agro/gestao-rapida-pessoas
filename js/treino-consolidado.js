@@ -81,7 +81,7 @@ function montarFiltros() {
 const tagRec = t => t.recicla_tipo_id ? '<br><span class="tag tc-rec">RECICLAGEM</span>' : '';
 const celNr = t => t.nr ? `<b>${esc(t.nr)}</b>` : '<span class="dc-sem">—</span>';
 const celCert = x => anexoSst('treinamento', x.id)
-  ? `<button class="btn mini principal" type="button" data-cert="${x.id}">Abrir</button>`
+  ? `<button class="btn mini principal" type="button" data-cert="${x.id}">Visualizar</button>`
   : '<span class="dc-sem">não anexado</span>';
 
 function desenhar() {
