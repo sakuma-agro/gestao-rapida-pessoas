@@ -19,8 +19,8 @@ export const locais = () => ativos('est_locais').slice()
   .sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || porNome(a, b));
 
 /* Grupos na ordem em que se conta. Item sem grupo conhecido cai no fim. */
-// Os grupos de contagem (pedido dele, 15/10/2026), na ordem da tela.
-export const GRUPOS = ['Defensivos', 'Fertilizantes', 'EPIs', 'Lubrificantes', 'Material de limpeza', 'Papelaria'];
+// Os grupos de contagem (pedido dele, 15/10/2026), na ordem da tela. Sementes entrou em 22/10/2026 com o cadastro consolidado.
+export const GRUPOS = ['Defensivos', 'Fertilizantes', 'Sementes', 'EPIs', 'Lubrificantes', 'Material de limpeza', 'Papelaria'];
 export const UNIDADES = ['kg', 'g', 'L', 'mL', 'un', 'sc', 'cx', 'pct', 'par'];
 const ordemGrupo = g => { const i = GRUPOS.indexOf(g); return i < 0 ? 99 : i; };
 export const itensOrdenados = (lista = ativos('est_itens')) => lista.slice()
