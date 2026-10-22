@@ -196,3 +196,16 @@ update public.est_locais set acerto_grupo = 'Quebra Cocão'
 -- Valor por unidade nas entradas do Estoque Quebra Cocão (21/10/2026, pedido dele).
 -- A saída não guarda valor: o app calcula pelo custo médio das entradas.
 alter table public.est_movimentos add column if not exists valor_unitario numeric;
+
+-- AGROFIT no cadastro de itens (22/10/2026) — dados do MAPA (dados.agricultura.gov.br, Produto Formulado)
+alter table public.est_itens
+  add column if not exists agrofit_situacao text,
+  add column if not exists agrofit_registro text,
+  add column if not exists agrofit_marca text,
+  add column if not exists agrofit_classe text,
+  add column if not exists agrofit_ingrediente_ativo text,
+  add column if not exists agrofit_formulacao text,
+  add column if not exists agrofit_toxicologica text,
+  add column if not exists agrofit_ambiental text,
+  add column if not exists agrofit_titular text,
+  add column if not exists agrofit_culturas text;
