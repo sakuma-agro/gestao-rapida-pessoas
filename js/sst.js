@@ -122,7 +122,7 @@ const RECEITAS = {
       carga: 'trCarga', instrutor: 'trInstrutor', obs: 'trObs',
       dlgTipo: 'dlgTipoTr', formTipo: 'formTipoTr', tituloTipo: 'tituloTipoTr', erroTipo: 'erroTipoTr',
       tNome: 'ttNome', tMeses: 'ttMeses', tAtivo: 'ttAtivo', tCarga: 'ttCarga', tApagar: 'bApagarTipoTr',
-      tRecicla: 'ttRecicla',
+      tRecicla: 'ttRecicla', tNr: 'ttNr',
     },
   },
 };
@@ -266,12 +266,22 @@ export async function abrirSst(tela) {
 }
 
 /* =============== cadastro de tipos =============== */
+/* NR do treinamento (22/10/2026): "nr 6", "NR6", "31" viram "NR-06", "NR-31".
+   Texto que não seja número fica como foi digitado. */
+function normNr(v) {
+  const t = so(v).toUpperCase();
+  if (!t) return null;
+  const m = t.match(/^(?:NR)?\s*-?\s*(\d{1,2})$/);
+  return m ? 'NR-' + m[1].padStart(2, '0') : t;
+}
+
 function desenharTipos(r) {
   if (r.id === 'exame') return desenharTiposExame();
   const tipos = S[r.id].tipos;
   $(r.el.listaTipos).innerHTML = tipos.length ? `
     <table class="dc-planilha"><thead><tr>
       <th>${esc(r.rotuloTipo)}</th>
+      ${r.el.tNr ? '<th class="ce">NR</th>' : ''}
       <th class="ce">${r.id === 'exame' ? 'Refazer a cada' : 'Reciclagem'}</th>
       ${r.completo ? '<th class="ce">Carga horária</th>' : ''}
       <th class="ce">Lançamentos</th><th class="ce">Situação</th><th></th>
@@ -282,6 +292,7 @@ function desenharTipos(r) {
       return `<tr>
         <td><b>${esc(t.nome)}</b>${recicla
           ? `<br><span class="dc-sem">recicla: ${esc(recicla.nome)}</span>` : ''}</td>
+        ${r.el.tNr ? `<td class="ce">${t.nr ? `<b>${esc(t.nr)}</b>` : '<span class="dc-sem">—</span>'}</td>` : ''}
         <td class="ce">${t.meses ? t.meses + ' meses' : '<span class="dc-sem">não vence</span>'}</td>
         ${r.completo ? `<td class="ce">${t.carga_horaria ? Number(t.carga_horaria) + ' h' : '—'}</td>` : ''}
         <td class="ce">${usos}</td>
@@ -339,6 +350,7 @@ function abrirTipo(r, id) {
   $(r.el.tNome).value = e.nome || '';
   $(r.el.tMeses).value = e.meses ?? '';
   if (r.el.tCarga) $(r.el.tCarga).value = e.carga_horaria ?? '';
+  if (r.el.tNr) $(r.el.tNr).value = e.nr || '';
   if (r.el.tRecicla) {
     // não deixo escolher ele mesmo nem quem já aponta para ele: viraria laço
     const opcoes = S[r.id].tipos.filter(o =>
@@ -1132,6 +1144,7 @@ function ligarReceita(r, avisar) {
     if (r.el.tCarga) {
       linha.carga_horaria = so($(r.el.tCarga).value) ? Number($(r.el.tCarga).value) : null;
     }
+    if (r.el.tNr) linha.nr = normNr($(r.el.tNr).value);
     if (r.el.tCategoria) linha.categoria = $(r.el.tCategoria).value;
     if (r.el.tRecicla) linha.recicla_tipo_id = $(r.el.tRecicla).value || null;
     linha.id = e.novo ? novoId() : e.id;

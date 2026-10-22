@@ -2067,6 +2067,14 @@ addEventListener('beforeinstallprompt', function (ev) {
       <label class="campo plena">Nome do treinamento
         <input type="text" id="ttNome" required placeholder="NR-35 · Trabalho em altura">
       </label>
+      <label class="campo">NR
+        <input type="text" id="ttNr" list="listaNrs" maxlength="20" placeholder="NR-31">
+        <datalist id="listaNrs">
+          <option value="NR-06"><option value="NR-07"><option value="NR-10"><option value="NR-11">
+          <option value="NR-12"><option value="NR-20"><option value="NR-23"><option value="NR-31">
+          <option value="NR-33"><option value="NR-35">
+        </datalist>
+      </label>
       <label class="campo">Reciclagem a cada (meses)
         <input type="number" id="ttMeses" min="0" max="120" step="1" placeholder="24">
       </label>
