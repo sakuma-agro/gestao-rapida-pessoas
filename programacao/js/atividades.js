@@ -3,93 +3,164 @@
    Lançar, editar, repetir, reprogramar, concluir e listar.
    ===================================================================== */
 
-/* ---------------------------------------------------------------- formulário */
+/* ---------------------------------------------------------------- formulário
+   Painel de lançamento enxuto (22/10/2026, no molde do DP › Lançar jornada):
+   4 linhas que cabem no notebook sem rolar, status e prioridade em botões de
+   um toque, Enter pula para o próximo campo e Ctrl+Enter lança. Depois de
+   lançar, data, local, cultura, plantio, operador, máquina e implemento ficam
+   — o cursor volta para a Atividade, pronto para a próxima do mesmo talhão. */
 
-/* Desenha o formulário da atividade dentro de `alvo`.
-   `base` pode trazer valores para preencher (local, data, etc.).
-   `aoSalvar(registros)` é chamado depois de gravar. */
-function formAtividade(alvo, base = {}, aoSalvar) {
+const PRIOR_BOTOES = [{ id: '', nome: 'Normal' }, { id: 'importante', nome: 'Importante' }, { id: 'urgente', nome: 'Urgente' }];
+
+function botoesEscolha(nome, lista, valor, classe = '') {
+  return `<input type="hidden" id="f-${nome}" name="${nome}" value="${esc(valor ?? '')}">
+    <div class="pc-seg ${classe}" data-seg="${nome}" role="group">${lista.map(o =>
+      `<button type="button" data-v="${esc(o.id)}" class="${String(o.id) === String(valor ?? '') ? 'on' : ''} ${o.cls || ''}">${esc(o.nome)}</button>`).join('')}</div>`;
+}
+
+function formAtividade(alvo, base = {}, aoSalvar, opc = {}) {
   const a = Object.assign({ status: 'Planejado' }, base);
   const novo = !a.id;
+  const listaStatus = (novo ? STATUS.filter(x => x !== 'Cancelado') : STATUS)
+    .map(x => ({ id: x, nome: x, cls: STATUS_CLASSE[x] }));
   alvo.innerHTML = `
-    <div class="colunas">
-      ${campoTexto('Data *', 'data', a.data || hoje(), 'date', '&nbsp;')}
-      <div class="campo"><label for="f-local_id">Local *</label>
-        <select id="f-local_id" name="local_id">${opcoesLocais(a.local_id)}</select></div>
-      ${campoLista('Cultura *', 'cultura_id', q.ordenado('culturas'), a.cultura_id)}
-      ${campoTexto('Plantio', 'plantio', a.plantio || '', 'text', 'Opcional. Ex.: PL 21')}
-      ${campoLista('Atividade *', 'tipo_id', q.ordenado('tipos_atividade'), a.tipo_id)}
-      ${campoLista('Operador', 'operador_id', q.ordenado('operadores'), a.operador_id, '— a definir —')}
-      ${campoLista('Status *', 'status', STATUS, a.status, null)}
-      ${campoLista('Prioridade', 'prioridade', PRIORIDADES, a.prioridade, 'Normal')}
-      ${campoLista('Máquina', 'maquina_id', listaMaquinas(), a.maquina_id, '— nenhuma —')}
-      ${campoLista('Implemento', 'implemento_id', listaImplementos(), a.implemento_id, '— nenhum —')}
-      ${campoTexto('Horas previstas', 'horas_previstas', fmtNum(a.horas_previstas), 'text', '', 'inputmode="decimal"')}
-      ${campoTexto('Horas realizadas', 'horas_realizadas', fmtNum(a.horas_realizadas), 'text', '', 'inputmode="decimal"')}
-    </div>
-    ${campoArea('Observações', 'observacoes', a.observacoes)}
-    ${novo ? `
-    <details class="pc-repetir">
-      <summary>Repetir esta atividade em outras datas ou outros locais</summary>
-      <div class="campo"><label>Outras datas</label>
-        <div id="rp-datas" class="pc-chips"></div>
-        <div class="pc-linha">
-          <input type="date" id="rp-data">
-          <button type="button" class="btn neutro" id="rp-add">Adicionar data</button>
+    <div class="pc-form">
+      <div class="pc-lin">
+        <div class="campo"><label for="f-data">Data *</label>
+          <input type="date" id="f-data" name="data" value="${esc(a.data || hoje())}">
+          <p class="ajuda pc-semtag" id="aj-data">&nbsp;</p></div>
+        <div class="campo pc-l2"><label for="f-local_id">Local *</label>
+          <select id="f-local_id" name="local_id">${opcoesLocais(a.local_id)}</select></div>
+        ${campoLista('Cultura *', 'cultura_id', q.ordenado('culturas'), a.cultura_id)}
+        ${campoTexto('Plantio', 'plantio', a.plantio || '', 'text', '', 'placeholder="Ex.: PL 21"')}
+      </div>
+      <div class="pc-lin">
+        <div class="campo pc-l2"><label for="f-tipo_id">Atividade *</label>
+          <select id="f-tipo_id" name="tipo_id">${opcoes(q.ordenado('tipos_atividade'), a.tipo_id)}</select></div>
+        ${campoLista('Operador', 'operador_id', q.ordenado('operadores'), a.operador_id, '— a definir —')}
+        ${campoLista('Máquina', 'maquina_id', listaMaquinas(), a.maquina_id, '— nenhuma —')}
+        ${campoLista('Implemento', 'implemento_id', listaImplementos(), a.implemento_id, '— nenhum —')}
+      </div>
+      <div class="pc-lin pc-lin3">
+        <div class="campo"><label>Status</label>${botoesEscolha('status', listaStatus, a.status, 'pc-seg-st')}</div>
+        <div class="campo"><label>Prioridade</label>${botoesEscolha('prioridade', PRIOR_BOTOES.map(o => ({ ...o, cls: o.id ? 'pri-' + o.id : '' })), a.prioridade || '', 'pc-seg-pri')}</div>
+        ${campoTexto('Horas prev.', 'horas_previstas', fmtNum(a.horas_previstas), 'text', '', 'inputmode="decimal"')}
+        ${campoTexto('Horas real.', 'horas_realizadas', fmtNum(a.horas_realizadas), 'text', '', 'inputmode="decimal"')}
+      </div>
+      <div class="campo pc-obs"><label for="f-observacoes">Observações</label>
+        <textarea id="f-observacoes" name="observacoes" rows="2">${esc(a.observacoes || '')}</textarea></div>
+      ${novo ? `
+      <details class="pc-repetir">
+        <summary>Repetir em outras datas ou outros locais <small id="rp-resumo"></small></summary>
+        <div class="campo"><label>Outras datas</label>
+          <div id="rp-datas" class="pc-chips"></div>
+          <div class="pc-linha">
+            <input type="date" id="rp-data">
+            <button type="button" class="btn neutro" id="rp-add">Adicionar data</button>
+          </div>
+          <p class="ajuda">Ex.: Kcl - 1 e Kcl - 2. Cada data vira uma atividade.</p>
         </div>
-        <p class="ajuda">Ex.: Kcl - 1 e Kcl - 2. Cada data vira uma atividade.</p>
+        <div class="campo"><label>Também nos locais</label>
+          <div class="pc-locais">${fazendasOrdenadas().map(f => {
+            const ls = locaisOrdenados().filter(l => l.fazenda_id === f.id);
+            return ls.length ? `<fieldset><legend>${esc(f.nome)}</legend>${ls.map(l =>
+              `<label class="pc-cx"><input type="checkbox" class="rp-local" value="${l.id}"> ${esc(l.nome)}</label>`).join('')}</fieldset>` : '';
+          }).join('')}</div>
+        </div>
+      </details>` : ''}
+      <div class="acoes pc-acoes">
+        <button type="button" class="btn" id="fa-salvar">${novo ? 'Lançar' : 'Salvar alterações'}</button>
+        ${novo ? '<button type="button" class="btn neutro" id="fa-limpar">Limpar</button>' : ''}
+        <span class="cresce"></span>
+        <small class="pc-dica">Enter passa para o próximo campo · <b>Ctrl+Enter</b> ${novo ? 'lança' : 'salva'}</small>
       </div>
-      <div class="campo"><label>Também nos locais</label>
-        <div class="pc-locais">${fazendasOrdenadas().map(f => {
-          const ls = locaisOrdenados().filter(l => l.fazenda_id === f.id);
-          return ls.length ? `<fieldset><legend>${esc(f.nome)}</legend>${ls.map(l =>
-            `<label class="pc-cx"><input type="checkbox" class="rp-local" value="${l.id}"> ${esc(l.nome)}</label>`).join('')}</fieldset>` : '';
-        }).join('')}</div>
-      </div>
-    </details>` : ''}
-    <div class="acoes">
-      <button type="button" class="btn" id="fa-salvar">${novo ? 'Salvar' : 'Salvar alterações'}</button>
-      ${novo ? '<button type="button" class="btn secundario" id="fa-outra">Salvar e lançar outra</button>' : ''}
     </div>`;
 
   const $a = s => alvo.querySelector(s);
   const extras = [];
 
+  // botões de um toque (status e prioridade) gravam no campo escondido
+  alvo.querySelectorAll('[data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => {
+    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    $a('#f-' + g.dataset.seg).value = b.dataset.v;
+    if (g.dataset.seg === 'status') pintarHoras();
+  }));
+  // horas realizadas só fazem sentido com a atividade andando ou feita
+  const pintarHoras = () => {
+    const st = $a('#f-status').value;
+    $a('#f-horas_realizadas').closest('.campo').classList.toggle('pc-apagado', st === 'Planejado' || st === 'Cancelado');
+  };
+  pintarHoras();
+
   const mostrarSemana = () => {
     const d = $a('#f-data').value;
-    $a('#aj-data').innerHTML = d ? `Cai em <strong>${esc(rotuloSemana(chaveSemana(d)))}</strong> (${esc(diaSemana(d))})` : '&nbsp;';
+    $a('#aj-data').innerHTML = d ? `<b>S${semanaDe(d)} · ${esc(MESES[partes(d).mes - 1])}</b> · ${esc(diaSemana(d))}` : '&nbsp;';
+    if (opc.aoMudar) opc.aoMudar(lerForm(alvo));
   };
   $a('#f-data').oninput = mostrarSemana;
-  mostrarSemana();
 
   // local com cultura fixa (abacate, café) preenche a cultura sozinho
   $a('#f-local_id').onchange = () => {
     const l = q.por_id('locais', $a('#f-local_id').value);
     if (l && l.cultura_id) $a('#f-cultura_id').value = l.cultura_id;
+    if (opc.aoMudar) opc.aoMudar(lerForm(alvo));
   };
-  if (novo && a.local_id && !a.cultura_id) $a('#f-local_id').onchange();
+  if (novo && a.local_id && !a.cultura_id) {
+    const l = q.por_id('locais', a.local_id);
+    if (l && l.cultura_id) $a('#f-cultura_id').value = l.cultura_id;
+  }
+  mostrarSemana();
+
+  // Enter anda pelos campos, Ctrl+Enter salva (igual ao Lançar jornada)
+  const ordem = ['#f-data', '#f-local_id', '#f-cultura_id', '#f-plantio', '#f-tipo_id', '#f-operador_id',
+                 '#f-maquina_id', '#f-implemento_id', '#f-horas_previstas', '#f-horas_realizadas', '#f-observacoes'];
+  alvo.querySelector('.pc-form').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); salvar(); return; }
+    const t = e.target;
+    if (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON' || !t.id) return;
+    const i = ordem.indexOf('#' + t.id);
+    if (i < 0) return;
+    e.preventDefault();
+    for (let j = i + 1; j < ordem.length; j++) {
+      const p = $a(ordem[j]);
+      if (p && !p.closest('.pc-apagado')) { p.focus(); if (p.select && p.tagName === 'INPUT') p.select(); return; }
+    }
+    $a('#fa-salvar').focus();
+  });
 
   if (novo) {
+    const resumo = () => {
+      const nl = alvo.querySelectorAll('.rp-local:checked').length;
+      const t = [extras.length ? `+${extras.length} data${extras.length > 1 ? 's' : ''}` : '',
+                 nl ? `+${nl} local${nl > 1 ? 'is' : ''}` : ''].filter(Boolean).join(' · ');
+      $a('#rp-resumo').textContent = t ? '(' + t + ')' : '';
+    };
     const pintar = () => {
       $a('#rp-datas').innerHTML = extras.map((d, i) =>
         `<span class="pc-chip">${br(d)} · S${semanaDe(d)} <button type="button" data-tira="${i}" aria-label="Tirar">×</button></span>`).join('')
         || '<small>nenhuma</small>';
       $a('#rp-datas').querySelectorAll('[data-tira]').forEach(b => b.onclick = () => { extras.splice(+b.dataset.tira, 1); pintar(); });
+      resumo();
     };
     pintar();
+    alvo.querySelectorAll('.rp-local').forEach(c => c.onchange = resumo);
     $a('#rp-add').onclick = () => {
       const d = $a('#rp-data').value;
       if (!d) return aviso('Escolha a data.', true);
       if (!extras.includes(d)) extras.push(d);
       extras.sort(); $a('#rp-data').value = ''; pintar();
     };
+    $a('#fa-limpar').onclick = () => formAtividade(alvo, { data: $a('#f-data').value }, aoSalvar, opc);
   }
 
-  const salvar = async (continuar) => {
+  let gravando = false;
+  const salvar = async () => {
+    if (gravando) return;
     const f = lerForm(alvo);
     for (const [c, rot] of [['data', 'a data'], ['local_id', 'o local'], ['cultura_id', 'a cultura'],
                             ['tipo_id', 'a atividade']]) {
-      if (!f[c]) return aviso('Falta informar ' + rot + '.', true);
+      if (!f[c]) { aviso('Falta informar ' + rot + '.', true); const p = $a('#f-' + c); if (p) p.focus(); return; }
     }
     const reg = Object.assign({}, a, {
       data: f.data, local_id: f.local_id, cultura_id: f.cultura_id, tipo_id: f.tipo_id,
@@ -104,41 +175,84 @@ function formAtividade(alvo, base = {}, aoSalvar) {
       if (m === null) return;
       reg.motivo = m.trim() || null;
     }
+    gravando = true;
     const salvos = [];
-    if (novo) {
-      const datas = [reg.data, ...extras.filter(d => d !== reg.data)];
-      const locais = [reg.local_id, ...Array.from(alvo.querySelectorAll('.rp-local:checked')).map(x => x.value)
-                                              .filter(x => x !== reg.local_id)];
-      for (const lid of locais) for (const d of datas) {
-        const l = q.por_id('locais', lid);
-        const r = Object.assign({}, reg, {
-          id: crypto.randomUUID(), local_id: lid, data: d,
-          // local com cultura própria mantém a dele
-          cultura_id: (lid !== reg.local_id && l && l.cultura_id) ? l.cultura_id : reg.cultura_id
-        });
-        salvos.push(await gravarAtividade(r));
+    try {
+      if (novo) {
+        const datas = [reg.data, ...extras.filter(d => d !== reg.data)];
+        const locais = [reg.local_id, ...Array.from(alvo.querySelectorAll('.rp-local:checked')).map(x => x.value)
+                                                .filter(x => x !== reg.local_id)];
+        for (const lid of locais) for (const d of datas) {
+          const l = q.por_id('locais', lid);
+          const r = Object.assign({}, reg, {
+            id: crypto.randomUUID(), local_id: lid, data: d,
+            // local com cultura própria mantém a dele
+            cultura_id: (lid !== reg.local_id && l && l.cultura_id) ? l.cultura_id : reg.cultura_id
+          });
+          salvos.push(await gravarAtividade(r));
+        }
+      } else {
+        salvos.push(await gravarAtividade(reg));
       }
-    } else {
-      salvos.push(await gravarAtividade(reg));
-    }
-    aviso(salvos.length > 1 ? `${salvos.length} atividades salvas.`
-      : `Salvo em ${rotuloSemana(chaveSemana(salvos[0].data))}.`);
-    if (continuar) {
+    } finally { gravando = false; }
+    aviso(salvos.length > 1 ? `${salvos.length} atividades lançadas.`
+      : `${nomeAtividade(salvos[0])} · ${q.nome('locais', salvos[0].local_id)} ${novo ? 'lançada' : 'salva'} em ${rotuloSemana(chaveSemana(salvos[0].data))}.`);
+    if (novo && opc.continuar) {
+      // fica pronto para a próxima do mesmo local
       formAtividade(alvo, { data: reg.data, local_id: reg.local_id, cultura_id: reg.cultura_id, plantio: reg.plantio,
-                            operador_id: reg.operador_id, maquina_id: reg.maquina_id }, aoSalvar);
+                            operador_id: reg.operador_id, maquina_id: reg.maquina_id, implemento_id: reg.implemento_id },
+                    aoSalvar, opc);
+      $a('#f-tipo_id').focus();
+      if (aoSalvar) aoSalvar(salvos);
     } else if (aoSalvar) aoSalvar(salvos);
   };
-  $a('#fa-salvar').onclick = () => salvar(false);
-  if (novo) $a('#fa-outra').onclick = () => salvar(true);
+  $a('#fa-salvar').onclick = salvar;
 }
 
+/* Lançar atividade: formulário à esquerda e, ao lado, o que já está
+   programado para o local na semana da data — evita lançar repetido — e o
+   que foi lançado agora. */
 TELAS.lancar = el => {
-  el.innerHTML = `<h1>Lançar atividade</h1>
-    <p class="sub">A data já coloca a atividade no mês e na semana certos do painel.</p>
-    <div class="pc-cartao" id="la-form"></div>`;
+  el.innerHTML = `<h1 class="pc-h1-lancar">Lançar atividade</h1>
+    <div class="pc-lancar">
+      <div class="pc-cartao pc-cartao-lancar" id="la-form"></div>
+      <aside class="pc-lado" id="la-lado"></aside>
+    </div>`;
   const base = window.baseLancamento || {};
   window.baseLancamento = null;
-  formAtividade($('#la-form'), base, () => TELAS.lancar(el));
+  const lancadas = [];
+  const lado = $('#la-lado');
+  let atual = {};
+  const linha = a => `<li class="${STATUS_CLASSE[statusDe(a)]}" data-id="${a.id}">
+      <div class="info"><strong>${esc(nomeAtividade(a))}</strong>
+      <small>${br(a.data)} · ${esc(diaSemana(a.data))}${a.operador_id ? ' · ' + esc(q.nome('operadores', a.operador_id)) : ''}</small></div>
+      ${etqStatus(a)}</li>`;
+  const pintarLado = () => {
+    const f = atual;
+    let html = '';
+    if (f.data && f.local_id) {
+      const k = chaveSemana(f.data);
+      const ja = atividadesVisiveis().filter(a => a.local_id === f.local_id && mesmaSemana(a.data, k))
+        .sort((x, y) => x.data.localeCompare(y.data));
+      html += `<h2>${esc(q.nome('locais', f.local_id))}</h2>
+        <p class="sub">Já programado na ${esc(rotuloSemana(k))}</p>
+        ${ja.length ? `<ul class="lista pc-rlista pc-lado-lista">${ja.map(linha).join('')}</ul>`
+                    : '<p class="pc-lado-vazio">Nada programado ainda.</p>'}`;
+    } else {
+      html += '<h2>Nesta semana</h2><p class="pc-lado-vazio">Escolha a data e o local para ver o que já está programado ali.</p>';
+    }
+    if (lancadas.length) {
+      html += `<h2 class="pc-lado-h2">Lançadas agora <small>${lancadas.length}</small></h2>
+        <ul class="lista pc-rlista pc-lado-lista">${lancadas.slice().reverse().slice(0, 8).map(a =>
+          linha(q.por_id('atividades', a.id) || a).replace('<small>', `<small>${esc(q.nome('locais', a.local_id))} · `)).join('')}</ul>`;
+    }
+    lado.innerHTML = html;
+    lado.querySelectorAll('[data-id]').forEach(li => li.onclick = () => abrirAtividade(li.dataset.id, pintarLado));
+  };
+  formAtividade($('#la-form'), base, salvos => { lancadas.push(...salvos); pintarLado(); },
+    { continuar: true, aoMudar: f => { atual = f; pintarLado(); } });
+  const pd = $('#la-form #f-data');
+  if (base.local_id) $('#la-form #f-tipo_id').focus(); else if (pd) pd.focus();
 };
 
 /* ---------------------------------------------------------------- ficha da atividade */

@@ -375,3 +375,73 @@ body.modo-quadro .pc-rolagem{max-height:calc(100vh - 180px)}
   .ql{width:100%}
   .ql-item{min-width:0;flex:0 0 auto;white-space:nowrap}
 }
+
+/* ---------- Lançar atividade enxuto (22/10/2026, no molde do Lançar jornada) ----------
+   4 linhas que cabem no notebook sem rolar; status e prioridade em botões;
+   ao lado, o que já está programado no local naquela semana. */
+.pc-h1-lancar{margin:0 0 10px}
+.pc-lancar{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.pc-cartao-lancar{margin:0;padding:12px 14px 10px}
+.pc-form .pc-lin{display:grid;grid-template-columns:1fr 1.4fr 1fr 1fr;gap:0 12px}
+.pc-form .pc-lin3{grid-template-columns:auto auto 1fr 1fr}
+.pc-form .campo{margin-bottom:8px;min-width:0}
+.pc-form .campo label{font-size:13px;margin-bottom:3px}
+.pc-form .campo input,.pc-form .campo select,.pc-form .campo textarea{min-height:38px;padding:6px 10px;font-size:15px}
+.pc-form .campo textarea{min-height:44px;height:48px}
+.pc-form .pc-semtag{margin:2px 0 0;font-size:12px;line-height:1.2}
+.pc-form .pc-semtag b{color:var(--marrom)}
+.pc-form .pc-apagado{opacity:.45}
+.pc-form .pc-repetir{padding:6px 12px;margin:2px 0 4px}
+.pc-form .pc-repetir summary{min-height:24px;font-size:14px}
+.pc-form .pc-repetir summary small{font-weight:normal;color:var(--verde-escuro)}
+.pc-acoes{margin:6px 0 0;align-items:center}
+.pc-acoes .btn{min-height:42px}
+.pc-dica{color:var(--cinza-claro);font-size:12px}
+
+/* botões de um toque */
+.pc-seg{display:inline-flex;border:1px solid var(--linha);border-radius:var(--raio);overflow:hidden;background:var(--branco)}
+.pc-seg button{border:0;border-right:1px solid var(--linha);background:none;font:inherit;font-size:13.5px;
+  color:var(--cinza);padding:0 11px;min-height:38px;cursor:pointer;white-space:nowrap}
+.pc-seg button:last-child{border-right:0}
+.pc-seg button:hover{background:var(--verde-claro)}
+.pc-seg button.on{background:var(--verde);color:#fff;font-weight:bold}
+.pc-seg-st button.on.st-plan{background:#E1A200}
+.pc-seg-st button.on.st-and{background:#2F5F8A}
+.pc-seg-st button.on.st-ok{background:var(--ok)}
+.pc-seg-st button.on.st-canc{background:var(--cinza-claro)}
+.pc-seg-pri button.on{background:var(--cinza)}
+.pc-seg-pri button.on.pri-importante{background:#E1A200}
+.pc-seg-pri button.on.pri-urgente{background:var(--urgente)}
+
+/* painel do lado */
+.pc-lado{background:var(--branco);border:1px solid var(--linha);border-top:4px solid var(--marrom);
+  border-radius:var(--raio);padding:10px 12px;max-height:calc(100vh - 190px);overflow:auto}
+.pc-lado h2{margin:0;font-size:15px;color:var(--marrom)}
+.pc-lado .sub{margin:0 0 6px;font-size:12.5px}
+.pc-lado-h2{margin-top:12px !important;padding-top:10px;border-top:1px solid var(--linha)}
+.pc-lado-h2 small{background:var(--verde);color:#fff;border-radius:999px;padding:0 7px;font-size:12px;margin-left:4px}
+.pc-lado-vazio{color:var(--cinza-claro);font-size:13px;margin:4px 0}
+.pc-lado-lista li{padding:6px 8px;cursor:pointer;gap:6px}
+.pc-lado-lista li .info strong{font-size:13.5px}
+.pc-lado-lista li .info small{font-size:12px}
+.pc-lado-lista .etq-st{font-size:11px;padding:1px 7px}
+
+/* dentro da ficha (modal) o formulário fica em 2 colunas */
+.modal .pc-form .pc-lin,.modal .pc-form .pc-lin3{grid-template-columns:1fr 1fr}
+.modal .pc-form .pc-dica{display:none}
+
+@media (max-width:1100px){
+  .pc-lancar{grid-template-columns:1fr}
+  .pc-lado{max-height:none}
+}
+@media (max-width:720px){
+  .pc-form .pc-lin,.pc-form .pc-lin3{grid-template-columns:1fr 1fr}
+  .pc-dica{display:none}
+  .pc-seg button{padding:0 8px}
+}
+@media (max-width:420px){
+  .pc-form .pc-lin{grid-template-columns:1fr}
+}
+.pc-lado-lista .info{flex:1 1 auto;min-width:0}
+.pc-lado-lista li{flex-wrap:nowrap}
+.modal .pc-seg{display:flex;flex-wrap:wrap}.modal .pc-seg button{flex:1 1 auto;padding:0 8px}
