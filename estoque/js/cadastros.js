@@ -37,6 +37,30 @@ function textoLocais(i) {
 let verInativos = false;
 const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 
+/* ---- AGROFIT (22/10/2026): dados do MAPA gravados em est_itens.agrofit_* ----
+   Situação: Encontrado / Nome aproximado – conferir / Vários registros – conferir /
+   Não encontrado no AGROFIT / Não se aplica (não é agrotóxico). */
+const toxCurta = t => { const m = String(t || '').match(/Categoria\s*(\d)/i); return m ? 'Tox. ' + m[1] : (t ? 'Tox. NC' : ''); };
+function resumoAgrofit(i) {
+  const s = i.agrofit_situacao || '';
+  if (!s || /^Não se aplica/.test(s)) return '';
+  if (/^Não encontrado/.test(s)) return ' · <span class="cad-agro fora">fora do AGROFIT</span>';
+  const conf = /conferir/.test(s) ? ' <span class="tag alerta">conferir</span>' : '';
+  const partes = [i.agrofit_classe, toxCurta(i.agrofit_toxicologica), i.agrofit_registro ? 'MAPA ' + i.agrofit_registro : ''].filter(Boolean);
+  return partes.length ? ` · <span class="cad-agro">${esc(partes.join(' · '))}</span>${conf}` : conf;
+}
+function blocoAgrofit(i) {
+  const s = i.agrofit_situacao;
+  if (!s) return '';
+  const linhas = [['Situação', s], ['Marca comercial', i.agrofit_marca], ['Nº registro MAPA', i.agrofit_registro],
+    ['Classe agronômica', i.agrofit_classe], ['Ingrediente ativo', i.agrofit_ingrediente_ativo], ['Formulação', i.agrofit_formulacao],
+    ['Classificação toxicológica', i.agrofit_toxicologica], ['Classificação ambiental', i.agrofit_ambiental],
+    ['Titular do registro', i.agrofit_titular]].filter(l => l[1]);
+  const cult = i.agrofit_culturas ? `<details class="cad-agro-cult"><summary>Culturas registradas (${i.agrofit_culturas.split(', ').length})</summary><p>${esc(i.agrofit_culturas)}</p></details>` : '';
+  return `<fieldset class="campo plena cad-agro-bloco"><legend>AGROFIT (MAPA)</legend>
+    <dl>${linhas.map(l => `<dt>${esc(l[0])}</dt><dd>${esc(l[1])}</dd>`).join('')}</dl>${cult}</fieldset>`;
+}
+
 /* ============================ ITENS ============================ */
 
 function desenharItens() {
@@ -78,7 +102,7 @@ function desenharItens() {
           <div class="sub">${esc(i.unidade || 'sem unidade')}${temMinimo(i)
             ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
               ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
-            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoLocais(i)}</div></div>
+            : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoLocais(i)}${resumoAgrofit(i)}</div></div>
         <div class="acoes"><button class="btn mini" type="button" data-editar="${esc(i.id)}">Editar</button></div>
       </div>`;
     }).join('') || `<div class="vazio">${todosItens.length ? 'Nenhum item com esse nome.' : 'Nenhum item cadastrado ainda.'}</div>`}</div>`;
@@ -131,6 +155,7 @@ function editarItem(id) {
           value="${esc(mostrarNumero(i.pedido_reposicao))}" placeholder="quanto pedir"></label>
       </div>
       ${caixasLocais(i.locais_contagem)}
+      ${blocoAgrofit(i)}
       <p class="dc-sem">Quando a contagem der igual ou abaixo do mínimo, o item aparece na Reposição com a quantidade a pedir.</p>
       <div class="barra entre">
         <button class="btn${i.ativo === false ? '' : ' perigo'}" type="button" id="cadAtivo">${i.ativo === false ? 'Reativar' : 'Desativar'}</button>

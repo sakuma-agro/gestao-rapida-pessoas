@@ -248,3 +248,13 @@ dialog h3{margin:0 0 14px;font-size:16px}
     page-break-inside:avoid;break-inside:avoid}
   .folha:last-child{page-break-after:auto;break-after:auto}
 }
+
+/* AGROFIT no cadastro de itens (22/10/2026) */
+.cad-agro{color:var(--suave)}
+.cad-agro.fora{opacity:.7;font-style:italic}
+.cad-agro-bloco dl{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:4px 12px;margin:4px 0 0;font-size:13px}
+.cad-agro-bloco dt{font-weight:700;opacity:.75}
+.cad-agro-bloco dd{margin:0;overflow-wrap:anywhere}
+.cad-agro-cult{margin-top:8px;font-size:13px}
+.cad-agro-cult p{margin:6px 0 0;line-height:1.45}
+@media (max-width:520px){.cad-agro-bloco dl{grid-template-columns:1fr}.cad-agro-bloco dt{margin-top:6px}}
