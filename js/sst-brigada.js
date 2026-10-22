@@ -239,13 +239,13 @@ function desenharPainel() {
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">Brigada e primeiros socorros</h2>
         <p class="dica" style="margin:2px 0 0">Conta quem está ativo, designado e já fez o curso. Vencido conta, mas aparece em vermelho para reciclar.</p></div>
-      <span class="barra"><button class="btn" type="button" id="brPdf">Relatório PDF</button></span>
     </div>
     ${semMin ? '<div class="aviso info" style="margin-top:10px">Os mínimos ainda não foram definidos. Informe quantos brigadistas e socorristas a SAKUMA precisa em <a href="#" data-br-ir="brMinimos">Mínimos</a>.</div>' : ''}
     ${avisos.map(a => `<div class="aviso ${a.cor}" style="margin-top:10px">${esc(a.txt)}</div>`).join('')}
     ${!semMin && !avisos.length ? '<div class="aviso ok" style="margin-top:10px">Brigada e primeiros socorros dentro do mínimo.</div>' : ''}
   </div>
-  <div class="br-grade">${rs.map(cartaoGrupo).join('')}</div>`;
+  <div class="br-grade">${rs.map(cartaoGrupo).join('')}</div>
+  <div class="cartao naoimprimir br-rodape"><button class="btn" type="button" id="brPdf">Relatório PDF</button></div>`;
   ligarComuns(tela);
   $('brPdf').addEventListener('click', () => mostrar(documentoBrigada(rs), { barra: true }));
 }

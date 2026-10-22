@@ -1693,3 +1693,4 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .br-equiv{border:1px solid var(--linha);border-radius:8px;padding:10px 12px;margin:12px 0 0}
 .br-equiv legend{font-size:12px;font-weight:700;padding:0 4px}
 .br-equiv .br-marca{font-size:12.5px}
+.br-rodape{display:flex;justify-content:flex-end;margin-top:14px}
