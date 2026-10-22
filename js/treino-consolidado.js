@@ -47,7 +47,7 @@ function linhas() {
     if (de && (x.realizado || '') < de) return false;
     if (ate && (x.realizado || '') > ate) return false;
     return true;
-  }).sort((a, b) => so(b.realizado).localeCompare(so(a.realizado)) ||
+  }).sort((a, b) => so(b.realizado || b.vence).localeCompare(so(a.realizado || a.vence)) ||
     so(pessoa(a.funcionario_id)?.nome).localeCompare(so(pessoa(b.funcionario_id)?.nome), 'pt-BR'));
 }
 
@@ -126,7 +126,7 @@ function desenhar() {
       </tr></thead><tbody>
       ${lista.map(x => {
         const t = tipoDe(x.tipo_id), p = pessoa(x.funcionario_id) || {};
-        const a = so(x.realizado).slice(0, 4);
+        const a = so(x.realizado || x.vence).slice(0, 4);
         const grupo = f && a !== ano ? `<tr class="tc-ano"><td colspan="8">${esc(a || 'Sem data')}</td></tr>` : '';
         ano = a;
         return grupo + `<tr>

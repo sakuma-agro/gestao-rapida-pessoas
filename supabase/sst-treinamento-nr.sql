@@ -9,3 +9,9 @@ alter table public.sst_tipos_treinamento add column if not exists nr text;
 -- digitado em cada lançamento (ex.: transporte de passageiros, que segue a CNH).
 alter table public.sst_tipos_treinamento add column if not exists validade_documento boolean not null default false;
 -- Transporte de passageiros passou a usar esse modo (meses zerados).
+
+-- Realização opcional (22/10/2026, gr-v317): nos tipos que vencem pela data do
+-- documento, o lançamento pode ter só a validade.
+alter table public.sst_treinamentos alter column realizado drop not null;
+-- Catálogo ganhou CETCI e CETPP (validade do documento) e o Valdinei recebeu
+-- CETCP 22/04/2028, CETCI 28/04/2028 e CETPP 08/05/2028, sem data de realização.

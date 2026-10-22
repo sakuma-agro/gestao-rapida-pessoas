@@ -275,6 +275,9 @@ function marcarValidadeDoc(r, doc) {
   $('trVenceRot').textContent = doc ? 'Validade do documento (CNH)' : 'Vence em';
   $('trVenceCampo').classList.toggle('tc-destaque', doc);
   $(r.el.vence).required = doc;
+  // vence pelo documento: a data de realização é opcional (22/10/2026)
+  $(r.el.data).required = !doc;
+  if ($('trDataRot')) $('trDataRot').textContent = doc ? 'Realizado em (se souber)' : 'Realizado em';
 }
 function modoValidade(r) {
   const doc = $(r.el.tDoc).value === '1';
@@ -833,8 +836,9 @@ function atualizarVencimento(r, forcar) {
   }
   marcarValidadeDoc(r, !!t.validade_documento);
   if (t.validade_documento) {
-    dica.textContent = 'A validade deste treinamento vem do documento (certificado/CNH): digite a data em "Validade do documento".';
+    dica.textContent = 'A validade deste treinamento vem do documento (certificado/CNH): digite a data em "Validade do documento". A data de realização pode ficar em branco.';
     if (forcar) $(r.el.vence).value = '';
+    if (forcar && data === hoje()) $(r.el.data).value = '';
     return;
   }
   if (!t.meses) {
@@ -1109,7 +1113,9 @@ function ligarReceita(r, avisar) {
       realizado: $(r.el.data).value,
       vence: $(r.el.vence).value || null,
     };
-    if (!linha.funcionario_id || !linha.tipo_id || !linha.realizado) {
+    const porDoc = !!tipoDe(r, linha.tipo_id)?.validade_documento;
+    if (!linha.realizado) linha.realizado = null;
+    if (!linha.funcionario_id || !linha.tipo_id || (!linha.realizado && !porDoc)) {
       return mostrarErro(r.el.erro, 'Escolha o funcionário, o tipo e a data.');
     }
     if (!linha.vence && tipoDe(r, linha.tipo_id)?.validade_documento) {
@@ -1128,7 +1134,7 @@ function ligarReceita(r, avisar) {
     const base = i >= 0 ? (S[r.id].regs[i]._base ?? null) : null;
     const data = i >= 0 ? { ...S[r.id].regs[i], ...linha } : { ...linha, _base: null };
     if (i >= 0) S[r.id].regs[i] = data; else S[r.id].regs.unshift(data);
-    S[r.id].regs.sort((a, b) => String(b.realizado).localeCompare(String(a.realizado)));
+    S[r.id].regs.sort((a, b) => String(b.realizado || b.vence || '').localeCompare(String(a.realizado || a.vence || '')));
     salvarCaixa();
     await enviarSst(r.tabelaRegs, 'salvar', linha, base);
     try { await anexosDe(r).salvar(data.id); }
