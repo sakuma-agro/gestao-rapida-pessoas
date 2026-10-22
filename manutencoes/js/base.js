@@ -58,6 +58,8 @@ async function quemSou(sessao) {
          Quebra Cocão) — mexe nos cadastros, mas só enxerga as fazendas dela. */
       let gest = false;
       try { const r = await App.sb.rpc('eh_gestor'); gest = !r.error && !!r.data; } catch (e) {}
+      // Reserva: se a função não responder, a própria lista de administradores diz.
+      if (!gest) try { const r = await App.sb.from('administradores').select('email').ilike('email', email); gest = !r.error && (r.data || []).length > 0; } catch (e) {}
       const { data: ul } = await App.sb.from('usuario_fazendas').select('local_id').eq('email', email);
       if (data) u = {
         id: sessao.user.id, email,

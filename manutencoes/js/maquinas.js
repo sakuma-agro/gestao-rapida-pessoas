@@ -11,7 +11,9 @@
    valem para todas as fazendas (itens, tipos, modelos de check list) ficam
    com o administrador de todas (ehAdminTotal). */
 const ehAdmin = () => !!(window.Acesso && (Acesso.admin || Acesso.gestor));
-const ehAdminTotal = () => !!(window.Acesso && Acesso.admin);
+/* 22/10/2026 (2ª): ele quer que quem administra a fazenda também veja a lista
+   de itens, os tipos de máquina e os modelos de check list. */
+const ehAdminTotal = () => ehAdmin();
 /* Fazendas em que a pessoa pode cadastrar: todas para o administrador geral,
    só as dela para quem administra algumas. */
 const locaisEditaveis = () => {

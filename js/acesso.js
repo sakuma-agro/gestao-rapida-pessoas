@@ -1289,8 +1289,8 @@ const MQ_MODULOS = [
 ];
 const MQ_NIVEIS = [
   ['uso', 'Usa no dia a dia', 'lança horímetro, abre e fecha OS, faz check list e movimenta bens — não mexe nos cadastros'],
-  ['fazenda', 'Administra as fazendas marcadas', 'também cadastra e edita máquinas, itens de manutenção, trocas e bens — só nas fazendas marcadas abaixo'],
-  ['total', 'Administra todas as fazendas', 'mexe em tudo da área, inclusive nas listas gerais (itens, tipos de máquina, modelos de check list)'],
+  ['fazenda', 'Administra as fazendas marcadas', 'também cadastra e edita máquinas, itens de manutenção, tipos de máquina, modelos de check list, trocas e bens — as máquinas e bens só nas fazendas marcadas abaixo'],
+  ['total', 'Administra todas as fazendas', 'mexe em tudo da área, em todas as fazendas'],
 ];
 const nivelManut = m => !m.admin ? 'uso' : m.restrito ? 'fazenda' : 'total';
 
