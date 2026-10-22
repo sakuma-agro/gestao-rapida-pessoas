@@ -45,3 +45,10 @@ select 1,
   (select id from public.sst_atividades where nome = 'Brigada de incêndio' limit 1),
   (select id from public.sst_atividades where nome = 'Primeiros socorros' limit 1)
 on conflict (id) do nothing;
+
+-- 22/10/2026 (tarde): cursos que também valem como primeiros socorros
+-- (a brigada orgânica ITMG-12 "E PRIMEIRO SOCORROS" já inclui o conteúdo).
+alter table public.sst_brigada_config add column if not exists socorros_equivalentes uuid[] not null default '{}';
+update public.sst_brigada_config set socorros_equivalentes = array(
+  select id from public.sst_tipos_treinamento where nome ilike '%ITMG-12%' and nome ilike '%INICIAL%')
+where id = 1 and socorros_equivalentes = '{}';

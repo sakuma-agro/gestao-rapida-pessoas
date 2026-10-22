@@ -1690,3 +1690,6 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .us-nivel{background:transparent;border-color:#3a424a}
  :root:not([data-theme="light"]) .us-nivel b{color:inherit}:root:not([data-theme="light"]) .us-nivel small{color:#b9bcb0}
  :root:not([data-theme="light"]) .us-nivel.ativo{background:rgba(132,189,0,.12)}}
+.br-equiv{border:1px solid var(--linha);border-radius:8px;padding:10px 12px;margin:12px 0 0}
+.br-equiv legend{font-size:12px;font-weight:700;padding:0 4px}
+.br-equiv .br-marca{font-size:12.5px}

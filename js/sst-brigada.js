@@ -79,24 +79,34 @@ const nomeTipo = id => lancamentosSst().treinamento.tipos.find(t => t.id === id)
  * curso exigido (inicial ou reciclagem). Vale o pior entre os cursos.
  * conta = entra na conta; logo = vence dentro do prazo de aviso.
  */
+function situacaoUlt(lista, sufixo = '') {
+  const ult = [...lista].sort((a, b) => String(b.realizado || '').localeCompare(String(a.realizado || '')))[0];
+  if (!ult) return { conta: false, logo: false, rotulo: 'nunca fez o curso — não conta', cor: 'perigo', vence: null, ordem: 0 };
+  const sit = situacaoDe(ult.vence);
+  if (sit.chave === 'vencido') return { conta: true, logo: false, venc: true, rotulo: `curso vencido em ${br(ult.vence)} — reciclar${sufixo}`, cor: 'perigo', vence: ult.vence, ordem: 1 };
+  if (sit.dias != null && sit.dias <= avisoDias()) return { conta: true, logo: true, rotulo: (sit.dias === 0 ? 'curso vence hoje' : `curso vence em ${sit.dias} dia${sit.dias > 1 ? 's' : ''} (${br(ult.vence)})`) + sufixo, cor: 'alerta', vence: ult.vence, ordem: 2 };
+  return { conta: true, logo: false, rotulo: (ult.vence ? `em dia até ${br(ult.vence)}` : 'em dia (sem validade)') + sufixo, cor: 'ativo', vence: ult.vence, ordem: 3 };
+}
+
+/* Cursos que também valem como primeiros socorros (22/10/2026, pedido dele):
+   a brigada orgânica ITMG-12 "E PRIMEIRO SOCORROS" já inclui o conteúdo.
+   Casa pelo tipo exato (não pelo grupo), senão a brigada básica também valeria. */
+const equivalentes = g => g.chave === 'socorros' ? (B.cfg?.socorros_equivalentes || []) : [];
+
 function cursoDaPessoa(funcionarioId, g) {
   const cursos = cursosDe(B.cfg?.[g.atv]);
-  if (!cursos.length) return { conta: true, logo: false, rotulo: 'sem curso ligado à atividade', cor: 'neutra', vence: null };
+  const equiv = equivalentes(g);
+  if (!cursos.length && !equiv.length) return { conta: true, logo: false, rotulo: 'sem curso ligado à atividade', cor: 'neutra', vence: null };
   const regs = lancamentosSst().treinamento.regs.filter(r => r.funcionario_id === funcionarioId);
   let pior = null;
   for (const grupo of cursos) {
-    const doCurso = regs.filter(r => grupoTr(r.tipo_id) === grupo)
-      .sort((a, b) => String(b.realizado || '').localeCompare(String(a.realizado || '')));
-    const ult = doCurso[0];
-    let s;
-    if (!ult) s = { conta: false, logo: false, rotulo: 'nunca fez o curso — não conta', cor: 'perigo', vence: null, ordem: 0, curso: nomeTipo(grupo) };
-    else {
-      const sit = situacaoDe(ult.vence);
-      if (sit.chave === 'vencido') s = { conta: true, logo: false, venc: true, rotulo: `curso vencido em ${br(ult.vence)} — reciclar`, cor: 'perigo', vence: ult.vence, ordem: 1 };
-      else if (sit.dias != null && sit.dias <= avisoDias()) s = { conta: true, logo: true, rotulo: sit.dias === 0 ? 'curso vence hoje' : `curso vence em ${sit.dias} dia${sit.dias > 1 ? 's' : ''} (${br(ult.vence)})`, cor: 'alerta', vence: ult.vence, ordem: 2 };
-      else s = { conta: true, logo: false, rotulo: ult.vence ? `em dia até ${br(ult.vence)}` : 'em dia (sem validade)', cor: 'ativo', vence: ult.vence, ordem: 3 };
-    }
+    const s = situacaoUlt(regs.filter(r => grupoTr(r.tipo_id) === grupo));
     if (!pior || s.ordem < pior.ordem) pior = s;
+  }
+  // um curso equivalente em situação melhor vale no lugar dos exigidos
+  if (equiv.length) {
+    const s = situacaoUlt(regs.filter(r => equiv.includes(r.tipo_id)), ' (por curso que inclui primeiros socorros)');
+    if (s.conta && (!pior || s.ordem > pior.ordem)) pior = s;
   }
   return pior;
 }
@@ -118,7 +128,7 @@ function retrato(g, { semId = null } = {}) {
   const precisa = Number(B.cfg?.[g.min] || 0);
   const candidatos = ativos().filter(f => !ids.has(f.id) && f.id !== semId)
     .map(f => ({ f, c: cursoDaPessoa(f.id, g) }))
-    .filter(x => x.c.conta && cursosDe(B.cfg?.[g.atv]).length)
+    .filter(x => x.c.conta && (cursosDe(B.cfg?.[g.atv]).length || equivalentes(g).length))
     .sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
   const desligados = (estado.funcionarios || []).filter(f => f.situacao !== 'ATIVO' && ids.has(f.id)).length;
   return { g, gente, tem, logo, vencidos, precisa, falta: Math.max(0, precisa - tem), depois: Math.max(0, precisa - (tem - logo)), candidatos, desligados };
@@ -287,6 +297,13 @@ function desenharMinimos() {
         <label class="campo">Socorristas necessários <input type="number" min="0" max="999" step="1" id="brMinS" value="${Number(cfg.min_socorros || 0)}" required></label>
         <label class="campo">Avisar curso que vence em até (dias) <input type="number" min="0" max="365" step="1" id="brAviso" value="${Number(cfg.aviso_dias ?? 60)}" required></label>
       </div>
+      <fieldset class="br-equiv"><legend>Também valem como primeiros socorros</legend>
+        <p class="dica" style="margin:0 0 6px">Cursos que já incluem primeiros socorros. O socorrista designado com um deles conta, mesmo sem o curso próprio.</p>
+        ${lancamentosSst().treinamento.tipos.filter(t => t.ativo !== false || (cfg.socorros_equivalentes || []).includes(t.id))
+          .filter(t => !cursosDe(cfg.atividade_socorros_id).includes(t.id))
+          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+          .map(t => `<label class="br-marca"><input type="checkbox" name="brEquiv" value="${t.id}" ${(cfg.socorros_equivalentes || []).includes(t.id) ? 'checked' : ''}> ${esc(t.nome)}</label>`).join('<br>')}
+      </fieldset>
       <div class="barra" style="margin-top:12px"><button class="btn principal" type="submit">Salvar</button><span class="dica" id="brMinMsg"></span></div>
     </form>
     <p class="dica" style="margin:14px 0 0">Quem conta: designado na atividade <b>${esc(atvNome(cfg.atividade_brigada_id) || 'Brigada de incêndio — não encontrada')}</b> ou
@@ -300,7 +317,8 @@ function desenharMinimos() {
     const msg = $('brMinMsg');
     msg.textContent = 'Salvando…';
     try {
-      await salvarMinimos({ min_brigada: n('brMinB'), min_socorros: n('brMinS'), aviso_dias: Math.min(365, n('brAviso')) });
+      await salvarMinimos({ min_brigada: n('brMinB'), min_socorros: n('brMinS'), aviso_dias: Math.min(365, n('brAviso')),
+        socorros_equivalentes: [...document.querySelectorAll('input[name=brEquiv]:checked')].map(x => x.value) });
       msg.textContent = 'Salvo.';
     } catch (e) { msg.textContent = 'Não consegui salvar: ' + (e.message || e); }
   });
