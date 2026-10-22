@@ -66,6 +66,19 @@ export const moduloDe = tela =>
 // Estoque não entra, quem entra na área enxerga todas as telas dela.
 export const acesso = { email: '', admin: true, modulos: MODULOS.map(m => m.id), telas: [], carregado: true };
 
+/* Módulos da área por pessoa (pedido dele, 22/10/2026): marcados em
+   Usuários - Acessos › Área Estoque e gravados em app_usuarios.telas como
+   'estoque.modulo:<id>'. Nada marcado = todos; administrador vê tudo. */
+export const PREFIXO_MODULO = 'estoque.modulo:';
+export function aplicarUsuario(u) {
+  if (!u) return;
+  const mods = u.admin ? [] : (u.telas || []).filter(x => String(x).startsWith(PREFIXO_MODULO))
+    .map(x => String(x).slice(PREFIXO_MODULO.length)).filter(id => MODULOS.some(m => m.id === id));
+  acesso.email = u.email || '';
+  acesso.admin = !!u.admin || !mods.length;   // sem recorte = enxerga a área toda, como antes
+  acesso.modulos = mods.length ? mods : MODULOS.map(m => m.id);
+}
+
 export const pode = m => acesso.admin || acesso.modulos.includes(m);
 
 /* Permissão por tela. A lista guarda 'modulo:tela'. Enquanto nenhuma tela de
@@ -108,12 +121,19 @@ export function montarMenu(callback) {
   if (callback) aoTrocar = callback;
   const libs = modulosLiberados();
 
-  $('navModulos').innerHTML = libs.map(m =>
-    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${esc(m.nome)}</button>`).join('')
-;   // quem entra e o que vê fica em Usuários - Acessos, no LOP
-
-  $('navModulos').querySelectorAll('.aba').forEach(b =>
-    b.addEventListener('click', () => abrirModulo(b.dataset.modulo)));
+  /* Pode ser chamado de novo quando o usuário chega (22/10/2026): troca só os
+     botões dos módulos, sem apagar a faixa de telas que a moldura de categoria
+     pôs dentro do #navModulos. */
+  const nav = $('navModulos');
+  nav.querySelectorAll(':scope > .aba').forEach(b => b.remove());
+  const molde = document.createElement('div');
+  molde.innerHTML = libs.map(m =>
+    `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${esc(m.nome)}</button>`).join('');
+  const antes = $('navTelas') && $('navTelas').parentElement === nav ? $('navTelas') : null;
+  [...molde.children].forEach(b => {
+    nav.insertBefore(b, antes);
+    b.addEventListener('click', () => abrirModulo(b.dataset.modulo));
+  });   // quem entra e o que vê fica em Usuários - Acessos, no LOP
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
   /* Menu em categoria (20/10/2026, pedido dele): módulo aberto com os filhos

@@ -6,12 +6,14 @@
 // número é guardado no aparelho na hora e sobe quando há sinal. Fechada a
 // contagem, ela entra sozinha no Acerto, no lugar das abas "Físico".
 import {
-  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais, itensOrdenados, itensDoLocal,
+  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais as todosLocais, podeLocal, itensOrdenados, itensDoLocal,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
   temMinimo, precisaRepor, textoPedido,
   mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
 } from './dados.js';
+/* Só os estoques liberados para esta pessoa (22/10/2026). */
+const locais = () => todosLocais().filter(l => podeLocal(l.id));
 import { desenharMapa, soltarMapa } from './mapa.js';
 import { gravar as gravarDireto } from './dados.js';
 
@@ -803,7 +805,7 @@ function desenharHistorico() {
   if (!alvo) return;
   if (!pronto()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const nomeLocal = id => (todos('est_locais').find(l => l.id === id) || {}).nome || '—';
-  const fechadas = todos('est_contagens').filter(c => c.status === 'fechada')
+  const fechadas = todos('est_contagens').filter(c => c.status === 'fechada' && podeLocal(c.local_id))
     .sort((a, b) => b.mes.localeCompare(a.mes) || nomeLocal(a.local_id).localeCompare(nomeLocal(b.local_id), 'pt-BR'));
   if (!fechadas.length) {
     alvo.innerHTML = '<div class="vazio">Nenhuma contagem fechada ainda.</div>';

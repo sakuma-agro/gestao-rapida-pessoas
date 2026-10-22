@@ -7,9 +7,11 @@
 // O desenho do barracão vem de est_mapas.layout (quadras, áreas reservadas,
 // muros e pilares, tudo em metros, frente à esquerda).
 import {
-  $, esc, pronto, todos, aviso, souAdmin, gravar, locais, mesAtual, nomeMes, contagem,
+  $, esc, pronto, todos, aviso, souAdmin, gravar, locais as todosLocais, podeLocal, mesAtual, nomeMes, contagem,
   mapaDoLocal, quadrasDe, capacidadeQuadra, pesoBag, mostrarNumero, lerNumero, dataHora,
 } from './dados.js';
+/* Só os estoques liberados para esta pessoa (22/10/2026). */
+const locais = () => todosLocais().filter(l => podeLocal(l.id));
 
 const CHAVE = 'estoque.mapaLocal';
 const sel = { localId: null, mes: mesAtual() };

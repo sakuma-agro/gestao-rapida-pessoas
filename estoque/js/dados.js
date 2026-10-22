@@ -18,6 +18,18 @@ const porNome = (a, b) => String(a.nome || '').localeCompare(String(b.nome || ''
 export const locais = () => ativos('est_locais').slice()
   .sort((a, b) => (a.ordem || 0) - (b.ordem || 0) || porNome(a, b));
 
+/* Estoques que cada pessoa vê (pedido dele, 22/10/2026): marcados em
+   Usuários - Acessos › Área Estoque e gravados em app_usuarios.telas como
+   'estoque.local:<id do almoxarifado>'. Nada marcado = todos; administrador vê todos. */
+export const PREFIXO_LOCAL = 'estoque.local:';
+export const meusLocais = () => {
+  const u = window.App && window.App.usuario;
+  if (!u || u.admin) return [];
+  return (u.telas || []).filter(x => String(x).startsWith(PREFIXO_LOCAL)).map(x => String(x).slice(PREFIXO_LOCAL.length));
+};
+export const podeLocal = id => { const m = meusLocais(); return !m.length || m.includes(id); };
+export const locaisDoUsuario = () => locais().filter(l => podeLocal(l.id));
+
 /* Grupos na ordem em que se conta. Item sem grupo conhecido cai no fim. */
 // Os grupos de contagem (pedido dele, 15/10/2026), na ordem da tela. Sementes entrou em 22/10/2026 com o cadastro consolidado.
 export const GRUPOS = ['Defensivos', 'Fertilizantes', 'Sementes', 'EPIs', 'Lubrificantes', 'Material de limpeza', 'Papelaria'];

@@ -36,13 +36,14 @@ async function quemSou(sessao) {
   if (App.online) {
     try {
       const { data } = await App.sb.schema('public').from('app_usuarios')
-        .select('nome, usuario, admin, modulos').eq('email', email).maybeSingle();
+        .select('nome, usuario, admin, modulos, telas').eq('email', email).maybeSingle();
       if (data) u = {
         id: sessao.user.id, email,
         nome: data.nome || data.usuario || email,
         usuario: data.usuario || null,
         admin: !!data.admin,
         modulos: data.modulos || [],
+        telas: data.telas || [],   // inclui 'estoque.local:<id>' e 'estoque.modulo:<id>' (22/10/2026)
         ativo: true,
       };
     } catch (e) { console.warn('não li o usuário', e); }
@@ -76,6 +77,7 @@ async function iniciarSessao() {
     return;
   }
   await meta('usuario', App.usuario);
+  window.dispatchEvent(new Event('estoque-usuario'));
   avisarDados();
 
   /* Com a base guardada neste aparelho, a tela abre na hora e a atualização

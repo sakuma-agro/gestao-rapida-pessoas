@@ -4,7 +4,7 @@
 // dentro do LOP. Esta página mora numa moldura do app principal: quem entra,
 // sai, instala e troca senha é o LOP, e quem pode abrir a área é marcado em
 // Usuários - Acessos (módulo 'estoque'). Aqui não há login nem topo de marca.
-import { MODULOS, telasDe, montarMenu, mostrarInicio, abrirModulo } from './acesso.js';
+import { MODULOS, telasDe, montarMenu, mostrarInicio, abrirModulo, aplicarUsuario } from './acesso.js';
 import { ligarAcerto, abrirAcerto } from './acerto.js';
 import { abrirContagem, soltarContagem } from './contagem.js';
 import { abrirCadastro, soltarCadastro } from './cadastros.js';
@@ -57,7 +57,11 @@ window.abrirTelaEstoque = tela => {
 try { ligarAcerto(mostrarAviso); }
 catch (e) { console.error('[Estoque] falhou ao ligar o acerto', e); }
 
+/* O menu sai com o recorte da pessoa (módulos marcados em Usuários - Acessos,
+   22/10/2026). O usuário chega pelo base.js; se ele já estiver aqui, usa na hora. */
+if (window.App && window.App.usuario) aplicarUsuario(window.App.usuario);
 montarMenu(abrirAba);
+window.addEventListener('estoque-usuario', () => { aplicarUsuario(window.App.usuario); montarMenu(); });
 
 /* O app principal confere isto para saber se a área terminou de abrir, e
    chama voltarAoInicioDaArea quando a pessoa volta para a área já aberta. */

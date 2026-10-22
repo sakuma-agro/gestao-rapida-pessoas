@@ -1668,3 +1668,10 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
 .br-cand{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
 .br-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
 .br-marca{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer;margin-bottom:4px}
+
+/* Usuários - Acessos › Área Estoque: estoques e módulos por pessoa (22/10/2026) */
+.us-est{margin:10px 0 0 24px}
+.us-est__topo{font-size:12px}
+.us-est .us-telas{margin-left:0}
+.us-est p.dc-sem{margin:6px 0 0;white-space:normal}
+@media (max-width:520px){.us-est{margin-left:12px}}

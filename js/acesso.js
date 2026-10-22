@@ -312,6 +312,23 @@ export const veSalario = () => acesso.admin || (acesso.modulos || []).includes(P
 const manut = { carregado: false, erro: '', locais: [], fazendas: {}, admins: new Set() };
 const temManut = u => !!u && (u.admin || (u.modulos || []).includes('manutencoes'));
 
+/* Estoques da área Estoque (22/10/2026), para marcar quem vê qual. */
+const estq = { carregado: false, locais: [] };
+async function carregarEstoques() {
+  estq.carregado = true;
+  if (!estado.cliente || !acesso.admin) return;
+  try {
+    const { data, error } = await estado.cliente.from('est_locais').select('id,nome,ordem,ativo').order('ordem');
+    if (error) throw error;
+    estq.locais = (data || []).filter(x => x.ativo !== false);
+  } catch (e) { console.warn('não li os estoques', e); }
+}
+/* Os módulos da área Estoque (mesmos ids de estoque/js/acesso.js). */
+const EST_MODULOS = [['contagem', 'Contagem'], ['compra', 'Compra inteligente'], ['qc', 'Estoque Quebra Cocão'],
+  ['acerto', 'Acerto'], ['cadastros', 'Cadastros']];
+const EST_LOCAL = 'estoque.local:', EST_MOD = 'estoque.modulo:';
+const estMarcados = (e, pre) => (e.telas || []).filter(x => x.startsWith(pre)).map(x => x.slice(pre.length));
+
 async function carregarManut() {
   manut.carregado = true;   // marca antes: um erro aqui não pode virar laço
   if (!estado.cliente || !acesso.admin) return;
@@ -824,6 +841,7 @@ export function desenharConfig() {
   }
 
   if (!manut.carregado) carregarManut().then(() => desenharConfig());
+  if (!estq.carregado) carregarEstoques().then(() => { if (editando) desenharPermissoes(); });
 
   $('cfTabela').innerHTML = usuarios.length ? `
     <table class="dc-planilha cf-tab"><thead><tr>
@@ -1078,10 +1096,18 @@ function desenharPermissoes() {
   });
   $('usEst')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
-    if (ev.target.checked) mods.add('estoque'); else mods.delete('estoque');
+    if (ev.target.checked) mods.add('estoque');
+    else { mods.delete('estoque'); e.telas = (e.telas || []).filter(x => !x.startsWith(EST_LOCAL) && !x.startsWith(EST_MOD)); }
     e.modulos = [...mods];
     desenharPermissoes();
   });
+  raiz.querySelectorAll('input[data-est-local], input[data-est-mod]').forEach(cx => cx.addEventListener('change', () => {
+    const v = cx.dataset.estLocal ? EST_LOCAL + cx.dataset.estLocal : EST_MOD + cx.dataset.estMod;
+    const t = new Set(e.telas || []);
+    if (cx.checked) t.add(v); else t.delete(v);
+    e.telas = [...t];
+    desenharPermissoes();
+  }));
   $('usCB')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('custobase'); else mods.delete('custobase');
@@ -1159,16 +1185,31 @@ function blocoProg(e) {
   </div>`;
 }
 
-/* Bloco "Área Estoque" (15/10/2026): entra ou não. Enquanto o banco do
-   Estoque não entra, quem entra enxerga todas as telas da área. */
+/* Bloco "Área Estoque" (15/10/2026): entra ou não. Desde 22/10/2026 (pedido
+   dele) dá para marcar quais estoques e quais módulos da área a pessoa vê —
+   gravados em telas como 'estoque.local:<id>' e 'estoque.modulo:<id>'.
+   Nada marcado = todos. */
 function blocoEst(e) {
   const tem = !!e && (e.admin || (e.modulos || []).includes('estoque'));
+  const locs = estMarcados(e, EST_LOCAL), mods = estMarcados(e, EST_MOD);
+  const todosL = !locs.length, todosM = !mods.length;
+  const resumo = !tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo'
+    : `entra · ${todosL ? 'todos os estoques' : locs.length + (locs.length === 1 ? ' estoque' : ' estoques')} · ${todosM ? 'todos os módulos' : mods.length + (mods.length === 1 ? ' módulo' : ' módulos')}`;
+  const detalhe = tem && !e.admin ? `
+    <div class="us-est"><div class="us-est__topo"><b>Estoques que vê</b> <span class="dc-sem">nada marcado = todos</span></div>
+      <div class="us-telas">${estq.locais.length ? estq.locais.map(l => `
+        <label class="us-tela"><input type="checkbox" data-est-local="${esc(l.id)}" ${locs.includes(l.id) ? 'checked' : ''}><span>${esc(l.nome)}</span></label>`).join('')
+        : '<span class="dc-sem">abrindo a lista de estoques…</span>'}</div></div>
+    <div class="us-est"><div class="us-est__topo"><b>Módulos da área</b> <span class="dc-sem">nada marcado = todos</span></div>
+      <div class="us-telas">${EST_MODULOS.map(([id, nome]) => `
+        <label class="us-tela"><input type="checkbox" data-est-mod="${id}" ${mods.includes(id) ? 'checked' : ''}><span>${esc(nome)}</span></label>`).join('')}</div>
+      <p class="dc-sem">Os estoques valem para a Contagem (contar, em andamento, reposição, mapa e histórico). Acerto e Compra inteligente comparam todos os estoques; o Estoque Quebra Cocão é um módulo próprio.</p></div>` : '';
   return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="estoque">
     <label class="us-mod__topo">
       <input type="checkbox" id="usEst" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Estoque</b>
-      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · contagem, acerto e cadastros'}</span>
-    </label>
+      <span class="dc-sem">${resumo}</span>
+    </label>${detalhe}
   </div>`;
 }
 
@@ -1367,4 +1408,5 @@ export function limparAcesso() {
   acesso.modulos = [...PADRAO]; acesso.destinos = []; acesso.carregado = false;
   destinosDp = [];
   manut.carregado = false; manut.erro = ''; manut.locais = []; manut.fazendas = {}; manut.admins = new Set();
+  estq.carregado = false; estq.locais = [];
 }
