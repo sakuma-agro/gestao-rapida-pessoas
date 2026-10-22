@@ -825,6 +825,51 @@ addEventListener('beforeinstallprompt', function (ev) {
       </div>
     </section>
 
+    <!-- ---- SST · EXAMES: relatório por funcionário (22/10/2026) ---- -->
+    <section class="tela" id="telaExRel" hidden>
+      <div class="cartao naoimprimir">
+        <div class="barra entre" style="margin:0">
+          <div>
+            <h2 style="margin:0">Exames por funcionário</h2>
+            <p class="dica" style="margin:2px 0 0">
+              Cada funcionário ativo, a função e os exames que ela e as atividades dele exigem — com o último feito e quando vence.
+            </p>
+          </div>
+          <span class="acoes">
+            <button class="btn" id="bErCsv">Baixar CSV</button>
+            <button class="btn principal" id="bErDoc">Gerar documento</button>
+          </span>
+        </div>
+        <div class="grade" style="margin-top:14px">
+          <label class="campo">Mostrar
+            <select id="erMostrar">
+              <option value="pendentes">Só o que precisa fazer</option>
+              <option value="todos">Todos os exames</option>
+            </select></label>
+          <label class="campo">Vencendo em até
+            <select id="erPrazo">
+              <option value="30">30 dias</option>
+              <option value="60" selected>60 dias</option>
+              <option value="90">90 dias</option>
+            </select></label>
+          <label class="campo">Fazenda <select id="erFazenda"></select></label>
+          <label class="campo">Função <select id="erFuncao"></select></label>
+          <label class="campo">Buscar funcionário <input id="erBusca" type="search" placeholder="Nome"></label>
+        </div>
+        <div class="barra" id="erResumo" style="margin:12px 0 0"></div>
+        <div class="aviso info" id="erSemLista" hidden style="margin:10px 0 0"></div>
+        <div id="erTabela" style="margin-top:12px"></div>
+      </div>
+
+      <div class="previa-lista" id="erSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirEr">Imprimir</button>
+        <span class="cresce"></span>
+        <span class="dc-sem">Gere o documento para ver a prévia antes de imprimir.</span>
+      </div>
+    </section>
+
     <!-- ---- SST · TREINAMENTOS: painel de alerta ---- -->
     <section class="tela" id="telaTrPainel" hidden>
       <div class="cartao naoimprimir">

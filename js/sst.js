@@ -9,7 +9,7 @@ import { estado, novoId } from './store.js';
 import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens, dadosAso, definirAso,
-  conferenciaDo, pendenciasDe, vencimentosDoAso } from './aso.js';
+  conferenciaDo, pendenciasDe, vencimentosDoAso, exigidosPessoa, marcadosNoAso } from './aso.js';
 import { definirTiposTr, carregarTreinoFuncao, dadosTreinoFuncao, definirTreinoFuncao,
   limparTreinoFuncao, funcaoExige, pendenciasTrDe, pendenciasTodos } from './treino-funcao.js';
 import { carregarAtividades, dadosAtividades, definirAtividades, limparAtividades } from './atividades-dados.js';
@@ -245,6 +245,48 @@ function grupoDe(r, tipoId) {
     id = t.recicla_tipo_id;
   }
   return id;
+}
+
+/* =============== relatório por funcionário (22/10/2026) ===============
+   Para cada funcionário ativo: o ASO e cada exame que a função e as
+   atividades dele exigem, com o último realizado e quando vence. Quem monta a
+   tela e o documento é o js/sst-exames-rel.js; a conta mora aqui, junto do
+   painel, para os dois nunca discordarem. */
+export async function retratoExames() {
+  if (!S.carregado) await carregarSst();
+  const r = RECEITAS.exame;
+  const todos = regsDe(r);                       // mais novo primeiro
+  const ehAso = id => tipoDe(r, id)?.categoria === 'aso';
+  return estado.funcionarios
+    .filter(f => f.situacao === 'ATIVO')
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map(f => {
+      const dela = todos.filter(x => x.funcionario_id === f.id);
+      const asos = dela.filter(x => !x.doAso && ehAso(x.tipo_id));
+      const linhas = [];
+      const aso = asos.find(x => x.vence) || asos[0];
+      linhas.push(aso
+        ? { exame: 'ASO', detalhe: tipoDe(r, aso.tipo_id)?.nome || '', realizado: aso.realizado, vence: aso.vence, sit: situacaoDe(aso.vence) }
+        : { exame: 'ASO', detalhe: '', realizado: null, vence: null, nunca: true });
+      exigidosPessoa(f).forEach(t => {
+        const g = grupoDe(r, t.id);
+        // lançamento próprio, ou marcação no ASO com validade própria
+        let ult = dela.find(x => grupoDe(r, x.tipo_id) === g);
+        // complementar sem validade própria: vale enquanto valer o ASO em que foi marcado
+        if (!t.meses) {
+          const noAso = asos.find(a => marcadosNoAso(a.id).some(m => m.tipo_id === t.id && m.feito));
+          if (noAso) {
+            const m = marcadosNoAso(noAso.id).find(m => m.tipo_id === t.id && m.feito);
+            const cand = { realizado: m.realizado || noAso.realizado, vence: noAso.vence };
+            if (!ult || String(cand.realizado || '') > String(ult.realizado || '')) ult = cand;
+          }
+        }
+        linhas.push(ult
+          ? { exame: t.nome, realizado: ult.realizado, vence: ult.vence, sit: situacaoDe(ult.vence) }
+          : { exame: t.nome, realizado: null, vence: null, nunca: true });
+      });
+      return { f, linhas, semLista: !exigidosPessoa(f).length };
+    });
 }
 
 /* =============== abrir uma tela =============== */

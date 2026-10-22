@@ -62,6 +62,7 @@ const PROPRIOS = {
   termoContrato: ['documento', 'Recebimento do contrato'],
   cadFuncoes:    ['cargo', 'Funções e setores'],
   exFuncoes:     ['exame', 'Exames por função'],
+  exRel:         ['exame', 'Exames por funcionário'],
   trFuncoes:     ['treino', 'Treinamentos por função'],
   trConsol:      ['lista', 'Treinamentos consolidados'],
   sstAtv:        ['check', 'Atividades e exigências'],

@@ -109,6 +109,9 @@ export function vencimentosDoAso(regs) {
   return fora;
 }
 
+/** As marcações gravadas de um ASO (para o relatório por funcionário). */
+export const marcadosNoAso = asoId => A.itens.get(asoId) || [];
+
 export function limparAso() {
   A.porFuncao = []; A.itens = new Map(); A.carregado = false;
   pendentes = null;

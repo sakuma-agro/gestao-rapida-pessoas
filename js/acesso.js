@@ -64,6 +64,7 @@ export const MODULOS = [
     { id: 'exames', nome: 'Exames', telas: [
       ['exPainel', 'Painel'],
       ['exVenc', 'Vencimentos'],
+      ['exRel', 'Relatório por funcionário'],
       ['exFuncoes', 'Exames por função'],
       ['exTipos', 'Tipos e periodicidade'],
     ] },

@@ -26,6 +26,7 @@ import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanha
 import { abrirBrigada, limparBrigada, ligarBrigada, avisoDesligamentoBrigada, TELAS_BRIGADA } from './sst-brigada.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
+import { ligarRelExames, abrirRelExames } from './sst-exames-rel.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
 import { ligarConsolidado, abrirConsolidado } from './treino-consolidado.js';
 import { ligarAtividades, abrirAtividades, desenharAtvFuncionario } from './sst-atividades.js';
@@ -136,6 +137,7 @@ function abrirAba(nome) {
   $('telaExVenc').hidden  = nome !== 'exVenc';
   $('telaExTipos').hidden = nome !== 'exTipos';
   $('telaExFuncoes').hidden = nome !== 'exFuncoes';
+  $('telaExRel').hidden = nome !== 'exRel';
   $('telaTrVenc').hidden  = nome !== 'trVenc';
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaTrFuncoes').hidden = nome !== 'trFuncoes';
@@ -192,6 +194,7 @@ function abrirAba(nome) {
   if (nome === 'config') desenharConfig();
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
+  if (nome === 'exRel') abrirRelExames();
   if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
   if (nome === 'trConsol') abrirConsolidado();
   if (nome === 'sstAtv') abrirAtividades();
@@ -2044,6 +2047,7 @@ ligar('DP', () => ligarJornada(irParaTela));
 ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
+ligar('relatório de exames', ligarRelExames);
 ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);
 ligar('atividades do sst', ligarAtividades);
