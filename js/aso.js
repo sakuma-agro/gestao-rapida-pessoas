@@ -11,6 +11,7 @@ import { estado, novoId } from './store.js';
 import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { examesDaPessoa } from './atividades-dados.js';
+import { somarMeses } from './sst.js';   // declaração de função: o import circular é seguro
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -80,6 +81,32 @@ export function definirAso(d) {
     A.itens.get(x.exame_id).push(x);
   });
   A.carregado = true;
+}
+
+/**
+ * Exame complementar com validade própria marcado DENTRO de um ASO
+ * (22/10/2026, pedido dele: a colinesterase de 6 meses lançada no ASO não
+ * aparecia nos vencimentos). Cada marcação feita vira uma linha de vencimento
+ * — realizado na data da marcação, vence pela periodicidade do tipo. Não é
+ * gravada em lugar nenhum: sai na hora, a partir do ASO e dos seus itens.
+ * O id é o do ASO, então "Editar" abre o ASO onde a marcação mora.
+ */
+export function vencimentosDoAso(regs) {
+  const fora = [];
+  (regs || []).forEach(aso => {
+    const t = tipo(aso.tipo_id);
+    if (!t || t.categoria !== 'aso') return;
+    (A.itens.get(aso.id) || []).forEach(m => {
+      if (!m.feito) return;
+      const tc = tipo(m.tipo_id);
+      if (!tc || !(Number(tc.meses) > 0)) return;
+      const realizado = m.realizado || aso.realizado;
+      if (!realizado) return;
+      fora.push({ id: aso.id, funcionario_id: aso.funcionario_id, tipo_id: m.tipo_id,
+        realizado, vence: somarMeses(realizado, tc.meses), doAso: true });
+    });
+  });
+  return fora;
 }
 
 export function limparAso() {
@@ -177,6 +204,7 @@ export function desenharItens(exameId, funcionarioId, tipoId) {
           <span class="acoes">
             <input type="date" class="aso-data" data-data="${e.id}"
                    value="${p.realizado || ''}" ${p.feito ? '' : 'disabled'}>
+            ${e.meses ? `<span class="dc-sem aso-vence" data-vence="${e.id}"></span>` : ''}
           </span>
         </label>`;
       }).join('')}
@@ -189,11 +217,25 @@ export function desenharItens(exameId, funcionarioId, tipoId) {
     campo.disabled = !cx.checked;
     if (cx.checked && !campo.value) { campo.value = $('exData')?.value || hoje(); p.realizado = campo.value; }
     contarItens();
+    mostrarVence();
   }));
   caixa.querySelectorAll('[data-data]').forEach(dt => dt.addEventListener('change', () => {
     pendentes.get(dt.dataset.data).realizado = dt.value || null;
+    mostrarVence();
   }));
   contarItens();
+  mostrarVence();
+}
+
+/** "vence dd/mm/aaaa" ao lado do exame que tem validade própria (colinesterase, 6 meses). */
+function mostrarVence() {
+  const caixa = $('exItens');
+  if (!caixa || !pendentes) return;
+  caixa.querySelectorAll('[data-vence]').forEach(el => {
+    const p = pendentes.get(el.dataset.vence), t = tipo(el.dataset.vence);
+    const v = p?.feito && p.realizado && t?.meses ? somarMeses(p.realizado, t.meses) : null;
+    el.textContent = v ? `vence ${dataBr(v)}` : `vale ${t?.meses || ''} meses`;
+  });
 }
 
 function contarItens() {

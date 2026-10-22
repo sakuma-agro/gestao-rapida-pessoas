@@ -9,7 +9,7 @@ import { estado, novoId } from './store.js';
 import * as nucleo from './nucleo.js';
 import { LOGO, PE_LOP } from './seed.js';
 import { definirTipos, carregarAso, limparAso, desenharItens, salvarItens, dadosAso, definirAso,
-  conferenciaDo, pendenciasDe } from './aso.js';
+  conferenciaDo, pendenciasDe, vencimentosDoAso } from './aso.js';
 import { definirTiposTr, carregarTreinoFuncao, dadosTreinoFuncao, definirTreinoFuncao,
   limparTreinoFuncao, funcaoExige, pendenciasTrDe, pendenciasTodos } from './treino-funcao.js';
 import { carregarAtividades, dadosAtividades, definirAtividades, limparAtividades } from './atividades-dados.js';
@@ -392,6 +392,17 @@ function abrirTipo(r, id) {
 }
 
 /* =============== vencimentos =============== */
+/** Os lançamentos que contam para vencimento. No exame entram também os
+   complementares com validade própria marcados dentro do ASO (22/10/2026). */
+function regsDe(r) {
+  const base = S[r.id].regs;
+  if (r.id !== 'exame') return base;
+  const extra = vencimentosDoAso(base);
+  if (!extra.length) return base;
+  return [...base, ...extra].sort((a, b) =>
+    String(b.realizado || b.vence || '').localeCompare(String(a.realizado || a.vence || '')));
+}
+
 function visiveis(r) {
   const q = so($(r.el.busca).value).toLowerCase();
   const tipo = $(r.el.fTipo).value;
@@ -401,7 +412,7 @@ function visiveis(r) {
   const fid = $(r.el.fFunc).value;
   const anexo = $(r.el.fAnexo).value;
 
-  let regs = S[r.id].regs.filter(x => {
+  let regs = regsDe(r).filter(x => {
     const f = funcionario(x.funcionario_id);
     if (!f) return false;
     if (fid && x.funcionario_id !== fid) return false;
@@ -441,7 +452,7 @@ function visiveis(r) {
 function atuais(r) {
   const vistos = new Set();
   const fora = [];
-  S[r.id].regs.forEach(x => {
+  regsDe(r).forEach(x => {
     const f = funcionario(x.funcionario_id);
     if (!f || f.situacao !== 'ATIVO') return;
     const chave = x.funcionario_id + '|' + grupoDe(r, x.tipo_id);
@@ -458,7 +469,7 @@ function atuais(r) {
 
 /** Quem está ativo e não tem nenhum lançamento — o buraco que o painel não vê. */
 function semNenhum(r) {
-  const comAlgum = new Set(S[r.id].regs.map(x => x.funcionario_id));
+  const comAlgum = new Set(regsDe(r).map(x => x.funcionario_id));
   return estado.funcionarios
     .filter(f => f.situacao === 'ATIVO' && !comAlgum.has(f.id))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -624,7 +635,7 @@ function desenharVenc(r) {
 
   // funcionário: só quem tem lançamento; mantém o escolhido
   const selF = $(r.el.fFunc), antesF = selF.value, sitF = $(r.el.fSit).value;
-  const comReg = new Set(S[r.id].regs.map(x => x.funcionario_id));
+  const comReg = new Set(regsDe(r).map(x => x.funcionario_id));
   selF.innerHTML = '<option value="">Todos</option>' + estado.funcionarios
     .filter(f => comReg.has(f.id) && (!sitF || f.situacao === sitF || f.id === antesF))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
@@ -658,7 +669,7 @@ function desenharVenc(r) {
       const t = tipoDe(r, x.tipo_id) || {};
       return `<tr>
         <td><b>${esc(f.nome || '—')}</b><br><span class="dc-sem">${esc(f.cargo || '—')}</span></td>
-        <td>${esc(t.nome || '—')}</td>
+        <td>${esc(t.nome || '—')}${x.doAso ? '<br><span class="dc-sem">lançado dentro do ASO</span>' : ''}</td>
         <td class="ce">${dataBr(x.realizado)}</td>
         <td class="ce">${dataBr(x.vence)}</td>
         ${r.completo ? `<td class="ce">${x.carga_horaria ? Number(x.carga_horaria) + ' h' : '—'}</td>
@@ -978,7 +989,7 @@ export function limparPreviaSst() {
 /** O vigente de cada tipo para uma pessoa, do mais urgente para o menos. */
 function vigentesDa(r, funcionarioId) {
   // os regs já chegam do banco do mais novo para o mais velho
-  const dela = S[r.id].regs.filter(x => x.funcionario_id === funcionarioId);
+  const dela = regsDe(r).filter(x => x.funcionario_id === funcionarioId);
   const vistos = new Set();
   const vigentes = [];
   dela.forEach(x => {

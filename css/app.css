@@ -240,6 +240,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .aso-data{font:inherit;font-size:12px;padding:4px 6px;border-radius:6px;
   border:1px solid var(--linha);background:var(--fundo);color:var(--texto);width:auto}
 .aso-data:disabled{opacity:.4}
+.aso-vence{margin-left:6px;font-size:11px;white-space:nowrap}
 /* documentos da guia e do quadro */
 .aso-rot{font-size:9pt;letter-spacing:.4px;color:#5e6657;background:#f3f8e8;
   -webkit-print-color-adjust:exact;print-color-adjust:exact}
