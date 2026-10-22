@@ -383,3 +383,20 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .qc-mov-rs{display:block;font-weight:400;font-size:12px;color:var(--suave)}
 .qc-rs{font-size:20px !important}
 .rel-tab tr.rel-total td{background:#E4EFC9 !important;font-weight:bold;color:#51534A}
+
+/* ---- lista de contagem para imprimir (22/10/2026) ---- */
+.so-impressao{display:none}
+@media print{ .so-impressao{display:block} }
+.lp-campos{display:flex;gap:10mm;margin:5mm 0 3mm;font-size:9.5pt;color:#51534A}
+.lp-campos b{color:#744F28}
+.lp-linha{display:inline-block;min-width:70mm;border-bottom:.3mm solid #51534A}
+.lp-tab td{height:6.2mm;padding:.8mm 2mm}
+.lp-tab td small{color:#8a8c82;font-size:7pt}
+.lp-tab .lp-qtd{width:28mm;font-weight:bold;color:#744F28}
+.lp-tab th.lp-qtd{color:#fff}
+.lp-tab tr.lp-grupo td{background:#E4EFC9 !important;font-weight:bold;color:#744F28;height:auto;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+.lp-pag{font-size:8pt;color:#51534A;align-self:flex-end}
+/* cada folha da lista ocupa exatamente uma página A4 (o pé fica na mesma folha) */
+.lp-folha{box-sizing:border-box}
+@media print{ .lp-folha{margin:0 auto !important;height:296mm;min-height:0;overflow:hidden} }

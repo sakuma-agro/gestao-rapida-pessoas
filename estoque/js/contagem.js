@@ -157,9 +157,12 @@ function desenharContar() {
       <span class="dc-sem">${fechada
         ? 'Contagem fechada: já está valendo no Acerto.'
         : 'Pode parar e continuar depois: o que foi digitado fica guardado.'}</span>
+      <span class="barra">
+      <button class="btn" type="button" id="ctImprimirLista">Imprimir lista</button>
       ${fechada
         ? (souAdmin() ? `<button class="btn" type="button" id="ctReabrir">Reabrir a contagem</button>` : '')
         : `<button class="btn principal" type="button" id="ctFechar">Fechar a contagem</button>`}
+      </span>
     </div>
   </div>`;
 
@@ -174,6 +177,7 @@ function desenharContar() {
   $('ctFechar')?.addEventListener('click', confirmarFechar);
   $('ctReabrir')?.addEventListener('click', reabrir);
   $('ctData')?.addEventListener('change', salvarData);
+  $('ctImprimirLista')?.addEventListener('click', escolherImpressao);
 
   alvo.querySelectorAll('[data-mais]').forEach(b => b.addEventListener('click', () => alternarLotes(b.dataset.mais)));
   ligarLotes(alvo);
@@ -871,6 +875,101 @@ function montarFolha(contagemId) {
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
     </div>
   </div>`;
+}
+
+/* ===================================================================
+   Lista para imprimir (pedido dele, 22/10/2026): a folha que vai para a
+   prateleira — item, unidade e espaço para escrever a quantidade (e, se
+   quiser, lote e validade). Pode sair em branco ou com o que já foi digitado.
+   =================================================================== */
+const LINHAS_POR_FOLHA = 29;
+
+function escolherImpressao() {
+  const c = contagem(sel.localId, sel.mes);
+  const itens = itensDoLocal(sel.localId);
+  const grupos = [...new Set(itens.map(i => i.grupo || 'Outros'))];
+  const fechada = c && c.status === 'fechada';
+  window.abrirModal('Imprimir lista da contagem', `
+    <form id="ctImpForm">
+      <div class="grade">
+        <label class="campo">Grupo <select name="grupo">
+          <option value="">Todos os grupos (${itens.length} itens)</option>
+          ${grupos.map(g => `<option${g === grupoFiltro ? ' selected' : ''}>${esc(g)}</option>`).join('')}
+        </select></label>
+      </div>
+      <label class="es-check"><input type="checkbox" name="valores"${fechada ? ' checked' : ''}> Levar as quantidades já digitadas</label>
+      <label class="es-check"><input type="checkbox" name="lotes"> Colunas para lote e validade</label>
+      <label class="es-check"><input type="checkbox" name="faltam"> Só os itens que faltam contar</label>
+      <p class="dc-sem">Sai em folhas A4 no padrão SAKUMA, ${LINHAS_POR_FOLHA} linhas por folha, com espaço para escrever.</p>
+      <div class="barra fim"><button class="btn principal" type="submit">Imprimir</button></div>
+    </form>`, corpo => {
+    corpo.querySelector('#ctImpForm').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const f = new FormData(ev.target);
+      montarListaImpressao({ grupo: f.get('grupo') || '', valores: !!f.get('valores'), lotes: !!f.get('lotes'), faltam: !!f.get('faltam') });
+      window.fecharModal();
+      setTimeout(() => window.print(), 80);
+    });
+  });
+}
+
+function montarListaImpressao(op) {
+  const c = contagem(sel.localId, sel.mes);
+  const local = todosLocais().find(l => l.id === sel.localId) || {};
+  const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
+  const tem = i => { const l = linhas.get(i.id); return l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== ''; };
+  const itens = itensDoLocal(sel.localId)
+    .filter(i => !op.grupo || (i.grupo || 'Outros') === op.grupo)
+    .filter(i => !op.faltam || !tem(i));
+  const data = c && c.data_contagem ? dataBR(c.data_contagem) : (op.valores ? dataBR(dataEscolhida()) : '');
+
+  // linhas da folha: cabeçalho de grupo + itens (o cabeçalho se repete ao virar a folha)
+  const corpo = [];
+  let g = null;
+  for (const i of itens) {
+    if ((i.grupo || 'Outros') !== g) { g = i.grupo || 'Outros'; corpo.push({ grupo: g }); }
+    const l = linhas.get(i.id);
+    corpo.push({ i, qtd: op.valores && l ? mostrarNumero(l.quantidade) : '' });
+  }
+  const folhas = [];
+  let atual = [], grupoAtual = null;
+  for (const r of corpo) {
+    if (r.grupo) grupoAtual = r.grupo;
+    if (atual.length >= LINHAS_POR_FOLHA) {
+      folhas.push(atual); atual = [];
+      if (!r.grupo) atual.push({ grupo: grupoAtual, cont: true });
+    }
+    atual.push(r);
+  }
+  if (atual.length || !folhas.length) folhas.push(atual);
+
+  const ncol = 3 + (op.lotes ? 2 : 0) + 1;
+  const cab = `<tr><th>Item</th><th class="ce">Un.</th><th class="ce lp-qtd">Quantidade</th>${op.lotes
+    ? '<th class="ce">Lote</th><th class="ce">Validade</th>' : ''}<th>Obs.</th></tr>`;
+  const sub = [local.nome || '', nomeMes(sel.mes), op.grupo || 'todos os grupos', itens.length + (itens.length === 1 ? ' item' : ' itens')]
+    .filter(Boolean).join(' · ');
+  $('ctListaFolha').innerHTML = folhas.map((fl, k) => `<div class="folha rel lp-folha">
+    <div class="rel-topo">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit">
+        <h1>Lista de Contagem de Estoque</h1>
+        <p>${esc(sub)}</p>
+      </div>
+    </div>
+    <div class="lp-campos">
+      <span>Data da contagem: <b>${data ? esc(data) : '____/____/______'}</b></span>
+      <span>Contado por: <b class="lp-linha">&nbsp;</b></span>
+    </div>
+    <table class="rel-tab lp-tab"><thead>${cab}</thead><tbody>${fl.map(r => r.grupo
+      ? `<tr class="lp-grupo"><td colspan="${ncol}">${esc(r.grupo)}${r.cont ? ' (continuação)' : ''}</td></tr>`
+      : `<tr><td>${esc(r.i.nome)}${r.i.codigo ? ` <small>cód. ${esc(r.i.codigo)}</small>` : ''}</td><td class="ce">${esc(r.i.unidade || '')}</td><td class="ce lp-qtd">${esc(r.qtd)}</td>${op.lotes
+        ? '<td></td><td></td>' : ''}<td></td></tr>`).join('') || `<tr><td colspan="${ncol}">Nenhum item para contar.</td></tr>`}</tbody></table>
+    <div class="rel-pe">
+      <div class="rel-assina"><span></span><small>Responsável pela contagem</small></div>
+      <small class="lp-pag">Folha ${k + 1} de ${folhas.length}</small>
+      <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
+    </div>
+  </div>`).join('');
 }
 
 /* ===================================================================
