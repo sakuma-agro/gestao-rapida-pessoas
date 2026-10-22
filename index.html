@@ -2071,7 +2071,7 @@ addEventListener('beforeinstallprompt', function (ev) {
       <label class="campo">Realizado em
         <input type="date" id="trData" required>
       </label>
-      <label class="campo">Vence em
+      <label class="campo" id="trVenceCampo"><span id="trVenceRot">Vence em</span>
         <input type="date" id="trVence">
       </label>
       <label class="campo">Carga horária
@@ -2119,6 +2119,11 @@ addEventListener('beforeinstallprompt', function (ev) {
           <option value="1">Data do documento (CNH, certificado)</option>
         </select>
       </label>
+      <p class="aviso info plena" id="ttDocAviso" hidden style="margin:0">
+        A data de vencimento não fica aqui, porque cada pessoa tem a sua (cada CNH vence num dia).
+        Ela é digitada em cada lançamento, no campo <b>Validade do documento</b>, em
+        Vencimentos › Lançar treinamento (ou Editar no lançamento que já existe).
+      </p>
       <label class="campo">Reciclagem a cada (meses)
         <input type="number" id="ttMeses" min="0" max="120" step="1" placeholder="24">
       </label>

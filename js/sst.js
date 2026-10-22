@@ -269,10 +269,18 @@ export async function abrirSst(tela) {
 /* Validade do documento (22/10/2026, pedido dele): transporte de passageiros
    vale até a data que vem no documento/CNH, não um prazo fixo. Nesses tipos a
    data de vencimento é digitada em cada lançamento e não é calculada. */
+/* No lançamento, o campo de vencimento troca de nome e fica em destaque. */
+function marcarValidadeDoc(r, doc) {
+  if (r.id !== 'treinamento' || !$('trVenceRot')) return;
+  $('trVenceRot').textContent = doc ? 'Validade do documento (CNH)' : 'Vence em';
+  $('trVenceCampo').classList.toggle('tc-destaque', doc);
+  $(r.el.vence).required = doc;
+}
 function modoValidade(r) {
   const doc = $(r.el.tDoc).value === '1';
   $(r.el.tMeses).disabled = doc;
   if (doc) $(r.el.tMeses).value = '';
+  if ($('ttDocAviso')) $('ttDocAviso').hidden = !doc;
 }
 
 /* NR do treinamento (22/10/2026): "nr 6", "NR6", "31" viram "NR-06", "NR-31".
@@ -819,12 +827,13 @@ function atualizarVencimento(r, forcar) {
   const data = $(r.el.data).value;
   const dica = $(r.el.dica);
 
-  if (!t) { dica.textContent = ''; return; }
+  if (!t) { dica.textContent = ''; marcarValidadeDoc(r, false); return; }
   if (r.completo && forcar && t.carga_horaria && !so($(r.el.carga).value)) {
     $(r.el.carga).value = Number(t.carga_horaria);
   }
+  marcarValidadeDoc(r, !!t.validade_documento);
   if (t.validade_documento) {
-    dica.textContent = 'A validade deste treinamento vem do documento (certificado/CNH): digite a data em "Vence em".';
+    dica.textContent = 'A validade deste treinamento vem do documento (certificado/CNH): digite a data em "Validade do documento".';
     if (forcar) $(r.el.vence).value = '';
     return;
   }
@@ -1104,7 +1113,7 @@ function ligarReceita(r, avisar) {
       return mostrarErro(r.el.erro, 'Escolha o funcionário, o tipo e a data.');
     }
     if (!linha.vence && tipoDe(r, linha.tipo_id)?.validade_documento) {
-      return mostrarErro(r.el.erro, 'Este treinamento vence pela data do documento. Preencha "Vence em".');
+      return mostrarErro(r.el.erro, 'Este treinamento vence pela data do documento. Preencha "Validade do documento".');
     }
     if (r.completo) {
       linha.carga_horaria = so($(r.el.carga).value) ? Number($(r.el.carga).value) : null;
