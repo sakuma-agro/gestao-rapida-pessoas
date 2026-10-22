@@ -309,7 +309,10 @@ export const veSalario = () => acesso.admin || (acesso.modulos || []).includes(P
    (manutencao.administradores) — mexe nos cadastros de lá sem ser
    administradora do app inteiro. As duas listas usam o e-mail como chave,
    igual a app_usuarios. */
-const manut = { carregado: false, erro: '', locais: [], fazendas: {}, admins: new Set() };
+const manut = { carregado: false, erro: '', locais: [], fazendas: {}, admins: new Set(), restritos: new Set() };
+/* 22/10/2026: administrador da área pode ser só das fazendas marcadas
+   (manutencao.administradores.todas_fazendas = false) — cadastra máquinas,
+   itens e bens, mas só enxerga as fazendas dele. */
 const temManut = u => !!u && (u.admin || (u.modulos || []).includes('manutencoes'));
 
 /* Estoques da área Estoque (22/10/2026), para marcar quem vê qual. */
@@ -337,7 +340,7 @@ async function carregarManut() {
     const [l, f, a] = await Promise.all([
       sc.from('locais').select('id,codigo,nome,ativo').order('nome'),
       sc.from('usuario_fazendas').select('email,local_id'),
-      sc.from('administradores').select('email'),
+      sc.from('administradores').select('email,todas_fazendas'),
     ]);
     const erro = l.error || f.error || a.error;
     if (erro) throw erro;
@@ -345,6 +348,7 @@ async function carregarManut() {
     manut.fazendas = {};
     (f.data || []).forEach(x => { const k = x.email.toLowerCase(); (manut.fazendas[k] = manut.fazendas[k] || []).push(x.local_id); });
     manut.admins = new Set((a.data || []).map(x => x.email.toLowerCase()));
+    manut.restritos = new Set((a.data || []).filter(x => x.todas_fazendas === false).map(x => x.email.toLowerCase()));
     manut.erro = '';
   } catch (e) {
     manut.erro = 'Não consegui ler as fazendas da área Máquinas e Patrimônio: ' + (e.message || e);
@@ -366,8 +370,11 @@ async function gravarManut(email, dados) {
     if (entra.length) { const r = await sc.from('usuario_fazendas').insert(entra.map(id => ({ email: k, local_id: id }))); if (r.error) throw r.error; }
     manut.fazendas[k] = quer;
     const adm = tem && !dados.u.admin && !!dados.admin;
-    if (adm && !manut.admins.has(k)) { const r = await sc.from('administradores').insert({ email: k }); if (r.error) throw r.error; manut.admins.add(k); }
-    if (!adm && manut.admins.has(k)) { const r = await sc.from('administradores').delete().eq('email', k); if (r.error) throw r.error; manut.admins.delete(k); }
+    const todas = !dados.restrito;
+    if (adm && !manut.admins.has(k)) { const r = await sc.from('administradores').insert({ email: k, todas_fazendas: todas }); if (r.error) throw r.error; manut.admins.add(k); }
+    else if (adm && manut.restritos.has(k) === todas) { const r = await sc.from('administradores').update({ todas_fazendas: todas }).eq('email', k); if (r.error) throw r.error; }
+    if (adm) { if (todas) manut.restritos.delete(k); else manut.restritos.add(k); }
+    if (!adm && manut.admins.has(k)) { const r = await sc.from('administradores').delete().eq('email', k); if (r.error) throw r.error; manut.admins.delete(k); manut.restritos.delete(k); }
     return true;
   } catch (e) {
     const a = $('cfAviso');
@@ -385,13 +392,15 @@ async function trocarEmailManut(antigo, novo) {
   await sc.from('administradores').update({ email: novo }).eq('email', antigo);
   if (manut.fazendas[antigo]) { manut.fazendas[novo] = manut.fazendas[antigo]; delete manut.fazendas[antigo]; }
   if (manut.admins.delete(antigo)) manut.admins.add(novo);
+  if (manut.restritos.delete(antigo)) manut.restritos.add(novo);
 }
 
 function resumoManut(u) {
   if (!temManut(u) || u.admin) return null;
   const k = (u.email || '').toLowerCase();
-  if (manut.admins.has(k)) return 'administra · todas as fazendas';
   const n = (manut.fazendas[k] || []).length;
+  if (manut.admins.has(k) && !manut.restritos.has(k)) return 'administra · todas as fazendas';
+  if (manut.admins.has(k)) return 'administra · ' + (n === 1 ? (manut.locais.find(l => l.id === manut.fazendas[k][0])?.nome || '1 fazenda') : n + ' fazendas');
   return n ? (n === 1 ? (manut.locais.find(l => l.id === manut.fazendas[k][0])?.nome || '1 fazenda') : n + ' fazendas') : 'nenhuma fazenda marcada';
 }
 
@@ -991,7 +1000,7 @@ function abrirUsuario(email, foco) {
                 : { email: '', nome: '', usuario: '', admin: false,
                     modulos: [...PADRAO], telas: [], destinos: [], novo: true };
   const k = (editando.email || '').toLowerCase();
-  editando.manut = { fazendas: [...(manut.fazendas[k] || [])], admin: manut.admins.has(k) };
+  editando.manut = { fazendas: [...(manut.fazendas[k] || [])], admin: manut.admins.has(k), restrito: manut.restritos.has(k) };
   $('usSenha').hidden = true;
   $('usSenha').className = 'us-senha';
   $('usSenha').innerHTML = '';
@@ -1082,6 +1091,7 @@ function desenharPermissoes() {
     desenharPermissoes();
   });
   $('usManutAdmin')?.addEventListener('change', ev => { e.manut.admin = ev.target.checked; desenharPermissoes(); });
+  $('usManutRestrito')?.addEventListener('change', ev => { e.manut.restrito = ev.target.checked; desenharPermissoes(); });
   $('usSal')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add(PERM_SALARIOS); else mods.delete(PERM_SALARIOS);
@@ -1135,7 +1145,7 @@ function desenharPermissoes() {
     if (!o) return;
     e.modulos = [...(o.modulos || [])]; e.telas = [...(o.telas || [])]; e.destinos = [...(o.destinos || [])];
     const ko = (o.email || '').toLowerCase();
-    e.manut = { fazendas: [...(manut.fazendas[ko] || [])], admin: manut.admins.has(ko) };
+    e.manut = { fazendas: [...(manut.fazendas[ko] || [])], admin: manut.admins.has(ko), restrito: manut.restritos.has(ko) };
     desenharPermissoes();
   });
   raiz.querySelectorAll('[data-tudo]').forEach(b => b.addEventListener('click', () => {
@@ -1255,17 +1265,20 @@ function blocoSal(e) {
    da área ou não, e quais fazendas enxerga. */
 function blocoManut(e) {
   const tem = temManut(e);
-  const m = e.manut || { fazendas: [], admin: false };
+  const m = e.manut || { fazendas: [], admin: false, restrito: false };
+  const total = m.admin && !m.restrito;
   return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="manutencoes">
     <label class="us-mod__topo">
       <input type="checkbox" id="usManut" ${tem ? 'checked' : ''}>
       <b>Área Máquinas e Patrimônio</b>
-      <span class="dc-sem">${!tem ? 'não entra' : m.admin ? 'administra a área · todas as fazendas' : `${m.fazendas.length} fazenda(s)`}</span>
+      <span class="dc-sem">${!tem ? 'não entra' : total ? 'administra a área · todas as fazendas' : m.admin ? `administra · ${m.fazendas.length} fazenda(s)` : `${m.fazendas.length} fazenda(s)`}</span>
     </label>
     ${!tem ? '' : manut.erro ? `<p class="dc-sem">${esc(manut.erro)}</p>` : `
     <label class="us-tela"><input type="checkbox" id="usManutAdmin" ${m.admin ? 'checked' : ''}>
       <span>Administrador da área<small>mexe nos cadastros de máquinas, patrimônio, planos e check lists; vê todas as fazendas</small></span></label>
-    ${m.admin ? '' : `<div class="us-subbloco"><span class="us-sub">Fazendas que enxerga</span>
+    ${m.admin ? `<label class="us-tela"><input type="checkbox" id="usManutRestrito" ${m.restrito ? 'checked' : ''}>
+      <span>Só nas fazendas marcadas abaixo<small>cadastra máquinas, itens, trocas e bens só delas; listas gerais (itens, tipos, modelos de check list) ficam com o administrador de todas</small></span></label>` : ''}
+    ${total ? '' : `<div class="us-subbloco"><span class="us-sub">Fazendas que enxerga</span>
       <div class="us-telas">${manut.locais.map(l => `
         <label class="us-tela"><input type="checkbox" data-fazenda="${l.id}" ${m.fazendas.includes(l.id) ? 'checked' : ''}>
           <span>${esc(l.nome)}</span></label>`).join('') || '<span class="dc-sem">Nenhuma fazenda cadastrada.</span>'}</div></div>`}`}

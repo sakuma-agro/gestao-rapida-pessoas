@@ -6,7 +6,20 @@
    faz a conta e é isso que sai impresso na OS.
    ===================================================================== */
 
-const ehAdmin = () => !!(window.Acesso && Acesso.admin);
+/* 22/10/2026: quem administra só algumas fazendas (Acesso.gestor) também
+   cadastra máquinas, itens e trocas — mas só nas fazendas dele. As listas que
+   valem para todas as fazendas (itens, tipos, modelos de check list) ficam
+   com o administrador de todas (ehAdminTotal). */
+const ehAdmin = () => !!(window.Acesso && (Acesso.admin || Acesso.gestor));
+const ehAdminTotal = () => !!(window.Acesso && Acesso.admin);
+/* Fazendas em que a pessoa pode cadastrar: todas para o administrador geral,
+   só as dela para quem administra algumas. */
+const locaisEditaveis = () => {
+  const todos = q.ordenado('locais');
+  if (window.Acesso && Acesso.admin) return todos;
+  const meus = (App.usuario && App.usuario.locais) || [];
+  return todos.filter(l => meus.includes(l.id));
+};
 
 /* Colunas que o banco calcula sozinho e recusa no envio */
 function limparBem(reg) {
@@ -47,8 +60,8 @@ TELAS.maquinas = el => {
     <div class="acoes">
       ${ehAdmin() ? '<button type="button" class="btn" id="mq-nova">Cadastrar máquina</button>' : ''}
       ${'' /* 14/10/2026: importação Realtec foi só a carga inicial; horímetro agora é lançado no app. Para voltar: botão #mq-importar (ver git). */}
-      ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de itens de manutenção</button>' : ''}
-      ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
+      ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de itens de manutenção</button>' : ''}
+      ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
     </div>
     <div class="filtros">
       <input type="search" id="mq-busca" placeholder="Buscar por código, descrição ou patrimônio" value="${esc(filtroMaq.busca)}">
@@ -219,7 +232,7 @@ function formMaquina(e, modelo) {
       ${campoLista('Tipo', 'tipo_equipamento_id',
           q.ordenado('tipos_equipamento').map(t => ({ id: t.id, nome: t.nome + ' — ' + nomeGrupo(t.grupo || 'outros') })),
           base.tipo_equipamento_id || (grupoAtual ? (q.ordenado('tipos_equipamento').find(t => (t.grupo || 'outros') === grupoAtual) || {}).id : ''))}
-      ${campoLista('Local', 'local_id', q.ordenado('locais'), base.local_id)}
+      ${campoLista('Local', 'local_id', locaisEditaveis(), base.local_id)}
       ${campoLista('Marca', 'marca_id', q.ordenado('marcas'), base.marca_id, '—')}
       ${campoTexto('Modelo', 'modelo', base.modelo)}
       ${campoLista('Como é medido', 'unidade_controle', [
@@ -583,4 +596,4 @@ function telaTiposMaquina() {
   desenhar();
 }
 
-Object.assign(window, { fichaMaquina, formMaquina, formItem, planosDa, limparBem, ehAdmin, telaTiposMaquina });
+Object.assign(window, { fichaMaquina, formMaquina, formItem, planosDa, limparBem, ehAdmin, ehAdminTotal, locaisEditaveis, telaTiposMaquina });

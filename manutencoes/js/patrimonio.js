@@ -44,7 +44,7 @@ const SITUACAO_DO_MOV = {
   MANUTENCAO: 'EM_MANUTENCAO', RETORNO: 'EM_USO', BAIXA: 'BAIXADO', AJUSTE: null,
 };
 
-const ehAdminP = () => !!(window.Acesso && Acesso.admin);
+const ehAdminP = () => !!(window.Acesso && (Acesso.admin || Acesso.gestor));   // 22/10/2026: gestor da fazenda também
 const dinheiro = v => v == null || v === '' ? '—'
   : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -295,7 +295,7 @@ function formBem(b, modelo) {
       ${campoTexto('Marca', 'marca', base.marca)}
       ${campoTexto('Modelo', 'modelo', base.modelo)}
       ${campoTexto('Nº de série', 'numero_serie', novo ? '' : base.numero_serie)}
-      ${campoLista('Fazenda', 'local_id', q.ordenado('locais'), base.local_id)}
+      ${campoLista('Fazenda', 'local_id', locaisEditaveis(), base.local_id)}
       ${novo || ehAdminP() ? campoLista('Situação', 'situacao', SITUACOES_BEM, base.situacao, null) : ''}
       ${campoTexto('Responsável / com quem está', 'responsavel', novo ? '' : base.responsavel)}
       ${campoTexto('Data de compra', 'data_compra', base.data_compra, 'date')}
@@ -367,7 +367,7 @@ function formMovimento(b) {
     <div class="colunas">
       ${campoLista('O que aconteceu', 'tipo', opcoes, opcoes[0] && opcoes[0].id, null)}
       ${campoTexto('Data', 'data', hoje(), 'date')}
-      <div id="fm-para">${campoLista('Para qual fazenda', 'para_local_id', q.ordenado('locais'), b.local_id)}</div>
+      <div id="fm-para">${campoLista('Para qual fazenda', 'para_local_id', locaisEditaveis(), b.local_id)}</div>
       ${campoTexto('Com quem fica / quem levou', 'responsavel', '', 'text', 'Ex.: nome do funcionário ou da oficina')}
     </div>
     ${campoArea('Observação', 'observacao', '')}

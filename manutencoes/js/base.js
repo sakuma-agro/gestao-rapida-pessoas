@@ -54,12 +54,17 @@ async function quemSou(sessao) {
       const { data } = await App.sb.schema('public').from('app_usuarios')
         .select('nome, usuario, admin, modulos').eq('email', email).maybeSingle();
       const { data: adm } = await App.sb.rpc('eh_administrador');
+      /* 22/10/2026: administrador só das fazendas marcadas (ex.: Laís na
+         Quebra Cocão) — mexe nos cadastros, mas só enxerga as fazendas dela. */
+      let gest = false;
+      try { const r = await App.sb.rpc('eh_gestor'); gest = !r.error && !!r.data; } catch (e) {}
       const { data: ul } = await App.sb.from('usuario_fazendas').select('local_id').eq('email', email);
       if (data) u = {
         id: sessao.user.id, email,
         nome: data.nome || data.usuario || email,
         usuario: data.usuario || null,
         admin: !!adm,
+        gestor: !!adm || gest,
         pode: !!(data.admin || (data.modulos || []).includes('manutencoes')),
         locais: (ul || []).map(x => x.local_id),
       };

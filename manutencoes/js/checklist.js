@@ -125,7 +125,7 @@ TELAS.checklist = el => {
     <div class="abas">
       <button type="button" data-aba="agenda">Agenda</button>
       <button type="button" data-aba="realizados">Realizados</button>
-      ${window.ehAdmin && ehAdmin() ? '<button type="button" data-aba="modelos">Modelos (editar itens)</button>' : ''}
+      ${window.ehAdminTotal && ehAdminTotal() ? '<button type="button" data-aba="modelos">Modelos (editar itens)</button>' : ''}
     </div>
     <div id="ck-corpo"></div>`;
   el.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { abaChecklist = b.dataset.aba; TELAS.checklist(el); });

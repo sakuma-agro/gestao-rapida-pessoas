@@ -78,6 +78,7 @@ function carregarAcesso(u) {
   // A lista de gente é a do app inteiro: quem tem a área liberada vê os dois
   // módulos (Manutenções e Patrimônio). Quem é administrador (do app ou só desta área) mexe nos cadastros.
   Acesso.admin = !!(u && u.admin);
+  Acesso.gestor = !!(u && (u.admin || u.gestor));   // 22/10/2026: cadastra só nas fazendas dele
   Acesso.modulos = [...MODULOS_PADRAO];
   Acesso.telas = [];
   Acesso.carregado = true;
