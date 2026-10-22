@@ -152,7 +152,7 @@ function desenhar() {
         const marcado = exigidos.some(e => e.id === t.id);
         const recicla = t.recicla_tipo_id ? tipo(t.recicla_tipo_id) : null;
         const sub = [
-          t.meses ? `reciclagem a cada ${t.meses} meses` : 'não vence',
+          t.validade_documento ? 'vence pela data do documento' : t.meses ? `reciclagem a cada ${t.meses} meses` : 'não vence',
           t.carga_horaria ? `${Number(t.carga_horaria)} h` : '',
           recicla ? `renova: ${recicla.nome} (conta junto)` : '',
         ].filter(Boolean).join(' · ');

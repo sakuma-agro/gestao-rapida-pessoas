@@ -122,7 +122,7 @@ const RECEITAS = {
       carga: 'trCarga', instrutor: 'trInstrutor', obs: 'trObs',
       dlgTipo: 'dlgTipoTr', formTipo: 'formTipoTr', tituloTipo: 'tituloTipoTr', erroTipo: 'erroTipoTr',
       tNome: 'ttNome', tMeses: 'ttMeses', tAtivo: 'ttAtivo', tCarga: 'ttCarga', tApagar: 'bApagarTipoTr',
-      tRecicla: 'ttRecicla', tNr: 'ttNr',
+      tRecicla: 'ttRecicla', tNr: 'ttNr', tDoc: 'ttDoc',
     },
   },
 };
@@ -266,6 +266,15 @@ export async function abrirSst(tela) {
 }
 
 /* =============== cadastro de tipos =============== */
+/* Validade do documento (22/10/2026, pedido dele): transporte de passageiros
+   vale até a data que vem no documento/CNH, não um prazo fixo. Nesses tipos a
+   data de vencimento é digitada em cada lançamento e não é calculada. */
+function modoValidade(r) {
+  const doc = $(r.el.tDoc).value === '1';
+  $(r.el.tMeses).disabled = doc;
+  if (doc) $(r.el.tMeses).value = '';
+}
+
 /* NR do treinamento (22/10/2026): "nr 6", "NR6", "31" viram "NR-06", "NR-31".
    Texto que não seja número fica como foi digitado. */
 function normNr(v) {
@@ -293,7 +302,8 @@ function desenharTipos(r) {
         <td><b>${esc(t.nome)}</b>${recicla
           ? `<br><span class="dc-sem">recicla: ${esc(recicla.nome)}</span>` : ''}</td>
         ${r.el.tNr ? `<td class="ce">${t.nr ? `<b>${esc(t.nr)}</b>` : '<span class="dc-sem">—</span>'}</td>` : ''}
-        <td class="ce">${t.meses ? t.meses + ' meses' : '<span class="dc-sem">não vence</span>'}</td>
+        <td class="ce">${t.validade_documento ? 'validade do documento'
+          : t.meses ? t.meses + ' meses' : '<span class="dc-sem">não vence</span>'}</td>
         ${r.completo ? `<td class="ce">${t.carga_horaria ? Number(t.carga_horaria) + ' h' : '—'}</td>` : ''}
         <td class="ce">${usos}</td>
         <td class="ce"><span class="tag ${t.ativo ? 'ativo' : 'inativo'}">${t.ativo ? 'EM USO' : 'DESATIVADO'}</span></td>
@@ -351,6 +361,7 @@ function abrirTipo(r, id) {
   $(r.el.tMeses).value = e.meses ?? '';
   if (r.el.tCarga) $(r.el.tCarga).value = e.carga_horaria ?? '';
   if (r.el.tNr) $(r.el.tNr).value = e.nr || '';
+  if (r.el.tDoc) { $(r.el.tDoc).value = e.validade_documento ? '1' : '0'; modoValidade(r); }
   if (r.el.tRecicla) {
     // não deixo escolher ele mesmo nem quem já aponta para ele: viraria laço
     const opcoes = S[r.id].tipos.filter(o =>
@@ -812,6 +823,11 @@ function atualizarVencimento(r, forcar) {
   if (r.completo && forcar && t.carga_horaria && !so($(r.el.carga).value)) {
     $(r.el.carga).value = Number(t.carga_horaria);
   }
+  if (t.validade_documento) {
+    dica.textContent = 'A validade deste treinamento vem do documento (certificado/CNH): digite a data em "Vence em".';
+    if (forcar) $(r.el.vence).value = '';
+    return;
+  }
   if (!t.meses) {
     dica.textContent = `${t.nome} está cadastrado como sem validade.`;
     if (forcar) $(r.el.vence).value = '';
@@ -1087,6 +1103,9 @@ function ligarReceita(r, avisar) {
     if (!linha.funcionario_id || !linha.tipo_id || !linha.realizado) {
       return mostrarErro(r.el.erro, 'Escolha o funcionário, o tipo e a data.');
     }
+    if (!linha.vence && tipoDe(r, linha.tipo_id)?.validade_documento) {
+      return mostrarErro(r.el.erro, 'Este treinamento vence pela data do documento. Preencha "Vence em".');
+    }
     if (r.completo) {
       linha.carga_horaria = so($(r.el.carga).value) ? Number($(r.el.carga).value) : null;
       linha.instrutor = so($(r.el.instrutor).value) || null;
@@ -1133,6 +1152,7 @@ function ligarReceita(r, avisar) {
   });
 
   /* ---- salvar tipo ---- */
+  if (r.el.tDoc) $(r.el.tDoc).addEventListener('change', () => modoValidade(r));
   $(r.el.formTipo).addEventListener('submit', async ev => {
     ev.preventDefault();
     const e = editandoTipo[r.id];
@@ -1147,6 +1167,10 @@ function ligarReceita(r, avisar) {
       linha.carga_horaria = so($(r.el.tCarga).value) ? Number($(r.el.tCarga).value) : null;
     }
     if (r.el.tNr) linha.nr = normNr($(r.el.tNr).value);
+    if (r.el.tDoc) {
+      linha.validade_documento = $(r.el.tDoc).value === '1';
+      if (linha.validade_documento) linha.meses = null;
+    }
     if (r.el.tCategoria) linha.categoria = $(r.el.tCategoria).value;
     if (r.el.tRecicla) linha.recicla_tipo_id = $(r.el.tRecicla).value || null;
     linha.id = e.novo ? novoId() : e.id;
