@@ -52,3 +52,6 @@ alter table public.sst_brigada_config add column if not exists socorros_equivale
 update public.sst_brigada_config set socorros_equivalentes = array(
   select id from public.sst_tipos_treinamento where nome ilike '%ITMG-12%' and nome ilike '%INICIAL%')
 where id = 1 and socorros_equivalentes = '{}';
+
+-- 22/10/2026: liga/desliga a observação do curso equivalente (tela Mínimos).
+alter table public.sst_brigada_config add column if not exists mostrar_obs_equivalente boolean not null default true;

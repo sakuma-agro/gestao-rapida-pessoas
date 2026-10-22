@@ -17,7 +17,7 @@
 // O desligamento no cadastro chama avisoDesligamentoBrigada (app.js).
 import { estado } from './store.js';
 import { carregarAtividades, ligacoes, todasAtividades } from './atividades-dados.js';
-import { garantirSst, sstCarregado, lancamentosSst, situacaoDe } from './sst.js';
+import { garantirSst, sstCarregado, lancamentosSst, situacaoDe, anexoSst, lerAnexosSst, verAnexoSst } from './sst.js';
 import { grupoTr } from './treino-funcao.js';
 import { mostrar } from './jornada-relatorios.js';
 
@@ -50,6 +50,7 @@ async function carregar() {
   const [cfg] = await Promise.all([
     c.from('sst_brigada_config').select('*').eq('id', 1).maybeSingle(),
     carregarAtividades(),
+    lerAnexosSst().catch(() => {}),   // quem tem certificado anexado (botão Visualizar)
   ]);
   if (cfg.error) throw cfg.error;
   B.cfg = cfg.data || { id: 1, min_brigada: 0, min_socorros: 0, aviso_dias: 60 };
@@ -83,9 +84,9 @@ function situacaoUlt(lista, sufixo = '') {
   const ult = [...lista].sort((a, b) => String(b.realizado || '').localeCompare(String(a.realizado || '')))[0];
   if (!ult) return { conta: false, logo: false, rotulo: 'nunca fez o curso — não conta', cor: 'perigo', vence: null, ordem: 0 };
   const sit = situacaoDe(ult.vence);
-  if (sit.chave === 'vencido') return { conta: true, logo: false, venc: true, rotulo: `curso vencido em ${br(ult.vence)} — reciclar${sufixo}`, cor: 'perigo', vence: ult.vence, ordem: 1 };
-  if (sit.dias != null && sit.dias <= avisoDias()) return { conta: true, logo: true, rotulo: (sit.dias === 0 ? 'curso vence hoje' : `curso vence em ${sit.dias} dia${sit.dias > 1 ? 's' : ''} (${br(ult.vence)})`) + sufixo, cor: 'alerta', vence: ult.vence, ordem: 2 };
-  return { conta: true, logo: false, rotulo: (ult.vence ? `em dia até ${br(ult.vence)}` : 'em dia (sem validade)') + sufixo, cor: 'ativo', vence: ult.vence, ordem: 3 };
+  if (sit.chave === 'vencido') return { conta: true, logo: false, venc: true, rotulo: `curso vencido em ${br(ult.vence)} — reciclar${sufixo}`, cor: 'perigo', vence: ult.vence, reg: ult.id, ordem: 1 };
+  if (sit.dias != null && sit.dias <= avisoDias()) return { conta: true, logo: true, rotulo: (sit.dias === 0 ? 'curso vence hoje' : `curso vence em ${sit.dias} dia${sit.dias > 1 ? 's' : ''} (${br(ult.vence)})`) + sufixo, cor: 'alerta', vence: ult.vence, reg: ult.id, ordem: 2 };
+  return { conta: true, logo: false, rotulo: (ult.vence ? `em dia até ${br(ult.vence)}` : 'em dia (sem validade)') + sufixo, cor: 'ativo', vence: ult.vence, reg: ult.id, ordem: 3 };
 }
 
 /* Cursos que também valem como primeiros socorros (22/10/2026, pedido dele):
@@ -105,7 +106,7 @@ function cursoDaPessoa(funcionarioId, g) {
   }
   // um curso equivalente em situação melhor vale no lugar dos exigidos
   if (equiv.length) {
-    const s = situacaoUlt(regs.filter(r => equiv.includes(r.tipo_id)), ' (por curso que inclui primeiros socorros)');
+    const s = situacaoUlt(regs.filter(r => equiv.includes(r.tipo_id)), B.cfg?.mostrar_obs_equivalente === false ? '' : ' (por curso que inclui primeiros socorros)');
     if (s.conta && (!pior || s.ordem > pior.ordem)) pior = s;
   }
   return pior;
@@ -204,6 +205,10 @@ async function salvarMinimos(valores) {
    TELA · PAINEL
    =================================================================== */
 const chip = (cor, txt) => `<span class="tag ${cor}">${esc(txt)}</span>`;
+/* Certificado do lançamento que decidiu a situação (22/10/2026, pedido dele). */
+const cert = c => c?.reg && anexoSst('treinamento', c.reg)
+  ? ` <button class="btn mini principal" type="button" data-br-cert="${c.reg}">Visualizar</button>`
+  : (c?.reg ? ' <span class="dc-sem">sem certificado</span>' : '');
 
 function cartaoGrupo(r) {
   const corFalta = r.precisa ? (r.falta ? 'perigo' : 'ok') : 'calma';
@@ -215,8 +220,8 @@ function cartaoGrupo(r) {
       <div class="pv-card pv-calma${r.precisa ? '' : ' pv-zero'}"><span>Precisa</span><strong>${r.precisa || '—'}</strong><small>${r.precisa ? 'mínimo definido' : 'defina em Mínimos'}</small></div>
       <div class="pv-card pv-${corFalta}${r.falta ? '' : ' pv-zero'}"><span>Falta</span><strong>${r.precisa ? r.falta : '—'}</strong><small>${[r.vencidos ? `${r.vencidos} vencido(s)` : '', r.logo ? `${r.logo} vence(m) em até ${avisoDias()} dias` : ''].filter(Boolean).join(' · ') || 'nenhum vencendo'}</small></div>
     </div>
-    <table class="dc-planilha" style="margin-top:10px"><thead><tr><th>${esc(r.g.papeis[0].toUpperCase() + r.g.papeis.slice(1))} designados</th><th style="width:22%">Fazenda</th><th style="width:36%">Curso</th></tr></thead><tbody>
-      ${r.gente.length ? r.gente.map(x => `<tr><td>${esc(x.f.nome)}<br><span class="dc-sem">${esc(x.f.cargo || '')}</span></td><td>${esc(x.f.fazenda || '—')}</td><td>${chip(x.c.cor, x.c.rotulo)}</td></tr>`).join('')
+    <table class="dc-planilha" style="margin-top:10px"><thead><tr><th>${esc(r.g.papeis[0].toUpperCase() + r.g.papeis.slice(1))} designados</th><th style="width:22%">Fazenda</th><th style="width:40%">Curso</th></tr></thead><tbody>
+      ${r.gente.length ? r.gente.map(x => `<tr><td>${esc(x.f.nome)}<br><span class="dc-sem">${esc(x.f.cargo || '')}</span></td><td>${esc(x.f.fazenda || '—')}</td><td>${chip(x.c.cor, x.c.rotulo)}${cert(x.c)}</td></tr>`).join('')
         : `<tr><td colspan="3" class="dc-sem">Ninguém designado ainda. Use "Designar".</td></tr>`}
     </tbody></table>
     ${r.desligados ? `<p class="dica" style="margin:6px 0 0">${r.desligados} designado(s) já desligado(s) — não entram na conta.</p>` : ''}
@@ -266,11 +271,12 @@ function desenharMembros() {
     </tr></thead><tbody>
     ${lista.length ? lista.map(f => `<tr><td>${esc(f.nome)}<br><span class="dc-sem">${esc(f.cargo || '')}</span></td><td>${esc(f.fazenda || '—')}</td>
       ${GRUPOS.map((g, i) => { const c = cursoDaPessoa(f.id, g); const on = sets[i].has(f.id);
-        return `<td><label class="br-marca"><input type="checkbox" data-br-tog="${g.chave}" data-f="${f.id}" ${on ? 'checked' : ''}> ${on ? 'Designado' : 'Designar'}</label><br>${chip(c.cor, c.rotulo)}</td>`; }).join('')}
+        return `<td><label class="br-marca"><input type="checkbox" data-br-tog="${g.chave}" data-f="${f.id}" ${on ? 'checked' : ''}> ${on ? 'Designado' : 'Designar'}</label><br>${chip(c.cor, c.rotulo)}${cert(c)}</td>`; }).join('')}
     </tr>`).join('') : '<tr><td colspan="4" class="dc-sem">Ninguém encontrado.</td></tr>'}
     </tbody></table></div>
     <p class="dica" id="brMsg" style="margin:8px 0 0"></p>
   </div>`;
+  ligarCert(tela);
   const busca = $('brBusca');
   busca.addEventListener('input', () => { B.busca = busca.value; const pos = busca.selectionStart; desenharMembros(); const nb = $('brBusca'); nb.focus(); try { nb.setSelectionRange(pos, pos); } catch { /* ok */ } });
   tela.querySelectorAll('[data-br-tog]').forEach(cx => cx.addEventListener('change', async () => {
@@ -303,6 +309,8 @@ function desenharMinimos() {
           .filter(t => !cursosDe(cfg.atividade_socorros_id).includes(t.id))
           .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
           .map(t => `<label class="br-marca"><input type="checkbox" name="brEquiv" value="${t.id}" ${(cfg.socorros_equivalentes || []).includes(t.id) ? 'checked' : ''}> ${esc(t.nome)}</label>`).join('<br>')}
+        <label class="br-marca" style="margin-top:8px"><input type="checkbox" id="brObs" ${cfg.mostrar_obs_equivalente === false ? '' : 'checked'}>
+          Mostrar a observação "(por curso que inclui primeiros socorros)" na situação do socorrista</label>
       </fieldset>
       <div class="barra" style="margin-top:12px"><button class="btn principal" type="submit">Salvar</button><span class="dica" id="brMinMsg"></span></div>
     </form>
@@ -318,7 +326,8 @@ function desenharMinimos() {
     msg.textContent = 'Salvando…';
     try {
       await salvarMinimos({ min_brigada: n('brMinB'), min_socorros: n('brMinS'), aviso_dias: Math.min(365, n('brAviso')),
-        socorros_equivalentes: [...document.querySelectorAll('input[name=brEquiv]:checked')].map(x => x.value) });
+        socorros_equivalentes: [...document.querySelectorAll('input[name=brEquiv]:checked')].map(x => x.value),
+        mostrar_obs_equivalente: $('brObs').checked });
       msg.textContent = 'Salvo.';
     } catch (e) { msg.textContent = 'Não consegui salvar: ' + (e.message || e); }
   });
@@ -353,7 +362,11 @@ let irPara = () => {};
 /** O app.js passa como abrir outra tela (sem import circular). */
 export function ligarBrigada({ abrir }) { irPara = abrir; }
 
+function ligarCert(tela) {
+  tela.querySelectorAll('[data-br-cert]').forEach(b => b.addEventListener('click', () => verAnexoSst('treinamento', b.dataset.brCert, b)));
+}
 function ligarComuns(tela) {
+  ligarCert(tela);
   tela.querySelectorAll('[data-br-ir]').forEach(b => b.addEventListener('click', ev => { ev.preventDefault(); irPara(b.dataset.brIr); }));
   tela.querySelectorAll('[data-br-add]').forEach(b => b.addEventListener('click', async () => {
     const g = GRUPOS.find(x => x.chave === b.dataset.brAdd);
