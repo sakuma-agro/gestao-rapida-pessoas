@@ -511,7 +511,7 @@ function desenharMov(sentido) {
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`
         : `
         <label class="campo qc-so" data-so="uso">Plantio / destino <small class="dc-sem">(lubrificante e EPI: destino na linha)</small> <input type="text" name="plantio" list="qcPlantios" placeholder="plantio, área, máquina ou local"></label>
-        <label class="campo">Operador * <input type="text" name="operador" list="qcOperadores"></label>
+        <label class="campo">Operador <span class="qc-op-obrig">*</span> <input type="text" name="operador" list="qcOperadores"></label>
         <label class="campo qc-so" data-so="transferencia">Fazenda de destino *
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`}
         <label class="campo plena">Observação <input type="text" name="obs"></label>
@@ -740,7 +740,9 @@ async function lancar(sentido, form) {
   }
   if (sentido === 'saida') {
     if (!txt('documento')) { aviso('Informe o nº do documento.', true); return; }
-    if (!txt('operador')) { aviso('Informe o operador.', true); return; }
+    // saída só de EPI (cada um com o funcionário) não pede operador (22/10/2026)
+    const soEpi = tipo === 'uso' && linhas.length && linhas.every(l => l.dt === 'func' && l.dest);
+    if (!txt('operador') && !soEpi) { aviso('Informe o operador.', true); return; }
     if (tipo === 'uso' && !txt('plantio') && linhas.some(l => !l.dest)) { aviso('Informe o plantio ou destino.', true); return; }
   }
   if (tipo === 'transferencia' && !txt('outra')) { aviso(sentido === 'saida' ? 'Escolha a fazenda de destino.' : 'Escolha a fazenda de origem.', true); return; }
