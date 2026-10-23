@@ -42,6 +42,7 @@ import { ligarBackup } from './backup.js';
 import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as enviarAnexos,
   fotosDe, urlDoArquivo } from './arquivos.js';
 import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
+import { abrirEtiquetas } from './etiquetas.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
@@ -189,6 +190,8 @@ function abrirAba(nome) {
   if (nome === 'cadRelatorios') desenharCadRelatorios();
   $('telaCadFerias').hidden = nome !== 'cadFerias';
   if (nome === 'cadFerias') desenharCadFerias();
+  $('telaEtqArmarios').hidden = nome !== 'etqArmarios';
+  if (nome === 'etqArmarios') abrirEtiquetas();
   if (nome === 'disc') abrirDisc();
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();

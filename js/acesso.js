@@ -48,6 +48,11 @@ export const MODULOS = [
       /* Férias do mês (15/10/2026): só consulta, lê o DP › Férias. */
       ['cadFerias', 'Férias do mês'],
     ] },
+    /* Etiquetas (23/10/2026): etiquetas impressas para plastificar. Por
+       enquanto só Armários (js/etiquetas.js). */
+    { id: 'etiquetas', nome: 'Etiquetas', telas: [
+      ['etqArmarios', 'Armários'],
+    ] },
     /* "Estrutura" (29/09/2026): Funções e setores e Empregador e fazenda viraram
        um submódulo só, a pedido dele. As chaves das telas não mudaram. */
     { id: 'estrutura', nome: 'Estrutura', admin: true, telas: [
@@ -635,7 +640,7 @@ const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
    dele, com "← Módulo" para voltar. Submódulo de uma tela só abre direto.
    Módulo de um submódulo só continua mostrando as telas. */
 const ICONE_SUB = {
-  gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', estrutura: 'predio',
+  gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', etiquetas: 'etiqueta', estrutura: 'predio',
   epis: 'escudo', exames: 'exame', treinamentos: 'treino', campanhas: 'megafone', brigada: 'chama',
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo', ticket: 'cartao',
