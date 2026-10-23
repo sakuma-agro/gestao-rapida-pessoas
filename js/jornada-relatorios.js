@@ -174,7 +174,7 @@ export function relatorioDP(competencia, destinoId) {
           return `<tr>
           <td>${esc(l.nome)}${l.atrasados.length ? `<br><span class="rel-mini rel-obs">${esc(obsAnterior(l, fmt))}</span>` : ''}</td>
           <td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
-          <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
+          <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : l.insalDesconsiderada ? '<span class="rel-mini">não acumula<sup>†</sup></span>' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
           <td class="rel-c">${l.faltasInformadas || ''}</td>
@@ -186,7 +186,9 @@ export function relatorioDP(competencia, destinoId) {
   const nota = linhas => {
     const atrasadas = linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
       .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
-    return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas do mês anterior</b>, lançadas depois do fechamento
+    const naoAcum = linhas.filter(l => l.insalDesconsiderada).map(l => esc(l.nome)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    return `${naoAcum.length ? `<div class="rel-resumo"><b>† Insalubridade desconsiderada</b> — recebe periculosidade, e os dois
+      adicionais não acumulam (CLT, art. 193, §2º): ${naoAcum.join(' · ')}.</div>` : ''}${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas do mês anterior</b>, lançadas depois do fechamento
       daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
       Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
     ${''/* nota do intervalo não feito retirada a pedido dele (14/10/2026) — segue no Relatório detalhado */}

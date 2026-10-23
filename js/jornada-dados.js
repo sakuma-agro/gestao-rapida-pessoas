@@ -542,6 +542,20 @@ export function feriadoEm(dataISO, municipio) {
 export const vinculoDe = funcionarioId =>
   dados.vinculos.find(v => v.funcionario_id === funcionarioId) || null;
 
+/** Recebe periculosidade na data? (23/10/2026, pedido dele) — marcada no
+    vínculo OU no salário vigente do RH › Salários (o "base + peric.").
+    Periculosidade e insalubridade não acumulam (CLT, art. 193, §2º): quem tem
+    periculosidade não marca insalubridade no boletim, e o fechamento não paga
+    insalubridade para essa pessoa, mesmo que algum boletim esteja marcado. */
+export function recebePericulosidade(funcionarioId, data) {
+  if (!funcionarioId) return false;
+  if (vinculoDe(funcionarioId)?.periculosidade) return true;
+  const d = String(data || new Date().toISOString()).slice(0, 10);
+  const s = (dados.salarios || []).filter(x => x.funcionario_id === funcionarioId && String(x.desde || '') <= d)
+    .sort((a, b) => String(b.desde).localeCompare(String(a.desde)))[0];
+  return !!s && Number(s.periculosidade) > 0;
+}
+
 export const setorDe = vinculo =>
   dados.setores.find(s => s.id === vinculo?.setor_id) || null;
 

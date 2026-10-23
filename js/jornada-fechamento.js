@@ -135,8 +135,15 @@ export function consolidar(competencia, destinoId) {
       diasAtestado: datasDe('ATESTADO').length,
       // RN-27/RN-28: permanente paga sempre; sem permanente, paga se algum
       // boletim do mês marcou a exposição no dia.
-      insalubridadePagar: insal === 'permanente' || boletins.some(b => b.insalubridade_dia),
-      periculosidade: !!v.periculosidade,
+      // 23/10/2026: quem recebe periculosidade (vínculo ou RH › Salários) não
+      // recebe insalubridade — não acumulam (CLT, art. 193, §2º). Se algum
+      // boletim marcou, a insalubridade é desconsiderada e o relatório avisa.
+      ...(() => {
+        const fimMes = new Date(Date.UTC(+competencia.slice(0, 4), +competencia.slice(5, 7), 0)).toISOString().slice(0, 10);
+        const peric = jd.recebePericulosidade(v.funcionario_id, fimMes);
+        const insalMarcada = insal === 'permanente' || boletins.some(b => b.insalubridade_dia);
+        return { insalubridadePagar: insalMarcada && !peric, insalDesconsiderada: insalMarcada && peric, periculosidade: peric };
+      })(),
     };
   });
 

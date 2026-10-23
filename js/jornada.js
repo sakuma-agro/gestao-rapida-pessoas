@@ -407,7 +407,7 @@ function desenharLancar() {
               ${tiposHeAtivos().map(t => `<option value="${t.id}">${esc(t.nome)} (${minParaHHMM(t.minutos)})</option>`).join('')}
             </select>
           </label>
-          <label class="jor-inline"><input type="checkbox" id="bInsal"> Insalubridade no dia</label>
+          <label class="jor-inline" id="bInsalRot" title=""><input type="checkbox" id="bInsal"> <span id="bInsalTxt">Insalubridade no dia</span></label>
           <label class="jor-inline" id="bDifRot"><input type="checkbox" id="bDif"> Marcou diferente do correto</label>
         </div>
         <div class="jor-caixa jor-marcado" id="bMarcadoBox" hidden>
@@ -889,7 +889,20 @@ function entradaDoFormulario() {
 }
 
 /** O painel "Apurado" roda o motor a cada tecla — sem gravar nada. */
+/* Quem recebe periculosidade não marca insalubridade (23/10/2026, pedido
+   dele): não acumulam (CLT, art. 193, §2º). A caixa fica travada e desmarcada. */
+function travarInsal() {
+  const cx = $('bInsal'); if (!cx) return;
+  const peric = jd.recebePericulosidade($('bFunc')?.value, $('bData')?.value);
+  cx.disabled = peric;
+  if (peric) cx.checked = false;
+  const t = $('bInsalTxt');
+  if (t) t.innerHTML = peric ? 'Insalubridade no dia <small class="dc-sem">— recebe periculosidade, não acumula</small>' : 'Insalubridade no dia';
+  const r = $('bInsalRot'); if (r) r.style.opacity = peric ? '.6' : '';
+}
+
 function mostrarApurado() {
+  travarInsal();
   marcarNivelObrigatorio();
   const entrada = entradaDoFormulario();
   const alvo = $('jorApurado');
@@ -999,7 +1012,7 @@ async function gravarBoletim(ev) {
     intervalo_suprimido_min: r.minIntervaloSuprimido,
     he_especial_min: minutosHe(),
     he_especial_tipo_id: $('bEspecial').value || null,
-    insalubridade_dia: $('bInsal').checked,
+    insalubridade_dia: $('bInsal').checked && !jd.recebePericulosidade(funcionarioId, entrada.data),
     observacao: $('bObs').value || null,
     qualidade: nivelMarcado(),
     motivo: $('bMotivoRot').hidden ? null : ($('bMotivo').value.trim() || null),
