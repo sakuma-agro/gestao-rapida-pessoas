@@ -694,7 +694,16 @@
 .jor-cartao--botao:hover { border-color: #744F28; }
 .jor-rec-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .jor-rec-cab .jor-h3 { margin-right: auto; }
-.jor-rec-periodo { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid #E1E2DE; border-radius: 6px; background: #fff; }
+/* Escolha de meses (vários) — 23/10/2026 */
+.jor-rec-filtro { position: relative; flex: 0 0 auto; }
+.jor-rec-filtro > summary { list-style: none; cursor: pointer; font-size: 13px; padding: 5px 28px 5px 10px; border: 1px solid #E1E2DE;
+  border-radius: 6px; background: #fff; color: #51534A; position: relative; white-space: nowrap; }
+.jor-rec-filtro > summary::-webkit-details-marker { display: none; }
+.jor-rec-filtro > summary::after { content: '▾'; position: absolute; right: 10px; top: 4px; color: #8A8D86; }
+.jor-rec-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; background: #fff; border: 1px solid #E1E2DE;
+  border-radius: 6px; padding: 8px 10px; min-width: 210px; max-height: 300px; overflow-y: auto; box-shadow: 0 4px 14px rgba(27,35,43,.12); }
+.jor-rec-menu label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; cursor: pointer; color: #51534A; }
+.jor-rec-menu-acoes { display: flex; gap: 6px; border-top: 1px solid #E1E2DE; margin-top: 6px; padding-top: 8px; }
 .jor-rec-barra { height: 8px; border-radius: 4px; background: #EEEFEA; overflow: hidden; margin: -8px 0 4px; }
 .jor-rec-barra i { display: block; height: 100%; background: #84BD00; }
 .jor-rec-nota { margin: 0 0 12px; font-size: 12px; }

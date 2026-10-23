@@ -33,7 +33,8 @@ const estadoTela = {
   editando: null,       // id do boletim em edição na tela Lançar jornada
   preencher: null,      // { fid, data } vindo do botão Lançar do painel (23/10/2026)
   recTodos: false,      // painel: lista de pendentes de lançar inteira
-  recPeriodo: 'mes',    // painel: 'mes' (competência) ou 'geral' (todos os meses)
+  recMeses: null,       // painel: null = mês do topo · 'todos' · ['2026-09', '2026-10'…] (23/10/2026)
+  recAberto: false,     // painel: lista de meses aberta
   reabrindo: null,
   pendAbertas: {},      // Fechamento: destino com a lista "Pendências do mês anterior" aberta (23/10/2026)
 };
@@ -186,7 +187,16 @@ function desenharPainel() {
     </div>` + assinatura();
 
   $('jorIrVinculos')?.addEventListener('click', () => irPara('funcionarios'));
-  $('jorRecPeriodo')?.addEventListener('change', ev => { estadoTela.recPeriodo = ev.target.value; estadoTela.recTodos = false; desenharPainel(); });
+  const filtro = $('jorRecFiltro');
+  filtro?.addEventListener('toggle', () => { estadoTela.recAberto = filtro.open; });
+  document.querySelectorAll('#telaJorPainel [data-rec-mes]').forEach(cx => cx.addEventListener('change', () => {
+    const marc = [...document.querySelectorAll('#telaJorPainel [data-rec-mes]:checked')].map(x => x.dataset.recMes);
+    const todos = document.querySelectorAll('#telaJorPainel [data-rec-mes]').length;
+    estadoTela.recMeses = !marc.length ? null : marc.length === todos ? 'todos' : marc;
+    estadoTela.recTodos = false; desenharPainel();
+  }));
+  $('jorRecSoTopo')?.addEventListener('click', () => { estadoTela.recMeses = null; estadoTela.recTodos = false; desenharPainel(); });
+  $('jorRecTodosMeses')?.addEventListener('click', () => { estadoTela.recMeses = 'todos'; estadoTela.recTodos = false; desenharPainel(); });
   $('jorRecAtualizar')?.addEventListener('click', () => { recGeral = null; desenharPainel(); });
   $('jorRecTodos')?.addEventListener('click', () => { estadoTela.recTodos = !estadoTela.recTodos; desenharPainel(); });
   document.querySelectorAll('#telaJorPainel [data-lancar-pend]').forEach(b => b.addEventListener('click', () => {
@@ -252,28 +262,50 @@ async function buscarRecGeral() {
   recGeralBuscando = true;
   try { recGeral = await jd.carregarRecebidosGeral(); }
   finally { recGeralBuscando = false; }
-  if (estadoTela.recPeriodo === 'geral' && $('telaJorPainel') && !$('telaJorPainel').hidden) desenharPainel();
+  if (estadoTela.recMeses && $('telaJorPainel') && !$('telaJorPainel').hidden) desenharPainel();
 }
 
 function painelRecebidos() {
-  const geral = estadoTela.recPeriodo === 'geral';
-  let ini = estadoTela.competencia;
-  const [a, m] = ini.split('-').map(Number);
-  let fim = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
-  if (geral) { ini = '0000-01-01'; fim = '9999-12-31'; if (!recGeral) buscarRecGeral(); }
-  const seletor = `<select id="jorRecPeriodo" class="jor-rec-periodo" aria-label="Período">
-      <option value="mes"${geral ? '' : ' selected'}>Competência · ${esc(rotuloCompetencia(estadoTela.competencia))}</option>
-      <option value="geral"${geral ? ' selected' : ''}>Geral · todos os meses</option>
-    </select>${geral ? ' <button type="button" class="btn mini" id="jorRecAtualizar">Atualizar</button>' : ''}`;
-  if (geral && !recGeral) return `<div class="jor-rec-cab"><h3 class="jor-h3">Boletins</h3>${seletor}</div>
-    <p class="dc-sem">Buscando os boletins de todos os meses…</p>`;
-  const r = bol.recebidosDoMes(ini, fim, geral ? recGeral : jd.dados);
+  const topo = estadoTela.competencia.slice(0, 7);
+  const sel = estadoTela.recMeses;                       // null · 'todos' · lista
+  const precisaGeral = sel === 'todos' || (Array.isArray(sel) && (sel.length > 1 || sel[0] !== topo));
+  if (precisaGeral && !recGeral) buscarRecGeral();
+  // Meses oferecidos: do primeiro dado (ou set/2026) até o mês atual ou o do topo.
+  const datas = recGeral ? [...recGeral.bolEntregas.map(x => x.data), ...recGeral.bolJornada.map(x => x.data_fato)] : [];
+  const ultimo = [jd.competenciaAtual().slice(0, 7), topo].sort().pop();
+  let mes = [...datas, '2026-09-01', topo + '-01'].sort()[0].slice(0, 7);
+  const meses = [];
+  while (mes <= ultimo) {
+    meses.push(mes);
+    const [y, mm] = mes.split('-').map(Number);
+    mes = mm === 12 ? `${y + 1}-01` : `${y}-${String(mm + 1).padStart(2, '0')}`;
+  }
+  const escolhidos = sel === 'todos' ? meses : Array.isArray(sel) ? sel : [topo];
+  const curto = k => `${MESES[Number(k.slice(5, 7)) - 1].slice(0, 3)}/${k.slice(2, 4)}`;
+  const rotulo = sel === 'todos' ? 'Todos os meses'
+    : escolhidos.length === 1 ? rotuloCompetencia(escolhidos[0] + '-01')
+    : `${escolhidos.length} meses: ${[...escolhidos].sort().map(curto).join(', ')}`;
+  const seletor = `<details class="jor-rec-filtro" id="jorRecFiltro"${estadoTela.recAberto ? ' open' : ''}>
+      <summary>${esc(rotulo)}</summary>
+      <div class="jor-rec-menu">
+        ${[...meses].reverse().map(k => `<label><input type="checkbox" data-rec-mes="${k}"${escolhidos.includes(k) ? ' checked' : ''}> ${esc(rotuloCompetencia(k + '-01'))}</label>`).join('')}
+        <div class="jor-rec-menu-acoes"><button type="button" class="btn mini" id="jorRecTodosMeses">Todos</button>
+          <button type="button" class="btn mini" id="jorRecSoTopo">Só ${esc(curto(topo))}</button></div>
+      </div>
+    </details>${precisaGeral ? ' <button type="button" class="btn mini" id="jorRecAtualizar">Atualizar</button>' : ''}`;
+  const titulo = escolhidos.length === 1 ? 'Boletins do mês' : 'Boletins';
+  if (precisaGeral && !recGeral) return `<div class="jor-rec-cab"><h3 class="jor-h3">${titulo}</h3>${seletor}</div>
+    <p class="dc-sem">Buscando os boletins dos meses escolhidos…</p>`;
+  const set = new Set(escolhidos);
+  const r = precisaGeral
+    ? bol.recebidosDoMes(d => set.has(d.slice(0, 7)), null, recGeral)
+    : bol.recebidosDoMes(estadoTela.competencia, `${topo}-31`, jd.dados);
   const pct = r.recebidos ? Math.round(100 * r.lancados / r.recebidos) : 0;
   const lista = estadoTela.recTodos ? r.porPessoa : r.porPessoa.slice(0, 5);
   const cobrar = podeTela('bdPend')
     ? `<button type="button" class="jor-cartao alerta jor-cartao--botao" data-ir-fer="bdPend" title="Abrir as pendências dos Boletins diários"><b>${r.cobrar}</b><span>A COBRAR DO CAMPO</span></button>`
     : cartao(r.cobrar, 'A COBRAR DO CAMPO', 'alerta');
-  return `<div class="jor-rec-cab"><h3 class="jor-h3">${geral ? 'Boletins · todos os meses' : 'Boletins do mês'}</h3>${seletor}</div>
+  return `<div class="jor-rec-cab"><h3 class="jor-h3">${titulo}</h3>${seletor}</div>
     <div class="jor-cartoes">
       ${cartao(r.recebidos, 'RECEBIDOS')}
       ${cartao(r.lancados, 'LANÇADOS', 'ok')}

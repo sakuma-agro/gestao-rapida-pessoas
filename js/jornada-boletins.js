@@ -1091,7 +1091,8 @@ export function resumoPainel() {
    jornada; pendente = recebido sem lançamento; a cobrar = não entregou ou
    em correção no mês. Os dados já vêm recortados pelo DP do login. */
 export function recebidosDoMes(ini, fim, fonte = jd.dados) {
-  const noMes = d => d >= ini && d <= fim;
+  // ini pode ser uma função (vários meses escolhidos no painel, 23/10/2026).
+  const noMes = typeof ini === 'function' ? ini : d => d >= ini && d <= fim;
   const lanc = new Set((fonte.bolJornada || [])
     .filter(b => b.situacao !== 'cancelado' && noMes(b.data_fato) && jd.noMeuDp(b.funcionario_id))
     .map(b => b.funcionario_id + '|' + b.data_fato));
