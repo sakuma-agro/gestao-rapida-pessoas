@@ -1223,6 +1223,7 @@ function desenharPendencias() {
         <select id="qcPendData"><option value="hoje"${dataEfetivar === 'hoje' ? ' selected' : ''}>Hoje</option>
           <option value="original"${dataEfetivar === 'original' ? ' selected' : ''}>A data do pedido</option></select></label>
       <button class="btn principal" type="button" id="qcPendTudo"${prontas ? '' : ' disabled'}>Efetivar tudo o que tem saldo (${prontas})</button>
+      <button class="btn" type="button" id="qcPendRel"${lista.length ? '' : ' disabled'}>Emitir relatório</button>
     </div>
     <div class="lista">${lista.map(m => {
       const i = itemDe(m.item_id);
@@ -1239,6 +1240,8 @@ function desenharPendencias() {
     }).join('') || '<div class="vazio">Nenhuma saída pendente.</div>'}</div>
   </div>`;
   $('qcPendData').addEventListener('change', e => { dataEfetivar = e.target.value; });
+  $('qcPendFolha').innerHTML = '';
+  $('qcPendRel').addEventListener('click', () => { montarFolhaPend(lista, sd, podeSair); setTimeout(() => window.print(), 50); });
   const efetivar = async (m, q) => {
     const total = Number(m.quantidade) || 0;
     const data = dataEfetivar === 'original' ? (m.pendente_desde || m.data) : hojeISO();
@@ -1274,6 +1277,35 @@ function desenharPendencias() {
     await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
     desenharPendencias();
   }));
+}
+
+/* Relatório das pendências (pedido dele, 23/10/2026) — para mandar ao
+   responsável: o que foi pedido, o que saiu, o que falta e o saldo de hoje. */
+function montarFolhaPend(lista, sd, podeSair) {
+  const saiu = m => movimentos().filter(x => x.sentido === 'saida' && x.item_id === m.item_id
+    && (m.lancamento_id ? x.lancamento_id === m.lancamento_id : x.documento === m.documento && x.data === m.data))
+    .reduce((t, x) => t + (Number(x.quantidade) || 0), 0);
+  const linhas = lista.map(m => {
+    const i = itemDe(m.item_id), u = i.unidade || '';
+    const s = Math.round(saiu(m) * 1000) / 1000, p = Number(m.quantidade) || 0;
+    const pode = podeSair.get(m.id) || 0;
+    return `<tr><td class="ce">${esc(dataBR(m.pendente_desde || m.data))}</td><td class="ce">${esc(m.documento || '')}</td><td>${esc(i.nome)}</td>
+      <td class="ce">${esc(mostrarNumero(Math.round((s + p) * 1000) / 1000))} ${esc(u)}</td><td class="ce">${esc(mostrarNumero(s))} ${esc(u)}</td>
+      <td class="ce"><b>${esc(mostrarNumero(p))} ${esc(u)}</b></td><td class="ce">${esc(mostrarNumero(sd.get(m.item_id) || 0))} ${esc(u)}</td>
+      <td>${esc([m.plantio, m.equipamento, m.funcionario, m.operador].filter(Boolean).join(' · '))}</td>
+      <td class="ce">${pode > 0 ? (pode < p ? 'Dá para sair ' + esc(mostrarNumero(pode)) : 'Dá para efetivar') : 'Aguardando entrada'}</td></tr>`;
+  });
+  $('qcPendFolha').innerHTML = `<div class="folha rel">
+    <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit"><h1>Saídas Pendentes — Faz. Quebra Cocão</h1>
+        <p>${lista.length} pendência(s) · saídas pedidas sem estoque suficiente · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
+    <p style="font-size:9pt;color:#51534A;margin:5mm 0 3mm">O que havia no estoque já saiu; a quantidade pendente aguarda entrada do produto (compra, transferência ou ajuste de balanço) para ser efetivada.</p>
+    <table class="rel-tab rel-mov"><thead><tr><th class="ce">Pedido em</th><th class="ce">Doc.</th><th>Produto</th><th class="ce">Pedido</th>
+      <th class="ce">Saiu</th><th class="ce">Pendente</th><th class="ce">Saldo hoje</th><th>Plantio / destino · Operador</th><th class="ce">Situação</th></tr></thead>
+    <tbody>${linhas.join('')}</tbody></table>
+    <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
+      <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+  </div>`;
 }
 
 /* ===================================================================
