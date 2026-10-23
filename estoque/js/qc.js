@@ -1295,7 +1295,7 @@ function montarFolhaPend(lista, sd, podeSair) {
       <td>${esc([m.plantio, m.equipamento, m.funcionario, m.operador].filter(Boolean).join(' · '))}</td>
       <td class="ce">${pode > 0 ? (pode < p ? 'Dá para sair ' + esc(mostrarNumero(pode)) : 'Dá para efetivar') : 'Aguardando entrada'}</td></tr>`;
   });
-  $('qcPendFolha').innerHTML = `<div class="folha rel">
+  $('qcPendFolha').innerHTML = `<div class="folha rel qc-folha-pais">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Saídas Pendentes — Faz. Quebra Cocão</h1>
         <p>${lista.length} pendência(s) · saídas pedidas sem estoque suficiente · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
