@@ -226,7 +226,7 @@ function abrirAba(nome) {
   if (nome.startsWith('fer')) abrirFerias(nome);
   if (nome.startsWith('bd')) abrirBoletins(nome);
   if (nome.startsWith('dm')) abrirDocumentos(nome);
-  // DP › Admissão e demissão (23/10/2026) — js/dp-tarefas.js
+  // Cadastros › Admissão e demissão (23/10/2026) — js/dp-tarefas.js
   for (const t of TELAS_TAREFAS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_TAREFAS.includes(nome)) abrirTarefas(nome);
   if (nome.startsWith('tk')) abrirTicket(nome);
@@ -1049,7 +1049,7 @@ function opcoesFuncao(sel) {
 async function tarefasDoMovimento(f, evento, data) {
   try {
     const n = await gerarTarefas(f, evento, data);
-    if (n) mostrarAviso(`${n} tarefa(s) de ${evento === 'admissao' ? 'admissão' : 'demissão'} criada(s) — DP › Admissão e demissão.`);
+    if (n) mostrarAviso(`${n} tarefa(s) de ${evento === 'admissao' ? 'admissão' : 'demissão'} criada(s) — Cadastros › Admissão e demissão.`);
   } catch (e) { console.warn('tarefas de admissão/demissão', e); }
 }
 
@@ -2075,7 +2075,7 @@ ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);
 ligar('atividades do sst', ligarAtividades);
 ligar('brigada e socorros', () => ligarBrigada({ abrir: irParaTela }));
-/* DP › Admissão e demissão (23/10/2026): o botão "Abrir ›" de cada tarefa
+/* Cadastros › Admissão e demissão (23/10/2026): o botão "Abrir ›" de cada tarefa
    leva à tela que resolve, já com a pessoa escolhida quando dá. */
 const depois = (fn, tentativas = 20) => setTimeout(() => { if (!fn() && tentativas > 0) depois(fn, tentativas - 1); }, 250);
 function acaoDaTarefa(acao, fid) {

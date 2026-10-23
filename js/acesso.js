@@ -30,6 +30,14 @@ export const MODULOS = [
       ['funcionarios', 'Cadastro'],
       ['aniversarios', 'Aniversariantes'],
     ] },
+    /* Admissão e demissão (23/10/2026): tarefas que nascem ao cadastrar e ao
+       desligar um funcionário — js/dp-tarefas.js, tabelas jor_tarefa_modelos
+       e jor_tarefas. Quem tem o Painel marca qualquer tarefa. Mora em
+       Cadastros (pedido dele no mesmo dia; saiu do DP). */
+    { id: 'tarefas', nome: 'Admissão e demissão', telas: [
+      ['tfPainel', 'Painel'],
+      ['tfModelos', 'Listas modelo'],
+    ] },
     /* Folha de ponto (28/09/2026): imprime empregador, nome, mês e ano na
        folha de ponto que vem da gráfica. Ele pediu aqui em Cadastros. */
     { id: 'folhaPonto', nome: 'Folha de ponto', telas: [
@@ -151,13 +159,6 @@ export const MODULOS = [
   { id: 'jornada', nome: 'DP', subs: [
     { id: 'dpPainel', nome: 'Painel', telas: [
       ['jorPainel',       'Painel'],
-    ] },
-    /* Admissão e demissão (23/10/2026): tarefas que nascem ao cadastrar e ao
-       desligar um funcionário — js/dp-tarefas.js, tabelas jor_tarefa_modelos
-       e jor_tarefas. Quem tem o Painel marca qualquer tarefa. */
-    { id: 'tarefas', nome: 'Admissão e demissão', telas: [
-      ['tfPainel',        'Painel'],
-      ['tfModelos',       'Listas modelo'],
     ] },
     { id: 'gestaoJornada', nome: 'Gestão de jornada', telas: [
       ['jorLancar',       'Lançar jornada'],

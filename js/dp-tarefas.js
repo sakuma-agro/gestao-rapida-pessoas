@@ -1,11 +1,13 @@
-// dp-tarefas.js — DP › Admissão e demissão (23/10/2026, pedido dele)
+// dp-tarefas.js — Cadastros › Admissão e demissão (23/10/2026, pedido dele)
 //
 // "Cadastrei um funcionário, ele gera tarefas de admissão: imprimir termo
 // sindicato, imprimir ficha de EPI e outros. Demissão: escanear fichas de EPI,
 // arquivar tudo do funcionário, entre outros."
 //
 // Decisões dele (23/10/2026):
-//  · fica no DP, submódulo "Admissão e demissão" (telas Painel e Listas modelo);
+//  · fica em Cadastros, submódulo "Admissão e demissão" (telas Painel e Listas modelo) —
+//    começou no DP e foi para Cadastros a pedido dele no mesmo dia (gr-v358);
+//    o resumo continua também no Painel do DP;
 //  · quem tem a tela Painel marca qualquer tarefa;
 //  · tudo manual — o app NÃO marca sozinho (nem com ASO lançado, EPI entregue…);
 //  · só daqui para frente: as tarefas nascem para admissões e desligamentos
