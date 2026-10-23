@@ -1740,3 +1740,19 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
   .tf-tab td:first-child{flex:1 1 100%}
   .tf-tab .tf-bt{margin-left:auto;text-align:right}
 }
+
+/* Cadastros › Impressos › Contrato de trabalho (23/10/2026) — várias folhas A4,
+   Arial 10 pt como no .docx dele. Paginação medida em js/contrato-trabalho.js. */
+.ct-previa{flex-direction:column;gap:8mm}
+.ct-folha{padding:14mm 18mm 10mm}
+.ct-folha .an-tit h1{font-size:13pt;line-height:1.2}
+.ct-topo img{height:18mm}
+.ct-cab{display:flex;justify-content:space-between;font-size:8.5pt;color:#7d8175;border-bottom:.3mm solid #dfe2d8;padding-bottom:2mm}
+.ct-corpo{margin-top:5mm;font-size:10pt;line-height:1.35;color:#51534A}
+.ct-p{margin:0 0 2.4mm;text-align:justify}
+.ct-p b{color:#3f413a}
+.ct-ass{margin-top:4mm;break-inside:avoid}
+.ct-assin{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:10mm}
+.ct-assin div{display:flex;flex-direction:column;align-items:center;text-align:center;font-size:9.5pt}
+.ct-assin b{margin-top:1mm}
+.ct-assin small{color:#7d8175;font-size:8.5pt}

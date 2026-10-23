@@ -413,6 +413,77 @@ addEventListener('beforeinstallprompt', function (ev) {
     </section>
 
     <!-- ---- TERMO DE RECEBIMENTO DO CONTRATO ---- -->
+    <!-- Cadastros › Impressos › Contrato de trabalho (23/10/2026) — js/contrato-trabalho.js -->
+    <section class="tela" id="telaContratoTrab" hidden>
+      <div class="cartao naoimprimir">
+        <h2>Contrato de trabalho</h2>
+        <p class="dica">Os dados vêm do cadastro e do RH. O que faltar sai com a linha em branco para preencher à mão — dá para completar aqui antes de imprimir.</p>
+        <div class="grade larga">
+          <label class="campo plena">Funcionário
+            <select id="ctFunc"></select>
+          </label>
+          <label class="campo">Data da contratação
+            <input type="date" id="ctAdmissao">
+          </label>
+          <label class="campo">Salário (R$)
+            <input type="text" id="ctSalario" inputmode="decimal" placeholder="em branco = linha para escrever">
+          </label>
+          <label class="campo">CBO da função <span class="dc-sem">(fica guardado por função)</span>
+            <input type="text" id="ctCbo" placeholder="ex.: 641015">
+          </label>
+          <label class="campo">Série da CTPS
+            <input type="text" id="ctSerie">
+          </label>
+          <label class="campo">Data da assinatura <span class="dc-sem">(opcional)</span>
+            <input type="date" id="ctDataAss">
+          </label>
+        </div>
+        <div class="aviso info" id="ctAviso" hidden></div>
+      </div>
+
+      <details class="cartao naoimprimir fu-bloco">
+        <summary>Texto do contrato</summary>
+        <form id="formContrato">
+          <p class="dica">Cada linha é um parágrafo. <code>**texto**</code> sai em negrito. Entre chaves, trocados pelo dado da pessoa:
+            <code>{NOME}</code> <code>{CPF}</code> <code>{CTPS}</code> <code>{SERIE}</code> <code>{ENDERECO}</code> <code>{ADMISSAO}</code>
+            <code>{FUNCAO}</code> <code>{CBO}</code> <code>{SALARIO}</code> <code>{SALARIO_EXTENSO}</code> <code>{EMPREGADOR}</code>
+            <code>{CEI}</code> <code>{SEDE}</code> <code>{REPRESENTANTE}</code> <code>{REPRESENTANTE_CPF}</code> <code>{FAZENDA}</code>.</p>
+          <div class="grade larga">
+            <label class="campo plena">Título
+              <input type="text" id="ctTitulo">
+            </label>
+            <label class="campo plena">Texto
+              <textarea id="ctCorpo" rows="16"></textarea>
+            </label>
+            <label class="campo">Local da assinatura
+              <input type="text" id="ctLocal">
+            </label>
+            <label class="campo">Representante do empregador <span class="dc-sem">(em branco = o próprio empregador)</span>
+              <input type="text" id="ctRepresentante">
+            </label>
+            <label class="campo">CPF do representante <span class="dc-sem">(em branco = CPF do empregador)</span>
+              <input type="text" id="ctRepresentanteCpf">
+            </label>
+          </div>
+          <div class="barra">
+            <button class="btn principal" type="submit">Salvar texto</button>
+            <button class="btn" type="button" id="bRestaurarContrato">Restaurar original</button>
+          </div>
+        </form>
+      </details>
+
+      <div class="previa ct-previa" id="ctSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirContrato">Imprimir contrato</button>
+        <span class="cresce"></span>
+        <span class="zoom">Zoom
+          <input type="range" id="zoomCt" min="50" max="150" value="80" step="5">
+          <span id="zoomCtV">80%</span>
+        </span>
+      </div>
+    </section>
+
     <section class="tela" id="telaTermoContrato" hidden>
       <div class="cartao naoimprimir">
         <h2>Recebimento da segunda via do contrato</h2>

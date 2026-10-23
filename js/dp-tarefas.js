@@ -54,6 +54,7 @@ export const ACOES = {
   fichaCadastral: 'Ficha cadastral',
   fichaEpi:       'Ficha de EPI',
   termoSindical:  'Termo de liberdade sindical',
+  contratoTrab:   'Contrato de trabalho',
   termoContrato:  'Recebimento do contrato',
   exames:         'Exames (relatório por funcionário)',
   treinamentos:   'Treinamentos por função',

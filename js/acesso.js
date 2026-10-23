@@ -43,9 +43,13 @@ export const MODULOS = [
     { id: 'folhaPonto', nome: 'Folha de ponto', telas: [
       ['folhaPonto', 'Folha de ponto'],
     ] },
-    { id: 'certificacao', nome: 'Certificação', telas: [
+    /* "Impressos" (23/10/2026): era "Certificação" — ele renomeou e pediu o
+       contrato de trabalho aqui. O id do submódulo (certificacao) não mudou,
+       para não mexer nas permissões já gravadas. */
+    { id: 'certificacao', nome: 'Impressos', telas: [
       ['lista', 'Lista de presença'],
       ['termoSindical', 'Termo de liberdade sindical'],
+      ['contratoTrab', 'Contrato de trabalho'],
       ['termoContrato', 'Recebimento do contrato'],
     ] },
     /* Quadro de pessoal (29/09/2026): saiu de RH › Relatórios a pedido dele — é

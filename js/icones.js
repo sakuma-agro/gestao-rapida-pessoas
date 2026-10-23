@@ -54,7 +54,7 @@ export const ICONES = {
 /** Ícone de cada tela da faixa do menu. Tela sem ícone aqui usa o do módulo. */
 export const ICONE_TELA = {
   funcionarios: 'pessoa', aniversarios: 'bolo', folhaPonto: 'calendario',
-  lista: 'check', termoSindical: 'documento', termoContrato: 'documento',
+  lista: 'check', termoSindical: 'documento', termoContrato: 'documento', contratoTrab: 'documento',
   cadRelatorios: 'grafico', rhQuadro: 'pizza', cadFerias: 'sol', etqArmarios: 'armario', cadFuncoes: 'cargo', cadEstrutura: 'predio',
   fichas: 'escudo', epis: 'lista', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exRel: 'ficha', exFuncoes: 'cargo', exTipos: 'ajuste',

@@ -31,6 +31,7 @@ import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-f
 import { ligarConsolidado, abrirConsolidado } from './treino-consolidado.js';
 import { ligarAtividades, abrirAtividades, desenharAtvFuncionario } from './sst-atividades.js';
 import { ligarTermos, abrirTermos } from './termos.js';
+import { abrirContrato, ligarContrato, contratoDe } from './contrato-trabalho.js';
 import { estadoCa, caReprovado, linkCa, dataBr as dataBrCa, conferirCas } from './ca.js';
 import { ligarRh, abrirRh, limparRh } from './rh.js';
 import * as jd from './jornada-dados.js';
@@ -123,6 +124,8 @@ function abrirAba(nome) {
   $('telaLista').hidden = nome !== 'lista';
   $('telaTermoSindical').hidden = nome !== 'termoSindical';
   $('telaTermoContrato').hidden = nome !== 'termoContrato';
+  $('telaContratoTrab').hidden = nome !== 'contratoTrab';
+  if (nome === 'contratoTrab') abrirContrato();
   $('telaFuncionarios').hidden = nome !== 'funcionarios';
   $('telaAniversarios').hidden = nome !== 'aniversarios';
   $('telaCadFuncoes').hidden = nome !== 'cadFuncoes';
@@ -2086,6 +2089,7 @@ function acaoDaTarefa(acao, fid) {
     s.value = fid; s.dispatchEvent(new Event('change')); return true; }); };
   if (acao === 'termoSindical') return escolher('tmSinFunc', 'termoSindical');
   if (acao === 'termoContrato') return escolher('tmConFunc', 'termoContrato');
+  if (acao === 'contratoTrab') { irParaTela('contratoTrab'); contratoDe(fid); return; }
   if (acao === 'fichaEpi') { marcados.clear(); marcados.add(fid); irParaTela('fichas'); desenharSelecao(); return; }
   if (acao === 'fichaCadastral') { irParaTela('funcionarios'); verFichaCadastral(f); return; }
   if (acao === 'exames') { irParaTela('exRel'); depois(() => { const b = $('erBusca'); if (!b) return false;
@@ -2097,6 +2101,7 @@ function acaoDaTarefa(acao, fid) {
 }
 ligar('admissão e demissão', () => ligarTarefas({ abrir: irParaTela, acao: acaoDaTarefa, aviso: mostrarAviso }));
 ligar('termos', () => ligarTermos(mostrarAviso));
+ligar('contrato de trabalho', () => ligarContrato(mostrarAviso));
 ligar('backup', () => ligarBackup(mostrarAviso));
 ligar('acesso rápido', () => ligarAtalhos(abrirModulo, mostrarAviso));
 

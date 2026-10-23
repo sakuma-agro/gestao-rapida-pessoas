@@ -62,6 +62,7 @@ const PROPRIOS = {
   lista:         ['lista', 'Lista de presença'],
   termoSindical: ['documento', 'Termo sindical'],
   termoContrato: ['documento', 'Recebimento do contrato'],
+  contratoTrab:  ['documento', 'Contrato de trabalho'],
   cadFuncoes:    ['cargo', 'Funções e setores'],
   exFuncoes:     ['exame', 'Exames por função'],
   exRel:         ['exame', 'Exames por funcionário'],
