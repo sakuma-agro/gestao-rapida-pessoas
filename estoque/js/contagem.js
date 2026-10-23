@@ -92,7 +92,8 @@ function itensDaContagem(localId, mes, c) {
   return { itens: todosItens.filter(i => tem(i.id) || naContagem.has(i.id)), criterio, total: todosItens.length, reg };
 }
 const gruposDaContagem = (localId, mes, c) => [...new Set(itensDaContagem(localId, mes, c).itens.map(grupoDe))];
-const cgDe = (c, g) => c ? (todos('est_contagem_grupos').filter(x => x.id === idGrupoC(c.id, g)).pop() || null) : null;
+/* tipo excluído (ativo false, 23/10/2026) conta como não começado */
+const cgDe = (c, g) => { if (!c) return null; const x = todos('est_contagem_grupos').filter(y => y.id === idGrupoC(c.id, g)).pop(); return x && x.ativo !== false ? x : null; };
 function grupoFechado(c, g) {
   if (!c) return false;
   const cg = cgDe(c, g);
@@ -343,6 +344,7 @@ function desenharContar() {
       ${fechada
         ? (souAdmin() ? `<button class="btn" type="button" id="ctReabrir">Reabrir ${esc(sel.grupo)}</button>` : '')
         : `<button class="btn principal" type="button" id="ctFechar">Fechar ${esc(sel.grupo)}</button>`}
+      ${souAdmin() && tipo.comecado ? `<button class="btn ct-excluir" type="button" id="ctExcluir">Excluir contagem de ${esc(sel.grupo)}</button>` : ''}
       </span>
     </div>
   </div>`;
@@ -363,6 +365,7 @@ function desenharContar() {
   });
   $('ctFechar')?.addEventListener('click', confirmarFechar);
   $('ctReabrir')?.addEventListener('click', reabrir);
+  $('ctExcluir')?.addEventListener('click', excluirTipo);
   $('ctData')?.addEventListener('change', salvarData);
   $('ctImprimirLista')?.addEventListener('click', escolherImpressao);
   $('ctAddItem')?.addEventListener('click', escolherItemNovo);
@@ -959,6 +962,59 @@ function confirmarFechar() {
         console.error(e);
         aviso('Não consegui fechar (' + (e.message || e) + ').', true);
         corpo.querySelector('#ctConfirmar').disabled = false;
+      }
+    };
+  });
+}
+
+/* Excluir a contagem de um tipo (pedido dele, 23/10/2026): só administrador.
+   Apaga os números, lotes e quadras dos itens desse tipo nesta contagem e
+   volta o tipo para "não começado". Se a contagem do mês estava fechada, ela
+   reabre (sai do Acerto até fechar de novo). Os outros tipos não mudam. */
+function excluirTipo() {
+  const c = atual();
+  if (!c || !souAdmin()) return;
+  const g = sel.grupo;
+  const ids = new Set(itensDoLocal(sel.localId).filter(i => grupoDe(i) === g).map(i => i.id));
+  const linhas = linhasDe(c.id).filter(l => ids.has(l.item_id) && temQtd(l));
+  const local = locais().find(l => l.id === sel.localId);
+  window.abrirModal('Excluir contagem de ' + g, `
+    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}${esc(sufixoRodada(c))}</strong> · <strong>${esc(g)}</strong></p>
+    <p>Vai apagar <strong>${linhas.length}</strong> ${linhas.length === 1 ? 'quantidade contada' : 'quantidades contadas'} de ${esc(g)}, com lotes e quadras, e ${esc(g)} volta a ficar <strong>não começado</strong>. Os outros tipos continuam como estão.</p>
+    ${c.status === 'fechada' ? '<p class="dc-sem">A contagem do mês estava fechada: ela reabre e sai do Acerto até fechar de novo.</p>' : ''}
+    <p class="dc-sem">Não dá para desfazer.</p>
+    <div class="barra fim">
+      <button class="btn" type="button" id="exVoltar">Voltar</button>
+      <button class="btn principal ct-excluir" type="button" id="exOk">Excluir</button>
+    </div>`, corpo => {
+    corpo.querySelector('#exVoltar').onclick = window.fecharModal;
+    corpo.querySelector('#exOk').onclick = async ev => {
+      ev.target.disabled = true;
+      try {
+        for (const l of linhas) await gravar('est_contagem_itens', Object.assign({}, l, { quantidade: null, contado_por: meuNome() }));
+        for (const l of todos('est_contagem_lotes').filter(x => x.contagem_id === c.id && ids.has(x.item_id) && x.ativo !== false))
+          await gravar('est_contagem_lotes', Object.assign({}, l, { ativo: false }));
+        for (const q of todos('est_contagem_quadras').filter(x => x.contagem_id === c.id && ids.has(x.item_id) && x.ativo !== false))
+          await gravar('est_contagem_quadras', Object.assign({}, q, { ativo: false }));
+        // contagem fechada de antes dos tipos: os outros tipos continuam fechados
+        if (c.status === 'fechada') {
+          for (const o of gruposDaContagem(sel.localId, sel.mes, c)) {
+            if (o !== g && !cgDe(c, o)) await gravar('est_contagem_grupos', { id: idGrupoC(c.id, o), contagem_id: c.id, grupo: o, status: 'fechada',
+              data_contagem: c.data_contagem || null, fechada_por: c.fechada_por || null, fechada_em: c.fechada_em || null, ativo: true });
+          }
+        }
+        const cg = todos('est_contagem_grupos').filter(x => x.id === idGrupoC(c.id, g)).pop();
+        await gravar('est_contagem_grupos', Object.assign({ id: idGrupoC(c.id, g), contagem_id: c.id, grupo: g }, cg || {},
+          { status: 'aberta', fechada_por: null, fechada_em: null, responsavel: null, data_contagem: null, ativo: false }));
+        if (c.status === 'fechada') await gravar('est_contagens', Object.assign({}, c, { status: 'aberta', fechada_por: null, fechada_em: null }));
+        abertos.clear();
+        window.fecharModal();
+        aviso(`Contagem de ${g} excluída.`);
+        desenharContar();
+      } catch (e) {
+        console.error(e);
+        aviso('Não consegui excluir (' + (e.message || e) + ').', true);
+        ev.target.disabled = false;
       }
     };
   });

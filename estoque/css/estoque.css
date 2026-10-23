@@ -456,3 +456,5 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ai-item{width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--linha);cursor:pointer;font:inherit;color:inherit}
 .ai-item:hover{background:var(--tagA-bg)}
 .ai-novo{margin-top:10px}
+.ct-excluir{border-color:#c0392b !important;color:#a5342a !important}
+.btn.principal.ct-excluir{background:#c0392b !important;color:#fff !important}
