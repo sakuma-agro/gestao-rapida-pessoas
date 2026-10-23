@@ -98,7 +98,7 @@ function dadosDoApp(mes) {
     const dep = arrumarNome(l.nome);
     // última contagem fechada até o mês do acerto
     const c = appDados('est_contagens').filter(x => x.local_id === l.id && x.status === 'fechada' && x.mes <= mes)
-      .sort((a, b) => b.mes.localeCompare(a.mes))[0];
+      .sort((a, b) => b.mes.localeCompare(a.mes) || rodadaC(b) - rodadaC(a))[0];
     fisicos.push({ local: dep, mes: c ? c.mes : null });
     if (c) for (const ln of appDados('est_contagem_itens')) {
       if (ln.contagem_id !== c.id || ln.quantidade === null || ln.quantidade === undefined) continue;
@@ -148,13 +148,23 @@ const chaveProduto = s => semAcento(s).replace(/\s+/g, ' ').trim();
    almoxarifado por almoxarifado, ligadas ao depósito pelo nome. */
 const chaveDep = s => semAcento(arrumarNome(s));
 const appDados = t => (window.App && window.App.dados && window.App.dados[t]) || [];
+/* 2ª contagem no mesmo mês (23/10/2026): vale a última fechada do mês. */
+const rodadaC = c => Number(c && c.rodada) || Number((String(c && c.id).match(/#(\d+)$/) || [])[1]) || 1;
+function ultimasFechadas(mes) {
+  const m = new Map();
+  for (const c of appDados('est_contagens')) {
+    if (c.status !== 'fechada' || (mes && c.mes !== mes)) continue;
+    const k = c.local_id + '|' + c.mes, a = m.get(k);
+    if (!a || rodadaC(c) > rodadaC(a)) m.set(k, c);
+  }
+  return [...m.values()];
+}
 
 /** Meses com contagem fechada no app, do mais novo para o mais velho. */
 export function mesesContados() {
   const locaisAtivos = appDados('est_locais').filter(l => l.ativo !== false).length;
   const porMes = new Map();
-  for (const c of appDados('est_contagens')) {
-    if (c.status !== 'fechada') continue;
+  for (const c of ultimasFechadas()) {
     porMes.set(c.mes, (porMes.get(c.mes) || 0) + 1);
   }
   return [...porMes.entries()].sort((a, b) => b[0].localeCompare(a[0]))
@@ -171,8 +181,7 @@ function fisicoDoApp(mes) {
   const itens = new Map(appDados('est_itens').map(i => [i.id, i]));
   const linhas = appDados('est_contagem_itens');
   const res = new Map();
-  for (const c of appDados('est_contagens')) {
-    if (c.mes !== mes || c.status !== 'fechada') continue;
+  for (const c of ultimasFechadas(mes)) {
     const local = locais.get(c.local_id);
     if (!local) continue;
     const d = { nome: arrumarNome(local.nome), itens: [] };

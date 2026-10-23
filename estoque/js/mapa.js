@@ -9,6 +9,7 @@
 import {
   $, esc, pronto, todos, aviso, souAdmin, gravar, locais as todosLocais, podeLocal, mesAtual, nomeMes, contagem,
   mapaDoLocal, quadrasDe, capacidadeQuadra, pesoBag, mostrarNumero, lerNumero, dataHora,
+  maisNova,
 } from './dados.js';
 /* Só os estoques liberados para esta pessoa (22/10/2026). */
 const locais = () => todosLocais().filter(l => podeLocal(l.id));
@@ -33,7 +34,7 @@ function contagemDoMapa(localId, mes) {
   if (c && quadrasDe(c.id).length) return { c, outra: false };
   const anteriores = todos('est_contagens')
     .filter(x => x.local_id === localId && x.mes <= mes && quadrasDe(x.id).length)
-    .sort((a, b) => b.mes.localeCompare(a.mes));
+    .sort(maisNova);
   if (anteriores[0]) return { c: anteriores[0], outra: anteriores[0].mes !== mes };
   return { c, outra: false };
 }

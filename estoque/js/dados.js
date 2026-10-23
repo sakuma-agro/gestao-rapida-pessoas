@@ -59,11 +59,30 @@ export const nomeMes = m => {
 };
 
 /* ---- chaves: as mesmas em qualquer aparelho, para nunca duplicar ---- */
-export const idContagem = (localId, mes) => localId + ':' + mes;
+/* Mais de uma contagem no mesmo mês (pedido dele, 23/10/2026): a 1ª segue com
+   o id de sempre (local:AAAA-MM); a 2ª em diante ganha "#n" no fim e a coluna
+   est_contagens.rodada. Sem rodada pedida, vale a mais recente do mês. */
+export const idContagem = (localId, mes, rodada) => localId + ':' + mes + (Number(rodada) > 1 ? '#' + Number(rodada) : '');
 export const idLinha = (contagemId, itemId) => contagemId + ':' + itemId;
-
-export const contagem = (localId, mes) =>
-  todos('est_contagens').find(c => c.id === idContagem(localId, mes)) || null;
+export const rodadaDe = c => {
+  if (!c) return 1;
+  const n = Number(c.rodada);
+  if (n > 0) return n;
+  const m = String(c.id || '').match(/#(\d+)$/);
+  return m ? Number(m[1]) : 1;
+};
+export const nomeRodada = n => Number(n || 1) + 'ª contagem';
+/** Contagens de um estoque no mês, da 1ª à última (uma por id). */
+export const contagensDoMes = (localId, mes) => [...new Map(todos('est_contagens')
+  .filter(c => c.local_id === localId && c.mes === mes).map(c => [c.id, c])).values()]
+  .sort((a, b) => rodadaDe(a) - rodadaDe(b));
+export const contagem = (localId, mes, rodada) => {
+  const l = contagensDoMes(localId, mes);
+  if (rodada) return l.find(c => rodadaDe(c) === Number(rodada)) || null;
+  return l[l.length - 1] || null;
+};
+/** Ordena contagens da mais nova (mês, depois rodada) para a mais velha. */
+export const maisNova = (a, b) => b.mes.localeCompare(a.mes) || rodadaDe(b) - rodadaDe(a);
 export const linhasDe = contagemId =>
   todos('est_contagem_itens').filter(l => l.contagem_id === contagemId);
 

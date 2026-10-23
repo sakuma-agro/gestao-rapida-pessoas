@@ -8,6 +8,7 @@
 import {
   $, esc, pronto, todos, aviso, souAdmin, meuNome, locais as todosLocais, podeLocal, itensOrdenados, itensDoLocal,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
+  contagensDoMes, rodadaDe, nomeRodada,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
   temMinimo, precisaRepor as precisaReporGeral, textoPedido, comMinimoDo,
   mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
@@ -35,7 +36,21 @@ const textoData = c => c && c.data_contagem ? 'contada em ' + dataBR(c.data_cont
 /* O que está escolhido na tela Contar. */
 const CHAVE_LOCAL = 'estoque.contarLocal';
 const CHAVE_GRUPO = 'estoque.contarGrupo';
-const sel = { localId: null, mes: mesAtual(), grupo: null };
+const sel = { localId: null, mes: mesAtual(), grupo: null, rodada: null };
+
+/* Mais de uma contagem no mesmo mês (pedido dele, 23/10/2026): sel.rodada
+   escolhe qual (1ª, 2ª…); vazio = a mais recente do mês. Uma nova só começa
+   depois que a anterior do mês fechou; o Acerto usa a última fechada. */
+const atual = () => contagem(sel.localId, sel.mes, sel.rodada);
+/** A contagem de antes desta: a rodada anterior do mês ou a última do mês passado. */
+function anterior() {
+  const c = atual();
+  const r = c ? rodadaDe(c) : 1;
+  if (r > 1) return contagem(sel.localId, sel.mes, r - 1);
+  return contagem(sel.localId, mesAnterior(sel.mes));
+}
+const rotuloAnterior = ant => ant.mes === sel.mes ? nomeRodada(rodadaDe(ant)) : nomeMes(ant.mes);
+const sufixoRodada = c => c && (rodadaDe(c) > 1 || contagensDoMes(c.local_id, c.mes).length > 1) ? ' · ' + nomeRodada(rodadaDe(c)) : '';
 try { sel.localId = localStorage.getItem(CHAVE_LOCAL); sel.grupo = localStorage.getItem(CHAVE_GRUPO); } catch { /* sem localStorage */ }
 
 /* Mínimo da fazenda escolhida na tela (22/10/2026). */
@@ -63,8 +78,8 @@ function progressoGrupo(c, localId, g) {
   return { feitos, total: itens.length };
 }
 /** Situação de cada tipo de um almoxarifado no mês. */
-function situacaoTipos(localId, mes) {
-  const c = contagem(localId, mes);
+function situacaoTipos(localId, mes, rodada) {
+  const c = contagem(localId, mes, rodada);
   return gruposDoLocal(localId).map(g => {
     const cg = cgDe(c, g);
     const p = progressoGrupo(c, localId, g);
@@ -121,7 +136,63 @@ function cabecalhoEscolha() {
       <label class="campo">Mês da contagem
         <input type="month" id="ctMes" value="${esc(sel.mes)}" max="${mesAtual()}"></label>
     </div>
+    ${blocoRodadas()}
   </div>`;
+}
+
+/* As contagens do mês (1ª, 2ª…) e o botão de começar outra. */
+function blocoRodadas() {
+  if (!sel.localId) return '';
+  const lista = contagensDoMes(sel.localId, sel.mes);
+  const ultima = lista[lista.length - 1];
+  const vista = atual();
+  const chips = lista.length > 1 ? `<div class="ct-chips ct-rodadas" role="tablist">${lista.map(c => `<button type="button" role="tab"
+    class="ct-chip${c.status === 'fechada' ? ' completo' : ''}" data-rodada="${rodadaDe(c)}" aria-pressed="${vista && vista.id === c.id}">${c.status === 'fechada' ? '✓ ' : ''}${esc(nomeRodada(rodadaDe(c)))}
+    <small>${c.status === 'fechada' ? (c.data_contagem ? esc(dataBR(c.data_contagem).slice(0, 5)) : 'fechada') : 'em andamento'}</small></button>`).join('')}</div>` : '';
+  const pode = ultima && ultima.status === 'fechada';
+  const dica = !ultima ? '' : pode
+    ? `A ${esc(nomeRodada(rodadaDe(ultima)))} de ${esc(nomeMes(sel.mes))} está fechada. Precisa contar de novo? Comece outra — a última fechada é a que vale no Acerto.`
+    : lista.length > 1 || rodadaDe(ultima) > 1 ? '' : 'Para começar outra contagem neste mês, feche todos os tipos desta primeiro.';
+  return `${chips}<div class="barra entre ct-rodada-pe">
+    <span class="dc-sem">${dica}</span>
+    ${pode ? `<button class="btn" type="button" id="ctNovaRodada">+ Nova contagem em ${esc(nomeMes(sel.mes))}</button>` : ''}
+  </div>`;
+}
+
+function novaRodada() {
+  const lista = contagensDoMes(sel.localId, sel.mes);
+  const ultima = lista[lista.length - 1];
+  if (!ultima || ultima.status !== 'fechada') return;
+  const n = rodadaDe(ultima) + 1;
+  const local = locais().find(l => l.id === sel.localId);
+  window.abrirModal('Nova contagem no mês', `
+    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong> · <strong>${esc(nomeRodada(n))}</strong></p>
+    <p>Começa uma lista em branco para contar de novo. A ${esc(nomeRodada(rodadaDe(ultima)))} continua guardada no Histórico.</p>
+    <p class="dc-sem">Quando esta nova fechar, é ela que passa a valer no Acerto de ${esc(nomeMes(sel.mes))}.</p>
+    <div class="barra fim">
+      <button class="btn" type="button" id="ctNrVoltar">Voltar</button>
+      <button class="btn principal" type="button" id="ctNrOk">Começar a ${esc(nomeRodada(n))}</button>
+    </div>`, corpo => {
+    corpo.querySelector('#ctNrVoltar').onclick = window.fecharModal;
+    corpo.querySelector('#ctNrOk').onclick = async () => {
+      corpo.querySelector('#ctNrOk').disabled = true;
+      try {
+        await gravar('est_contagens', {
+          id: idContagem(sel.localId, sel.mes, n), local_id: sel.localId, mes: sel.mes, rodada: n,
+          status: 'aberta', responsavel: meuNome(), aberta_por: meuNome(), data_contagem: hojeLocal(),
+        });
+        sel.rodada = n;
+        abertos.clear();
+        window.fecharModal();
+        aviso(`${nomeRodada(n)} de ${nomeMes(sel.mes)} começada.`);
+        desenharContar();
+      } catch (e) {
+        console.error(e);
+        aviso('Não consegui começar a nova contagem (' + (e.message || e) + ').', true);
+        corpo.querySelector('#ctNrOk').disabled = false;
+      }
+    };
+  });
 }
 
 function desenharContar() {
@@ -151,8 +222,8 @@ function desenharContar() {
     return;
   }
 
-  const c = contagem(sel.localId, sel.mes);
-  const tipos = situacaoTipos(sel.localId, sel.mes);
+  const c = atual();
+  const tipos = situacaoTipos(sel.localId, sel.mes, sel.rodada);
   if (!tipos.some(t => t.g === sel.grupo)) sel.grupo = tipos[0].g;
   const tipo = tipos.find(t => t.g === sel.grupo);
   const cg = tipo.cg;
@@ -205,7 +276,7 @@ function desenharContar() {
   alvo.innerHTML = cabecalhoEscolha() + `
   <div class="cartao">
     <div class="ct-topo">
-      <div><h2>${esc(local ? local.nome : '')} · ${esc(nomeMes(sel.mes))} · ${esc(sel.grupo)}</h2>
+      <div><h2>${esc(local ? local.nome : '')} · ${esc(nomeMes(sel.mes))}${esc(sufixoRodada(c))} · ${esc(sel.grupo)}</h2>
         <div class="ct-estado">${estado}</div>
         <label class="campo ct-data">Data da contagem
           <input type="date" id="ctData" value="${esc(dataTipo || hojeLocal())}" max="${hojeLocal()}"${fechada ? ' disabled' : ''}></label></div>
@@ -341,13 +412,17 @@ function filtrar() {
 
 function ligarEscolha() {
   $('ctLocal')?.addEventListener('change', e => {
-    sel.localId = e.target.value;
+    sel.localId = e.target.value; sel.rodada = null;
     try { localStorage.setItem(CHAVE_LOCAL, sel.localId); } catch { /* sem localStorage */ }
     desenharContar();
   });
   $('ctMes')?.addEventListener('change', e => {
-    if (/^\d{4}-\d{2}$/.test(e.target.value)) { sel.mes = e.target.value; desenharContar(); }
+    if (/^\d{4}-\d{2}$/.test(e.target.value)) { sel.mes = e.target.value; sel.rodada = null; desenharContar(); }
   });
+  $('ctNovaRodada')?.addEventListener('click', novaRodada);
+  document.querySelectorAll('.ct-rodadas [data-rodada]').forEach(b => b.addEventListener('click', () => {
+    sel.rodada = Number(b.dataset.rodada); abertos.clear(); desenharContar();
+  }));
 }
 
 /* ===================================================================
@@ -458,7 +533,7 @@ async function tirarLote(div) {
   div.remove();
   if (!salvo) return;
   await gravar('est_contagem_lotes', Object.assign({}, salvo, { ativo: false }));
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   if (c) await somarLotes(c, itemId);
 }
 
@@ -528,7 +603,7 @@ function linhaQuadra(q, fechada, contagemId) {
 }
 
 function desenharQuadras(item, c, quads, fechada) {
-  const ant = !fechada && !quads.length ? contagem(sel.localId, mesAnterior(sel.mes)) : null;
+  const ant = !fechada && !quads.length ? anterior() : null;
   const antQ = ant ? quadrasDe(ant.id, item.id).filter(q => Number(q.bags) > 0) : [];
   const totalBags = quads.reduce((t, q) => t + (Number(q.bags) || 0), 0);
   return `<div class="ct-quadras" data-item-q="${esc(item.id)}">
@@ -536,7 +611,7 @@ function desenharQuadras(item, c, quads, fechada) {
     ${quads.map(q => linhaQuadra(q, fechada, c && c.id)).join('') || (fechada ? '<p class="dc-sem">Sem quadra marcada.</p>' : '')}
     ${fechada ? '' : `<div class="ct-quadras-pe">
       <button type="button" class="btn mini" data-nova-quadra="${esc(item.id)}">+ Adicionar quadra</button>
-      ${antQ.length ? `<button type="button" class="btn mini" data-repetir="${esc(item.id)}">Repetir ${esc(nomeMes(ant.mes))}: ${esc(antQ.map(q => q.quadra + ' (' + mostrarNumero(q.bags) + ')').join(', '))}</button>` : ''}
+      ${antQ.length ? `<button type="button" class="btn mini" data-repetir="${esc(item.id)}">Repetir ${esc(rotuloAnterior(ant))}: ${esc(antQ.map(q => q.quadra + ' (' + mostrarNumero(q.bags) + ')').join(', '))}</button>` : ''}
       <span class="dc-sem">${quads.length ? `${esc(mostrarNumero(totalBags))} bags = ${esc(mostrarNumero(totalBags * pesoBag(mapa.layout)))} kg${lotesDe(c.id, item.id).length ? ' (o total do item vem dos lotes)' : ''}` : '1 bag = ' + esc(mostrarNumero(pesoBag(mapa.layout))) + ' kg. Marque a quadra e quantos bags tem nela.'}</span>
     </div>`}
   </div>`;
@@ -557,7 +632,7 @@ function ligarLinhaQuadra(div) {
 
 /** Próxima quadra ainda não usada pelo item (para a linha nova já vir escolhida). */
 function quadraLivre(itemId) {
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const usadas = new Set(c ? quadrasDe(c.id, itemId).map(q => q.quadra) : []);
   const bloco = document.querySelector(`.ct-quadras[data-item-q="${CSS.escape(itemId)}"]`);
   if (bloco) bloco.querySelectorAll('.ct-quad[data-quad]').forEach(d => usadas.add(d.dataset.quad));
@@ -610,7 +685,7 @@ async function salvarQuadra(div) {
 async function trocarQuadra(div) {
   const itemId = div.closest('.ct-quadras').dataset.itemQ;
   const antiga = div.dataset.quad;
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const salvo = c && todos('est_contagem_quadras').find(q => q.id === idQuadraLinha(c.id, itemId, antiga));
   if (salvo && salvo.ativo !== false) await gravar('est_contagem_quadras', Object.assign({}, salvo, { ativo: false }));
   if (lerNumero(div.querySelector('.cq-bags').value) !== null) await salvarQuadra(div);
@@ -619,7 +694,7 @@ async function trocarQuadra(div) {
 
 async function tirarQuadra(div) {
   const itemId = div.closest('.ct-quadras').dataset.itemQ;
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const salvo = c && todos('est_contagem_quadras').find(q => q.id === idQuadraLinha(c.id, itemId, div.dataset.quad));
   div.remove();
   if (!salvo) return;
@@ -629,7 +704,7 @@ async function tirarQuadra(div) {
 }
 
 async function repetirQuadras(itemId) {
-  const ant = contagem(sel.localId, mesAnterior(sel.mes));
+  const ant = anterior();
   if (!ant) return;
   try {
     const c = await garantirContagem();
@@ -641,7 +716,7 @@ async function repetirQuadras(itemId) {
     }
     await somarQuadras(c, itemId);
     redesenharQuadras(itemId);
-    aviso('Posição do mês passado copiada. Confira os bags de cada quadra.');
+    aviso('Posição da contagem anterior copiada. Confira os bags de cada quadra.');
   } catch (e) {
     console.error(e);
     aviso('Não consegui copiar (' + (e.message || e) + ').', true);
@@ -676,7 +751,7 @@ async function somarQuadras(c, itemId, soSeSemLotes) {
 
 /** Redesenha só o quadro de quadras (e o resumo no nome) de um item. */
 function redesenharQuadras(itemId) {
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const item = todos('est_itens').find(i => i.id === itemId);
   const bloco = document.querySelector(`.ct-item[data-item="${CSS.escape(itemId)}"]`);
   if (!c || !item || !bloco || !mapa) return;
@@ -697,10 +772,10 @@ function redesenharQuadras(itemId) {
 
 /** A contagem do mês nasce no primeiro número digitado. */
 async function garantirContagem() {
-  let c = contagem(sel.localId, sel.mes);
+  let c = atual();
   if (!c) c = await gravar('est_contagens', {
-    id: idContagem(sel.localId, sel.mes),
-    local_id: sel.localId, mes: sel.mes, status: 'aberta',
+    id: idContagem(sel.localId, sel.mes, sel.rodada || 1),
+    local_id: sel.localId, mes: sel.mes, rodada: Number(sel.rodada) || 1, status: 'aberta',
     responsavel: meuNome(), aberta_por: meuNome(),
     data_contagem: dataEscolhida(),
   });
@@ -760,7 +835,7 @@ async function salvarCampo(inp) {
 }
 
 function atualizarConta() {
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   if (!c) return;
   const chips = document.querySelector('.ct-chips:not(.ct-tipos)');
   const lugar = chips || document.querySelector('.ct-barra');
@@ -788,7 +863,7 @@ function atualizarConta() {
 function confirmarFechar() {
   // o que estiver no campo e ainda não saiu dele também vale
   if (document.activeElement && document.activeElement.classList.contains('ct-qtd')) document.activeElement.blur();
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const itens = itensDoLocal(sel.localId).filter(i => grupoDe(i) === sel.grupo);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const branco = itens.filter(i => {
@@ -798,7 +873,7 @@ function confirmarFechar() {
   const local = locais().find(l => l.id === sel.localId);
   const faltam = gruposDoLocal(sel.localId).filter(g => g !== sel.grupo && !grupoFechado(c, g));
   window.abrirModal('Fechar ' + sel.grupo, `
-    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong> · <strong>${esc(sel.grupo)}</strong> · contada em <strong>${esc(dataBR(dataEscolhida()))}</strong></p>
+    <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}${esc(sufixoRodada(atual()))}</strong> · <strong>${esc(sel.grupo)}</strong> · contada em <strong>${esc(dataBR(dataEscolhida()))}</strong></p>
     ${branco.length
       ? `<p><strong>${branco.length}</strong> ${branco.length === 1 ? 'item ficou' : 'itens ficaram'} em branco e
          ${branco.length === 1 ? 'vai entrar' : 'vão entrar'} como <strong>zero</strong> (não tem na prateleira):</p>
@@ -828,7 +903,7 @@ function confirmarFechar() {
           status: 'fechada', fechada_por: meuNome(), fechada_em: new Date().toISOString(),
           data_contagem: cg.data_contagem || dataEscolhida(),
         }));
-        const mesFechou = await conferirFechamentoMes(contagem(sel.localId, sel.mes) || ct);
+        const mesFechou = await conferirFechamentoMes(atual() || ct);
         window.fecharModal();
         aviso(mesFechou ? `${sel.grupo} fechado. Todos os tipos fecharam: a contagem já entra no Acerto.` : `${sel.grupo} fechado.`);
         desenharContar();
@@ -842,7 +917,7 @@ function confirmarFechar() {
 }
 
 async function reabrir() {
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   if (!c || !souAdmin()) return;
   if (!confirm(`Reabrir ${sel.grupo} de ${nomeMes(sel.mes)}?${c.status === 'fechada' ? ' A contagem do mês sai do Acerto até fechar de novo.' : ''}`)) return;
   // contagem fechada de antes dos tipos: os outros tipos continuam fechados
@@ -872,9 +947,10 @@ function desenharAndamento() {
   const linhas = ls.map(l => {
     const c = contagem(l.id, mesAndamento);
     const p = c ? progresso(c.id) : { feitos: 0, total: itensDoLocal(l.id).length };
-    const situ = !c ? '<span class="tag neutra">não começada</span>'
+    const rot = c && rodadaDe(c) > 1 ? ` <span class="tag neutra">${esc(nomeRodada(rodadaDe(c)))}</span>` : '';
+    const situ = (!c ? '<span class="tag neutra">não começada</span>'
       : c.status === 'fechada' ? '<span class="tag ativo">fechada</span>'
-        : '<span class="tag alerta">em andamento</span>';
+        : '<span class="tag alerta">em andamento</span>') + rot;
     // um selo por tipo: ✓ fechado (com a data), em andamento ou não começado
     const tiposTxt = situacaoTipos(l.id, mesAndamento).map(t => `<button type="button" class="ct-tipo-selo ${t.fechado ? 'ok' : t.comecado ? 'and' : ''}"
       data-contar="${esc(l.id)}" data-tipo="${esc(t.g)}" title="${t.fechado ? 'fechado' : t.comecado ? 'em andamento' : 'não começado'}">${t.fechado ? '✓ ' : ''}${esc(t.g)} <small>${t.p.feitos}/${t.p.total}${t.cg && t.cg.data_contagem ? ' · ' + esc(dataBR(t.cg.data_contagem).slice(0, 5)) : ''}</small></button>`).join('');
@@ -901,7 +977,7 @@ function desenharAndamento() {
     if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesAndamento = e.target.value; desenharAndamento(); }
   });
   alvo.querySelectorAll('[data-contar]').forEach(b => b.addEventListener('click', () => {
-    sel.localId = b.dataset.contar; sel.mes = mesAndamento;
+    sel.localId = b.dataset.contar; sel.mes = mesAndamento; sel.rodada = null;
     if (b.dataset.tipo) sel.grupo = b.dataset.tipo;
     window.abrirTelaEstoque('ctNova');
   }));
@@ -916,7 +992,7 @@ function desenharHistorico() {
   if (!pronto()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const nomeLocal = id => (todos('est_locais').find(l => l.id === id) || {}).nome || '—';
   const fechadas = todos('est_contagens').filter(c => c.status === 'fechada' && podeLocal(c.local_id))
-    .sort((a, b) => b.mes.localeCompare(a.mes) || nomeLocal(a.local_id).localeCompare(nomeLocal(b.local_id), 'pt-BR'));
+    .sort((a, b) => b.mes.localeCompare(a.mes) || nomeLocal(a.local_id).localeCompare(nomeLocal(b.local_id), 'pt-BR') || rodadaDe(b) - rodadaDe(a));
   if (!fechadas.length) {
     alvo.innerHTML = '<div class="vazio">Nenhuma contagem fechada ainda.</div>';
     $('ctFolha').innerHTML = '';
@@ -927,7 +1003,7 @@ function desenharHistorico() {
     const cab = c.mes !== mes ? `<h3 class="es-secao">${esc(nomeMes(mes = c.mes))}</h3>` : '';
     const n = linhasDe(c.id).length;
     return cab + `<div class="item"><span></span>
-      <div><div class="nome">${esc(nomeLocal(c.local_id))}</div>
+      <div><div class="nome">${esc(nomeLocal(c.local_id))}${esc(sufixoRodada(c))}</div>
         <div class="sub">${n} itens · ${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}</div>
         ${(() => { const gs = todos('est_contagem_grupos').filter(x => x.contagem_id === c.id && x.status === 'fechada');
           return gs.length ? `<div class="sub">${gs.map(x => `${esc(x.grupo)}${x.data_contagem ? ' ' + esc(dataBR(x.data_contagem)) : ''}${x.fechada_por ? ' (' + esc(x.fechada_por) + ')' : ''}`).join(' · ')}</div>` : ''; })()}</div>
@@ -939,7 +1015,7 @@ function desenharHistorico() {
   alvo.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => {
     const c = todos('est_contagens').find(x => x.id === b.dataset.ver);
     if (!c) return;
-    sel.localId = c.local_id; sel.mes = c.mes;
+    sel.localId = c.local_id; sel.mes = c.mes; sel.rodada = rodadaDe(c);
     window.abrirTelaEstoque('ctNova');
   }));
   alvo.querySelectorAll('[data-imprimir]').forEach(b => b.addEventListener('click', () => {
@@ -972,7 +1048,7 @@ function montarFolha(contagemId) {
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit">
         <h1>Contagem de Estoque — ${esc(local.nome || '')}</h1>
-        <p>${esc(nomeMes(c.mes))}${c.data_contagem ? ' · contada em ' + esc(dataBR(c.data_contagem)) : ''} · fechada em ${esc(dataHora(c.fechada_em))} · ${linhas.length} itens</p>
+        <p>${esc(nomeMes(c.mes))}${esc(sufixoRodada(c))}${c.data_contagem ? ' · contada em ' + esc(dataBR(c.data_contagem)) : ''} · fechada em ${esc(dataHora(c.fechada_em))} · ${linhas.length} itens</p>
       </div>
     </div>
     ${grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
@@ -993,7 +1069,7 @@ function montarFolha(contagemId) {
 const LINHAS_POR_FOLHA = 29;
 
 function escolherImpressao() {
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const itens = itensDoLocal(sel.localId);
   const grupos = [...new Set(itens.map(i => i.grupo || 'Outros'))];
   const fechada = grupoFechado(c, sel.grupo);
@@ -1023,7 +1099,7 @@ function escolherImpressao() {
 }
 
 function montarListaImpressao(op) {
-  const c = contagem(sel.localId, sel.mes);
+  const c = atual();
   const local = todosLocais().find(l => l.id === sel.localId) || {};
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const tem = i => { const l = linhas.get(i.id); return l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== ''; };
@@ -1063,7 +1139,7 @@ function montarListaImpressao(op) {
   const ncol = 3 + (op.lotes ? 2 : 0) + 1 + (temLoc ? 1 : 0);
   const cab = `<tr>${temLoc ? '<th class="ce">Local</th>' : ''}<th>Item</th><th class="ce">Un.</th><th class="ce lp-qtd">Quantidade</th>${op.lotes
     ? '<th class="ce">Lote</th><th class="ce">Validade</th>' : ''}<th>Obs.</th></tr>`;
-  const sub = [local.nome || '', nomeMes(sel.mes), op.grupo || 'todos os grupos', itens.length + (itens.length === 1 ? ' item' : ' itens')]
+  const sub = [local.nome || '', nomeMes(sel.mes) + sufixoRodada(atual()), op.grupo || 'todos os grupos', itens.length + (itens.length === 1 ? ' item' : ' itens')]
     .filter(Boolean).join(' · ');
   $('ctListaFolha').innerHTML = folhas.map((fl, k) => `<div class="folha rel lp-folha">
     <div class="rel-topo">
