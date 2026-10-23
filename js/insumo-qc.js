@@ -32,10 +32,10 @@
     if (!local) return { local: null, itens: [], saldo: new Map(), direcionadores: [], operadores: [] };
     const [ri, rm] = await Promise.all([
       sb.from('est_itens').select('id,nome,unidade,grupo,ativo,locais_contagem'),
-      sb.from('est_movimentos').select('item_id,sentido,quantidade,plantio,operador,ativo').eq('local_id', local.id).limit(20000),
+      sb.from('est_movimentos').select('item_id,sentido,quantidade,plantio,operador,ativo,pendente').eq('local_id', local.id).limit(20000),
     ]);
     if (ri.error || rm.error) throw new Error((ri.error || rm.error).message);
-    const movs = (rm.data || []).filter(m => m.ativo !== false);
+    const movs = (rm.data || []).filter(m => m.ativo !== false && !m.pendente);   // pendência não mexe no saldo (23/10/2026)
     const saldo = new Map();
     movs.forEach(m => saldo.set(m.item_id, (saldo.get(m.item_id) || 0) + (m.sentido === 'entrada' ? 1 : -1) * (Number(m.quantidade) || 0)));
     const conta = item => !Array.isArray(item.locais_contagem) || !item.locais_contagem.length || item.locais_contagem.includes(local.id);
@@ -159,21 +159,26 @@
         linhas.push({ it, q });
       }
       if (!linhas.length) return erro('Escolha pelo menos um produto e a quantidade.');
-      const negativos = linhas.filter(x => (c.saldo.get(x.it.id) || 0) - x.q < 0);
-      if (negativos.length && !confirm(`O saldo vai ficar negativo em: ${negativos.map(x => x.it.nome).join(', ')}.\nDar saída mesmo assim?`)) return;
+      // falta estoque: sai o que tem e o resto fica em Pendências (23/10/2026, mesma regra da tela Saídas)
+      const disp = new Map(c.saldo);
+      linhas.forEach(x => { const tem = Math.max(0, disp.get(x.it.id) || 0); x.sai = Math.min(x.q, tem); x.pend = Math.round((x.q - x.sai) * 1000) / 1000; disp.set(x.it.id, tem - x.sai); });
+      const faltam = linhas.filter(x => x.pend > 0);
+      if (faltam.length && !confirm(`Falta estoque:\n${faltam.map(x => `${x.it.nome}: sai ${fmt(x.sai)}, fica pendente ${fmt(x.pend)}`).join('\n')}\n\nSai o que tem e o resto fica em Estoque › Pendências. Lançar assim?`)) return;
       const b = $('ins-salvar'); b.disabled = true; b.textContent = 'Salvando…';
       const lanc = uuid(), agora = new Date().toISOString(), obs = $('ins-obs').value.trim();
-      const rows = linhas.map(x => ({
-        id: uuid(), local_id: c.local.id, data, sentido: 'saida', tipo: 'uso', item_id: x.it.id, quantidade: x.q,
+      const linhaDe = (x, q, pend) => ({
+        id: uuid(), local_id: c.local.id, data, sentido: 'saida', tipo: 'uso', item_id: x.it.id, quantidade: q,
         documento: doc, plantio: dir, operador: oper, obs: obs || null, lancamento_id: lanc,
         criado_por: 'DP · + Insumo', ativo: true, atualizado_em: agora,
-      }));
+        pendente: pend, pendente_desde: pend ? data : null,
+      });
+      const rows = linhas.flatMap(x => [x.sai > 0 ? linhaDe(x, x.sai, false) : null, x.pend > 0 ? linhaDe(x, x.pend, true) : null].filter(Boolean));
       const { error } = await op.cliente.schema('public').from('est_movimentos').insert(rows);
       if (error) {
         b.disabled = false; b.textContent = 'Dar saída';
         return erro(/security|permission/i.test(error.message) ? 'Seu login não pode lançar no Estoque. Peça ao administrador.' : 'Não salvou: ' + error.message);
       }
-      linhas.forEach(x => c.saldo.set(x.it.id, (c.saldo.get(x.it.id) || 0) - x.q));
+      linhas.forEach(x => c.saldo.set(x.it.id, (c.saldo.get(x.it.id) || 0) - x.sai));
       b.textContent = '✓ Saída lançada';
       if (typeof op.aoSalvar === 'function') { try { op.aoSalvar(rows); } catch (e) {} }
       setTimeout(() => {   // pronto para o próximo: mantém data, boletim, operador e direcionador

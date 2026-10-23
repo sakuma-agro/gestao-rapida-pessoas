@@ -36,11 +36,18 @@ const localQc = () => { const l = todos('est_locais').find(x => x.ativo !== fals
   return l && podeLocal(l.id) ? l : null; };   // quem não tem a Quebra Cocão liberada não vê este módulo
 /** Produto novo criado aqui só aparece na contagem mensal da Quebra Cocão. */
 const soQc = () => { const l = localQc(); return l ? [l.id] : null; };
-const movimentos = () => {
+const movimentosTodos = () => {
   const lc = localQc();
   return lc ? [...new Map(todos('est_movimentos').filter(m => m.local_id === lc.id).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false) : [];
 };
+/* Saída pendente (pedido dele, 23/10/2026): pediram 7 L e o estoque tem 4 —
+   saem os 4 e os 3 ficam como pendência (pendente = true, mesmo lançamento,
+   documento, plantio e operador). Pendência NÃO mexe no saldo nem no custo;
+   vira saída de verdade no botão Efetivar da tela Pendências. */
+const movimentos = () => movimentosTodos().filter(m => !m.pendente);
+const pendencias = () => movimentosTodos().filter(m => m.pendente && m.sentido === 'saida');
+const pendenteDe = () => { const p = new Map(); for (const m of pendencias()) p.set(m.item_id, (p.get(m.item_id) || 0) + (Number(m.quantidade) || 0)); return p; };
 /* Mínimo da Quebra Cocão, quando ela tem o seu (22/10/2026). */
 const precisaRepor = (item, qtd) => precisaReporGeral(comMinimoDo(item, (localQc() || {}).id), qtd);
 const temMinimo = item => temMinimoGeral(comMinimoDo(item, (localQc() || {}).id));
@@ -118,6 +125,8 @@ function desenharVisao() {
   const zerados = itens.filter(i => Math.abs(sd.get(i.id)) <= 0.0005).length;
   const negativos = itens.filter(i => sd.get(i.id) < -0.0001).length;
   const repor = itens.filter(i => precisaRepor(i, sd.get(i.id))).length;
+  const pend = pendenteDe();
+  const nPend = pendencias().length;
   let grupo = null;
   alvo.innerHTML = `
   <div class="cartao">
@@ -128,6 +137,7 @@ function desenharVisao() {
       <div class="es-card es-transf"><span>Valor em estoque</span><strong class="qc-rs">${esc(brl(vistosValor(itens, cu)))}</strong><small>pelo custo médio${semValor(itens, cu, sd) ? ` · ${semValor(itens, cu, sd)} sem valor` : ''}</small></div>
       <div class="es-card es-falta"><span>Saldo negativo</span><strong>${negativos}</strong><small>saiu mais do que entrou</small></div>
       <div class="es-card es-sobra"><span>No estoque mínimo</span><strong>${repor}</strong><small>pelo cadastro do item</small></div>
+      <div class="es-card es-falta qc-card-pend" role="button" tabindex="0" id="qcVerPend"><span>Saídas pendentes</span><strong>${nPend}</strong><small>${nPend ? 'esperando estoque · toque para ver' : 'nenhuma'}</small></div>
     </div>
     <div class="ct-chips" style="margin-top:12px">
       <button type="button" class="ct-chip" data-qc-g="" aria-pressed="${!grupoVisao}">Todas</button>
@@ -148,7 +158,7 @@ function desenharVisao() {
       const cab = (i.grupo || 'Outros') !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo || 'Outros')}</h3>` : '';
       return cab + `<div class="item qc-item" data-extrato="${esc(i.id)}"><span></span>
         <div><div class="nome">${esc(i.nome)}${v < -0.0001 ? ' <span class="tag perigo">negativo</span>'
-          : precisaRepor(i, v) ? ' <span class="tag alerta">no mínimo</span>' : ''}</div>
+          : precisaRepor(i, v) ? ' <span class="tag alerta">no mínimo</span>' : ''}${pend.get(i.id) ? ` <span class="tag alerta">${esc(mostrarNumero(pend.get(i.id)))} pendente</span>` : ''}</div>
           <div class="sub">${esc(i.unidade || '')}${temMinimo(i) ? ` · mínimo ${esc(mostrarNumero(comMinimoDo(i, localQc().id).estoque_minimo))}` : ''}${(cu.itens.get(i.id) || {}).medio != null ? ` · custo médio ${esc(brlU(cu.itens.get(i.id).medio))}` : ' · sem valor'} · toque para ver o extrato</div></div>
         <div class="acoes" style="text-align:right"><strong class="qc-saldo${v < -0.0001 ? ' neg' : ''}">${esc(mostrarNumero(Math.round(v * 1000) / 1000))}</strong>
           ${(cu.itens.get(i.id) || {}).emEstoque != null && v > 0.0005 ? `<div class="sub">${esc(brl(cu.itens.get(i.id).emEstoque))}</div>` : ''}</div>
@@ -161,6 +171,9 @@ function desenharVisao() {
     desenharVisao(); const el = $('qcBusca'); el.focus(); el.setSelectionRange(pos, pos);
   });
   alvo.querySelectorAll('[data-extrato]').forEach(el => el.addEventListener('click', () => extrato(el.dataset.extrato)));
+  const irPend = () => window.abrirTelaEstoque && window.abrirTelaEstoque('qcPendencias');
+  $('qcVerPend').addEventListener('click', irPend);
+  $('qcVerPend').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); irPend(); } });
   $('qcImprimir')?.addEventListener('click', () => { montarPosicao(vistos, sd, cu); setTimeout(() => window.print(), 50); });
   $('qcRelatorio')?.addEventListener('click', abrirRelatorio);
   $('qcZerados').addEventListener('change', e => { esconderZerados = e.target.checked; desenharVisao(); });
@@ -747,13 +760,30 @@ async function lancar(sentido, form) {
   }
   if (tipo === 'transferencia' && !txt('outra')) { aviso(sentido === 'saida' ? 'Escolha a fazenda de destino.' : 'Escolha a fazenda de origem.', true); return; }
 
-  if (sentido === 'saida') {
+  if (sentido === 'saida' && tipo === 'ajuste') {
     const sd = saldos();
     const soma = new Map();
     for (const l of linhas) soma.set(l.item.id, (soma.get(l.item.id) || 0) + l.qtd);
     const falta = [...soma.entries()].filter(([id, q]) => q > (sd.get(id) || 0) + 0.0001)
       .map(([id, q]) => `${itemDe(id).nome}: sai ${mostrarNumero(q)}, saldo ${mostrarNumero(sd.get(id) || 0)}`);
     if (falta.length && !confirm(`Estes itens ficam com saldo negativo:\n\n${falta.join('\n')}\n\nLançar mesmo assim?`)) return;
+  }
+  // uso e transferência: sai o que tem, o resto fica pendente (23/10/2026)
+  if (sentido === 'saida' && tipo !== 'ajuste') {
+    const disp = new Map(saldos());
+    const avisos = [];
+    for (const l of linhas) {
+      const tem = Math.max(0, disp.get(l.item.id) || 0);
+      const sai = Math.min(l.qtd, tem);
+      l.pend = Math.round((l.qtd - sai) * 1000) / 1000;
+      l.qtd = Math.round(sai * 1000) / 1000;
+      disp.set(l.item.id, tem - sai);
+      if (l.pend > 0) avisos.push(`${l.item.nome}: sai ${mostrarNumero(l.qtd)}, fica pendente ${mostrarNumero(l.pend)} ${l.item.unidade || ''}`);
+    }
+    if (avisos.length && !confirm(`Falta estoque para estes itens:\n\n${avisos.join('\n')}\n\nSai o que tem e o resto fica em Pendências, para efetivar quando o produto entrar. Lançar assim?`)) {
+      for (const l of linhas) { l.qtd += l.pend || 0; l.pend = 0; }
+      return;
+    }
   }
 
   $('qcEnviar').disabled = true;
@@ -766,11 +796,21 @@ async function lancar(sentido, form) {
     fornecedor: sentido === 'entrada' && tipo === 'compra' ? txt('fornecedor') : null,
     obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
   };
-  for (const l of linhas) await gravar('est_movimentos', Object.assign({}, base, { item_id: l.item.id, quantidade: l.qtd,
-    valor_unitario: sentido === 'entrada' ? l.vu : null,
-    equipamento_id: l.dt === 'equip' ? l.dest.id : null, equipamento: l.dt === 'equip' ? l.dest.nome : null,
-    funcionario_id: l.dt === 'func' ? l.dest.id : null, funcionario: l.dt === 'func' ? l.dest.nome : null }));
-  aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.length} produto(s).`);
+  const pendAntes = sentido === 'entrada' ? pendenteDe() : null;
+  for (const l of linhas) {
+    const linha = { item_id: l.item.id,
+      valor_unitario: sentido === 'entrada' ? l.vu : null,
+      equipamento_id: l.dt === 'equip' ? l.dest.id : null, equipamento: l.dt === 'equip' ? l.dest.nome : null,
+      funcionario_id: l.dt === 'func' ? l.dest.id : null, funcionario: l.dt === 'func' ? l.dest.nome : null };
+    if (l.qtd > 0) await gravar('est_movimentos', Object.assign({ id: crypto.randomUUID() }, base, linha, { quantidade: l.qtd }));
+    if (l.pend > 0) await gravar('est_movimentos', Object.assign({ id: crypto.randomUUID() }, base, linha, { quantidade: l.pend, pendente: true, pendente_desde: base.data }));
+  }
+  const nPend = linhas.filter(l => l.pend > 0).length;
+  aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.filter(l => l.qtd > 0).length} produto(s)${nPend ? ` · ${nPend} ficaram em Pendências` : ''}.`);
+  if (pendAntes) {
+    const comPend = [...new Set(linhas.filter(l => pendAntes.get(l.item.id)).map(l => l.item.nome))];
+    if (comPend.length) setTimeout(() => aviso(`Tem saída pendente esperando: ${comPend.slice(0, 3).join(', ')}${comPend.length > 3 ? '…' : ''}. Efetive em Pendências.`), 2500);
+  }
   mesLista = String(base.data).slice(0, 7);
   abertos.add(lancamento);
   desenharMov(sentido);
@@ -804,7 +844,7 @@ function desenharListaMes(sentido) {
   if (!alvo) return;
   const ent = sentido === 'entrada';
   const tipos = ent ? TIPOS_ENTRADA : TIPOS_SAIDA;
-  const doMes = movimentos().filter(m => m.sentido === sentido && String(m.data).slice(0, 7) === mesLista);
+  const doMes = movimentosTodos().filter(m => m.sentido === sentido && String(m.data).slice(0, 7) === mesLista);
   const grupos = new Map();
   for (const m of doMes) {
     const k = m.lancamento_id || m.id;
@@ -830,12 +870,12 @@ function desenharListaMes(sentido) {
           <span class="qc-seta">${aberto ? '▾' : '▸'}</span>
         </button>
         <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); const c = cu.mov.get(x.id) || {}; return `<div class="qc-lanc-item${ent ? ' com-valor' : ''}">
-          <span>${esc(i.nome)}${x.equipamento || x.funcionario ? `<small class="qc-dest-txt">→ ${esc(x.equipamento || x.funcionario)}</small>` : ''}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
+          <span>${esc(i.nome)}${x.equipamento || x.funcionario ? `<small class="qc-dest-txt">→ ${esc(x.equipamento || x.funcionario)}</small>` : ''}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${x.pendente ? '<span class="tag alerta">pendente</span> ' : ''}${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
           ${ent ? `<label class="qc-vu-ed" title="Valor por unidade (R$)">R$/${esc(i.unidade || 'un')} <input type="text" inputmode="decimal" data-vu="${esc(x.id)}"
             value="${vazio(x.valor_unitario) ? '' : esc(Number(x.valor_unitario).toLocaleString('pt-BR', { maximumFractionDigits: 4 }))}"
             placeholder="${c.vu !== null && c.vu !== undefined ? esc(Number(c.vu).toLocaleString('pt-BR', { maximumFractionDigits: 2 })) + ' (médio)' : '—'}"></label>
             <small class="qc-vu-tot">${c.total !== null && c.total !== undefined ? esc(brl(c.total)) : ''}</small>`
-          : `<small class="qc-vu-tot" title="Custo médio na data">${c.vu !== null && c.vu !== undefined ? esc(brlU(c.vu)) + ' · ' + esc(brl(c.total)) : 'sem custo médio'}</small>`}
+          : x.pendente ? '<small class="qc-vu-tot">esperando estoque</small>' : `<small class="qc-vu-tot" title="Custo médio na data">${c.vu !== null && c.vu !== undefined ? esc(brlU(c.vu)) + ' · ' + esc(brl(c.total)) : 'sem custo médio'}</small>`}
           <button class="btn mini" type="button" data-tirar="${esc(x.id)}">Tirar</button></div>`; }).join('')}
           ${ms.length > 1 ? `<div class="barra fim"><button class="btn mini" type="button" data-tirar-tudo="${esc(k)}">Tirar o lançamento inteiro</button></div>` : ''}
         </div>
@@ -856,13 +896,13 @@ function desenharListaMes(sentido) {
     desenharListaMes(sentido);
   }));
   alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', async () => {
-    const m = movimentos().find(x => x.id === b.dataset.tirar);
+    const m = movimentosTodos().find(x => x.id === b.dataset.tirar);
     if (!m || !confirm(`Tirar ${itemDe(m.item_id).nome} deste lançamento? O saldo volta como estava.`)) return;
     await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
     desenharListaMes(sentido);
   }));
   alvo.querySelectorAll('[data-tirar-tudo]').forEach(b => b.addEventListener('click', async () => {
-    const ms = movimentos().filter(x => (x.lancamento_id || x.id) === b.dataset.tirarTudo);
+    const ms = movimentosTodos().filter(x => (x.lancamento_id || x.id) === b.dataset.tirarTudo);
     if (!confirm(`Tirar o lançamento inteiro (${ms.length} produtos)? Os saldos voltam como estavam.`)) return;
     for (const m of ms) await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
     desenharListaMes(sentido);
@@ -1149,9 +1189,97 @@ async function importar(lidos, progresso) {
 }
 
 /* ===================================================================
+   Pendências (pedido dele, 23/10/2026) — saídas que esperam estoque.
+   Efetivar: vira saída de verdade com o que tiver de saldo; se tiver menos
+   que o pendente, sai o que tem e o resto continua pendente. A data da
+   saída é a escolhida na tela (hoje, ou a data original do pedido).
+   =================================================================== */
+let dataEfetivar = 'hoje';
+function desenharPendencias() {
+  const alvo = $('qcPendCorpo');
+  if (!alvo) return;
+  if (!pronto()) { alvo.innerHTML = '<div class="cartao"><div class="vazio">Abrindo…</div></div>'; return; }
+  if (!localQc()) return semLocal(alvo);
+  const sd = saldos();
+  const lista = pendencias().sort((a, b) => String(a.pendente_desde || a.data).localeCompare(String(b.pendente_desde || b.data))
+    || String(a.atualizado_em || '').localeCompare(String(b.atualizado_em || '')));
+  // quanto cada pendência consegue sair agora, da mais antiga para a mais nova
+  const disp = new Map(sd);
+  const podeSair = new Map();
+  for (const m of lista) {
+    const tem = Math.max(0, disp.get(m.item_id) || 0);
+    const q = Math.min(Number(m.quantidade) || 0, tem);
+    podeSair.set(m.id, Math.round(q * 1000) / 1000);
+    disp.set(m.item_id, tem - q);
+  }
+  const prontas = lista.filter(m => podeSair.get(m.id) > 0).length;
+  alvo.innerHTML = `
+  <div class="cartao">
+    <h2>Saídas pendentes · Faz. Quebra Cocão</h2>
+    <p class="dica">Saída pedida sem estoque suficiente: o que tinha já saiu e o resto ficou aqui. Pendência não mexe no saldo.
+      Quando o produto entrar, toque em <strong>Efetivar</strong>.</p>
+    <div class="barra">
+      <label class="campo" style="margin:0">Data da saída ao efetivar
+        <select id="qcPendData"><option value="hoje"${dataEfetivar === 'hoje' ? ' selected' : ''}>Hoje</option>
+          <option value="original"${dataEfetivar === 'original' ? ' selected' : ''}>A data do pedido</option></select></label>
+      <button class="btn principal" type="button" id="qcPendTudo"${prontas ? '' : ' disabled'}>Efetivar tudo o que tem saldo (${prontas})</button>
+    </div>
+    <div class="lista">${lista.map(m => {
+      const i = itemDe(m.item_id);
+      const pode = podeSair.get(m.id);
+      const q = Number(m.quantidade) || 0;
+      return `<div class="item"><span></span>
+        <div><div class="nome">${esc(i.nome)} <span class="tag alerta">falta ${esc(mostrarNumero(q))} ${esc(i.unidade || '')}</span></div>
+          <div class="sub">pedido em ${dataBR(m.pendente_desde || m.data)} · ${esc(TIPOS_SAIDA[m.tipo] || m.tipo)} · ${detalhe(m)}${m.equipamento || m.funcionario ? ' · → ' + esc(m.equipamento || m.funcionario) : ''}</div>
+          <div class="sub">saldo agora ${esc(mostrarNumero(sd.get(m.item_id) || 0))} ${esc(i.unidade || '')}${pode > 0 ? (pode < q ? ` · dá para sair ${esc(mostrarNumero(pode))}` : ' · <b>dá para sair tudo</b>') : ' · ainda sem estoque'}</div></div>
+        <div class="acoes" style="text-align:right">
+          <button class="btn mini principal" type="button" data-efetivar="${esc(m.id)}"${pode > 0 ? '' : ' disabled'}>Efetivar${pode > 0 && pode < q ? ' ' + esc(mostrarNumero(pode)) : ''}</button>
+          <button class="btn mini" type="button" data-cancelar="${esc(m.id)}">Cancelar</button></div>
+      </div>`;
+    }).join('') || '<div class="vazio">Nenhuma saída pendente.</div>'}</div>
+  </div>`;
+  $('qcPendData').addEventListener('change', e => { dataEfetivar = e.target.value; });
+  const efetivar = async (m, q) => {
+    const total = Number(m.quantidade) || 0;
+    const data = dataEfetivar === 'original' ? (m.pendente_desde || m.data) : hojeISO();
+    const obs = [m.obs, `pendência de ${dataBR(m.pendente_desde || m.data)} efetivada por ${meuNome()}`].filter(Boolean).join(' · ');
+    if (q >= total - 0.0001) {
+      await gravar('est_movimentos', Object.assign({}, m, { pendente: false, data, obs }));
+    } else {
+      const { id, atualizado_em, ...resto } = m;
+      await gravar('est_movimentos', Object.assign({}, resto, { id: crypto.randomUUID(), quantidade: q, pendente: false, data, obs }));
+      await gravar('est_movimentos', Object.assign({}, m, { quantidade: Math.round((total - q) * 1000) / 1000 }));
+    }
+  };
+  alvo.querySelectorAll('[data-efetivar]').forEach(b => b.addEventListener('click', async () => {
+    const m = pendencias().find(x => x.id === b.dataset.efetivar);
+    const q = podeSair.get(b.dataset.efetivar);
+    if (!m || !(q > 0)) return;
+    b.disabled = true;
+    await efetivar(m, q);
+    aviso(`Saída efetivada: ${itemDe(m.item_id).nome}, ${mostrarNumero(q)} ${itemDe(m.item_id).unidade || ''}.`);
+    desenharPendencias();
+  }));
+  $('qcPendTudo').addEventListener('click', async () => {
+    const fila = lista.filter(m => podeSair.get(m.id) > 0);
+    if (!confirm(`Efetivar ${fila.length} pendência(s) com o saldo que tem hoje?`)) return;
+    $('qcPendTudo').disabled = true;
+    for (const m of fila) await efetivar(m, podeSair.get(m.id));
+    aviso(`${fila.length} pendência(s) efetivada(s).`);
+    desenharPendencias();
+  });
+  alvo.querySelectorAll('[data-cancelar]').forEach(b => b.addEventListener('click', async () => {
+    const m = pendencias().find(x => x.id === b.dataset.cancelar);
+    if (!m || !confirm(`Cancelar a pendência de ${itemDe(m.item_id).nome} (${mostrarNumero(m.quantidade)})? Ela some sem dar saída.`)) return;
+    await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
+    desenharPendencias();
+  }));
+}
+
+/* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { qcVisao: desenharVisao, qcPainel: desenharPainel, qcEntrada: () => desenharMov('entrada'), qcSaida: () => desenharMov('saida') };
+const DESENHOS = { qcVisao: desenharVisao, qcPainel: desenharPainel, qcEntrada: () => desenharMov('entrada'), qcSaida: () => desenharMov('saida'), qcPendencias: desenharPendencias };
 export function abrirQc(tela) { telaAberta = tela; (DESENHOS[tela] || (() => {}))(); }
 export function soltarQc() {
   telaAberta = null;
@@ -1162,7 +1290,7 @@ window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;
   // nunca redesenha com um formulário sendo preenchido
-  if (foco && foco.closest && foco.closest('#qcForm, #qcVisaoCorpo, #qcPainelCorpo') && /INPUT|SELECT|TEXTAREA/.test(foco.tagName)) return;
+  if (foco && foco.closest && foco.closest('#qcForm, #qcVisaoCorpo, #qcPainelCorpo, #qcPendCorpo') && /INPUT|SELECT|TEXTAREA/.test(foco.tagName)) return;
   const form = $('qcForm');
   if (form && [...form.querySelectorAll('input[type=text]')].some(i => i.value)) { desenharListaMes(telaAberta === 'qcEntrada' ? 'entrada' : 'saida'); return; }
   if (document.querySelector('#modal') && !document.querySelector('#modal.oculto')) return;

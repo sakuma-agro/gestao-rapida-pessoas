@@ -31,6 +31,7 @@ export const MODULOS = [
     ['qcPainel',   'Movimentações'],
     ['qcEntrada',  'Entradas'],
     ['qcSaida',    'Saídas'],
+    ['qcPendencias', 'Pendências'],
   ] },
   { id: 'acerto', nome: 'Acerto', telas: [
     ['acSaldo',           'Saldo do sistema'],
@@ -107,6 +108,8 @@ export function podeTela(tela) {
   if (soAdmin.has(tela)) return false;
   const m = moduloDe(tela);
   if (!m || !pode(m)) return false;
+  // Pendências anda junto com Saídas (23/10/2026): quem lança saída efetiva a pendência
+  if (tela === 'qcPendencias' && temRestricao(m) && !acesso.telas.includes(m + ':' + tela)) return acesso.telas.includes(m + ':qcSaida');
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
 

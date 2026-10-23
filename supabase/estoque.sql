@@ -247,3 +247,9 @@ create table if not exists public.est_minimos (
 
 -- Localização (prateleira) do item (22/10/2026): EPIs e limpeza receberam o "A.1", "L.5"… que estava no começo do nome.
 alter table public.est_itens add column if not exists localizacao text;
+
+-- Saída pendente na Quebra Cocão (23/10/2026, pedido dele): pediram 7 L com 4 no estoque —
+-- saem 4 e os 3 ficam pendentes (pendente = true) até alguém tocar em Efetivar na tela Pendências.
+-- Pendência não entra no saldo nem no custo médio. pendente_desde = data do pedido original.
+alter table public.est_movimentos add column if not exists pendente boolean not null default false,
+  add column if not exists pendente_desde date;
