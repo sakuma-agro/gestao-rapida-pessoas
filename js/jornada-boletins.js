@@ -133,11 +133,14 @@ export const pendenciasDe = (fid, ini = '', fim = '', tipo = '') => (jd.dados.bo
 /* Ordem (13/10/2026, pedido dele): 'qtd' = quem mais deve boletim primeiro;
    'nome' = ordem alfabética. */
 const ORDENS = { qtd: 'Mais pendências primeiro', nome: 'Nome (A a Z)' };
-function comPendencia(ini, fim, fazenda, tipo = '', ordem = 'qtd') {
+/* Situação do funcionário (23/10/2026, pedido dele): ativos, inativos ou todos. */
+const SITS_PEND = { '': 'Ativos e inativos', ativos: 'Só ativos', inativos: 'Só inativos' };
+const casaSit = (f, sit) => !sit || (sit === 'ativos' ? ativa(f) : !ativa(f));
+function comPendencia(ini, fim, fazenda, tipo = '', ordem = 'qtd', sit = '') {
   const ids = [...new Set((jd.dados.bolEntregas || []).filter(x => ehPend(x.situacao)).map(x => x.funcionario_id))];
   const porNome = (a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR');
   return ids.map(id => ({ f: pessoa(id), p: pendenciasDe(id, ini, fim, tipo) }))
-    .filter(x => x.f && x.p.length && casaFazenda(x.f, fazenda))
+    .filter(x => x.f && x.p.length && casaFazenda(x.f, fazenda) && casaSit(x.f, sit))
     .sort(ordem === 'nome' ? porNome : (a, b) => b.p.length - a.p.length || porNome(a, b));
 }
 
@@ -289,13 +292,13 @@ export function relIndividual(fid, ini = '', fim = '', tipo = '') {
 }
 
 /** Relatório geral: todos que têm pendência. */
-export function relGeral(ini = '', fim = '', fazenda = '', tipo = '', ordem = 'qtd', so = null) {
-  const l = comPendencia(ini, fim, fazenda, tipo, ordem).filter(x => !so || so.has(x.f.id));
+export function relGeral(ini = '', fim = '', fazenda = '', tipo = '', ordem = 'qtd', so = null, sit = '') {
+  const l = comPendencia(ini, fim, fazenda, tipo, ordem, sit).filter(x => !so || so.has(x.f.id));
   const tot = l.reduce((s, x) => s + x.p.length, 0);
   const data = y => y.situacao === 'correcao' ? `${brCurto(y.data)} <span class="rel-mini">(correção)</span>` : brCurto(y.data);
   return `<article class="rel">
     ${cabecalhoDoc(tipo === 'correcao' ? 'Boletins devolvidos para correção' : 'Boletins de serviço pendentes',
-      `Todos os funcionários · ${TIPOS_PEND[tipo].toLowerCase()}`,
+      `${sit === 'ativos' ? 'Funcionários ativos' : sit === 'inativos' ? 'Funcionários inativos' : 'Todos os funcionários'} · ${TIPOS_PEND[tipo].toLowerCase()}`,
       `posição em<strong>${br(hoje())}</strong>${esc(rotPeriodo(ini, fim))}${rotFazendas(fazenda) ? ' · ' + esc(rotFazendas(fazenda)) : ''}`)}
     <table class="rel-tabela"><thead><tr><th>Funcionário</th><th>Fazenda</th><th class="rel-num">Pendentes</th><th>Datas</th></tr></thead>
     <tbody>${l.map(x => `<tr><td>${esc(x.f.nome)}${ativa(x.f) ? '' : ' <span class="rel-mini">(inativo)</span>'}</td><td>${esc(x.f.fazenda || '—')}</td>
@@ -644,7 +647,7 @@ function ligarBarraDoc(raiz) {
 
 let avisar = () => {};
 let irPara = () => {};
-const est = { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '', pOrdem: 'qtd', sel: new Set() };
+const est = { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '', pSit: '', pOrdem: 'qtd', sel: new Set() };
 
 function cabecalho(titulo, sub, direita) {
   return `<header class="jor-cabecalho"><div>
@@ -918,12 +921,12 @@ export const fecharMenuBoletins = fecharMenu;
 function desenharPend() {
   const rolaAntes = document.querySelector('#telaBdPend .bd-pend-rola');
   const posAntes = rolaAntes ? rolaAntes.scrollTop : null;
-  const l = comPendencia(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem);
+  const l = comPendencia(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem, est.pSit);
   // seleção para o envio em lote: só vale para quem está na lista agora
   const naLista = new Set(l.map(x => x.f.id));
   [...est.sel].forEach(id => { if (!naLista.has(id)) est.sel.delete(id); });
   const nSel = est.sel.size, todosSel = l.length > 0 && nSel === l.length;
-  const todosPend = comPendencia(est.pIni, est.pFim, est.pFaz).flatMap(x => x.p);
+  const todosPend = comPendencia(est.pIni, est.pFim, est.pFaz, '', 'qtd', est.pSit).flatMap(x => x.p);
   const nNao = todosPend.filter(x => x.situacao === 'nao_entregou').length;
   const nCor = todosPend.filter(x => x.situacao === 'correcao').length;
   const tagData = y => y.situacao === 'correcao'
@@ -940,11 +943,14 @@ function desenharPend() {
         <select id="bdPTipo" class="dc-mini bd-sel" aria-label="O que cobrar">
           ${Object.entries(TIPOS_PEND).map(([k, v]) => `<option value="${k}" ${est.pTipo === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
+        <select id="bdPSit" class="dc-mini bd-sel" aria-label="Situação do funcionário">
+          ${Object.entries(SITS_PEND).map(([k, v]) => `<option value="${k}" ${est.pSit === k ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
         <div id="bdPFaz" aria-label="Fazenda"></div>
         <label class="fer-filtro">Ordem <select id="bdPOrdem" class="dc-mini bd-sel" aria-label="Ordem da lista">
           ${Object.entries(ORDENS).map(([k, v]) => `<option value="${k}" ${est.pOrdem === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select></label>
-        ${est.pIni || est.pFim || est.pFaz.length || est.pTipo ? '<button class="btn mini" type="button" id="bdPLimpa">Limpar filtro</button>' : ''}
+        ${est.pIni || est.pFim || est.pFaz.length || est.pTipo || est.pSit ? '<button class="btn mini" type="button" id="bdPLimpa">Limpar filtro</button>' : ''}
       </div>
       <div class="pv-cards bd-cards">
         <button type="button" class="pv-card ${nNao ? 'pv-atencao' : 'pv-ok'}" data-tipo="nao_entregou" aria-pressed="${est.pTipo === 'nao_entregou'}"><span>Não entregou</span><strong>${nNao}</strong><small>${est.pIni || est.pFim ? 'no período' : 'todos em aberto'}</small></button>
@@ -985,12 +991,13 @@ function desenharPend() {
   montarMulti($('bdPFaz'), { opcoes: opcoesFazenda(), marcados: est.pFaz, todas: 'Todas as fazendas', plural: 'fazendas' });
   $('bdPFaz').addEventListener('change', () => setP('pFaz', $('bdPFaz').valores));
   $('bdPTipo').addEventListener('change', ev => setP('pTipo', ev.target.value));
+  $('bdPSit').addEventListener('change', ev => setP('pSit', ev.target.value));
   document.querySelectorAll('#telaBdPend [data-tipo]').forEach(b => b.addEventListener('click', () =>
     setP('pTipo', est.pTipo === b.dataset.tipo ? '' : b.dataset.tipo)));
-  $('bdPLimpa')?.addEventListener('click', () => { est.pIni = ''; est.pFim = ''; est.pFaz = []; est.pTipo = ''; desenharPend(); });
+  $('bdPLimpa')?.addEventListener('click', () => { est.pIni = ''; est.pFim = ''; est.pFaz = []; est.pTipo = ''; est.pSit = ''; desenharPend(); });
   $('bdIrMes')?.addEventListener('click', () => { est.mes = sm[0].d.slice(0, 7); irPara('bdMes'); });
   $('bdPOrdem').addEventListener('change', ev => setP('pOrdem', ev.target.value));
-  $('bdRelGeral').addEventListener('click', () => mostrarDoc(relGeral(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem, nSel ? est.sel : null), 'bdBarraPend'));
+  $('bdRelGeral').addEventListener('click', () => mostrarDoc(relGeral(est.pIni, est.pFim, est.pFaz, est.pTipo, est.pOrdem, nSel ? est.sel : null, est.pSit), 'bdBarraPend'));
   $('bdLote').addEventListener('click', ev => enviarLote(l.map(x => x.f.id).filter(id => est.sel.has(id)), ev.currentTarget));
   $('bdSelLimpa')?.addEventListener('click', () => { est.sel.clear(); desenharPend(); });
   $('bdSelTodos')?.addEventListener('change', ev => {
@@ -1088,5 +1095,5 @@ export function ligarBoletins(navegar, aviso) {
 
 export function limparBoletins() {
   carregados.clear();
-  Object.assign(est, { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '', pOrdem: 'qtd', sel: new Set() });
+  Object.assign(est, { dia: null, mes: null, busca: '', fazenda: [], pIni: '', pFim: '', pFaz: [], pTipo: '', pSit: '', pOrdem: 'qtd', sel: new Set() });
 }
