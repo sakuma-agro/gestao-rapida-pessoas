@@ -31,6 +31,9 @@ const estadoTela = {
   filtroSit: '',        // Lançados: '' todos · 'aberto' · 'fechado'
   filtroFunc: '',       // Lançados: id do funcionário ('' = todos) — 14/10/2026
   editando: null,       // id do boletim em edição na tela Lançar jornada
+  preencher: null,      // { fid, data } vindo do botão Lançar do painel (23/10/2026)
+  recTodos: false,      // painel: lista de pendentes de lançar inteira
+  recPeriodo: 'mes',    // painel: 'mes' (competência) ou 'geral' (todos os meses)
   reabrindo: null,
   pendAbertas: {},      // Fechamento: destino com a lista "Pendências do mês anterior" aberta (23/10/2026)
 };
@@ -116,6 +119,7 @@ export function limparJornada() {
   estadoTela.competencia = jd.competenciaAtual();
   competenciaDecidida = false;
   estadoTela.editando = null;
+  recGeral = null;
 }
 
 function aviso(texto, ok = false) {
@@ -152,27 +156,18 @@ const assinatura = () => '';
    =================================================================== */
 
 function desenharPainel() {
-  const bs = jd.dados.boletins;
   const aps = jd.dados.apuracoes;
-  const somar = campo => aps.reduce((s, a) => s + (a[campo] || 0), 0);
 
-  const extras = somar('min_extra_50') + somar('min_extra_100');
   const avisos = aps.flatMap(a => a.avisos || []);
   const semVinculo = jd.pessoasDp().filter(f =>
     (f.situacao || 'ATIVO') === 'ATIVO' && !jd.vinculoDe(f.id)).length;
 
   $('telaJorPainel').innerHTML = cabecalho('Departamento Pessoal', 'Apuração de jornada · Campo e Administrativo') + `
     <div class="jor-corpo">
-      <div class="jor-cartoes">
-        ${cartao(bs.length, 'BOLETINS LANÇADOS')}
-        ${cartao(horas(extras), 'HORAS EXTRAS')}
-        ${cartao(horas(somar('min_deficit')), 'DÉFICIT')}
-        ${cartao(avisos.length, 'AVISOS', avisos.length ? 'alerta' : '')}
-      </div>
+      ${painelRecebidos()}
 
       ${painelEmprestimos()}
       ${painelFerias()}
-      ${painelBoletins()}
       ${painelTarefas()}
       ${painelDocumentos()}
       ${painelAtrasados()}
@@ -191,6 +186,14 @@ function desenharPainel() {
     </div>` + assinatura();
 
   $('jorIrVinculos')?.addEventListener('click', () => irPara('funcionarios'));
+  $('jorRecPeriodo')?.addEventListener('change', ev => { estadoTela.recPeriodo = ev.target.value; estadoTela.recTodos = false; desenharPainel(); });
+  $('jorRecAtualizar')?.addEventListener('click', () => { recGeral = null; desenharPainel(); });
+  $('jorRecTodos')?.addEventListener('click', () => { estadoTela.recTodos = !estadoTela.recTodos; desenharPainel(); });
+  document.querySelectorAll('#telaJorPainel [data-lancar-pend]').forEach(b => b.addEventListener('click', () => {
+    const [fid, data] = b.dataset.lancarPend.split('|');
+    estadoTela.preencher = { fid, data };
+    irPara('jorLancar');
+  }));
   $('jorIrEmprestimos')?.addEventListener('click', () => irPara('empRecibos'));
   document.querySelectorAll('#telaJorPainel [data-ir-fer]').forEach(b =>
     b.addEventListener('click', () => irPara(b.dataset.irFer)));
@@ -218,12 +221,74 @@ function painelAtrasados() {
 }
 
 /* Boletins diários no painel: só para quem enxerga a tela de pendências. */
-function painelBoletins() {
-  if (!podeTela('bdPend')) return '';
-  const r = bol.resumoPainel();
-  if (!r.pendentes) return '';
-  return `<div class="jor-caixa alerta"><b>${r.pendentes} boletim(ns) de serviço pendente(s)</b> — ${r.naoEntregou} não entregue(s), ${r.correcao} em correção — de ${r.pessoas} pessoa(s).
-    <button class="btn mini" data-ir-fer="bdPend">Ver pendências</button></div>`;
+/* Recebidos × lançados × pendentes (23/10/2026, pedido dele) no lugar dos
+   cartões Boletins lançados / Horas extras / Déficit / Avisos. Mês = data do
+   fato dentro da competência escolhida. */
+function diasTxt(dias) {
+  const meses = new Map();
+  for (const d of dias) {
+    const k = d.slice(0, 7);
+    if (!meses.has(k)) meses.set(k, []);
+    meses.get(k).push(Number(d.slice(8, 10)));
+  }
+  return [...meses].map(([k, n]) => {
+    const partes = [];
+    for (let i = 0; i < n.length; i++) {
+      let j = i;
+      while (j + 1 < n.length && n[j + 1] === n[j] + 1) j++;
+      const a = String(n[i]).padStart(2, '0'), b = String(n[j]).padStart(2, '0');
+      partes.push(j - i >= 2 ? `${a} a ${b}` : j > i ? `${a}, ${b}` : a);
+      i = j;
+    }
+    return partes.join(', ') + '/' + k.slice(5, 7);
+  }).join(' · ');
+}
+
+/* Geral = todos os meses (23/10/2026, pedido dele). Busca à parte, guardada
+   na memória da tela; "Atualizar" busca de novo. */
+let recGeral = null, recGeralBuscando = false;
+async function buscarRecGeral() {
+  if (recGeralBuscando) return;
+  recGeralBuscando = true;
+  try { recGeral = await jd.carregarRecebidosGeral(); }
+  finally { recGeralBuscando = false; }
+  if (estadoTela.recPeriodo === 'geral' && $('telaJorPainel') && !$('telaJorPainel').hidden) desenharPainel();
+}
+
+function painelRecebidos() {
+  const geral = estadoTela.recPeriodo === 'geral';
+  let ini = estadoTela.competencia;
+  const [a, m] = ini.split('-').map(Number);
+  let fim = new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+  if (geral) { ini = '0000-01-01'; fim = '9999-12-31'; if (!recGeral) buscarRecGeral(); }
+  const seletor = `<select id="jorRecPeriodo" class="jor-rec-periodo" aria-label="Período">
+      <option value="mes"${geral ? '' : ' selected'}>Competência · ${esc(rotuloCompetencia(estadoTela.competencia))}</option>
+      <option value="geral"${geral ? ' selected' : ''}>Geral · todos os meses</option>
+    </select>${geral ? ' <button type="button" class="btn mini" id="jorRecAtualizar">Atualizar</button>' : ''}`;
+  if (geral && !recGeral) return `<div class="jor-rec-cab"><h3 class="jor-h3">Boletins</h3>${seletor}</div>
+    <p class="dc-sem">Buscando os boletins de todos os meses…</p>`;
+  const r = bol.recebidosDoMes(ini, fim, geral ? recGeral : jd.dados);
+  const pct = r.recebidos ? Math.round(100 * r.lancados / r.recebidos) : 0;
+  const lista = estadoTela.recTodos ? r.porPessoa : r.porPessoa.slice(0, 5);
+  const cobrar = podeTela('bdPend')
+    ? `<button type="button" class="jor-cartao alerta jor-cartao--botao" data-ir-fer="bdPend" title="Abrir as pendências dos Boletins diários"><b>${r.cobrar}</b><span>A COBRAR DO CAMPO</span></button>`
+    : cartao(r.cobrar, 'A COBRAR DO CAMPO', 'alerta');
+  return `<div class="jor-rec-cab"><h3 class="jor-h3">${geral ? 'Boletins · todos os meses' : 'Boletins do mês'}</h3>${seletor}</div>
+    <div class="jor-cartoes">
+      ${cartao(r.recebidos, 'RECEBIDOS')}
+      ${cartao(r.lancados, 'LANÇADOS', 'ok')}
+      ${cartao(r.pendentes, 'PENDENTES DE LANÇAR', r.pendentes ? 'pendente' : 'ok')}
+      ${cobrar}
+    </div>
+    ${r.recebidos ? `<div class="jor-rec-barra"><i style="width:${pct}%"></i></div>
+      <p class="dc-sem jor-rec-nota">${pct}% dos boletins recebidos já lançados · conta por funcionário e dia, pela data do fato</p>` : ''}
+    ${r.porPessoa.length ? `<div class="jor-rec-lista">
+      <div class="jor-rec-topo"><b>Recebidos e ainda não lançados</b>${r.porPessoa.length > 5
+        ? `<button type="button" class="btn mini" id="jorRecTodos">${estadoTela.recTodos ? 'Mostrar só os 5 primeiros' : `Ver todos (${r.porPessoa.length} pessoas)`}</button>` : ''}</div>
+      <table class="dc-planilha"><thead><tr><th>Funcionário</th><th class="ce">Qtd</th><th>Dias</th><th></th></tr></thead><tbody>
+        ${lista.map(p => `<tr><td>${esc(p.nome)}</td><td class="ce">${p.dias.length}</td><td>${diasTxt(p.dias)}</td>
+          <td class="ce"><button type="button" class="btn mini" data-lancar-pend="${p.fid}|${p.dias[0]}" title="Abre o Lançar jornada em ${dataBR(p.dias[0])}">Lançar</button></td></tr>`).join('')}
+      </tbody></table></div>` : ''}`;
 }
 
 /* Admissão e demissão no painel (23/10/2026): só para quem enxerga o Painel do submódulo. */
@@ -497,7 +562,16 @@ function desenharLancar() {
   document.querySelectorAll('input[name="bNivel"]').forEach(r =>
     r.addEventListener('change', () => $('bNivelBox').classList.remove('jor-falta')));
   prepararEdicao();
+  // Veio do botão Lançar do painel (23/10/2026): funcionário e dia pendente já preenchidos.
+  const pre = estadoTela.preencher; estadoTela.preencher = null;
+  if (pre && !estadoTela.editando) rascunho = null;
   const voltou = restaurarRascunho();
+  if (pre && !estadoTela.editando && [...$('bFunc').options].some(o => o.value === pre.fid)) {
+    $('bFunc').value = pre.fid; cadastroDoSelecionado();
+    $('bData').value = pre.data;
+    preencherJornadaPadrao();
+    setTimeout(() => $('bNumero')?.focus(), 0);
+  }
   mostrarDiaAuto(); mostrarMotivo(); mostrarApurado();
   if (voltou && !$('bMotivoRot').hidden) $('bMotivo').value = rascunho.valores.bMotivo || '';
   carregarDia(voltou);   // voltou do rascunho: o horário digitado fica como estava

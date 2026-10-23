@@ -1084,6 +1084,33 @@ export function resumoPainel() {
     naoEntregou: pend.filter(x => x.situacao === 'nao_entregou').length, correcao: pend.filter(x => x.situacao === 'correcao').length };
 }
 
+/* Painel do DP (23/10/2026, pedido dele): "lancei todos os boletins que
+   recebi?". Conta por funcionário × dia, pela DATA DO FATO no mês:
+   recebido = marcado Entregou em Boletins diários OU já lançado na Gestão de
+   jornada (se foi lançado, chegou); lançado = tem boletim na Gestão de
+   jornada; pendente = recebido sem lançamento; a cobrar = não entregou ou
+   em correção no mês. Os dados já vêm recortados pelo DP do login. */
+export function recebidosDoMes(ini, fim, fonte = jd.dados) {
+  const noMes = d => d >= ini && d <= fim;
+  const lanc = new Set((fonte.bolJornada || [])
+    .filter(b => b.situacao !== 'cancelado' && noMes(b.data_fato) && jd.noMeuDp(b.funcionario_id))
+    .map(b => b.funcionario_id + '|' + b.data_fato));
+  const marc = (fonte.bolEntregas || []).filter(x => noMes(x.data) && jd.noMeuDp(x.funcionario_id));
+  const ent = marc.filter(x => x.situacao === 'entregou');
+  const rec = new Set([...lanc, ...ent.map(x => x.funcionario_id + '|' + x.data)]);
+  const pend = ent.filter(x => !lanc.has(x.funcionario_id + '|' + x.data));
+  const grupos = new Map();
+  for (const x of pend) {
+    if (!grupos.has(x.funcionario_id)) grupos.set(x.funcionario_id, []);
+    grupos.get(x.funcionario_id).push(x.data);
+  }
+  const nomes = new Map(jd.pessoasDp().map(f => [f.id, f.nome]));
+  const porPessoa = [...grupos].map(([fid, dias]) => ({ fid, nome: nomes.get(fid) || '—', dias: dias.sort() }))
+    .sort((a, b) => b.dias.length - a.dias.length || a.nome.localeCompare(b.nome, 'pt-BR'));
+  return { recebidos: rec.size, lancados: lanc.size, pendentes: pend.length,
+    cobrar: marc.filter(x => ehPend(x.situacao)).length, porPessoa };
+}
+
 /* ===================================================================
    LIGAÇÃO
    =================================================================== */

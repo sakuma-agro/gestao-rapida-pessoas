@@ -385,6 +385,23 @@ export async function carregarEntregas(ini, fim) {
   salvarCache();
 }
 
+/* Painel do DP, visão Geral (23/10/2026): entregas e lançamentos de TODOS os
+   meses, só os campos que a conta usa. Sem rede, fica com o que já está na
+   memória. Recortado pelo DP do login. */
+export async function carregarRecebidosGeral() {
+  const c = estado.cliente;
+  const local = () => ({ bolEntregas: dados.bolEntregas || [], bolJornada: dados.bolJornada || [] });
+  if (!c || !estado.sessao) return local();
+  try {
+    const [ent, bol] = await Promise.all([
+      todas(() => c.from(TABELAS.bolEntregas).select('funcionario_id,data,situacao')
+        .in('situacao', ['entregou', 'nao_entregou', 'correcao']).order('data')),
+      todas(() => c.from(TABELAS.boletins).select('funcionario_id,data_fato,situacao').order('data_fato')),
+    ]);
+    return { bolEntregas: soMeuDp(ent), bolJornada: soMeuDp(bol) };
+  } catch { return local(); }
+}
+
 /* ---------------- escrita ---------------- */
 
 /* Coleções gravadas num formato diferente do que a tela usa. */
