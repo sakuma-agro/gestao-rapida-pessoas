@@ -252,6 +252,69 @@ export function podeEnviar(consolidado) {
 const MESES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 export const mesCurto = c => { const [a, m] = c.split('-').map(Number); return `${MESES_ABREV[m - 1]}/${a}`; };
 
+/* ------------------------------------------------------------------
+   Pendências do mês anterior (23/10/2026, pedido dele). Boletim que ficou
+   gravado no mês anterior de um destino cujo mês anterior NÃO foi enviado
+   pelo app (ex.: setembro do DP 2 fechado fora do app). O botão do
+   Fechamento lista esses boletins e traz os escolhidos para a competência
+   aberta — viram "competência anterior", com observação no relatório.
+   ------------------------------------------------------------------ */
+
+const MESES_NOME = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+export const nomeMes = c => MESES_NOME[Number(c.split('-')[1]) - 1];
+
+export function competenciaAnterior(comp) {
+  const [a, m] = comp.split('-').map(Number);
+  return m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
+}
+
+export function pendenciasMesAnterior(competencia, destinoId) {
+  const ant = competenciaAnterior(competencia);
+  if (jd.travada(ant, destinoId)) return [];      // mês anterior já foi ao DP: nada pendente
+  const atual = jd.competenciaDoDestino(competencia, destinoId);
+  if (atual && !['aberta', 'reaberta'].includes(atual.situacao)) return [];
+  const unidades = new Set(jd.dados.unidades.filter(u => u.destino_id === destinoId).map(u => u.id));
+  return jd.dados.boletins
+    .filter(b => b.competencia === ant && b.situacao !== 'cancelado' && unidades.has(b.unidade_id))
+    .map(b => {
+      const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      const f = jd.pessoasDp().find(x => x.id === b.funcionario_id);
+      return { b, nome: f?.nome || '', data: b.data_fato,
+               extra: (a.min_extra_50 || 0) + (a.min_extra_100 || 0),
+               falta: (a.min_deficit || 0) > 0 && !b.hora_ini };
+    })
+    .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR') || x.data.localeCompare(y.data));
+}
+
+/** Leva os boletins escolhidos para a competência aberta, com registro na auditoria. */
+export async function trazerParaCompetencia(boletins, competencia) {
+  for (const b of boletins) {
+    const depois = { ...b, competencia, atualizado_em: new Date().toISOString() };
+    delete depois._base;
+    await jd.salvar('boletins', depois);
+    await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'update', antes: b, depois,
+      justificativa: `Pendência do mês anterior trazida para ${mesCurto(competencia)}` });
+  }
+}
+
+/** "obs.: inclui 1,00 h de setembro (30/09)" — linha da competência com boletim atrasado. */
+export function obsAnterior(linha, fmt) {
+  if (!linha.atrasados?.length) return '';
+  const porMes = {};
+  for (const x of linha.atrasados) (porMes[x.origem] ||= []).push(x);
+  return 'obs.: inclui ' + Object.keys(porMes).sort().map(m => {
+    const xs = porMes[m];
+    const min = xs.reduce((s, x) => s + x.extra, 0);
+    const faltas = xs.filter(x => x.falta).length;
+    const dias = xs.map(x => x.data.slice(8, 10) + '/' + x.data.slice(5, 7)).join(', ');
+    const partes = [];
+    if (min) partes.push(`${formatarHoras(min, fmt)} h`);
+    if (faltas) partes.push(`${faltas} falta${faltas > 1 ? 's' : ''}`);
+    return `${partes.join(' e ') || 'lançamento'} de ${nomeMes(m)} (boletim ${dias})`;
+  }).join('; ');
+}
+
 /** Comparativo com o mês anterior, para o número estranho saltar aos olhos. */
 export async function comparativo(competencia, destinoId) {
   const [a, m] = competencia.split('-').map(Number);

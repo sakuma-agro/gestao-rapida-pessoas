@@ -24,7 +24,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
-import { consolidar, formatarHoras, mesCurto } from './jornada-fechamento.js';
+import { consolidar, formatarHoras, mesCurto, obsAnterior } from './jornada-fechamento.js';
 import { minParaHHMM } from './jornada-motor.js';
 import { valorParaFolha, secaoRelatorioDP } from './jornada-emprestimos.js';
 
@@ -172,7 +172,7 @@ export function relatorioDP(competencia, destinoId) {
         <tbody>${g.linhas.map(l => {
           const parcela = valorParaFolha(l.vinculo.funcionario_id, competencia);
           return `<tr>
-          <td>${esc(l.nome)}</td>
+          <td>${esc(l.nome)}${l.atrasados.length ? `<br><span class="rel-mini rel-obs">${esc(obsAnterior(l, fmt))}</span>` : ''}</td>
           <td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
@@ -186,7 +186,7 @@ export function relatorioDP(competencia, destinoId) {
   const nota = linhas => {
     const atrasadas = linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
       .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
-    return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas de competência anterior</b>, lançadas depois do envio
+    return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas do mês anterior</b>, lançadas depois do fechamento
       daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
       Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
     ${''/* nota do intervalo não feito retirada a pedido dele (14/10/2026) — segue no Relatório detalhado */}

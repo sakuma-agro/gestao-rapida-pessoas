@@ -85,6 +85,7 @@
 }
 .rel-num { text-align: right; white-space: nowrap; }
 .rel-mini { font-size: 10px; color: #8A8D86; }
+.rel-obs { color: #744F28; }
 .rel-vazio { text-align: center; color: #8A8D86; padding: 12px; }
 
 /* ---- ficha do extrato ---- */

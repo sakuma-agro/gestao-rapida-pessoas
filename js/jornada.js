@@ -31,6 +31,7 @@ const estadoTela = {
   filtroFunc: '',       // Lançados: id do funcionário ('' = todos) — 14/10/2026
   editando: null,       // id do boletim em edição na tela Lançar jornada
   reabrindo: null,
+  pendAbertas: {},      // Fechamento: destino com a lista "Pendências do mês anterior" aberta (23/10/2026)
 };
 
 const rotuloCompetencia = c => {
@@ -1592,6 +1593,10 @@ async function desenharFechamento() {
     const sit = comp?.situacao || 'aberta';
     const ant = await fech.comparativo(estadoTela.competencia, d.id);
     const h = m => fech.formatarHoras(m, d.formato_horas);
+    const pend = fech.pendenciasMesAnterior(estadoTela.competencia, d.id);
+    const mesAnt = fech.nomeMes(fech.competenciaAnterior(estadoTela.competencia));
+    const mesAtual = fech.nomeMes(estadoTela.competencia);
+    const pendAberta = pend.length && estadoTela.pendAbertas[d.id];
 
     const variacao = ant
       ? (() => {
@@ -1616,7 +1621,29 @@ async function desenharFechamento() {
             ${variacao}
           </div>
           <span class="tag ${sit === 'aberta' ? 'ativo' : ''}">${esc(sit)}${comp?.versao > 1 ? ` · v${comp.versao}` : ''}</span>
+          ${pend.length ? `<button class="btn mini jor-pend-btn" data-pendant="${d.id}">Pendências do mês anterior <span class="jor-pend-num">${pend.length}</span></button>` : ''}
         </div>
+
+        ${pendAberta ? `<div class="jor-caixa alerta jor-pend-caixa" data-pendcaixa="${d.id}">
+          <b>Pendências de ${esc(mesAnt)} — ${esc(d.nome)}</b>
+          <span class="dc-sem">Boletins que ficaram em ${esc(mesAnt)}, mês que não foi enviado ao DP pelo app. Os marcados entram em ${esc(mesAtual)} com observação no relatório.</span>
+          <table class="dc-planilha jor-pend-tab"><thead><tr>
+            <th class="ce"><input type="checkbox" data-pendtodos checked aria-label="Marcar todos"></th>
+            <th>Funcionário</th><th class="ce">Data</th><th class="ce">Boletim</th><th class="ce">Extras</th>
+          </tr></thead><tbody>
+            ${pend.map(p => `<tr>
+              <td class="ce"><input type="checkbox" data-pendbol="${p.b.id}" checked aria-label="Trazer ${esc(p.nome)}"></td>
+              <td>${esc(p.nome)}</td>
+              <td class="ce">${dataBR(p.data)}</td>
+              <td class="ce">${esc(p.b.numero || '—')}</td>
+              <td class="ce">${p.falta ? 'falta' : p.extra ? h(p.extra) : '—'}</td>
+            </tr>`).join('')}
+          </tbody></table>
+          <div class="jor-pend-acoes">
+            <button class="btn principal" data-pendtrazer="${d.id}">Trazer para ${esc(mesAtual)}</button>
+            <button class="btn" data-pendfechar="${d.id}">Deixar em ${esc(mesAnt)}</button>
+          </div>
+        </div>` : ''}
 
         ${check.bloqueios.length ? `<div class="jor-caixa alerta">
           <b>Não dá para enviar ainda:</b>
@@ -1638,7 +1665,8 @@ async function desenharFechamento() {
           ${c.linhas.map(l => `<tr>
             <td>${esc(l.nome)}${fer.afastadoNaComp(l.vinculo.funcionario_id, estadoTela.competencia)
               ? ' <span class="tag neutra">afastado</span>'
-              : l.boletins === 0 ? ' <span class="jor-pend">sem lançamento</span>' : ''}</td>
+              : l.boletins === 0 && !l.atrasados.length ? ' <span class="jor-pend">sem lançamento</span>' : ''}${l.atrasados.length
+              ? `<br><span class="jor-obs">${esc(fech.obsAnterior(l, d.formato_horas))}</span>` : ''}</td>
             <td class="dc-sem">${esc(l.unidadeNome)}</td>
             <td class="ce">${h(l.minExtraTotal)}</td>
             ${c.totais.atrasados ? `<td class="ce">${l.atrasados.length
@@ -1676,6 +1704,32 @@ async function desenharFechamento() {
     <div class="jor-corpo">${blocos.join('')}</div>` + assinatura();
 
   emp.ligarBlocoFechamento(() => desenharFechamento());
+
+  /* Pendências do mês anterior (23/10/2026). */
+  document.querySelectorAll('[data-pendant]').forEach(b => b.addEventListener('click', () => {
+    estadoTela.pendAbertas[b.dataset.pendant] = !estadoTela.pendAbertas[b.dataset.pendant];
+    desenharFechamento();
+  }));
+  document.querySelectorAll('[data-pendfechar]').forEach(b => b.addEventListener('click', () => {
+    estadoTela.pendAbertas[b.dataset.pendfechar] = false;
+    desenharFechamento();
+  }));
+  document.querySelectorAll('[data-pendtodos]').forEach(t => t.addEventListener('change', () => {
+    t.closest('[data-pendcaixa]').querySelectorAll('[data-pendbol]').forEach(c => { c.checked = t.checked; });
+  }));
+  document.querySelectorAll('[data-pendtrazer]').forEach(b => b.addEventListener('click', async () => {
+    const caixa = b.closest('[data-pendcaixa]');
+    const ids = [...caixa.querySelectorAll('[data-pendbol]:checked')].map(c => c.dataset.pendbol);
+    if (!ids.length) { aviso('Marque pelo menos um boletim para trazer.'); return; }
+    const boletins = jd.dados.boletins.filter(x => ids.includes(x.id));
+    b.disabled = true;
+    try {
+      await fech.trazerParaCompetencia(boletins, estadoTela.competencia);
+      estadoTela.pendAbertas[b.dataset.pendtrazer] = false;
+      aviso(`${boletins.length} boletim(ns) trazido(s) para ${rotuloCompetencia(estadoTela.competencia)}.`, true);
+    } catch (e) { aviso(e.message); }
+    desenharFechamento();
+  }));
 
   document.querySelectorAll('[data-enviar]').forEach(b => b.addEventListener('click', async () => {
     const c = fech.consolidar(estadoTela.competencia, b.dataset.enviar);

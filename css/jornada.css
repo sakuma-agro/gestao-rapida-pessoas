@@ -57,6 +57,16 @@
 
 .jor-pend { color: #744F28; font-weight: 700; }
 
+/* Pendências do mês anterior no Fechamento (23/10/2026). */
+.jor-pend-btn { border-color: #744F28; color: #744F28; align-self: center; }
+.jor-pend-num { display: inline-block; background: #744F28; color: #fff; border-radius: 10px;
+  padding: 0 7px; margin-left: 4px; font-size: 11px; line-height: 18px; }
+.jor-pend-caixa > b { display: block; margin-bottom: 2px; color: #744F28; }
+.jor-pend-caixa > .dc-sem { display: block; margin-bottom: 8px; }
+.jor-pend-tab { margin: 0 0 10px; }
+.jor-caixa .jor-pend-acoes .btn { margin-left: 0; margin-right: 8px; }
+.jor-obs { font-size: 11px; color: #744F28; }
+
 .jor-total td { background: #EFF1EB; font-weight: 700; }
 
 .jor-nota { font-size: 12px; margin-top: 8px; }
