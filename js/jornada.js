@@ -13,6 +13,7 @@ import * as rel from './jornada-relatorios.js';
 import * as emp from './jornada-emprestimos.js';
 import * as fer from './jornada-ferias.js';
 import * as bol from './jornada-boletins.js';
+import * as tf from './dp-tarefas.js';
 import * as docm from './jornada-documentos.js';
 import * as tk from './jornada-ticket.js';
 import { podeTela } from './acesso.js';
@@ -172,6 +173,7 @@ function desenharPainel() {
       ${painelEmprestimos()}
       ${painelFerias()}
       ${painelBoletins()}
+      ${painelTarefas()}
       ${painelDocumentos()}
       ${painelAtrasados()}
 
@@ -222,6 +224,17 @@ function painelBoletins() {
   if (!r.pendentes) return '';
   return `<div class="jor-caixa alerta"><b>${r.pendentes} boletim(ns) de serviço pendente(s)</b> — ${r.naoEntregou} não entregue(s), ${r.correcao} em correção — de ${r.pessoas} pessoa(s).
     <button class="btn mini" data-ir-fer="bdPend">Ver pendências</button></div>`;
+}
+
+/* Admissão e demissão no painel (23/10/2026): só para quem enxerga o Painel do submódulo. */
+function painelTarefas() {
+  if (!podeTela('tfPainel')) return '';
+  const r = tf.resumoPainel();
+  if (!r.pessoas) return '';
+  return `<div class="jor-caixa ${r.atrasadas ? 'alerta' : ''}"><b>${r.pendentes} tarefa(s) de admissão/demissão pendente(s)</b> — ${
+    [r.admissao ? `${r.admissao} admissão(ões)` : '', r.demissao ? `${r.demissao} demissão(ões)` : ''].filter(Boolean).join(' e ')} em andamento${
+    r.atrasadas ? `, <b>${r.atrasadas} atrasada(s)</b>` : ''}.
+    <button class="btn mini" data-ir-fer="tfPainel">Admissão e demissão</button></div>`;
 }
 
 /* Folha, holerite e recibo no painel: só para quem enxerga o Painel do submódulo. */

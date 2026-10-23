@@ -69,6 +69,10 @@ export const TABELAS = {
      relatório emitido (chave = AAAA-MM). */
   ticketMes:      'jor_ticket_mes',
   ticketEmissoes: 'jor_ticket_emissoes',
+  /* Admissão e demissão (23/10/2026): listas modelo e as tarefas de cada
+     pessoa. Chave da tarefa = funcionario_id|evento|data|modelo. */
+  tarefaModelos:  'jor_tarefa_modelos',
+  tarefas:        'jor_tarefas',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
@@ -78,7 +82,7 @@ const APOIO = ['faltas', 'bolFerias', 'bolJornada'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave', ticketMes: 'chave', ticketEmissoes: 'competencia' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave', ticketMes: 'chave', ticketEmissoes: 'competencia', tarefas: 'chave' };
 const chaveDe = c => CHAVE[c] || 'id';
 
 export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
@@ -113,7 +117,7 @@ async function carregarCache() {
    ficam inteiros: a aba Cadastros continua mostrando todo mundo. */
 const POR_PESSOA = ['boletins', 'ocorrencias', 'emprestimos', 'abatimentos', 'salarios',
   'afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas', 'bolEntregas',
-  'docEntregas', 'banco', 'ticketMes', 'faltas', 'bolFerias', 'bolJornada'];
+  'docEntregas', 'banco', 'ticketMes', 'tarefas', 'faltas', 'bolFerias', 'bolJornada'];
 
 /** Destino de DP da pessoa, pelo vínculo → unidade. */
 export const destinoIdDoFuncionario = fid => unidadeDe(vinculoDe(fid))?.destino_id || null;
@@ -214,6 +218,8 @@ export async function carregar(competencia = competenciaAtual()) {
     }),
     // Ticket e vínculos dos indicadores: pequenos, vêm inteiros.
     ...['ticketMes', 'ticketEmissoes', 'indVinculos', 'tiposDeslig'].map(k => lerTabela(k)),
+    // Admissão e demissão: pequenas, vêm inteiras (painel do DP).
+    carregarTarefas().catch(() => {}),
   ]);
   if (apur.error) throw apur.error;
   dados.apuracoes = comBase(apur.data);
@@ -328,6 +334,28 @@ export async function carregarDocs() {
   const mapa = new Map(todos.filter(x => !fila.has(x.chave)).map(x => [x.chave, x]));
   for (const x of dados.docEntregas || []) if (fila.has(x.chave)) mapa.set(x.chave, x);
   dados.docEntregas = [...mapa.values()];
+  recortar();
+  salvarCache();
+}
+
+/* Admissão e demissão (23/10/2026): modelos e tarefas vêm inteiros. O que
+   ainda está na fila fica como está no aparelho. */
+export async function carregarTarefas() {
+  const c = estado.cliente;
+  if (!c || !estado.sessao) return;
+  await enviarFila();
+  const [mods, tars] = await Promise.all([
+    todas(() => c.from(TABELAS.tarefaModelos).select('*').order('ordem')),
+    todas(() => c.from(TABELAS.tarefas).select('*').order('data_evento')),
+  ]);
+  const naFila = (await nucleo.listarFila(CAMADA));
+  for (const [col, lista] of [['tarefaModelos', mods], ['tarefas', tars]]) {
+    const k = chaveDe(col);
+    const fila = new Set(naFila.filter(p => p.colecao === col).map(p => p.item[k]));
+    const mapa = new Map(comBase(lista).filter(x => !fila.has(x[k])).map(x => [x[k], x]));
+    for (const x of dados[col] || []) if (fila.has(x[k])) mapa.set(x[k], x);
+    dados[col] = [...mapa.values()];
+  }
   recortar();
   salvarCache();
 }

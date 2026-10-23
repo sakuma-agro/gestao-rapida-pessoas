@@ -152,6 +152,13 @@ export const MODULOS = [
     { id: 'dpPainel', nome: 'Painel', telas: [
       ['jorPainel',       'Painel'],
     ] },
+    /* Admissão e demissão (23/10/2026): tarefas que nascem ao cadastrar e ao
+       desligar um funcionário — js/dp-tarefas.js, tabelas jor_tarefa_modelos
+       e jor_tarefas. Quem tem o Painel marca qualquer tarefa. */
+    { id: 'tarefas', nome: 'Admissão e demissão', telas: [
+      ['tfPainel',        'Painel'],
+      ['tfModelos',       'Listas modelo'],
+    ] },
     { id: 'gestaoJornada', nome: 'Gestão de jornada', telas: [
       ['jorLancar',       'Lançar jornada'],
       ['jorBoletins',     'Lançados'],
@@ -275,6 +282,8 @@ export const ACAO_TELA = {
   dmPainel: 'consulta: quem deve e o que falta escanear',
   dmMes:    'marca entregue, não entregue, em correção',
   dmScan:   'marca escaneado (só o que já foi entregue)',
+  tfPainel: 'marca as tarefas de admissão e demissão como feitas',
+  tfModelos: 'edita as listas modelo de admissão e demissão',
 };
 
 // Quem ainda não estiver na lista entra com estes módulos — assim ninguém

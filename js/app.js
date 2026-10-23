@@ -45,7 +45,8 @@ import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirEtiquetas } from './etiquetas.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
-import { abrirSalarios, limparSalarios, TELAS_SALARIOS } from './rh-salarios.js';
+import { abrirSalarios, limparSalarios, TELAS_SALARIOS, _sal } from './rh-salarios.js';
+import { abrirTarefas, limparTarefas, ligarTarefas, gerarTarefas, TELAS_TAREFAS } from './dp-tarefas.js';
 import { abrirEnquadra, limparEnquadra, TELAS_ENQUADRA } from './rh-enquadramento.js';
 import { abrirSalarioDigno, limparSalarioDigno, TELAS_SALARIO_DIGNO } from './rh-salario-digno.js';
 import { verFichaCadastral, imprimirFichaCadastral, fecharFichaCadastral } from './ficha-cadastral.js';
@@ -225,6 +226,9 @@ function abrirAba(nome) {
   if (nome.startsWith('fer')) abrirFerias(nome);
   if (nome.startsWith('bd')) abrirBoletins(nome);
   if (nome.startsWith('dm')) abrirDocumentos(nome);
+  // DP › Admissão e demissão (23/10/2026) — js/dp-tarefas.js
+  for (const t of TELAS_TAREFAS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_TAREFAS.includes(nome)) abrirTarefas(nome);
   if (nome.startsWith('tk')) abrirTicket(nome);
 }
 
@@ -277,7 +281,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 
@@ -944,6 +948,7 @@ function desenharFuncionarios() {
       const mov = f && await iv.pedirMovimento('desligar', { nome: f.nome, admissao: iv.abertoDe(f.id)?.admissao || f.admissao });
       if (!mov) return;
       await iv.desligar(f, mov);
+      await tarefasDoMovimento(f, 'demissao', mov.data);
       desenharFuncionarios();
     }));
 
@@ -1038,6 +1043,14 @@ function opcoesFuncao(sel) {
   return '<option value=""></option>'
     + (atual ? `<option value="${atual.id}" selected>${esc(atual.nome)} (fora de uso — escolha o nível)</option>` : '')
     + grupos;
+}
+
+/** Gera as tarefas de admissão/demissão sem travar o cadastro se falhar. */
+async function tarefasDoMovimento(f, evento, data) {
+  try {
+    const n = await gerarTarefas(f, evento, data);
+    if (n) mostrarAviso(`${n} tarefa(s) de ${evento === 'admissao' ? 'admissão' : 'demissão'} criada(s) — DP › Admissão e demissão.`);
+  } catch (e) { console.warn('tarefas de admissão/demissão', e); }
 }
 
 function abrirFuncionario(id) {
@@ -1260,6 +1273,13 @@ $('formFunc').addEventListener('submit', async ev => {
       await iv.transferir(f, retratoAntes, mov.data, mov.tipo, jd.nomeUnidade(uNova));
     else await iv.sincronizar(f);
   } catch (e) { console.warn('vínculo dos indicadores', e); }
+
+  /* Admissão e demissão (23/10/2026): funcionário novo ativo e readmissão
+     geram a lista de admissão; desligamento, a de demissão. Só daqui para
+     frente — decisão dele. */
+  if (!antes && f.situacao === 'ATIVO') await tarefasDoMovimento(f, 'admissao', f.admissao);
+  else if (mov?.modo === 'reativar' && mov.escolha === 'readmissao') await tarefasDoMovimento(f, 'admissao', mov.data);
+  else if (mov?.modo === 'desligar') await tarefasDoMovimento(f, 'demissao', mov.data);
 
   $('dlgFunc').close();
   preencherControles(); desenharFuncionarios(); desenharSelecao();
@@ -2055,6 +2075,27 @@ ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);
 ligar('atividades do sst', ligarAtividades);
 ligar('brigada e socorros', () => ligarBrigada({ abrir: irParaTela }));
+/* DP › Admissão e demissão (23/10/2026): o botão "Abrir ›" de cada tarefa
+   leva à tela que resolve, já com a pessoa escolhida quando dá. */
+const depois = (fn, tentativas = 20) => setTimeout(() => { if (!fn() && tentativas > 0) depois(fn, tentativas - 1); }, 250);
+function acaoDaTarefa(acao, fid) {
+  const f = estado.funcionarios.find(x => x.id === fid);
+  if (!f) return;
+  const escolher = (sel, tela) => { irParaTela(tela); depois(() => {
+    const s = $(sel); if (!s || ![...s.options].some(o => o.value === fid)) return false;
+    s.value = fid; s.dispatchEvent(new Event('change')); return true; }); };
+  if (acao === 'termoSindical') return escolher('tmSinFunc', 'termoSindical');
+  if (acao === 'termoContrato') return escolher('tmConFunc', 'termoContrato');
+  if (acao === 'fichaEpi') { marcados.clear(); marcados.add(fid); irParaTela('fichas'); desenharSelecao(); return; }
+  if (acao === 'fichaCadastral') { irParaTela('funcionarios'); verFichaCadastral(f); return; }
+  if (acao === 'exames') { irParaTela('exRel'); depois(() => { const b = $('erBusca'); if (!b) return false;
+    b.value = f.nome; b.dispatchEvent(new Event('input')); return true; }); return; }
+  if (acao === 'salario') { irParaTela('rhSalarios'); depois(() => { if (!_sal.S.carregado) return false; _sal.abrirFicha(fid); return true; }); return; }
+  if (acao === 'treinamentos') return irParaTela('trFuncoes');
+  if (acao === 'armario') return irParaTela('etqArmarios');
+  if (acao === 'folhaPonto') return irParaTela('folhaPonto');
+}
+ligar('admissão e demissão', () => ligarTarefas({ abrir: irParaTela, acao: acaoDaTarefa, aviso: mostrarAviso }));
 ligar('termos', () => ligarTermos(mostrarAviso));
 ligar('backup', () => ligarBackup(mostrarAviso));
 ligar('acesso rápido', () => ligarAtalhos(abrirModulo, mostrarAviso));

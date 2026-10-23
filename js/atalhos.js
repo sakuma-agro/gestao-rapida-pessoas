@@ -51,6 +51,7 @@ const PROPRIOS = {
   bdMes:         ['calendario', 'Boletins do mês'],
   bdPend:        ['alerta', 'Boletins pendentes'],
   dmPainel:      ['recibo', 'Folha, holerite e recibo'],
+  tfPainel:      ['check', 'Admissão e demissão'],
   dmMes:         ['recibo', 'Documentos do mês'],
   dmScan:        ['check', 'Escanear documentos'],
   tkMes:         ['cartao', 'Ticket alimentação'],
