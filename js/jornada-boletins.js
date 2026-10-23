@@ -1090,6 +1090,10 @@ export function resumoPainel() {
    jornada (se foi lançado, chegou); lançado = tem boletim na Gestão de
    jornada; pendente = recebido sem lançamento; a cobrar = não entregou ou
    em correção no mês. Os dados já vêm recortados pelo DP do login. */
+/* Situação marcada em Boletins diários → tipo do dia na Gestão de jornada.
+   Folga não tem tipo na Gestão de jornada (não entra no Relatório Horas Extras). */
+const SIT_OCOR = { faltou: 'FALTA', atestado: 'ATESTADO' };
+
 export function recebidosDoMes(ini, fim, fonte = jd.dados) {
   // ini pode ser uma função (vários meses escolhidos no painel, 23/10/2026).
   const noMes = typeof ini === 'function' ? ini : d => d >= ini && d <= fim;
@@ -1108,8 +1112,22 @@ export function recebidosDoMes(ini, fim, fonte = jd.dados) {
   const nomes = new Map(jd.pessoasDp().map(f => [f.id, f.nome]));
   const porPessoa = [...grupos].map(([fid, dias]) => ({ fid, nome: nomes.get(fid) || '—', dias: dias.sort() }))
     .sort((a, b) => b.dias.length - a.dias.length || a.nome.localeCompare(b.nome, 'pt-BR'));
+  // Faltas e atestados marcados em Boletins diários e ainda sem lançamento na
+  // Gestão de jornada (23/10/2026, pedido dele: "o painel não me lembra de
+  // lançar as faltas e atestados" — sem eles o Relatório Horas Extras sai
+  // incompleto). Uma linha por pessoa × tipo, com os dias.
+  const ocor = marc.filter(x => SIT_OCOR[x.situacao] && !lanc.has(x.funcionario_id + '|' + x.data));
+  const gOc = new Map();
+  for (const x of ocor) {
+    const k = x.funcionario_id + '|' + x.situacao;
+    if (!gOc.has(k)) gOc.set(k, { fid: x.funcionario_id, sit: x.situacao, tipo: SIT_OCOR[x.situacao], dias: [] });
+    gOc.get(k).dias.push(x.data);
+  }
+  const ocorrencias = [...gOc.values()].map(o => ({ ...o, nome: nomes.get(o.fid) || '—', dias: o.dias.sort() }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.sit.localeCompare(b.sit));
   return { recebidos: rec.size, lancados: lanc.size, pendentes: pend.length,
-    cobrar: marc.filter(x => ehPend(x.situacao)).length, porPessoa };
+    cobrar: marc.filter(x => ehPend(x.situacao)).length, porPessoa,
+    ocorPendentes: ocor.length, ocorrencias };
 }
 
 /* ===================================================================

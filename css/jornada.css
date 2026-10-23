@@ -710,3 +710,10 @@
 .jor-rec-lista { border: 1px solid #E1E2DE; border-radius: 6px; background: #fff; margin-bottom: 18px; overflow-x: auto; }
 .jor-rec-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #E1E2DE; }
 .jor-rec-lista table { width: 100%; margin: 0; }
+
+/* Painel do DP: 5 cartões (faltas e atestados a lançar, 23/10/2026) */
+.jor-cartoes.cinco { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 900px) { .jor-cartoes.cinco { grid-template-columns: repeat(2, 1fr); } }
+.jor-oc-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+.jor-oc-tag.faltou { background: #F8E1DE; color: #A93226; }
+.jor-oc-tag.atestado { background: #E3EEF7; color: #2C6A9A; }

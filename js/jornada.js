@@ -200,8 +200,8 @@ function desenharPainel() {
   $('jorRecAtualizar')?.addEventListener('click', () => { recGeral = null; desenharPainel(); });
   $('jorRecTodos')?.addEventListener('click', () => { estadoTela.recTodos = !estadoTela.recTodos; desenharPainel(); });
   document.querySelectorAll('#telaJorPainel [data-lancar-pend]').forEach(b => b.addEventListener('click', () => {
-    const [fid, data] = b.dataset.lancarPend.split('|');
-    estadoTela.preencher = { fid, data };
+    const [fid, data, tipo] = b.dataset.lancarPend.split('|');
+    estadoTela.preencher = { fid, data, tipo: tipo || null };
     irPara('jorLancar');
   }));
   $('jorIrEmprestimos')?.addEventListener('click', () => irPara('empRecibos'));
@@ -306,11 +306,12 @@ function painelRecebidos() {
     ? `<button type="button" class="jor-cartao alerta jor-cartao--botao" data-ir-fer="bdPend" title="Abrir as pendências dos Boletins diários"><b>${r.cobrar}</b><span>A COBRAR DO CAMPO</span></button>`
     : cartao(r.cobrar, 'A COBRAR DO CAMPO', 'alerta');
   return `<div class="jor-rec-cab"><h3 class="jor-h3">${titulo}</h3>${seletor}</div>
-    <div class="jor-cartoes">
+    <div class="jor-cartoes cinco">
       ${cartao(r.recebidos, 'RECEBIDOS')}
       ${cartao(r.lancados, 'LANÇADOS', 'ok')}
       ${cartao(r.pendentes, 'PENDENTES DE LANÇAR', r.pendentes ? 'pendente' : 'ok')}
       ${cobrar}
+      ${cartao(r.ocorPendentes, 'FALTAS E ATESTADOS A LANÇAR', r.ocorPendentes ? 'pendente' : 'ok')}
     </div>
     ${r.recebidos ? `<div class="jor-rec-barra"><i style="width:${pct}%"></i></div>
       <p class="dc-sem jor-rec-nota">${pct}% dos boletins recebidos já lançados · conta por funcionário e dia, pela data do fato</p>` : ''}
@@ -320,6 +321,15 @@ function painelRecebidos() {
       <table class="dc-planilha"><thead><tr><th>Funcionário</th><th class="ce">Qtd</th><th>Dias</th><th></th></tr></thead><tbody>
         ${lista.map(p => `<tr><td>${esc(p.nome)}</td><td class="ce">${p.dias.length}</td><td>${diasTxt(p.dias)}</td>
           <td class="ce"><button type="button" class="btn mini" data-lancar-pend="${p.fid}|${p.dias[0]}" title="Abre o Lançar jornada em ${dataBR(p.dias[0])}">Lançar</button></td></tr>`).join('')}
+      </tbody></table></div>` : ''}
+    ${r.ocorrencias.length ? `<div class="jor-rec-lista">
+      <div class="jor-rec-topo"><b>Faltas e atestados marcados e ainda não lançados</b>
+        <span class="dc-sem" style="font-size:12px">sem eles o Relatório Horas Extras sai incompleto</span></div>
+      <table class="dc-planilha"><thead><tr><th>Funcionário</th><th>Tipo</th><th class="ce">Qtd</th><th>Dias</th><th></th></tr></thead><tbody>
+        ${r.ocorrencias.map(o => `<tr><td>${esc(o.nome)}</td>
+          <td><span class="jor-oc-tag ${o.sit}">${o.sit === 'faltou' ? 'Falta' : 'Atestado'}</span></td>
+          <td class="ce">${o.dias.length}</td><td>${diasTxt(o.dias)}</td>
+          <td class="ce"><button type="button" class="btn mini" data-lancar-pend="${o.fid}|${o.dias[0]}|${o.tipo}" title="Abre o Lançar jornada em ${dataBR(o.dias[0])} com o tipo do dia já escolhido">Lançar</button></td></tr>`).join('')}
       </tbody></table></div>` : ''}`;
 }
 
@@ -601,6 +611,10 @@ function desenharLancar() {
   if (pre && !estadoTela.editando && [...$('bFunc').options].some(o => o.value === pre.fid)) {
     $('bFunc').value = pre.fid; cadastroDoSelecionado();
     $('bData').value = pre.data;
+    // Falta / atestado vindo do painel: tipo do dia já escolhido (a falta vem
+    // como "Falta"; se for justificada, troca na hora de lançar).
+    const t = pre.tipo && jd.dados.tipos.find(x => x.codigo === pre.tipo && x.ativo !== false);
+    if (t) { $('bTipo').value = t.id; marcarNivelObrigatorio(); }
     preencherJornadaPadrao();
     setTimeout(() => $('bNumero')?.focus(), 0);
   }
