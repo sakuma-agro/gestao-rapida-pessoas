@@ -461,6 +461,32 @@ export const competenciaAtual = (d = new Date()) =>
 
 export const competenciaDe = dataISO => dataISO.slice(0, 8) + '01';
 
+/* Pendências do mês anterior (23/10/2026). Os boletins em memória são só os
+   da competência aberta; o Fechamento busca à parte os do mês anterior, com
+   as apurações, para o botão "Pendências do mês anterior". Sem rede: lista vazia. */
+dados.bolAnterior = [];
+dados.apurAnterior = [];
+let anteriorDe = null;
+export async function carregarAnterior(competencia, forcar = false) {
+  const [a, m] = competencia.split('-').map(Number);
+  const ant = m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
+  if (!forcar && anteriorDe === ant) return;
+  const c = estado.cliente;
+  if (!c || !estado.sessao) return;
+  try {
+    const r = await c.from(TABELAS.boletins).select('*').eq('competencia', ant).neq('situacao', 'cancelado');
+    if (r.error) throw r.error;
+    const ids = r.data.map(b => b.id);
+    const ap = ids.length ? await c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids) : { data: [] };
+    if (ap.error) throw ap.error;
+    dados.bolAnterior = r.data;
+    dados.apurAnterior = ap.data;
+    anteriorDe = ant;
+  } catch (e) {
+    console.warn('[jornada] pendências do mês anterior:', e.message || e);
+  }
+}
+
 /**
  * Parâmetros vigentes NA DATA DO FATO (RN-124) — não na data do lançamento.
  * É o que impede que mudar um percentual hoje recalcule o mês passado.

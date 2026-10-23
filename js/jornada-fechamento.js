@@ -275,10 +275,10 @@ export function pendenciasMesAnterior(competencia, destinoId) {
   const atual = jd.competenciaDoDestino(competencia, destinoId);
   if (atual && !['aberta', 'reaberta'].includes(atual.situacao)) return [];
   const unidades = new Set(jd.dados.unidades.filter(u => u.destino_id === destinoId).map(u => u.id));
-  return jd.dados.boletins
+  return (jd.dados.bolAnterior || [])
     .filter(b => b.competencia === ant && b.situacao !== 'cancelado' && unidades.has(b.unidade_id))
     .map(b => {
-      const a = jd.dados.apuracoes.find(x => x.boletim_id === b.id) || {};
+      const a = (jd.dados.apurAnterior || []).find(x => x.boletim_id === b.id) || {};
       const f = jd.pessoasDp().find(x => x.id === b.funcionario_id);
       return { b, nome: f?.nome || '', data: b.data_fato,
                extra: (a.min_extra_50 || 0) + (a.min_extra_100 || 0),
@@ -293,6 +293,10 @@ export async function trazerParaCompetencia(boletins, competencia) {
     const depois = { ...b, competencia, atualizado_em: new Date().toISOString() };
     delete depois._base;
     await jd.salvar('boletins', depois);
+    // A apuração vem junto para a memória da competência aberta (no banco ela não muda).
+    const ap = (jd.dados.apurAnterior || []).find(x => x.boletim_id === b.id);
+    if (ap && !jd.dados.apuracoes.some(x => x.boletim_id === b.id)) jd.dados.apuracoes.push({ ...ap });
+    jd.dados.bolAnterior = (jd.dados.bolAnterior || []).filter(x => x.id !== b.id);
     await jd.registrar({ tabela: 'jor_boletins', registro_id: b.id, acao: 'update', antes: b, depois,
       justificativa: `Pendência do mês anterior trazida para ${mesCurto(competencia)}` });
   }

@@ -1584,6 +1584,7 @@ function desenharAbatimento() {
 
 async function desenharFechamento() {
   limparUsosOrfaos(estadoTela.competencia);
+  await jd.carregarAnterior(estadoTela.competencia);
   const destinos = jd.destinosDp();
 
   const blocos = await Promise.all(destinos.map(async d => {
@@ -1721,7 +1722,7 @@ async function desenharFechamento() {
     const caixa = b.closest('[data-pendcaixa]');
     const ids = [...caixa.querySelectorAll('[data-pendbol]:checked')].map(c => c.dataset.pendbol);
     if (!ids.length) { aviso('Marque pelo menos um boletim para trazer.'); return; }
-    const boletins = jd.dados.boletins.filter(x => ids.includes(x.id));
+    const boletins = (jd.dados.bolAnterior || []).filter(x => ids.includes(x.id));
     b.disabled = true;
     try {
       await fech.trazerParaCompetencia(boletins, estadoTela.competencia);
