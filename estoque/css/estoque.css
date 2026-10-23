@@ -443,3 +443,16 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
   html.imp-pais body{page:paisagem}
   html.imp-pais #qcPendCorpo{display:none}
 }
+/* divergências e "+ Adicionar item" na contagem (23/10/2026) */
+.ct-criterio{margin:6px 0 2px;font-size:12.5px}
+.ct-div{margin:10px 0;padding:10px 12px;border:1px solid rgba(192,57,43,.35);border-left:4px solid #c0392b;border-radius:10px;background:rgba(192,57,43,.05)}
+.ct-div p{margin:0 0 8px;font-size:13px}
+.ct-div-tab{width:100%;font-size:13px}
+.ct-div-tab td,.ct-div-tab th{padding:5px 8px;border-bottom:1px solid var(--linha)}
+.ct-div-tab small{color:var(--suave)}
+.ct-div-ok{margin:10px 0;color:var(--verde-esc);font-weight:600;font-size:13px}
+.ct-div-btn{border-color:#c0392b !important;color:#a5342a !important;font-weight:700}
+.ai-lista{max-height:46vh;overflow:auto;margin:8px 0}
+.ai-item{width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--linha);cursor:pointer;font:inherit;color:inherit}
+.ai-item:hover{background:var(--tagA-bg)}
+.ai-novo{margin-top:10px}

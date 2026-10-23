@@ -1,0 +1,6 @@
+-- 23/10/2026: produtos duplicados juntados (pedido dele).
+-- 53 pares mesma grafia (Quebra Cocão × cadastro consolidado) + 25 pares da
+-- Quebra Cocão com nome diferente do da planilha Produtos_Consolidados_Sakuma.
+-- Para cada par: movimentos, lotes e compras passam para o item que fica; a
+-- contagem soma no item que fica e a linha do duplicado vira null; "Contado em"
+-- é unido; o duplicado fica ativo=false. Mapa guardado em public._dup_itens_20261023.

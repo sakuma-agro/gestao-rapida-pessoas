@@ -8,7 +8,7 @@
 import {
   $, esc, pronto, todos, aviso, souAdmin, meuNome, locais as todosLocais, podeLocal, itensOrdenados, itensDoLocal,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
-  contagensDoMes, rodadaDe, nomeRodada,
+  contagensDoMes, rodadaDe, nomeRodada, maisNova, saldoRegistrado, UNIDADES,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
   temMinimo, precisaRepor as precisaReporGeral, textoPedido, comMinimoDo,
   mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
@@ -64,15 +64,42 @@ const precisaRepor = (item, qtd, localId = sel.localId) => precisaReporGeral(com
    como todos os tipos fechados. */
 const idGrupoC = (cid, g) => cid + ':' + g;
 const grupoDe = i => (i && i.grupo) || 'Outros';
-const gruposDoLocal = localId => [...new Set(itensDoLocal(localId).map(grupoDe))];
+/* Lista da contagem (pedido dele, 23/10/2026): só o que TEM em estoque —
+   saldo registrado no app diferente de zero (entradas e saídas, ou o saldo do
+   sistema lançado no Acerto) —, mais o que já foi lançado nesta contagem e o
+   que a pessoa acrescentar pelo "+ Adicionar item". Estoque sem saldo
+   registrado: o que tinha quantidade na última contagem fechada; sem nenhuma
+   contagem antes, todos os itens. */
+const temQtd = l => !!l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '';
+const dataRef = c => (c && c.data_contagem) || hojeLocal();
+function contagemAnteriorFechada(localId, mes, c) {
+  const r = c ? rodadaDe(c) : 9999;
+  return todos('est_contagens').filter(x => x.local_id === localId && x.status === 'fechada'
+    && (x.mes < mes || (x.mes === mes && rodadaDe(x) < r))).sort(maisNova)[0] || null;
+}
+function itensDaContagem(localId, mes, c) {
+  const todosItens = itensDoLocal(localId);
+  const naContagem = new Set((c ? linhasDe(c.id) : []).map(l => l.item_id));
+  const reg = saldoRegistrado(localId, mes, dataRef(c));
+  let tem, criterio;
+  if (reg) { tem = id => (reg.saldos.get(id) || 0) !== 0; criterio = 'registro'; }
+  else {
+    const ant = contagemAnteriorFechada(localId, mes, c);
+    if (!ant) return { itens: todosItens, criterio: 'todos', total: todosItens.length, reg: null };
+    const comQtd = new Set(linhasDe(ant.id).filter(l => Number(l.quantidade) > 0).map(l => l.item_id));
+    tem = id => comQtd.has(id); criterio = 'anterior';
+  }
+  return { itens: todosItens.filter(i => tem(i.id) || naContagem.has(i.id)), criterio, total: todosItens.length, reg };
+}
+const gruposDaContagem = (localId, mes, c) => [...new Set(itensDaContagem(localId, mes, c).itens.map(grupoDe))];
 const cgDe = (c, g) => c ? (todos('est_contagem_grupos').filter(x => x.id === idGrupoC(c.id, g)).pop() || null) : null;
 function grupoFechado(c, g) {
   if (!c) return false;
   const cg = cgDe(c, g);
   return cg ? cg.status === 'fechada' : c.status === 'fechada';
 }
-function progressoGrupo(c, localId, g) {
-  const itens = itensDoLocal(localId).filter(i => grupoDe(i) === g);
+function progressoGrupo(c, lista, g) {
+  const itens = lista.filter(i => grupoDe(i) === g);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const feitos = itens.filter(i => { const l = linhas.get(i.id); return l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== ''; }).length;
   return { feitos, total: itens.length };
@@ -80,9 +107,10 @@ function progressoGrupo(c, localId, g) {
 /** Situação de cada tipo de um almoxarifado no mês. */
 function situacaoTipos(localId, mes, rodada) {
   const c = contagem(localId, mes, rodada);
-  return gruposDoLocal(localId).map(g => {
+  const { itens } = itensDaContagem(localId, mes, c);
+  return [...new Set(itens.map(grupoDe))].map(g => {
     const cg = cgDe(c, g);
-    const p = progressoGrupo(c, localId, g);
+    const p = progressoGrupo(c, itens, g);
     const fechado = grupoFechado(c, g);
     return { g, cg, p, fechado, comecado: fechado || !!cg || p.feitos > 0 };
   });
@@ -96,7 +124,7 @@ async function garantirGrupo(c, g) {
 }
 /** Quando todos os tipos fecham, a contagem do mês fecha (e entra no Acerto). */
 async function conferirFechamentoMes(c) {
-  const tipos = gruposDoLocal(c.local_id);
+  const tipos = gruposDaContagem(c.local_id, c.mes, c);
   const todosFechados = tipos.every(g => grupoFechado(c, g));
   const datas = tipos.map(g => (cgDe(c, g) || {}).data_contagem).filter(Boolean).sort();
   if (todosFechados && c.status !== 'fechada') {
@@ -223,13 +251,23 @@ function desenharContar() {
   }
 
   const c = atual();
+  const base = itensDaContagem(sel.localId, sel.mes, c);
   const tipos = situacaoTipos(sel.localId, sel.mes, sel.rodada);
+  if (!tipos.length) {
+    alvo.innerHTML = cabecalhoEscolha() + `<div class="cartao">
+      <div class="vazio">Nada com saldo neste estoque em ${esc(nomeMes(sel.mes))}${base.reg ? ` (${esc(base.reg.texto)})` : ''}.
+      Se tem algum produto na prateleira, acrescente pela busca.</div>
+      <div class="barra fim"><button class="btn principal" type="button" id="ctAddItem">+ Adicionar item</button></div></div>`;
+    ligarEscolha();
+    $('ctAddItem').addEventListener('click', escolherItemNovo);
+    return;
+  }
   if (!tipos.some(t => t.g === sel.grupo)) sel.grupo = tipos[0].g;
   const tipo = tipos.find(t => t.g === sel.grupo);
   const cg = tipo.cg;
   const fechada = tipo.fechado;
-  const itensTodos = itens;
-  itens = itensTodos.filter(i => grupoDe(i) === sel.grupo);
+  itens = base.itens.filter(i => grupoDe(i) === sel.grupo);
+  const div = divergenciasDe(c, sel.localId, sel.mes, sel.grupo, fechada);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const p = tipo.p;
   const pct = p.total ? Math.round(100 * p.feitos / p.total) : 0;
@@ -281,17 +319,20 @@ function desenharContar() {
         <label class="campo ct-data">Data da contagem
           <input type="date" id="ctData" value="${esc(dataTipo || hojeLocal())}" max="${hojeLocal()}"${fechada ? ' disabled' : ''}></label></div>
       <div class="ct-topo-dir">
+        ${div && div.lista.length ? `<button class="btn ct-div-btn" type="button" id="ctVerDiv">⚠ ${div.lista.length} ${div.lista.length === 1 ? 'divergência' : 'divergências'}</button>` : ''}
         <button class="btn" type="button" id="ctImprimirLista">🖨 Imprimir lista</button>
         <div class="ct-conta"><strong>${p.feitos}</strong> de ${p.total} contados</div>
       </div>
     </div>
     <div class="ct-barra"><span style="width:${pct}%"></span></div>
     ${abasTipos(tipos)}
+    <p class="dc-sem ct-criterio">${textoCriterio(base)}</p>
     ${chipsGrupos(itens, linhas)}
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Procurar item
         <input type="text" id="ctBusca" placeholder="Digite parte do nome..." value="${esc(busca)}"></label>
       <label class="es-check"><input type="checkbox" id="ctSoFalta"${soFalta ? ' checked' : ''}> só o que falta contar</label>
+      ${fechada ? '' : '<button class="btn" type="button" id="ctAddItem">+ Adicionar item</button>'}
     </div>
     <div class="ct-lista${soFalta ? ' so-falta' : ''}" id="ctLista">${corpo}</div>
     <div class="barra entre ct-pe">
@@ -324,6 +365,8 @@ function desenharContar() {
   $('ctReabrir')?.addEventListener('click', reabrir);
   $('ctData')?.addEventListener('change', salvarData);
   $('ctImprimirLista')?.addEventListener('click', escolherImpressao);
+  $('ctAddItem')?.addEventListener('click', escolherItemNovo);
+  $('ctVerDiv')?.addEventListener('click', () => abrirDivergencias(c, sel.grupo));
 
   alvo.querySelectorAll('[data-mais]').forEach(b => b.addEventListener('click', () => alternarLotes(b.dataset.mais)));
   ligarLotes(alvo);
@@ -842,15 +885,15 @@ function atualizarConta() {
   if (lugar) {
     const linhas = new Map(linhasDe(c.id).map(l => [l.item_id, l]));
     const novo = document.createElement('div');
-    novo.innerHTML = chipsGrupos(itensDoLocal(sel.localId).filter(i => grupoDe(i) === sel.grupo), linhas);
+    novo.innerHTML = chipsGrupos(itensDaContagem(sel.localId, sel.mes, atual()).itens.filter(i => grupoDe(i) === sel.grupo), linhas);
     const n = novo.firstElementChild;
     const rolagem = chips ? chips.scrollLeft : 0;
     if (chips) chips.remove();
     if (n) { (document.querySelector('.ct-tipos') || document.querySelector('.ct-barra')).after(n); n.scrollLeft = rolagem; ligarChips(); }
     const aba = document.querySelector(`.ct-tipos [data-tipo="${CSS.escape(sel.grupo)}"] small`);
-    if (aba) { const pg = progressoGrupo(c, sel.localId, sel.grupo); aba.textContent = pg.feitos + '/' + pg.total; }
+    if (aba) { const pg = progressoGrupo(c, itensDaContagem(sel.localId, sel.mes, c).itens, sel.grupo); aba.textContent = pg.feitos + '/' + pg.total; }
   }
-  const p = progressoGrupo(c, sel.localId, sel.grupo);
+  const p = progressoGrupo(c, itensDaContagem(sel.localId, sel.mes, c).itens, sel.grupo);
   const el = document.querySelector('.ct-conta');
   if (el) el.innerHTML = `<strong>${p.feitos}</strong> de ${p.total} contados`;
   const barra = document.querySelector('.ct-barra span');
@@ -864,14 +907,15 @@ function confirmarFechar() {
   // o que estiver no campo e ainda não saiu dele também vale
   if (document.activeElement && document.activeElement.classList.contains('ct-qtd')) document.activeElement.blur();
   const c = atual();
-  const itens = itensDoLocal(sel.localId).filter(i => grupoDe(i) === sel.grupo);
+  const itens = itensDaContagem(sel.localId, sel.mes, c).itens.filter(i => grupoDe(i) === sel.grupo);
+  const div = divergenciasDe(c, sel.localId, sel.mes, sel.grupo, true);
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const branco = itens.filter(i => {
     const l = linhas.get(i.id);
     return !l || l.quantidade === null || l.quantidade === undefined || l.quantidade === '';
   });
   const local = locais().find(l => l.id === sel.localId);
-  const faltam = gruposDoLocal(sel.localId).filter(g => g !== sel.grupo && !grupoFechado(c, g));
+  const faltam = gruposDaContagem(sel.localId, sel.mes, c).filter(g => g !== sel.grupo && !grupoFechado(c, g));
   window.abrirModal('Fechar ' + sel.grupo, `
     <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}${esc(sufixoRodada(atual()))}</strong> · <strong>${esc(sel.grupo)}</strong> · contada em <strong>${esc(dataBR(dataEscolhida()))}</strong></p>
     ${branco.length
@@ -880,6 +924,7 @@ function confirmarFechar() {
          <ul class="ct-branco">${branco.slice(0, 12).map(i => `<li>${esc(i.nome)}</li>`).join('')}${branco.length > 12
            ? `<li>… e mais ${branco.length - 12}</li>` : ''}</ul>`
       : '<p>Todos os itens foram contados.</p>'}
+    ${blocoDivergencias(div, true)}
     <p class="dc-sem">Depois de fechado, ${esc(sel.grupo)} não pode mais ser alterado${souAdmin()
       ? ' (o administrador pode reabrir)' : ''}. ${faltam.length
       ? `A contagem do mês entra no Acerto quando os outros tipos fecharem (faltam: ${esc(faltam.join(', '))}).`
@@ -907,6 +952,9 @@ function confirmarFechar() {
         window.fecharModal();
         aviso(mesFechou ? `${sel.grupo} fechado. Todos os tipos fecharam: a contagem já entra no Acerto.` : `${sel.grupo} fechado.`);
         desenharContar();
+        // divergências do que acabou de fechar: aparecem na hora, para saber onde ajustar
+        const depois = divergenciasDe(atual(), sel.localId, sel.mes, sel.grupo, true);
+        if (depois && depois.lista.length) setTimeout(() => abrirDivergencias(atual(), sel.grupo), 300);
       } catch (e) {
         console.error(e);
         aviso('Não consegui fechar (' + (e.message || e) + ').', true);
@@ -921,7 +969,7 @@ async function reabrir() {
   if (!c || !souAdmin()) return;
   if (!confirm(`Reabrir ${sel.grupo} de ${nomeMes(sel.mes)}?${c.status === 'fechada' ? ' A contagem do mês sai do Acerto até fechar de novo.' : ''}`)) return;
   // contagem fechada de antes dos tipos: os outros tipos continuam fechados
-  for (const g of gruposDoLocal(sel.localId)) {
+  for (const g of gruposDaContagem(sel.localId, sel.mes, c)) {
     if (g !== sel.grupo && !cgDe(c, g) && c.status === 'fechada') {
       await gravar('est_contagem_grupos', { id: idGrupoC(c.id, g), contagem_id: c.id, grupo: g, status: 'fechada',
         data_contagem: c.data_contagem || null, fechada_por: c.fechada_por || null, fechada_em: c.fechada_em || null, ativo: true });
@@ -932,6 +980,199 @@ async function reabrir() {
   if (c.status === 'fechada') await gravar('est_contagens', Object.assign({}, c, { status: 'aberta', fechada_por: null, fechada_em: null }));
   aviso(`${sel.grupo} reaberto.`);
   desenharContar();
+}
+
+/* ===================================================================
+   Critério da lista e "+ Adicionar item" (pedido dele, 23/10/2026)
+   =================================================================== */
+function textoCriterio(base) {
+  const fora = base.total - base.itens.length;
+  if (base.criterio === 'todos') return `Todos os ${base.total} itens deste estoque (ainda não há saldo registrado nem contagem anterior).`;
+  const de = base.criterio === 'registro' ? 'com saldo em ' + base.reg.texto : 'que tinham quantidade na última contagem fechada';
+  return `Mostrando ${base.itens.length} de ${base.total} itens: só os ${de}, mais os acrescentados.${fora ? ' Achou na prateleira algo que não está aqui? Use <strong>+ Adicionar item</strong>.' : ''}`;
+}
+
+function escolherItemNovo() {
+  const c = atual();
+  const naLista = new Set(itensDaContagem(sel.localId, sel.mes, c).itens.map(i => i.id));
+  const fora = itensDoLocal(sel.localId).filter(i => !naLista.has(i.id));
+  window.abrirModal('Adicionar item à contagem', `
+    <p class="dc-sem">Procure o produto que está na prateleira e não apareceu na lista.</p>
+    <label class="campo">Produto <input type="text" id="aiBusca" placeholder="Digite parte do nome..." autocomplete="off"></label>
+    <div class="lista ai-lista" id="aiLista"></div>
+    <div id="aiNovo"></div>`, corpo => {
+    const busca = corpo.querySelector('#aiBusca');
+    const desenhar = () => {
+      const b = semAcento(busca.value).trim();
+      const achados = fora.filter(i => !b || semAcento(i.nome).includes(b)).slice(0, 40);
+      corpo.querySelector('#aiLista').innerHTML = achados.map(i => `<button type="button" class="item ai-item" data-add="${esc(i.id)}">
+        <span></span><div><div class="nome">${esc(i.nome)}</div><div class="sub">${esc(i.grupo || 'Outros')} · ${esc(i.unidade || '')}${i.localizacao ? ' · 📍 ' + esc(i.localizacao) : ''}</div></div></button>`).join('')
+        || `<div class="vazio">${b ? 'Nenhum item do cadastro com esse nome fora da lista.' : 'Todos os itens do cadastro já estão na lista.'}</div>`;
+      corpo.querySelectorAll('[data-add]').forEach(x => x.addEventListener('click', () => adicionarItem(fora.find(i => i.id === x.dataset.add))));
+      const nome = busca.value.replace(/\s+/g, ' ').trim();
+      const existe = itensDoLocal(sel.localId).some(i => semAcento(i.nome) === semAcento(nome));
+      corpo.querySelector('#aiNovo').innerHTML = nome.length >= 3 && !existe ? `<div class="cartao ai-novo">
+        <p>Não achou? Cadastrar <strong>${esc(nome)}</strong> como item novo deste estoque:</p>
+        <div class="grade">
+          <label class="campo">Unidade <select id="aiUni">${UNIDADES.map(u => `<option>${u}</option>`).join('')}</select></label>
+          <label class="campo">Grupo <select id="aiGrupo">${GRUPOS_TELA().map(g => `<option${g === sel.grupo ? ' selected' : ''}>${esc(g)}</option>`).join('')}</select></label>
+        </div>
+        <div class="barra fim"><button class="btn principal" type="button" id="aiCadastrar">Cadastrar e adicionar</button></div></div>` : '';
+      corpo.querySelector('#aiCadastrar')?.addEventListener('click', async ev => {
+        ev.target.disabled = true;
+        try {
+          const item = await gravarDireto('est_itens', { nome, unidade: corpo.querySelector('#aiUni').value,
+            grupo: corpo.querySelector('#aiGrupo').value, locais_contagem: [sel.localId], ativo: true });
+          await adicionarItem(item);
+        } catch (e) { console.error(e); aviso('Não consegui cadastrar (' + (e.message || e) + ').', true); ev.target.disabled = false; }
+      });
+    };
+    busca.addEventListener('input', desenhar);
+    desenhar();
+    setTimeout(() => busca.focus(), 50);
+  });
+}
+const GRUPOS_TELA = () => { const g = [...new Set(itensDoLocal(sel.localId).map(grupoDe))]; return g.length ? g : ['Defensivos']; };
+
+async function adicionarItem(item) {
+  if (!item) return;
+  const g = grupoDe(item);
+  const c0 = atual();
+  if (c0 && grupoFechado(c0, g)) { aviso(`${g} já foi fechado nesta contagem. Para incluir ${item.nome}, reabra ${g}.`, true); return; }
+  try {
+    sel.grupo = g;
+    try { localStorage.setItem(CHAVE_GRUPO, g); } catch { /* sem localStorage */ }
+    const c = await garantirContagem();
+    const ja = linhasDe(c.id).find(l => l.item_id === item.id);
+    if (!ja) await gravar('est_contagem_itens', { id: idLinha(c.id, item.id), contagem_id: c.id, item_id: item.id,
+      quantidade: null, contado_por: meuNome() });
+    window.fecharModal();
+    grupoFiltro = ''; busca = ''; soFalta = false;
+    desenharContar();
+    const inp = document.getElementById('q-' + item.id);
+    if (inp) { inp.scrollIntoView({ block: 'center' }); inp.focus(); }
+    aviso(`${item.nome} entrou na lista. Digite a quantidade.`);
+  } catch (e) {
+    console.error(e);
+    aviso('Não consegui adicionar (' + (e.message || e) + ').', true);
+  }
+}
+
+/* ===================================================================
+   Divergências (pedido dele, 23/10/2026): contado × registrado no app,
+   como no acerto dos defensivos e fertilizantes. Aparecem ao fechar um tipo,
+   num botão no alto da contagem e no Histórico. Na Quebra Cocão (entradas e
+   saídas no app) o administrador pode lançar os ajustes de balanço dali.
+   =================================================================== */
+/** grupo null = a contagem inteira. brancoZero: item sem número conta como zero (ao fechar). */
+function divergenciasDe(c, localId, mes, grupo, brancoZero) {
+  if (!localId) return null;
+  const { itens } = itensDaContagem(localId, mes, c);
+  const regs = new Map();
+  const regDo = g => {
+    if (!regs.has(g)) { const cg = c ? cgDe(c, g) : null; regs.set(g, saldoRegistrado(localId, mes, (cg && cg.data_contagem) || dataRef(c))); }
+    return regs.get(g);
+  };
+  const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
+  const lista = [];
+  let reg = null;
+  for (const i of itens) {
+    const g = grupoDe(i);
+    if (grupo && g !== grupo) continue;
+    const r = regDo(g);
+    if (!r) continue;
+    reg = reg || r;
+    const l = linhas.get(i.id);
+    const cont = temQtd(l) ? Number(l.quantidade) : (brancoZero ? 0 : null);
+    if (cont === null) continue;
+    const registrado = r.saldos.get(i.id) || 0;
+    const dif = Math.round((cont - registrado) * 1000) / 1000;
+    if (dif) lista.push({ item: i, registrado, contado: cont, dif, ate: r.ate });
+  }
+  if (!reg) reg = grupo ? regDo(grupo) : saldoRegistrado(localId, mes, dataRef(c));
+  return reg ? { reg, lista } : null;
+}
+const numDif = d => `<span class="${d.dif > 0 ? 'es-num-sobra' : 'es-num-falta'}">${d.dif > 0 ? '+' : '−'}${esc(mostrarNumero(Math.abs(d.dif)))} ${d.dif > 0 ? 'sobra' : 'falta'}</span>`;
+function tabelaDiv(lista) {
+  return `<div class="es-larga"><table class="tabela ct-div-tab"><thead><tr><th>Item</th><th class="ce">Registrado</th><th class="ce">Contado</th><th class="ce">Diferença</th></tr></thead>
+    <tbody>${lista.map(d => `<tr><td>${esc(d.item.nome)} <small>${esc(d.item.unidade || '')}</small></td><td class="ce">${esc(mostrarNumero(d.registrado))}</td>
+      <td class="ce">${esc(mostrarNumero(d.contado))}</td><td class="ce">${numDif(d)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function blocoDivergencias(div, aoFechar) {
+  if (!div) return `<p class="dc-sem">Este estoque não tem saldo registrado no app para comparar (nem entradas e saídas, nem saldo do sistema do mês).</p>`;
+  if (!div.lista.length) return `<p class="ct-div-ok">✓ Sem divergência: o contado bate com o registrado (${esc(div.reg.texto)}).</p>`;
+  return `<div class="ct-div">
+    <p><strong>⚠ ${div.lista.length} ${div.lista.length === 1 ? 'divergência' : 'divergências'}</strong> com o registrado (${esc(div.reg.texto)})${aoFechar ? ' — confira antes de fechar; item em branco entra como zero' : ''}:</p>
+    ${tabelaDiv(div.lista)}
+    <p class="dc-sem">${div.reg.fonte === 'movimentos'
+      ? 'Onde tem diferença, o estoque precisa de ajuste de balanço (entrada se sobrou, saída se faltou).'
+      : 'O ajuste é feito no sistema agro; depois, lance o saldo novo em Acerto › Saldo do sistema.'}</p></div>`;
+}
+
+function abrirDivergencias(c, grupo, folhaId = 'ctListaFolha') {
+  if (!c) return;
+  const div = divergenciasDe(c, c.local_id, c.mes, grupo, c.status === 'fechada' || (grupo && grupoFechado(c, grupo)));
+  const local = todosLocais().find(l => l.id === c.local_id) || {};
+  const titulo = `${local.nome || ''} · ${nomeMes(c.mes)}${sufixoRodada(c)}${grupo ? ' · ' + grupo : ''}`;
+  const podeAjustar = div && div.lista.length && div.reg.fonte === 'movimentos' && souAdmin()
+    && (grupo ? grupoFechado(c, grupo) : c.status === 'fechada');
+  window.abrirModal('Divergências da contagem', `
+    <p><strong>${esc(titulo)}</strong></p>
+    ${blocoDivergencias(div, false)}
+    <div class="barra fim">
+      ${div && div.lista.length ? '<button class="btn" type="button" id="dvImprimir">🖨 Imprimir</button>' : ''}
+      ${podeAjustar ? `<button class="btn principal" type="button" id="dvAjustar">Lançar ${div.lista.length} ${div.lista.length === 1 ? 'ajuste' : 'ajustes'} de balanço</button>` : ''}
+      <button class="btn" type="button" id="dvFechar">Fechar</button>
+    </div>`, corpo => {
+    corpo.querySelector('#dvFechar').onclick = window.fecharModal;
+    corpo.querySelector('#dvImprimir')?.addEventListener('click', () => {
+      montarFolhaDiv(folhaId, titulo, div);
+      window.fecharModal();
+      setTimeout(() => window.print(), 80);
+    });
+    corpo.querySelector('#dvAjustar')?.addEventListener('click', async ev => {
+      if (!confirm(`Lançar ${div.lista.length} ajuste(s) de balanço em ${local.nome} com data ${dataBR(div.lista[0].ate)}? O saldo do app passa a bater com a contagem.`)) return;
+      ev.target.disabled = true;
+      try {
+        const lancamento = crypto.randomUUID();
+        for (const d of div.lista) {
+          await gravar('est_movimentos', { id: crypto.randomUUID(), local_id: c.local_id, data: d.ate,
+            sentido: d.dif > 0 ? 'entrada' : 'saida', tipo: 'ajuste', item_id: d.item.id, quantidade: Math.abs(d.dif),
+            documento: 'Contagem ' + nomeMes(c.mes), operador: meuNome(), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
+            obs: `Ajuste da contagem de ${nomeMes(c.mes)}${sufixoRodada(c)} (${grupoDe(d.item)}): contado ${mostrarNumero(d.contado)}, registrado ${mostrarNumero(d.registrado)}` });
+        }
+        window.fecharModal();
+        aviso(`${div.lista.length} ajuste(s) de balanço lançados no Estoque ${local.nome}.`);
+        if (telaAberta === 'ctNova') desenharContar();
+      } catch (e) {
+        console.error(e);
+        aviso('Não consegui lançar os ajustes (' + (e.message || e) + ').', true);
+        ev.target.disabled = false;
+      }
+    });
+  });
+}
+
+/** Folha A4 das divergências, padrão SAKUMA, sem linha de assinatura. */
+function montarFolhaDiv(folhaId, titulo, div) {
+  const alvo = $(folhaId);
+  if (!alvo || !div) return;
+  const sobra = div.lista.filter(d => d.dif > 0).length;
+  alvo.innerHTML = `<div class="folha rel">
+    <div class="rel-topo">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit">
+        <h1>Divergências da Contagem de Estoque</h1>
+        <p>${esc(titulo)} · registrado: ${esc(div.reg.texto)}</p>
+      </div>
+    </div>
+    <p style="font-size:9pt;color:#51534A;margin:4mm 0 3mm">${div.lista.length} ${div.lista.length === 1 ? 'item' : 'itens'} com diferença: ${sobra} com sobra (precisa de entrada de ajuste) e ${div.lista.length - sobra} com falta (precisa de saída de ajuste).</p>
+    <table class="rel-tab"><thead><tr><th>Grupo</th><th>Item</th><th class="ce">Un.</th><th class="ce">Registrado</th><th class="ce">Contado</th><th class="ce">Diferença</th></tr></thead>
+    <tbody>${div.lista.map(d => `<tr><td>${esc(grupoDe(d.item))}</td><td>${esc(d.item.nome)}</td><td class="ce">${esc(d.item.unidade || '')}</td>
+      <td class="ce">${esc(mostrarNumero(d.registrado))}</td><td class="ce">${esc(mostrarNumero(d.contado))}</td>
+      <td class="ce">${d.dif > 0 ? '+' : '−'}${esc(mostrarNumero(Math.abs(d.dif)))}</td></tr>`).join('')}</tbody></table>
+    <div class="rel-pe"><span></span><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+  </div>`;
 }
 
 /* ===================================================================
@@ -946,13 +1187,14 @@ function desenharAndamento() {
   const ls = locais();
   const linhas = ls.map(l => {
     const c = contagem(l.id, mesAndamento);
-    const p = c ? progresso(c.id) : { feitos: 0, total: itensDoLocal(l.id).length };
+    const sit = situacaoTipos(l.id, mesAndamento);
+    const p = sit.reduce((t, x) => ({ feitos: t.feitos + x.p.feitos, total: t.total + x.p.total }), { feitos: 0, total: 0 });
     const rot = c && rodadaDe(c) > 1 ? ` <span class="tag neutra">${esc(nomeRodada(rodadaDe(c)))}</span>` : '';
     const situ = (!c ? '<span class="tag neutra">não começada</span>'
       : c.status === 'fechada' ? '<span class="tag ativo">fechada</span>'
         : '<span class="tag alerta">em andamento</span>') + rot;
     // um selo por tipo: ✓ fechado (com a data), em andamento ou não começado
-    const tiposTxt = situacaoTipos(l.id, mesAndamento).map(t => `<button type="button" class="ct-tipo-selo ${t.fechado ? 'ok' : t.comecado ? 'and' : ''}"
+    const tiposTxt = sit.map(t => `<button type="button" class="ct-tipo-selo ${t.fechado ? 'ok' : t.comecado ? 'and' : ''}"
       data-contar="${esc(l.id)}" data-tipo="${esc(t.g)}" title="${t.fechado ? 'fechado' : t.comecado ? 'em andamento' : 'não começado'}">${t.fechado ? '✓ ' : ''}${esc(t.g)} <small>${t.p.feitos}/${t.p.total}${t.cg && t.cg.data_contagem ? ' · ' + esc(dataBR(t.cg.data_contagem).slice(0, 5)) : ''}</small></button>`).join('');
     const quem = !c ? '' : c.status === 'fechada'
       ? `${textoData(c) ? esc(textoData(c)) + ' · ' : ''}fechada por ${esc(c.fechada_por || '—')} em ${esc(dataHora(c.fechada_em))}`
@@ -1010,6 +1252,7 @@ function desenharHistorico() {
       <div class="acoes">
         <button class="btn mini" type="button" data-ver="${esc(c.id)}">Ver</button>
         <button class="btn mini" type="button" data-imprimir="${esc(c.id)}">Imprimir</button>
+        <button class="btn mini" type="button" data-div="${esc(c.id)}">Divergências</button>
       </div></div>`;
   }).join('');
   alvo.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => {
@@ -1017,6 +1260,10 @@ function desenharHistorico() {
     if (!c) return;
     sel.localId = c.local_id; sel.mes = c.mes; sel.rodada = rodadaDe(c);
     window.abrirTelaEstoque('ctNova');
+  }));
+  alvo.querySelectorAll('[data-div]').forEach(b => b.addEventListener('click', () => {
+    const c = todos('est_contagens').find(x => x.id === b.dataset.div);
+    if (c) abrirDivergencias(c, null, 'ctFolha');
   }));
   alvo.querySelectorAll('[data-imprimir]').forEach(b => b.addEventListener('click', () => {
     montarFolha(b.dataset.imprimir);
@@ -1070,7 +1317,7 @@ const LINHAS_POR_FOLHA = 29;
 
 function escolherImpressao() {
   const c = atual();
-  const itens = itensDoLocal(sel.localId);
+  const itens = itensDaContagem(sel.localId, sel.mes, c).itens;
   const grupos = [...new Set(itens.map(i => i.grupo || 'Outros'))];
   const fechada = grupoFechado(c, sel.grupo);
   window.abrirModal('Imprimir lista da contagem', `
@@ -1103,7 +1350,7 @@ function montarListaImpressao(op) {
   const local = todosLocais().find(l => l.id === sel.localId) || {};
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));
   const tem = i => { const l = linhas.get(i.id); return l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== ''; };
-  const itens = itensDoLocal(sel.localId)
+  const itens = itensDaContagem(sel.localId, sel.mes, c).itens
     .filter(i => !op.grupo || (i.grupo || 'Outros') === op.grupo)
     .filter(i => !op.faltam || !tem(i));
   const gsOrdem = [...new Set(itens.map(i => i.grupo || 'Outros'))];
@@ -1124,16 +1371,16 @@ function montarListaImpressao(op) {
     corpo.push({ i, qtd: op.valores && l ? mostrarNumero(l.quantidade) : '' });
   }
   const folhas = [];
-  let atual = [], grupoAtual = null;
+  let folha = [], grupoAtual = null;
   for (const r of corpo) {
     if (r.grupo) grupoAtual = r.grupo;
-    if (atual.length >= LINHAS_POR_FOLHA) {
-      folhas.push(atual); atual = [];
-      if (!r.grupo) atual.push({ grupo: grupoAtual, cont: true });
+    if (folha.length >= LINHAS_POR_FOLHA) {
+      folhas.push(folha); folha = [];
+      if (!r.grupo) folha.push({ grupo: grupoAtual, cont: true });
     }
-    atual.push(r);
+    folha.push(r);
   }
-  if (atual.length || !folhas.length) folhas.push(atual);
+  if (folha.length || !folhas.length) folhas.push(folha);
 
   const temLoc = itens.some(i => i.localizacao);
   const ncol = 3 + (op.lotes ? 2 : 0) + 1 + (temLoc ? 1 : 0);

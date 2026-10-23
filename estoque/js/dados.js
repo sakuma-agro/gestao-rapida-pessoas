@@ -185,3 +185,35 @@ export const mesAnterior = m => {
   const d = new Date(a, mm - 2, 1);
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 };
+
+/* ---- saldo registrado no app (pedido dele, 23/10/2026) ----
+   O que o app diz que tem num estoque, para (1) a contagem mostrar só o que
+   tem em estoque e (2) avisar as divergências ao fechar. De onde vem:
+   - estoque com entradas e saídas lançadas no app (Quebra Cocão): saldo dos
+     movimentos até a data da contagem (pendência não conta, igual ao Estoque QC);
+   - senão, o saldo do sistema agro lançado no Acerto para o mês;
+   - senão, nada (null): não há com o que comparar. */
+const fimDoMes = m => { const [a, mm] = String(m).split('-').map(Number); const d = new Date(a, mm, 0); return a + '-' + String(mm).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+export function saldoRegistrado(localId, mes, ateData) {
+  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId).map(m => [m.id, m])).values()]
+    .filter(m => m.ativo !== false && !m.pendente);
+  if (movs.length) {
+    const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);
+    const sal = new Map();
+    for (const m of movs) {
+      if (String(m.data || '').slice(0, 10) > lim) continue;
+      const q = Number(m.quantidade) || 0;
+      sal.set(m.item_id, (sal.get(m.item_id) || 0) + (m.sentido === 'entrada' ? q : -q));
+    }
+    for (const [k, v] of sal) sal.set(k, Math.round(v * 1000) / 1000 || 0);
+    return { fonte: 'movimentos', saldos: sal, ate: lim, texto: 'entradas e saídas lançadas no app até ' + dataBR(lim) };
+  }
+  const ss = [...new Map(todos('est_saldos_sistema').filter(x => x.local_id === localId && x.mes === mes).map(x => [x.id, x])).values()]
+    .filter(x => x.saldo !== null && x.saldo !== undefined && x.saldo !== '');
+  if (ss.length) {
+    const sal = new Map();
+    for (const x of ss) sal.set(x.item_id, (sal.get(x.item_id) || 0) + (Number(x.saldo) || 0));
+    return { fonte: 'sistema', saldos: sal, texto: 'saldo do sistema lançado no Acerto (' + nomeMes(mes) + ')' };
+  }
+  return null;
+}
