@@ -6,7 +6,7 @@
 // número é guardado no aparelho na hora e sobe quando há sinal. Fechada a
 // contagem, ela entra sozinha no Acerto, no lugar das abas "Físico".
 import {
-  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais as todosLocais, podeLocal, itensOrdenados, itensDoLocal,
+  $, esc, pronto, todos, aviso, souAdmin, meuNome, locais as todosLocais, podeLocal, meusLocais, itensOrdenados, itensDoLocal,
   mesAtual, nomeMes, idContagem, idLinha, contagem, linhasDe, progresso,
   contagensDoMes, rodadaDe, nomeRodada, maisNova, saldoRegistrado, UNIDADES,
   lerNumero, mostrarNumero, dataHora, lotesDe, dataBR, hojeISO,
@@ -15,6 +15,10 @@ import {
 } from './dados.js';
 /* Só os estoques liberados para esta pessoa (22/10/2026). */
 const locais = () => todosLocais().filter(l => podeLocal(l.id));
+/* Quem pode excluir a contagem de um tipo (pedido dele, 23/10/2026): o
+   administrador e o responsável pelo estoque — quem tem esse estoque marcado
+   em Usuários - Acessos › Estoques que vê (ex.: Laís na Quebra Cocão). */
+const podeExcluir = localId => souAdmin() || meusLocais().includes(localId);
 import { desenharMapa, soltarMapa } from './mapa.js';
 import { gravar as gravarDireto } from './dados.js';
 
@@ -344,7 +348,7 @@ function desenharContar() {
       ${fechada
         ? (souAdmin() ? `<button class="btn" type="button" id="ctReabrir">Reabrir ${esc(sel.grupo)}</button>` : '')
         : `<button class="btn principal" type="button" id="ctFechar">Fechar ${esc(sel.grupo)}</button>`}
-      ${souAdmin() && tipo.comecado ? `<button class="btn ct-excluir" type="button" id="ctExcluir">Excluir contagem de ${esc(sel.grupo)}</button>` : ''}
+      ${podeExcluir(sel.localId) && tipo.comecado ? `<button class="btn ct-excluir" type="button" id="ctExcluir">Excluir contagem de ${esc(sel.grupo)}</button>` : ''}
       </span>
     </div>
   </div>`;
@@ -973,7 +977,7 @@ function confirmarFechar() {
    reabre (sai do Acerto até fechar de novo). Os outros tipos não mudam. */
 function excluirTipo() {
   const c = atual();
-  if (!c || !souAdmin()) return;
+  if (!c || !podeExcluir(sel.localId)) return;
   const g = sel.grupo;
   const ids = new Set(itensDoLocal(sel.localId).filter(i => grupoDe(i) === g).map(i => i.id));
   const linhas = linhasDe(c.id).filter(l => ids.has(l.item_id) && temQtd(l));
