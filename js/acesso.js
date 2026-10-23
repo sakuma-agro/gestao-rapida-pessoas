@@ -1118,6 +1118,7 @@ function desenharPermissoes() {
     ${blocoEst(e)}
     ${blocoCB(e)}
     ${blocoCP(e)}
+    ${blocoPJ(e)}
     ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
@@ -1178,6 +1179,12 @@ function desenharPermissoes() {
   $('usCP')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('colheita'); else mods.delete('colheita');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usPJ')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('projetos'); else mods.delete('projetos');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -1295,6 +1302,18 @@ function blocoCP(e) {
       <input type="checkbox" id="usCP" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Colheita e Produção</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · cargas, conferência, painel e cadastros'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Área Projetos (PMBOK)" (23/10/2026): entra ou não. */
+function blocoPJ(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('projetos'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="projetos">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usPJ" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Projetos (PMBOK)</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · todos os projetos, painel e lições aprendidas'}</span>
     </label>
   </div>`;
 }

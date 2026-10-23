@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Projetos · LOP - Gestão Rápida</title>
+<meta name="theme-color" content="#1B232B">
+<link rel="stylesheet" href="css/app.css?v=1">
+<link rel="stylesheet" href="css/projetos.css?v=1">
+<link rel="stylesheet" href="../css/categoria-moldura.css?v=1">
+<!-- Área Projetos (PMBOK) do LOP - Gestão Rápida (23/10/2026).
+     Gerenciamento dos projetos internos da SAKUMA pelas boas práticas do Guia
+     PMBOK e do material do MBA em Gerenciamento de Projetos. Esta página não
+     abre sozinha: mora dentro do app principal (a pasta de cima), numa
+     moldura, e usa o login de lá. -->
+<script>
+  (function () {
+    var dentro = false;
+    try { dentro = window.parent !== window && !!window.parent.grCliente; } catch (e) {}
+    if (!dentro) {
+      var q = location.search ? location.search.slice(1) + '&' : '';
+      location.replace('../?' + q + 'area=projetos');
+    }
+  })();
+</script>
+</head>
+<body class="embutido">
+
+<div id="app">
+  <header class="topo">
+    <nav class="abas" role="tablist" id="navModulos"></nav>
+    <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
+    <nav class="aba3s" role="tablist" id="navSub" hidden></nav>
+  </header>
+
+  <main>
+    <div class="aviso info" id="avisoGlobal" hidden></div>
+    <div class="aviso erro" id="pjSemAcesso" hidden></div>
+    <div class="est-estado naoimprimir">
+      <span class="estado" id="estado-conexao"><span class="ponto" id="ponto-conexao"></span><span id="txt-conexao"></span></span>
+      <button type="button" id="btn-fila" class="fila oculto">0 aguardando envio</button>
+    </div>
+
+    <!-- ---- ENTRADA ---- -->
+    <section class="tela inicio cb-inicio" id="telaInicio">
+      <div class="ini-lateral">
+        <nav class="ql naoimprimir" id="atalhosInicio" aria-label="Acesso rápido"></nav>
+        <div class="ini-centro">
+          <img class="in-sakuma" src="img/sakuma-marca-vertical.png" alt="SAKUMA Agronegócios">
+          <h2>Gestão Rápida <span>Projetos</span></h2>
+          <p class="in-dica">Projetos internos pelas boas práticas do Guia PMBOK: iniciação, planejamento, execução, monitoramento e controle, encerramento.</p>
+          <div class="lop-ass in-lop-escuro" role="img" aria-label="Desenvolvido por LOP — Inteligência para o agronegócio">
+            <img src="img/lop-marca.png" alt=""><span class="lop-div"></span>
+            <span class="lop-txt"><b>DESENVOLVIDO POR LOP</b><span>INTELIGÊNCIA PARA O AGRONEGÓCIO</span></span>
+          </div>
+          <img class="in-lop in-lop-claro" src="img/lop-assinatura-laser-claro.png" alt="">
+        </div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaPjPainel" hidden>
+      <div class="cartao">
+        <h2>Painel dos projetos</h2>
+        <p class="dica">Projetos por fase, semáforos de prazo, custo e escopo, atrasos e custos orçado × realizado.</p>
+        <div id="pjPainelCorpo"></div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaPjLista" hidden>
+      <div class="cartao">
+        <div id="pjListaCorpo"></div>
+      </div>
+      <div class="previa" id="pjFolha"></div>
+    </section>
+
+    <section class="tela" id="telaPjAlertas" hidden>
+      <div class="cartao">
+        <h2>Atrasos e alertas</h2>
+        <p class="dica">Tudo o que pede ação nos projetos em andamento. Toque na linha para abrir o projeto na aba certa.</p>
+        <div id="pjAlertasCorpo"></div>
+      </div>
+    </section>
+
+    <section class="tela" id="telaPjLicoes" hidden>
+      <div class="cartao">
+        <h2>Lições aprendidas</h2>
+        <p class="dica">O que deu certo e o que melhorar, de todos os projetos — para consultar antes de começar um novo.</p>
+        <div id="pjLicoesCorpo"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal oculto naoimprimir" role="dialog" aria-modal="true">
+  <div class="caixa">
+    <header><h2 id="modal-titulo"></h2>
+      <button type="button" id="modal-fechar" aria-label="Fechar">×</button></header>
+    <div id="modal-corpo"></div>
+  </div>
+</div>
+<div id="aviso" class="est-toast oculto naoimprimir" role="status"></div>
+
+<script src="../js/categoria-moldura.js?v=1"></script>
+<script src="../vendor/supabase.js"></script>
+<script src="../vendor/jspdf.umd.min.js"></script>
+<script src="../vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="js/config.js?v=1"></script>
+<script src="../js/moldura-nucleo.js?v=6"></script>
+<script src="js/base.js?v=1"></script>
+<script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>

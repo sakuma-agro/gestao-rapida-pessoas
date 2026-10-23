@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v360';
+const VERSAO = 'gr-v361';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -73,6 +73,14 @@ const ARQUIVOS = [
   './colheita/js/financeiro.js', './colheita/js/parametros.js', './colheita/js/pdf.js',
   './colheita/img/sakuma-logo.png', './colheita/img/lop-marca.png', './colheita/img/sakuma-marca-vertical.png',
   './colheita/img/lop-assinatura-laser-claro.png', './colheita/img/whatsapp.png',
+  './icons/area-projetos.v1.svg',
+  './projetos/', './projetos/index.html', './projetos/css/app.css', './projetos/css/projetos.css',
+  './projetos/js/config.js', './projetos/js/base.js', './projetos/js/acesso.js', './projetos/js/app.js', './projetos/js/dados.js',
+  './projetos/js/ui.js', './projetos/js/painel.js', './projetos/js/projetos.js', './projetos/js/abas-inicio.js',
+  './projetos/js/abas-escopo.js', './projetos/js/abas-plano.js', './projetos/js/abas-rede.js', './projetos/js/abas-controle.js',
+  './projetos/js/encerramento.js', './projetos/js/relatorio.js', './projetos/js/alertas.js', './projetos/js/licoes.js', './projetos/js/pdf.js',
+  './projetos/img/sakuma-logo.png', './projetos/img/lop-marca.png', './projetos/img/sakuma-marca-vertical.png',
+  './projetos/img/lop-assinatura-laser-claro.png', './projetos/img/whatsapp.png',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
   './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v1.svg',

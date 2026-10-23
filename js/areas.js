@@ -28,6 +28,8 @@ const VERSAO_EST = '27';
 const VERSAO_CB = '17';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
 const VERSAO_CP = '4';
+/* Sobe a cada publicação da área Projetos (PMBOK) (e nos ?v= do projetos/index.html). */
+const VERSAO_PJ = '1';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -64,6 +66,13 @@ export const AREAS = [
      Mora em colheita/, numa moldura. */
   { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v2.svg',
     desc: 'Painel da safra · Cargas · Conciliação balança/cooperativa · Cadastros · Financeiro' },
+  /* Projetos (PMBOK) (23/10/2026, pedido dele): os projetos internos da SAKUMA
+     pelas boas práticas do Guia PMBOK e do material do MBA — termo de
+     abertura, partes interessadas, escopo e requisitos, EAP, rede e caminho
+     crítico, RACI, riscos, comunicação, custos, mudanças, encerramento e
+     lições aprendidas. Mora em projetos/, numa moldura. */
+  { id: 'projetos', nome: 'Projetos (PMBOK)', icone: 'icons/area-projetos.v1.svg',
+    desc: 'Painel · Projetos (termo, EAP, rede, riscos, custos, mudanças) · Alertas · Lições aprendidas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
@@ -148,6 +157,8 @@ function liberada(id) {
   if (id === 'custobase') return acesso.admin || (acesso.modulos || []).includes('custobase');
   /* Colheita e Produção (20/10/2026): administrador ou módulo 'colheita'. */
   if (id === 'colheita') return acesso.admin || (acesso.modulos || []).includes('colheita');
+  /* Projetos (PMBOK) (23/10/2026): administrador ou módulo 'projetos'. */
+  if (id === 'projetos') return acesso.admin || (acesso.modulos || []).includes('projetos');
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -165,6 +176,7 @@ let molduraProgCarregada = false;
 let molduraEstCarregada = false;
 let molduraCBCarregada = false;
 let molduraCPCarregada = false;
+let molduraPJCarregada = false;
 
 export const areaAberta = () => areaAtual;
 
@@ -375,6 +387,24 @@ export function entrarNaArea(id, tela, extra) {
     }
     return;
   }
+  if (id === 'projetos') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('projetos');
+    medirTopo();
+    const moldura = $('molduraPJ');
+    if (!molduraPJCarregada || extra) {
+      molduraPJCarregada = true;
+      moldura.src = 'projetos/?v=' + VERSAO_PJ + (extra ? '&' + extra : '');
+    } else {
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'projetos/?v=' + VERSAO_PJ + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
   if (id === 'colheita') {
     $('navModulos').hidden = true;
     $('navTelas').hidden = true;
@@ -440,6 +470,7 @@ export function limparAreas() {
   molduraEstCarregada = false;
   molduraCBCarregada = false;
   molduraCPCarregada = false;
+  molduraPJCarregada = false;
   vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
   if (m) m.src = 'about:blank';
@@ -453,6 +484,8 @@ export function limparAreas() {
   if (mc) mc.src = 'about:blank';
   const mcp = $('molduraCP');
   if (mcp) mcp.src = 'about:blank';
+  const mpj = $('molduraPJ');
+  if (mpj) mpj.src = 'about:blank';
   pintarEtiqueta();
 }
 

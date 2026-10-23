@@ -118,7 +118,8 @@ function abrirAba(nome) {
   $('telaEst').hidden = nome !== 'estoque';
   $('telaCB').hidden = nome !== 'custobase';
   $('telaCP').hidden = nome !== 'colheita';
-  document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita'].includes(nome));
+  $('telaPJ').hidden = nome !== 'projetos';
+  document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita', 'projetos'].includes(nome));
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
@@ -1793,7 +1794,7 @@ async function sincronizarTudo() {
     for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarAnexos()]) {
       try { await fn(); } catch {}
     }
-    for (const id of ['molduraManut', 'molduraProg', 'molduraEst', 'molduraCB', 'molduraCP']) {
+    for (const id of ['molduraManut', 'molduraProg', 'molduraEst', 'molduraCB', 'molduraCP', 'molduraPJ']) {
       const m = $(id); try { if (m && m.src) m.contentWindow.postMessage({ tipo: 'gr-sincronizar' }, location.origin); } catch {}
     }
     try { await db.sincronizar(); } catch {}
