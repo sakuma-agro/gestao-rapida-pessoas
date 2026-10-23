@@ -563,6 +563,17 @@ function proximaData(iso) {
    07–19, desconta o que já foi pago e grava 3h, pagas em outubro. */
 const dia = { chave: '', boletins: [], apuracoes: [] };
 
+/* Coluna "Horário": com entrada/saída mostra a faixa; boletim só de hora
+   extra especial (23/10/2026) mostra o tipo; senão, o tipo do dia. */
+function horarioTxt(b) {
+  if (b.hora_ini) return `${b.hora_ini.slice(0, 5)}–${(b.hora_fim || '').slice(0, 5)}`;
+  if (b.he_especial_min > 0) {
+    const t = (jd.dados.tiposHe || []).find(x => x.id === b.he_especial_tipo_id);
+    return 'Só HE especial' + (t ? ': ' + esc(t.nome) : '');
+  }
+  return esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—');
+}
+
 const outrosDoDia = (fid, data) => (fid + '|' + data) !== dia.chave ? []
   : dia.boletins.filter(b => b.id !== estadoTela.editando && b.situacao !== 'cancelado' && b.hora_ini && b.hora_fim);
 
@@ -588,8 +599,7 @@ function mostrarDiaJa() {
   box.hidden = false;
   box.innerHTML = `<b>Já existe lançamento neste dia:</b> ${todos.map(b => {
     const s = situacaoBoletim(b);
-    const tipo = jd.dados.tipos.find(t => t.id === b.tipo_id);
-    return `${b.hora_ini ? `${b.hora_ini.slice(0, 5)}–${(b.hora_fim || '').slice(0, 5)}` : esc(tipo?.nome || '—')}${b.numero ? ` (nº ${esc(b.numero)})` : ''}
+    return `${horarioTxt(b)}${b.numero ? ` (nº ${esc(b.numero)})` : ''}
       · ${s.fechado ? `fechado, pago em ${esc(fech.mesCurto(s.pagoEm))}` : `em aberto, a pagar em ${esc(fech.mesCurto(s.pagoEm))}`}`;
   }).join('; ')}.
   ${outros.length ? `<br>Este lançamento entra como <b>complemento</b>: o app junta com o que já existe e grava só a diferença.
@@ -664,7 +674,7 @@ function entradaMarcada(e) {
   const m = { ini: $('bMIni').value, fim: $('bMFim').value, intervalo: Number($('bMInterv').value || 0) };
   if (!m.ini || !m.fim) return null;
   const bs = [...e.boletins];
-  const novo = ($('bIni').value && $('bFim').value) ? bs.pop() : { numero: $('bNumero').value, heEspecial: minutosHe() };
+  const novo = ($('bIni').value && $('bFim').value) || minutosHe() > 0 ? bs.pop() : { numero: $('bNumero').value, heEspecial: minutosHe() };
   bs.push({ ...novo, ...m });
   return { ...e, boletins: bs };
 }
@@ -866,13 +876,15 @@ function entradaDoFormulario() {
   }));
   return {
     data,
+    // 23/10/2026: a hora extra especial conta mesmo sem entrada/saída
+    // (boletim só de hora extra especial, inclusive domingo e feriado).
     boletins: [...doDia, ...(($('bIni').value && $('bFim').value) ? [{
       numero: $('bNumero').value,
       ini: $('bIni').value,
       fim: $('bFim').value,
       intervalo: Number($('bInterv').value || 0),
       heEspecial: minutosHe(),
-    }] : [])],
+    }] : minutosHe() > 0 ? [{ numero: $('bNumero').value, heEspecial: minutosHe() }] : [])],
     jornadaDia: jd.jornadaDoDia(v, data),
     tipo: tipo ? {
       codigo: tipo.codigo, nome: tipo.nome, apura: tipo.apura,
@@ -1155,8 +1167,7 @@ function desenharExtras() {
       </tr></thead><tbody>
         ${ord.map(({ b, f, a }) => `<tr><td>${dataBR(b.data_fato)}</td><td>${esc(b.numero || '—')}</td>
           <td>${esc(f.nome)}</td>
-          <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
-            : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}</td>
+          <td>${horarioTxt(b)}</td>
           <td class="ce">${horas(a?.min_extra_50)}</td><td class="ce">${horas(a?.min_extra_100)}</td>
           <td class="ce"><b>${horas((a?.min_extra_50 || 0) + (a?.min_extra_100 || 0))}</b></td>
           <td class="ce">${horas(a?.min_noturnos)}</td></tr>`).join('')}
@@ -1244,8 +1255,7 @@ function desenharBoletins() {
           <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? `<br><span class="jor-pend">pago em ${esc(rotuloCompetencia(b.competencia))}</span>` : ''}</td>
           <td>${esc(b.numero || '—')}${b.qualidade ? `<br><span class="jor-nivel-tag jor-nivel--${b.qualidade}">${nivelTexto(b.qualidade)}</span>` : ''}</td>
           <td>${esc(f?.nome || '—')}</td>
-          <td>${b.hora_ini ? `${b.hora_ini.slice(0,5)}–${(b.hora_fim||'').slice(0,5)}`
-            : esc(jd.dados.tipos.find(t => t.id === b.tipo_id)?.nome || '—')}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
+          <td>${horarioTxt(b)}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
               ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · marcou diferente</span>` : ''}</td>
           <td class="ce">${horas((a?.min_extra_50 || 0) + (a?.min_extra_100 || 0))}</td>
           <td class="ce">${b.insalubridade_dia ? 'Sim' : '—'}</td>

@@ -208,9 +208,16 @@ export function apurarDia(e) {
     // 5b. Domingo e feriado: TODO o tempo trabalhado é extra (RN-15/RN-16).
     const extra = minTrabalhados + heEspecial;
     if (percentual >= 100) minExtra100 = extra; else minExtra50 = extra;
-    linhas.push(`Todo o tempo do dia é extra a ${percentual}%: ${minParaHHMM(extra)}`);
+    linhas.push(`Todo o tempo do dia é extra a ${percentual}%: ${minParaHHMM(extra)}`
+      + (heEspecial > 0 ? ` (inclui hora extra especial ${minParaHHMM(heEspecial)})` : ''));
   } else {
     // 5c. Dia útil e sábado.
+    // Boletim só de hora extra especial (23/10/2026, pedido dele): sem
+    // entrada/saída no dia, não há déficit — conta só a hora extra especial.
+    if (!faixas.length && heEspecial > 0) {
+      if (percentual >= 100) minExtra100 = heEspecial; else minExtra50 = heEspecial;
+      linhas.push(`Só hora extra especial (sem horário no dia): ${minParaHHMM(heEspecial)} a ${percentual}%`);
+    } else {
     const bruto = minTrabalhados - minPrevistos;
     const marcacoes = Math.max(2, faixas.length * 2);
     const limite = Math.min(
@@ -241,6 +248,7 @@ export function apurarDia(e) {
     } else if (heEspecial > 0) {
       if (percentual >= 100) minExtra100 = heEspecial; else minExtra50 = heEspecial;
       linhas.push(`Hora extra especial: ${minParaHHMM(heEspecial)}`);
+    }
     }
   }
 

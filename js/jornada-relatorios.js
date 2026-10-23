@@ -650,7 +650,7 @@ export function extratoIndividual(competencia, funcionarioId) {
         return `<tr>
           <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? ' <span class="rel-mini">(mês anterior)</span>' : ''}</td>
           <td class="rel-num">${esc(b.numero || '—')}</td>
-          <td>${b.hora_ini ? `${String(b.hora_ini).slice(0,5)}–${String(b.hora_fim || '').slice(0,5)}` : '—'}</td>
+          <td>${b.hora_ini ? `${String(b.hora_ini).slice(0,5)}–${String(b.hora_fim || '').slice(0,5)}` : (b.he_especial_min > 0 ? 'Só HE especial' : '—')}</td>
           <td class="rel-num">${minParaHHMM(a.min_previstos || 0)}</td>
           <td class="rel-num">${minParaHHMM(a.min_trabalhados || 0)}</td>
           <td class="rel-num">${h(a.min_extra_50 || 0)}</td>
