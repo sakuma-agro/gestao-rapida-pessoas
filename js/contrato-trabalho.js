@@ -12,7 +12,7 @@
 // O contrato tem mais de uma folha: os parágrafos são distribuídos em folhas
 // A4 medindo o que cabe (paginar()), e o bloco de assinaturas nunca quebra.
 import { estado, modeloAtual, salvarModelo } from './store.js';
-import { LOGO, PE_LOP_SIMBOLO as PE_LOP } from './seed.js';
+import { LOGO } from './seed.js';
 import * as jd from './jornada-dados.js';
 
 const $ = id => document.getElementById(id);
@@ -204,7 +204,8 @@ function folhaVazia(primeira, titulo, nome) {
   d.innerHTML = `${primeira ? `<div class="an-topo ct-topo"><img src="${LOGO}" alt=""><div class="an-tit"><h1>${esc(titulo)}</h1><p>${esc(nome)}</p></div></div>`
     : `<div class="ct-cab"><span>${esc(titulo)}</span><span>${esc(nome)}</span></div>`}
     <div class="ct-corpo"></div>
-    <div class="an-pe"><span>SAKUMA Agronegócios</span><span class="ct-pag"></span></div>${PE_LOP}`;
+    <div class="an-pe"><span>SAKUMA Agronegócios</span><span class="ct-pag"></span></div>`;
+  // Sem a marca da LOP no contrato (pedido dele, 23/10/2026): é documento do empregador.
   return d;
 }
 
