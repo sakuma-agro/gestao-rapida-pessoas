@@ -1241,7 +1241,14 @@ function desenharPendencias() {
   </div>`;
   $('qcPendData').addEventListener('change', e => { dataEfetivar = e.target.value; });
   $('qcPendFolha').innerHTML = '';
-  $('qcPendRel').addEventListener('click', () => { montarFolhaPend(lista, sd, podeSair); setTimeout(() => window.print(), 50); });
+  $('qcPendRel').addEventListener('click', () => {
+    montarFolhaPend(lista, sd, podeSair);
+    // a página inteira vira paisagem só nesta impressão: com só a folha em
+    // paisagem o navegador soltava uma 1ª página retrato em branco (23/10/2026)
+    document.documentElement.classList.add('imp-pais');
+    window.addEventListener('afterprint', () => document.documentElement.classList.remove('imp-pais'), { once: true });
+    setTimeout(() => window.print(), 50);
+  });
   const efetivar = async (m, q) => {
     const total = Number(m.quantidade) || 0;
     const data = dataEfetivar === 'original' ? (m.pendente_desde || m.data) : hojeISO();
@@ -1303,8 +1310,7 @@ function montarFolhaPend(lista, sd, podeSair) {
     <table class="rel-tab rel-mov"><thead><tr><th class="ce">Pedido em</th><th class="ce">Doc.</th><th>Produto</th><th class="ce">Pedido</th>
       <th class="ce">Saiu</th><th class="ce">Pendente</th><th class="ce">Saldo hoje</th><th>Plantio / destino · Operador</th><th class="ce">Situação</th></tr></thead>
     <tbody>${linhas.join('')}</tbody></table>
-    <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
-      <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
+    <div class="rel-pe" style="justify-content:flex-end"><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
 }
 

@@ -438,4 +438,8 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .qc-card-pend:focus-visible{outline:2px solid var(--verde-esc);outline-offset:2px}
 /* Relatório de pendências em paisagem (23/10/2026, pedido dele) */
 .qc-folha-pais{width:296.8mm;min-height:210mm;page:paisagem;padding:10mm 12mm 8mm}
-@media print{ .qc-folha-pais{min-height:0;margin:0 auto !important} }
+@media print{
+  .qc-folha-pais{min-height:0;margin:0 auto !important;page-break-after:auto;break-after:auto}
+  html.imp-pais body{page:paisagem}
+  html.imp-pais #qcPendCorpo{display:none}
+}
