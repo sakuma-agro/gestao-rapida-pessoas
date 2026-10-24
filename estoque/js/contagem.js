@@ -76,24 +76,44 @@ const grupoDe = i => (i && i.grupo) || 'Outros';
    contagem antes, todos os itens. */
 const temQtd = l => !!l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '';
 const dataRef = c => (c && c.data_contagem) || hojeLocal();
-function contagemAnteriorFechada(localId, mes, c) {
+/* Por TIPO (correção 24/10/2026): um tipo que ficou todo zerado/em branco na
+   contagem anterior (ex.: 1ª contagem de out/2026 do Lote 35 fechada só com
+   EPIs, Fertilizantes zerados) não pode sumir da próxima. Para cada tipo
+   procura a última contagem fechada em que ELE teve quantidade; se nenhuma
+   teve, mostra todos os itens daquele tipo no estoque. */
+function contagensFechadasAntes(localId, mes, c) {
   const r = c ? rodadaDe(c) : 9999;
   return todos('est_contagens').filter(x => x.local_id === localId && x.status === 'fechada'
-    && (x.mes < mes || (x.mes === mes && rodadaDe(x) < r))).sort(maisNova)[0] || null;
+    && (x.mes < mes || (x.mes === mes && rodadaDe(x) < r))).sort(maisNova);
 }
 function itensDaContagem(localId, mes, c) {
   const todosItens = itensDoLocal(localId);
   const naContagem = new Set((c ? linhasDe(c.id) : []).map(l => l.item_id));
   const reg = saldoRegistrado(localId, mes, dataRef(c));
-  let tem, criterio;
-  if (reg) { tem = id => (reg.saldos.get(id) || 0) !== 0; criterio = 'registro'; }
-  else {
-    const ant = contagemAnteriorFechada(localId, mes, c);
-    if (!ant) return { itens: todosItens, criterio: 'todos', total: todosItens.length, reg: null };
-    const comQtd = new Set(linhasDe(ant.id).filter(l => Number(l.quantidade) > 0).map(l => l.item_id));
-    tem = id => comQtd.has(id); criterio = 'anterior';
-  }
-  return { itens: todosItens.filter(i => tem(i.id) || naContagem.has(i.id)), criterio, total: todosItens.length, reg };
+  const porGrupo = new Map();
+  todosItens.forEach(i => { const g = grupoDe(i); if (!porGrupo.has(g)) porGrupo.set(g, []); porGrupo.get(g).push(i); });
+  const antes = reg ? null : contagensFechadasAntes(localId, mes, c);
+  if (!reg && !antes.length) return { itens: todosItens, criterio: 'todos', total: todosItens.length, reg: null };
+  const comQtdDe = new Map(); // contagem id -> Set de item_id com quantidade > 0
+  const comQtd = cid => {
+    if (!comQtdDe.has(cid)) comQtdDe.set(cid, new Set(linhasDe(cid).filter(l => Number(l.quantidade) > 0).map(l => l.item_id)));
+    return comQtdDe.get(cid);
+  };
+  const itens = [];
+  porGrupo.forEach(lista => {
+    let tem = null;
+    if (reg) {
+      const comSaldo = lista.filter(i => (reg.saldos.get(i.id) || 0) !== 0);
+      if (comSaldo.length) tem = id => (reg.saldos.get(id) || 0) !== 0;
+    }
+    if (!tem) {
+      const lista2 = antes || contagensFechadasAntes(localId, mes, c);
+      const ant = lista2.find(x => lista.some(i => comQtd(x.id).has(i.id)));
+      tem = ant ? (id => comQtd(ant.id).has(id)) : (() => true);
+    }
+    lista.forEach(i => { if (tem(i.id) || naContagem.has(i.id)) itens.push(i); });
+  });
+  return { itens, criterio: reg ? 'registro' : 'anterior', total: todosItens.length, reg };
 }
 const gruposDaContagem = (localId, mes, c) => [...new Set(itensDaContagem(localId, mes, c).itens.map(grupoDe))];
 /* tipo excluído (ativo false, 23/10/2026) conta como não começado */
@@ -1048,7 +1068,7 @@ async function reabrir() {
 function textoCriterio(base) {
   const fora = base.total - base.itens.length;
   if (base.criterio === 'todos') return `Todos os ${base.total} itens deste estoque (ainda não há saldo registrado nem contagem anterior).`;
-  const de = base.criterio === 'registro' ? 'com saldo em ' + base.reg.texto : 'que tinham quantidade na última contagem fechada';
+  const de = base.criterio === 'registro' ? 'com saldo em ' + base.reg.texto : 'que tinham quantidade na última contagem fechada de cada tipo (tipo sem contagem anterior: todos os itens dele)';
   return `Mostrando ${base.itens.length} de ${base.total} itens: só os ${de}, mais os acrescentados.${fora ? ' Achou na prateleira algo que não está aqui? Use <strong>+ Adicionar item</strong>.' : ''}`;
 }
 
