@@ -49,7 +49,7 @@ export const AREAS = [
   /* Programação Campo (15/10/2026, pedido dele): o app avulso veio para dentro
      do LOP para usar os cadastros de funcionários (Pessoas) e de máquinas e
      implementos (Máquinas e Patrimônio). Mora em programacao/, numa moldura. */
-  { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v1.svg',
+  { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v2.svg',
     desc: 'Painel anual · Atividades · Reunião semanal · Relatório diário' },
   /* Estoque (15/10/2026, pedido dele): o app avulso Gestão Rápida (Estoque
      Inteligente) veio para dentro do LOP. Balanço, não movimento: contagem,

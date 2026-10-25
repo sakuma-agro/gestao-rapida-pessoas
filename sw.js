@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v366';
+const VERSAO = 'gr-v367';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -42,7 +42,7 @@ const ARQUIVOS = [
   './icons/area-pessoas.v1.svg', './icons/area-manutencoes.v1.svg',
   './icons/area-certificacao.v1.svg', './icons/area-vistorias.v1.svg', './icons/area-usuarios.v2.svg', './icons/area-backup.v1.svg',
   // Programação Campo (15/10/2026): abre sem sinal no campo, como o app avulso abria.
-  './icons/area-programacao.v1.svg',
+  './icons/area-programacao.v2.svg',
   './vendor/jspdf.umd.min.js', './vendor/jspdf.plugin.autotable.min.js',
   './programacao/', './programacao/index.html', './programacao/css/app.css', './programacao/css/programacao.css',
   './programacao/js/config.js', './programacao/js/base.js', './programacao/js/comum.js', './programacao/js/acesso.js',
