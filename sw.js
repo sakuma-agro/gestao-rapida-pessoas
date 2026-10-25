@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v367';
+const VERSAO = 'gr-v368';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -39,10 +39,10 @@ const ARQUIVOS = [
   // Vistorias e Segurança (14/10/2026): abre sem sinal no campo, como o app avulso abria.
   './icons/mod-vistorias.v1.png',
   /* ícones das áreas (14/10/2026): uma família, cor e símbolo por área */
-  './icons/area-pessoas.v1.svg', './icons/area-manutencoes.v1.svg',
-  './icons/area-certificacao.v1.svg', './icons/area-vistorias.v1.svg', './icons/area-usuarios.v2.svg', './icons/area-backup.v1.svg',
+  './icons/area-pessoas.v2.svg', './icons/area-manutencoes.v2.svg',
+  './icons/area-certificacao.v2.svg', './icons/area-vistorias.v2.svg', './icons/area-usuarios.v3.svg', './icons/area-backup.v2.svg',
   // Programação Campo (15/10/2026): abre sem sinal no campo, como o app avulso abria.
-  './icons/area-programacao.v2.svg',
+  './icons/area-programacao.v3.svg',
   './vendor/jspdf.umd.min.js', './vendor/jspdf.plugin.autotable.min.js',
   './programacao/', './programacao/index.html', './programacao/css/app.css', './programacao/css/programacao.css',
   './programacao/js/config.js', './programacao/js/base.js', './programacao/js/comum.js', './programacao/js/acesso.js',
@@ -51,7 +51,7 @@ const ARQUIVOS = [
   './programacao/img/sakuma-logo.png', './programacao/img/lop-marca.png',
   './programacao/img/whatsapp.png',
   // Estoque (15/10/2026): conta-se no almoxarifado, muitas vezes sem sinal.
-  './icons/area-estoque.v2.svg',
+  './icons/area-estoque.v3.svg',
   './estoque/', './estoque/index.html', './estoque/css/app.css', './estoque/css/estoque.css',
   './estoque/js/app.js', './estoque/js/acesso.js', './estoque/js/acerto.js',
   './estoque/js/acerto-motor.js', './estoque/js/planilha.js',
@@ -60,20 +60,20 @@ const ARQUIVOS = [
   './vendor/three.min.js', './vendor/three-orbit.js',
   './estoque/img/sakuma-logo.png', './estoque/img/lop-marca.png',
   // Custo Base (20/10/2026): rateio mensal por cultura, que era a planilha do ADM.
-  './icons/area-custobase.v2.svg',
+  './icons/area-custobase.v3.svg',
   './custobase/', './custobase/index.html', './custobase/css/app.css', './custobase/css/custobase.css',
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
   './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
   './custobase/img/sakuma-logo.png', './custobase/img/lop-marca.png', './custobase/img/sakuma-marca-vertical.png', './custobase/img/lop-assinatura-laser-claro.png',
   // Colheita e Produção (20/10/2026)
-  './icons/area-colheita.v2.svg',
+  './icons/area-colheita.v3.svg',
   './colheita/', './colheita/index.html', './colheita/css/app.css', './colheita/css/base.css', './colheita/css/colheita.css',
   './colheita/js/config.js', './colheita/js/base.js', './colheita/js/acesso.js', './colheita/js/app.js', './colheita/js/dados.js',
   './colheita/js/painel.js', './colheita/js/cargas.js', './colheita/js/conciliacao.js', './colheita/js/cadastros.js',
   './colheita/js/financeiro.js', './colheita/js/parametros.js', './colheita/js/pdf.js',
   './colheita/img/sakuma-logo.png', './colheita/img/lop-marca.png', './colheita/img/sakuma-marca-vertical.png',
   './colheita/img/lop-assinatura-laser-claro.png', './colheita/img/whatsapp.png',
-  './icons/area-projetos.v1.svg',
+  './icons/area-projetos.v2.svg',
   './projetos/', './projetos/index.html', './projetos/css/app.css', './projetos/css/projetos.css',
   './projetos/js/config.js', './projetos/js/base.js', './projetos/js/acesso.js', './projetos/js/app.js', './projetos/js/dados.js',
   './projetos/js/ui.js', './projetos/js/painel.js', './projetos/js/projetos.js', './projetos/js/abas-inicio.js',
@@ -83,7 +83,7 @@ const ARQUIVOS = [
   './projetos/img/lop-assinatura-laser-claro.png', './projetos/img/whatsapp.png',
   './vistorias/', './vistorias/index.html', './vistorias/lop-antes.js', './vistorias/lop-depois.js', './vistorias/vistorias.js',
   './vistorias/img/sakuma-marca-vertical.png', './vistorias/img/lop-marca.png', './vistorias/img/lop-assinatura-laser-escuro.png',
-  './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v1.svg',
+  './vistorias/icons/gr-vs-192.v1.png', './vistorias/icons/area-vistorias.v2.svg',
   // Excel sem internet (14/10/2026): o modelo NR-24 que a Vistorias oferece para baixar.
   './vistorias/arquivos/Checklist_NR24_Portaria_MTE_1590_2026.xlsx',
 ];

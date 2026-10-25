@@ -35,43 +35,43 @@ const VERSAO_PJ = '1';
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
    Estoque · (Usuários - Acessos, só admin). */
 export const AREAS = [
-  { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v1.svg',
+  { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
   /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
      ganhou o módulo Patrimônio. Só o nome mudou: o id segue 'manutencoes', a
      pasta segue manutencoes/ e o banco segue no esquema manutencao. */
-  { id: 'manutencoes', nome: 'Máquinas e Patrimônio', icone: 'icons/area-manutencoes.v1.svg',
+  { id: 'manutencoes', nome: 'Máquinas e Patrimônio', icone: 'icons/area-manutencoes.v2.svg',
     desc: 'Máquinas · Patrimônio · Vencimentos · Ordens de serviço · Check list' },
-  { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v1.svg',
+  { id: 'certificacao', nome: 'Certificação', icone: 'icons/area-certificacao.v2.svg',
     desc: 'IFA · GRASP · Rainforest · SMETA — listas, cronograma e caderno de campo' },
-  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v1.svg',
+  { id: 'vistorias', nome: 'Vistorias e Segurança', icone: 'icons/area-vistorias.v2.svg',
     desc: 'Vistorias · Checklists · Anomalias · Extintores' },
   /* Programação Campo (15/10/2026, pedido dele): o app avulso veio para dentro
      do LOP para usar os cadastros de funcionários (Pessoas) e de máquinas e
      implementos (Máquinas e Patrimônio). Mora em programacao/, numa moldura. */
-  { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v2.svg',
+  { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v3.svg',
     desc: 'Painel anual · Atividades · Reunião semanal · Relatório diário' },
   /* Estoque (15/10/2026, pedido dele): o app avulso Gestão Rápida (Estoque
      Inteligente) veio para dentro do LOP. Balanço, não movimento: contagem,
      acerto entre as fazendas e cadastros. Mora em estoque/, numa moldura. */
-  { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v2.svg',
+  { id: 'estoque', nome: 'Estoque', icone: 'icons/area-estoque.v3.svg',
     desc: 'Contagem · Acerto entre fazendas · Cadastros' },
   /* Custo Base (20/10/2026, pedido dele): o rateio mensal do custo
      administrativo por cultura/plantio, que era a planilha "Rateio -
      Direcionador Mensal ADM". Mora em custobase/, numa moldura. */
-  { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v2.svg',
+  { id: 'custobase', nome: 'Custo Base', icone: 'icons/area-custobase.v3.svg',
     desc: 'Rateio mensal culturas · Hora-homem' },
   /* Colheita e Produção (20/10/2026, pedido dele): as planilhas "Controle
      Colheita" de cenoura, batata, café, milho, trigo e abacate numa área só.
      Mora em colheita/, numa moldura. */
-  { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v2.svg',
+  { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v3.svg',
     desc: 'Painel da safra · Cargas · Conciliação balança/cooperativa · Cadastros · Financeiro' },
   /* Projetos (PMBOK) (23/10/2026, pedido dele): os projetos internos da SAKUMA
      pelas boas práticas do Guia PMBOK e do material do MBA — termo de
      abertura, partes interessadas, escopo e requisitos, EAP, rede e caminho
      crítico, RACI, riscos, comunicação, custos, mudanças, encerramento e
      lições aprendidas. Mora em projetos/, numa moldura. */
-  { id: 'projetos', nome: 'Projetos (PMBOK)', icone: 'icons/area-projetos.v1.svg',
+  { id: 'projetos', nome: 'Projetos (PMBOK)', icone: 'icons/area-projetos.v2.svg',
     desc: 'Painel · Projetos (termo, EAP, rede, riscos, custos, mudanças) · Alertas · Lições aprendidas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
@@ -567,7 +567,7 @@ function desenharPrincipal() {
   conteudo.hidden = true;
   hub.innerHTML = `
     <button type="button" class="ar-cartao arb-tile" id="cfHubUsuarios" title="Quem acessa o quê · Senhas">
-      <img src="icons/area-usuarios.v2.svg" alt="">
+      <img src="icons/area-usuarios.v3.svg" alt="">
       <span class="ar-txt"><b>Usuários - Acessos</b></span>
     </button>
     <div id="cfHubBackup"></div>`;

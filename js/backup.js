@@ -545,7 +545,7 @@ export async function desenharBackupInicio(alvo, avisar = () => {}) {
   alvo.innerHTML = `
     <div class="arb-mini" role="group" aria-label="Backup de todo o app">
       <button type="button" class="ar-cartao arb-tile" id="arbFazer">
-        <img src="icons/area-backup.v1.svg" alt="">
+        <img src="icons/area-backup.v2.svg" alt="">
         <span class="ar-txt"><b>Backup</b></span>
         <small class="arb-quando" id="arbStatus"></small>
       </button>
