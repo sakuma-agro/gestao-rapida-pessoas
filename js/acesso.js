@@ -253,6 +253,14 @@ export const MODULOS = [
       ['ccCalibracoes', 'Calibrações'],
       ['ccRelatorios',  'Relatórios'],
     ] },
+    /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
+       trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
+    { id: 'ceFaunaSub', nome: 'Biodiversidade', telas: [
+      ['faPainel',    'Painel'],
+      ['faRegistros', 'Registros'],
+      ['faEspecies',  'Espécies'],
+      ['faCameras',   'Câmeras'],
+    ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
@@ -663,7 +671,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

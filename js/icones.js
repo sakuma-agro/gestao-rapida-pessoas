@@ -22,6 +22,7 @@ export const ICONES = {
   exame: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11h6M12 8v6"/>',
   treino: '<path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/>',
   painel: '<path d="M5 20V10M11 20V4M17 20v-7"/>',
+  folha: '<path d="M5 19c0-8.5 6-14 15-14 0 9-6.5 15-15 14z"/><path d="M5 19l7.5-7.5"/>',
   relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   disc: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>',
   boletim: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 13l2 2 4-4"/>',
@@ -78,6 +79,7 @@ export const ICONE_TELA = {
   reuSemana: 'reuniao', reuFrases: 'aspas', reuResp: 'pessoas', reuAtiv: 'vassoura',
   cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
   ccPainel: 'painel', ccRegistros: 'boletim', ccPlantios: 'lista', ccInsumos: 'documento', ccAnalises: 'exame', ccCalibracoes: 'ajuste', ccRelatorios: 'grafico',
+  faPainel: 'painel', faRegistros: 'boletim', faEspecies: 'lista', faCameras: 'ajuste',
 };
 export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check', reuniao: 'reuniao' };
 

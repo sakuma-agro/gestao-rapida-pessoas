@@ -17,6 +17,7 @@
 //   pessoas/treinamento/<id do lançamento>/….pdf
 //   pessoas/exame/<id do lançamento>/….pdf
 //   certificacao/documento/<id do documento>/….pdf
+//   certificacao/fauna/<id do registro>/….jpg  (Biodiversidade — FORM 050, 26/10/2026)
 //   manutencoes/os/<código>/<uuid>.jpg  ·  manutencoes/checklist/<código>/<uuid>.jpg
 //   manutencoes/maquina/<id da máquina>/<uuid>.jpg  ·  manutencoes/patrimonio/<id do bem>/<uuid>.jpg
 //   programacao/diario/<id do diário>/<uuid>.jpg  (Programação Campo, 15/10/2026)
@@ -36,7 +37,7 @@ const G_SEGREDO = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
 const G_RENOVA = Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "";
 const RAIZ_NOME = "LOP - Gestão Rápida – arquivos";
 const MAX_BYTES = 15 * 1024 * 1024;
-const CHAVE_OK = /^(pessoas|manutencoes|certificacao|programacao)\/(funcionario|treinamento|exame|os|checklist|documento|maquina|patrimonio|diario|atividade|reuniao|caderno)\/[\w.-]{1,80}\/[\w.-]{1,120}\.(jpe?g|png|webp|pdf)$/;   // chaves geradas pelo app, sempre em minúsculas
+const CHAVE_OK = /^(pessoas|manutencoes|certificacao|programacao)\/(funcionario|treinamento|exame|os|checklist|documento|maquina|patrimonio|diario|atividade|reuniao|caderno|fauna)\/[\w.-]{1,80}\/[\w.-]{1,120}\.(jpe?g|png|webp|pdf)$/;   // chaves geradas pelo app, sempre em minúsculas
 const TIPOS_OK = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 
 const NOME_AREA: Record<string, string> = { pessoas: "Pessoas", manutencoes: "Manutenções", certificacao: "Certificação", programacao: "Programação Campo" };
@@ -45,7 +46,7 @@ const NOME_TIPO: Record<string, string> = {
   os: "Ordens de serviço", checklist: "Check lists", documento: "Documentos",
   maquina: "Fotos das máquinas", patrimonio: "Fotos do patrimônio",
   diario: "Relatórios diários", atividade: "Atividades", reuniao: "Reuniões semanais",
-  caderno: "Caderno de campo",
+  caderno: "Caderno de campo", fauna: "Monitoramento de animais",
 };
 
 const CORS = {
