@@ -163,3 +163,32 @@ on conflict (nome) do nothing;
 alter table public.cmc_casos add column if not exists conclusao text;
 alter table public.cmc_casos add column if not exists comunicado_como text;
 alter table public.cmc_casos add column if not exists comunicado_detalhe text;
+
+-- ---------------------------------------------------------------------------
+-- FORM 042 › Abertura das caixas de sugestão (26/10/2026). Migração "cmc_caixas_aberturas".
+-- A certificação pede o registro de abertura de cada caixa 1 vez por mês, mesmo vazia.
+create table if not exists public.cmc_caixas (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  fazenda text, local text,
+  ativo boolean not null default true,
+  criado_em timestamptz not null default now(),
+  criado_por text default public.app_email(),
+  atualizado_em timestamptz not null default now(), atualizado_por text
+);
+create table if not exists public.cmc_aberturas (
+  id uuid primary key default gen_random_uuid(),
+  caixa_id uuid not null references public.cmc_caixas(id) on delete cascade,
+  data date not null,
+  aberto_por text not null,
+  testemunha text,
+  qtd_papeis int not null default 0 check (qtd_papeis >= 0),
+  observacao text,
+  criado_em timestamptz not null default now(),
+  criado_por text default public.app_email(),
+  atualizado_em timestamptz not null default now(), atualizado_por text
+);
+create index if not exists cmc_aberturas_caixa_data on public.cmc_aberturas (caixa_id, data);
+alter table public.cmc_casos add column if not exists abertura_id uuid references public.cmc_aberturas(id) on delete set null;
+-- RLS app_pode('cert') + trigger cmc_carimbo iguais às outras cmc_* (bloco "do $$" acima, com as duas tabelas).
+grant select, insert, update, delete on public.cmc_caixas, public.cmc_aberturas to authenticated;

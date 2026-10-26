@@ -60,14 +60,14 @@ const ST_ACAO = ['A FAZER', 'EM ANDAMENTO', 'CONCLUÍDA', 'CANCELADA'];
 const COR_ETAPA = e => FIM.has(e) ? 'ativo' : e === 'AGUARDANDO RECURSO' ? 'alerta' : e === 'VERIFICAÇÃO' ? 'tc' : e === 'ABERTA' || e === 'IDEIA' || e === 'RECEBIDO' ? 'neutra' : 'alerta';
 
 /* ---------------- estado ---------------- */
-const M = { carregado: false, casos: [], acoes: [], ands: [], arq: new Set(),
+const M = { carregado: false, casos: [], acoes: [], ands: [], caixas: [], aberturas: [], arq: new Set(), fc: { ano: new Date().getFullYear() },
   fn: { ver: 'abertas', q: '' }, fm: { ver: 'lista', etapa: 'abertas', q: '' }, ff: { ver: 'abertas' } };
 const CAIXA = 'melhorias2.cache';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { casos: M.casos, acoes: M.acoes, ands: M.ands });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { casos: M.casos, acoes: M.acoes, ands: M.ands, caixas: M.caixas, aberturas: M.aberturas });
 
 async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
-  if (c0 && !M.carregado) { Object.assign(M, { casos: c0.casos || [], acoes: c0.acoes || [], ands: c0.ands || [] }); M.carregado = true; }
+  if (c0 && !M.carregado) { Object.assign(M, { casos: c0.casos || [], acoes: c0.acoes || [], ands: c0.ands || [], caixas: c0.caixas || [], aberturas: c0.aberturas || [] }); M.carregado = true; }
   const c = estado.cliente;
   if (!c || !estado.sessao || !navigator.onLine) {
     if (M.carregado) return;
@@ -85,6 +85,12 @@ async function carregar() {
     throw erro;
   }
   Object.assign(M, { casos: a.data || [], acoes: b.data || [], ands: d.data || [], carregado: true });
+  const [cx, ab] = await Promise.all([
+    c.from('cmc_caixas').select('*').order('nome'),
+    c.from('cmc_aberturas').select('*').order('data', { ascending: false }),
+  ]);
+  if (!cx.error) M.caixas = cx.data || [];
+  if (!ab.error) M.aberturas = ab.data || [];
   salvarCaixa();
   M.arq = await donosComArquivo('certificacao', 'evidencia').catch(() => new Set());
 }
@@ -341,6 +347,206 @@ function concluirFeedback(c) {
       } catch (e) { $('mcCcOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
     });
   });
+}
+
+/* ===================================================================
+   TELA · ABERTURA DAS CAIXAS (FORM 042) — 26/10/2026, pedido dele:
+   "a certificação nos obriga a ter esse registro de abertura das caixas,
+   1 vez no mês, mesmo estando vazia". Cada abertura: data, caixa, quem
+   abriu, testemunha, quantos papéis e a foto. Cada papel encontrado vira
+   uma reclamação/sugestão (via CAIXA DE SUGESTÕES) ligada à abertura.
+   =================================================================== */
+const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const caixasAtivas = () => M.caixas.filter(x => x.ativo !== false);
+const nomeCaixa = id => { const x = M.caixas.find(c => c.id === id); return x ? x.nome : '—'; };
+const abDoMes = (cxId, ym) => M.aberturas.filter(a => a.caixa_id === cxId && String(a.data).slice(0, 7) === ym).sort((a, b) => String(a.data).localeCompare(String(b.data)));
+function desenharCaixas() {
+  const tela = $('telaMcCaixas'); const f = M.fc;
+  const ymHoje = hoje().slice(0, 7);
+  const ativas = caixasAtivas();
+  const faltamMes = ativas.filter(cx => !abDoMes(cx.id, ymHoje).length);
+  const fimMes = (() => { const d = new Date(); return isoD(new Date(d.getFullYear(), d.getMonth() + 1, 0)); })();
+  const anos = [...new Set([new Date().getFullYear(), ...M.aberturas.map(a => Number(String(a.data).slice(0, 4)))])].sort((a, b) => b - a);
+  const cel = (cx, m) => {
+    const ym = `${f.ano}-${String(m + 1).padStart(2, '0')}`;
+    const l = abDoMes(cx.id, ym);
+    if (l.length) { const a = l[l.length - 1]; const n = l.reduce((t, x) => t + (x.qtd_papeis || 0), 0);
+      return `<td class="cx-cel cx-ok"><button type="button" data-ab="${esc(a.id)}" title="Aberta em ${br(a.data)} por ${esc(a.aberto_por)}${l.length > 1 ? ' (' + l.length + ' aberturas)' : ''}">✓ ${br(a.data).slice(0, 5)}<small>${n ? n + ' papel(éis)' : 'vazia'}</small></button></td>`; }
+    if (ym > ymHoje) return '<td class="cx-cel cx-fut"></td>';
+    if (cx.criado_em && ym < String(cx.criado_em).slice(0, 7)) return '<td class="cx-cel cx-fut"><small>—</small></td>';
+    return ym === ymHoje ? `<td class="cx-cel cx-pend"><button type="button" data-abrir-cx="${esc(cx.id)}">Abrir até ${br(fimMes).slice(0, 5)}</button></td>` : '<td class="cx-cel cx-falta">falta</td>';
+  };
+  const ultimas = M.aberturas.filter(a => String(a.data).startsWith(String(f.ano))).slice(0, 60);
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    ${cab('Abertura das caixas · FORM 042', 'A certificação pede que cada caixa de sugestões seja aberta e registrada <b>1 vez por mês, mesmo vazia</b>. O que for encontrado vira reclamação/sugestão na outra aba.',
+      '<button class="btn" type="button" id="cxCad">Caixas</button><button class="btn principal" type="button" id="cxNova">+ Registrar abertura</button>')}
+    ${!ativas.length ? `<div class="aviso info" style="margin-top:12px">Nenhuma caixa cadastrada. Clique em <b>Caixas</b> e cadastre cada caixa (nome, fazenda e onde fica).</div>`
+      : faltamMes.length ? `<div class="aviso alerta" style="margin-top:12px"><b>${MESES[new Date().getMonth()]}/${new Date().getFullYear()}:</b> falta abrir ${faltamMes.length} de ${ativas.length} caixa(s) até ${br(fimMes)} — ${faltamMes.map(c => esc(c.nome)).join(', ')}.</div>`
+      : `<div class="aviso ok" style="margin-top:12px"><b>${MESES[new Date().getMonth()]}/${new Date().getFullYear()}:</b> todas as ${ativas.length} caixa(s) já foram abertas este mês.</div>`}
+    ${ativas.length ? `<div class="barra" style="margin:12px 0 6px;align-items:flex-end"><label class="campo" style="margin:0">Ano <select id="cxAno">${opcoes(anos.map(a => [a, String(a)]), f.ano)}</select></label></div>
+    <div class="ac-rola"><table class="dc-planilha cx-grade"><thead><tr><th>Caixa</th>${MESES.map(m => `<th class="ce">${m}</th>`).join('')}</tr></thead><tbody>
+      ${ativas.map(cx => `<tr><td><b>${esc(cx.nome)}</b><br><small class="dica">${esc([cx.fazenda, cx.local].filter(Boolean).join(' · '))}</small></td>${MESES.map((_, m) => cel(cx, m)).join('')}</tr>`).join('')}
+    </tbody></table></div>` : ''}
+    ${ultimas.length ? `<h3 class="bm-h3" style="margin-top:16px">Aberturas de ${f.ano}</h3>
+    <div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Caixa</th><th>Aberta por</th><th>Testemunha</th><th class="ce">Papéis</th><th>Observação</th><th class="ce">Foto</th><th></th></tr></thead><tbody>
+      ${ultimas.map(a => `<tr><td class="ce">${br(a.data)}</td><td>${esc(nomeCaixa(a.caixa_id))}</td><td>${esc(a.aberto_por)}</td><td>${esc(a.testemunha || '—')}</td>
+        <td class="ce">${a.qtd_papeis ? '<b>' + a.qtd_papeis + '</b>' : 'vazia'}</td><td>${esc(a.observacao || '')}</td><td class="ce">${M.arq.has('cx-' + a.id) ? '📷' : '—'}</td>
+        <td class="ce"><button class="btn mini" type="button" data-ab="${esc(a.id)}">Abrir</button></td></tr>`).join('')}
+    </tbody></table></div>` : ''}
+  </div>
+  <div class="rodape-fixo naoimprimir"><button class="btn principal" type="button" id="cxImp">Imprimir registro ${f.ano}</button></div>`;
+  $('cxCad').addEventListener('click', cadastroCaixas);
+  $('cxNova').addEventListener('click', () => ativas.length ? fichaAbertura(null) : cadastroCaixas());
+  $('cxAno')?.addEventListener('change', e => { f.ano = Number(e.target.value); desenharCaixas(); });
+  $('cxImp').addEventListener('click', () => mostrar(docAberturas(f.ano), { barra: true }));
+  tela.querySelectorAll('[data-ab]').forEach(b => b.addEventListener('click', () => fichaAbertura(M.aberturas.find(a => a.id === b.dataset.ab))));
+  tela.querySelectorAll('[data-abrir-cx]').forEach(b => b.addEventListener('click', () => fichaAbertura(null, b.dataset.abrirCx)));
+}
+
+function cadastroCaixas() {
+  const linhas = M.caixas.map(c => ({ ...c }));
+  dialogo(`<h3 style="margin:0 0 4px">Caixas de sugestões</h3>
+    <p class="dica" style="margin:0 0 10px">Uma linha por caixa. Desmarque "ativa" se a caixa foi retirada (o histórico fica).</p>
+    <div class="aviso erro" id="mcErro" hidden></div>
+    <div id="cxLinhas"></div><button class="btn mini" type="button" id="cxMais">＋ Caixa</button>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="cxOk">Salvar</button></div>`, d => {
+    const ler = () => d.querySelectorAll('[data-cx]').forEach(i => { const x = linhas[i.dataset.cx]; if (x) x[i.dataset.k] = i.type === 'checkbox' ? i.checked : i.value; });
+    const pintar = () => {
+      $('cxLinhas').innerHTML = linhas.length ? linhas.map((c, i) => `<div class="cx-lin">
+        <input type="text" data-cx="${i}" data-k="nome" value="${esc(c.nome || '')}" placeholder="Nome (ex.: Caixa do refeitório)">
+        <select data-cx="${i}" data-k="fazenda">${opcoes(FAZENDAS, c.fazenda, 'Fazenda')}</select>
+        <input type="text" data-cx="${i}" data-k="local" value="${esc(c.local || '')}" placeholder="Onde fica (ex.: refeitório, ao lado do QR Code)">
+        <label class="cx-at"><input type="checkbox" data-cx="${i}" data-k="ativo" ${c.ativo !== false ? 'checked' : ''}> ativa</label></div>`).join('')
+        : '<p class="dica">Nenhuma caixa ainda.</p>';
+    };
+    pintar();
+    $('cxMais').addEventListener('click', () => { ler(); linhas.push({ _nova: true, ativo: true }); pintar(); d.querySelector(`[data-cx="${linhas.length - 1}"][data-k="nome"]`)?.focus(); });
+    $('cxOk').addEventListener('click', async () => {
+      ler();
+      const l = linhas.filter(c => so(c.nome));
+      if (precisaRede()) return;
+      $('cxOk').disabled = true;
+      try {
+        for (const c of l) {
+          const reg = { nome: so(c.nome), fazenda: c.fazenda || null, local: so(c.local) || null, ativo: c.ativo !== false };
+          const r = c.id ? await estado.cliente.from('cmc_caixas').update(reg).eq('id', c.id).select().single() : await estado.cliente.from('cmc_caixas').insert(reg).select().single();
+          if (r.error) throw r.error;
+          const i = M.caixas.findIndex(x => x.id === r.data.id); if (i >= 0) M.caixas[i] = r.data; else M.caixas.push(r.data);
+        }
+        M.caixas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        salvarCaixa(); fechar(); redesenhar();
+      } catch (e) { $('cxOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+    });
+  });
+}
+
+function fichaAbertura(a, caixaId) {
+  const v = a ? { ...a } : { data: hoje(), caixa_id: caixaId || (caixasAtivas().length === 1 ? caixasAtivas()[0].id : ''), qtd_papeis: 0 };
+  const papeis = a ? M.casos.filter(c => c.abertura_id === a.id) : [];
+  const novos = [];
+  const pessoas = [...new Set(M.aberturas.flatMap(x => [x.aberto_por, x.testemunha]).concat(M.casos.map(x => x.responsavel)).filter(Boolean))].sort();
+  dialogo(`<h3 style="margin:0 0 4px">${a ? 'Abertura de ' + br(a.data) : 'Registrar abertura da caixa'}</h3>
+    <p class="dica" style="margin:0 0 10px">Registre mesmo se a caixa estiver vazia — é o que a auditoria confere.</p>
+    <div class="aviso erro" id="mcErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Data <input type="date" id="abData" value="${esc(String(v.data).slice(0, 10))}"></label>
+      <label class="campo">Caixa <select id="abCx">${opcoes(M.caixas.filter(c => c.ativo !== false || c.id === v.caixa_id).map(c => [c.id, c.nome + (c.fazenda ? ' · ' + c.fazenda : '')]), v.caixa_id, '— escolha —')}</select></label>
+      <label class="campo">Aberta por <input type="text" id="abPor" list="abPessoas" value="${esc(v.aberto_por || '')}"></label>
+      <label class="campo">Testemunha (opcional) <input type="text" id="abTest" list="abPessoas" value="${esc(v.testemunha || '')}"></label>
+    </div>
+    <fieldset class="cp-fs"><legend>O que tinha na caixa</legend>
+      <div class="barra" style="margin:0 0 6px"><label class="cx-at"><input type="radio" name="abVaz" value="1" ${!v.qtd_papeis && !papeis.length ? 'checked' : ''}> Vazia</label>
+        <label class="cx-at"><input type="radio" name="abVaz" value="0" ${v.qtd_papeis || papeis.length ? 'checked' : ''}> Tinha papéis</label>
+        <label class="campo" id="abQtdC" style="margin:0 0 0 10px;width:140px">Quantos papéis <input type="number" min="0" id="abQtd" value="${esc(v.qtd_papeis || papeis.length || '')}"></label></div>
+      <div id="abPapeis"></div>
+      <button class="btn mini" type="button" id="abMais">＋ Lançar um papel (reclamação / sugestão / elogio)</button>
+      <p class="dica" style="margin:4px 0 0">Cada papel lançado entra em "Reclamações e sugestões" com via CAIXA DE SUGESTÕES, a fazenda da caixa e a data da abertura.</p>
+    </fieldset>
+    <label class="campo">Observação <input type="text" id="abObs" value="${esc(v.observacao || '')}"></label>
+    <div id="abAnx" style="margin-top:6px"></div>
+    <datalist id="abPessoas">${pessoas.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+    <div class="barra entre"><div>${a ? '<button class="btn perigo" type="button" id="abApagar">Apagar</button>' : ''}</div>
+      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="abOk">Salvar</button></div></div>`, d => {
+    const anx = campoAnexos($('abAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Foto da caixa aberta', dica: 'foto com data (ex.: GPS Câmera) — evidência para a auditoria' });
+    anx.abrir(a ? 'cx-' + a.id : null);
+    const lerNovos = () => d.querySelectorAll('[data-np]').forEach(i => { const x = novos[i.dataset.np]; if (x) x[i.dataset.k] = i.value; });
+    const pintar = () => {
+      const vazia = d.querySelector('input[name=abVaz]:checked')?.value === '1';
+      $('abQtdC').hidden = vazia; $('abMais').hidden = vazia;
+      $('abPapeis').innerHTML = (vazia ? '' : papeis.map(c => `<div class="cx-pap cx-pap-ok">${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')} ${esc(c.titulo)} <button type="button" class="ce-link" data-caso="${esc(c.id)}">abrir</button></div>`).join('')
+        + novos.map((n, i) => `<div class="cx-pap"><select data-np="${i}" data-k="tipo">${opcoes(TIPOS_FB, n.tipo)}</select>
+          <input type="text" data-np="${i}" data-k="texto" value="${esc(n.texto || '')}" placeholder="O que está escrito no papel">
+          <button class="btn mini" type="button" data-npx="${i}">✕</button></div>`).join(''));
+      d.querySelectorAll('[data-npx]').forEach(b => b.addEventListener('click', () => { lerNovos(); novos.splice(Number(b.dataset.npx), 1); pintar(); }));
+      d.querySelectorAll('#abPapeis [data-caso]').forEach(b => b.addEventListener('click', () => ficha(M.casos.find(c => c.id === b.dataset.caso))));
+    };
+    pintar();
+    d.querySelectorAll('input[name=abVaz]').forEach(r => r.addEventListener('change', () => { lerNovos(); pintar(); }));
+    $('abMais').addEventListener('click', () => { lerNovos(); novos.push({ tipo: 'SUGESTÃO', texto: '' }); pintar(); d.querySelector(`[data-np="${novos.length - 1}"][data-k="texto"]`)?.focus(); });
+    $('abOk').addEventListener('click', async () => {
+      lerNovos();
+      const vazia = d.querySelector('input[name=abVaz]:checked')?.value === '1';
+      const ns = vazia ? [] : novos.filter(n => so(n.texto));
+      const qtd = vazia ? 0 : Math.max(Number($('abQtd').value) || 0, papeis.length + ns.length);
+      const linha = { data: $('abData').value, caixa_id: $('abCx').value, aberto_por: so($('abPor').value), testemunha: so($('abTest').value) || null, qtd_papeis: qtd, observacao: so($('abObs').value) || null };
+      if (!linha.data) return erroDlg('Informe a data.');
+      if (!linha.caixa_id) return erroDlg('Escolha a caixa.');
+      if (!linha.aberto_por) return erroDlg('Informe quem abriu a caixa.');
+      if (!vazia && !qtd) return erroDlg('Diga quantos papéis tinha (ou marque "Vazia").');
+      if (precisaRede()) return;
+      $('abOk').disabled = true;
+      try {
+        const cl = estado.cliente;
+        const r = a ? await cl.from('cmc_aberturas').update(linha).eq('id', a.id).select().single() : await cl.from('cmc_aberturas').insert(linha).select().single();
+        if (r.error) throw r.error;
+        const ab = r.data;
+        const i = M.aberturas.findIndex(x => x.id === ab.id); if (i >= 0) M.aberturas[i] = ab; else M.aberturas.unshift(ab);
+        M.aberturas.sort((x, y) => String(y.data).localeCompare(String(x.data)));
+        const cx = M.caixas.find(c => c.id === ab.caixa_id);
+        for (const n of ns) {
+          const t = so(n.texto);
+          const rc = await cl.from('cmc_casos').insert({ natureza: 'FEEDBACK', tipo: n.tipo || 'SUGESTÃO', titulo: t.length > 90 ? t.slice(0, 87) + '…' : t, descricao: t,
+            via: 'CAIXA DE SUGESTÕES', fazenda: cx?.fazenda || null, local: cx ? [cx.nome, cx.local].filter(Boolean).join(' · ') : null,
+            etapa: 'RECEBIDO', data_abertura: ab.data, abertura_id: ab.id, porques: [] }).select().single();
+          if (rc.error) throw rc.error;
+          M.casos.unshift(rc.data);
+        }
+        if (anx.mudou) { await anx.salvar('cx-' + ab.id); M.arq.add('cx-' + ab.id); }
+        salvarCaixa(); fechar(); redesenhar();
+      } catch (e) { $('abOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+    });
+    $('abApagar')?.addEventListener('click', async () => {
+      if (!confirm('Apagar este registro de abertura? (as reclamações/sugestões lançadas continuam)')) return;
+      if (precisaRede()) return;
+      const { error } = await estado.cliente.from('cmc_aberturas').delete().eq('id', a.id);
+      if (error) return erroDlg('Não consegui apagar: ' + esc(error.message));
+      M.aberturas = M.aberturas.filter(x => x.id !== a.id);
+      M.casos.forEach(c => { if (c.abertura_id === a.id) c.abertura_id = null; });
+      salvarCaixa(); fechar(); redesenhar();
+    });
+  });
+}
+
+/* Registro anual para a auditoria: uma linha por caixa e mês. */
+function docAberturas(ano) {
+  const F = FORMS.FEEDBACK;
+  const ativas = M.caixas.filter(c => c.ativo !== false || M.aberturas.some(a => a.caixa_id === c.id && String(a.data).startsWith(String(ano))));
+  const ymHoje = hoje().slice(0, 7);
+  const linhas = ativas.flatMap(cx => MESES.map((m, i) => {
+    const ym = `${ano}-${String(i + 1).padStart(2, '0')}`;
+    if (ym > ymHoje) return null;
+    const l = abDoMes(cx.id, ym);
+    return l.length ? l.map(a => `<tr><td>${esc(cx.nome)}${cx.fazenda ? ' · ' + esc(cx.fazenda) : ''}</td><td>${m}/${ano}</td><td>${br(a.data)}</td><td>${esc(a.aberto_por)}</td><td>${esc(a.testemunha || '')}</td><td>${a.qtd_papeis ? a.qtd_papeis + ' papel(éis)' : 'Vazia'}</td><td>${esc(a.observacao || '')}</td></tr>`).join('')
+      : `<tr class="cx-imp-falta"><td>${esc(cx.nome)}${cx.fazenda ? ' · ' + esc(cx.fazenda) : ''}</td><td>${m}/${ano}</td><td colspan="5">Sem registro de abertura</td></tr>`;
+  }).filter(Boolean)).join('');
+  return `<article class="rel">
+    <header class="rel-cabecalho"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-titulo"><h1>Registro de abertura das caixas de sugestões — ${ano}</h1><p>${esc(F.titulo)} · abertura mensal, mesmo vazia</p></div>
+      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${F.codigo}</span></div></header>
+    <div class="rel-ficha"><div><span>Código</span><b>${F.codigo}</b></div><div><span>Data</span><b>${F.data}</b></div><div><span>Revisão</span><b>${F.nrev}</b></div>
+      <div><span>Elaboração / revisão</span><b>${F.elaborador}</b></div><div><span>Aprovação</span><b>${F.aprovador}</b></div><div><span>Caixas</span><b>${ativas.length}</b></div></div>
+    <table class="rel-tabela"><thead><tr><th>Caixa</th><th>Mês</th><th>Aberta em</th><th>Aberta por</th><th>Testemunha</th><th>Conteúdo</th><th>Observação</th></tr></thead><tbody>${linhas || '<tr><td colspan="7">Nenhuma caixa cadastrada.</td></tr>'}</tbody></table>
+    <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer></article>`;
 }
 
 /* ===================================================================
@@ -636,8 +842,8 @@ async function exportar(nat) {
 /* ===================================================================
    ENTRADA
    =================================================================== */
-export const TELAS_MELHORIAS = ['mcPainel', 'mcNcs', 'mcMelhorias', 'mcFeedbacks'];
-const DESENHO = { mcPainel: desenharPainel, mcNcs: desenharNcs, mcMelhorias: desenharMelhorias, mcFeedbacks: desenharFeedbacks };
+export const TELAS_MELHORIAS = ['mcPainel', 'mcNcs', 'mcMelhorias', 'mcFeedbacks', 'mcCaixas'];
+const DESENHO = { mcPainel: desenharPainel, mcNcs: desenharNcs, mcMelhorias: desenharMelhorias, mcFeedbacks: desenharFeedbacks, mcCaixas: desenharCaixas };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }

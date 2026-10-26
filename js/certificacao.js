@@ -132,7 +132,7 @@ const EVID_APP = {
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -140,6 +140,7 @@ async function carregarCadeia(c) {
     c.from('cp_cargas').select('data, cp_culturas!inner(slug)').eq('cp_culturas.slug', 'abacate').eq('ativo', true),
     c.from('cfo_avaliacoes').select('data'),
     c.from('cmc_casos').select('data_abertura, tipo, natureza'),
+    c.from('cmc_aberturas').select('data'),
   ]);
   if (!v.error) S.vinc = v.data || [];
   if (!ev.error) S.evid = ev.data || [];
@@ -148,7 +149,8 @@ async function carregarCadeia(c) {
   if (!bm.error) S.viva.FORM13 = S.viva.AN7 = contaMeses((bm.data || []).map(x => x.data));
   if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
   if (!mc.error) { const doTipo = n => contaMeses((mc.data || []).filter(x => x.natureza === n).map(x => x.data_abertura));
-    S.viva.FORM4 = doTipo('NC'); S.viva.FORM20 = doTipo('MELHORIA'); S.viva.FORM42 = contaMeses((mc.data || []).filter(x => x.natureza === 'FEEDBACK').map(x => x.data_abertura)); }
+    S.viva.FORM4 = doTipo('NC'); S.viva.FORM20 = doTipo('MELHORIA'); S.viva.FORM42 = contaMeses((mc.data || []).filter(x => x.natureza === 'FEEDBACK').map(x => x.data_abertura)
+      .concat(cxa && !cxa.error ? (cxa.data || []).map(x => x.data) : [])); }
   S.evArq = await donosComArquivo('certificacao', 'evidencia').catch(() => new Set());
 }
 const porCodigo = (a, b) => so(a.codigo).localeCompare(so(b.codigo), 'pt-BR', { numeric: true });

@@ -296,6 +296,7 @@ export const MODULOS = [
     ] },
     { id: 'ceFbSub', grupo: 'Forms', codigo: 'FORM 042', nome: 'Reclamações e sugestões', telas: [
       ['mcFeedbacks',  'Reclamações e sugestões'],
+      ['mcCaixas',     'Abertura das caixas'],
     ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],

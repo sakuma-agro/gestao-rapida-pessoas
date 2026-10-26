@@ -2097,3 +2097,26 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-faz b{font-size:11px;color:var(--suave)}
 .mc-faz:hover{border-color:#84BD00}
 .mc-faz.on{background:var(--verde-fundo);border-color:#84BD00;color:var(--verde-esc)}
+
+/* FORM 042 › Abertura das caixas (26/10/2026) */
+.aviso.alerta{background:rgba(201,138,0,.10);border-color:rgba(201,138,0,.45);color:#7a5600}
+.cx-grade th,.cx-grade td{text-align:center;vertical-align:middle}
+.cx-grade td:first-child{text-align:left;white-space:nowrap}
+.cx-cel{padding:4px !important;min-width:64px}
+.cx-cel button{font:inherit;border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;width:100%;padding:3px 0}
+.cx-ok{background:rgba(132,189,0,.14)}
+.cx-ok button{color:var(--verde-esc);font-weight:700;font-size:12.5px}
+.cx-cel small{font-size:10.5px;font-weight:500;color:var(--suave)}
+.cx-falta{background:rgba(192,57,43,.10);color:#a93226;font-size:12px;font-weight:700}
+.cx-pend{background:repeating-linear-gradient(45deg,transparent 0 6px,rgba(201,138,0,.10) 6px 12px)}
+.cx-pend button{color:#7a5600;font-size:11.5px;font-weight:700}
+.cx-fut{background:var(--fundo)}
+.cx-lin{display:grid;grid-template-columns:minmax(160px,2fr) 170px minmax(160px,2fr) auto;gap:6px;align-items:center;margin-bottom:6px}
+.cx-lin input,.cx-lin select{margin:0}
+.cx-at{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;white-space:nowrap;margin-right:12px}
+.cx-at input{width:auto;margin:0}
+.cx-pap{display:grid;grid-template-columns:150px 1fr auto;gap:6px;align-items:center;margin-bottom:6px}
+.cx-pap select,.cx-pap input{margin:0}
+.cx-pap-ok{display:block;font-size:13px}
+.rel .cx-imp-falta td{color:#a93226;font-weight:600}
+@media (max-width:760px){.cx-lin{grid-template-columns:1fr 1fr}.cx-pap{grid-template-columns:1fr auto}.cx-pap select{grid-column:1/-1}}
