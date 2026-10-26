@@ -3,7 +3,7 @@
    A ficha reproduz a aba "Ficha EPI" da planilha original.
    ========================================================= */
 
-:root{
+:root{--largura-app:1680px;
   --verde:#84BD00; --verde-esc:#6a9800; --verde-fundo:rgba(132,189,0,.10);
   --marrom:#744F28;
   --alerta:#c98a00; --erro:#c0392b;
@@ -44,7 +44,7 @@ body{background:var(--fundo);color:var(--texto);
 
 /* ---------- estrutura ---------- */
 .topo{position:sticky;top:0;z-index:20;background:var(--papel);border-bottom:1px solid var(--linha)}
-.topo-int{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.topo-int{max-width:var(--largura-app);margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .topo img{height:34px;width:34px;border-radius:7px}
 /* O ícone e o nome viraram um botão só, mas continuam parecendo texto:
    nada de moldura nem de fundo — só o cursor e um realce no passar do mouse. */
@@ -57,12 +57,12 @@ body{background:var(--fundo);color:var(--texto);
   background:var(--verde-fundo);color:var(--verde-esc);font-size:11px;font-weight:700;
   letter-spacing:.4px;text-transform:uppercase;vertical-align:2px}
 .topo .cresce{flex:1}
-.abas{max-width:1180px;margin:0 auto;padding:0 8px;display:flex;gap:2px;overflow-x:auto}
+.abas{max-width:var(--largura-app);margin:0 auto;padding:0 8px;display:flex;gap:2px;overflow-x:auto}
 .aba{font:inherit;font-size:13.5px;font-weight:600;padding:10px 14px;border:0;background:transparent;
   color:var(--suave);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap}
 .aba:hover{color:var(--texto)}
 .aba[aria-selected="true"]{color:var(--verde-esc);border-bottom-color:var(--verde)}
-.aba2s{max-width:1180px;margin:0 auto;padding:8px 16px 10px;display:flex;gap:6px;overflow-x:auto;
+.aba2s{max-width:var(--largura-app);margin:0 auto;padding:8px 16px 10px;display:flex;gap:6px;overflow-x:auto;
   border-top:1px solid var(--linha)}
 .aba2s[hidden]{display:none}
 .aba2{font:inherit;font-size:12.5px;font-weight:600;padding:6px 13px;border-radius:20px;cursor:pointer;
@@ -71,13 +71,13 @@ body{background:var(--fundo);color:var(--texto);
 .aba2[aria-selected="true"]{background:var(--verde);border-color:var(--verde);color:#fff}
 
 /* terceira faixa: as telas de dentro do submódulo */
-.aba3s{max-width:1180px;margin:0 auto;padding:0 16px 10px;display:flex;gap:14px;overflow-x:auto}
+.aba3s{max-width:var(--largura-app);margin:0 auto;padding:0 16px 10px;display:flex;gap:14px;overflow-x:auto}
 .aba3s[hidden]{display:none}
 .aba3{font:inherit;font-size:12.5px;font-weight:600;padding:4px 2px;border:0;background:transparent;
   color:var(--suave);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent}
 .aba3:hover{color:var(--texto)}
 .aba3[aria-selected="true"]{color:var(--verde-esc);border-bottom-color:var(--verde)}
-main{max-width:1180px;margin:0 auto;padding:18px 16px 80px}
+main{max-width:var(--largura-app);margin:0 auto;padding:18px 16px 80px}
 .tela[hidden]{display:none}
 
 /* ---------- blocos ---------- */
