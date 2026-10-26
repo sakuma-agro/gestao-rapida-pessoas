@@ -352,7 +352,7 @@ function reduzir(fonte, w, h, max = 1280) {
 }
 async function quadrosFoto(file) {
   const bmp = await createImageBitmap(file);
-  return [reduzir(bmp, bmp.width, bmp.height)];
+  return [reduzir(bmp, bmp.width, bmp.height, 1600)];
 }
 function quadrosVideo(file) {
   return new Promise((ok, falha) => {

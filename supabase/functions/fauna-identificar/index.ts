@@ -57,11 +57,12 @@ function instrucoes(catalogo: string[], cameras: string[]) {
   return `Você identifica fauna em imagens de câmeras de trilha (armadilhas fotográficas) instaladas em fragmentos de mata e APPs de uma fazenda agrícola no Brasil, para o Plano de Biodiversidade da certificação (GLOBALG.A.P./GRASP/SMETA).
 
 Regras:
-- Responda SEMPRE chamando a ferramenta "identificacao".
+- Responda SEMPRE e SOMENTE chamando a ferramenta "identificacao" (uma vez), sem texto fora dela.
 - Imagens noturnas costumam ser infravermelho em preto e branco; considere silhueta, porte, cauda, focinho, marcas e comportamento.
 - Se o animal for uma espécie do catálogo abaixo, devolva em "especie_do_catalogo" o nome EXATAMENTE como está escrito na lista e repita os mesmos nomes comum/científico. Só fuja do catálogo quando tiver certeza de que é outro animal.
 - Não chute espécie: se só der para chegar no gênero ou na família, diga isso no nome científico (ex.: "Penelope sp.") e use confiança "baixa" ou "média".
 - Se não houver animal (disparo falso, vegetação, sombra), animal_presente = false. Pessoas, veículos, gado, cães e gatos domésticos: animal_presente = true e pessoa_ou_veiculo = true.
+- Confusões comuns — confira antes de responder: filhote de anta (corpo com listras e pintas claras, focinho alongado/tromba caído, patas compridas) × paca (pintas claras em fileiras, cabeça curta e arredondada, sem tromba, patas curtas); cutia × paca; quati × irara; tatu-galinha × tatu-peba; gambá × cuíca; jacu × mutum (mutum-de-penacho tem topete crespo e bico/cera amarela). Na dúvida entre duas, diga as duas na observação e use confiança "média" ou "baixa".
 - Leia o carimbo que a câmera imprime na imagem (data, hora, nome da câmera, temperatura) quando existir.
 - Status de conservação: IUCN e Lista Nacional (Portaria MMA nº 148/2022) só quando souber; senão null.
 
@@ -108,9 +109,10 @@ Deno.serve(async (req) => {
     { type: 'text', text: `${video ? `Quadros de um vídeo (${imagens.length}), em ordem de tempo.` : 'Foto da câmera de trilha.'} Arquivo: ${arquivo || '(sem nome)'}. Identifique o animal.` },
   ];
   const corpoReq = JSON.stringify({
-    model: MODELO, max_tokens: 1200,
+    model: MODELO, max_tokens: 4000,
     system: [{ type: 'text', text: instrucoes(catalogo, cameras), cache_control: { type: 'ephemeral' } }],
-    tools: [FERRAMENTA], tool_choice: { type: 'tool', name: 'identificacao' },
+    // tool_choice forçado não é aceito por todos os modelos: a instrução manda chamar a ferramenta.
+    tools: [FERRAMENTA],
     messages: [{ role: 'user', content: conteudo }],
   });
   const enviar = (modo: 'bearer' | 'x-api-key') => fetch('https://api.anthropic.com/v1/messages', {
@@ -128,8 +130,15 @@ Deno.serve(async (req) => {
   }
   // deno-lint-ignore no-explicit-any
   const bloco = (resp.content || []).find((b: any) => b.type === 'tool_use');
-  if (!bloco) return json({ erro: 'O Claude não devolveu a identificação.' }, 502);
-  const id = bloco.input || {};
+  // deno-lint-ignore no-explicit-any
+  let id: any = bloco?.input;
+  if (!id) {   // respondeu em texto: tenta achar o JSON
+    // deno-lint-ignore no-explicit-any
+    const txt = (resp.content || []).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
+    const m = txt.match(/\{[\s\S]*\}/);
+    try { id = m ? JSON.parse(m[0]) : null; } catch { id = null; }
+  }
+  if (!id) return json({ erro: 'O Claude não devolveu a identificação.' }, 502);
 
   await adm.from('cf_ia_uso').insert({
     email, arquivo, modelo: MODELO, resultado: id,
