@@ -1850,3 +1850,13 @@ body.ce-apr-aberto{overflow:hidden}
 .cf-id-ok{background:var(--verde-fundo)}
 .cf-id-erro td{background:rgba(192,57,43,.06)}
 .cf-id-msg-erro{color:#a5342a}
+
+/* ---- Certificação › Energia (FORM 043), 26/10/2026 ---- */
+.en-pilha{width:70%;max-width:40px;display:flex;flex-direction:column;border-radius:4px 4px 0 0;overflow:hidden;min-height:2px}
+.en-ren{background:#84BD00}
+.en-nao{background:#744F28}
+.en-pilha div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.en-leg{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin:0 2px 0 8px}
+.en-total td{font-weight:700;background:var(--verde-fundo)}
+.en-duas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.en-duas{grid-template-columns:1fr}}

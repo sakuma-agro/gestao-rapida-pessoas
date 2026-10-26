@@ -261,6 +261,13 @@ export const MODULOS = [
       ['faEspecies',  'Espécies'],
       ['faCameras',   'Câmeras'],
     ] },
+    /* Energia (26/10/2026): consumo de energias — o FORM 043 virou painel.
+       js/cert-energia.js; tabelas ce_fontes / ce_consumos. */
+    { id: 'ceEnergiaSub', nome: 'Energia', telas: [
+      ['enPainel',      'Painel'],
+      ['enLancamentos', 'Lançamentos'],
+      ['enFontes',      'Fontes'],
+    ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
@@ -671,7 +678,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

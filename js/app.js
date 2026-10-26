@@ -55,6 +55,7 @@ import { ligarAreas, abrirPrimeiraTela, limparAreas, ehTelaVist, abrirTelaVist, 
 import { abrirCertificacao, limparCertificacao, TELAS_CERT, enviarFilaCert } from './certificacao.js';
 import { abrirCaderno, limparCaderno, TELAS_CADERNO, enviarFilaCaderno, recarregarCaderno } from './cert-caderno.js';
 import { abrirFauna, limparFauna, TELAS_FAUNA } from './cert-fauna.js';
+import { abrirEnergia, limparEnergia, TELAS_ENERGIA } from './cert-energia.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -229,6 +230,9 @@ function abrirAba(nome) {
   // Certificação › Biodiversidade (26/10/2026) — js/cert-fauna.js
   for (const t of TELAS_FAUNA) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_FAUNA.includes(nome)) abrirFauna(nome);
+  // Certificação › Energia (26/10/2026) — js/cert-energia.js
+  for (const t of TELAS_ENERGIA) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_ENERGIA.includes(nome)) abrirEnergia(nome);
   if (nome.startsWith('jor')) abrirJornada(nome);
   if (nome.startsWith('emp')) abrirEmprestimo(nome);
   if (nome.startsWith('fer')) abrirFerias(nome);
@@ -289,7 +293,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparFauna(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 
