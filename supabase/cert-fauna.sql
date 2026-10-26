@@ -96,3 +96,7 @@ returns boolean language sql stable security definer set search_path to 'public'
     when p_area = 'programacao' and p_tipo in ('diario','atividade','reuniao') then public.app_pode('programacao')
     else false end;
 $$;
+
+-- O tipo 'fauna' também precisa estar na trava da tabela de arquivos (migração "arquivos_tipo_fauna").
+alter table public.arquivos drop constraint if exists arquivos_tipo_check;
+alter table public.arquivos add constraint arquivos_tipo_check check (tipo = any (array['funcionario','treinamento','exame','os','checklist','documento','maquina','patrimonio','diario','atividade','reuniao','caderno','fauna']));

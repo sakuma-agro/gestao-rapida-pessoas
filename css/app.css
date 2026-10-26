@@ -1817,7 +1817,7 @@ body.ce-apr-aberto{overflow:hidden}
 .cf-evid:hover{text-decoration:underline}
 .cf-ameacada td:first-child{box-shadow:inset 3px 0 0 #c0392b}
 .cf-inativa{opacity:.55}
-.cf-graf{display:flex;align-items:flex-end;gap:6px;height:170px;padding:18px 4px 0;border-bottom:1px solid var(--linha);overflow-x:auto}
+.cf-graf{display:flex;align-items:flex-end;gap:6px;height:170px;padding:18px 4px 0;border-bottom:1px solid var(--linha);overflow-x:auto;overflow-y:hidden}
 .cf-col{flex:1 0 34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:34px}
 .cf-barra{width:70%;max-width:38px;background:var(--verde);border-radius:4px 4px 0 0;min-height:2px}
 .cf-val{font-size:11px;font-weight:700;color:var(--verde-esc);margin-bottom:2px}

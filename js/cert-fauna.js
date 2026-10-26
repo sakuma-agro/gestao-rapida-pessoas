@@ -248,7 +248,7 @@ function desenharPainel() {
     </div>
     <div class="pv-cards" style="margin-top:12px">
       ${cartao('calma', 'Registros', k.regs.length, `${k.fotos} foto(s) · ${k.videos} vídeo(s) · ${k.dias} dia(s)`, 'faRegistros')}
-      ${cartao('calma', 'Espécies', k.especies.length, k.novasNoPeriodo.length && F.fp.periodo !== 'tudo' ? `${k.novasNoPeriodo.length} nova(s) no período` : 'diferentes no período', 'faEspecies')}
+      ${cartao('calma', 'Espécies', k.especies.length, k.novasNoPeriodo.length && F.fp.periodo !== 'tudo' && F.regs.some(r => r.data < inicioPeriodo(F.fp.periodo)) ? `${k.novasNoPeriodo.length} nova(s) no período` : 'diferentes no período', 'faEspecies')}
       ${cartao(k.ameacadas.length ? 'atencao' : 'ok', 'Ameaçadas', k.ameacadas.length, 'IUCN VU/EN/CR ou lista do MMA', 'ameacadas')}
       ${cartao(k.exoticas.length ? 'alerta' : 'ok', 'Exóticas', k.exoticas.length, k.exoticas.map(x => x.e.nome).join(', ') || 'nenhuma', 'exoticas')}
       ${cartao(k.paradas.length ? 'alerta' : 'calma', 'Câmeras ativas', k.ativas.length, k.paradas.length ? `${k.paradas.length} sem registro há +${SEM_REGISTRO_DIAS} dias` : 'todas com registro recente', 'faCameras')}
