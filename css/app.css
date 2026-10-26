@@ -1994,3 +1994,12 @@ body.ce-apr-aberto{overflow:hidden}
 .bm-impresso .bm-pl th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .bm-impresso .bm-rast td.bm-nf{min-width:0;max-width:150px;font-size:6.5px}
 .bm-impresso .ac-rola{overflow:visible}
+
+/* Certificação › Fornecedores — FORM 023 (26/10/2026) */
+.cfo-sim{color:#4E7D00;font-weight:700}
+.cfo-nao{color:#B42318;font-weight:700}
+.cfo-linha-nc td{background:#FDECEA}
+.cfo-perg{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border-bottom:1px dashed var(--linha,#dfe2d8)}
+.cfo-perg:last-child{border-bottom:0}
+.cfo-sn{display:flex;gap:14px;white-space:nowrap}
+.cfo-sn label{display:flex;align-items:center;gap:4px;font-weight:600}

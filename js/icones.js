@@ -82,6 +82,7 @@ export const ICONE_TELA = {
   ccPainel: 'painel', ccRegistros: 'boletim', ccPlantios: 'lista', ccInsumos: 'documento', ccAnalises: 'exame', ccCalibracoes: 'ajuste', ccRelatorios: 'grafico',
   faPainel: 'painel', faRegistros: 'boletim', faEspecies: 'lista', faCameras: 'ajuste',
   enPainel: 'painel', enLancamentos: 'boletim', enFontes: 'ajuste',
+  foPainel: 'painel', foAvaliacoes: 'boletim',
   bmPainel: 'painel', bmRastreio: 'boletim', bmLotes: 'documento', bmFechamento: 'grafico',
 };
 export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check', reuniao: 'reuniao' };

@@ -276,6 +276,12 @@ export const MODULOS = [
       ['bmLotes',      'Boletins e vendas'],
       ['bmFechamento', 'Fechamento'],
     ] },
+    /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
+       aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
+    { id: 'ceFornSub', nome: 'Fornecedores', telas: [
+      ['foPainel',     'Painel'],
+      ['foAvaliacoes', 'Avaliações'],
+    ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],

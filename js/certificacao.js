@@ -124,22 +124,25 @@ const EVID_APP = {
   FORM50: { nome: 'Biodiversidade — registros das câmeras', tela: 'faPainel' },
   FORM43: { nome: 'Energia — lançamentos de consumo', tela: 'enPainel' },
   FORM13: { nome: 'Balanço de massa — cargas de abacate', tela: 'bmPainel' },
+  FORM23: { nome: 'Fornecedores — avaliações', tela: 'foPainel' },
   AN7: { nome: 'Balanço de massa — cargas de abacate', tela: 'bmPainel' },
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm] = await Promise.all([
+  const [v, ev, fa, en, bm, fo] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
     c.from('ce_consumos').select('competencia'),
     c.from('cp_cargas').select('data, cp_culturas!inner(slug)').eq('cp_culturas.slug', 'abacate').eq('ativo', true),
+    c.from('cfo_avaliacoes').select('data'),
   ]);
   if (!v.error) S.vinc = v.data || [];
   if (!ev.error) S.evid = ev.data || [];
   if (!fa.error) S.viva.FORM50 = contaMeses((fa.data || []).map(x => x.data));
   if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
   if (!bm.error) S.viva.FORM13 = S.viva.AN7 = contaMeses((bm.data || []).map(x => x.data));
+  if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
   S.evArq = await donosComArquivo('certificacao', 'evidencia').catch(() => new Set());
 }
 const porCodigo = (a, b) => so(a.codigo).localeCompare(so(b.codigo), 'pt-BR', { numeric: true });
