@@ -1041,6 +1041,14 @@ textarea.ck-tp-campo{resize:vertical}
 .tela-assin-pe{display:flex;gap:10px;justify-content:flex-end}
 body.tela-assin-aberta{overflow:hidden}
 
+/* Câmera ou galeria (26/10/2026) */
+.origem-foto{position:fixed;inset:0;z-index:10001;background:rgba(27,35,43,.45);display:flex;align-items:flex-end;justify-content:center;padding:12px}
+.origem-foto-folha{width:100%;max-width:420px;background:#fff;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;font-family:Arial,Helvetica,sans-serif;color:#51534A;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.origem-foto-folha b{font-size:16px;color:#744F28;text-align:center;margin-bottom:2px}
+.origem-foto-folha button{font:inherit;font-size:16px;padding:14px;border-radius:12px;border:1px solid #84BD00;background:#F1F7DF;color:#3E5A00;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer}
+.origem-foto-folha button span{font-size:20px}
+.origem-foto-folha .origem-foto-cancelar{background:#fff;border-color:#d6d8d0;color:#51534A;font-weight:400}
+
 /* ═══════════════════════════ Antes e Depois ═══════════════════════════ */
 body[data-aba="ad"] #bt-salvar,body[data-aba="ad"] #bt-pdf,body[data-aba="ad"] .status{display:none}
 
@@ -6548,6 +6556,50 @@ try{
   }
 }catch(e){}
 
+/* ── Câmera ou galeria (26/10/2026) ──
+   Pedido do Guilherme: em qualquer módulo do Vistorias, ao pôr foto, escolher
+   entre abrir a câmera e pegar da galeria. Todos os módulos criam um
+   <input type=file accept=image/*> e chamam .click(); aqui o .click() desses
+   campos passa antes por uma folha com as duas opções. Só em celular/tablet
+   (toque): no computador abre direto o seletor de arquivos. Tudo dentro da
+   função para não repetir nome com o resto do app. */
+(function(){
+  const clicarOriginal = HTMLInputElement.prototype.click;
+  const ehFoto = el => el.type === "file" && /image/.test(el.accept || "") && !el.dataset.origemOk;
+  const temToque = () => { try{ return matchMedia("(pointer:coarse)").matches; }catch(e){ return false; } };
+
+  function escolherOrigem(varias, aoEscolher){
+    const fundo = document.createElement("div");
+    fundo.className = "origem-foto";
+    fundo.innerHTML = `<div class="origem-foto-folha" role="dialog" aria-label="Adicionar foto">
+        <b>Adicionar foto${varias ? "s" : ""}</b>
+        <button type="button" data-origem="camera"><span aria-hidden="true">📷</span> Abrir a câmera</button>
+        <button type="button" data-origem="galeria"><span aria-hidden="true">🖼️</span> Escolher da galeria</button>
+        <button type="button" class="origem-foto-cancelar" data-origem="">Cancelar</button>
+      </div>`;
+    const fechar = () => fundo.remove();
+    fundo.addEventListener("click", ev => {
+      ev.stopPropagation();
+      const b = ev.target.closest("[data-origem]");
+      if(!b){ if(ev.target === fundo) fechar(); return; }
+      fechar();
+      if(b.dataset.origem) aoEscolher(b.dataset.origem);
+    });
+    document.body.appendChild(fundo);
+  }
+
+  HTMLInputElement.prototype.click = function(){
+    if(!ehFoto(this) || !temToque()) return clicarOriginal.call(this);
+    const inp = this;
+    escolherOrigem(inp.multiple, origem => {
+      inp.dataset.origemOk = "1";
+      if(origem === "camera") inp.setAttribute("capture", "environment");
+      else inp.removeAttribute("capture");
+      clicarOriginal.call(inp);
+    });
+  };
+})();
+
 </script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
@@ -8866,6 +8918,6 @@ renderConfig = function(){ const r=_renderConfigFD.apply(this, arguments); try{ 
 
 </script>
 <script src="vistorias.js"></script>
-<script src="lop-depois.js?v=17"></script>
+<script src="lop-depois.js?v=18"></script>
 </body>
 </html>
