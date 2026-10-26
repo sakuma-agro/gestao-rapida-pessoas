@@ -629,6 +629,9 @@ function fecharCategoria() {
   const nav = $('navModulos');
   nav.classList.remove('aberto');
   nav.querySelector('.mod-subs')?.remove();
+  nav.querySelectorAll('.mod-foco').forEach(x => x.remove());
+  nav.querySelectorAll('.foco-oculto').forEach(x => x.classList.remove('foco-oculto'));
+  faixaEstado.foco = null;
 }
 
 /** Nenhum módulo marcado e sem faixa: o início de uma área. */
@@ -707,7 +710,7 @@ const ICONE_SUB = {
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
-const faixaEstado = { modulo: null, sub: null, tela: null, grupoHub: null };
+const faixaEstado = { modulo: null, sub: null, tela: null, grupoHub: null, foco: null };
 const ultimaTela = {};
 
 function desenharFaixa(id, subs, tela) {
@@ -718,6 +721,7 @@ function desenharFaixa(id, subs, tela) {
   // submódulo de várias telas: já abre dentro dele. Senão, nível dos submódulos.
   const dentro = subs.length > 1 && tela && subAlvo.telas.length > 1 ? subAlvo.id : null;
   faixaEstado.modulo = id; faixaEstado.sub = subs.length > 1 ? dentro : subAlvo.id; faixaEstado.tela = alvo; faixaEstado.grupoHub = null;
+  faixaEstado.foco = focoDe(id, subs, subAlvo);
   pintarFaixa(id, subs);
   marcarTela(id, subs, alvo, true);
 }
@@ -731,6 +735,12 @@ function desenharFaixa(id, subs, tela) {
 const emCategoria = id => !$('navModulos').hidden && !!$('navModulos').querySelector(`.aba[data-modulo="${id}"]`);
 /* Módulo que não fecha ao clicar de novo (Certificação: é o único da área). */
 const SEMPRE_ABERTO = new Set(['cert']);
+/* Submódulo em foco (26/10/2026, pedido dele): na Certificação, ao abrir um
+   submódulo (Requisitos, Caderno de campo, Forms…) ele toma o lugar do botão
+   verde "Certificação", os outros saem da linha e o que tem dentro fica logo
+   abaixo. "← Certificação" (ou o ✕ no verde) volta para a lista. O primeiro
+   submódulo (Painel) é o início da área: não entra em foco. */
+const focoDe = (id, subs, s) => !SEMPRE_ABERTO.has(id) || !s || s === subs[0] ? null : (s.grupo ? 'g:' + s.grupo : 's:' + s.id);
 
 function pintarCategoria(id, subs) {
   const nav = $('navModulos');
@@ -741,7 +751,9 @@ function pintarCategoria(id, subs) {
   // linha de cima: módulo aberto + submódulos ao lado
   nav.classList.add('aberto');
   nav.querySelector('.mod-subs')?.remove();
+  nav.querySelectorAll('.mod-foco').forEach(x => x.remove());
   const mod = nav.querySelector(`.aba[data-modulo="${id}"]`);
+  mod?.classList.remove('foco-oculto');
   if (mod) {
     mod.classList.toggle('sem-fechar', SEMPRE_ABERTO.has(id));
     mod.title = SEMPRE_ABERTO.has(id) ? (modPorId(id)?.nome || '') : 'Fechar ' + (modPorId(id)?.nome || '') + ' e voltar aos módulos';
@@ -753,10 +765,27 @@ function pintarCategoria(id, subs) {
   const abrirSub = s => {
     const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
     faixaEstado.tela = t; faixaEstado.grupoHub = null;
+    faixaEstado.foco = focoDe(id, subs, s);
     pintarCategoria(id, subs);
     marcarTela(id, subs, t, true);
   };
-  if (subs.length > 1 && mod) {
+  if (faixaEstado.foco && mod) {
+    const grupo = faixaEstado.foco.startsWith('g:') ? faixaEstado.foco.slice(2) : null;
+    const nomeMod = modPorId(id)?.nome || 'Voltar';
+    const voltar = document.createElement('button');
+    voltar.type = 'button'; voltar.className = 'aba aba-sub mod-foco mod-foco-voltar';
+    voltar.title = 'Voltar para a lista de ' + nomeMod;
+    voltar.innerHTML = `${svgIcone('seta-esq')}<span>${esc(nomeMod)}</span>`;
+    const verde = document.createElement('button');
+    verde.type = 'button'; verde.className = 'aba mod-foco'; verde.setAttribute('aria-selected', 'true');
+    verde.title = 'Fechar e voltar para a lista de ' + nomeMod;
+    verde.innerHTML = `${svgIcone(grupo ? 'documento' : iconeSub(atual, id))}<span>${esc(grupo || atual.nome)}</span>`;
+    mod.classList.add('foco-oculto');
+    mod.before(voltar, verde);
+    const sair = () => { faixaEstado.foco = null; faixaEstado.grupoHub = null; pintarCategoria(id, subs); };
+    voltar.addEventListener('click', sair);
+    verde.addEventListener('click', sair);
+  } else if (subs.length > 1 && mod) {
     const caixa = document.createElement('span');
     caixa.className = 'mod-subs';
     const vistos = new Set();
@@ -775,6 +804,7 @@ function pintarCategoria(id, subs) {
     caixa.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSub(subs.find(x => x.id === b.dataset.sub))));
     caixa.querySelectorAll('[data-grupo]').forEach(b => b.addEventListener('click', () => {
       faixaEstado.grupoHub = b.dataset.grupo;
+      if (SEMPRE_ABERTO.has(id)) faixaEstado.foco = 'g:' + b.dataset.grupo;
       pintarCategoria(id, subs);
     }));
   }

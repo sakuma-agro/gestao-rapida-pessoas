@@ -2071,3 +2071,9 @@ body.ce-apr-aberto{overflow:hidden}
 .ar-rec b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ar-rec small{font-size:11.5px;color:var(--suave);white-space:nowrap}
 @media (max-width:560px){.ar-rec{flex:1 1 100%;max-width:none}}
+
+/* Certificação: submódulo em foco no lugar do botão verde (26/10/2026) */
+#navModulos .foco-oculto{display:none !important}
+#navModulos .mod-foco-voltar{font-size:13px;font-weight:600;padding:7px 13px;background:var(--papel);color:var(--texto);border:1px solid var(--linha)}
+#navModulos .mod-foco-voltar svg{width:16px;height:16px}
+#navModulos .mod-foco-voltar:hover{border-color:var(--verde);background:var(--verde-fundo)}
