@@ -19,7 +19,7 @@ import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
-import { campoAnexos, donosComArquivo } from './arquivos.js';
+import { campoAnexos, donosComArquivo, enfileirarArquivo, enviarPendentes } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -256,6 +256,8 @@ function desenharPainel() {
     </div>
     ${diasUlt != null && diasUlt > SEM_REGISTRO_DIAS ? `<div class="aviso" style="margin-top:12px">Nenhum registro lançado há ${diasUlt} dias. Descarregue os cartões das câmeras e lance os flagrantes — o auditor olha a continuidade do monitoramento.</div>` : ''}
 
+    <div id="faId" class="cf-id"></div>
+
     <div class="qp-bloco"><h3>Registros por mês</h3>${graficoMeses(k.eixo)}</div>
 
     <div class="qp-bloco"><h3>Espécies registradas</h3>
@@ -300,6 +302,7 @@ function desenharPainel() {
   $('faPer').addEventListener('change', e => { F.fp.periodo = e.target.value; desenharPainel(); });
   $('faCam').addEventListener('change', e => { F.fp.camera = e.target.value; desenharPainel(); });
   $('faNovo').addEventListener('click', () => formRegistro(null));
+  desenharIdentificar();
   $('faImpPainel').addEventListener('click', () => mostrar(docPainel(k), { barra: true }));
   $('faImpForm').addEventListener('click', () => mostrar(docForm(k.regs.slice().sort((a, b) => -ordemReg(a, b))), { barra: true }));
   $('faXlsx').addEventListener('click', () => exportar(k.regs.slice().sort((a, b) => -ordemReg(a, b))));
@@ -309,6 +312,269 @@ function desenharPainel() {
     if (a === 'faRegistros') Object.assign(F.fr, { q: '', especie: '', camera: F.fp.camera, tipo: '', de: inicioPeriodo(F.fp.periodo), ate: fimPeriodo(F.fp.periodo) });
     abrirModulo('cert', a);
   }));
+}
+
+
+/* ===================================================================
+   IDENTIFICAR POR FOTO / VÍDEO (26/10/2026)
+   "Quero ter um lugar aonde vou soltar as fotos e vídeos e você vai
+   identificar." Solta os arquivos (ou a pasta do cartão) → o app tira até
+   3 quadros de cada vídeo aqui no navegador → a função fauna-identificar
+   pergunta ao Claude → a linha volta preenchida para conferir → "Lançar".
+   Data e hora: do nome do arquivo da câmera (2025-1127-161847_000001.MP4),
+   senão do carimbo na imagem, senão da data do arquivo. Câmera: da pasta
+   ("CÂMERA 2"), do carimbo ou a escolhida para o lote.
+   =================================================================== */
+const ID = { itens: [], camera: '', rodando: 0, seq: 0 };
+const EXT_FOTO = /\.(jpe?g|png|webp|heic|heif)$/i, EXT_VIDEO = /\.(mp4|mov|avi|m4v|3gp|webm)$/i;
+const CONF_COR = { alta: 'ativo', 'média': 'alerta', baixa: 'perigo' };
+
+function dataDoNome(nome) {
+  const m = String(nome).match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})[-_ T]?(\d{2})[-_.:]?(\d{2})[-_.:]?(\d{2})/);
+  if (!m) return null;
+  const [, a, me, d, h, mi] = m;
+  if (+me < 1 || +me > 12 || +d < 1 || +d > 31 || +h > 23 || +mi > 59) return null;
+  return { data: `${a}-${me}-${d}`, hora: `${h}:${mi}` };
+}
+function cameraDoTexto(t) {
+  const m = String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').match(/\b(?:camera|cam)\s*[-_ ]?\s*(\d{1,2})\b/i);
+  if (!m) return '';
+  const c = F.cameras.find(x => (x.nome.match(/\d+/) || [])[0] === String(Number(m[1])));
+  return c ? c.id : '';
+}
+const isoDeMs = ms => { const d = new Date(ms); return { data: `${d.getFullYear()}-${doisD(d.getMonth() + 1)}-${doisD(d.getDate())}`, hora: `${doisD(d.getHours())}:${doisD(d.getMinutes())}` }; };
+
+function reduzir(fonte, w, h, max = 1280) {
+  const e = Math.min(1, max / Math.max(w, h));
+  const cv = document.createElement('canvas'); cv.width = Math.round(w * e); cv.height = Math.round(h * e);
+  cv.getContext('2d').drawImage(fonte, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/jpeg', 0.82);
+}
+async function quadrosFoto(file) {
+  const bmp = await createImageBitmap(file);
+  return [reduzir(bmp, bmp.width, bmp.height)];
+}
+function quadrosVideo(file) {
+  return new Promise((ok, falha) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.muted = true; v.preload = 'auto'; v.playsInline = true; v.src = url;
+    const fim = (e, r) => { clearTimeout(t); URL.revokeObjectURL(url); v.removeAttribute('src'); e ? falha(e) : ok(r); };
+    const t = setTimeout(() => fim(new Error('o vídeo demorou demais para abrir')), 30000);
+    v.onerror = () => fim(new Error('este navegador não abre esse formato de vídeo'));
+    v.onloadedmetadata = async () => {
+      try {
+        const dur = isFinite(v.duration) && v.duration > 0 ? v.duration : 1;
+        const out = [];
+        for (const f of [0.12, 0.45, 0.8]) {
+          await new Promise((s, r2) => { v.onseeked = s; v.onerror = () => r2(new Error('falha ao ler o vídeo')); v.currentTime = Math.min(dur - 0.05, f * dur); });
+          if (v.videoWidth) out.push(reduzir(v, v.videoWidth, v.videoHeight, 1024));
+        }
+        out.length ? fim(null, out) : fim(new Error('o vídeo não tem imagem'));
+      } catch (e) { fim(e); }
+    };
+  });
+}
+async function arquivosDoDrop(dt) {
+  const itens = [...(dt.items || [])].map(i => i.webkitGetAsEntry?.()).filter(Boolean);
+  if (!itens.length) return [...(dt.files || [])].map(f => ({ file: f, caminho: f.name }));
+  const out = [];
+  const ler = ent => new Promise(res => {
+    if (ent.isFile) ent.file(f => { out.push({ file: f, caminho: ent.fullPath || f.name }); res(); }, () => res());
+    else if (ent.isDirectory) {
+      const r = ent.createReader(); const todos = [];
+      const lote = () => r.readEntries(async es => { if (!es.length) { for (const e of todos) await ler(e); res(); } else { todos.push(...es); lote(); } }, () => res());
+      lote();
+    } else res();
+  });
+  for (const e of itens) await ler(e);
+  return out;
+}
+function adicionarArquivos(lista) {
+  let ign = 0;
+  for (const { file, caminho } of lista) {
+    const video = EXT_VIDEO.test(file.name) || /^video\//.test(file.type);
+    const foto = EXT_FOTO.test(file.name) || /^image\//.test(file.type);
+    if (!video && !foto) { ign++; continue; }
+    if (ID.itens.some(x => x.nome === file.name && x.tamanho === file.size)) continue;
+    const dn = dataDoNome(file.name) || dataDoNome(caminho);
+    ID.itens.push({ id: ++ID.seq, file, nome: file.name, caminho, tamanho: file.size, video, estado: 'fila', quadros: [], thumb: '',
+      data: dn?.data || '', hora: dn?.hora || '', origemData: dn ? 'nome' : '', camera_id: cameraDoTexto(caminho) || ID.camera,
+      tipo: video ? 'Vídeo' : 'Foto', individuos: null, especie: '', nova: null, res: null, incluir: true, erro: '' });
+  }
+  desenharIdentificar(ign);
+  processarFila();
+}
+async function processarFila() {
+  while (ID.rodando < 2) {
+    const it = ID.itens.find(x => x.estado === 'fila');
+    if (!it) return;
+    ID.rodando++; it.estado = 'lendo'; desenharLinhaId(it);
+    identificar(it).finally(() => { ID.rodando--; desenharLinhaId(it); resumoId(); processarFila(); });
+  }
+}
+async function identificar(it) {
+  try {
+    it.quadros = it.video ? await quadrosVideo(it.file) : await quadrosFoto(it.file);
+    it.thumb = it.quadros[Math.min(1, it.quadros.length - 1)];
+    if (!it.data) { const d = isoDeMs(it.file.lastModified || Date.now()); it.data = d.data; it.hora = it.hora || d.hora; it.origemData = 'arquivo'; }
+    it.estado = 'identificando'; desenharLinhaId(it);
+    if (!navigator.onLine || !estado.cliente) throw new Error('sem internet');
+    const { data, error } = await estado.cliente.functions.invoke('fauna-identificar', { body: {
+      arquivo: it.nome, video: it.video, imagens: it.quadros,
+      especies: F.especies.map(e => e.cientifico ? `${e.nome} (${e.cientifico})` : e.nome), cameras: F.cameras.map(c => c.nome) } });
+    if (error) { let m = error.message; try { m = (await error.context.json()).erro || m; } catch {} throw new Error(m); }
+    const r = data.identificacao || {};
+    it.res = r;
+    if (r.data_carimbo && /^\d{4}-\d{2}-\d{2}$/.test(r.data_carimbo) && it.origemData !== 'nome') { it.data = r.data_carimbo; it.origemData = 'carimbo'; }
+    if (r.hora_carimbo && /^\d{1,2}:\d{2}$/.test(r.hora_carimbo) && it.origemData !== 'nome') it.hora = r.hora_carimbo.padStart(5, '0');
+    if (!it.camera_id && r.camera_carimbo) it.camera_id = cameraDoTexto(r.camera_carimbo);
+    it.individuos = r.individuos > 1 ? r.individuos : null;
+    const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s*\(.*\)$/, '').trim();
+    const cat = F.especies.find(e => r.especie_do_catalogo && norm(e.nome) === norm(r.especie_do_catalogo))
+      || F.especies.find(e => r.cientifico && e.cientifico && norm(e.cientifico) === norm(r.cientifico))
+      || F.especies.find(e => norm(e.nome) === norm(r.nome_comum));
+    if (cat) { it.especie = cat.id; it.nova = null; }
+    else { it.especie = '__nova'; it.nova = { nome: r.nome_comum, cientifico: r.cientifico || null, familia: r.familia || null, classe: CLASSES.includes(r.classe) ? r.classe : 'Outro',
+      status_iucn: IUCN[r.status_iucn] ? r.status_iucn : null, status_brasil: BRASIL[r.status_brasil] ? r.status_brasil : null, exotica: !!r.exotica, ativo: true }; }
+    it.incluir = r.animal_presente !== false && !r.pessoa_ou_veiculo;
+    marcarDuplicado(it);
+    it.estado = 'pronto';
+  } catch (e) { it.estado = 'erro'; it.erro = String(e.message || e); it.incluir = false; }
+}
+function marcarDuplicado(it) {
+  it.dup = it.especie && it.especie !== '__nova' && F.regs.some(r => r.especie_id === it.especie && r.data === it.data && hm(r.hora) === it.hora && r.tipo === it.tipo);
+  if (it.dup) it.incluir = false;
+}
+
+function desenharIdentificar(ignorados = 0) {
+  const el = $('faId'); if (!el) return;
+  el.innerHTML = `<div class="cf-drop" id="faDrop" tabindex="0">
+      <input type="file" id="faIdArq" multiple accept="image/*,video/*" hidden>
+      <strong>📷 Solte aqui as fotos e vídeos das câmeras</strong>
+      <span>ou <button type="button" class="btn mini" id="faIdEscolher">escolher arquivos</button> — pode soltar a pasta inteira do cartão. O Claude identifica o animal; você confere e lança.</span>
+      <label class="campo cf-drop-cam">Câmera destes arquivos <select id="faIdCam">${opcoes(F.cameras.filter(c => c.ativa).map(c => [c.id, c.nome]), ID.camera, 'Pela pasta / carimbo')}</select></label>
+    </div>
+    ${ignorados ? `<p class="dica">${ignorados} arquivo(s) ignorado(s): não são foto nem vídeo.</p>` : ''}
+    <div id="faIdTabela"></div>`;
+  const drop = $('faDrop'), inp = $('faIdArq');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('cf-drop-sobre'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('cf-drop-sobre'); }));
+  drop.addEventListener('drop', async e => adicionarArquivos(await arquivosDoDrop(e.dataTransfer)));
+  $('faIdEscolher').addEventListener('click', () => inp.click());
+  inp.addEventListener('change', () => { adicionarArquivos([...inp.files].map(f => ({ file: f, caminho: f.webkitRelativePath || f.name }))); inp.value = ''; });
+  $('faIdCam').addEventListener('change', e => {
+    ID.camera = e.target.value;
+    ID.itens.filter(x => x.estado !== 'lancado').forEach(x => { x.camera_id = ID.camera || cameraDoTexto(x.caminho) || cameraDoTexto(x.res?.camera_carimbo); });
+    tabelaId();
+  });
+  tabelaId();
+}
+function tabelaId() {
+  const el = $('faIdTabela'); if (!el) return;
+  if (!ID.itens.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="ac-rola"><table class="dc-planilha cf-id-tab"><thead><tr><th class="ce"><input type="checkbox" id="faIdTodos" title="Marcar todos"></th><th>Imagem</th><th>Espécie</th><th>Data</th><th>Hora</th><th>Câmera</th><th>Tipo</th><th></th></tr></thead>
+    <tbody>${ID.itens.map(it => `<tr id="faIdL${it.id}"></tr>`).join('')}</tbody></table></div>
+    <div class="barra entre" style="margin-top:8px"><span class="dica" id="faIdResumo"></span>
+      <div class="barra" style="margin:0"><button class="btn" type="button" id="faIdLimpar">Limpar a lista</button>
+      <button class="btn principal" type="button" id="faIdLancar">Lançar marcados</button></div></div>`;
+  ID.itens.forEach(desenharLinhaId);
+  $('faIdTodos').addEventListener('change', e => { ID.itens.filter(x => x.estado === 'pronto').forEach(x => { x.incluir = e.target.checked; }); ID.itens.forEach(desenharLinhaId); resumoId(); });
+  $('faIdLimpar').addEventListener('click', () => { ID.itens = ID.itens.filter(x => ['fila', 'lendo', 'identificando'].includes(x.estado)); tabelaId(); });
+  $('faIdLancar').addEventListener('click', lancarId);
+  resumoId();
+}
+function resumoId() {
+  const r = $('faIdResumo'); if (!r) return;
+  const n = s => ID.itens.filter(x => x.estado === s).length;
+  const marc = ID.itens.filter(x => x.estado === 'pronto' && x.incluir).length;
+  r.textContent = [`${ID.itens.length} arquivo(s)`, n('fila') + n('lendo') + n('identificando') ? `${n('fila') + n('lendo') + n('identificando')} identificando…` : '',
+    n('pronto') ? `${n('pronto')} pronto(s), ${marc} marcado(s)` : '', n('lancado') ? `${n('lancado')} lançado(s)` : '', n('erro') ? `${n('erro')} com erro` : ''].filter(Boolean).join(' · ');
+  if ($('faIdLancar')) { $('faIdLancar').disabled = !marc; $('faIdLancar').textContent = marc ? `Lançar ${marc} registro(s)` : 'Lançar marcados'; }
+}
+function desenharLinhaId(it) {
+  const tr = $('faIdL' + it.id); if (!tr) return;
+  const r = it.res;
+  const ocupado = ['fila', 'lendo', 'identificando'].includes(it.estado);
+  const fixo = it.estado === 'lancado';
+  const thumb = it.thumb ? `<img class="cf-id-thumb" src="${it.thumb}" alt="">` : `<div class="cf-id-thumb cf-id-vazio">${it.video ? '▶' : '📷'}</div>`;
+  const estadoTxt = { fila: 'na fila', lendo: it.video ? 'lendo o vídeo…' : 'lendo a foto…', identificando: 'identificando…', erro: 'erro', lancado: 'lançado ✓', pronto: '' }[it.estado];
+  const optsEsp = opcoes(F.especies.filter(e => e.ativo || e.id === it.especie).map(e => [e.id, e.nome]), it.especie === '__nova' ? '' : it.especie, 'Escolha…')
+    + (it.nova ? `<option value="__nova" ${it.especie === '__nova' ? 'selected' : ''}>＋ Nova: ${esc(it.nova.nome)}${it.nova.cientifico ? ' (' + esc(it.nova.cientifico) + ')' : ''}</option>` : '');
+  tr.className = it.estado === 'lancado' ? 'cf-id-ok' : it.estado === 'erro' ? 'cf-id-erro' : '';
+  tr.innerHTML = `<td class="ce"><input type="checkbox" data-k="incluir" ${it.incluir ? 'checked' : ''} ${it.estado !== 'pronto' ? 'disabled' : ''}></td>
+    <td><div class="cf-id-img">${thumb}<div><b class="cf-id-nome" title="${esc(it.caminho)}">${esc(it.nome)}</b>
+      ${estadoTxt ? `<br><small class="${it.estado === 'erro' ? 'cf-id-msg-erro' : 'dica'}">${esc(estadoTxt)}${it.erro ? ': ' + esc(it.erro) : ''}</small>` : ''}
+      ${r ? `<br><small class="dica">${r.animal_presente === false ? '<b>Sem animal</b> (disparo falso) — ' : r.pessoa_ou_veiculo ? '<b>Pessoa/veículo/doméstico</b> — ' : ''}${esc(r.observacao || '')}</small>` : ''}</div></div></td>
+    <td>${ocupado ? '…' : `<select data-k="especie" ${fixo ? 'disabled' : ''}>${optsEsp}</select>`}
+      ${r && !ocupado ? `<br>${tag('confiança ' + r.confianca, CONF_COR[r.confianca] || 'neutra')}${it.dup ? ' ' + tag('já lançado', 'inativo', 'Já existe registro igual (espécie, data, hora, tipo)') : ''}` : ''}</td>
+    <td><input type="date" data-k="data" value="${esc(it.data)}" max="${hoje()}" ${fixo ? 'disabled' : ''}>${it.origemData ? `<br><small class="dica">${{ nome: 'pelo nome do arquivo', carimbo: 'pelo carimbo', arquivo: 'data do arquivo — confira' }[it.origemData]}</small>` : ''}</td>
+    <td><input type="time" data-k="hora" value="${esc(it.hora)}" ${fixo ? 'disabled' : ''}></td>
+    <td><select data-k="camera_id" ${fixo ? 'disabled' : ''}>${opcoes(F.cameras.map(c => [c.id, c.nome]), it.camera_id, '—')}</select></td>
+    <td><select data-k="tipo" ${fixo ? 'disabled' : ''}>${opcoes(TIPOS, it.tipo)}</select></td>
+    <td class="ce">${it.estado === 'erro' ? '<button class="btn mini" type="button" data-acao="tentar">Tentar de novo</button>' : ''}${!ocupado && !fixo ? '<button class="btn mini" type="button" data-acao="tirar" title="Tirar da lista">✕</button>' : ''}</td>`;
+  tr.querySelectorAll('[data-k]').forEach(c => c.addEventListener('change', e => {
+    const k = c.dataset.k;
+    it[k] = c.type === 'checkbox' ? c.checked : c.value;
+    if (k === 'hora' || k === 'data') it.origemData = it.origemData === 'arquivo' ? '' : it.origemData;
+    if (['especie', 'data', 'hora', 'tipo'].includes(k)) { const antes = it.dup; marcarDuplicado(it); if (antes && !it.dup) it.incluir = true; desenharLinhaId(it); }
+    resumoId();
+  }));
+  tr.querySelector('img.cf-id-thumb')?.addEventListener('click', () => dialogo(`<h3>${esc(it.nome)}</h3>
+    ${it.quadros.map(q => `<img src="${q}" alt="" style="width:100%;border-radius:8px;margin-bottom:8px">`).join('')}
+    ${it.res ? `<p class="dica">${esc(it.res.nome_comum || '')} ${it.res.cientifico ? '— <i>' + esc(it.res.cientifico) + '</i>' : ''} · ${esc(it.res.observacao || '')}</p>` : ''}
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Fechar</button></div>`));
+  tr.querySelector('[data-acao="tentar"]')?.addEventListener('click', () => { it.estado = 'fila'; it.erro = ''; it.incluir = true; desenharLinhaId(it); processarFila(); });
+  tr.querySelector('[data-acao="tirar"]')?.addEventListener('click', () => { ID.itens = ID.itens.filter(x => x !== it); tr.remove(); resumoId(); });
+}
+function dataUrlParaArquivo(u, nome) {
+  const [cab, b64] = u.split(','); const bin = atob(b64); const a = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+  return new File([a], nome, { type: (cab.match(/data:([^;]+)/) || [])[1] || 'image/jpeg' });
+}
+async function lancarId() {
+  if (precisaRede()) return;
+  const lista = ID.itens.filter(x => x.estado === 'pronto' && x.incluir);
+  const falta = lista.filter(x => !x.especie || !x.data);
+  if (falta.length) return alert(`${falta.length} linha(s) marcada(s) sem espécie ou sem data. Confira antes de lançar.`);
+  const btn = $('faIdLancar'); btn.disabled = true; btn.textContent = 'Lançando…';
+  const novas = new Map();
+  let ok = 0, erros = 0;
+  for (const it of lista) {
+    try {
+      let espId = it.especie;
+      if (espId === '__nova') {
+        const k = it.nova.nome.toLowerCase();
+        if (!novas.has(k)) {
+          const ja = F.especies.find(e => e.nome.toLowerCase() === k);
+          if (ja) novas.set(k, ja.id);
+          else {
+            const { data, error } = await estado.cliente.from('cf_especies').insert({ id: novoId(), ...it.nova, observacao: 'Cadastrada pela identificação automática (Claude) — conferir.', criado_por: quem() }).select().single();
+            if (error) throw error;
+            F.especies.push(data); F.especies.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+            novas.set(k, data.id);
+          }
+        }
+        espId = novas.get(k);
+      }
+      const r = it.res || {};
+      const linha = { id: novoId(), data: it.data, hora: it.hora || null, especie_id: espId, camera_id: it.camera_id || null, tipo: it.tipo,
+        individuos: it.individuos, evidencia: null, criado_por: quem(),
+        observacao: `Identificado pelo Claude (confiança ${r.confianca || '?'}) a partir de ${it.nome}.${r.observacao ? ' ' + r.observacao : ''}`.slice(0, 900) };
+      const { data, error } = await estado.cliente.from('cf_registros').insert(linha).select().single();
+      if (error) throw error;
+      F.regs.unshift(data);
+      if (it.thumb) { await enfileirarArquivo('certificacao', 'fauna', data.id, dataUrlParaArquivo(it.thumb, `${it.nome.replace(/\.[^.]+$/, '')}.jpg`), `${it.nome.replace(/\.[^.]+$/, '')}.jpg`); F.arq.add(String(data.id)); }
+      it.estado = 'lancado'; it.regId = data.id; ok++;
+    } catch (e) { it.erro = String(e.message || e); erros++; }
+    desenharLinhaId(it);
+  }
+  salvarCaixa();
+  enviarPendentes();
+  btn.disabled = false; resumoId();
+  if (erros) alert(`${ok} lançado(s); ${erros} com erro (veja a linha).`);
+  // redesenha o painel mantendo a lista
+  if (telaAtual === 'faPainel') desenharPainel();
 }
 
 /* ===================================================================
@@ -334,7 +600,7 @@ function desenharRegistros() {
   const tela = $('telaFaRegistros');
   tela.innerHTML = `<div class="cartao naoimprimir">
     ${cabecalho('Registros de fauna', `Cada flagrante das câmeras: data, hora, espécie, câmera e a evidência (foto ou vídeo no OneDrive, ou foto anexada aqui).`,
-      `<button class="btn principal" type="button" id="frNovo">Novo registro</button>`)}
+      `<div class="barra" style="margin:0"><button class="btn" type="button" id="frIdent">📷 Identificar fotos e vídeos</button><button class="btn principal" type="button" id="frNovo">Novo registro</button></div>`)}
     <div class="grade larga" style="margin-top:12px">
       <label class="campo">Buscar <input type="text" id="frQ" value="${esc(F.fr.q)}" placeholder="Espécie, família, câmera, observação"></label>
       <label class="campo">Espécie <select id="frEsp">${opcoes(F.especies.map(e => [e.id, e.nome]), F.fr.especie, 'Todas')}</select></label>
@@ -353,6 +619,7 @@ function desenharRegistros() {
   const liga = (id, k, ev = 'change') => $(id).addEventListener(ev, e => { F.fr[k] = e.target.value; tabelaRegistros(); });
   liga('frQ', 'q', 'input'); liga('frEsp', 'especie'); liga('frCam', 'camera'); liga('frTipo', 'tipo'); liga('frDe', 'de'); liga('frAte', 'ate');
   $('frNovo').addEventListener('click', () => formRegistro(null));
+  $('frIdent').addEventListener('click', () => { abrirModulo('cert', 'faPainel'); setTimeout(() => $('faId')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300); });
   $('frImp').addEventListener('click', () => mostrar(docForm(regsFiltrados().reverse()), { barra: true }));
   $('frXlsx').addEventListener('click', () => exportar(regsFiltrados().reverse()));
   $('frLimpa').addEventListener('click', () => { Object.assign(F.fr, { q: '', especie: '', camera: '', tipo: '', de: '', ate: '' }); desenharRegistros(); });

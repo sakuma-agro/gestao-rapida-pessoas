@@ -100,3 +100,22 @@ $$;
 -- O tipo 'fauna' também precisa estar na trava da tabela de arquivos (migração "arquivos_tipo_fauna").
 alter table public.arquivos drop constraint if exists arquivos_tipo_check;
 alter table public.arquivos add constraint arquivos_tipo_check check (tipo = any (array['funcionario','treinamento','exame','os','checklist','documento','maquina','patrimonio','diario','atividade','reuniao','caderno','fauna']));
+
+-- Identificação por foto/vídeo (26/10/2026): função fauna-identificar chama o Claude;
+-- cada identificação fica registrada aqui (quem, arquivo, resultado, tokens). Migração "cf_ia_uso".
+create table if not exists public.cf_ia_uso (
+  id bigint generated always as identity primary key,
+  email text not null,
+  arquivo text,
+  modelo text,
+  resultado jsonb,
+  tokens_entrada int,
+  tokens_saida int,
+  criado_em timestamptz not null default now()
+);
+create index if not exists cf_ia_uso_email on public.cf_ia_uso(email, criado_em desc);
+alter table public.cf_ia_uso enable row level security;
+revoke all on public.cf_ia_uso from anon, authenticated;
+grant select on public.cf_ia_uso to authenticated;
+drop policy if exists cf_ia_uso_le on public.cf_ia_uso;
+create policy cf_ia_uso_le on public.cf_ia_uso for select to authenticated using (public.app_pode('cert'));
