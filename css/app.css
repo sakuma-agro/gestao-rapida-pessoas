@@ -1796,3 +1796,4 @@ span.anx-nome{color:var(--texto);text-decoration:none;cursor:default}
   .ce-dv-lista{border-right:0;border-bottom:1px solid var(--linha);max-height:320px}
   .ce-dv-info{grid-template-columns:1fr}
 }
+.ce-btn-link{text-decoration:none}.ce-btn-link svg{width:16px;height:16px;vertical-align:-3px;margin-right:2px}

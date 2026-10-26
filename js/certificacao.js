@@ -618,6 +618,8 @@ const TIPOS_DOC = [
   { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST' },
   { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO' },
 ];
+/* Pasta espelho "Certificação - Lop Gestão Rápida" no OneDrive (link que ele mandou, 26/10/2026). */
+const PASTA_CERT = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida&viewid=076de95f%2D2e95%2D4233%2Da472%2D0c15d08dc08e';
 const prefixoDoc = d => (so(d.codigo).toUpperCase().match(/^[A-Z]+/) || [''])[0];
 const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Outros', desc: 'Outros documentos', icone: 'documento', cat: '' };
 const docsDoTipo = id => S.docs.filter(d => (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
@@ -653,7 +655,8 @@ function desenharTiposDocs() {
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">Lista mestra</h2>
         <p class="dica" style="margin:2px 0 0">Escolha o tipo de documento. Cada um abre com o PDF vigente, a pasta no OneDrive e as revisões anteriores.</p></div>
-      <span class="barra" style="margin:0"><button class="btn" type="button" id="ceDcTabela2">Ver tudo em tabela</button>
+      <span class="barra" style="margin:0"><a class="btn ce-btn-link" href="${PASTA_CERT}" target="_blank" rel="noopener" title="Certificação - Lop Gestão Rápida: o que está nesta pasta é o que está no app">${svgIcone('predio')} Pasta no OneDrive</a>
+      <button class="btn" type="button" id="ceDcTabela2">Ver tudo em tabela</button>
       <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button></span>
     </div>
     <label class="campo" style="margin-top:12px">Buscar em todos <input type="text" id="ceDcBusca" value="${esc(f.q2)}" placeholder="Código, nome ou código da norma (ex.: 4.6.1)"></label>
