@@ -226,240 +226,273 @@ const precisaRede = () => { if (!navigator.onLine || !estado.cliente) { alert('S
 function trocar(lista, linha) { const i = lista.findIndex(x => x.id === linha.id); if (i >= 0) lista[i] = linha; else lista.push(linha); }
 const nomeTal = c => plantio(c.plantio_id)?.nome || '?';
 
-/* ---------- peças de categoria e calibre (tela, apresentação e impresso) ---------- */
-function barraCats(o, base, rel) {
-  const tot = CATS.reduce((s, [k]) => s + Number(o[k] || 0), 0); if (!tot) return '';
-  return `<div class="bm-cats${rel ? ' bm-cats-rel' : ''}">${CATS.map(([k, r], i) => Number(o[k]) ? `<i class="bm-c${i + 1}" style="flex:${Number(o[k])}" title="${r}: ${fmt(o[k])} kg">${Number(o[k]) / tot > 0.07 ? `${r} ${pct(Number(o[k]), tot, 0)}` : ''}</i>` : '').join('')}</div>
-    <p class="${rel ? 'rel-nota' : 'dica'}" style="margin:4px 0 0">${CATS.filter(([k]) => Number(o[k])).map(([k, r]) => `${r}: <b>${fmt(o[k])} kg</b> (${pct(Number(o[k]), tot)})`).join(' · ')}${base ? ` · soma ${fmt(tot)} de ${fmt(base)} kg que entraram (${pct(tot, base, 0)})` : ''}</p>`;
-}
-function graficoCal(cl, rel) {
-  if (!cl.calibres.length) return `<p class="${rel ? 'rel-nota' : 'dica'}">Sem notas de venda com calibre neste recorte.</p>`;
-  const max = Math.max(...cl.calibres.map(x => x.p), 0.0001);
-  return `<div class="bm-cal${rel ? ' bm-cal-rel' : ''}">${cl.calibres.map(x => `<div class="bm-calc" title="T${x.c} (${REF_CAL[x.c] || ''}): ${fmt(x.kg)} kg · ${pct(x.kg, cl.totCal)}">
-      <span class="bm-calp">${fmt(x.p * 100, 1)}%</span>
-      <div class="bm-calb" style="height:${Math.max(2, Math.round(x.p / max * 100))}%"><i class="bm-c1" style="flex:${x.c1}"></i><i class="bm-c2" style="flex:${x.c2}"></i></div>
-      <span class="bm-caln">T${x.c}</span><span class="bm-calg">${esc((REF_CAL[x.c] || '').replace(' g', ''))}</span></div>`).join('')}</div>
-    <p class="${rel ? 'rel-nota' : 'dica'}" style="margin:4px 0 0"><span class="en-leg bm-c1"></span> Cat 1 <span class="en-leg bm-c2"></span> Cat 2 · % do peso vendido em caixas com calibre (${fmt(cl.totCal)} kg) · faixa de peso do fruto em gramas</p>
-    <div class="bm-faixas">${Object.entries(ROT_FAIXA).map(([k, r]) => `<span><b>${pct(cl.faixas[k], cl.totCal, 0)}</b> ${r}</span>`).join('')}${cl.top ? `<span>Calibre que mais saiu: <b>T${cl.top.c}</b> (${pct(cl.top.kg, cl.totCal, 0)})</span>` : ''}</div>`;
-}
-function tabelaCal(cl, rel) {
-  if (!cl.calibres.length) return '';
-  const cls = rel ? 'rel-tabela bm-rel' : 'dc-planilha bm-tab';
-  return `<table class="${cls}"><thead><tr><th>Calibre</th><th>Peso do fruto</th><th class="ce">Cat 1 (kg)</th><th class="ce">Cat 2 (kg)</th><th class="ce">Total (kg)</th><th class="ce">%</th></tr></thead><tbody>
-    ${cl.calibres.map(x => `<tr><td><b>T${x.c}</b></td><td>${esc(REF_CAL[x.c] || '—')}</td><td class="ce rel-num">${fmt(x.c1)}</td><td class="ce rel-num">${fmt(x.c2)}</td><td class="ce rel-num">${fmt(x.kg)}</td><td class="ce rel-num"><b>${pct(x.kg, cl.totCal)}</b></td></tr>`).join('')}
-    <tr class="en-total"><td colspan="2"><b>Total</b></td><td class="ce rel-num">${fmt(cl.calibres.reduce((s, x) => s + x.c1, 0))}</td><td class="ce rel-num">${fmt(cl.calibres.reduce((s, x) => s + x.c2, 0))}</td><td class="ce rel-num"><b>${fmt(cl.totCal)}</b></td><td class="ce rel-num">100%</td></tr></tbody></table>`;
-}
-const EXPLICA_CAL = 'Calibre do Hass = quantos frutos cabem numa caixa de 4 kg: quanto menor o número, maior o fruto (T12 ≈ 300–371 g; T30 ≈ 123–137 g).';
+/* ===================================================================
+   AS TABELAS — no formato da planilha (pedido de 26/10/2026: "ficou
+   complexo, deixe simples, igual a planilha")
+   =================================================================== */
+const cabForm = k => `<div class="bm-form">
+  <div class="bm-form-logo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios"></div>
+  <div class="bm-form-tit">BALANÇO DE MASSA</div>
+  <table class="bm-form-cod"><tr><td>Código:</td><td>${FORM.alt}-00</td></tr><tr><td>Revisão:</td><td>${FORM.nrev}</td></tr></table>
+  <div class="bm-form-faixa"><span>PROPRIEDADE: ${esc(k.faz || 'Todas')}</span><span>CULTURA: Abacate</span></div>
+  <div class="bm-form-ano">${esc(safraNome(k.safraId))}</div></div>`;
 
-/* ---------- a cadeia de um lote (tela, apresentação e impresso) ---------- */
-function cadeiaLote(l, k, rel = false) {
-  const cs = cargasDoLote(l.id).sort((a, b) => String(a.data).localeCompare(String(b.data)));
-  const ent = entradaLote(l), vend = vendidoLote(l), it = itensDoLote(l.id);
-  const nfs = [...new Set(it.map(i => i.nf))];
-  const cl = classif(cs);
-  const tals = [...new Set(cs.map(nomeTal))];
-  const suj = /suj/i.test(l.tipo || '');
-  const T = rel ? 'rel-tabela bm-rel' : 'dc-planilha bm-tab';
-  return `<article class="bm-cadeia${rel ? ' bm-cadeia-rel' : ''}">
-    <header class="bm-cad-cab"><div><h3>${esc(l.codigo)}</h3><p>${esc(l.destino || 'packing house não informado')} · ${esc(l.tipo || '')}${l.certificacao ? ' · ' + esc(l.certificacao) : ''}${l.rastreio ? ' · rastreio ' + esc(l.rastreio) : ''}</p></div>
-      <div class="bm-cad-num"><span>entrou <b>${fmt(ent)} kg</b></span><span>vendido <b>${fmt(vend)} kg</b></span><span>descarte <b>${vend != null && ent ? pct(ent - vend, ent) : '—'}</b></span></div></header>
-    <ol class="bm-passos">
-      <li><span class="bm-pn">1</span><div><b>Talhão</b><p>${tals.map(esc).join(', ') || '—'}</p></div></li>
-      <li><span class="bm-pn">2</span><div><b>Colheita</b><p>${cs.length} carga(s) · ${fmt(cs.reduce((s, c) => s + cxC(c), 0))} cx · ${cs.length ? `${br(cs[0].data)} a ${br(cs[cs.length - 1].data)}` : '—'}</p></div></li>
-      <li><span class="bm-pn">3</span><div><b>Balança</b><p>${fmt(ent)} kg · ${[...new Set(cs.map(c => c.ticket_balanca).filter(Boolean))].length} ticket(s)</p></div></li>
-      <li><span class="bm-pn">4</span><div><b>${suj ? 'Carga suja' : 'Boletim do lavador'}</b><p>${suj ? 'vendida sem beneficiar' : CATS.some(([kk]) => l[kk] != null) ? CATS.filter(([kk]) => Number(l[kk])).map(([kk, r]) => `${r} ${pct(Number(l[kk]), CATS.reduce((s, [x]) => s + Number(l[x] || 0), 0), 0)}`).join(' · ') : 'categorias não lançadas'}</p></div></li>
-      <li><span class="bm-pn">5</span><div><b>Venda</b><p>${nfs.length ? `${nfs.length} NF-e` : esc(l.nfs ? String(l.nfs).split(/[,/]/).length + ' NF-e' : '—')} · ${fmt(vend)} kg</p></div></li>
-    </ol>
-    <table class="${T}"><thead><tr><th>Data</th><th>Placa</th><th>Ticket faz.</th><th>Talhão</th><th class="ce">Caixas</th><th>Ticket balança</th><th class="ce">Peso (kg)</th><th class="ce">Vendido (kg)</th></tr></thead><tbody>
-      ${cs.map(c => { const b = balancaDe(c), v = k?.vend?.get(c.id); return `<tr><td>${br(c.data)}</td><td>${esc(c.placa || '')}</td><td>${esc(c.ticket_faz || '')}</td><td>${esc(nomeTal(c))}</td>
-        <td class="ce rel-num">${fmt(cxC(c))}${dividida(c) ? ` <small>(${fmt(ef(c) * 100, 0)}% do caminhão)</small>` : ''}</td><td>${esc(c.ticket_balanca || '—')}${b ? ' ✓' : ''}</td><td class="ce rel-num">${fmt(kgC(c))}</td><td class="ce rel-num">${v != null ? fmt(v) : '—'}</td></tr>`; }).join('')}</tbody></table>
-    ${!suj && CATS.some(([kk]) => Number(l[kk])) ? `<p class="${rel ? 'rel-secao' : 'bm-sub'}">Boletim do lavador — categorias</p>${barraCats(l, ent, rel)}` : ''}
-    ${cl.calibres.length ? `<p class="${rel ? 'rel-secao' : 'bm-sub'}">Calibres vendidos</p>${graficoCal(cl, rel)}` : ''}
-    ${nfs.length ? `<p class="${rel ? 'rel-secao' : 'bm-sub'}">Notas de venda (${nfs.length})</p><p class="${rel ? 'rel-nota' : 'bm-nfs'}">${nfs.map(n => { const s = it.filter(i => i.nf === n); return `<span>${esc(n)} · ${br(s[0].data)} · ${fmt(s.reduce((a, i) => a + Number(i.kg || 0), 0))} kg</span>`; }).join('')}</p>`
-      : l.nfs ? `<p class="${rel ? 'rel-nota' : 'bm-nfs'}">NF-e: ${esc(l.nfs)}</p>` : ''}
-  </article>`;
+/** 2 - Balanço de Massa: uma linha por talhão. edita = a produção prevista vira campo. */
+function tabBalanco(k, edita) {
+  return `<div class="ac-rola"><table class="bm-pl"><thead><tr>
+    <th>Talhão</th><th>Variedade</th><th>Área (ha)</th><th>Início Colheita</th><th>Fim Colheita</th><th class="bm-digita">Produção prevista (kg)</th>
+    <th class="bm-az">Colheita em caixas</th><th class="bm-az">Peso líquido colhido (kg)</th><th class="bm-az">Produção (t/ha)</th><th class="bm-az">% Aproveitamento</th>
+    <th class="bm-az2">Peso Sujo</th><th class="bm-az2">Peso Beneficiado</th><th class="bm-az2">Peso Vendido</th><th class="bm-az2">Peso Descarte</th><th class="bm-az2">% Perda</th></tr></thead><tbody>
+    ${k.talhoes.map(t => `<tr><td>${esc(t.p.nome)}</td><td>${esc(t.p.variedade || '')}</td><td class="n">${fmt(t.area, 2)}</td><td>${t.n ? br(t.ini) : ''}</td><td>${t.n ? br(t.fim) : ''}</td>
+      <td class="n bm-digita">${edita ? `<input type="text" inputmode="decimal" class="bm-exp" data-exp="${esc(t.p.id)}" value="${t.exp != null ? esc(fmt(t.exp)) : ''}" aria-label="Produção prevista de ${esc(t.p.nome)}">` : t.exp != null ? fmt(t.exp) : ''}</td>
+      <td class="n">${t.n ? fmt(t.cx) : '-'}</td><td class="n">${t.n ? fmt(t.kg, 2) : '-'}</td><td class="n">${t.kgHa != null ? fmt(t.kgHa / 1000, 2) : '-'}</td><td class="n">${t.aprov != null ? fmt(t.aprov * 100, 1) + '%' : '-'}</td>
+      <td class="n">${t.sujo ? fmt(t.sujo, 2) : '-'}</td><td class="n">${t.benef ? fmt(t.benef, 2) : '-'}</td><td class="n">${t.n ? fmt(t.vend, 2) : '-'}</td><td class="n">${t.n ? fmt(t.desc, 2) : '-'}</td><td class="n">${t.kg ? pct(t.desc, t.kg, 2) : '-'}</td></tr>`).join('')}
+    <tr class="bm-tot"><td colspan="2">Total</td><td class="n">${fmt(k.area, 2)}</td><td>${br(k.tot.ini)}</td><td>${br(k.tot.fim)}</td><td class="n">${k.expTot != null ? fmt(k.expTot) : ''}</td>
+      <td class="n">${fmt(k.tot.cx)}</td><td class="n">${fmt(k.tot.kg, 2)}</td><td class="n">${k.kgHa != null ? fmt(k.kgHa / 1000, 2) : '-'}</td><td class="n">${k.expTot ? pct(k.tot.kg, k.expTot) : '-'}</td>
+      <td class="n">${fmt(k.tot.sujo, 2)}</td><td class="n">${fmt(k.tot.benef, 2)}</td><td class="n">${fmt(k.tot.vend, 2)}</td><td class="n">${fmt(k.tot.desc, 2)}</td><td class="n">${pct(k.tot.desc, k.tot.kg, 2)}</td></tr>
+  </tbody></table></div>`;
+}
+
+/** 1 - Rastreabilidade: uma linha por carga; boletim/NF, vendido e descarte juntam as cargas do mesmo lote (como as células mescladas da planilha). */
+function grupos(k, q) {
+  const ach = so(q) ? new Set(rastrear(q, k.safraId).map(a => a.l.id)) : null;
+  const porLote = new Map();
+  for (const c of k.cargas.slice().sort((a, b) => String(a.data).localeCompare(String(b.data)) || String(a.ticket_faz || '').localeCompare(String(b.ticket_faz || ''), 'pt-BR', { numeric: true }))) {
+    const id = c.lote_venda_id || 'sem';
+    if (ach && !ach.has(id)) continue;
+    if (!porLote.has(id)) porLote.set(id, []);
+    porLote.get(id).push(c);
+  }
+  const ord = l => (l && /suj/i.test(l.tipo || '')) ? 0 : l ? 1 : 2;
+  return [...porLote.entries()].map(([id, cs]) => ({ l: lote(id), cs })).sort((a, b) => ord(a.l) - ord(b.l) || String(a.cs[0].data).localeCompare(String(b.cs[0].data)));
+}
+const nfsDe = l => { if (!l) return ''; const n = [...new Set(itensDoLote(l.id).map(i => i.nf))]; return n.length ? n.join(', ') : so(l.nfs); };
+function tabRastreio(k, q, edita) {
+  const G = grupos(k, q);
+  if (!G.length) return `<div class="vazio">${so(q) ? `Nada encontrado para “${esc(q)}”.` : 'Nenhuma carga nesta safra.'}</div>`;
+  const linhas = G.map(({ l, cs }) => {
+    const suj = l ? /suj/i.test(l.tipo || '') : false;
+    const ent = cs.reduce((s, c) => s + kgC(c), 0), vend = l ? vendidoLote(l) : null;
+    const todoLote = l ? cargasDoLote(l.id).length === cs.length : true;
+    return cs.map((c, i) => {
+      const cx = cxC(c), kg = kgC(c), b = balancaDe(c);
+      const mesc = i ? '' : `<td rowspan="${cs.length}" class="bm-nf">${l ? `${edita ? `<button type="button" class="ce-link" data-lv="${esc(l.id)}">` : ''}${esc(nfsDe(l) || '—')}${edita ? '</button>' : ''}` : '<span class="tag alerta">sem boletim / NF</span>'}</td>
+        <td rowspan="${cs.length}" class="ce">${evid(l?.evid_url, 'Ver evidência')}</td>
+        <td rowspan="${cs.length}" class="n"><b>${vend != null ? fmt(todoLote ? vend : vend * ent / (entradaLote(l) || 1), 2) : '-'}</b></td>
+        <td rowspan="${cs.length}" class="n">${vend != null && !suj ? fmt(ent - (todoLote ? vend : vend * ent / (entradaLote(l) || 1)), 2) : '-'}</td>
+        <td rowspan="${cs.length}" class="n">${vend != null && !suj && ent ? pct(ent - (todoLote ? vend : vend * ent / (entradaLote(l) || 1)), ent) : '-'}</td>`;
+      return `<tr${edita ? ` data-cg="${esc(c.id)}"` : ''}><td>${br(c.data)}</td><td>${esc(c.placa || '')}</td><td class="ce">${esc(c.ticket_faz || '')}</td><td class="ce">${c.conferido ? 'SIM' : ''}</td><td class="ce">${evid(c.evid_url, 'Ver')}</td>
+        <td class="ce">${esc(nomeTal(c).replace('Talhão ', 'T-').replace(/T-(\d)$/, 'T-0$1'))}</td><td class="ce">${esc(plantio(c.plantio_id)?.variedade || '')}</td><td class="n">${fmt(cx)}</td><td class="n">${fmt(ef(c) * 100, 0)}%</td>
+        <td class="ce">${esc(c.ticket_balanca || '')}${b ? ' ✓' : ''}</td><td class="n">${fmt(kg)}</td><td class="n">${cx ? fmt(kg / cx, 2) : '-'}</td>
+        <td class="ce">${esc(l?.destino || '')}</td><td class="ce ${suj ? 'bm-tsuja' : 'bm-tbenef'}">${suj ? 'SUJA' : l ? 'BENEF.' : ''}</td><td class="ce">${esc(c.boletim || (l && !suj ? l.codigo.replace(/^Boletim\s*/i, '') : '0'))}</td>${mesc}</tr>`;
+    }).join('');
+  }).join('');
+  const s = somar(G.flatMap(g => g.cs), k.vend);
+  return `<div class="ac-rola"><table class="bm-pl bm-rast"><thead><tr>
+    <th>Data colheita</th><th>Placa</th><th>Ticket</th><th>Inspeção colheita</th><th>Evidências</th><th>Talhão</th><th>Variedade</th><th>Caixas</th><th>% Colheita</th>
+    <th>Ticket balança</th><th>Peso líq</th><th>Peso / Cx</th><th>Packing House</th><th>Tipo Carga</th><th>Boletim</th><th>NF-e</th><th>Evidências</th><th>Peso Vendido</th><th>Peso Descarte</th><th>% Descarte</th></tr></thead>
+    <tbody>${linhas}</tbody>
+    <tfoot><tr class="bm-tot"><td colspan="7">Total</td><td class="n">${fmt(s.cx)}</td><td></td><td></td><td class="n">${fmt(s.kg)}</td><td class="n">${s.cx ? fmt(s.kg / s.cx, 2) : ''}</td><td colspan="5"></td>
+      <td class="n">${fmt(s.vend, 2)}</td><td class="n">${fmt(s.desc, 2)}</td><td class="n">${pct(s.desc, s.kg)}</td></tr></tfoot></table></div>`;
+}
+
+/** Classificação do boletim do lavador: Cat 1, Cat 2, Cat 3 (campos) e o % de cada. */
+function tabClassif(k, edita) {
+  const L = k.lotes.filter(l => !/suj/i.test(l.tipo || '') && cargasDoLote(l.id).length);
+  if (!L.length) return '<p class="dica">Nenhum boletim do lavador nesta safra.</p>';
+  const tot = { ent: 0 }; CATS.forEach(([c]) => { tot[c] = 0; });
+  const linhas = L.map(l => {
+    const ent = entradaLote(l); tot.ent += ent;
+    const soma = CATS.reduce((s, [c]) => s + Number(l[c] || 0), 0);
+    CATS.forEach(([c]) => { tot[c] += Number(l[c] || 0); });
+    return `<tr><td>${esc(l.codigo)}</td><td class="n">${fmt(ent)}</td>
+      ${CATS.map(([c, r]) => `<td class="n bm-digita">${edita ? `<input type="text" inputmode="decimal" class="bm-exp" data-cat="${esc(l.id)}" data-campo="${c}" value="${l[c] != null ? esc(fmt(l[c])) : ''}" aria-label="${r} do ${esc(l.codigo)} (kg)">` : l[c] != null ? fmt(l[c]) : ''}</td><td class="n">${l[c] != null && soma ? pct(Number(l[c]), soma) : ''}</td>`).join('')}</tr>`;
+  }).join('');
+  const st = CATS.reduce((s, [c]) => s + tot[c], 0);
+  return `<div class="ac-rola"><table class="bm-pl"><thead><tr><th>Boletim</th><th>Peso que entrou (kg)</th>${CATS.map(([, r]) => `<th class="bm-digita">${r} (kg)</th><th>%</th>`).join('')}</tr></thead>
+    <tbody>${linhas}<tr class="bm-tot"><td>Total</td><td class="n">${fmt(tot.ent)}</td>${CATS.map(([c]) => `<td class="n">${fmt(tot[c])}</td><td class="n">${st ? pct(tot[c], st) : ''}</td>`).join('')}</tr></tbody></table></div>`;
+}
+
+/** Calibres: % de cada calibre no que foi vendido (notas da Coopadap). */
+function tabCalibres(k) {
+  const cl = k.cl;
+  if (!cl.calibres.length) return '<p class="dica">Sem notas de venda com calibre nesta safra.</p>';
+  return `<div class="ac-rola"><table class="bm-pl"><thead><tr><th>Calibre</th><th>Peso do fruto</th><th>Cat 1 (kg)</th><th>Cat 2 (kg)</th><th>Total (kg)</th><th>%</th></tr></thead><tbody>
+    ${cl.calibres.map(x => `<tr><td class="ce"><b>${x.c}</b></td><td class="ce">${esc(REF_CAL[x.c] || '')}</td><td class="n">${fmt(x.c1)}</td><td class="n">${fmt(x.c2)}</td><td class="n">${fmt(x.kg)}</td><td class="n"><b>${pct(x.kg, cl.totCal)}</b></td></tr>`).join('')}
+    <tr class="bm-tot"><td colspan="2">Total</td><td class="n">${fmt(cl.calibres.reduce((s, x) => s + x.c1, 0))}</td><td class="n">${fmt(cl.calibres.reduce((s, x) => s + x.c2, 0))}</td><td class="n">${fmt(cl.totCal)}</td><td class="n">100%</td></tr></tbody></table></div>
+    <p class="dica" style="margin-top:4px">Calibre = quantos frutos cabem numa caixa de 4 kg (quanto menor o número, maior o fruto).</p>`;
+}
+
+function avisoCurto(k) {
+  const a = [];
+  if (k.tot.semVenda) a.push(`${k.tot.semVenda} carga(s) sem boletim/NF`);
+  const semCat = k.lotes.filter(l => !/suj/i.test(l.tipo || '') && cargasDoLote(l.id).length && !CATS.some(([c]) => l[c] != null)).length;
+  if (semCat) a.push(`${semCat} boletim(ns) sem Cat 1/2/3`);
+  return a.length ? `<p class="dica" style="margin:8px 0 0">⚠ ${a.join(' · ')}.</p>` : '';
+}
+function ligarCampos(el) {
+  el.querySelectorAll('[data-exp]').forEach(inp => inp.addEventListener('change', () => salvarCampo(inp, 'cp_plantios', inp.dataset.exp, 'expectativa_kg', B.plantios)));
+  el.querySelectorAll('[data-cat]').forEach(inp => inp.addEventListener('change', () => salvarCampo(inp, 'cp_lotes_venda', inp.dataset.cat, inp.dataset.campo, B.lotes)));
+}
+async function salvarCampo(inp, tabela, id, campo, lista) {
+  if (precisaRede()) return;
+  const v = num(inp.value);
+  if (Number.isNaN(v) || (v != null && v < 0)) { inp.classList.add('bm-erro'); return; }
+  inp.disabled = true;
+  const { data, error } = await estado.cliente.from(tabela).update({ [campo]: v }).eq('id', id).select().single();
+  if (error) { inp.disabled = false; inp.classList.add('bm-erro'); alert('Não consegui gravar: ' + error.message); return; }
+  trocar(lista, data); salvarCaixa(); redesenhar();
 }
 
 /* ===================================================================
-   TELA · PAINEL (FORM 013)
+   TELA · BALANÇO DE MASSA (painel do FORM 013)
    =================================================================== */
-function blocoTalhao(t) {
-  return `<div class="bm-talhao">
-    <h4>${esc(t.p.nome)} <small class="dica">${esc(t.p.variedade || '')} · ${fmt(t.area, 2)} ha · ${esc(t.p.fazenda || '')}</small></h4>
-    <div class="bm-mini">
-      <div><span>Colheita</span><b>${t.n ? `${ddmm(t.ini)} → ${ddmm(t.fim)}` : '—'}</b></div>
-      <div><span>Caixas</span><b>${fmt(t.cx)}</b></div>
-      <div><span>Peso colhido</span><b>${ton(t.kg)}</b></div>
-      <div><span>Beneficiado</span><b>${ton(t.benef)}</b></div>
-      <div><span>Sujo</span><b>${ton(t.sujo)}</b></div>
-      <div><span>Vendido</span><b>${ton(t.vend)}</b></div>
-    </div>
-    ${t.kg ? `<div class="bm-barra" title="Beneficiado ${pct(t.benef, t.kg)} · sujo ${pct(t.sujo, t.kg)}"><i class="bm-b" style="flex:${t.benef}"></i><i class="bm-s" style="flex:${t.sujo}"></i></div>
-      <p class="dica" style="margin:4px 0 0">${pct(t.benef, t.kg, 0)} benef. · ${pct(t.sujo, t.kg, 0)} sujo · perda ${pct(t.desc, t.kg)} · ${fmt(t.kgHa / 1000, 1)} t/ha${t.cl.top ? ` · calibre que mais saiu T${t.cl.top.c}` : ''}</p>` : '<p class="dica">Sem carga nesta safra.</p>'}
-  </div>`;
-}
-function tabelaBalanco(k) {
-  const L = k.talhoes;
-  return `<div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr>
-    <th>Talhão</th><th>Variedade</th><th class="ce">Área (ha)</th><th class="ce">Início</th><th class="ce">Fim</th><th class="ce bm-digita">Produção prevista (kg)</th><th class="ce">Caixas</th>
-    <th class="ce">Peso líq. colhido (kg)</th><th class="ce">Produção (t/ha)</th><th class="ce">% aprov.</th><th class="ce">Peso sujo</th><th class="ce">Peso benef.</th><th class="ce">Peso vendido</th><th class="ce">Descarte</th><th class="ce">% perda</th></tr></thead><tbody>
-    ${L.map(t => `<tr${t.n ? '' : ' class="cf-inativa"'}><td><b>${esc(t.p.nome)}</b><br><small class="dica">${esc(t.p.fazenda || '')}</small></td><td>${esc(t.p.variedade || '')}</td>
-      <td class="ce">${fmt(t.area, 2)}</td><td class="ce">${t.n ? br(t.ini) : '—'}</td><td class="ce">${t.n ? br(t.fim) : '—'}</td>
-      <td class="ce bm-digita"><input type="text" inputmode="decimal" class="bm-exp" data-exp="${esc(t.p.id)}" value="${t.exp != null ? esc(fmt(t.exp)) : ''}" placeholder="digite" aria-label="Produção prevista de ${esc(t.p.nome)} em kg"></td>
-      <td class="ce">${fmt(t.cx)}</td><td class="ce"><b>${fmt(t.kg)}</b></td><td class="ce">${t.kgHa != null ? fmt(t.kgHa / 1000, 2) : '—'}</td><td class="ce">${t.aprov != null ? fmt(t.aprov * 100, 0) + '%' : '—'}</td>
-      <td class="ce">${fmt(t.sujo)}</td><td class="ce">${fmt(t.benef)}</td><td class="ce">${fmt(t.vend)}</td><td class="ce">${fmt(t.desc)}</td><td class="ce">${t.kg ? pct(t.desc, t.kg) : '—'}</td></tr>`).join('')}
-    <tr class="en-total"><td colspan="2">Total</td><td class="ce">${fmt(k.area, 2)}</td><td class="ce">${br(k.tot.ini)}</td><td class="ce">${br(k.tot.fim)}</td><td class="ce">${k.expTot != null ? fmt(k.expTot) : '—'}</td>
-      <td class="ce">${fmt(k.tot.cx)}</td><td class="ce">${fmt(k.tot.kg)}</td><td class="ce">${k.kgHa != null ? fmt(k.kgHa / 1000, 2) : '—'}</td><td class="ce">${k.expTot ? fmt(k.tot.kg / k.expTot * 100, 0) + '%' : '—'}</td>
-      <td class="ce">${fmt(k.tot.sujo)}</td><td class="ce">${fmt(k.tot.benef)}</td><td class="ce">${fmt(k.tot.vend)}</td><td class="ce">${fmt(k.tot.desc)}</td><td class="ce">${pct(k.tot.desc, k.tot.kg)}</td></tr>
-  </tbody></table></div>`;
-}
-function tabelaCatTalhao(k, rel) {
-  const L = k.talhoes.filter(t => t.n && (t.cl.somaCat || t.cl.totCal));
-  if (!L.length) return '';
-  const cls = rel ? 'rel-tabela bm-rel' : 'dc-planilha bm-tab';
-  const c = (o, kk) => o.somaCat ? `${fmt(o.cat[kk])} <small>(${pct(o.cat[kk], o.somaCat, 0)})</small>` : '—';
-  return `<table class="${cls}"><thead><tr><th>Talhão</th><th class="ce">Beneficiado (kg)</th>${CATS.map(([, r]) => `<th class="ce">${r} (kg)</th>`).join('')}<th class="ce">Graúdos</th><th class="ce">Médios</th><th class="ce">Miúdos</th><th class="ce">Calibre que mais saiu</th></tr></thead><tbody>
-    ${L.map(t => `<tr><td><b>${esc(t.p.nome)}</b></td><td class="ce rel-num">${fmt(t.benef)}</td>${CATS.map(([kk]) => `<td class="ce rel-num">${c(t.cl, kk)}</td>`).join('')}
-      ${['graudo', 'medio', 'miudo'].map(f => `<td class="ce rel-num">${pct(t.cl.faixas[f], t.cl.totCal, 0)}</td>`).join('')}<td class="ce">${t.cl.top ? 'T' + t.cl.top.c : '—'}</td></tr>`).join('')}
-    <tr class="en-total"><td>Total</td><td class="ce rel-num">${fmt(k.tot.benef)}</td>${CATS.map(([kk]) => `<td class="ce rel-num">${c(k.cl, kk)}</td>`).join('')}
-      ${['graudo', 'medio', 'miudo'].map(f => `<td class="ce rel-num">${pct(k.cl.faixas[f], k.cl.totCal, 0)}</td>`).join('')}<td class="ce">${k.cl.top ? 'T' + k.cl.top.c : '—'}</td></tr></tbody></table>`;
-}
-function avisosDe(k) {
-  const a = [];
-  if (k.tot.semVenda) a.push(`${k.tot.semVenda} carga(s) sem boletim/lote de venda — o vendido delas conta como zero. Ligue em <b>Boletins e vendas</b>.`);
-  const semBal = k.cargas.filter(c => Number(c.peso_liquido) && !balancaDe(c) && B.balanca.some(b => b.safra_id === c.safra_id)).length;
-  if (semBal) a.push(`${semBal} carga(s) sem o ticket no relatório da balança importado.`);
-  const semCat = k.lotes.filter(l => !/suj/i.test(l.tipo || '') && cargasDoLote(l.id).length && !CATS.some(([kk]) => l[kk] != null)).length;
-  if (semCat) a.push(`${semCat} boletim(ns) do lavador sem Cat 1 / Cat 2 / Cat 3 lançadas.`);
-  if (k.lotesVazios.length) a.push(`${k.lotesVazios.length} lote(s) de venda sem carga ligada.`);
-  if (k.itensSemLote.length) a.push(`${k.itensSemLote.length} linha(s) de nota sem boletim (${fmt(k.itensSemLote.reduce((s, i) => s + Number(i.kg || 0), 0))} kg) — fora do balanço.`);
-  return a;
-}
 function desenharPainel() {
   const tela = $('telaBmPainel');
   const fil = filtros();
   const k = resumo(B.f.safra, B.f.faz);
-  const t = k.tot;
-  const av = avisosDe(k);
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cabecalho('Balanço de massa — Abacate', `${FORM.codigo} · o resultado da rastreabilidade: talhão → carga → balança → boletim → venda. Você só digita a produção prevista; o resto vem das cargas e das notas.`,
-      `<button class="btn principal" type="button" id="bmApr">▶ Apresentar ao auditor</button>`)}
-    <div class="grade larga" style="margin-top:12px">${fil}</div>
-    ${k.cargas.length ? `
-    <div class="pv-cards" style="margin-top:12px">
-      ${cartao('calma', 'Janela de colheita', `${dias(t.ini, t.fim)} dias`, `${ddmm(t.ini)} a ${ddmm(t.fim)}`)}
-      ${cartao('calma', 'Caixas colhidas', fmt(t.cx), k.talhoes.filter(x => x.n).map(x => `${fmt(x.cx)} ${x.p.nome.replace('Talhão ', 'T')}`).join(' · '), 'bmRastreio')}
-      ${cartao('calma', 'Peso colhido', ton(t.kg), `${pct(t.benef, t.kg, 0)} benef. · ${pct(t.sujo, t.kg, 0)} sujo`)}
-      ${cartao('calma', 'Peso vendido', ton(t.vend), `${pct(t.vend, t.kg)} do peso colhido`, 'bmLotes')}
-      ${cartao(t.perda > .2 ? 'alerta' : t.perda > .1 ? 'atencao' : 'calma', 'Descarte', pct(t.desc, t.kg), `${fmt(t.desc)} kg`)}
-      ${cartao('calma', 'Produção', k.kgHa != null ? fmt(k.kgHa / 1000, 1) + ' t/ha' : '—', `${fmt(k.area, 2)} ha · ${fmt(k.kgCx, 1)} kg/cx`, 'bmFechamento')}
-      ${k.cl.somaCat ? cartao('calma', 'Cat 1 no lavador', pct(k.cl.cat.cat1_kg, k.cl.somaCat, 0), `Cat 2 ${pct(k.cl.cat.cat2_kg, k.cl.somaCat, 0)} · Cat 3 ${pct(k.cl.cat.cat3_kg, k.cl.somaCat, 0)}`) : ''}
-      ${k.cl.top ? cartao('calma', 'Calibre que mais saiu', 'T' + k.cl.top.c, `${pct(k.cl.top.kg, k.cl.totCal, 0)} · graúdos ${pct(k.cl.faixas.graudo, k.cl.totCal, 0)}`) : ''}
-    </div>
-    ${av.length ? `<div class="aviso" style="margin-top:12px">${av.join('<br>')}</div>` : ''}
-    <div class="qp-bloco"><h3>Balanço por talhão</h3>${tabelaBalanco(k)}
-      <p class="dica" style="margin-top:6px">A coluna verde é a única que você digita (salva ao sair do campo). Área e variedade vêm do cadastro do talhão na Colheita e Produção.</p></div>
-    <div class="qp-bloco"><h3>Detalhamento por talhão</h3><div class="bm-talhoes">${k.talhoes.filter(x => x.n).map(blocoTalhao).join('')}</div></div>
-    <div class="qp-bloco"><h3>Categorias do boletim do lavador</h3>${k.cl.somaCat ? barraCats(k.cl.cat, k.tot.benef) : '<p class="dica">Nenhum boletim com Cat 1 / 2 / 3 lançadas neste recorte. Lance em <b>Boletins e vendas</b>.</p>'}
-      <div class="ac-rola" style="margin-top:8px">${tabelaCatTalhao(k)}</div></div>
-    <div class="qp-bloco"><h3>Calibres do Hass vendidos</h3><p class="dica" style="margin:0 0 6px">${EXPLICA_CAL}</p>${graficoCal(k.cl)}
-      <details style="margin-top:8px"><summary class="ce-link">Ver a tabela de calibres</summary><div class="ac-rola">${tabelaCal(k.cl)}</div></details></div>`
-    : '<div class="vazio" style="margin-top:12px">Nenhuma carga nesta safra ainda. As cargas são lançadas na Colheita e Produção.</div>'}
+    <div class="grade larga">${fil}</div>
+    ${cabForm(k)}
+    ${tabBalanco(k, true)}
+    <p class="dica" style="margin:4px 0 0">Você digita só a coluna verde (produção prevista). O resto vem das cargas e das notas.</p>
+    ${avisoCurto(k)}
+    <h3 class="bm-h3">Classificação do lavador (por boletim)</h3>${tabClassif(k, true)}
+    <h3 class="bm-h3">Calibres vendidos</h3>${tabCalibres(k)}
   </div>
   <div class="rodape-fixo naoimprimir">
-    <button class="btn principal" type="button" id="bmImpForm">Imprimir ${FORM.codigo}</button>
-    <button class="btn" type="button" id="bmImpTudo">Imprimir a rastreabilidade completa</button>
+    <button class="btn principal" type="button" id="bmTela">Tela cheia (auditor)</button>
+    <button class="btn" type="button" id="bmImp">Imprimir</button>
     <button class="btn" type="button" id="bmXlsx">Excel</button>
   </div>`;
-  ligarFiltros(desenharPainel);
-  $('bmApr').addEventListener('click', () => apresentar());
-  $('bmImpForm').addEventListener('click', () => mostrar(docForm(k), { barra: true }));
-  $('bmImpTudo').addEventListener('click', () => mostrar(docCompleto(k), { barra: true }));
+  ligarFiltros(desenharPainel); ligarCampos(tela);
+  $('bmTela').addEventListener('click', () => telaCheia());
+  $('bmImp').addEventListener('click', () => mostrar(docForm(k), { barra: true }));
   $('bmXlsx').addEventListener('click', () => exportar(k));
-  tela.querySelectorAll('[data-ir]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', b.dataset.ir)));
-  tela.querySelectorAll('[data-exp]').forEach(inp => inp.addEventListener('change', () => salvarExpectativa(inp)));
-}
-async function salvarExpectativa(inp) {
-  if (precisaRede()) return;
-  const p = plantio(inp.dataset.exp); if (!p) return;
-  const v = num(inp.value);
-  if (Number.isNaN(v) || (v != null && v < 0)) { inp.classList.add('bm-erro'); return; }
-  inp.disabled = true;
-  const { data, error } = await estado.cliente.from('cp_plantios').update({ expectativa_kg: v }).eq('id', p.id).select().single();
-  if (error) { inp.disabled = false; inp.classList.add('bm-erro'); alert('Não consegui gravar: ' + error.message); return; }
-  trocar(B.plantios, data); salvarCaixa(); redesenhar();
 }
 
 /* ===================================================================
-   TELA · RASTREABILIDADE (a cadeia de cada boletim, e o "rastrear")
+   TELA · RASTREABILIDADE (igual à aba 1 da planilha)
    =================================================================== */
-const PASSOS = [['Talhão', 'onde foi colhido'], ['Carga', 'controle de carregamento da fazenda'], ['Balança', 'ticket da Coopadap = peso líquido'],
-  ['Boletim do lavador', 'junta as cargas · Cat 1, 2 e 3'], ['Notas de venda', 'calibre, categoria e peso vendido']];
-const fluxo = () => `<ol class="bm-fluxo">${PASSOS.map(([t, d], i) => `<li><span class="bm-pn">${i + 1}</span><b>${t}</b><small>${d}</small></li>`).join('')}</ol>`;
 function desenharRastreio() {
   const tela = $('telaBmRastreio');
   const fil = filtros();
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cabecalho('Rastreabilidade', 'Um passo atrás e um passo à frente: de qualquer nota de venda se chega ao talhão, e de qualquer carga se chega às notas.',
-      `<button class="btn principal" type="button" id="brApr">▶ Apresentar ao auditor</button>`)}
-    ${fluxo()}
-    <div class="grade larga" style="margin-top:12px">${fil}
-      <label class="campo" style="grid-column:span 2">Rastrear <input type="search" id="brQ" value="${esc(B.fr.q)}" placeholder="NF, boletim, placa, ticket da fazenda ou da balança, código de rastreio"></label>
-      <label class="campo">Mostrar <select id="brVer">${opcoes([['cadeia', 'A cadeia de cada boletim'], ['tabela', 'Tabela de cargas']], B.fr.ver)}</select></label>
-    </div>
-    <div id="brCorpo" style="margin-top:12px"></div>
+    <div class="grade larga">${fil}
+      <label class="campo" style="grid-column:span 2">Procurar <input type="search" id="brQ" value="${esc(B.fr.q)}" placeholder="NF, boletim, placa ou ticket"></label></div>
+    <div id="brCorpo" style="margin-top:10px"></div>
+    <p class="dica" style="margin-top:6px">Clique numa carga para ligar ao boletim/NF; clique na NF para abrir o boletim. Cargas e pesos se lançam na <a class="ce-link" href="${COLHEITA_URL}" target="_blank" rel="noopener">Colheita e Produção</a>.</p>
   </div>
   <div class="rodape-fixo naoimprimir">
-    <button class="btn principal" type="button" id="brImp">Imprimir a rastreabilidade completa</button>
-    <button class="btn" type="button" id="brTeste">Imprimir teste de rastreabilidade</button>
+    <button class="btn principal" type="button" id="brTela">Tela cheia (auditor)</button>
+    <button class="btn" type="button" id="brImp">Imprimir</button>
     <button class="btn" type="button" id="brXlsx">Excel</button>
   </div>`;
   ligarFiltros(desenharRastreio);
   $('brQ').addEventListener('input', e => { B.fr.q = e.target.value; corpoRastreio(); });
-  $('brVer').addEventListener('change', e => { B.fr.ver = e.target.value; corpoRastreio(); });
-  $('brApr').addEventListener('click', () => apresentar());
-  $('brImp').addEventListener('click', () => mostrar(docCompleto(resumo(B.f.safra, B.f.faz)), { barra: true }));
-  $('brTeste').addEventListener('click', () => { if (!so(B.fr.q)) return alert('Digite no "Rastrear" a NF (ou boletim, placa, ticket) que o auditor escolheu.'); mostrar(docTeste(B.fr.q), { barra: true }); });
+  $('brTela').addEventListener('click', () => telaCheia());
+  $('brImp').addEventListener('click', () => mostrar(docRastreio(resumo(B.f.safra, B.f.faz)), { barra: true }));
   $('brXlsx').addEventListener('click', () => exportar(resumo(B.f.safra, B.f.faz)));
   corpoRastreio();
 }
 function corpoRastreio() {
+  const el = $('brCorpo'); if (!el) return;
+  el.innerHTML = tabRastreio(resumo(B.f.safra, B.f.faz), B.fr.q, true);
+  el.querySelectorAll('[data-cg]').forEach(tr => tr.addEventListener('click', e => { if (e.target.closest('a,button')) return; formCarga(B.cargas.find(c => c.id === tr.dataset.cg)); }));
+  el.querySelectorAll('[data-lv]').forEach(b => b.addEventListener('click', () => formLote(lote(b.dataset.lv))));
+}
+
+/* ===================================================================
+   TELA CHEIA PARA O AUDITOR — tudo numa página só, sem edição
+   =================================================================== */
+let apr = null;
+function telaCheia() {
+  fecharApr();
+  const el = document.createElement('div'); el.id = 'bmApresenta'; el.className = 'bm-ap'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+  document.body.appendChild(el);
+  apr = { el, q: '', tecla: e => { if (e.key === 'Escape') fecharApr(); } };
+  document.addEventListener('keydown', apr.tecla);
+  desenharTelaCheia();
+}
+function desenharTelaCheia() {
   const k = resumo(B.f.safra, B.f.faz);
-  const alvo = $('brCorpo'); if (!alvo) return;
-  const q = so(B.fr.q);
-  let lotes = k.lotes, cab = '';
-  if (q) {
-    const ach = rastrear(q, B.f.safra);
-    lotes = ach.map(a => a.l);
-    cab = ach.length ? `<div class="aviso ok">“${esc(q)}” leva a ${ach.length === 1 ? 'este lote' : ach.length + ' lotes'}: ${ach.map(a => `<b>${esc(a.l.codigo)}</b> (${esc([...a.porque].slice(0, 3).join(', '))})`).join(' · ')}</div>`
-      : `<div class="aviso">Nada encontrado para “${esc(q)}” na safra ${esc(safraNome(B.f.safra))}.</div>`;
-  }
-  if (B.fr.ver === 'tabela') { alvo.innerHTML = cab + tabelaCargas(k, q ? new Set(lotes.map(l => l.id)) : null); ligarTabela(alvo); return; }
-  const semLote = q ? [] : k.cargas.filter(c => !c.lote_venda_id && kgC(c));
-  alvo.innerHTML = cab + (lotes.length ? lotes.map(l => `<div class="bm-cad-wrap">${cadeiaLote(l, k)}<div class="barra fim" style="margin:6px 0 0">
-      ${evid(l.evid_url, 'Evidência da venda ↗')}<button class="btn mini" type="button" data-lv="${esc(l.id)}">Editar boletim / lote</button></div></div>`).join('') : '')
-    + (semLote.length ? `<div class="aviso" style="margin-top:10px">Cargas sem boletim/lote: ${semLote.map(c => `${br(c.data)} ${esc(c.placa || '')} (${fmt(kgC(c))} kg)`).join(' · ')}</div>` : '');
-  alvo.querySelectorAll('[data-lv]').forEach(b => b.addEventListener('click', () => formLote(lote(b.dataset.lv))));
+  apr.el.innerHTML = `<header class="bm-ap-topo"><div><h2>Balanço de massa e rastreabilidade</h2><small>${FORM.codigo} · Abacate · safra ${esc(safraNome(B.f.safra))} · ${esc(B.f.faz || 'todas as propriedades')}</small></div>
+      <input type="search" id="apQ" placeholder="Procurar NF, boletim, placa ou ticket" value="${esc(apr.q)}">
+      <button class="btn" type="button" id="apSair">Fechar (Esc)</button></header>
+    <main class="bm-ap-corpo">
+      ${cabForm(k)}${tabBalanco(k, false)}
+      <h3 class="bm-h3">Rastreabilidade das cargas</h3><div id="apRast">${tabRastreio(k, apr.q, false)}</div>
+      <h3 class="bm-h3">Classificação do lavador (por boletim)</h3>${tabClassif(k, false)}
+      <h3 class="bm-h3">Calibres vendidos</h3>${tabCalibres(k)}
+    </main>`;
+  $('apSair').onclick = fecharApr;
+  $('apQ').addEventListener('input', e => { apr.q = e.target.value; $('apRast').innerHTML = tabRastreio(k, apr.q, false); });
 }
-function tabelaCargas(k, filtroLotes) {
-  const l = k.cargas.filter(c => !filtroLotes || filtroLotes.has(c.lote_venda_id)).sort((a, b) => String(a.data).localeCompare(String(b.data)));
-  const s = somar(l, k.vend);
-  return l.length ? `<div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr>
-    <th class="ce">Data</th><th>Placa</th><th class="ce">Ticket</th><th>Talhão</th><th class="ce">Caixas</th><th class="ce">Ticket bal.</th><th class="ce">Peso líq.</th><th class="ce">kg/cx</th>
-    <th>Packing house</th><th>Tipo</th><th>Boletim / NF</th><th class="ce">Vendido</th><th class="ce">Descarte</th><th class="ce">%</th><th class="ce">Evid.</th><th></th></tr></thead><tbody>
-    ${l.map(c => { const lv = lote(c.lote_venda_id), v = k.vend.get(c.id), kg = kgC(c), cx = cxC(c), b = balancaDe(c);
-      return `<tr><td class="ce">${br(c.data)}</td><td>${esc(c.placa || '')}</td><td class="ce">${esc(c.ticket_faz || '')}</td><td>${esc(nomeTal(c))}${c.conferido ? ' <span title="Inspeção da colheita feita">✓</span>' : ''}</td>
-        <td class="ce">${fmt(cx)}${dividida(c) ? ` <small class="dica">${fmt(ef(c) * 100, 0)}%</small>` : ''}</td><td class="ce">${esc(c.ticket_balanca || '')}${b ? ' <span title="Achado no relatório da balança">✓</span>' : ''}</td><td class="ce">${fmt(kg)}</td><td class="ce">${cx ? fmt(kg / cx, 1) : '—'}</td>
-        <td>${esc(lv?.destino || '')}</td><td>${esc(c.tipo || '')}</td>
-        <td>${lv ? `<b>${esc(lv.codigo)}</b>` : tag('sem lote', 'alerta')}${c.rastreio ? `<br><small class="dica">${esc(c.rastreio)}</small>` : ''}</td>
-        <td class="ce">${v != null ? fmt(v) : '—'}</td><td class="ce">${v != null ? fmt(kg - v) : '—'}</td><td class="ce">${v != null && kg ? pct(kg - v, kg) : '—'}</td>
-        <td class="ce">${evid(c.evid_url, 'carga')} ${evid(lv?.evid_url, 'venda')}</td>
-        <td class="ce"><button class="btn mini" type="button" data-cg="${esc(c.id)}">Abrir</button></td></tr>`; }).join('')}
-    <tr class="en-total"><td colspan="4">${l.length} carga(s)</td><td class="ce">${fmt(s.cx)}</td><td></td><td class="ce">${fmt(s.kg)}</td><td class="ce">${s.cx ? fmt(s.kg / s.cx, 1) : ''}</td><td colspan="3"></td>
-      <td class="ce">${fmt(s.vend)}</td><td class="ce">${fmt(s.desc)}</td><td class="ce">${pct(s.desc, s.kg)}</td><td colspan="2"></td></tr>
-  </tbody></table></div>` : '<div class="vazio">Nenhuma carga.</div>';
+function fecharApr() { if (!apr) return; document.removeEventListener('keydown', apr.tecla); apr.el.remove(); apr = null; }
+
+/* ===================================================================
+   TELA · FECHAMENTO (comparativo entre safras, como a aba Fechamento)
+   =================================================================== */
+function comparativo(faz) { return safrasOrd().slice().reverse().map(s => ({ s, k: resumo(s.id, faz) })).filter(x => x.k.cargas.length); }
+const INDIC = [
+  ['Área (ha)', k => fmt(k.area, 2)], ['Início Colheita', k => br(k.tot.ini)], ['Fim Colheita', k => br(k.tot.fim)],
+  ['Peso Colhido (kg)', k => fmt(k.tot.kg, 2)], ['Colhido (kg/ha)', k => fmt(k.kgHa, 2)],
+  ['Peso Vendido (kg)', k => fmt(k.tot.vend, 2)], ['Vendido (kg/ha)', k => fmt(k.vendHa, 2)],
+  ['Peso Descarte (kg)', k => fmt(k.tot.desc, 2)], ['% Perda', k => pct(k.tot.desc, k.tot.kg, 2)],
+];
+function tabFechamento(L) {
+  return `<div class="ac-rola"><table class="bm-pl"><thead><tr><th>Indicador</th>${L.map(x => `<th>${esc(x.s.nome)}</th>`).join('')}</tr></thead><tbody>
+    ${INDIC.map(([r, f]) => `<tr><td>${r}</td>${L.map(x => `<td class="n">${f(x.k)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
-function ligarTabela(el) { el.querySelectorAll('[data-cg]').forEach(b => b.addEventListener('click', () => formCarga(B.cargas.find(c => c.id === b.dataset.cg)))); }
+function tabFechTalhao(L) {
+  const nomes = [...new Set(L.flatMap(x => x.k.talhoes.filter(t => t.n).map(t => t.p.nome)))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
+  return `<div class="ac-rola"><table class="bm-pl"><thead><tr><th rowspan="2">Talhão</th>${L.map(x => `<th colspan="3">${esc(x.s.nome)}</th>`).join('')}</tr>
+    <tr>${L.map(() => '<th>Colhido (kg)</th><th>Vendido (kg)</th><th>% Perda</th>').join('')}</tr></thead><tbody>
+    ${nomes.map(n => `<tr><td>${esc(n)}</td>${L.map(x => { const t = x.k.talhoes.find(y => y.p.nome === n && y.n); return t ? `<td class="n">${fmt(t.kg, 2)}</td><td class="n">${fmt(t.vend, 2)}</td><td class="n">${pct(t.desc, t.kg, 2)}</td>` : '<td class="n">-</td><td class="n">-</td><td class="n">-</td>'; }).join('')}</tr>`).join('')}
+  </tbody></table></div>`;
+}
+function desenharFechamento() {
+  const tela = $('telaBmFechamento');
+  if (B.f.faz === null) B.f.faz = fazPadrao(B.f.safra || safraPadrao());
+  const L = comparativo(B.f.faz);
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="grade larga"><label class="campo">Propriedade <select id="bmFaz">${opcoes(fazendas(''), B.f.faz, 'Todas')}</select></label></div>
+    <h3 class="bm-h3">Comparativo entre safras — Abacate · ${esc(B.f.faz || 'todas as propriedades')}</h3>
+    ${L.length ? tabFechamento(L) + `<h3 class="bm-h3">Por talhão</h3>${tabFechTalhao(L)}<p class="dica" style="margin-top:6px">Safra = ano da colheita (na planilha: 2024 = “2022/2023”, 2025 = “2023/2024”, 2026 = “2024/2025”).</p>` : '<div class="vazio">Nenhuma carga.</div>'}
+  </div>
+  <div class="rodape-fixo naoimprimir"><button class="btn principal" type="button" id="bfImp">Imprimir</button></div>`;
+  $('bmFaz').addEventListener('change', e => { B.f.faz = e.target.value; desenharFechamento(); });
+  $('bfImp').addEventListener('click', () => mostrar(docFechamento(L), { barra: true }));
+}
+
+/* ===================================================================
+   IMPRESSOS
+   =================================================================== */
+function documento({ titulo, subtitulo, canto, corpo }) {
+  return `<article class="rel rel-paisagem">
+    <header class="rel-cabecalho"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-titulo"><h1>${esc(titulo)}</h1><p>${esc(subtitulo)}</p></div>
+      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${esc(canto || '')}</span></div></header>
+    <div class="bm-impresso">${corpo}</div>
+    <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer></article>`;
+}
+const subt = k => `Abacate · safra ${safraNome(k.safraId)} · ${k.faz || 'todas as propriedades'}`;
+function docForm(k) {
+  return documento({ titulo: 'Balanço de massa', subtitulo: subt(k), canto: `${FORM.codigo} (${FORM.alt}) · rev. ${FORM.nrev}`, corpo: `
+    ${tabBalanco(k, false)}
+    <p class="rel-secao">Classificação do lavador (por boletim)</p>${tabClassif(k, false)}
+    <p class="rel-secao">Calibres vendidos</p>${tabCalibres(k)}` });
+}
+function docRastreio(k) {
+  return documento({ titulo: 'Rastreabilidade', subtitulo: subt(k), canto: FORM.codigo, corpo: tabRastreio(k, B.fr.q, false) });
+}
+function docFechamento(L) {
+  return documento({ titulo: 'Fechamento — comparativo entre safras', subtitulo: `Abacate · ${B.f.faz || 'todas as propriedades'}`, canto: FORM.codigo, corpo: `${tabFechamento(L)}<p class="rel-secao">Por talhão</p>${tabFechTalhao(L)}` });
+}
+
+/* ===================================================================
+   CARGA (o que a Certificação completa)
+   =================================================================== */
 function formCarga(c) {
   if (!c) return;
   const lotes = B.lotes.filter(l => l.safra_id === c.safra_id);
@@ -491,6 +524,10 @@ function formCarga(c) {
 
 /* ===================================================================
    TELA · BOLETINS E VENDAS (lotes, categorias e notas)
+   =================================================================== */
+
+/* ===================================================================
+   TELA · BOLETINS E VENDAS
    =================================================================== */
 function desenharLotes() {
   const tela = $('telaBmLotes');
@@ -555,7 +592,7 @@ function formLote(l) {
         return `<label class="rs-check${outro ? ' dica' : ''}"><input type="checkbox" value="${esc(c.id)}" data-kg="${kgC(c)}" ${l && c.lote_venda_id === l.id ? 'checked' : ''}>
           ${br(c.data)} · ${esc(nomeTal(c))} · ${esc(c.placa || '')} · ${fmt(cxC(c))} cx · ${fmt(kgC(c))} kg${c.tipo ? ' · ' + esc(c.tipo) : ''}${outro ? ` <small>(hoje em ${esc(outro.codigo)})</small>` : ''}</label>`; }).join('') || '<p class="dica">Nenhuma carga nesta safra.</p>'}</div>
     </fieldset>
-    ${it.length ? `<details class="cp-fs"><summary class="ce-link">Notas de venda deste lote (${new Set(it.map(i => i.nf)).size} NF, ${it.length} linhas)</summary>${tabelaCal(classif(cargasDoLote(l.id)))}</details>` : ''}
+    ${it.length ? `<details class="cp-fs"><summary class="ce-link">Notas de venda deste lote (${new Set(it.map(i => i.nf)).size} NF, ${it.length} linhas)</summary>${tabCalibres({ cl: classif(cargasDoLote(l.id)) })}</details>` : ''}
     <label class="campo">Observação <textarea id="lvObs" rows="2">${esc(v.obs || '')}</textarea></label>
     <div class="barra entre"><div>${l ? '<button class="btn perigo" type="button" id="lvApagar">Apagar</button>' : ''}</div>
       <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="lvOk">Salvar</button></div></div>`, d => {
@@ -690,166 +727,7 @@ async function importarItens(linhas) {
 
 /* ===================================================================
    TELA · FECHAMENTO (comparativo entre safras)
-   =================================================================== */
-function comparativo(faz) { return safrasOrd().slice().reverse().map(s => ({ s, k: resumo(s.id, faz) })).filter(x => x.k.cargas.length); }
-const INDIC = [
-  ['Área (ha)', k => fmt(k.area, 2)], ['Início da colheita', k => br(k.tot.ini)], ['Fim da colheita', k => br(k.tot.fim)],
-  ['Caixas colhidas', k => fmt(k.tot.cx)], ['Peso colhido (kg)', k => fmt(k.tot.kg)], ['Colhido (kg/ha)', k => fmt(k.kgHa)], ['Peso médio (kg/cx)', k => fmt(k.kgCx, 1)],
-  ['Produção prevista (kg)', k => k.expTot != null ? fmt(k.expTot) : '—'], ['% aproveitamento', k => k.expTot ? pct(k.tot.kg, k.expTot, 0) : '—'],
-  ['Beneficiado (kg)', k => fmt(k.tot.benef)], ['Sujo (kg)', k => fmt(k.tot.sujo)],
-  ['Cat 1 no lavador', k => k.cl.somaCat ? pct(k.cl.cat.cat1_kg, k.cl.somaCat) : '—'], ['Cat 2 no lavador', k => k.cl.somaCat ? pct(k.cl.cat.cat2_kg, k.cl.somaCat) : '—'], ['Cat 3 no lavador', k => k.cl.somaCat ? pct(k.cl.cat.cat3_kg, k.cl.somaCat) : '—'],
-  ['Graúdos T10–T16', k => k.cl.totCal ? pct(k.cl.faixas.graudo, k.cl.totCal) : '—'], ['Calibre que mais saiu', k => k.cl.top ? 'T' + k.cl.top.c : '—'],
-  ['Peso vendido (kg)', k => fmt(k.tot.vend)], ['Vendido (kg/ha)', k => fmt(k.vendHa)], ['Peso descarte (kg)', k => fmt(k.tot.desc)], ['% perda', k => pct(k.tot.desc, k.tot.kg)],
-];
-function graficoSafras(L, rel) {
-  const max = Math.max(...L.map(x => x.k.tot.kg), 1);
-  return `<div class="bm-graf${rel ? ' bm-graf-rel' : ''}">${L.map(x => `<div class="bm-gl"><span class="bm-gr">${esc(x.s.nome)}</span>
-    <div class="bm-gb"><i class="bm-b" style="width:${x.k.tot.vend / max * 100}%"></i><i class="bm-s" style="width:${Math.max(0, x.k.tot.desc) / max * 100}%"></i></div>
-    <span class="bm-gv">${ton(x.k.tot.kg)} · vendido ${pct(x.k.tot.vend, x.k.tot.kg, 0)}</span></div>`).join('')}</div>
-    <p class="${rel ? 'rel-nota' : 'dica'}" style="margin:4px 0 0"><span class="en-leg en-ren"></span> vendido <span class="en-leg en-nao"></span> descarte</p>`;
-}
-function tabelaCalSafras(L, rel) {
-  const cals = [...new Set(L.flatMap(x => x.k.cl.calibres.map(c => c.c)))].sort((a, b) => a - b);
-  if (!cals.length) return '';
-  const cls = rel ? 'rel-tabela bm-rel' : 'dc-planilha bm-tab';
-  return `<table class="${cls}"><thead><tr><th>Calibre</th><th>Peso do fruto</th>${L.map(x => `<th class="ce">${esc(x.s.nome)}</th>`).join('')}</tr></thead><tbody>
-    ${cals.map(c => `<tr><td><b>T${c}</b></td><td>${esc(REF_CAL[c] || '')}</td>${L.map(x => { const r = x.k.cl.calibres.find(y => y.c === c); return `<td class="ce rel-num">${r ? pct(r.kg, x.k.cl.totCal) : '—'}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
-}
-function desenharFechamento() {
-  const tela = $('telaBmFechamento');
-  if (B.f.faz === null) B.f.faz = fazPadrao(B.f.safra || safraPadrao());
-  const L = comparativo(B.f.faz);
-  tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cabecalho('Fechamento — comparativo entre safras', `Abacate · ${esc(B.f.faz || 'todas as propriedades')}. Safra = ano da colheita (na planilha, 2024 aparecia como “2022/2023”, 2025 como “2023/2024” e 2026 como “2024/2025”).`)}
-    <div class="grade larga" style="margin-top:12px"><label class="campo">Propriedade <select id="bmFaz">${opcoes(fazendas(''), B.f.faz, 'Todas')}</select></label></div>
-    ${L.length ? `<div class="qp-bloco"><h3>Colhido × vendido</h3>${graficoSafras(L)}</div>
-    <div class="qp-bloco"><h3>Indicadores</h3><div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr><th>Indicador</th>${L.map(x => `<th class="ce">${esc(x.s.nome)}</th>`).join('')}</tr></thead><tbody>
-      ${INDIC.map(([r, f]) => `<tr><td>${r}</td>${L.map(x => `<td class="ce">${f(x.k)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
-    <div class="qp-bloco"><h3>Calibres por safra (% do peso vendido)</h3><div class="ac-rola">${tabelaCalSafras(L) || '<p class="dica">Sem notas com calibre.</p>'}</div></div>
-    <div class="qp-bloco"><h3>Por talhão</h3><div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr><th>Talhão</th>${L.map(x => `<th class="ce" colspan="3">${esc(x.s.nome)}</th>`).join('')}</tr>
-      <tr><th></th>${L.map(() => '<th class="ce">Colhido (kg)</th><th class="ce">kg/ha</th><th class="ce">% perda</th>').join('')}</tr></thead><tbody>
-      ${[...new Set(L.flatMap(x => x.k.talhoes.filter(t => t.n).map(t => t.p.nome)))].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true })).map(nome => `<tr><td>${esc(nome)}</td>${L.map(x => { const t = x.k.talhoes.find(y => y.p.nome === nome && y.n);
-        return t ? `<td class="ce">${fmt(t.kg)}</td><td class="ce">${fmt(t.kgHa)}</td><td class="ce">${pct(t.desc, t.kg)}</td>` : '<td class="ce">—</td><td></td><td></td>'; }).join('')}</tr>`).join('')}
-    </tbody></table></div></div>` : '<div class="vazio" style="margin-top:12px">Nenhuma carga.</div>'}
-  </div>
-  <div class="rodape-fixo naoimprimir"><button class="btn principal" type="button" id="bfImp">Imprimir o fechamento</button></div>`;
-  $('bmFaz').addEventListener('change', e => { B.f.faz = e.target.value; desenharFechamento(); });
-  $('bfImp').addEventListener('click', () => mostrar(docFechamento(L), { barra: true }));
-}
 
-/* ===================================================================
-   APRESENTAR AO AUDITOR — tela cheia, um assunto por página
-   =================================================================== */
-let apr = null;
-function slidesDe(k) {
-  const t = k.tot, S = [];
-  S.push({ t: 'Balanço de massa', h: `<p class="bm-ap-sub">Abacate · safra ${esc(safraNome(k.safraId))} · ${esc(k.faz || 'todas as propriedades')} · ${FORM.codigo}</p>
-    <div class="bm-ap-kpis">
-      <div><span>Colheita</span><b>${ddmm(t.ini)} a ${ddmm(t.fim)}</b><small>${dias(t.ini, t.fim)} dias · ${k.cargas.length} cargas</small></div>
-      <div><span>Caixas</span><b>${fmt(t.cx)}</b><small>${fmt(k.kgCx, 1)} kg por caixa</small></div>
-      <div><span>Colhido</span><b>${ton(t.kg)}</b><small>${fmt(k.kgHa / 1000, 1)} t/ha em ${fmt(k.area, 2)} ha</small></div>
-      <div><span>Vendido</span><b>${ton(t.vend)}</b><small>${pct(t.vend, t.kg)} do colhido</small></div>
-      <div><span>Descarte</span><b>${pct(t.desc, t.kg)}</b><small>${fmt(t.desc)} kg</small></div>
-      ${k.expTot ? `<div><span>Aproveitamento</span><b>${pct(t.kg, k.expTot, 0)}</b><small>do previsto (${ton(k.expTot)})</small></div>` : ''}
-    </div>
-    <h4>Como a rastreabilidade funciona</h4>${fluxo()}
-    <p class="dica">Toda carga sai da fazenda com ticket; o ticket da balança da Coopadap dá o peso; as cargas entram num boletim do lavador; o boletim vira as notas de venda. Assim, de qualquer nota se chega ao talhão (um passo atrás) e de qualquer carga se chega às notas (um passo à frente).</p>` });
-  S.push({ t: 'Balanço por talhão', h: tabelaBalanco(k).replace(/<input[^>]*value="([^"]*)"[^>]*>/g, '$1') + `<div class="bm-talhoes" style="margin-top:12px">${k.talhoes.filter(x => x.n).map(blocoTalhao).join('')}</div>` });
-  if (k.cl.somaCat || k.cl.totCal) S.push({ t: 'Categorias e calibres', h: `${k.cl.somaCat ? `<h4>Boletins do lavador — categorias</h4>${barraCats(k.cl.cat, k.tot.benef)}<div class="ac-rola" style="margin-top:8px">${tabelaCatTalhao(k)}</div>` : ''}
-    ${k.cl.totCal ? `<h4>Calibres vendidos</h4><p class="dica">${EXPLICA_CAL}</p>${graficoCal(k.cl)}` : ''}` });
-  for (const l of k.lotes) S.push({ t: `Cadeia · ${l.codigo}`, h: cadeiaLote(l, k) });
-  S.push({ t: 'Teste de rastreabilidade', h: `<p>Peça ao auditor uma nota fiscal, um boletim, uma placa ou um ticket e digite abaixo: o app mostra o caminho inteiro.</p>
-    <label class="campo"><input type="search" id="apQ" placeholder="NF, boletim, placa ou ticket" style="font-size:18px"></label><div id="apRes" style="margin-top:10px"></div>` });
-  return S;
-}
-function apresentar() {
-  const k = resumo(B.f.safra, B.f.faz);
-  if (!k.cargas.length) return alert('Nenhuma carga nesta safra.');
-  const S = slidesDe(k);
-  fecharApr();
-  const el = document.createElement('div'); el.id = 'bmApresenta'; el.className = 'bm-ap'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
-  document.body.appendChild(el);
-  apr = { S, i: 0, el, k, tecla: e => { if (e.target.closest('input')) return; if (e.key === 'ArrowRight' || e.key === 'PageDown') ir(1); else if (e.key === 'ArrowLeft' || e.key === 'PageUp') ir(-1); else if (e.key === 'Escape') fecharApr(); } };
-  document.addEventListener('keydown', apr.tecla);
-  desenharSlide();
-}
-function ir(d) { if (!apr) return; apr.i = Math.max(0, Math.min(apr.S.length - 1, apr.i + d)); desenharSlide(); }
-function desenharSlide() {
-  const { S, i, el } = apr; const s = S[i];
-  el.innerHTML = `<header class="bm-ap-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios"><div><h2>${esc(s.t)}</h2><small>${FORM.codigo} · ${esc(safraNome(B.f.safra))} · ${esc(B.f.faz || 'todas as propriedades')}</small></div>
-      <select id="apIr" aria-label="Ir para">${S.map((x, j) => `<option value="${j}" ${j === i ? 'selected' : ''}>${j + 1}. ${esc(x.t)}</option>`).join('')}</select>
-      <button class="btn" type="button" id="apSair">Sair (Esc)</button></header>
-    <main class="bm-ap-corpo">${s.h}</main>
-    <footer class="bm-ap-pe"><button class="btn" type="button" id="apAnt" ${i ? '' : 'disabled'}>← Anterior</button><span>${i + 1} de ${S.length}</span>
-      <button class="btn principal" type="button" id="apProx" ${i < S.length - 1 ? '' : 'disabled'}>Próximo →</button><img src="img/lop-marca.png" alt="LOP" class="bm-ap-lop"></footer>`;
-  $('apSair').onclick = fecharApr; $('apAnt').onclick = () => ir(-1); $('apProx').onclick = () => ir(1);
-  $('apIr').onchange = e => { apr.i = Number(e.target.value); desenharSlide(); };
-  el.querySelector('.bm-ap-corpo').scrollTop = 0;
-  $('apQ')?.addEventListener('input', e => {
-    const ach = rastrear(e.target.value, B.f.safra);
-    $('apRes').innerHTML = so(e.target.value).length < 2 ? '' : ach.length ? ach.map(a => `<div class="aviso ok">Encontrado em <b>${esc(a.l.codigo)}</b> por ${esc([...a.porque].slice(0, 3).join(', '))}</div>${cadeiaLote(a.l, apr.k)}`).join('') : '<div class="aviso">Nada encontrado nesta safra.</div>';
-  });
-}
-function fecharApr() { if (!apr) return; document.removeEventListener('keydown', apr.tecla); apr.el.remove(); apr = null; }
-
-/* ===================================================================
-   IMPRESSOS E EXCEL
-   =================================================================== */
-function documento({ titulo, subtitulo, canto, corpo, paisagem }) {
-  return `<article class="rel${paisagem ? ' rel-paisagem' : ''}">
-    <header class="rel-cabecalho"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-titulo"><h1>${esc(titulo)}</h1><p>${esc(subtitulo)}</p></div>
-      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${esc(canto || '')}</span></div></header>
-    ${corpo}
-    <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer></article>`;
-}
-const subt = k => `Abacate · safra ${safraNome(k.safraId)} · ${k.faz || 'todas as propriedades'}`;
-function tabelaBalRel(k) {
-  return `<table class="rel-tabela bm-rel"><thead><tr><th>Talhão</th><th>Variedade</th><th>Área (ha)</th><th>Início</th><th>Fim</th><th>Prevista (kg)</th><th>Caixas</th><th>Peso líq. (kg)</th><th>t/ha</th><th>% aprov.</th><th>Sujo</th><th>Benef.</th><th>Vendido</th><th>Descarte</th><th>% perda</th></tr></thead><tbody>
-    ${k.talhoes.map(t => `<tr><td>${esc(t.p.nome)}</td><td>${esc(t.p.variedade || '')}</td><td class="rel-num">${fmt(t.area, 2)}</td><td>${t.n ? br(t.ini) : '—'}</td><td>${t.n ? br(t.fim) : '—'}</td><td class="rel-num">${t.exp != null ? fmt(t.exp) : '—'}</td>
-      <td class="rel-num">${fmt(t.cx)}</td><td class="rel-num">${fmt(t.kg)}</td><td class="rel-num">${t.kgHa != null ? fmt(t.kgHa / 1000, 2) : '—'}</td><td class="rel-num">${t.aprov != null ? fmt(t.aprov * 100, 0) + '%' : '—'}</td>
-      <td class="rel-num">${fmt(t.sujo)}</td><td class="rel-num">${fmt(t.benef)}</td><td class="rel-num">${fmt(t.vend)}</td><td class="rel-num">${fmt(t.desc)}</td><td class="rel-num">${t.kg ? pct(t.desc, t.kg) : '—'}</td></tr>`).join('')}
-    <tr><td colspan="2"><b>Total</b></td><td class="rel-num"><b>${fmt(k.area, 2)}</b></td><td>${br(k.tot.ini)}</td><td>${br(k.tot.fim)}</td><td class="rel-num">${k.expTot != null ? fmt(k.expTot) : '—'}</td><td class="rel-num"><b>${fmt(k.tot.cx)}</b></td>
-      <td class="rel-num"><b>${fmt(k.tot.kg)}</b></td><td class="rel-num">${k.kgHa != null ? fmt(k.kgHa / 1000, 2) : '—'}</td><td class="rel-num">${k.expTot ? fmt(k.tot.kg / k.expTot * 100, 0) + '%' : '—'}</td>
-      <td class="rel-num">${fmt(k.tot.sujo)}</td><td class="rel-num">${fmt(k.tot.benef)}</td><td class="rel-num"><b>${fmt(k.tot.vend)}</b></td><td class="rel-num">${fmt(k.tot.desc)}</td><td class="rel-num"><b>${pct(k.tot.desc, k.tot.kg)}</b></td></tr></tbody></table>`;
-}
-const fichaForm = k => `<div class="rel-ficha"><div><span>Código</span><b>${FORM.codigo} (${FORM.alt})</b></div><div><span>Revisão</span><b>${FORM.nrev}</b></div><div><span>Propriedade</span><b>${esc(k.faz || 'Todas')}</b></div>
-  <div><span>Cultura</span><b>Abacate</b></div><div><span>Elaboração / revisão</span><b>${FORM.elaborador}</b></div><div><span>Aprovação</span><b>${FORM.aprovador}</b></div></div>`;
-function docForm(k) {
-  return documento({ titulo: 'Balanço de massa', subtitulo: subt(k), canto: FORM.codigo, paisagem: true, corpo: `${fichaForm(k)}${tabelaBalRel(k)}
-    ${k.cl.somaCat ? `<p class="rel-secao">Categorias do boletim do lavador</p>${barraCats(k.cl.cat, k.tot.benef, true)}${tabelaCatTalhao(k, true)}` : ''}
-    ${k.cl.totCal ? `<p class="rel-secao">Calibres vendidos — ${EXPLICA_CAL}</p>${graficoCal(k.cl, true)}` : ''}
-    <p class="rel-secao">Boletins e lotes de venda</p>
-    <table class="rel-tabela bm-rel"><thead><tr><th>Lote</th><th>Data</th><th>Destino</th><th>Tipo</th><th>Cargas</th><th>Entrou (kg)</th><th>Cat 1</th><th>Cat 2</th><th>Cat 3</th><th>Vendido (kg)</th><th>% perda</th></tr></thead><tbody>
-      ${k.lotes.map(l => { const s = somar(k.cargas.filter(c => c.lote_venda_id === l.id), k.vend); const tc = CATS.reduce((a, [kk]) => a + Number(l[kk] || 0), 0);
-        return `<tr><td>${esc(l.codigo)}</td><td>${br(l.data)}</td><td>${esc(l.destino || '')}</td><td>${esc(l.tipo || '')}</td><td class="rel-num">${s.n}</td><td class="rel-num">${fmt(s.kg)}</td>
-        ${['cat1_kg', 'cat2_kg', 'cat3_kg'].map(kk => `<td class="rel-num">${l[kk] != null ? pct(Number(l[kk]), tc, 0) : '—'}</td>`).join('')}<td class="rel-num">${fmt(s.vend)}</td><td class="rel-num">${pct(s.desc, s.kg)}</td></tr>`; }).join('')}</tbody></table>
-    <p class="rel-nota">Peso colhido = peso líquido da balança da Coopadap (ticket). Vendido = notas de venda do packing house por boletim (ou NF da carga suja), repartido entre as cargas pelo peso. Descarte = colhido − vendido.</p>` });
-}
-function docCompleto(k) {
-  return documento({ titulo: 'Rastreabilidade completa', subtitulo: subt(k), canto: FORM.codigo, paisagem: true, corpo: `${fichaForm(k)}
-    <ol class="bm-fluxo bm-fluxo-rel">${PASSOS.map(([t, d], i) => `<li><span class="bm-pn">${i + 1}</span><b>${t}</b><small>${d}</small></li>`).join('')}</ol>
-    ${tabelaBalRel(k)}
-    ${k.cl.somaCat ? `<p class="rel-secao">Categorias do boletim do lavador</p>${barraCats(k.cl.cat, k.tot.benef, true)}` : ''}
-    ${k.cl.totCal ? `<p class="rel-secao">Calibres vendidos</p>${graficoCal(k.cl, true)}${tabelaCal(k.cl, true)}` : ''}
-    ${k.lotes.map(l => cadeiaLote(l, k, true)).join('')}` });
-}
-function docTeste(q) {
-  const k = resumo(B.f.safra, ''); const ach = rastrear(q, B.f.safra);
-  return documento({ titulo: 'Teste de rastreabilidade', subtitulo: `Abacate · safra ${safraNome(B.f.safra)} · busca por “${q}”`, canto: 'FORM 021', paisagem: true, corpo: `
-    <div class="rel-ficha"><div><span>Item rastreado</span><b>${esc(q)}</b></div><div><span>Data do teste</span><b>${br(hoje())}</b></div><div><span>Resultado</span><b>${ach.length ? 'Rastreado até o talhão' : 'Não encontrado'}</b></div>
-      <div><span>Lote(s)</span><b>${ach.map(a => esc(a.l.codigo)).join(', ') || '—'}</b></div><div><span>Talhão(ões)</span><b>${esc([...new Set(ach.flatMap(a => cargasDoLote(a.l.id).map(nomeTal)))].join(', ') || '—')}</b></div><div><span>Responsável</span><b>&nbsp;</b></div></div>
-    ${ach.map(a => cadeiaLote(a.l, k, true)).join('')}
-    <p class="rel-nota">Um passo atrás (da venda até o talhão e a carga) e um passo à frente (da carga até as notas de venda), conforme a GLOBALG.A.P.</p>` });
-}
-function docFechamento(L) {
-  return documento({ titulo: 'Fechamento — comparativo entre safras', subtitulo: `Abacate · ${B.f.faz || 'todas as propriedades'}`, canto: FORM.codigo, paisagem: true, corpo: `
-    ${graficoSafras(L, true)}
-    <table class="rel-tabela" style="margin-top:10px"><thead><tr><th>Indicador</th>${L.map(x => `<th>${esc(x.s.nome)}</th>`).join('')}</tr></thead><tbody>
-      ${INDIC.map(([r, f]) => `<tr><td>${r}</td>${L.map(x => `<td class="rel-num">${f(x.k)}</td>`).join('')}</tr>`).join('')}</tbody></table>
-    ${tabelaCalSafras(L, true) ? `<p class="rel-secao">Calibres por safra (% do peso vendido)</p>${tabelaCalSafras(L, true)}` : ''}
-    <p class="rel-nota">Safra = ano da colheita. Vendido conforme as notas de venda do packing house (Coopadap / Carlini).</p>` });
-}
 async function exportar(k) {
   const l = k.cargas.slice().sort((a, b) => String(a.data).localeCompare(String(b.data)));
   const tit = `${FORM.codigo} — ${FORM.titulo} · ${subt(k)}`, sub = `SAKUMA Agronegócios · emitido em ${br(hoje())}`;
@@ -883,6 +761,7 @@ async function exportar(k) {
 
 /* ===================================================================
    ENTRADA
+
    =================================================================== */
 export const TELAS_BALANCO = ['bmPainel', 'bmRastreio', 'bmLotes', 'bmFechamento'];
 const DESENHO = { bmPainel: desenharPainel, bmRastreio: desenharRastreio, bmLotes: desenharLotes, bmFechamento: desenharFechamento };

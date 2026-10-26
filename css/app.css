@@ -1963,3 +1963,34 @@ body.ce-apr-aberto{overflow:hidden}
 .bm-ap-pe{display:flex;align-items:center;justify-content:center;gap:16px;padding:10px;border-top:1px solid var(--linha);background:var(--papel)}
 .bm-ap-lop{height:22px;position:absolute;right:20px}
 .bm-ap-pe{position:relative}
+/* Balanço de massa — formato planilha (26/10/2026, "deixe simples, igual a planilha") */
+.bm-pl{border-collapse:collapse;width:100%;font-size:12.5px;background:var(--papel)}
+.bm-pl th,.bm-pl td{border:1px solid #B7B9AE;padding:4px 6px;vertical-align:middle}
+.bm-pl th{background:#84BD00;color:#fff;font-weight:700;text-align:center;white-space:normal;line-height:1.2}
+.bm-pl th.bm-az{background:#6a9800}.bm-pl th.bm-az2{background:#744F28}
+.bm-pl th.bm-digita{background:#4f7300}
+.bm-pl td.bm-digita{background:#EEF6DC}
+.bm-pl td.n{text-align:right;white-space:nowrap}.bm-pl td.ce{text-align:center}
+.bm-pl tbody tr:nth-child(even) td{background:rgba(132,189,0,.06)}
+.bm-pl tbody tr:nth-child(even) td.bm-digita{background:#E4F0CC}
+.bm-pl .bm-tot td{background:#D5E8A6!important;font-weight:700}
+.bm-pl .bm-exp{width:100%;min-width:90px;border:1px solid #c9d6ad;background:#fff}
+.bm-rast td{white-space:nowrap}.bm-rast td.bm-nf{white-space:normal;min-width:220px;max-width:320px;font-size:11px;color:#2f6f9f;text-align:center}
+.bm-rast tr[data-cg]{cursor:pointer}.bm-rast tr[data-cg]:hover td{background:var(--verde-fundo)}
+.bm-tsuja{background:#FBE3D3!important;color:#a0521b;font-weight:700;font-size:11px}
+.bm-tbenef{background:#E6F2CF!important;color:#4f7300;font-weight:700;font-size:11px}
+.bm-h3{margin:20px 0 6px;font-size:15px}
+.bm-form{display:grid;grid-template-columns:150px 1fr 190px;border:1px solid #B7B9AE;margin:12px 0 0;background:var(--papel)}
+.bm-form-logo{display:flex;align-items:center;justify-content:center;padding:8px;border-right:1px solid #B7B9AE}
+.bm-form-logo img{max-width:110px;max-height:60px}
+.bm-form-tit{display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;letter-spacing:1px;color:#51534A}
+.bm-form-cod{border-collapse:collapse;border-left:1px solid #B7B9AE;font-size:12px}
+.bm-form-cod td{border-bottom:1px solid #B7B9AE;padding:4px 8px}
+.bm-form-faixa{grid-column:1/-1;display:flex;justify-content:space-around;background:#84BD00;color:#fff;font-weight:700;padding:4px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bm-form-ano{grid-column:1/-1;text-align:center;font-weight:800;font-size:18px;padding:4px;border-bottom:1px solid #B7B9AE}
+@media (max-width:700px){.bm-form{grid-template-columns:1fr}.bm-form-logo,.bm-form-cod{border:0}.bm-form-tit{font-size:22px}}
+.bm-ap-topo input{max-width:320px;padding:6px 10px;border-radius:6px;border:0}
+.bm-impresso .bm-pl{font-size:7.5px}.bm-impresso .bm-pl th,.bm-impresso .bm-pl td{padding:2px 3px}
+.bm-impresso .bm-pl th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bm-impresso .bm-rast td.bm-nf{min-width:0;max-width:150px;font-size:6.5px}
+.bm-impresso .ac-rola{overflow:visible}
