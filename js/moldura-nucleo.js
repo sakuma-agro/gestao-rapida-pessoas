@@ -743,5 +743,5 @@ window.voltarAoInicioDaArea = () => { if (App.usuario && window.mostrarInicio) m
 Object.assign(window, {
   App, q, $, $$, esc, aviso, abrirModal, fecharModal,
   gravar, inativar, sincronizar, pk, meta, blobDaFoto, blobDoDrive, baixarBase,
-  guardarFoto, enviarFotos, lerLocal, gravarLocal
+  guardarFoto, enviarFotos, lerLocal, gravarLocal, chamarArquivos
 });

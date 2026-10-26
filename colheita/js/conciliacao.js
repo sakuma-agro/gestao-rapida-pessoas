@@ -218,14 +218,16 @@ export async function lerRelatorio(arquivo, tipo, cult) {
 }
 
 let lido = null;
+let impSo = 'balanca';   /* 26/10/2026: balança no módulo Balança, cooperativa em Comercialização */
 function desenharImp() {
-  const alvo = $('cpImpCorpo');
+  const alvo = $(impSo === 'cooperativa' ? 'cpImpCoopCorpo' : 'cpImpCorpo');
   if (!alvo) return;
+  const outro = $(impSo === 'cooperativa' ? 'cpImpCorpo' : 'cpImpCoopCorpo'); if (outro) outro.innerHTML = '';   /* um #cpImpPrevia só */
   if (!pronto() || carregando()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const cult = culturaSel(), saf = safraSel();
   if (!cult || !saf) { alvo.innerHTML = '<div class="vazio">Escolha a cultura e a safra.</div>'; return; }
-  const tipos = cult.conciliacao === 'balanca_coop' ? ['balanca', 'cooperativa'] : cult.conciliacao === 'balanca' ? ['balanca'] : [];
-  if (!tipos.length) { alvo.innerHTML = `<div class="vazio">${esc(cult.nome)} não usa relatório de balança (conferência: ${esc(cult.conciliacao)}).</div>`; return; }
+  const tipos = (cult.conciliacao === 'balanca_coop' ? ['balanca', 'cooperativa'] : cult.conciliacao === 'balanca' ? ['balanca'] : []).filter(t => t === impSo);
+  if (!tipos.length) { alvo.innerHTML = `<div class="vazio">${esc(cult.nome)} não usa relatório ${impSo === 'cooperativa' ? 'da cooperativa' : 'de balança'} (conferência: ${esc(cult.conciliacao)}).</div>`; return; }
   const ja = t => todos(t === 'balanca' ? 'cp_balanca' : 'cp_cooperativa').filter(b => b.cultura_id === cult.id && b.safra_id === saf.id && b.ativo !== false);
   alvo.innerHTML = `
     <div class="grade">${tipos.map(t => `<div class="cp-imp-box">
@@ -287,4 +289,5 @@ function previa(cult, saf) {
   };
 }
 
-export function abrirImportar() { desenharImp(); if (lido) previa(culturaSel(), safraSel()); }
+export function abrirImportar() { impSo = 'balanca'; desenharImp(); if (lido && lido.tipo === impSo) previa(culturaSel(), safraSel()); }
+export function abrirImportarCoop() { impSo = 'cooperativa'; desenharImp(); if (lido && lido.tipo === impSo) previa(culturaSel(), safraSel()); }

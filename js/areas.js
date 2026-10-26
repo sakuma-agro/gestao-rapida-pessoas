@@ -27,7 +27,7 @@ const VERSAO_EST = '31';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
 const VERSAO_CB = '17';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
-const VERSAO_CP = '5';
+const VERSAO_CP = '6';
 /* Sobe a cada publicação da área Projetos (PMBOK) (e nos ?v= do projetos/index.html). */
 const VERSAO_PJ = '1';
 
@@ -65,7 +65,7 @@ export const AREAS = [
      Colheita" de cenoura, batata, café, milho, trigo e abacate numa área só.
      Mora em colheita/, numa moldura. */
   { id: 'colheita', nome: 'Colheita e Produção', icone: 'icons/area-colheita.v3.svg',
-    desc: 'Painel da safra · Cargas · Conciliação balança/cooperativa · Cadastros · Financeiro' },
+    desc: 'Painel da safra · Cargas · Balança · Beneficiamento · Comercialização · Cadastros · Financeiro' },
   /* Projetos (PMBOK) (23/10/2026, pedido dele): os projetos internos da SAKUMA
      pelas boas práticas do Guia PMBOK e do material do MBA — termo de
      abertura, partes interessadas, escopo e requisitos, EAP, rede e caminho

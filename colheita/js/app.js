@@ -11,9 +11,10 @@ import { $, esc, pronto, carregando, culturas, culturaSel, safraSel, safrasDe, e
   resumoSafra, unidadeRot, num } from './dados.js';
 import { abrirPainel, abrirHistorico } from './painel.js';
 import { abrirCargas } from './cargas.js';
-import { abrirConferencia, abrirImportar } from './conciliacao.js';
+import { abrirConferencia, abrirImportar, abrirImportarCoop } from './conciliacao.js';
 import { abrirPlantios, abrirSafras, abrirVeiculos, abrirHistCad } from './cadastros.js';
 import { abrirFinanceiro } from './financeiro.js';
+import { abrirBeneficiamento, abrirComercializacao } from './venda.js';
 import { abrirCulturas, abrirCargaInicial } from './parametros.js';
 
 const TELAS = ['inicio', ...MODULOS.flatMap(m => telasDe(m).map(([t]) => t))];
@@ -23,6 +24,7 @@ const SEM_SELETOR = new Set(['inicio', 'cpVeiculos', 'cpCulturas', 'cpCargaInici
 const ABRIR = {
   cpPainel: abrirPainel, cpHistorico: abrirHistorico, cpCargas: abrirCargas,
   cpConferencia: abrirConferencia, cpImportar: abrirImportar,
+  cpBenef: abrirBeneficiamento, cpCom: abrirComercializacao, cpImpCoop: abrirImportarCoop,
   cpPlantios: abrirPlantios, cpSafras: abrirSafras, cpVeiculos: abrirVeiculos, cpHistCad: abrirHistCad,
   cpFinanceiro: abrirFinanceiro, cpCulturas: abrirCulturas, cpCargaInicial: abrirCargaInicial,
 };

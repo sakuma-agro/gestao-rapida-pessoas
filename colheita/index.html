@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=1">
 <link rel="stylesheet" href="css/base.css?v=1">
-<link rel="stylesheet" href="css/colheita.css?v=2">
+<link rel="stylesheet" href="css/colheita.css?v=3">
 <link rel="stylesheet" href="../css/categoria-moldura.css?v=1">
 <!-- Área Colheita e Produção do LOP - Gestão Rápida (20/10/2026).
      Substitui as planilhas "Controle Colheita - <cultura>" (cenoura, batata,
@@ -84,19 +84,44 @@
       </div>
     </section>
 
-    <!-- =================== CONCILIAÇÃO =================== -->
+    <!-- =================== BALANÇA (ex-Conciliação) =================== -->
     <section class="tela" id="telaCpConferencia" hidden>
       <div class="cartao">
-        <h2>Conferência</h2>
+        <h2>Conferência carga × balança</h2>
         <p class="dica">Cada carga do campo cruzada com o relatório da balança (e da cooperativa) pelo ticket. Ajuste as tolerâncias em Parâmetros.</p>
         <div id="cpConfCorpo"></div>
       </div>
     </section>
     <section class="tela" id="telaCpImportar" hidden>
       <div class="cartao">
-        <h2>Importar balança / cooperativa</h2>
-        <p class="dica">Exporte o relatório do sistema da balança ou da cooperativa (Excel ou CSV) e escolha o arquivo aqui. O app lê pelo nome das colunas, guarda por ticket (importar de novo só atualiza) e já cruza com as cargas.</p>
+        <h2>Importar relatório da balança</h2>
+        <p class="dica">Exporte o relatório do sistema da balança (Excel ou CSV) e escolha o arquivo aqui. O app lê pelo nome das colunas, guarda por ticket (importar de novo só atualiza) e já liga cada pesagem à carga pelo ticket.</p>
         <div id="cpImpCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== BENEFICIAMENTO (26/10/2026) =================== -->
+    <section class="tela" id="telaCpBenef" hidden>
+      <div class="cartao">
+        <h2>Boletins do lavador</h2>
+        <p class="dica">Cada boletim junta as cargas que entraram no lavador e traz quanto saiu de Cat 1, Cat 2, Cat 3 e refugo (kg). É o mesmo boletim que a Certificação usa no balanço de massa.</p>
+        <div id="cpBenefCorpo"></div>
+      </div>
+    </section>
+
+    <!-- =================== COMERCIALIZAÇÃO (26/10/2026) =================== -->
+    <section class="tela" id="telaCpCom" hidden>
+      <div class="cartao">
+        <h2>Notas fiscais (NF-e)</h2>
+        <p class="dica">Cadastre cada NF-e de venda, ligue ao boletim (ou à carga suja) e anexe o PDF. As notas aparecem também na rastreabilidade da Certificação.</p>
+        <div id="cpComCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaCpImpCoop" hidden>
+      <div class="cartao">
+        <h2>Importar relatório da cooperativa</h2>
+        <p class="dica">Exporte o relatório da cooperativa (Excel ou CSV) e escolha o arquivo aqui. Guarda por ticket (importar de novo só atualiza) e cruza com as cargas na Conferência.</p>
+        <div id="cpImpCoopCorpo"></div>
       </div>
     </section>
 
@@ -175,8 +200,8 @@
 <!-- Excel: a biblioteca entra aqui porque ../js/excel.js a carregaria por um caminho relativo ao app principal. -->
 <script src="../vendor/xlsx-js-style.min.js" defer></script>
 <script src="js/config.js?v=1"></script>
-<script src="../js/moldura-nucleo.js?v=6"></script>
+<script src="../js/moldura-nucleo.js?v=7"></script>
 <script src="js/base.js?v=1"></script>
-<script type="module" src="js/app.js?v=3"></script>
+<script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>
