@@ -266,17 +266,57 @@ function desenharFeedbacks() {
   tela.innerHTML = `<div class="cartao naoimprimir">
     ${cab('Reclamações e sugestões · FORM 042', 'Reclamações, sugestões e elogios — o que chega pelo QR Code (JotForm, entra sozinho), caixa de sugestões, quadro, WhatsApp ou conversa. Ao tratar, pode virar uma não conformidade ou uma melhoria.', '<button class="btn principal" type="button" id="mcNovoFb">+ Registrar</button>')}
     <div class="grade larga" style="margin-top:12px"><label class="campo">Mostrar <select id="mcFf">${opcoes([['abertas', 'Sem tratar'], ['todas', 'Todos']], f.ver)}</select></label></div>
-    ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Via</th><th>Quem</th><th>Situação</th><th>Virou</th><th></th></tr></thead><tbody>
-      ${L.map(c => { const g = gerado(c); return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${c.descricao ? `<br><small class="dica">${esc(c.descricao)}</small>` : ''}</td>
-        <td>${esc(c.via || '')}</td><td>${esc(c.solicitante || 'Anônimo')}</td><td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td><td>${g ? `<button type="button" class="ce-link" data-caso="${esc(g.id)}">${esc(NOME_NAT[g.natureza])}</button>` : '—'}</td>
-        <td class="ce"><button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button></td></tr>`; }).join('')}
+    ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Via</th><th>Quem</th><th>Situação</th><th>Conclusão</th><th></th></tr></thead><tbody>
+      ${L.map(c => { const g = gerado(c); const desc = c.descricao && so(c.descricao) !== so(c.titulo) && !so(c.descricao).startsWith(so(c.titulo).replace(/…$/, '')) ? c.descricao : '';
+        return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${desc ? `<br><small class="dica">${esc(desc)}</small>` : ''}${c.fazenda ? `<br><small class="dica">${esc(c.fazenda)}</small>` : ''}</td>
+        <td>${esc(c.via || '')}</td><td>${esc(c.solicitante || 'Anônimo')}</td><td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td>
+        <td class="mc-fb-conc">${c.etapa === 'TRATADO' ? `${c.data_encerramento ? `<b>${br(c.data_encerramento)}</b> · ` : ''}${esc(c.conclusao || (g ? '' : '—'))}${g ? `${c.conclusao ? '<br>' : ''}virou <button type="button" class="ce-link" data-caso="${esc(g.id)}">${esc(NOME_NAT[g.natureza])}</button>` : ''}${c.comunicado_como ? `<br><small class="dica">Passado aos funcionários: ${esc(c.comunicado_como)}${c.comunicado_detalhe ? ' — ' + esc(c.comunicado_detalhe) : ''}</small>` : ''}` : '—'}</td>
+        <td class="ce mc-fb-bt">${c.etapa !== 'TRATADO' ? `<button class="btn mini principal" type="button" data-concluir="${esc(c.id)}">Concluir</button>` : ''}<button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button></td></tr>`; }).join('')}
     </tbody></table></div>` : '<div class="vazio" style="margin-top:10px">Nada registrado.</div>'}
   </div>
   ${rodapeForm('FEEDBACK')}`;
   ligarRodape('FEEDBACK', L);
   $('mcNovoFb').addEventListener('click', () => ficha(null, 'FEEDBACK'));
   $('mcFf').addEventListener('change', e => { f.ver = e.target.value; desenharFeedbacks(); });
+  tela.querySelectorAll('[data-concluir]').forEach(b => b.addEventListener('click', () => concluirFeedback(M.casos.find(c => c.id === b.dataset.concluir))));
   ligarAbrir(tela);
+}
+
+/* Concluir (26/10/2026, pedido dele): data, a conclusão e como foi passado
+   aos funcionários — a devolutiva que a auditoria pede para a reclamação. */
+const COMUNICACOES = ['DDS / reunião com a equipe', 'Quadro de avisos', 'WhatsApp', 'Conversa individual', 'Treinamento', 'Não foi passado (não se aplica)'];
+function concluirFeedback(c) {
+  if (!c) return;
+  dialogo(`<h3 style="margin:0 0 4px">Concluir ${esc((c.tipo || 'feedback').toLowerCase())}</h3>
+    <p class="dica" style="margin:0 0 10px">“${esc(c.descricao || c.titulo)}” · ${br(c.data_abertura)}${c.fazenda ? ' · ' + esc(c.fazenda) : ''}</p>
+    <div class="aviso erro" id="mcErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Data da conclusão <input type="date" id="mcCcData" value="${esc(String(c.data_encerramento || hoje()).slice(0, 10))}"></label>
+      <label class="campo">Como foi passado para os funcionários <select id="mcCcComo">${opcoes(COMUNICACOES, c.comunicado_como, '— escolha —')}</select></label>
+    </div>
+    <label class="campo">Conclusão (o que foi feito / a resposta) <textarea id="mcCcTxt" rows="3" placeholder="ex.: combinado com o gerente de campo que o lanche sai às 15h">${esc(c.conclusao || '')}</textarea></label>
+    <label class="campo">Detalhe da comunicação (opcional) <input type="text" id="mcCcDet" value="${esc(c.comunicado_detalhe || '')}" placeholder="ex.: DDS de 27/10 com a turma do Lote 35"></label>
+    <div id="mcCcAnx" style="margin-top:6px"></div>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="mcCcOk">Concluir</button></div>`, d => {
+    const anx = campoAnexos($('mcCcAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Evidência da devolutiva', dica: 'foto do quadro, lista de presença do DDS, print' });
+    anx.abrir('mc-' + c.id);
+    $('mcCcOk').addEventListener('click', async () => {
+      const linha = { etapa: 'TRATADO', data_encerramento: $('mcCcData').value || null, conclusao: so($('mcCcTxt').value) || null,
+        comunicado_como: $('mcCcComo').value || null, comunicado_detalhe: so($('mcCcDet').value) || null };
+      if (!linha.data_encerramento) return erroDlg('Informe a data da conclusão.');
+      if (!linha.conclusao) return erroDlg('Escreva a conclusão — o que foi feito ou a resposta dada.');
+      if (!linha.comunicado_como) return erroDlg('Diga como foi passado para os funcionários.');
+      if (precisaRede()) return;
+      $('mcCcOk').disabled = true;
+      try {
+        const { data, error } = await estado.cliente.from('cmc_casos').update(linha).eq('id', c.id).select().single();
+        if (error) throw error;
+        if (anx.mudou) { await anx.salvar('mc-' + c.id); M.arq.add('mc-' + c.id); }
+        const i = M.casos.findIndex(x => x.id === c.id); if (i >= 0) M.casos[i] = data;
+        salvarCaixa(); fechar(); redesenhar();
+      } catch (e) { $('mcCcOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+    });
+  });
 }
 
 /* ===================================================================
@@ -351,6 +391,11 @@ function ficha(c, natNovo, pre) {
       <label class="campo">Resolveu? <select id="mcVe">${opcoes([['1', 'Sim — eficaz'], ['0', 'Não — reabrir o plano']], v.verif_eficaz == null ? '' : v.verif_eficaz ? '1' : '0', '—')}</select></label></div>
       <label class="campo">Resultado <input type="text" id="mcVr" value="${esc(v.verif_resultado || '')}"></label>
       <label class="campo">Padronização (virou POP, IT, treinamento?) <input type="text" id="mcPad" value="${esc(v.padronizacao || '')}"></label></fieldset>` : ''}
+    ${ehFb ? `<fieldset class="cp-fs"><legend>Conclusão e devolutiva aos funcionários</legend><div class="grade">
+      <label class="campo">Data da conclusão <input type="date" id="mcFbData" value="${esc(String(v.data_encerramento || '').slice(0, 10))}"></label>
+      <label class="campo">Como foi passado <select id="mcFbComo">${opcoes(COMUNICACOES, v.comunicado_como, '—')}</select></label>
+      <label class="campo" style="grid-column:span 2">Detalhe da comunicação <input type="text" id="mcFbDet" value="${esc(v.comunicado_detalhe || '')}"></label></div>
+      <label class="campo">Conclusão <input type="text" id="mcFbConc" value="${esc(v.conclusao || '')}"></label></fieldset>` : ''}
     ${ehMe ? `<label class="campo">Resultado / o que mudou <input type="text" id="mcPad" value="${esc(v.padronizacao || '')}"></label>` : ''}
     <fieldset class="cp-fs"><legend>Evidências</legend>
       <label class="campo">Link (OneDrive) <input type="url" id="mcEv" value="${esc(v.evid_url || '')}" placeholder="https://…"></label>
@@ -441,6 +486,7 @@ function ficha(c, natNovo, pre) {
         solicitante: val('mcSol'), responsavel: val('mcResp'), descricao: val('mcDesc'), evid_url: val('mcEv'),
         reavaliar_em: etapa === 'AGUARDANDO RECURSO' ? ($('mcReav').value || null) : null };
       if (!ehFb) Object.assign(linha, { prioridade: $('mcPri').value || null, previsao: $('mcPrev').value || null });
+      if (ehFb) Object.assign(linha, { conclusao: val('mcFbConc'), comunicado_como: $('mcFbComo').value || null, comunicado_detalhe: val('mcFbDet') });
       if (ehNC) Object.assign(linha, { contencao: val('mcCont'), causa_raiz: val('mcCausa'), porques: [...d.querySelectorAll('[data-pq]')].map(i => so(i.value)).filter(Boolean),
         verif_data: $('mcVd').value || null, verif_por: val('mcVp'), verif_eficaz: $('mcVe').value === '' ? null : $('mcVe').value === '1', verif_resultado: val('mcVr'), padronizacao: val('mcPad') });
       if (ehMe) {
@@ -453,7 +499,7 @@ function ficha(c, natNovo, pre) {
       if (ehNC && etapa === 'ENCERRADA' && !(c && c.criado_por === 'importado do FORMAGR-42A' && c.etapa === 'ENCERRADA') && (linha.verif_eficaz !== true || !linha.verif_data))
         return erroDlg('Para encerrar a não conformidade, registre a verificação de eficácia (data e "Sim — eficaz").');
       if (ehNC && linha.verif_eficaz === false && etapa === 'ENCERRADA') return erroDlg('A verificação diz que não resolveu: volte para o plano de ação.');
-      linha.data_encerramento = FIM.has(etapa) ? (v.data_encerramento && FIM.has(v.etapa) ? v.data_encerramento : (linha.verif_data || hoje())) : null;
+      linha.data_encerramento = FIM.has(etapa) ? ((ehFb && $('mcFbData').value) || (v.data_encerramento && FIM.has(v.etapa) ? v.data_encerramento : (linha.verif_data || hoje()))) : null;
       const acs = acoes.map((a, i) => ({ ...a, oque: so(a.oque), quem: so(a.quem) || null, quando: a.quando || null, quanto: num(a.quanto), resultado: so(a.resultado) || null, ordem: i + 1 })).filter(a => a.oque);
       if (acs.some(a => Number.isNaN(a.quanto))) return erroDlg('Confira o valor de uma das ações.');
       const ans = ands.map(a => ({ ...a, texto: so(a.texto), empresa: so(a.empresa) || null, link: so(a.link) || null, valor: num(a.valor) })).filter(a => a.texto);
@@ -533,6 +579,7 @@ function docCasos(lista, titulo, F) {
       <div><span>Elaboração / revisão</span><b>${FORM_.elaborador}</b></div><div><span>Aprovação</span><b>${FORM_.aprovador}</b></div><div><span>Casos</span><b>${L.length}</b></div></div>
     ${L.map(c => { const ac = acoesDe(c), an = andsDe(c); return `<section class="mc-rel-caso"><h2 class="rel-secao">${esc(NOME_NAT[c.natureza])} · ${esc(c.titulo)}</h2>
       <p class="rel-nota">Abertura ${br(c.data_abertura)} · ${esc([c.via, c.local, c.fazenda].filter(Boolean).join(' · '))} · etapa <b>${esc(c.etapa)}</b> · ${esc(situacao(c).rot)}${c.responsavel ? ' · responsável ' + esc(c.responsavel) : ''}</p>
+      ${c.conclusao ? `<p class="rel-nota"><b>Conclusão${c.data_encerramento ? ' (' + br(c.data_encerramento) + ')' : ''}:</b> ${esc(c.conclusao)}${c.comunicado_como ? ` · <b>Passado aos funcionários:</b> ${esc(c.comunicado_como)}${c.comunicado_detalhe ? ' — ' + esc(c.comunicado_detalhe) : ''}` : ''}</p>` : ''}
       ${c.causa_raiz ? `<p class="rel-nota"><b>Causa raiz:</b> ${esc(c.causa_raiz)}</p>` : ''}
       ${c.natureza === 'MELHORIA' && (c.impacto || c.ano_previsto) ? `<p class="rel-nota">Impacto ${esc(NIVEL[c.impacto] || '—')} · custo ${esc(NIVEL[c.custo] || '—')}${c.custo_estimado != null ? ' · ' + reais(c.custo_estimado) : ''}${c.ano_previsto ? ' · previsto ' + c.ano_previsto + (c.trimestre_previsto ? ' T' + c.trimestre_previsto : '') : ''}</p>` : ''}
       ${ac.length ? `<table class="rel-tabela"><thead><tr><th>Ação</th><th>Quem</th><th>Até</th><th>Valor</th><th>Status</th><th>Resultado</th></tr></thead><tbody>${ac.map(a => `<tr><td>${esc(a.oque)}</td><td>${esc(a.quem || '')}</td><td>${br(a.quando)}</td><td>${reais(a.quanto)}</td><td>${esc(a.status)}</td><td>${esc(a.resultado || '')}</td></tr>`).join('')}</tbody></table>` : ''}
@@ -550,9 +597,11 @@ async function exportar(nat) {
     { nome: 'Casos', titulo: `${F.codigo} — ${F.titulo}`, subtitulo: `SAKUMA Agronegócios · emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Natureza', larg: 16 }, { rot: 'Tipo', larg: 18 }, { rot: 'Título', larg: 44 }, { rot: 'Abertura', larg: 11, tipo: 'data' }, { rot: 'Etapa', larg: 18 }, { rot: 'Situação', larg: 30 },
         { rot: 'Via', larg: 18 }, { rot: 'Local', larg: 24 }, { rot: 'Fazenda', larg: 14 }, { rot: 'Responsável', larg: 24 }, { rot: 'Previsão', larg: 11, tipo: 'data' }, { rot: 'Reavaliar em', larg: 11, tipo: 'data' },
-        { rot: 'Causa raiz', larg: 40 }, { rot: 'Impacto', larg: 8 }, { rot: 'Custo', larg: 8 }, { rot: 'Custo estimado', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Ano previsto', larg: 8 }, { rot: 'Encerramento', larg: 11, tipo: 'data' }],
+        { rot: 'Causa raiz', larg: 40 }, { rot: 'Impacto', larg: 8 }, { rot: 'Custo', larg: 8 }, { rot: 'Custo estimado', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Ano previsto', larg: 8 }, { rot: 'Encerramento', larg: 11, tipo: 'data' },
+        { rot: 'Conclusão', larg: 44 }, { rot: 'Passado aos funcionários', larg: 26 }, { rot: 'Detalhe', larg: 30 }],
       linhas: casos.map(c => [NOME_NAT[c.natureza], c.tipo, c.titulo, c.data_abertura, c.etapa, situacao(c).rot, c.via || '', c.local || '', c.fazenda || '', c.responsavel || '', c.previsao, c.reavaliar_em,
-        c.causa_raiz || '', NIVEL[c.impacto] || '', NIVEL[c.custo] || '', c.custo_estimado != null ? Number(c.custo_estimado) : null, c.ano_previsto || '', c.data_encerramento]) },
+        c.causa_raiz || '', NIVEL[c.impacto] || '', NIVEL[c.custo] || '', c.custo_estimado != null ? Number(c.custo_estimado) : null, c.ano_previsto || '', c.data_encerramento,
+        c.conclusao || '', c.comunicado_como || '', c.comunicado_detalhe || '']) },
     { nome: 'Plano de ação', colunas: [{ rot: 'Caso', larg: 40 }, { rot: 'Ação', larg: 40 }, { rot: 'Quem', larg: 24 }, { rot: 'Até', larg: 11, tipo: 'data' }, { rot: 'Valor', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Status', larg: 14 }, { rot: 'Resultado', larg: 40 }],
       linhas: M.acoes.filter(a => ids.has(a.caso_id)).map(a => [nomeCaso(a.caso_id), a.oque, a.quem || '', a.quando, a.quanto != null ? Number(a.quanto) : null, a.status, a.resultado || '']) },
     { nome: 'Andamentos', colunas: [{ rot: 'Caso', larg: 40 }, { rot: 'Data', larg: 11, tipo: 'data' }, { rot: 'Andamento', larg: 60 }, { rot: 'Empresa', larg: 24 }, { rot: 'Valor', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Link', larg: 40 }],

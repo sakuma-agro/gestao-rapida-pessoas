@@ -158,3 +158,8 @@ alter table public.integracoes_tokens enable row level security;   -- sem polít
 insert into public.integracoes_tokens (nome, token)
 values ('jotform-feedback', replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''))
 on conflict (nome) do nothing;
+
+-- Reclamações e sugestões: conclusão e devolutiva aos funcionários (26/10/2026). Migração "cmc_conclusao_devolutiva".
+alter table public.cmc_casos add column if not exists conclusao text;
+alter table public.cmc_casos add column if not exists comunicado_como text;
+alter table public.cmc_casos add column if not exists comunicado_detalhe text;

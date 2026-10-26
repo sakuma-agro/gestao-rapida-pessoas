@@ -2080,3 +2080,6 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-an-slot:empty{display:none}
 .mc-an-anx{margin:2px 0 6px}
 .mc-an .mc-an-com{border-color:#84BD00;background:var(--verde-fundo)}
+/* Reclamações e sugestões: coluna Conclusão e botão Concluir (26/10/2026) */
+.mc-fb-conc{min-width:220px;max-width:360px;font-size:12.5px}
+.mc-fb-bt{white-space:nowrap}.mc-fb-bt .btn+.btn{margin-left:4px}
