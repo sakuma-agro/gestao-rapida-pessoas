@@ -190,19 +190,127 @@ function tabelaCasos(lista, colunasExtra = '') {
         <td>${p ? esc(p.oque) + (p.quando ? `<br><small class="dica">${esc(p.quem || '')} · até ${br(p.quando)}</small>` : p.quem ? `<br><small class="dica">${esc(p.quem)}</small>` : '') : '—'}</td>
         <td>${an ? `<small class="dica">${br(an.data)}</small> ${esc(an.texto)}${an.valor != null ? ' · ' + reais(an.valor) : ''}` : '—'}</td><td>${esc(c.responsavel || '')}</td>
         ${colunasExtra ? `<td>${c.ano_previsto ? esc(c.ano_previsto) + (c.trimestre_previsto ? ' · T' + c.trimestre_previsto : '') : '—'}${c.custo_estimado != null ? '<br><small class="dica">' + reais(c.custo_estimado) + '</small>' : ''}</td>` : ''}
-        <td class="ce"><button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button></td></tr>`; }).join('')}
+        <td class="ce mc-acoes-lin">${botoesLinha(c)}</td></tr>`; }).join('')}
   </tbody></table></div>`;
 }
+
+/* Mudar de etapa sem abrir a ficha (26/10/2026, pedido dele: "vamos deixar
+   mais fácil"). Na linha: ▸ próxima etapa · + Andamento · Concluir/Encerrar. */
+function proxEtapa(c) {
+  if (!aberto(c)) return null;
+  if (c.natureza === 'MELHORIA') return { IDEIA: 'AVALIADA', AVALIADA: 'APROVADA', APROVADA: 'EM EXECUÇÃO' }[c.etapa] || null;
+  if (c.natureza === 'NC') return { ABERTA: 'CAUSA ANALISADA', 'CAUSA ANALISADA': 'PLANO DE AÇÃO', 'PLANO DE AÇÃO': 'EM EXECUÇÃO', 'EM EXECUÇÃO': 'VERIFICAÇÃO', 'AGUARDANDO RECURSO': 'EM EXECUÇÃO' }[c.etapa] || null;
+  return null;
+}
+const rotEtapa = e => e[0] + e.slice(1).toLowerCase();
+function botoesLinha(c) {
+  const b = [];
+  if (aberto(c)) {
+    const px = proxEtapa(c);
+    if (px) b.push(`<button class="btn mini mc-av" type="button" data-avancar="${esc(c.id)}" title="Passar para a etapa ${esc(rotEtapa(px))}">▸ ${esc(c.etapa === 'AGUARDANDO RECURSO' ? 'Retomar' : rotEtapa(px))}</button>`);
+    b.push(`<button class="btn mini" type="button" data-andamento="${esc(c.id)}" title="Registrar um andamento (orçamento, contato, decisão, entrega)">+ Andamento</button>`);
+    if (c.natureza === 'MELHORIA') b.push(`<button class="btn mini principal" type="button" data-concluir-me="${esc(c.id)}">Concluir</button>`);
+    if (c.natureza === 'NC' && c.etapa === 'VERIFICAÇÃO') b.push(`<button class="btn mini principal" type="button" data-caso="${esc(c.id)}" title="Registrar a verificação de eficácia e encerrar">Encerrar</button>`);
+  }
+  b.push(`<button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button>`);
+  return b.join('');
+}
+function ligarLinhas(el) {
+  el.querySelectorAll('[data-avancar]').forEach(x => x.addEventListener('click', () => avancarEtapa(M.casos.find(c => c.id === x.dataset.avancar), x)));
+  el.querySelectorAll('[data-andamento]').forEach(x => x.addEventListener('click', () => andamentoRapido(M.casos.find(c => c.id === x.dataset.andamento))));
+  el.querySelectorAll('[data-concluir-me]').forEach(x => x.addEventListener('click', () => concluirMelhoria(M.casos.find(c => c.id === x.dataset.concluirMe))));
+}
+async function gravarAndamento(c, reg) {
+  const r = await estado.cliente.from('cmc_andamentos').insert({ caso_id: c.id, ...reg }).select().single();
+  if (r.error) throw r.error;
+  M.ands.push(r.data); return r.data;
+}
+async function avancarEtapa(c, botao) {
+  const px = proxEtapa(c); if (!c || !px) return;
+  if (precisaRede()) return;
+  if (botao) { botao.disabled = true; botao.textContent = '…'; }
+  try {
+    const { data, error } = await estado.cliente.from('cmc_casos').update({ etapa: px, reavaliar_em: null }).eq('id', c.id).select().single();
+    if (error) throw error;
+    const i = M.casos.findIndex(x => x.id === c.id); if (i >= 0) M.casos[i] = data;
+    await gravarAndamento(c, { data: hoje(), texto: `Etapa: ${rotEtapa(c.etapa)} → ${rotEtapa(px)}` });
+    salvarCaixa(); redesenhar();
+  } catch (e) { alert('Não consegui mudar a etapa: ' + (e.message || e)); redesenhar(); }
+}
+function andamentoRapido(c) {
+  if (!c) return;
+  dialogo(`<h3 style="margin:0 0 4px">Novo andamento</h3><p class="dica" style="margin:0 0 10px">${esc(c.titulo)} · etapa ${esc(rotEtapa(c.etapa))}</p>
+    <div class="aviso erro" id="mcErro" hidden></div>
+    <div class="grade"><label class="campo">Data <input type="date" id="anqData" value="${hoje()}"></label>
+      <label class="campo">Empresa / pessoa <input type="text" id="anqEmp"></label>
+      <label class="campo">Valor (R$) <input type="text" inputmode="decimal" id="anqVal"></label>
+      <label class="campo">Link <input type="url" id="anqLink" placeholder="https://…"></label></div>
+    <label class="campo">O que aconteceu <input type="text" id="anqTxt" placeholder="ex.: recebido orçamento da empresa X"></label>
+    <div id="anqAnx" style="margin-top:6px"></div>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="anqOk">Salvar andamento</button></div>`, d => {
+    const anx = campoAnexos($('anqAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Arquivos', dica: 'orçamento, proposta, foto' });
+    anx.abrir(null);
+    $('anqTxt').focus();
+    $('anqOk').addEventListener('click', async () => {
+      const valor = num($('anqVal').value);
+      const reg = { data: $('anqData').value, texto: so($('anqTxt').value), empresa: so($('anqEmp').value) || null, valor, link: so($('anqLink').value) || null };
+      if (!reg.data || !reg.texto) return erroDlg('Informe a data e o que aconteceu.');
+      if (Number.isNaN(valor)) return erroDlg('Confira o valor.');
+      if (reg.link && !/^https?:\/\//i.test(reg.link)) return erroDlg('O link precisa começar com https://');
+      if (precisaRede()) return;
+      $('anqOk').disabled = true;
+      try {
+        const an = await gravarAndamento(c, reg);
+        if (anx.mudou) { await anx.salvar('mc-an-' + an.id); M.arq.add('mc-an-' + an.id); }
+        salvarCaixa(); fechar(); redesenhar();
+      } catch (e) { $('anqOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+    });
+  });
+}
+function concluirMelhoria(c) {
+  if (!c) return;
+  dialogo(`<h3 style="margin:0 0 4px">Concluir melhoria</h3><p class="dica" style="margin:0 0 10px">${esc(c.titulo)}</p>
+    <div class="aviso erro" id="mcErro" hidden></div>
+    <div class="grade"><label class="campo">Data da conclusão <input type="date" id="cmData" value="${hoje()}"></label>
+      <label class="campo">Custo final (R$, opcional) <input type="text" inputmode="decimal" id="cmVal" placeholder="${c.custo_estimado != null ? 'estimado ' + esc(reais(c.custo_estimado)) : ''}"></label></div>
+    <label class="campo">Resultado / o que mudou <textarea id="cmRes" rows="3" placeholder="ex.: blusas entregues para os 40 funcionários do campo">${esc(c.padronizacao || '')}</textarea></label>
+    <div id="cmAnx" style="margin-top:6px"></div>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="cmOk">Concluir</button></div>`, d => {
+    const anx = campoAnexos($('cmAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Evidência', dica: 'foto do depois, nota, termo de entrega' });
+    anx.abrir('mc-' + c.id);
+    $('cmOk').addEventListener('click', async () => {
+      const dt = $('cmData').value, res = so($('cmRes').value), val = num($('cmVal').value);
+      if (!dt) return erroDlg('Informe a data da conclusão.');
+      if (!res) return erroDlg('Escreva o resultado — o que mudou.');
+      if (Number.isNaN(val)) return erroDlg('Confira o custo final.');
+      if (precisaRede()) return;
+      $('cmOk').disabled = true;
+      try {
+        const { data, error } = await estado.cliente.from('cmc_casos').update({ etapa: 'CONCLUÍDA', data_encerramento: dt, padronizacao: res }).eq('id', c.id).select().single();
+        if (error) throw error;
+        const i = M.casos.findIndex(x => x.id === c.id); if (i >= 0) M.casos[i] = data;
+        await gravarAndamento(c, { data: dt, texto: 'Concluída: ' + res, valor: val });
+        if (anx.mudou) { await anx.salvar('mc-' + c.id); M.arq.add('mc-' + c.id); }
+        salvarCaixa(); fechar(); redesenhar();
+      } catch (e) { $('cmOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+    });
+  });
+}
+/* Abas Em aberto × Fechados (igual Reclamações e sugestões). */
+const abasAbertoFechado = (nAb, nFe, fech, rotFe = 'Fechados') => `<div class="mc-abas" role="tablist">
+  <button type="button" role="tab" class="mc-aba${fech ? '' : ' on'}" data-aba="abertas" aria-selected="${!fech}">Em aberto <b>${nAb}</b></button>
+  <button type="button" role="tab" class="mc-aba${fech ? ' on' : ''}" data-aba="fechadas" aria-selected="${fech}">${rotFe} <b>${nFe}</b></button></div>`;
 const filtroTexto = (lista, q) => { const t = semAc(q); return t ? lista.filter(c => semAc([c.titulo, c.descricao, c.local, c.fazenda, c.responsavel, c.solicitante].join(' ')).includes(t)) : lista; };
 function desenharNcs() {
   const tela = $('telaMcNcs'); const f = M.fn;
-  let L = M.casos.filter(c => c.natureza === 'NC');
-  L = f.ver === 'abertas' ? L.filter(aberto) : f.ver === 'encerradas' ? L.filter(c => !aberto(c)) : f.ver === 'todas' ? L : L.filter(c => c.etapa === f.ver);
-  L = filtroTexto(L, f.q).sort((a, b) => situacao(b).nivel - situacao(a).nivel || String(b.data_abertura).localeCompare(String(a.data_abertura)));
+  if (f.ver !== 'fechadas') f.ver = 'abertas';
+  const todasNc = filtroTexto(M.casos.filter(c => c.natureza === 'NC'), f.q);
+  const abNc = todasNc.filter(aberto), feNc = todasNc.filter(c => !aberto(c));
+  let L = (f.ver === 'fechadas' ? feNc : abNc).sort((a, b) => situacao(b).nivel - situacao(a).nivel || String(b.data_abertura).localeCompare(String(a.data_abertura)));
   tela.innerHTML = `<div class="cartao naoimprimir">
     ${cab('Não conformidades · FORM 004', 'Cada uma passa pelas etapas: causa raiz → plano de ação → execução → verificação de eficácia. Os andamentos (orçamentos, contatos, decisões) ficam na linha do tempo do caso.', '<button class="btn principal" type="button" id="mcNovaNc">+ Não conformidade</button>')}
+    ${abasAbertoFechado(abNc.length, feNc.length, f.ver === 'fechadas', 'Encerradas')}
     <div class="grade larga" style="margin-top:12px">
-      <label class="campo">Mostrar <select id="mcFn">${opcoes([['abertas', 'Abertas'], ...ETAPAS.NC.map(e => [e, e[0] + e.slice(1).toLowerCase()]), ['encerradas', 'Encerradas'], ['todas', 'Todas']], f.ver)}</select></label>
       <label class="campo" style="grid-column:span 2">Procurar <input type="search" id="mcFnQ" value="${esc(f.q)}" placeholder="caso, local, responsável…"></label>
     </div>
     <p class="dica" style="margin:8px 0 4px">${L.length} caso(s).</p>${tabelaCasos(L)}
@@ -210,7 +318,8 @@ function desenharNcs() {
   ${rodapeForm('NC')}`;
   ligarRodape('NC', L);
   $('mcNovaNc').addEventListener('click', () => ficha(null, 'NC'));
-  $('mcFn').addEventListener('change', e => { f.ver = e.target.value; desenharNcs(); });
+  tela.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { f.ver = b.dataset.aba; desenharNcs(); }));
+  ligarLinhas(tela);
   $('mcFnQ').addEventListener('input', e => { f.q = e.target.value; const p = e.target.selectionStart; desenharNcs(); const i = $('mcFnQ'); i.focus(); i.setSelectionRange(p, p); });
   ligarAbrir(tela);
 }
@@ -221,10 +330,11 @@ function desenharNcs() {
 function desenharMelhorias() {
   const tela = $('telaMcMelhorias'); const f = M.fm;
   const todas = M.casos.filter(c => c.natureza === 'MELHORIA');
-  let L = f.etapa === 'abertas' ? todas.filter(aberto) : f.etapa === 'todas' ? todas : todas.filter(c => c.etapa === f.etapa);
-  L = filtroTexto(L, f.q);
+  if (f.etapa !== 'fechadas') f.etapa = 'abertas';
+  const abMe = filtroTexto(todas.filter(aberto), f.q), feMe = filtroTexto(todas.filter(c => !aberto(c)), f.q);
+  let L = f.etapa === 'fechadas' ? feMe.sort((a, b) => String(b.data_encerramento || '').localeCompare(String(a.data_encerramento || ''))) : abMe;
   let corpo = '';
-  if (f.ver === 'lista') corpo = tabelaCasos(L.sort((a, b) => ETAPAS.MELHORIA.indexOf(a.etapa) - ETAPAS.MELHORIA.indexOf(b.etapa) || String(a.previsao || '9').localeCompare(String(b.previsao || '9'))), true);
+  if (f.ver === 'lista' || f.etapa === 'fechadas') corpo = tabelaCasos(L.sort((a, b) => ETAPAS.MELHORIA.indexOf(a.etapa) - ETAPAS.MELHORIA.indexOf(b.etapa) || String(a.previsao || '9').localeCompare(String(b.previsao || '9'))), true);
   else if (f.ver === 'matriz') {
     const vivas = L.filter(aberto);
     const sem = vivas.filter(c => !c.impacto || !c.custo);
@@ -244,9 +354,9 @@ function desenharMelhorias() {
   }
   tela.innerHTML = `<div class="cartao naoimprimir">
     ${cab('Melhorias contínuas · FORM 020', 'O banco de melhorias da fazenda: ideia → avaliada (impacto × custo) → aprovada (ano e orçamento) → em execução → concluída.', '<button class="btn principal" type="button" id="mcNovaMe">+ Melhoria</button>')}
+    ${abasAbertoFechado(abMe.length, feMe.length, f.etapa === 'fechadas', 'Concluídas')}
     <div class="grade larga" style="margin-top:12px">
-      <label class="campo">Ver <select id="mcFmVer">${opcoes([['lista', 'Lista'], ['matriz', 'Matriz impacto × custo'], ['plano', 'Plano por ano']], f.ver)}</select></label>
-      <label class="campo">Etapa <select id="mcFmEt">${opcoes([['abertas', 'Em aberto'], ...ETAPAS.MELHORIA.map(e => [e, e[0] + e.slice(1).toLowerCase()]), ['todas', 'Todas']], f.etapa)}</select></label>
+      ${f.etapa === 'fechadas' ? '' : `<label class="campo">Ver <select id="mcFmVer">${opcoes([['lista', 'Lista'], ['matriz', 'Matriz impacto × custo'], ['plano', 'Plano por ano']], f.ver)}</select></label>`}
       <label class="campo">Procurar <input type="search" id="mcFmQ" value="${esc(f.q)}" placeholder="melhoria, local…"></label>
     </div>
     <div style="margin-top:10px">${corpo}</div>
@@ -254,8 +364,9 @@ function desenharMelhorias() {
   ${rodapeForm('MELHORIA', '<button class="btn" type="button" id="mcImpPl">Imprimir plano de melhorias</button>')}`;
   ligarRodape('MELHORIA', L);
   $('mcNovaMe').addEventListener('click', () => ficha(null, 'MELHORIA'));
-  $('mcFmVer').addEventListener('change', e => { f.ver = e.target.value; desenharMelhorias(); });
-  $('mcFmEt').addEventListener('change', e => { f.etapa = e.target.value; desenharMelhorias(); });
+  $('mcFmVer')?.addEventListener('change', e => { f.ver = e.target.value; desenharMelhorias(); });
+  tela.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { f.etapa = b.dataset.aba; desenharMelhorias(); }));
+  ligarLinhas(tela);
   $('mcFmQ').addEventListener('input', e => { f.q = e.target.value; const p = e.target.selectionStart; desenharMelhorias(); const i = $('mcFmQ'); i.focus(); i.setSelectionRange(p, p); });
   $('mcImpPl').addEventListener('click', () => mostrar(docCasos(todas.filter(aberto), 'Plano de melhorias'), { barra: true }));
   ligarAbrir(tela);
@@ -599,6 +710,7 @@ function ficha(c, natNovo, pre) {
     <div class="aviso erro" id="mcErro" hidden></div>
     ${mudouClasse ? `<div class="aviso info">Classificação muda de <b>${esc(c.natureza === 'FEEDBACK' ? (c.tipo || 'Reclamação / sugestão').toLowerCase() : NOME_NAT[c.natureza].toLowerCase())}</b> para <b>${esc((CLASSES.find(x => x[0] === classe) || [, ''])[1].toLowerCase())}</b> ao salvar.</div>` : ''}
     <div class="mc-etapas" role="radiogroup" aria-label="Etapa">${ETAPAS[nat].map((e, i) => `<button type="button" class="mc-etapa${e === v.etapa ? ' atual' : ''}${ETAPAS[nat].indexOf(v.etapa) > i ? ' feita' : ''}" data-etapa="${esc(e)}"><b>${i + 1}</b>${esc(e[0] + e.slice(1).toLowerCase())}</button>`).join('')}</div>
+    <p class="dica mc-etapa-dica">Para mudar de etapa: clique na etapa acima e depois em <b>Salvar</b> — ou use os botões ▸ / Concluir direto na lista.</p>
     <fieldset class="cp-fs"><legend>${ehFb ? 'O que chegou' : 'Identificação'}</legend>
       <div class="grade">
         <label class="campo" style="grid-column:span 2">${ehFb ? 'Resumo' : 'Título'} <input type="text" id="mcTit" value="${esc(v.titulo || '')}"></label>
