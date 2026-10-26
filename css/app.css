@@ -2014,3 +2014,7 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-barras i{display:block;width:40%;min-height:1px;border-radius:3px 3px 0 0}
 .mc-ab{background:#E39B00}.mc-fin{background:#84BD00}
 .mc-leg{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin:0 4px 0 8px}
+.cfo-alertas ul{margin:6px 0 0;padding-left:18px}
+.cfo-alertas li{margin:3px 0}
+.cfo-link{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,3fr) auto auto;gap:6px;align-items:center;margin-bottom:6px}
+.cfo-inativo td{opacity:.6}

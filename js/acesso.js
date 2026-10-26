@@ -281,6 +281,7 @@ export const MODULOS = [
     { id: 'ceFornSub', nome: 'Fornecedores', telas: [
       ['foPainel',     'Painel'],
       ['foAvaliacoes', 'Avaliações'],
+      ['foCadastro',   'Cadastro'],
     ] },
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as

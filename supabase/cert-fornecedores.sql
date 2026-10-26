@@ -67,3 +67,55 @@ from (values
   ('packing','2026-03-06','COOPADAP','{"manuseio":true}')
 ) v(cat, d, f, i)
 where not exists (select 1 from public.cfo_avaliacoes);
+
+-- 26/10/2026 (2ª parte) — cadastro de fornecedores com a periodicidade da avaliação.
+-- Pedido: "quero poder cadastrar o fornecedor e o tempo de avaliação, mensal,
+-- trimestral e etc, para alertar". Próxima avaliação = última + período; o painel
+-- alerta vencidos e os que vencem em até 15 dias. "A cada entrega" não gera alerta.
+-- Migração "cert_fornecedores_cadastro". As avaliações se ligam pelo nome (categoria + nome).
+create table if not exists public.cfo_fornecedores (
+  id uuid primary key default gen_random_uuid(),
+  categoria text not null check (categoria in ('viveiro','pragas','caixa_agua','colheita','packing')),
+  nome text not null,
+  periodicidade text not null default 'Anual' check (periodicidade in ('Mensal','Bimestral','Trimestral','Semestral','Anual','A cada entrega')),
+  cert_validade date,          -- validade do certificado GLOBALG.A.P. do fornecedor
+  contato text,
+  ativo boolean not null default true,
+  observacao text,
+  criado_em timestamptz not null default now(),
+  criado_por text default public.app_email(),
+  atualizado_em timestamptz not null default now(),
+  atualizado_por text
+);
+create unique index if not exists cfo_fornecedores_nome on public.cfo_fornecedores(categoria, upper(nome));
+drop trigger if exists cfo_forn_carimbo on public.cfo_fornecedores;
+create trigger cfo_forn_carimbo before update on public.cfo_fornecedores for each row execute function public.marcar_atualizacao();
+alter table public.cfo_fornecedores enable row level security;
+revoke all on public.cfo_fornecedores from anon;
+grant select, insert, update, delete on public.cfo_fornecedores to authenticated;
+drop policy if exists cfof_leem on public.cfo_fornecedores;
+drop policy if exists cfof_inserem on public.cfo_fornecedores;
+drop policy if exists cfof_alteram on public.cfo_fornecedores;
+drop policy if exists cfof_apagam on public.cfo_fornecedores;
+create policy cfof_leem on public.cfo_fornecedores for select to authenticated using (public.app_pode('cert'));
+create policy cfof_inserem on public.cfo_fornecedores for insert to authenticated with check (public.app_pode('cert'));
+create policy cfof_alteram on public.cfo_fornecedores for update to authenticated using (public.app_pode('cert')) with check (public.app_pode('cert'));
+create policy cfof_apagam on public.cfo_fornecedores for delete to authenticated using (public.app_pode('cert'));
+-- Cadastro inicial a partir do histórico (periodicidade sugerida pelo intervalo das visitas; ajustar no app).
+insert into public.cfo_fornecedores (categoria, nome, periodicidade, criado_por)
+select v.c, v.n, v.p, 'cadastro inicial (histórico do FORM 023)' from (values
+  ('viveiro','CURTS GOODSON GUIMARAES','A cada entrega'),
+  ('pragas','DETE HIGI','Trimestral'),
+  ('caixa_agua','DETE HIGI','Semestral'),
+  ('colheita','COOPADAP','Anual'),
+  ('packing','COOPADAP','Anual'),
+  ('packing','CARLINI','Anual')
+) v(c, n, p)
+where not exists (select 1 from public.cfo_fornecedores);
+
+-- 26/10/2026 (3ª parte) — links das evidências. Pedido: "pegue os links das avaliações
+-- e coloque nas avaliações no app". Lidos do PDF "FORM 023 - AVALIAÇÃO DE FORNECEDORES
+-- (FV-GFS 04.01)" pela posição de cada link na linha da avaliação (21 de 21 ligadas).
+-- evid_links = [{rot, url}] (relatório, FISPQs, NF, declaração…); evid_url = o primeiro.
+-- Migração "cert_fornecedores_links" (os updates estão nela).
+alter table public.cfo_avaliacoes add column if not exists evid_links jsonb not null default '[]'::jsonb;
