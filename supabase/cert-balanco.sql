@@ -119,3 +119,41 @@ do $$ begin
     create policy cp_ler_cert on public.cp_balanca for select to authenticated using (public.app_pode('cert'));
   end if;
 end $$;
+
+-- 26/10/2026 (3ª parte) — cadastro das NF-e do lote, com o PDF anexado.
+-- Pedido: "em nf-e, vamos colocar uma forma de cadastrar a nota, e anexar o pdf".
+-- Uma linha por nota; o PDF vai para o Google Drive pela função "arquivos"
+-- (chave certificacao/evidencia/nfe-<id da nota>/<arquivo>.pdf — reaproveita o
+-- tipo 'evidencia', que já está liberado para a Certificação).
+create table if not exists public.cp_notas_fiscais (
+  id uuid primary key default gen_random_uuid(),
+  cultura_id uuid not null references public.cp_culturas(id),
+  safra_id uuid references public.cp_safras(id),
+  lote_venda_id uuid references public.cp_lotes_venda(id) on delete set null,
+  numero text not null,                -- número da NF-e
+  serie text,
+  data_emissao date,
+  chave_acesso text,                   -- 44 dígitos
+  destinatario text,                   -- quem comprou (Coopadap, Carlini…)
+  peso_kg numeric,
+  valor numeric,
+  obs text,
+  ativo boolean not null default true,
+  criado_por text,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists cp_notas_fiscais_lote on public.cp_notas_fiscais(lote_venda_id);
+create index if not exists cp_notas_fiscais_safra on public.cp_notas_fiscais(safra_id);
+alter table public.cp_notas_fiscais enable row level security;
+grant select, insert, update, delete on public.cp_notas_fiscais to authenticated;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname='marcar_atualizacao' and tgrelid='public.cp_notas_fiscais'::regclass) then
+    create trigger marcar_atualizacao before insert or update on public.cp_notas_fiscais for each row execute function public.marcar_atualizacao();
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='cp_notas_fiscais' and policyname='cp_nf_ler') then
+    create policy cp_nf_ler on public.cp_notas_fiscais for select to authenticated using (public.app_pode('colheita') or public.app_pode('cert'));
+    create policy cp_nf_gravar on public.cp_notas_fiscais for insert to authenticated with check (public.app_pode('colheita') or public.app_pode('cert'));
+    create policy cp_nf_trocar on public.cp_notas_fiscais for update to authenticated using (public.app_pode('colheita') or public.app_pode('cert')) with check (public.app_pode('colheita') or public.app_pode('cert'));
+    create policy cp_nf_apagar on public.cp_notas_fiscais for delete to authenticated using (public.app_pode('colheita') or public.app_pode('cert'));
+  end if;
+end $$;

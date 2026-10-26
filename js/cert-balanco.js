@@ -30,6 +30,7 @@ import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx, lerPlanilha } from './excel.js';
 import { abrirModulo } from './acesso.js';
+import { campoAnexos, fotosDe, abrirArquivo } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -62,15 +63,15 @@ const CATS = [['cat1_kg', 'Cat 1'], ['cat2_kg', 'Cat 2'], ['cat3_kg', 'Cat 3'], 
 
 /* ---------------- estado ---------------- */
 const B = {
-  carregado: false, cult: null, safras: [], plantios: [], cargas: [], lotes: [], itens: [], balanca: [],
+  carregado: false, cult: null, safras: [], plantios: [], cargas: [], lotes: [], itens: [], balanca: [], notas: [], pdf: new Map(),
   f: { safra: '', faz: null }, fr: { q: '', ver: 'cadeia' }, fv: { q: '', lote: '' },
 };
 const CAIXA = 'balanco.cache';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { cult: B.cult, safras: B.safras, plantios: B.plantios, cargas: B.cargas, lotes: B.lotes, itens: B.itens, balanca: B.balanca });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { cult: B.cult, safras: B.safras, plantios: B.plantios, cargas: B.cargas, lotes: B.lotes, itens: B.itens, balanca: B.balanca, notas: B.notas });
 
 async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
-  if (c0 && !B.carregado) { Object.assign(B, { cult: c0.cult, safras: c0.safras || [], plantios: c0.plantios || [], cargas: c0.cargas || [], lotes: c0.lotes || [], itens: c0.itens || [], balanca: c0.balanca || [] }); B.carregado = true; }
+  if (c0 && !B.carregado) { Object.assign(B, { cult: c0.cult, safras: c0.safras || [], plantios: c0.plantios || [], cargas: c0.cargas || [], lotes: c0.lotes || [], itens: c0.itens || [], balanca: c0.balanca || [], notas: c0.notas || [] }); B.carregado = true; }
   const c = estado.cliente;
   if (!c || !estado.sessao || !navigator.onLine) {
     if (B.carregado) return;
@@ -80,19 +81,37 @@ async function carregar() {
   if (cu.error) { if (B.carregado) return; throw new Error(/permission|policy|does not exist/i.test(cu.error.message) ? 'As tabelas da Colheita não estão liberadas para a Certificação (supabase/cert-balanco.sql).' : cu.error.message); }
   if (!cu.data) throw new Error('A cultura Abacate não está cadastrada na Colheita e Produção.');
   const id = cu.data.id;
-  const [s, p, g, l, it, ba] = await Promise.all([
+  const [s, p, g, l, it, ba, nf] = await Promise.all([
     c.from('cp_safras').select('*').eq('cultura_id', id).eq('ativo', true),
     c.from('cp_plantios').select('*').eq('cultura_id', id),
     c.from('cp_cargas').select('*').eq('cultura_id', id).eq('ativo', true).order('data'),
     c.from('cp_lotes_venda').select('*').eq('cultura_id', id).eq('ativo', true).order('data'),
     c.from('cp_vendas_itens').select('*').eq('cultura_id', id).eq('ativo', true).order('data').range(0, 9999),
     c.from('cp_balanca').select('id,ticket,data,placa,motorista,peso_bruto,peso_liquido,safra_id').eq('cultura_id', id).range(0, 9999),
+    c.from('cp_notas_fiscais').select('*').eq('cultura_id', id).eq('ativo', true).order('data_emissao').range(0, 9999),
   ]);
   const erro = s.error || p.error || g.error || l.error || it.error;
   if (erro) { if (B.carregado) return; throw erro; }
-  Object.assign(B, { cult: cu.data, safras: s.data || [], plantios: p.data || [], cargas: g.data || [], lotes: l.data || [], itens: it.data || [], balanca: ba.error ? [] : ba.data || [], carregado: true });
+  Object.assign(B, { cult: cu.data, safras: s.data || [], plantios: p.data || [], cargas: g.data || [], lotes: l.data || [], itens: it.data || [], balanca: ba.error ? [] : ba.data || [], notas: nf.error ? B.notas : nf.data || [], carregado: true });
   salvarCaixa();
+  atualizarPdfs();
 }
+/* PDF de cada NF-e (Google Drive, chave certificacao/evidencia/nfe-<id>/…) */
+const donoNota = id => 'nfe-' + id;
+async function atualizarPdfs() {
+  try {
+    const m = await fotosDe('certificacao', 'evidencia', B.notas.map(n => donoNota(n.id)));
+    B.pdf = new Map(B.notas.filter(n => m.has(donoNota(n.id))).map(n => [n.id, m.get(donoNota(n.id))]));
+    if (telaAtual && !$('dlgBm')?.open && !document.activeElement?.classList?.contains('bm-exp')) redesenhar();
+    if (apr) desenharTelaCheia();
+  } catch { /* sem internet: segue sem o 📄 */ }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-nfpdf]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const ch = B.pdf.get(b.dataset.nfpdf);
+  if (ch) abrirArquivo(ch); else alert('Esta nota ainda não tem PDF anexado.');
+}, true);
 
 /* ===================================================================
    AS CONTAS
@@ -111,9 +130,15 @@ const fazendas = safraId => [...new Set(B.plantios.filter(p => !safraId || p.saf
 function fazPadrao(safraId) { const com = [...new Set(B.cargas.filter(c => c.safra_id === safraId).map(fazDe))]; return com.includes('Faz. Faca') ? 'Faz. Faca' : ''; }
 const cargasDoLote = id => B.cargas.filter(c => c.lote_venda_id === id);
 const itensDoLote = id => B.itens.filter(i => i.lote_venda_id === id);
+const notasDoLote = id => B.notas.filter(n => n.lote_venda_id === id).sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')) || String(a.numero).localeCompare(String(b.numero), 'pt-BR', { numeric: true }));
 const entradaLote = l => cargasDoLote(l.id).reduce((s, c) => s + kgC(c), 0);
 /** Vendido do lote: a soma das notas; sem notas, o que foi digitado. */
-function vendidoLote(l) { const it = itensDoLote(l.id); return it.length ? it.reduce((s, i) => s + Number(i.kg || 0), 0) : (l.peso_vendido != null ? Number(l.peso_vendido) : null); }
+function vendidoLote(l) {
+  const it = itensDoLote(l.id); if (it.length) return it.reduce((s, i) => s + Number(i.kg || 0), 0);
+  const nf = notasDoLote(l.id).filter(n => n.peso_kg != null); if (nf.length) return nf.reduce((s, n) => s + Number(n.peso_kg), 0);
+  return l.peso_vendido != null ? Number(l.peso_vendido) : null;
+}
+const origemVendido = l => itensDoLote(l.id).length ? 'itens' : notasDoLote(l.id).some(n => n.peso_kg != null) ? 'notas' : 'digitado';
 const balancaDe = c => c.ticket_balanca ? B.balanca.find(b => String(b.ticket) === String(c.ticket_balanca)) : null;
 function rateio() {
   const m = new Map(), ent = {}, vend = {};
@@ -188,6 +213,7 @@ function rastrear(txt, safraId) {
   const add = (l, porque) => { if (l && (!safraId || l.safra_id === safraId)) { const a = achados.get(l.id) || { l, porque: new Set() }; a.porque.add(porque); achados.set(l.id, a); } };
   for (const l of B.lotes) { if (bate(l.codigo) || bate(l.rastreio)) add(l, 'lote'); if (String(l.nfs || '').split(/[\s,/;]+/).some(bate)) add(l, 'NF do lote'); }
   for (const i of B.itens) if (bate(i.nf) || bate(i.boletim)) add(lote(i.lote_venda_id), 'NF ' + i.nf);
+  for (const n of B.notas) if (bate(n.numero) || bate(n.chave_acesso)) add(lote(n.lote_venda_id), 'NF ' + n.numero);
   for (const c of B.cargas) if ([c.placa, c.ticket_faz, c.ticket_balanca, c.nf, c.boletim, c.rastreio].some(bate)) add(lote(c.lote_venda_id), `carga ${br(c.data)} ${c.placa || ''}`);
   return [...achados.values()];
 }
@@ -266,7 +292,10 @@ function grupos(k, q) {
   const ord = l => (l && /suj/i.test(l.tipo || '')) ? 0 : l ? 1 : 2;
   return [...porLote.entries()].map(([id, cs]) => ({ l: lote(id), cs })).sort((a, b) => ord(a.l) - ord(b.l) || String(a.cs[0].data).localeCompare(String(b.cs[0].data)));
 }
-const nfsDe = l => { if (!l) return ''; const n = [...new Set(itensDoLote(l.id).map(i => i.nf))]; return n.length ? n.join(', ') : so(l.nfs); };
+const nfsDe = l => { if (!l) return ''; const n = [...new Set([...notasDoLote(l.id).map(x => so(x.numero)), ...itensDoLote(l.id).map(i => so(i.nf))])].filter(Boolean); return n.length ? n.join(', ') : so(l.nfs); };
+/** Botões 📄 das NF-e do lote que têm PDF anexado. */
+const pdfsDe = l => l ? notasDoLote(l.id).filter(n => B.pdf.has(n.id)).map(n => `<button type="button" class="ce-link bm-pdf" data-nfpdf="${esc(n.id)}" title="Abrir o PDF da NF-e ${esc(n.numero)}">📄 ${esc(n.numero)}</button>`).join(' ') : '';
+const qtdNfs = l => { const n = nfsDe(l); return n ? n.split(/[,/]/).filter(x => so(x)).length : 0; };
 function tabRastreio(k, q, edita) {
   const G = grupos(k, q);
   if (!G.length) return `<div class="vazio">${so(q) ? `Nada encontrado para “${esc(q)}”.` : 'Nenhuma carga nesta safra.'}</div>`;
@@ -276,7 +305,7 @@ function tabRastreio(k, q, edita) {
     const todoLote = l ? cargasDoLote(l.id).length === cs.length : true;
     return cs.map((c, i) => {
       const cx = cxC(c), kg = kgC(c), b = balancaDe(c);
-      const mesc = i ? '' : `<td rowspan="${cs.length}" class="bm-nf">${l ? `${edita ? `<button type="button" class="ce-link" data-lv="${esc(l.id)}">` : ''}${esc(nfsDe(l) || '—')}${edita ? '</button>' : ''}` : '<span class="tag alerta">sem boletim / NF</span>'}</td>
+      const mesc = i ? '' : `<td rowspan="${cs.length}" class="bm-nf">${l ? `${edita ? `<button type="button" class="ce-link" data-lv="${esc(l.id)}">` : ''}${esc(nfsDe(l) || '—')}${edita ? '</button>' : ''}${pdfsDe(l) ? `<br>${pdfsDe(l)}` : ''}` : '<span class="tag alerta">sem boletim / NF</span>'}</td>
         <td rowspan="${cs.length}" class="ce">${evid(l?.evid_url, 'Ver evidência')}</td>
         <td rowspan="${cs.length}" class="n"><b>${vend != null ? fmt(todoLote ? vend : vend * ent / (entradaLote(l) || 1), 2) : '-'}</b></td>
         <td rowspan="${cs.length}" class="n">${vend != null && !suj ? fmt(ent - (todoLote ? vend : vend * ent / (entradaLote(l) || 1)), 2) : '-'}</td>
@@ -548,9 +577,9 @@ function desenharLotes() {
       ${linhas.map(({ l, s, v, it }) => { const tc = CATS.reduce((a, [k]) => a + Number(l[k] || 0), 0);
         return `<tr><td><b>${esc(l.codigo)}</b>${l.rastreio ? `<br><small class="dica">${esc(l.rastreio)}</small>` : ''}</td><td class="ce">${br(l.data)}</td><td>${esc(l.destino || '')}</td><td>${esc(l.tipo || '')}</td>
         <td class="ce">${s.n || tag('0', 'alerta')}</td><td class="ce">${fmt(s.kg)}</td>
-        ${CATS.map(([k]) => `<td class="ce">${l[k] != null ? `${fmt(l[k])}<br><small class="dica">${pct(Number(l[k]), tc, 0)}</small>` : /suj/i.test(l.tipo || '') ? '' : '<small class="dica">—</small>'}</td>`).join('')}
-        <td class="ce">${it.length ? new Set(it.map(i => i.nf)).size : (l.nfs ? String(l.nfs).split(/[,/]/).filter(x => so(x)).length : 0)}</td>
-        <td class="ce"><b>${fmt(v)}</b>${it.length ? '' : v != null ? '<br><small class="dica">digitado</small>' : ''}</td><td class="ce">${s.kg && v != null ? pct(s.kg - v, s.kg) : '—'}</td>
+        ${CATS.map(([k]) => `<td class="ce">${l[k] != null ? `${fmt(l[k])}<br><small class="dica">${pct(Number(l[k]), tc, 0)}</small>` : /suj/i.test(l.tipo || '') ? '' : `<button class="ce-link" type="button" data-lv="${esc(l.id)}" title="Lançar a quantidade">lançar</button>`}</td>`).join('')}
+        <td class="ce">${qtdNfs(l)}${notasDoLote(l.id).some(n => B.pdf.has(n.id)) ? ' 📄' : ''}</td>
+        <td class="ce"><b>${fmt(v)}</b>${it.length || v == null ? '' : `<br><small class="dica">${origemVendido(l) === 'notas' ? 'das NF-e' : 'digitado'}</small>`}</td><td class="ce">${s.kg && v != null ? pct(s.kg - v, s.kg) : '—'}</td>
         <td class="ce"><button class="btn mini" type="button" data-lv="${esc(l.id)}">Abrir</button></td></tr>`; }).join('')}
       <tr class="en-total"><td colspan="4">${linhas.length} lote(s)</td><td class="ce">${linhas.reduce((a, x) => a + x.s.n, 0)}</td><td class="ce">${fmt(linhas.reduce((a, x) => a + x.s.kg, 0))}</td>
         ${CATS.map(([k]) => `<td class="ce">${fmt(linhas.reduce((a, x) => a + Number(x.l[k] || 0), 0))}</td>`).join('')}<td></td>
@@ -568,6 +597,7 @@ function formLote(l) {
   const cargas = B.cargas.filter(c => c.safra_id === saf && (kgC(c) || c.lote_venda_id === l?.id)).sort((a, b) => String(a.data).localeCompare(String(b.data)));
   const destinos = [...new Set(['Coopadap', 'Carlini', ...B.lotes.map(x => x.destino).filter(Boolean)])];
   const it = l ? itensDoLote(l.id) : [];
+  const nfs = l ? notasDoLote(l.id) : [];
   const nkg = n => n != null ? esc(fmt(n, Number(n) % 1 ? 2 : 0)) : '';
   dialogo(`<h3>${l ? esc(l.codigo) : 'Novo boletim / lote de venda'} · safra ${esc(safraNome(saf))}</h3>
     <div class="aviso erro" id="bmErro" hidden></div>
@@ -579,14 +609,24 @@ function formLote(l) {
       <label class="campo">Certificação <select id="lvCert">${opcoes(['Com certificação', 'Sem certificação'], v.certificacao, '—')}</select></label>
       <label class="campo">Código de rastreabilidade <input type="text" id="lvRast" value="${esc(v.rastreio || '')}"></label>
     </div>
-    <fieldset class="cp-fs bm-fs-cat"><legend>Boletim do lavador — o que saiu de cada categoria (kg) <span class="dica" id="lvCatSoma"></span></legend>
+    <fieldset class="cp-fs bm-fs-cat"><legend>Quantidade de Cat 1, Cat 2 e Cat 3 do boletim do lavador (kg) <span class="dica" id="lvCatSoma"></span></legend>
       <div class="grade">${CATS.map(([k, r]) => `<label class="campo">${r} <input type="text" inputmode="decimal" id="lv_${k}" value="${nkg(v[k])}"></label>`).join('')}</div></fieldset>
     <div class="grade">
-      <label class="campo">Peso vendido (kg) ${it.length ? `<input type="text" disabled value="${esc(fmt(vendidoLote(l), 2))} (soma de ${it.length} linha(s) de nota)">` : `<input type="text" inputmode="decimal" id="lvVend" value="${nkg(v.peso_vendido)}">`}</label>
+      <label class="campo">Peso vendido (kg) ${it.length ? `<input type="text" disabled value="${esc(fmt(vendidoLote(l), 2))} (soma de ${it.length} linha(s) de nota)">` : l && origemVendido(l) === 'notas' ? `<input type="text" disabled value="${esc(fmt(vendidoLote(l), 2))} (soma das NF-e cadastradas)">` : `<input type="text" inputmode="decimal" id="lvVend" value="${nkg(v.peso_vendido)}">`}</label>
       <label class="campo">Evidência da venda (link) <input type="url" id="lvEv" value="${esc(v.evid_url || '')}" placeholder="https://…"></label>
     </div>
     <datalist id="lvDests">${destinos.map(d => `<option value="${esc(d)}">`).join('')}</datalist>
-    <label class="campo">NF-e(s) <textarea id="lvNfs" rows="2">${esc(v.nfs || '')}</textarea></label>
+    <fieldset class="cp-fs"><legend>NF-e do lote</legend>
+      ${nfs.length ? `<div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr><th>NF-e</th><th class="ce">Emissão</th><th>Destinatário</th><th class="ce">Peso (kg)</th><th class="ce">Valor (R$)</th><th class="ce">PDF</th><th></th></tr></thead><tbody>
+        ${nfs.map(n => `<tr><td><b>${esc(n.numero)}</b>${n.serie ? ` <small class="dica">série ${esc(n.serie)}</small>` : ''}${n.chave_acesso ? `<br><small class="dica">${esc(n.chave_acesso)}</small>` : ''}</td><td class="ce">${br(n.data_emissao)}</td><td>${esc(n.destinatario || '')}</td>
+          <td class="ce">${n.peso_kg != null ? fmt(n.peso_kg, 2) : '—'}</td><td class="ce">${n.valor != null ? fmt(n.valor, 2) : '—'}</td>
+          <td class="ce">${B.pdf.has(n.id) ? `<button type="button" class="ce-link" data-nfpdf="${esc(n.id)}">📄 Abrir</button>` : '<span class="tag alerta">sem PDF</span>'}</td>
+          <td class="ce"><button class="btn mini" type="button" data-nfed="${esc(n.id)}">Editar</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="dica" style="margin:4px 0">Nenhuma NF-e cadastrada neste lote.</p>'}
+      <div class="barra" style="margin:8px 0 0"><button class="btn" type="button" id="lvNfNova">＋ Cadastrar NF-e (com PDF)</button>
+        <small class="dica">${l ? 'O lote é salvo antes de abrir a nota.' : 'O lote é salvo primeiro; depois abre a nota.'}</small></div>
+      ${v.nfs ? `<details style="margin-top:6px"><summary class="ce-link">NF-e em texto (lançamento antigo)</summary><textarea id="lvNfs" rows="2">${esc(v.nfs || '')}</textarea></details>` : ''}
+    </fieldset>
     <fieldset class="cp-fs"><legend>Cargas deste lote <span class="dica" id="lvSoma"></span></legend>
       <div class="bm-cargas">${cargas.map(c => { const outro = c.lote_venda_id && c.lote_venda_id !== l?.id ? lote(c.lote_venda_id) : null;
         return `<label class="rs-check${outro ? ' dica' : ''}"><input type="checkbox" value="${esc(c.id)}" data-kg="${kgC(c)}" ${l && c.lote_venda_id === l.id ? 'checked' : ''}>
@@ -607,14 +647,16 @@ function formLote(l) {
     d.querySelectorAll('.bm-cargas input').forEach(i => i.addEventListener('change', conta));
     $('lvVend')?.addEventListener('input', conta); conta();
     $('lvOk').addEventListener('click', () => salvarLote(l, saf, marcadas().map(i => i.value)));
+    $('lvNfNova').addEventListener('click', () => salvarLote(l, saf, marcadas().map(i => i.value), novo => formNota(null, novo)));
+    d.querySelectorAll('[data-nfed]').forEach(b => b.addEventListener('click', () => salvarLote(l, saf, marcadas().map(i => i.value), novo => formNota(B.notas.find(n => n.id === b.dataset.nfed), novo))));
     $('lvApagar')?.addEventListener('click', () => apagarLote(l));
   });
 }
-async function salvarLote(atual, saf, ids) {
+async function salvarLote(atual, saf, ids, depois) {
   if (precisaRede()) return;
   const ev = so($('lvEv').value);
   const linha = { codigo: so($('lvCod').value), data: $('lvData').value || null, destino: so($('lvDest').value) || null, tipo: $('lvTipo').value || null,
-    certificacao: $('lvCert').value || null, rastreio: so($('lvRast').value) || null, evid_url: ev || null, nfs: so($('lvNfs').value) || null, obs: so($('lvObs').value) || null };
+    certificacao: $('lvCert').value || null, rastreio: so($('lvRast').value) || null, evid_url: ev || null, nfs: $('lvNfs') ? so($('lvNfs').value) || null : (atual?.nfs || null), obs: so($('lvObs').value) || null };
   if ($('lvVend')) { const vend = num($('lvVend').value); if (Number.isNaN(vend) || (vend != null && vend < 0)) return erroDlg('Confira o peso vendido.'); linha.peso_vendido = vend; }
   for (const [k, r] of CATS) { const x = num($('lv_' + k).value); if (Number.isNaN(x) || (x != null && x < 0)) return erroDlg(`Confira ${r}.`); linha[k] = x; }
   if (!linha.codigo) return erroDlg('Informe a identificação (ex.: Boletim 798).');
@@ -630,13 +672,85 @@ async function salvarLote(atual, saf, ids) {
     const entra = ids.filter(id => !antes.has(id)), sai = [...antes].filter(id => !ids.includes(id));
     if (entra.length) { const r = await estado.cliente.from('cp_cargas').update({ lote_venda_id: data.id }).in('id', entra).select(); if (r.error) throw r.error; r.data.forEach(x => trocar(B.cargas, x)); }
     if (sai.length) { const r = await estado.cliente.from('cp_cargas').update({ lote_venda_id: null }).in('id', sai).select(); if (r.error) throw r.error; r.data.forEach(x => trocar(B.cargas, x)); }
-    salvarCaixa(); fechar(); redesenhar();
+    salvarCaixa();
+    if (depois) { redesenhar(); return depois(data); }
+    fechar(); redesenhar();
   } catch (e) { if ($('lvOk')) $('lvOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+}
+
+/* ---------- cadastro da NF-e, com o PDF (pedido de 26/10/2026) ----------
+   "Em nf-e, vamos colocar uma forma de cadastrar a nota, e anexar o pdf."
+   Abre no mesmo diálogo do lote; ao salvar ou voltar, o lote reabre. */
+let anexoNota = null;
+function formNota(n, l) {
+  if (!l) return;
+  const v = n || { numero: '', serie: '', data_emissao: l.data || hoje(), chave_acesso: '', destinatario: l.destino || '', peso_kg: null, valor: null, obs: '' };
+  const destinos = [...new Set(['Coopadap', 'Carlini', ...B.lotes.map(x => x.destino), ...B.notas.map(x => x.destinatario)].filter(Boolean))];
+  const nn = (x, c) => x != null ? esc(fmt(x, c)) : '';
+  dialogo(`<h3>${n ? 'NF-e ' + esc(n.numero) : 'Cadastrar NF-e'} · ${esc(l.codigo)}</h3>
+    <div class="aviso erro" id="bmErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Número da NF-e * <input type="text" id="nfNum" inputmode="numeric" value="${esc(v.numero || '')}" placeholder="001031094"></label>
+      <label class="campo">Série <input type="text" id="nfSerie" value="${esc(v.serie || '')}" placeholder="2"></label>
+      <label class="campo">Data de emissão <input type="date" id="nfData" value="${esc(String(v.data_emissao || '').slice(0, 10))}"></label>
+      <label class="campo">Destinatário <input type="text" id="nfDest" value="${esc(v.destinatario || '')}" list="nfDests"></label>
+      <label class="campo">Peso (kg) <input type="text" inputmode="decimal" id="nfPeso" value="${nn(v.peso_kg, 2)}"></label>
+      <label class="campo">Valor (R$) <input type="text" inputmode="decimal" id="nfValor" value="${nn(v.valor, 2)}"></label>
+    </div>
+    <label class="campo">Chave de acesso (44 números) <input type="text" inputmode="numeric" id="nfChave" value="${esc(v.chave_acesso || '')}" placeholder="opcional"></label>
+    <datalist id="nfDests">${destinos.map(d => `<option value="${esc(d)}">`).join('')}</datalist>
+    <div id="nfAnexo" style="margin-top:8px"></div>
+    <label class="campo">Observação <textarea id="nfObs" rows="2">${esc(v.obs || '')}</textarea></label>
+    <p class="dica">O peso das NF-e cadastradas vira o peso vendido do lote quando não há relatório de vendas importado.</p>
+    <div class="barra entre"><div>${n ? '<button class="btn perigo" type="button" id="nfApagar">Apagar nota</button>' : ''}</div>
+      <div class="barra fim" style="margin:0"><button class="btn" type="button" id="nfVolta">Voltar ao lote</button><button class="btn principal" type="button" id="nfOk">Salvar nota</button></div></div>`, () => {
+    anexoNota = campoAnexos($('nfAnexo'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'PDF da NF-e', dica: 'PDF (ou foto) da nota' });
+    anexoNota.abrir(n ? donoNota(n.id) : null);
+    $('nfVolta').addEventListener('click', () => formLote(lote(l.id)));
+    $('nfOk').addEventListener('click', () => salvarNota(n, l));
+    $('nfApagar')?.addEventListener('click', () => apagarNota(n, l));
+  });
+}
+async function salvarNota(atual, l) {
+  if (precisaRede()) return;
+  const chave = so($('nfChave').value).replace(/\D/g, '');
+  const linha = { numero: so($('nfNum').value).replace(/^NF-?e?\s*/i, ''), serie: so($('nfSerie').value) || null, data_emissao: $('nfData').value || null,
+    destinatario: so($('nfDest').value) || null, chave_acesso: chave || null, obs: so($('nfObs').value) || null, lote_venda_id: l.id, safra_id: l.safra_id };
+  if (!linha.numero) return erroDlg('Informe o número da NF-e.');
+  if (chave && chave.length !== 44) return erroDlg(`A chave de acesso tem 44 números (esta tem ${chave.length}).`);
+  for (const [id, campo, rot] of [['nfPeso', 'peso_kg', 'o peso'], ['nfValor', 'valor', 'o valor']]) {
+    const x = num($(id).value); if (Number.isNaN(x) || (x != null && x < 0)) return erroDlg(`Confira ${rot}.`); linha[campo] = x;
+  }
+  const rep = B.notas.find(x => x.id !== atual?.id && x.safra_id === l.safra_id && so(x.numero).replace(/^0+/, '') === linha.numero.replace(/^0+/, '') && so(x.serie) === so(linha.serie));
+  if (rep) return erroDlg(`A NF-e ${esc(linha.numero)} já está cadastrada${lote(rep.lote_venda_id) ? ' em ' + esc(lote(rep.lote_venda_id).codigo) : ''}.`);
+  $('nfOk').disabled = true;
+  try {
+    const t = estado.cliente.from('cp_notas_fiscais');
+    const { data, error } = atual ? await t.update(linha).eq('id', atual.id).select().single()
+      : await t.insert({ ...linha, cultura_id: B.cult.id, criado_por: quem() }).select().single();
+    if (error) throw error;
+    trocar(B.notas, data);
+    if (anexoNota?.mudou) { await anexoNota.salvar(donoNota(data.id)); }
+    salvarCaixa();
+    await atualizarPdfs();
+    formLote(lote(l.id)); redesenhar();
+  } catch (e) { if ($('nfOk')) $('nfOk').disabled = false; erroDlg('Não consegui gravar a nota: ' + esc(e.message || e)); }
+}
+function apagarNota(n, l) {
+  if (!confirm(`Apagar a NF-e ${n.numero}? O PDF anexado sai junto.`)) return;
+  if (precisaRede()) return;
+  (async () => {
+    const { error } = await estado.cliente.from('cp_notas_fiscais').delete().eq('id', n.id);
+    if (error) return erroDlg('Não consegui apagar: ' + esc(error.message));
+    if (B.pdf.has(n.id) && anexoNota) { /* tira o PDF do Drive */ document.querySelectorAll('#nfAnexo [data-tirar]').forEach(b => b.click()); if (anexoNota.mudou) await anexoNota.salvar(donoNota(n.id)); }
+    B.notas = B.notas.filter(x => x.id !== n.id); B.pdf.delete(n.id);
+    salvarCaixa(); formLote(lote(l.id)); redesenhar();
+  })();
 }
 function apagarLote(l) {
   const n = cargasDoLote(l.id).length, ni = itensDoLote(l.id).length;
   dialogo(`<h3>Apagar ${esc(l.codigo)}</h3><div class="aviso erro" id="bmErro" hidden></div>
-    <p>${n ? `${n} carga(s) ficam sem lote (as cargas não são apagadas).` : 'Nenhuma carga ligada.'}${ni ? ` ${ni} linha(s) de nota ficam sem boletim.` : ''}</p>
+    <p>${n ? `${n} carga(s) ficam sem lote (as cargas não são apagadas).` : 'Nenhuma carga ligada.'}${ni ? ` ${ni} linha(s) de nota ficam sem boletim.` : ''}${notasDoLote(l.id).length ? ` ${notasDoLote(l.id).length} NF-e cadastrada(s) ficam sem lote.` : ''}</p>
     <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn perigo" type="button" id="laOk">Apagar</button></div>`, () => {
     $('laOk').addEventListener('click', async () => {
       if (precisaRede()) return;
@@ -644,7 +758,7 @@ function apagarLote(l) {
       if (n) { const r = await estado.cliente.from('cp_cargas').update({ lote_venda_id: null }).eq('lote_venda_id', l.id).select(); if (r.error) { $('laOk').disabled = false; return erroDlg(esc(r.error.message)); } r.data.forEach(x => trocar(B.cargas, x)); }
       const { error } = await estado.cliente.from('cp_lotes_venda').delete().eq('id', l.id);
       if (error) { $('laOk').disabled = false; return erroDlg('Não consegui apagar: ' + esc(error.message)); }
-      B.lotes = B.lotes.filter(x => x.id !== l.id); B.itens.forEach(i => { if (i.lote_venda_id === l.id) i.lote_venda_id = null; });
+      B.lotes = B.lotes.filter(x => x.id !== l.id); B.itens.forEach(i => { if (i.lote_venda_id === l.id) i.lote_venda_id = null; }); B.notas.forEach(x => { if (x.lote_venda_id === l.id) x.lote_venda_id = null; });
       salvarCaixa(); fechar(); redesenhar();
     });
   });
@@ -778,7 +892,7 @@ export async function abrirBalanco(tela) {
   if (telaAtual === tela) redesenhar();
 }
 export function limparBalanco() {
-  Object.assign(B, { carregado: false, cult: null, safras: [], plantios: [], cargas: [], lotes: [], itens: [], balanca: [] });
+  Object.assign(B, { carregado: false, cult: null, safras: [], plantios: [], cargas: [], lotes: [], itens: [], balanca: [], notas: [], pdf: new Map() });
   Object.assign(B.f, { safra: '', faz: null }); Object.assign(B.fr, { q: '', ver: 'cadeia' });
   nucleo.apagarCaixa(CAIXA); telaAtual = ''; fechar(); fecharApr();
 }
