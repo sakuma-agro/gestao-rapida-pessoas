@@ -273,7 +273,7 @@ export const MODULOS = [
     { id: 'ceBalancoSub', nome: 'Balanço de massa', telas: [
       ['bmPainel',     'Painel'],
       ['bmRastreio',   'Rastreabilidade'],
-      ['bmLotes',      'Lotes de venda'],
+      ['bmLotes',      'Boletins e vendas'],
       ['bmFechamento', 'Fechamento'],
     ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [

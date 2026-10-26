@@ -100,3 +100,10 @@ function valor(v, col = {}) {
   }
   return v;
 }
+
+/** Lê um .xlsx/.csv escolhido pela pessoa: devolve [{nome, linhas: Array<Array<any>>}] (datas como Date). */
+export async function lerPlanilha(arquivo) {
+  const XLSX = await biblioteca();
+  const wb = XLSX.read(await arquivo.arrayBuffer(), { type: 'array', cellDates: true });
+  return wb.SheetNames.map(n => ({ nome: n, linhas: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: null }) }));
+}

@@ -67,3 +67,55 @@ do $$ declare t text; begin
     create policy cp_lv_apagar on public.cp_lotes_venda for delete to authenticated using (public.app_pode('colheita') or public.app_pode('cert'));
   end if;
 end $$;
+
+-- 26/10/2026 (2ª parte) — categorias do boletim do lavador e itens de venda.
+-- Pedido: "quero um campo para colocar a qtde de cat 1, cat 2, e cat 3, de cada
+-- boletim feito do lavador" e "colocar sobre o calibre do abacate hass, a qtde %
+-- de cada um". Os calibres vêm do relatório de vendas da Coopadap: cada linha
+-- (NF × material) vira um item; o material diz calibre (T12…T32), categoria e
+-- embalagem. O peso vendido do lote passa a ser a soma dos itens dele.
+alter table public.cp_lotes_venda add column if not exists cat1_kg numeric;
+alter table public.cp_lotes_venda add column if not exists cat2_kg numeric;
+alter table public.cp_lotes_venda add column if not exists cat3_kg numeric;
+alter table public.cp_lotes_venda add column if not exists refugo_kg numeric;
+
+create table if not exists public.cp_vendas_itens (
+  id uuid primary key default gen_random_uuid(),
+  cultura_id uuid not null references public.cp_culturas(id),
+  safra_id uuid references public.cp_safras(id),
+  lote_venda_id uuid references public.cp_lotes_venda(id) on delete set null,
+  chave text unique,                   -- NF | documento de compras | item (evita importar duas vezes)
+  data date,                           -- emissão da NF
+  nf text,
+  boletim text,
+  material text,                       -- '7000755 - AVOCADO HASS CX PLASTICA T16 10KG'
+  categoria text,                      -- CAT 1 | CAT 2 | CAT 3 | Sujo
+  calibre int,                         -- frutos por caixa de 4 kg (T16 = 16)
+  embalagem text,                      -- CX 10 kg | CX 4 kg | Contentor | Granel
+  caixas numeric,
+  kg numeric,
+  talhao text,                         -- como veio no relatório (opcional)
+  origem text,                         -- de onde veio (arquivo importado)
+  ativo boolean not null default true,
+  criado_por text,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists cp_vendas_itens_lote on public.cp_vendas_itens(lote_venda_id);
+create index if not exists cp_vendas_itens_safra on public.cp_vendas_itens(safra_id);
+alter table public.cp_vendas_itens enable row level security;
+grant select, insert, update, delete on public.cp_vendas_itens to authenticated;
+do $$ begin
+  if not exists (select 1 from pg_trigger where tgname='marcar_atualizacao' and tgrelid='public.cp_vendas_itens'::regclass) then
+    create trigger marcar_atualizacao before insert or update on public.cp_vendas_itens for each row execute function public.marcar_atualizacao();
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='cp_vendas_itens' and policyname='cp_vi_ler') then
+    create policy cp_vi_ler on public.cp_vendas_itens for select to authenticated using (public.app_pode('colheita') or public.app_pode('cert'));
+    create policy cp_vi_gravar on public.cp_vendas_itens for insert to authenticated with check (public.app_pode('colheita') or public.app_pode('cert'));
+    create policy cp_vi_trocar on public.cp_vendas_itens for update to authenticated using (public.app_pode('colheita') or public.app_pode('cert')) with check (public.app_pode('colheita') or public.app_pode('cert'));
+    create policy cp_vi_apagar on public.cp_vendas_itens for delete to authenticated using (public.app_pode('colheita') or public.app_pode('cert'));
+  end if;
+  -- a Certificação também importa o relatório da balança da cooperativa
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='cp_balanca' and policyname='cp_ler_cert') then
+    create policy cp_ler_cert on public.cp_balanca for select to authenticated using (public.app_pode('cert'));
+  end if;
+end $$;
