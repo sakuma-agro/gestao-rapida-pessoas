@@ -781,7 +781,7 @@ async function painelDoc() {
     return;
   }
   const btn = $('ceDvPdf'); btn.disabled = false;
-  btn.addEventListener('click', () => abrirArquivo(vig.chave));
+  btn.addEventListener('click', () => apresentar(d.id));
   const anexos = extras.length ? `<div class="ce-dv-extras">Também nesta pasta: ${extras.map(x => `<button class="ce-link" type="button" data-ver="${esc(x.chave)}">${esc(x.nome)}</button>`).join(' · ')}</div>` : '';
   if (celular) {
     visor.innerHTML = `<span class="dc-sem">${esc(vig.nome)} — toque em “Abrir PDF”.</span>${anexos}`;
@@ -790,13 +790,86 @@ async function painelDoc() {
     try {
       const u = await urlDoArquivo(vig.chave);
       if (g !== geracaoPainel) return;
-      visor.innerHTML = `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH"></iframe>${anexos}`;
+      visor.innerHTML = `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH&navpanes=0"></iframe>${anexos}`;
     } catch (e) {
       if (g !== geracaoPainel) return;
       visor.innerHTML = `<span class="dc-sem">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</span>${anexos}`;
     }
   }
   visor.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.ver)));
+}
+
+
+/* -------------------------------------------------------------------
+   Modo apresentação (26/10/2026, pedido dele: "o objetivo é apresentar para
+   o auditor pelo app — abrir somente o PDF"). "Abrir PDF" cobre a tela do app
+   só com o PDF; barra fina com código · revisão · data · nome, setas para o
+   documento anterior/próximo da lista aberta (← →), tela cheia e fechar (Esc).
+   ------------------------------------------------------------------- */
+async function pdfVigente(d) {
+  const arqs = await listarArquivos('certificacao', 'documento', d.id).catch(() => []);
+  const pdfs = arqs.filter(ehPdf);
+  return pdfs.find(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo)) || pdfs[0] || arqs[0] || null;
+}
+let apr = null;
+function apresentar(id) {
+  const lista = docsDoTipo(S.fd.tipo || prefixoDoc(S.docs.find(x => x.id === id) || {}));
+  let el = $('ceApr');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'ceApr'; el.className = 'ce-apr';
+    el.innerHTML = `<div class="ce-apr-barra">
+        <button type="button" class="ce-apr-b" data-a="ant" title="Documento anterior (←)">‹</button>
+        <div class="ce-apr-tit"><b id="ceAprCod"></b> <span id="ceAprNome"></span></div>
+        <button type="button" class="ce-apr-b" data-a="prox" title="Próximo documento (→)">›</button>
+        <span class="cresce"></span>
+        <button type="button" class="ce-apr-b" data-a="cheia" title="Tela cheia">⛶</button>
+        <button type="button" class="ce-apr-b" data-a="aba" title="Abrir em outra aba">↗</button>
+        <button type="button" class="ce-apr-b" data-a="fechar" title="Fechar (Esc)">✕</button>
+      </div><div class="ce-apr-pdf" id="ceAprPdf"></div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', ev => {
+      const a = ev.target.closest('[data-a]')?.dataset.a; if (!a || !apr) return;
+      if (a === 'ant') mostrarApr(apr.i - 1);
+      else if (a === 'prox') mostrarApr(apr.i + 1);
+      else if (a === 'fechar') fecharApr();
+      else if (a === 'aba' && apr.chave) abrirArquivo(apr.chave);
+      else if (a === 'cheia') { if (document.fullscreenElement) document.exitFullscreen?.(); else el.requestFullscreen?.().catch(() => {}); }
+    });
+    document.addEventListener('keydown', ev => {
+      if (!apr || $('ceApr')?.hidden) return;
+      if (ev.key === 'Escape' && !document.fullscreenElement) fecharApr();
+      else if (ev.key === 'ArrowLeft') mostrarApr(apr.i - 1);
+      else if (ev.key === 'ArrowRight') mostrarApr(apr.i + 1);
+    });
+  }
+  apr = { lista, i: Math.max(0, lista.findIndex(x => x.id === id)), chave: null, g: 0 };
+  el.hidden = false; document.body.classList.add('ce-apr-aberto');
+  mostrarApr(apr.i);
+}
+function fecharApr() {
+  const el = $('ceApr'); if (!el) return;
+  if (document.fullscreenElement) document.exitFullscreen?.();
+  el.hidden = true; $('ceAprPdf').innerHTML = ''; document.body.classList.remove('ce-apr-aberto');
+  if (apr) { S.fd.sel = apr.lista[apr.i]?.id ?? S.fd.sel; apr = null; if (S.fd.modo === 'tipo') desenharDocumentos(); }
+}
+async function mostrarApr(i) {
+  if (!apr || !apr.lista.length) return;
+  i = (i + apr.lista.length) % apr.lista.length; apr.i = i;
+  const d = apr.lista[i]; const g = ++apr.g;
+  $('ceAprCod').textContent = `${d.codigo}${d.revisao ? ' · Rev. ' + d.revisao : ''}${d.data_revisao ? ' · ' + br(d.data_revisao) : ''}`;
+  $('ceAprNome').textContent = d.nome;
+  const box = $('ceAprPdf'); box.innerHTML = '<p class="ce-apr-msg">Carregando…</p>'; apr.chave = null;
+  try {
+    const v = await pdfVigente(d);
+    if (!apr || g !== apr.g) return;
+    if (!v) { box.innerHTML = '<p class="ce-apr-msg">Este documento ainda não tem PDF no app.</p>'; return; }
+    apr.chave = v.chave;
+    const u = await urlDoArquivo(v.chave);
+    if (!apr || g !== apr.g) return;
+    box.innerHTML = `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH&navpanes=0"></iframe>`;
+  } catch (e) {
+    if (apr && g === apr.g) box.innerHTML = `<p class="ce-apr-msg">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</p>`;
+  }
 }
 
 /* Barra de envio: quantos arquivos ainda sobem para o Drive. */
