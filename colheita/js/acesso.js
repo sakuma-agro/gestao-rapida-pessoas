@@ -77,7 +77,7 @@ export const MODULOS = [
   ] },
   { id: 'financeiro', nome: 'Financeiro', icone: 'financeiro', subs: [
     { id: 'cpSubFin', nome: 'Financeiro', icone: 'financeiro', telas: [
-      ['cpFinanceiro', 'Custos da colheita por plantio', 'financeiro'],
+      ['cpFretes', 'Controle de pagamento de fretes', 'caminhao'],
     ] },
   ] },
   { id: 'parametros', nome: 'Parâmetros', icone: 'param', subs: [

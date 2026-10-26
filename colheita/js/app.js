@@ -13,7 +13,7 @@ import { abrirPainel, abrirHistorico } from './painel.js';
 import { abrirCargas } from './cargas.js';
 import { abrirConferencia, abrirImportar, abrirImportarCoop } from './conciliacao.js';
 import { abrirPlantios, abrirSafras, abrirVeiculos, abrirHistCad } from './cadastros.js';
-import { abrirFinanceiro } from './financeiro.js';
+import { abrirFretes } from './fretes.js';
 import { abrirBeneficiamento, abrirComercializacao, temBeneficiamento } from './venda.js';
 import { abrirCulturas, abrirCargaInicial } from './parametros.js';
 
@@ -26,7 +26,7 @@ const ABRIR = {
   cpConferencia: abrirConferencia, cpImportar: abrirImportar,
   cpBenef: abrirBeneficiamento, cpCom: abrirComercializacao, cpImpCoop: abrirImportarCoop,
   cpPlantios: abrirPlantios, cpSafras: abrirSafras, cpVeiculos: abrirVeiculos, cpHistCad: abrirHistCad,
-  cpFinanceiro: abrirFinanceiro, cpCulturas: abrirCulturas, cpCargaInicial: abrirCargaInicial,
+  cpFretes: abrirFretes, cpCulturas: abrirCulturas, cpCargaInicial: abrirCargaInicial,
 };
 let telaAtual = 'inicio';
 

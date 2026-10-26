@@ -122,3 +122,4 @@
 .cp-etapas{border:1px solid var(--linha,#dfe2d8);border-radius:10px;padding:8px 12px}
 .cp-etapas>summary{cursor:pointer;font-weight:600;color:#51534A}
 .cp-bf-cargas{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto}
+.cb-tab input.cp-fr-valor{width:110px;max-width:110px;text-align:right;padding:4px 8px;min-height:0}

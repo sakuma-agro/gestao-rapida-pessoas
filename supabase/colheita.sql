@@ -269,3 +269,13 @@ select v.* from (values
    '{"tolerancia_data":3}'::jsonb, '#3F8A4F', 6)
 ) v(slug, nome, unidade_nome, unidade_kg, unidade_area, conciliacao, palavra_chave, classes, campos, parametros, cor, ordem)
 where not exists (select 1 from public.cp_culturas c where c.slug = v.slug);
+
+-- 26/10/2026 — Financeiro › Controle de pagamento de fretes (carga por carga).
+-- O valor fica em valor_frete (o mesmo de "Custos desta carga"); a situação do
+-- pagamento do frete tem campos próprios (situacao_pagto/data_pagto são do
+-- pagamento da cooperativa). Migração "cp_cargas_pagamento_frete".
+alter table public.cp_cargas add column if not exists valor_frete numeric;
+alter table public.cp_cargas add column if not exists frete_situacao text;   -- Pendente | Pago
+alter table public.cp_cargas add column if not exists frete_pago_em date;
+alter table public.cp_cargas add column if not exists frete_forma text;      -- PIX, Transferência, Boleto, Dinheiro, Cheque
+alter table public.cp_cargas add column if not exists frete_obs text;
