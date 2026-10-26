@@ -14,7 +14,7 @@ import { abrirCargas } from './cargas.js';
 import { abrirConferencia, abrirImportar, abrirImportarCoop } from './conciliacao.js';
 import { abrirPlantios, abrirSafras, abrirVeiculos, abrirHistCad } from './cadastros.js';
 import { abrirFinanceiro } from './financeiro.js';
-import { abrirBeneficiamento, abrirComercializacao } from './venda.js';
+import { abrirBeneficiamento, abrirComercializacao, temBeneficiamento } from './venda.js';
 import { abrirCulturas, abrirCargaInicial } from './parametros.js';
 
 const TELAS = ['inicio', ...MODULOS.flatMap(m => telasDe(m).map(([t]) => t))];
@@ -47,6 +47,9 @@ function abrirAba(nome) {
 function desenharSeletor() {
   const el = $('cpSeletor');
   if (!el) return;
+  /* Beneficiamento só para cultura com classificação (26/10/2026): milho e trigo não têm. */
+  const cs = pronto() ? culturaSel() : null;
+  document.querySelectorAll('[data-modulo="beneficiamento"], [data-ir="cpBenef"]').forEach(b => { b.style.display = cs && !temBeneficiamento(cs) ? "none" : ""; });
   el.hidden = SEM_SELETOR.has(telaAtual) || !pronto();
   if (el.hidden) return;
   const c = culturaSel(), s = safraSel();

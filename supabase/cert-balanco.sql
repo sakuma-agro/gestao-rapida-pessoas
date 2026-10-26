@@ -157,3 +157,9 @@ do $$ begin
     create policy cp_nf_apagar on public.cp_notas_fiscais for delete to authenticated using (public.app_pode('colheita') or public.app_pode('cert'));
   end if;
 end $$;
+
+-- 26/10/2026 (4ª parte) — boletim com a classificação de cada cultura.
+-- Pedido: "só muda o beneficiamento". Abacate segue em cat1_kg…refugo_kg; as
+-- outras culturas gravam as classes do cadastro (cenoura AAA/AA/A/G, batata,
+-- café) aqui, como {"AAA": 8000, "AA": 6000, …}. Migração "cp_lotes_venda_classes".
+alter table public.cp_lotes_venda add column if not exists classes jsonb not null default '{}'::jsonb;

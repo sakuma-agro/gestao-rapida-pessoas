@@ -10,10 +10,24 @@
 // lança aqui aparece lá (rastreabilidade e FORM 013) e vice-versa.
 // PDF da nota: chave certificacao/evidencia/nfe-<id da nota>/…pdf (a mesma
 // da Certificação), enviado pela função "arquivos" (precisa de internet).
-import { $, esc, pronto, carregando, todos, gravar, aviso, culturaSel, safraSel, cargasDa, plantio, nomePlantio,
+import { $, esc, pronto, carregando, todos, gravar, aviso, culturaSel, safraSel, cargasDa, plantio, nomePlantio, classes,
   kgDe, dataBR, num, lerNumero, meuNome, semAcento } from './dados.js';
 
 const CATS = [['cat1_kg', 'Cat 1'], ['cat2_kg', 'Cat 2'], ['cat3_kg', 'Cat 3'], ['refugo_kg', 'Refugo']];
+/* Classificação do boletim por cultura (26/10/2026, pedido dele: "só muda o
+   beneficiamento"). Abacate: Cat 1/2/3/Refugo nas colunas cat1_kg… (que a
+   Certificação lê). As outras: as classes do cadastro da cultura
+   (Parâmetros › Culturas) — cenoura AAA/AA/A/G em kg, batata Extra…Florão e
+   café BX/BM/Esc. em sacas —, gravadas em cp_lotes_venda.classes (jsonb).
+   Cultura sem classe nenhuma (milho, trigo) não tem beneficiamento. */
+const ehAbacate = c => c && c.slug === 'abacate';
+function catsDa(cult) {
+  if (ehAbacate(cult)) return CATS.map(([k, nome]) => ({ chave: k, nome, col: true }));
+  return classes(cult).map(k => ({ chave: k.chave, nome: k.nome, col: false }));
+}
+export const temBeneficiamento = cult => catsDa(cult).length > 0;
+const unidCat = cult => ehAbacate(cult) || classes(cult).some(k => k.modo === 'kg') ? 'kg' : (cult.unidade_nome || 'un');
+const valCat = (l, k) => k.col ? l[k.chave] : (l.classes || {})[k.chave];
 const hoje = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 const vivos = t => todos(t).filter(x => x.ativo !== false);
 const lotesDa = (cult, saf) => vivos('cp_lotes_venda').filter(l => l.cultura_id === cult.id && l.safra_id === saf.id)
@@ -37,25 +51,27 @@ function desenharBenef() {
   if (!pronto() || carregando()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const cult = culturaSel(), saf = safraSel();
   if (!cult || !saf) { alvo.innerHTML = '<div class="vazio">Escolha a cultura e a safra.</div>'; return; }
+  const K = catsDa(cult), U = unidCat(cult);
+  if (!K.length) { alvo.innerHTML = `<div class="vazio">${esc(cult.nome)} não passa por beneficiamento (não tem classificação cadastrada em Parâmetros › Culturas).</div>`; return; }
   const L = lotesDa(cult, saf);
   const semLote = cargasDa(saf.id).filter(c => !c.lote_venda_id);
   const linhas = L.map(l => { const cs = cargasDoLote(saf, l.id); const kg = cs.reduce((s, c) => s + kgDe(c, cult), 0);
-    const tc = CATS.reduce((s, [k]) => s + Number(l[k] || 0), 0); return { l, cs, kg, tc }; });
-  const tot = k => linhas.reduce((s, x) => s + Number(x.l[k] || 0), 0);
-  const totTc = CATS.reduce((s, [k]) => s + tot(k), 0);
+    const tc = K.reduce((s, k) => s + Number(valCat(l, k) || 0), 0); return { l, cs, kg, tc }; });
+  const tot = k => linhas.reduce((s, x) => s + Number(valCat(x.l, k) || 0), 0);
+  const totTc = K.reduce((s, k) => s + tot(k), 0);
   alvo.innerHTML = `
     <div class="barra entre" style="margin-top:0"><span class="dc-sem">${L.length} boletim(ns) nesta safra${semLote.length ? ` · <b>${semLote.length}</b> carga(s) ainda sem boletim` : ''}</span>
       <button class="btn principal" type="button" id="cpBfNovo">+ Novo boletim</button></div>
     ${L.length ? `<div class="cb-rolagem"><table class="dc-planilha cb-tab"><thead><tr><th>Boletim</th><th>Data</th><th>Destino</th><th>Tipo</th><th class="dir">Cargas</th><th class="dir">Entrou (kg)</th>
-      ${CATS.map(([, r]) => `<th class="dir">${r} (kg)</th>`).join('')}<th class="dir">Soma</th><th class="dir">NF-e</th><th></th></tr></thead><tbody>
+      ${K.map(k => `<th class="dir">${esc(k.nome)} (${esc(U)})</th>`).join('')}<th class="dir">Soma</th><th class="dir">NF-e</th><th></th></tr></thead><tbody>
       ${linhas.map(({ l, cs, kg, tc }) => `<tr><td><b>${esc(l.codigo)}</b></td><td>${dataBR(l.data)}</td><td>${esc(l.destino || '')}</td><td>${esc(l.tipo || '')}</td>
         <td class="dir">${cs.length || '<span class="cb-pin alerta">0</span>'}</td><td class="dir">${num(kg, 0)}</td>
-        ${CATS.map(([k]) => `<td class="dir">${vazio(l[k]) ? (/suj/i.test(l.tipo || '') ? '' : `<button class="ce-link" type="button" data-bf="${esc(l.id)}">lançar</button>`) : `${num(l[k], 0)}<br><small class="dc-sem">${pctTxt(Number(l[k]), tc)}</small>`}</td>`).join('')}
-        <td class="dir">${tc ? num(tc, 0) + (kg ? `<br><small class="dc-sem">${pctTxt(tc, kg)} do que entrou</small>` : '') : ''}</td>
+        ${K.map(k => { const x = valCat(l, k); return `<td class="dir">${vazio(x) ? (/suj/i.test(l.tipo || '') ? '' : `<button class="ce-link" type="button" data-bf="${esc(l.id)}">lançar</button>`) : `${num(x, 0)}<br><small class="dc-sem">${pctTxt(Number(x), tc)}</small>`}</td>`; }).join('')}
+        <td class="dir">${tc ? num(tc, 0) + (kg && U === 'kg' ? `<br><small class="dc-sem">${pctTxt(tc, kg)} do que entrou</small>` : '') : ''}</td>
         <td class="dir">${notasDoLote(l.id).length || ''}</td>
         <td class="dir"><button class="btn mini" type="button" data-bf="${esc(l.id)}">Abrir</button></td></tr>`).join('')}
       </tbody><tfoot><tr class="dc-total"><td colspan="4">Total</td><td class="dir">${linhas.reduce((s, x) => s + x.cs.length, 0)}</td><td class="dir">${num(linhas.reduce((s, x) => s + x.kg, 0), 0)}</td>
-        ${CATS.map(([k]) => `<td class="dir">${num(tot(k), 0)}<br><small class="dc-sem">${pctTxt(tot(k), totTc)}</small></td>`).join('')}<td class="dir">${num(totTc, 0)}</td><td colspan="2"></td></tr></tfoot></table></div>`
+        ${K.map(k => `<td class="dir">${num(tot(k), 0)}<br><small class="dc-sem">${pctTxt(tot(k), totTc)}</small></td>`).join('')}<td class="dir">${num(totTc, 0)}</td><td colspan="2"></td></tr></tfoot></table></div>`
       : '<div class="vazio">Nenhum boletim nesta safra. Toque em “+ Novo boletim”.</div>'}`;
   $('cpBfNovo').onclick = () => formBoletim(null);
   alvo.querySelectorAll('[data-bf]').forEach(b => b.addEventListener('click', () => formBoletim(lote(b.dataset.bf))));
@@ -64,6 +80,7 @@ function desenharBenef() {
 function formBoletim(l) {
   const cult = culturaSel(), saf = safraSel(); if (!cult || !saf) return;
   const v = l || { codigo: '', data: hoje(), destino: 'Coopadap', tipo: 'Beneficiado' };
+  const K = catsDa(cult), U = unidCat(cult);
   const cargas = cargasDa(saf.id).slice().reverse();
   window.abrirModal(l ? 'Boletim ' + String(l.codigo).replace(/^Boletim\s*/i, '') : 'Novo boletim do lavador', `
     <form class="grade" id="cpBfForm" autocomplete="off">
@@ -72,8 +89,8 @@ function formBoletim(l) {
       ${campoTxt('bfDest', 'Destino (packing house)', v.destino, 'list="bfDests"')}
       <label class="campo">Tipo<select id="bfTipo">${['Beneficiado', 'Sujo', 'Lavado'].map(t => `<option${t === v.tipo ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
       <datalist id="bfDests">${destinos().map(d => `<option value="${esc(d)}">`).join('')}</datalist>
-      <fieldset class="plena cp-fs"><legend>Quantidade de Cat 1, Cat 2 e Cat 3 do boletim (kg) <span class="dc-sem" id="bfSomaCat"></span></legend>
-        <div class="cp-etapa1-grade">${CATS.map(([k, r]) => campoNum('bf_' + k, r, v[k])).join('')}</div></fieldset>
+      <fieldset class="plena cp-fs"><legend>Quantidade de ${esc(K.map(k => k.nome).join(', '))} do boletim (${esc(U)}) <span class="dc-sem" id="bfSomaCat"></span></legend>
+        <div class="cp-etapa1-grade">${K.map((k, i) => campoNum('bf_' + i, k.nome, valCat(v, k))).join('')}</div></fieldset>
       <fieldset class="plena cp-fs"><legend>Cargas que entraram neste boletim <span class="dc-sem" id="bfSoma"></span></legend>
         <div class="cp-bf-cargas">${cargas.map(c => { const outro = c.lote_venda_id && c.lote_venda_id !== l?.id ? lote(c.lote_venda_id) : null; const p = plantio(c.plantio_id);
           return `<label class="cb-check"><input type="checkbox" value="${esc(c.id)}" data-kg="${kgDe(c, cult)}" ${l && c.lote_venda_id === l.id ? 'checked' : ''}>
@@ -90,8 +107,8 @@ function formBoletim(l) {
     const conta = () => {
       const kg = marcadas().reduce((s, i) => s + Number(i.dataset.kg), 0);
       $('bfSoma').textContent = `— ${marcadas().length} carga(s), ${num(kg, 0)} kg`;
-      const tc = CATS.reduce((s, [k]) => s + (lerNumero($('bf_' + k).value) || 0), 0);
-      $('bfSomaCat').textContent = tc ? `— soma ${num(tc, 0)} kg${kg ? ' (' + pctTxt(tc, kg) + ' do que entrou)' : ''}` : '';
+      const tc = K.reduce((s, k, i) => s + (lerNumero($('bf_' + i).value) || 0), 0);
+      $('bfSomaCat').textContent = tc ? `— soma ${num(tc, 0)} ${U}${kg && U === 'kg' ? ' (' + pctTxt(tc, kg) + ' do que entrou)' : ''}` : '';
     };
     f.addEventListener('input', conta); f.addEventListener('change', conta); conta();
     corpo.querySelector('#bfCancelar').onclick = () => window.fecharModal();
@@ -107,7 +124,12 @@ function formBoletim(l) {
         codigo: $('bfCod').value.trim(), data: $('bfData').value || null, destino: $('bfDest').value.trim() || null, tipo: $('bfTipo').value || null, obs: $('bfObs').value.trim() || null };
       if (!r.codigo) { aviso('Informe o nº do boletim.', true); return; }
       if (/^\d+$/.test(r.codigo) && r.tipo !== 'Sujo') r.codigo = 'Boletim ' + r.codigo;
-      for (const [k, rot] of CATS) { const x = lerNumero($('bf_' + k).value); if (Number.isNaN(x) || (x !== null && x < 0)) { aviso('Confira ' + rot + '.', true); return; } r[k] = x; }
+      const cl = { ...(r.classes || {}) };
+      for (const [i, k] of K.entries()) {
+        const x = lerNumero($('bf_' + i).value); if (Number.isNaN(x) || (x !== null && x < 0)) { aviso('Confira ' + k.nome + '.', true); return; }
+        if (k.col) r[k.chave] = x; else if (x === null) delete cl[k.chave]; else cl[k.chave] = x;
+      }
+      r.classes = cl;
       if (lotesDa(cult, saf).some(x => x.id !== r.id && semAcento(x.codigo) === semAcento(r.codigo))) { aviso('Já existe ' + r.codigo + ' nesta safra.', true); return; }
       const salvo = await gravar('cp_lotes_venda', r);
       const ids = new Set(marcadas().map(i => i.value));
