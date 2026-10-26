@@ -63,7 +63,7 @@ const COR_PRIOR = { 'Crítica': 'perigo', 'Maior': 'alerta', 'Menor': 'neutra' }
 const SITUACOES_DOC = ['Em dia', 'Revisar', 'Pendente', 'Obsoleto'];
 const COR_SIT = { 'Em dia': 'ativo', 'Revisar': 'alerta', 'Pendente': 'perigo', 'Obsoleto': 'inativo' };
 const CATEGORIAS = ['ANEXO', 'CHECK LIST', 'INST. TRABALHO', 'P.O.Ps', 'REGISTROS'];
-const PERIODOS = ['Diário', 'Semanal', 'Mensal', 'Trimestral', 'Semestral', 'Anual', 'A cada 2 anos', 'A cada 3 anos'];
+const PERIODOS = ['Diário', 'Semanal', 'Mensal', 'Trimestral', 'Semestral', 'Anual', 'A cada 2 anos', 'A cada 3 anos', 'Por evento'];
 /* Quantos meses até a próxima vez (o que é diário ou semanal não vai ao calendário: é rotina). */
 const MESES_PERIODO = { 'Mensal': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12, 'A cada 2 anos': 24, 'A cada 3 anos': 36 };
 const REPETIR = ['', 'Mensal', 'Trimestral', 'Semestral', 'Anual'];
@@ -79,7 +79,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 
 /* ---------------- estado ---------------- */
 const S = {
-  carregado: false, certs: [], reqs: [], docs: [], evs: [],
+  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {},
   fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
   fd: { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
@@ -92,7 +92,7 @@ const S = {
    (cert_marcar_feito). Cadastrar/editar requisitos continua só com internet. */
 const CAIXA = 'cert.cache';
 const CAMADA = 'cert';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva });
 const CAMADA_DEF = {
   tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, i) => i,
   cliente: () => estado.cliente,
@@ -109,10 +109,77 @@ export const enviarFilaCert = () => nucleo.enviarFila(CAMADA, CAMADA_DEF);
 addEventListener('online', () => { enviarFilaCert().catch(() => {}); });
 setInterval(() => { if (nucleo.pendentes(CAMADA) > 0) enviarFilaCert().catch(() => {}); }, 2 * 60 * 1000);
 
+/* ===================================================================
+   CADEIA POP → FORM → EVIDÊNCIAS (26/10/2026)
+   Pedido dele: "um pop é vinculado a um form e depois aos Anexos que são
+   evidências". cert_vinculos liga documento a documento (POP → FORM; as
+   ligações iniciais foram lidas do texto de cada POP); cert_evidencias guarda
+   cada evidência de um documento (data, descrição, link) com os arquivos no
+   Drive em certificacao/evidencia/<id>. Evidência "viva": o FORM 050 e o
+   FORM 043 contam como evidenciados nos meses em que o app tem lançamento
+   (Biodiversidade e Energia).
+   =================================================================== */
+const EVID_APP = {
+  FORM50: { nome: 'Biodiversidade — registros das câmeras', tela: 'faPainel' },
+  FORM43: { nome: 'Energia — lançamentos de consumo', tela: 'enPainel' },
+};
+const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
+async function carregarCadeia(c) {
+  const [v, ev, fa, en] = await Promise.all([
+    c.from('cert_vinculos').select('*'),
+    c.from('cert_evidencias').select('*').order('data', { ascending: false }),
+    c.from('cf_registros').select('data'),
+    c.from('ce_consumos').select('competencia'),
+  ]);
+  if (!v.error) S.vinc = v.data || [];
+  if (!ev.error) S.evid = ev.data || [];
+  if (!fa.error) S.viva.FORM50 = contaMeses((fa.data || []).map(x => x.data));
+  if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
+  S.evArq = await donosComArquivo('certificacao', 'evidencia').catch(() => new Set());
+}
+const porCodigo = (a, b) => so(a.codigo).localeCompare(so(b.codigo), 'pt-BR', { numeric: true });
+const ligadosDe = d => S.vinc.filter(v => v.de_id === d.id).map(v => ({ v, d: S.docs.find(x => x.id === v.para_id) })).filter(x => x.d).sort((a, b) => porCodigo(a.d, b.d));
+const ligadosPara = d => S.vinc.filter(v => v.para_id === d.id).map(v => ({ v, d: S.docs.find(x => x.id === v.de_id) })).filter(x => x.d).sort((a, b) => porCodigo(a.d, b.d));
+const evidDe = d => S.evid.filter(e => e.documento_id === d.id).sort((a, b) => b.data.localeCompare(a.data));
+const vivaDe = d => (EVID_APP[chaveCodigo(d.codigo)] ? { ...EVID_APP[chaveCodigo(d.codigo)], meses: S.viva[chaveCodigo(d.codigo)] || {} } : null);
+const ehPop = d => prefixoDoc(d) === 'POP';
+/** Janelas de cobrança da evidência conforme a periodicidade (as mais recentes por último). */
+function janelas(d) {
+  const p = d.periodicidade || 'Mensal';
+  if (p === 'Por evento') return null;
+  const hj = hoje(); const ano = Number(hj.slice(0, 4)), mes = Number(hj.slice(5, 7));
+  const out = [];
+  if (['Diário', 'Semanal', 'Mensal'].includes(p)) {
+    for (let i = 11; i >= 0; i--) { const dt = new Date(Date.UTC(ano, mes - 1 - i, 1)); const k = isoD(dt).slice(0, 7);
+      out.push({ rot: MES3[dt.getUTCMonth()] + '/' + String(dt.getUTCFullYear()).slice(2), de: k + '-01', ate: k + '-31', atual: i === 0 }); }
+  } else if (p === 'Trimestral' || p === 'Semestral') {
+    const n = p === 'Trimestral' ? 3 : 6; const blocos = p === 'Trimestral' ? 8 : 4;
+    const idx = Math.floor((mes - 1) / n);
+    for (let i = blocos - 1; i >= 0; i--) { let b = idx - i, a = ano; while (b < 0) { b += 12 / n; a--; }
+      const m1 = b * n + 1, m2 = m1 + n - 1;
+      out.push({ rot: `${p === 'Trimestral' ? (b + 1) + 'º tri' : (b + 1) + 'º sem'}/${String(a).slice(2)}`, de: `${a}-${doisD(m1)}-01`, ate: `${a}-${doisD(m2)}-31`, atual: i === 0 }); }
+  } else {
+    const passo = p === 'A cada 3 anos' ? 3 : p === 'A cada 2 anos' ? 2 : 1;
+    for (let i = 3; i >= 0; i--) { const a1 = ano - i * passo, a2 = a1 + passo - 1;
+      out.push({ rot: passo === 1 ? String(a1) : `${a1}–${String(a2).slice(2)}`, de: `${a1}-01-01`, ate: `${a2}-12-31`, atual: i === 0 }); }
+  }
+  return out;
+}
+function cobertura(d) {
+  const js = janelas(d); if (!js) return null;
+  const ev = evidDe(d); const viva = vivaDe(d);
+  return js.map(j => {
+    const n = ev.filter(e => e.data >= j.de && e.data <= j.ate).length
+      + (viva ? Object.entries(viva.meses).filter(([k]) => `${k}-01` >= j.de && `${k}-01` <= j.ate).reduce((s, [, q]) => s + q, 0) : 0);
+    return { ...j, n, estado: n ? 'ok' : j.atual ? 'aberto' : 'falta' };
+  });
+}
+
 async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
   if (c0 && !S.carregado) {
     S.certs = c0.certs || []; S.reqs = c0.reqs || []; S.docs = c0.docs || []; S.evs = c0.evs || [];
+    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {};
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -138,6 +205,7 @@ async function carregar() {
     throw erro;
   }
   S.certs = a.data || []; S.reqs = b.data || []; S.docs = d.data || []; S.evs = e.data || [];
+  await carregarCadeia(c);
   S.carregado = true;
   salvarCaixa();
   S.docArq = await donosComArquivo('certificacao', 'documento').catch(() => new Set());
@@ -614,7 +682,7 @@ function docFiltrados() {
 const TIPOS_DOC = [
   { id: 'POP', nome: 'POP', desc: 'Procedimentos operacionais', icone: 'documento', cat: 'P.O.Ps' },
   { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO' },
-  { id: 'RG', nome: 'RG', desc: 'Registros e formulários', icone: 'boletim', cat: 'REGISTROS' },
+  { id: 'FORM', nome: 'FORM', desc: 'Formulários e registros', icone: 'boletim', cat: 'REGISTROS' },
   { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST' },
   { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO' },
 ];
@@ -625,7 +693,7 @@ const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Out
 const docsDoTipo = id => S.docs.filter(d => (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
   .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 /* código comparável: "POP 1", "POP 001" e "POPAGR-01" viram POP1 */
-const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP').replace(/^POAGR/, 'POP').match(/^([A-Z]+)[\s._-]*0*(\d+)/); return m ? m[1] + Number(m[2]) : ''; };
+const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP').replace(/^POAGR/, 'POP').replace(/^FORMAGR/, 'FORM').match(/^([A-Z]+)[\s._-]*0*(\d+)/); return m ? m[1] + Number(m[2]) : ''; };
 const revDono = id => `${id}-rev`;
 const ehPdf = x => /pdf$/i.test(x.mime || '') || /\.pdf$/i.test(x.nome || '');
 
@@ -662,7 +730,11 @@ function desenharTiposDocs() {
     <label class="campo" style="margin-top:12px">Buscar em todos <input type="text" id="ceDcBusca" value="${esc(f.q2)}" placeholder="Código, nome ou código da norma (ex.: 4.6.1)"></label>
     <div id="ceDcAchados"></div>
     <div class="ce-tipos">${tipos.map(cartao).join('')}</div>
+    ${resumoCadeia()}
   </div>`;
+  tela.querySelectorAll('[data-cad-ir]').forEach(b => b.addEventListener('click', () => {
+    const x = S.docs.find(y => y.id === Number(b.dataset.cadIr)); if (x) abrirTipo(prefixoDoc(x) in { POP: 1, FORM: 1, IT: 1, CL: 1, AN: 1 } ? prefixoDoc(x) : 'OUTROS', x.id);
+  }));
   tela.querySelectorAll('[data-tipo]').forEach(b => b.addEventListener('click', () => abrirTipo(b.dataset.tipo)));
   $('ceDcTabela2').addEventListener('click', () => { f.modo = 'tabela'; desenharDocumentos(); });
   $('ceDcNovo').addEventListener('click', () => formDocumento(null));
@@ -679,6 +751,20 @@ function desenharTiposDocs() {
   };
   $('ceDcBusca').addEventListener('input', e => { f.q2 = e.target.value; achados(); });
   achados();
+}
+
+function resumoCadeia() {
+  const pops = docsDoTipo('POP'), forms = docsDoTipo('FORM');
+  if (!pops.length && !forms.length) return '';
+  const popSem = pops.filter(d => !ligadosDe(d).length);
+  const formSem = forms.filter(d => !ligadosPara(d).length);
+  const semEvid = forms.filter(d => { const c = cobertura(d); return c && c.length > 1 && c[c.length - 2].estado === 'falta'; });
+  const lista = (l, max = 14) => l.slice(0, max).map(d => `<button class="ce-link" type="button" data-cad-ir="${d.id}">${esc(d.codigo)}</button>`).join(' · ') + (l.length > max ? ` · +${l.length - max}` : '');
+  return `<div class="ce-cadeia-res"><h4 class="ac-h4">Cadeia POP → FORM → evidências</h4>
+    <p>${tag(S.vinc.length + ' ligações', 'neutra')} ${tag(S.evid.length + ' evidências', 'neutra')}</p>
+    ${popSem.length ? `<p><b>POPs sem FORM ligado (${popSem.length}):</b> ${lista(popSem)}</p>` : ''}
+    ${formSem.length ? `<p><b>FORMs que nenhum POP exige (${formSem.length}):</b> ${lista(formSem)}</p>` : ''}
+    ${semEvid.length ? `<p><b>Sem evidência no último período fechado (${semEvid.length}):</b> ${lista(semEvid)}</p>` : ''}</div>`;
 }
 
 function abrirTipo(id, sel = null) {
@@ -756,7 +842,9 @@ async function painelDoc() {
           : '<p class="dica">Nenhum requisito ligado ainda. A ligação se faz no requisito, em “Documentos que comprovam”.</p>'}
         ${d.observacao ? `<h4 class="ac-h4">Observação</h4><p class="dica">${esc(d.observacao)}</p>` : ''}</div>
       <div><h4 class="ac-h4">Revisões anteriores</h4><div id="ceDvRevs"><span class="dc-sem">…</span></div></div>
-    </div>`;
+    </div>
+    <div class="ce-cadeia" id="ceDvCadeia">${htmlCadeia(d)}</div>`;
+  ligarCadeia(d);
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
   $('ceDvCopiar')?.addEventListener('click', async () => {
@@ -800,6 +888,106 @@ async function painelDoc() {
 }
 
 
+/* ---- Cadeia no painel do documento ---- */
+function htmlCadeia(d) {
+  const de = ligadosDe(d), para = ligadosPara(d);
+  const chip = (x, lado) => `<span class="ce-elo"><button type="button" class="ce-link" data-ir-doc="${x.d.id}" title="${esc(x.d.nome)}"><b>${esc(x.d.codigo)}</b> ${esc(x.d.nome)}</button>${x.v.origem === 'texto do POP' ? '<small class="dc-sem" title="Ligação lida do texto do POP">· texto</small>' : ''}<button type="button" class="ce-elo-x" data-desligar="${x.v.id}" title="Desfazer esta ligação">✕</button></span>`;
+  const candidatos = S.docs.filter(x => x.id !== d.id && !de.some(y => y.d.id === x.id) && !para.some(y => y.d.id === x.id)
+    && (ehPop(d) ? !ehPop(x) : true)).sort(porCodigo);
+  const cob = !ehPop(d) ? cobertura(d) : null;
+  const ev = !ehPop(d) ? evidDe(d) : [];
+  const viva = !ehPop(d) ? vivaDe(d) : null;
+  const okN = cob ? cob.filter(j => j.estado === 'ok').length : 0;
+  return `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">${ehPop(d) ? 'Cadeia: formulários deste POP' : 'Cadeia: exigido por / ligado a'}</h4>
+      ${ehPop(d) && de.length ? '<button class="btn mini principal" type="button" id="ceCadApr">▶ Apresentar a cadeia</button>' : !ehPop(d) && (ev.length || para.length) ? '<button class="btn mini" type="button" id="ceCadApr">▶ Apresentar com evidências</button>' : ''}</div>
+    ${ehPop(d)
+      ? (de.length ? `<div class="ce-elos">${de.map(x => chip(x)).join('')}</div>` : '<p class="dica">Nenhum FORM ligado a este POP ainda.</p>')
+      : `${para.length ? `<div class="ce-elos">${para.map(x => chip(x)).join('')}</div>` : '<p class="dica">Nenhum POP exige este documento ainda.</p>'}
+         ${de.length ? `<div class="ce-elos">${de.map(x => chip(x)).join('')}</div>` : ''}`}
+    <div class="barra" style="margin:6px 0 0"><select id="ceCadSel"><option value="">${ehPop(d) ? '＋ Ligar um FORM / documento…' : '＋ Ligar a um POP / documento…'}</option>${candidatos.map(x => `<option value="${x.id}">${esc(x.codigo)} — ${esc(x.nome)}</option>`).join('')}</select>
+      <button class="btn mini" type="button" id="ceCadLigar">Ligar</button></div>
+    ${ehPop(d) ? '' : `<div class="ce-cadeia-cab" style="margin-top:14px"><h4 class="ac-h4" style="margin:0">Evidências${d.periodicidade ? ` <small class="dc-sem">· ${esc(d.periodicidade)}</small>` : ''}</h4>
+        <button class="btn mini principal" type="button" id="ceEvNova">＋ Evidência</button></div>
+      ${viva ? `<p class="dica" style="margin:4px 0">Gerada no app: <button class="ce-link" type="button" id="ceEvViva">${esc(viva.nome)} ↗</button> — ${Object.keys(viva.meses).length} mês(es) com lançamento.</p>` : ''}
+      ${cob ? `<div class="ce-janelas">${cob.map(j => `<span class="ce-jan ce-jan-${j.estado}" title="${esc(j.rot)}: ${j.n ? j.n + ' evidência(s)' : j.estado === 'aberto' ? 'período em andamento' : 'sem evidência'}">${esc(j.rot)}</span>`).join('')}</div>
+        <p class="dc-sem" style="margin:2px 0 6px">${okN} de ${cob.length} período(s) com evidência.</p>` : '<p class="dc-sem" style="margin:2px 0 6px">Por evento: anexe cada ocorrência.</p>'}
+      ${ev.length ? `<ul class="ce-evs">${ev.slice(0, 12).map(e => `<li><b>${br(e.data)}</b> ${esc(e.descricao || '')}
+          ${S.evArq?.has(String(e.id)) ? `<button class="ce-link" type="button" data-ev-ver="${e.id}">📎 abrir</button>` : ''}
+          ${linkOk(e.link) ? `<a class="ce-link" href="${esc(e.link)}" target="_blank" rel="noopener">OneDrive ↗</a>` : ''}
+          <button class="ce-link dc-sem" type="button" data-ev-ed="${e.id}">editar</button></li>`).join('')}</ul>${ev.length > 12 ? `<p class="dc-sem">+ ${ev.length - 12} mais antiga(s).</p>` : ''}`
+        : '<p class="dica">Nenhuma evidência anexada ainda.</p>'}`}`;
+}
+function ligarCadeia(d) {
+  const el = $('ceDvCadeia'); if (!el) return;
+  el.querySelectorAll('[data-ir-doc]').forEach(b => b.addEventListener('click', () => {
+    const x = S.docs.find(y => y.id === Number(b.dataset.irDoc)); if (!x) return;
+    abrirTipo(TIPOS_DOC.some(t => t.id === prefixoDoc(x)) ? prefixoDoc(x) : 'OUTROS', x.id);
+  }));
+  el.querySelectorAll('[data-desligar]').forEach(b => b.addEventListener('click', async () => {
+    if (!confirm('Desfazer esta ligação?')) return;
+    const { error } = await estado.cliente.from('cert_vinculos').delete().eq('id', Number(b.dataset.desligar));
+    if (error) return alert('Não consegui: ' + error.message);
+    S.vinc = S.vinc.filter(v => v.id !== Number(b.dataset.desligar)); salvarCaixa(); refazCadeia(d);
+  }));
+  $('ceCadLigar')?.addEventListener('click', async () => {
+    const outro = Number($('ceCadSel').value); if (!outro) return;
+    const o = S.docs.find(x => x.id === outro);
+    // POP sempre na ponta de cima; entre outros documentos, quem está aberto aponta para o escolhido
+    const [de, para] = !ehPop(d) && ehPop(o) ? [o.id, d.id] : [d.id, o.id];
+    const { data, error } = await estado.cliente.from('cert_vinculos').insert({ de_id: de, para_id: para, origem: 'manual' }).select().single();
+    if (error) return alert(/duplicate/i.test(error.message) ? 'Já estão ligados.' : 'Não consegui ligar: ' + error.message);
+    S.vinc.push(data); salvarCaixa(); refazCadeia(d);
+  });
+  $('ceEvNova')?.addEventListener('click', () => formEvidencia(d, null));
+  $('ceEvViva')?.addEventListener('click', () => abrirModulo('cert', vivaDe(d).tela));
+  el.querySelectorAll('[data-ev-ed]').forEach(b => b.addEventListener('click', () => formEvidencia(d, S.evid.find(e => e.id === b.dataset.evEd))));
+  el.querySelectorAll('[data-ev-ver]').forEach(b => b.addEventListener('click', async () => {
+    const l = await listarArquivos('certificacao', 'evidencia', b.dataset.evVer).catch(() => []);
+    if (l[0]) abrirArquivo(l[0].chave); else alert('Arquivo ainda não está no Drive.');
+  }));
+  $('ceCadApr')?.addEventListener('click', () => apresentarCadeia(d));
+}
+function refazCadeia(d) { const el = $('ceDvCadeia'); if (!el) return; el.innerHTML = htmlCadeia(d); ligarCadeia(d); }
+
+function formEvidencia(d, e) {
+  const v = e || { data: hoje(), descricao: '', link: '' };
+  let anx = null;
+  dialogo(`<h3>${e ? 'Evidência' : 'Nova evidência'} — ${esc(d.codigo)}</h3>
+    <p class="dica">${esc(d.nome)}</p>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Data (ou mês de referência) <input type="date" id="evData" value="${esc(v.data)}" max="${hoje()}"></label>
+      <label class="campo">Descrição <input type="text" id="evDesc" value="${esc(v.descricao || '')}" placeholder="Ex.: FORM preenchido de março, laudo, certificado"></label>
+    </div>
+    <label class="campo">Link no OneDrive (opcional) <input type="url" id="evLink" value="${esc(v.link || '')}" placeholder="https://…"></label>
+    <div id="evAnx" style="margin-top:8px"></div>
+    <div class="barra entre"><div>${e ? '<button class="btn perigo" type="button" id="evApagar">Apagar</button>' : ''}</div>
+      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="evOk">Salvar</button></div></div>`, () => {
+    anx = campoAnexos($('evAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Arquivo da evidência', dica: 'PDF ou foto (o FORM preenchido, laudo, certificado…)' });
+    anx.abrir(e ? e.id : null);
+    $('evOk').addEventListener('click', async () => {
+      const linha = { documento_id: d.id, data: $('evData').value, descricao: so($('evDesc').value) || null, link: so($('evLink').value) || null };
+      if (!linha.data) return erroDlg('Informe a data.');
+      if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
+      if (!e && !anx.mudou && !linha.link) return erroDlg('Anexe o arquivo ou cole o link da evidência.');
+      const salvo = await salvar('cert_evidencias', e, e ? { ...linha, atualizado_por: quem() } : { ...linha, criado_por: quem() }, S.evid, 'evOk');
+      if (!salvo) return;
+      if (anx.mudou) { await anx.salvar(salvo.id); (S.evArq ||= new Set()).add(String(salvo.id)); }
+      salvarCaixa(); refazCadeia(d);
+    });
+    $('evApagar')?.addEventListener('click', () => apagar('cert_evidencias', e.id, `${d.codigo} · ${br(e.data)} ${e.descricao || ''}`, () => { S.evid = S.evid.filter(x => x.id !== e.id); salvarCaixa(); }));
+  });
+}
+
+/** Modo apresentação seguindo a cadeia: POP → cada FORM → as evidências dele (as 6 mais recentes). */
+function apresentarCadeia(d) {
+  const itens = [];
+  const comEvid = f => { itens.push(f); evidDe(f).slice(0, 6).forEach(e => itens.push({ id: 'ev:' + e.id, codigo: `${f.codigo} · evidência`, nome: `${br(e.data)}${e.descricao ? ' — ' + e.descricao : ''}`, _ev: e })); };
+  if (ehPop(d)) { itens.push(d); ligadosDe(d).forEach(x => comEvid(x.d)); }
+  else comEvid(d);
+  apresentar(d.id, itens);
+}
+
 /* -------------------------------------------------------------------
    Modo apresentação (26/10/2026, pedido dele: "o objetivo é apresentar para
    o auditor pelo app — abrir somente o PDF"). "Abrir PDF" cobre a tela do app
@@ -812,8 +1000,8 @@ async function pdfVigente(d) {
   return pdfs.find(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo)) || pdfs[0] || arqs[0] || null;
 }
 let apr = null;
-function apresentar(id) {
-  const lista = docsDoTipo(S.fd.tipo || prefixoDoc(S.docs.find(x => x.id === id) || {}));
+function apresentar(id, listaPronta = null) {
+  const lista = listaPronta || docsDoTipo(S.fd.tipo || prefixoDoc(S.docs.find(x => x.id === id) || {}));
   let el = $('ceApr');
   if (!el) {
     el = document.createElement('div'); el.id = 'ceApr'; el.className = 'ce-apr';
@@ -850,7 +1038,7 @@ function fecharApr() {
   const el = $('ceApr'); if (!el) return;
   if (document.fullscreenElement) document.exitFullscreen?.();
   el.hidden = true; $('ceAprPdf').innerHTML = ''; document.body.classList.remove('ce-apr-aberto');
-  if (apr) { S.fd.sel = apr.lista[apr.i]?.id ?? S.fd.sel; apr = null; if (S.fd.modo === 'tipo') desenharDocumentos(); }
+  if (apr) { const atual = apr.lista[apr.i]; if (atual && typeof atual.id === 'number') S.fd.sel = atual.id; apr = null; if (S.fd.modo === 'tipo') desenharDocumentos(); }
 }
 async function mostrarApr(i) {
   if (!apr || !apr.lista.length) return;
@@ -860,13 +1048,18 @@ async function mostrarApr(i) {
   $('ceAprNome').textContent = d.nome;
   const box = $('ceAprPdf'); box.innerHTML = '<p class="ce-apr-msg">Carregando…</p>'; apr.chave = null;
   try {
-    const v = await pdfVigente(d);
+    const v = d._ev ? (await listarArquivos('certificacao', 'evidencia', d._ev.id).catch(() => []))[0] || null : await pdfVigente(d);
     if (!apr || g !== apr.g) return;
-    if (!v) { box.innerHTML = '<p class="ce-apr-msg">Este documento ainda não tem PDF no app.</p>'; return; }
+    if (!v) {
+      box.innerHTML = d._ev && linkOk(d._ev.link) ? `<p class="ce-apr-msg">Evidência no OneDrive: <a href="${esc(d._ev.link)}" target="_blank" rel="noopener">abrir ↗</a></p>`
+        : '<p class="ce-apr-msg">Este documento ainda não tem PDF no app.</p>';
+      return;
+    }
     apr.chave = v.chave;
     const u = await urlDoArquivo(v.chave);
     if (!apr || g !== apr.g) return;
-    box.innerHTML = `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH&navpanes=0"></iframe>`;
+    box.innerHTML = /^image\//.test(v.mime || '') ? `<img class="ce-apr-img" alt="${esc(d.nome)}" src="${u}">`
+      : `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH&navpanes=0"></iframe>`;
   } catch (e) {
     if (apr && g === apr.g) box.innerHTML = `<p class="ce-apr-msg">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</p>`;
   }
@@ -1603,7 +1796,7 @@ export async function abrirCertificacao(tela) {
 }
 
 export function limparCertificacao() {
-  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = [];
+  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {};
   nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' });

@@ -113,15 +113,15 @@ const opcoes = (lista, val, vazio) => (vazio != null ? `<option value="">${esc(v
 const cabecalho = (titulo, dica, botao) => `<div class="barra entre" style="margin:0">
   <div><h2 style="margin:0">${esc(titulo)}</h2><p class="dica" style="margin:2px 0 0">${dica}</p></div>${botao || ''}</div>`;
 function dialogo(html, ligar) {
-  let d = $('dlgCe');
-  if (!d) { d = document.createElement('dialog'); d.id = 'dlgCe'; d.className = 'rs-largo'; document.body.appendChild(d); }
+  let d = $('dlgEn');
+  if (!d) { d = document.createElement('dialog'); d.id = 'dlgEn'; d.className = 'rs-largo'; document.body.appendChild(d); }
   d.innerHTML = `<form method="dialog" onsubmit="return false">${html}</form>`;
   d.querySelectorAll('[data-fechar]').forEach(b => b.addEventListener('click', () => d.close()));
   if (!d.open) d.showModal();
   d.scrollTop = 0; ligar?.(d); return d;
 }
-const fechar = () => $('dlgCe')?.open && $('dlgCe').close();
-const erroDlg = t => { const e = $('enErro'); if (e) { e.innerHTML = t; e.hidden = false; } if ($('dlgCe')) $('dlgCe').scrollTop = 0; };
+const fechar = () => $('dlgEn')?.open && $('dlgEn').close();
+const erroDlg = t => { const e = $('enErro'); if (e) { e.innerHTML = t; e.hidden = false; } if ($('dlgEn')) $('dlgEn').scrollTop = 0; };
 const precisaRede = () => { if (!navigator.onLine || !estado.cliente) { alert('Sem internet: gravar precisa de conexão. A consulta continua funcionando.'); return true; } return false; };
 async function gravar(tabela, lista, atual, linha, botao) {
   if (precisaRede()) return null;
@@ -415,7 +415,7 @@ export async function abrirEnergia(tela) {
   if (!E.carregado) {
     alvo.innerHTML = '<div class="cartao"><p class="dica">Carregando o consumo de energia…</p></div>';
     try { await carregar(); } catch (e) { alvo.innerHTML = `<div class="cartao"><div class="aviso erro">Não consegui abrir o consumo de energia: ${esc(e.message || e)}</div></div>`; return; }
-  } else if (navigator.onLine) carregar().then(() => { if (telaAtual === tela && !$('dlgCe')?.open) redesenhar(); }).catch(() => {});
+  } else if (navigator.onLine) carregar().then(() => { if (telaAtual === tela && !$('dlgEn')?.open) redesenhar(); }).catch(() => {});
   if (telaAtual === tela) redesenhar();
 }
 export function limparEnergia() {

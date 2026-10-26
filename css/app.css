@@ -1860,3 +1860,22 @@ body.ce-apr-aberto{overflow:hidden}
 .en-total td{font-weight:700;background:var(--verde-fundo)}
 .en-duas{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:700px){.en-duas{grid-template-columns:1fr}}
+
+/* ---- Lista mestra: cadeia POP → FORM → evidências (26/10/2026) ---- */
+.ce-cadeia{margin-top:16px;border-top:1px solid var(--linha);padding-top:12px}
+.ce-cadeia-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ce-elos{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ce-elo{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--linha);border-left:3px solid var(--verde);border-radius:8px;padding:3px 6px;background:var(--fundo);font-size:12.5px}
+.ce-elo .ce-link{text-align:left}
+.ce-elo-x{border:0;background:none;color:var(--suave);cursor:pointer;font-size:11px;padding:0 2px}
+.ce-elo-x:hover{color:#a5342a}
+.ce-janelas{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0 2px}
+.ce-jan{font-size:11px;padding:3px 7px;border-radius:6px;border:1px solid var(--linha);white-space:nowrap}
+.ce-jan-ok{background:var(--verde-fundo);border-color:var(--verde);color:var(--verde-esc);font-weight:700}
+.ce-jan-falta{background:rgba(192,57,43,.08);border-color:rgba(192,57,43,.45);color:#a5342a}
+.ce-jan-aberto{color:var(--suave);border-style:dashed}
+.ce-evs{list-style:none;margin:6px 0 0;padding:0;font-size:13px}
+.ce-evs li{padding:4px 0;border-bottom:1px dashed var(--linha)}
+.ce-cadeia-res{margin-top:16px;border:1px solid var(--linha);border-radius:12px;padding:10px 14px;font-size:13px}
+.ce-cadeia-res p{margin:4px 0}
+.ce-apr-img{max-width:100%;max-height:100%;display:block;margin:auto;object-fit:contain}
