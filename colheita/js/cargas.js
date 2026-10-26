@@ -103,14 +103,22 @@ export function editar(id, pre = null) {
   const opPl = `<option value="">— escolha —</option>` + pls.map(p => `<option value="${esc(p.id)}"${p.id === c.plantio_id ? ' selected' : ''}>${esc(nomePlantio(p))}${p.variedade ? ' · ' + esc(p.variedade) : ''}</option>`).join('');
   window.abrirModal(id ? 'Editar carga' : 'Nova carga · ' + cult.nome, `
     <form class="grade" id="cpCgForm" autocomplete="off">
-      <label class="campo">Data <input type="date" name="data" required value="${esc(String(c.data || '').slice(0, 10))}"></label>
-      <label class="campo plena-2">${esc(Maiusc(rotArea(cult)))} <select name="plantio_id">${opPl}</select></label>
-      <label class="campo">Placa <input type="text" name="placa" list="cpVeicLista" value="${esc(c.placa || '')}" style="text-transform:uppercase"></label>
-      <datalist id="cpVeicLista">${veics.map(v => `<option value="${esc(v.placa)}">${esc(v.motorista || '')}</option>`).join('')}</datalist>
-      ${cp.motorista ? campoTxt('motorista', 'Motorista', c.motorista) : ''}
-      ${cp.turmeiro ? campoTxt('turmeiro', 'Turmeiro', c.turmeiro) : ''}
-      ${campoTxt('ticket_faz', 'Ticket fazenda', c.ticket_faz, 'inputmode="numeric"')}
-      ${cp.ticket_balanca ? campoTxt('ticket_balanca', 'Ticket balança', c.ticket_balanca, 'inputmode="numeric"') : ''}
+      <fieldset class="plena cp-fs cp-etapa1"><legend>1º lançamento da carga</legend>
+        <div class="cp-etapa1-grade">
+          <label class="campo">Data <input type="date" name="data" required value="${esc(String(c.data || '').slice(0, 10))}"></label>
+          <label class="campo">${esc(Maiusc(rotArea(cult)))} <select name="plantio_id">${opPl}</select></label>
+          ${campoTxt('ticket_faz', 'Ticket fazenda', c.ticket_faz, 'inputmode="numeric"')}
+          ${campoNum('quantidade', 'Qtde ' + String(cp.quantidade || 'caixas').toLowerCase() + (porPeso(cult) ? ' (contadas)' : ''), c.quantidade)}
+          <span class="cp-quebra"></span>
+          ${campoTxt('ticket_balanca', 'Ticket balança', c.ticket_balanca, 'inputmode="numeric"')}
+          ${campoTxt('turmeiro', 'Turmeiro', c.turmeiro)}
+          <span class="cp-quebra"></span>
+          <label class="campo">Placa <input type="text" name="placa" list="cpVeicLista" value="${esc(c.placa || '')}" style="text-transform:uppercase"></label>
+          ${campoTxt('motorista', 'Motorista', c.motorista)}
+        </div>
+        <datalist id="cpVeicLista">${veics.map(v => `<option value="${esc(v.placa)}">${esc(v.motorista || '')}</option>`).join('')}</datalist>
+      </fieldset>
+      <details class="plena cp-etapas"${id ? ' open' : ''}><summary>Próximas etapas — nota, boletim, pesos${fin.length ? ', custos' : ''} e observação</summary><div class="grade" style="margin-top:10px">
       ${cp.nf ? campoTxt('nf', 'Nota fiscal', c.nf, 'inputmode="numeric"') : ''}
       ${cp.boletim ? campoTxt('boletim', 'Nº boletim / NF lavador', c.boletim) : ''}
       ${cp.lote ? campoTxt('lote', 'Lote', c.lote) : ''}
@@ -118,7 +126,6 @@ export function editar(id, pre = null) {
       ${Array.isArray(cp.tipo) ? `<label class="campo">Tipo <select name="tipo"><option value=""></option>${cp.tipo.map(t => `<option${t === c.tipo ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`
         : (cp.tipo || cult.slug === 'batata' || cult.slug === 'abacate') ? campoTxt('tipo', cult.slug === 'batata' ? 'Lavador' : 'Tipo', c.tipo) : ''}
       ${cp.bags ? campoNum('bags', 'Bags', c.bags) : ''}
-      ${cp.quantidade ? campoNum('quantidade', cp.quantidade + (porPeso(cult) ? ' (contadas)' : ''), c.quantidade) : ''}
       ${cp.pct_carga ? campoNum('pct_carga', '% da carga', c.pct_carga ?? 100) : ''}
       ${cp.peso_entrada ? campoNum('peso_entrada', cp.peso_entrada, c.peso_entrada) : ''}
       ${cp.peso_liquido ? campoNum('peso_liquido', cp.peso_liquido, c.peso_liquido) : ''}
@@ -133,6 +140,7 @@ export function editar(id, pre = null) {
       ${cp.data_pagto ? `<label class="campo">Data do pagamento <input type="date" name="data_pagto" value="${esc(String(c.data_pagto || '').slice(0, 10))}"></label>` : ''}
       ${fin.length ? `<fieldset class="plena cp-fs"><legend>Custos desta carga</legend><div class="grade">${fin.map(f => campoNum(f, ROT_VALOR[f] || f, c[f])).join('')}</div></fieldset>` : ''}
       <label class="campo plena">Observação <input type="text" name="obs" value="${esc(c.obs || '')}"></label>
+      </div></details>
       <label class="cb-check plena"><input type="checkbox" name="conferido"${c.conferido ? ' checked' : ''}> conferida no campo</label>
       ${cf && cf.msgs.length ? `<p class="plena aviso alerta" style="margin:0">${esc(cf.msgs.join(' · '))}</p>` : ''}
       <div class="barra entre plena">
