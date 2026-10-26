@@ -2127,3 +2127,16 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-acoes-lin .btn+.btn{margin-left:4px}
 .mc-av{border-color:#84BD00;color:var(--verde-esc);font-weight:700}
 .mc-etapa-dica{margin:4px 0 8px;font-size:12px}
+
+/* Barra dos submódulos como abas com sublinhado (26/10/2026, pedido dele —
+   sugestão 1 de 3): sem caixinhas, texto maior, a aberta em verde com traço. */
+#navModulos.aberto{align-items:stretch;border-bottom:1px solid var(--linha)}
+#navModulos.aberto > .aba[data-modulo],#navModulos.aberto > .mod-foco{align-self:center;margin-bottom:8px}
+#navModulos .mod-subs{border-left:0;gap:2px;padding-left:6px;margin-left:6px;align-self:stretch;align-items:stretch}
+#navModulos .mod-subs .aba-sub{border:0;background:none;border-radius:0;padding:12px 15px 10px;font-size:15px;font-weight:600;color:#51534A;
+  border-bottom:3px solid transparent;margin-bottom:-1px}
+#navModulos .mod-subs .aba-sub svg{width:18px;height:18px;color:#744F28}
+#navModulos .mod-subs .aba-sub:hover{background:none;color:#1B232B;border-bottom-color:#dfe3d6}
+#navModulos .mod-subs .aba-sub[aria-selected="true"]{background:none;color:#4f7300;border-bottom-color:#84BD00}
+#navModulos .mod-subs .aba-sub[aria-selected="true"] svg{color:#84BD00}
+@media (max-width:640px){#navModulos .mod-subs .aba-sub{font-size:13.5px;padding:10px 11px 8px}}
