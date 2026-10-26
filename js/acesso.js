@@ -268,6 +268,14 @@ export const MODULOS = [
       ['enLancamentos', 'Lançamentos'],
       ['enFontes',      'Fontes'],
     ] },
+    /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
+       e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
+    { id: 'ceBalancoSub', nome: 'Balanço de massa', telas: [
+      ['bmPainel',     'Painel'],
+      ['bmRastreio',   'Rastreabilidade'],
+      ['bmLotes',      'Lotes de venda'],
+      ['bmFechamento', 'Fechamento'],
+    ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
@@ -678,7 +686,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceBalancoSub: 'balanca',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

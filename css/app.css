@@ -1879,3 +1879,29 @@ body.ce-apr-aberto{overflow:hidden}
 .ce-cadeia-res{margin-top:16px;border:1px solid var(--linha);border-radius:12px;padding:10px 14px;font-size:13px}
 .ce-cadeia-res p{margin:4px 0}
 .ce-apr-img{max-width:100%;max-height:100%;display:block;margin:auto;object-fit:contain}
+
+/* Certificação › Balanço de massa (26/10/2026) — js/cert-balanco.js */
+.bm-talhoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.bm-talhao{border:1px solid var(--linha);border-radius:10px;padding:10px 12px;border-top:3px solid var(--verde)}
+.bm-talhao h4{margin:0 0 8px;font-size:14px}
+.bm-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 10px}
+.bm-mini span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.3px;color:var(--suave)}
+.bm-mini b{font-size:14px}
+.bm-barra{display:flex;height:8px;border-radius:4px;overflow:hidden;margin-top:10px;background:var(--linha)}
+.bm-b{background:#84BD00;display:block}
+.bm-s{background:#744F28;display:block}
+.bm-barra i,.bm-gb i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bm-tab td,.bm-tab th{white-space:nowrap}
+.bm-cargas{display:grid;gap:2px;max-height:280px;overflow:auto;padding:4px 2px}
+.bm-cargas label{font-size:12.5px}
+.cp-fs{border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin:8px 0}
+.cp-fs legend{font-size:12px;font-weight:600;padding:0 4px}
+.bm-graf{display:grid;gap:8px}
+.bm-gl{display:grid;grid-template-columns:60px 1fr 190px;align-items:center;gap:10px;font-size:12.5px}
+.bm-gr{font-weight:700}
+.bm-gb{display:flex;height:18px;background:var(--linha);border-radius:4px;overflow:hidden}
+.bm-gv{color:var(--suave)}
+.bm-graf-rel .bm-gl{grid-template-columns:50px 1fr 170px;font-size:10px}
+.bm-graf-rel .bm-gb{height:12px;background:#EEF0E8}
+.bm-rel{font-size:8.5px}
+@media (max-width:700px){.bm-gl{grid-template-columns:48px 1fr}.bm-gv{grid-column:2}.bm-mini{grid-template-columns:repeat(2,1fr)}}
