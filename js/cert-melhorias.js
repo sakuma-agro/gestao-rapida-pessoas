@@ -272,17 +272,32 @@ function desenharFeedbacks() {
    A FICHA DO CASO (abrir / novo)
    =================================================================== */
 let anexos = null;
+/* Classificação (26/10/2026, pedido dele): uma melhoria pode virar sugestão ou
+   reclamação, e vice-versa. Para FEEDBACK o valor é o tipo (RECLAMAÇÃO…). */
+const CLASSES = [['NC', 'Não conformidade'], ['MELHORIA', 'Melhoria'], ['RECLAMAÇÃO', 'Reclamação'], ['SUGESTÃO', 'Sugestão'], ['ELOGIO', 'Elogio']];
+const natDaClasse = k => k === 'NC' || k === 'MELHORIA' ? k : 'FEEDBACK';
+function etapaNaNova(etapa, natNova) {
+  const l = ETAPAS[natNova];
+  if (l.includes(etapa)) return etapa;
+  if (FIM.has(etapa)) return natNova === 'NC' ? 'ENCERRADA' : natNova === 'MELHORIA' ? 'CONCLUÍDA' : 'TRATADO';
+  return l[0];
+}
+
 function ficha(c, natNovo, pre) {
-  const nat = c ? c.natureza : natNovo;
-  const v = c ? { ...c } : { natureza: nat, tipo: nat === 'NC' ? 'NÃO CONFORMIDADE' : nat === 'MELHORIA' ? 'MELHORIA' : 'SUGESTÃO', etapa: ETAPAS[nat][0], data_abertura: hoje(), prioridade: 'MÉDIA', via: nat === 'FEEDBACK' ? 'CAIXA DE SUGESTÕES' : 'AUDITORIA INTERNA', porques: [], ...(pre || {}) };
-  let acoes = c ? acoesDe(c).map(a => ({ ...a })) : [];
-  let ands = c ? andsDe(c).map(a => ({ ...a })) : [];
+  const nat = (pre && pre.natureza) || (c ? c.natureza : natNovo);
+  const v = c ? { ...c, ...(pre || {}) } : { natureza: nat, tipo: nat === 'NC' ? 'NÃO CONFORMIDADE' : nat === 'MELHORIA' ? 'MELHORIA' : 'SUGESTÃO', etapa: ETAPAS[nat][0], data_abertura: hoje(), prioridade: 'MÉDIA', via: nat === 'FEEDBACK' ? 'CAIXA DE SUGESTÕES' : 'AUDITORIA INTERNA', porques: [], ...(pre || {}) };
+  let acoes = pre?._acoes || (c ? acoesDe(c).map(a => ({ ...a })) : []);
+  let ands = pre?._ands || (c ? andsDe(c).map(a => ({ ...a })) : []);
+  const mudouClasse = c && (c.natureza !== nat || (nat === 'FEEDBACK' && c.tipo !== v.tipo));
   const pessoas = [...new Set(M.casos.flatMap(x => [x.solicitante, x.responsavel]).concat(M.acoes.map(a => a.quem)).filter(Boolean))].sort();
   const locais = [...new Set(M.casos.map(x => x.local).filter(Boolean))].sort();
   const pq = Array.from({ length: 5 }, (_, i) => (v.porques || [])[i] || '');
   const ehNC = nat === 'NC', ehMe = nat === 'MELHORIA', ehFb = nat === 'FEEDBACK';
-  dialogo(`<div class="barra entre" style="margin:0 0 6px"><h3 style="margin:0">${c ? esc(c.titulo) : 'Novo — ' + esc(NOME_NAT[nat])}</h3>${tag(NOME_NAT[nat], ehNC ? 'perigo' : ehMe ? 'ativo' : 'neutra')}</div>
+  const classe = ehFb ? (v.tipo || 'SUGESTÃO') : nat;
+  dialogo(`<div class="barra entre" style="margin:0 0 6px"><h3 style="margin:0">${c ? esc(c.titulo) : 'Novo — ' + esc(NOME_NAT[nat])}</h3>
+      <label class="mc-classe mc-classe-${ehNC ? 'nc' : ehMe ? 'me' : 'fb'}" title="Mudar a classificação">É uma <select id="mcClasse">${opcoes(CLASSES, classe)}</select></label></div>
     <div class="aviso erro" id="mcErro" hidden></div>
+    ${mudouClasse ? `<div class="aviso info">Classificação muda de <b>${esc(c.natureza === 'FEEDBACK' ? (c.tipo || 'Reclamação / sugestão').toLowerCase() : NOME_NAT[c.natureza].toLowerCase())}</b> para <b>${esc((CLASSES.find(x => x[0] === classe) || [, ''])[1].toLowerCase())}</b> ao salvar.</div>` : ''}
     <div class="mc-etapas" role="radiogroup" aria-label="Etapa">${ETAPAS[nat].map((e, i) => `<button type="button" class="mc-etapa${e === v.etapa ? ' atual' : ''}${ETAPAS[nat].indexOf(v.etapa) > i ? ' feita' : ''}" data-etapa="${esc(e)}"><b>${i + 1}</b>${esc(e[0] + e.slice(1).toLowerCase())}</button>`).join('')}</div>
     <fieldset class="cp-fs"><legend>${ehFb ? 'O que chegou' : 'Identificação'}</legend>
       <div class="grade">
@@ -337,6 +352,18 @@ function ficha(c, natNovo, pre) {
     anexos = campoAnexos($('mcAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Arquivos', dica: 'PDF ou foto — orçamento, relatório, foto do antes e depois' });
     anexos.abrir(c ? 'mc-' + c.id : null);
     let etapa = v.etapa;
+    $('mcClasse').addEventListener('change', e => {
+      const k = e.target.value, natNova = natDaClasse(k);
+      if (natNova === 'FEEDBACK' && nat === 'FEEDBACK' && $('mcTipo')) { $('mcTipo').value = k; return; }
+      lerLinhas();
+      const val = id => $(id) ? $(id).value : undefined;
+      const atual = { titulo: val('mcTit'), data_abertura: val('mcAb'), via: val('mcVia'), local: val('mcLocal'), fazenda: val('mcFaz'),
+        solicitante: val('mcSol'), responsavel: val('mcResp'), descricao: val('mcDesc'), evid_url: val('mcEv') };
+      Object.keys(atual).forEach(x => atual[x] === undefined && delete atual[x]);
+      ficha(c, natNova, { ...(c ? {} : v), ...atual, natureza: natNova, tipo: natNova === 'FEEDBACK' ? k : natNova === 'NC' ? 'NÃO CONFORMIDADE' : 'MELHORIA',
+        etapa: etapaNaNova(etapa, natNova), _acoes: acoes, _ands: ands });
+    });
+    if ($('mcTipo')) $('mcTipo').addEventListener('change', e => { $('mcClasse').value = e.target.value; });
     d.querySelectorAll('[data-etapa]').forEach(b => b.addEventListener('click', () => {
       etapa = b.dataset.etapa;
       d.querySelectorAll('[data-etapa]').forEach((x, i) => { x.classList.toggle('atual', x.dataset.etapa === etapa); x.classList.toggle('feita', ETAPAS[nat].indexOf(etapa) > i); });
@@ -358,6 +385,16 @@ function ficha(c, natNovo, pre) {
         <input type="text" class="mc-ac-res" data-ac="${i}" data-k="resultado" value="${esc(a.resultado || '')}" placeholder="Resultado / como (opcional)"></div>`).join('')}</div>` : '<p class="dica" style="margin:0">Nenhuma ação ainda.</p>';
       d.querySelectorAll('[data-acx]').forEach(b => b.addEventListener('click', () => { lerLinhas(); acoes.splice(Number(b.dataset.acx), 1); desenharAcoes(); }));
     };
+    const donoAnd = a => a.id && !a._novo ? 'mc-an-' + a.id : null;
+    const temAnx = a => !!(donoAnd(a) && M.arq.has(donoAnd(a))) || !!a._anx?.mudou;
+    const campoDoAnd = a => {
+      if (!a._anxEl) {
+        a._anxEl = document.createElement('div'); a._anxEl.className = 'mc-an-anx';
+        a._anx = campoAnexos(a._anxEl, { area: 'certificacao', tipo: 'evidencia', rotulo: 'Arquivos do andamento', dica: 'orçamento, proposta, foto' });
+        a._anx.abrir(donoAnd(a));
+      }
+      return a._anxEl;
+    };
     const desenharAnds = () => {
       const ord = ands.map((a, i) => [a, i]).sort((x, y) => String(x[0].data).localeCompare(String(y[0].data)));
       $('mcAnds').innerHTML = ands.length ? `<div class="mc-tempo">${ord.map(([a, i]) => `<div class="mc-an">
@@ -366,8 +403,19 @@ function ficha(c, natNovo, pre) {
         <input type="text" data-an="${i}" data-k="empresa" value="${esc(a.empresa || '')}" placeholder="Empresa / pessoa">
         <input type="text" data-an="${i}" data-k="valor" inputmode="decimal" value="${a.valor != null && a.valor !== '' ? esc(String(a.valor).replace('.', ',')) : ''}" placeholder="R$">
         <input type="url" data-an="${i}" data-k="link" value="${esc(a.link || '')}" placeholder="link">
-        <button class="btn mini" type="button" data-anx="${i}" title="Tirar">✕</button></div>`).join('')}</div>` : '<p class="dica" style="margin:0">Nenhum andamento ainda.</p>';
+        <button class="btn mini${temAnx(a) ? ' mc-an-com' : ''}" type="button" data-anclip="${i}" title="Anexar arquivos a este andamento (orçamento, proposta, foto)">📎</button>
+        <button class="btn mini" type="button" data-anx="${i}" title="Tirar">✕</button>
+        <div class="mc-an-slot" data-anslot="${i}"></div></div>`).join('')}</div>` : '<p class="dica" style="margin:0">Nenhum andamento ainda.</p>';
       d.querySelectorAll('[data-anx]').forEach(b => b.addEventListener('click', () => { lerLinhas(); ands.splice(Number(b.dataset.anx), 1); desenharAnds(); }));
+      /* Arquivos de cada andamento (26/10/2026, pedido dele): o campo é criado
+         uma vez e só muda de lugar quando a lista é redesenhada. */
+      d.querySelectorAll('[data-anslot]').forEach(slot => {
+        const a = ands[slot.dataset.anslot];
+        if (a && (a._aberto || temAnx(a))) slot.appendChild(campoDoAnd(a));
+      });
+      d.querySelectorAll('[data-anclip]').forEach(b => b.addEventListener('click', () => {
+        lerLinhas(); const a = ands[b.dataset.anclip]; a._aberto = !a._aberto; desenharAnds();
+      }));
     };
     desenharAcoes(); desenharAnds();
     $('mcAcMais')?.addEventListener('click', () => { lerLinhas(); acoes.push({ _novo: true, oque: '', status: 'A FAZER', ordem: acoes.length + 1 }); desenharAcoes(); d.querySelector(`[data-ac="${acoes.length - 1}"][data-k="oque"]`)?.focus(); });
@@ -421,6 +469,7 @@ function ficha(c, natNovo, pre) {
           const reg = { caso_id: caso.id, data: a.data, texto: a.texto, empresa: a.empresa, valor: a.valor, link: a.link };
           const r = a.id && !a._novo ? await cl.from('cmc_andamentos').update(reg).eq('id', a.id).select().single() : await cl.from('cmc_andamentos').insert(reg).select().single();
           if (r.error) throw r.error; ficamAn.add(r.data.id);
+          if (a._anx?.mudou) { await a._anx.salvar('mc-an-' + r.data.id); M.arq.add('mc-an-' + r.data.id); }
           const i = M.ands.findIndex(x => x.id === r.data.id); if (i >= 0) M.ands[i] = r.data; else M.ands.push(r.data);
         }
         for (const id of antesAn.filter(x => !ficamAn.has(x))) { await cl.from('cmc_andamentos').delete().eq('id', id); M.ands = M.ands.filter(x => x.id !== id); }
