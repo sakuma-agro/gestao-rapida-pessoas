@@ -287,8 +287,10 @@ export const MODULOS = [
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
        manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
     { id: 'ceMelhSub', grupo: 'Forms', codigo: 'FORM 020 · 042', nome: 'Melhoria contínua', telas: [
-      ['mcPainel',    'Painel'],
-      ['mcRegistros', 'Registros'],
+      ['mcPainel',     'Painel'],
+      ['mcNcs',        'Não conformidades'],
+      ['mcMelhorias',  'Melhorias'],
+      ['mcFeedbacks',  'Reclamações e sugestões'],
     ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],

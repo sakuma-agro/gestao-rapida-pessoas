@@ -94,7 +94,7 @@ main{max-width:var(--largura-app);margin:0 auto;padding:18px 16px 80px}
 label.campo,div.campo{display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:700;
   color:var(--suave);text-transform:uppercase;letter-spacing:.5px}
 label.campo.plena{grid-column:1/-1}
-input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=time],input[type=month],input[type=search],select,textarea{
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],input[type=time],input[type=month],input[type=search],input[type=url],input[type=tel],select,textarea{
   font:inherit;font-size:14px;padding:9px 10px;border-radius:8px;text-transform:none;letter-spacing:0;
   border:1px solid var(--linha);background:var(--fundo);color:var(--texto);width:100%}
 textarea{resize:vertical;min-height:70px;line-height:1.4}
@@ -2018,3 +2018,32 @@ body.ce-apr-aberto{overflow:hidden}
 .cfo-alertas li{margin:3px 0}
 .cfo-link{display:grid;grid-template-columns:minmax(110px,1fr) minmax(0,3fr) auto auto;gap:6px;align-items:center;margin-bottom:6px}
 .cfo-inativo td{opacity:.6}
+
+/* Melhoria contínua v2 — casos com etapas (26/10/2026) */
+.mc-dlg{width:min(1100px,96vw)}
+.mc-etapas{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 10px}
+.mc-etapa{display:flex;align-items:center;gap:6px;border:1px solid var(--linha,#dfe2d8);background:#fff;border-radius:999px;padding:5px 12px 5px 5px;font:inherit;font-size:12.5px;cursor:pointer;color:#51534A}
+.mc-etapa b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#EEF0EA;font-size:11px}
+.mc-etapa.feita{border-color:#84BD00;color:#4E7D00}.mc-etapa.feita b{background:#84BD00;color:#fff}
+.mc-etapa.atual{background:#744F28;border-color:#744F28;color:#fff;font-weight:700}.mc-etapa.atual b{background:#fff;color:#744F28}
+.mc-pq{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.mc-linhas,.mc-tempo{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.mc-ac{display:grid;grid-template-columns:minmax(160px,3fr) minmax(110px,1.6fr) 140px 90px 130px auto;gap:6px;align-items:center;padding:6px;border:1px solid var(--linha,#dfe2d8);border-radius:8px}
+.mc-ac .mc-ac-res{grid-column:1/-1}
+.mc-ac.feita{background:#F1F7DF}.mc-ac.atrasada{background:#FDECEA}
+.mc-an{display:grid;grid-template-columns:140px minmax(180px,3fr) minmax(110px,1.4fr) 90px minmax(100px,1.2fr) auto;gap:6px;align-items:center;padding-left:10px;border-left:3px solid #84BD00}
+@media (max-width:760px){.mc-ac,.mc-an{grid-template-columns:1fr 1fr}.mc-ac input:first-child,.mc-an input:nth-child(2){grid-column:1/-1}}
+.mc-pipe{display:flex;gap:4px;flex-wrap:wrap}
+.mc-pipe-e{flex:1;min-width:84px;background:#F1F7DF;border:1px solid #cfe3a0;border-radius:8px;padding:6px;text-align:center}
+.mc-pipe-e b{display:block;font-size:20px;color:#4E7D00}.mc-pipe-e span{font-size:10.5px;color:#51534A}
+.mc-pipe-e.vazio{background:#fff;border-color:var(--linha,#dfe2d8)}.mc-pipe-e.vazio b{color:#aaa}
+.mc-matriz{display:grid;grid-template-columns:24px 1fr;grid-template-rows:1fr auto;gap:4px}
+.mc-mx-eixo-y{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:12px;color:#51534A}
+.mc-mx-eixo-x{grid-column:2;text-align:center;font-size:12px;color:#51534A}
+.mc-mx-grade{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.mc-mx-cel{min-height:110px;border-radius:8px;padding:6px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:4px;background:#F6F7F3;border:1px solid var(--linha,#dfe2d8)}
+.mc-mx-31,.mc-mx-21,.mc-mx-32{background:#F1F7DF;border-color:#cfe3a0}
+.mc-mx-13,.mc-mx-23{background:#FBF1EA}
+.mc-mx-rot{width:100%;font-size:12px;font-weight:700;color:#744F28}.mc-mx-rot small{font-weight:400;color:#7d8175;margin-left:4px}
+.mc-chip{font:inherit;font-size:12px;border:1px solid #84BD00;background:#fff;border-radius:999px;padding:3px 9px;cursor:pointer;color:#3E5A00}
+.mc-rel-caso{break-inside:avoid;margin-bottom:10px}
