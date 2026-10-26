@@ -19,7 +19,7 @@ import { estado } from './store.js';
 import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
-import { campoAnexos, donosComArquivo } from './arquivos.js';
+import { campoAnexos, donosComArquivo, listarArquivos, abrirArquivo, urlDoArquivo } from './arquivos.js';
 import { abrirModulo } from './acesso.js';
 
 const $ = id => document.getElementById(id);
@@ -390,7 +390,7 @@ function desenharCaixas() {
     ${ultimas.length ? `<h3 class="bm-h3" style="margin-top:16px">Aberturas de ${f.ano}</h3>
     <div class="ac-rola"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Caixa</th><th>Aberta por</th><th>Testemunha</th><th class="ce">Papéis</th><th>Observação</th><th class="ce">Foto</th><th></th></tr></thead><tbody>
       ${ultimas.map(a => `<tr><td class="ce">${br(a.data)}</td><td>${esc(nomeCaixa(a.caixa_id))}</td><td>${esc(a.aberto_por)}</td><td>${esc(a.testemunha || '—')}</td>
-        <td class="ce">${a.qtd_papeis ? '<b>' + a.qtd_papeis + '</b>' : 'vazia'}</td><td>${esc(a.observacao || '')}</td><td class="ce">${M.arq.has('cx-' + a.id) ? '📷' : '—'}</td>
+        <td class="ce">${a.qtd_papeis ? '<b>' + a.qtd_papeis + '</b>' : 'vazia'}</td><td>${esc(a.observacao || '')}</td><td class="ce">${M.arq.has('cx-' + a.id) ? `<button class="btn mini" type="button" data-verfoto="${esc(a.id)}" title="Ver a foto da caixa aberta">📷 Ver foto</button>` : '—'}</td>
         <td class="ce"><button class="btn mini" type="button" data-ab="${esc(a.id)}">Abrir</button></td></tr>`).join('')}
     </tbody></table></div>` : ''}
   </div>
@@ -400,7 +400,26 @@ function desenharCaixas() {
   $('cxAno')?.addEventListener('change', e => { f.ano = Number(e.target.value); desenharCaixas(); });
   $('cxImp').addEventListener('click', () => mostrar(docAberturas(f.ano), { barra: true }));
   tela.querySelectorAll('[data-ab]').forEach(b => b.addEventListener('click', () => fichaAbertura(M.aberturas.find(a => a.id === b.dataset.ab))));
+  /* Ver a foto direto da lista (26/10/2026, pedido dele). */
+  tela.querySelectorAll('[data-verfoto]').forEach(b => b.addEventListener('click', () => verFotoAbertura(M.aberturas.find(a => a.id === b.dataset.verfoto))));
   tela.querySelectorAll('[data-abrir-cx]').forEach(b => b.addEventListener('click', () => fichaAbertura(null, b.dataset.abrirCx)));
+}
+
+/* A foto da caixa aberta numa janela dentro do app. */
+function verFotoAbertura(a) {
+  if (!a) return;
+  dialogo(`<div class="barra entre" style="margin:0 0 8px"><h3 style="margin:0">${esc(nomeCaixa(a.caixa_id))} · ${br(a.data)}</h3><button class="btn" type="button" data-fechar>Fechar</button></div>
+    <p class="dica" style="margin:0 0 8px">Aberta por ${esc(a.aberto_por)}${a.testemunha ? ' · testemunha ' + esc(a.testemunha) : ''} · ${a.qtd_papeis ? a.qtd_papeis + ' papel(éis)' : 'vazia'}</p>
+    <div class="cx-foto" id="cxFoto"><span class="dica">Carregando a foto…</span></div>`, async () => {
+    try {
+      const l = await listarArquivos('certificacao', 'evidencia', 'cx-' + a.id);
+      const fotos = l.filter(x => /\.(jpe?g|png|webp)$/i.test(x.nome || x.chave));
+      if (!l.length) { $('cxFoto').innerHTML = '<span class="dica">Sem foto nesta abertura.</span>'; return; }
+      const urls = await Promise.all((fotos.length ? fotos : l).map(x => urlDoArquivo(x.chave).then(u => [x, u])));
+      $('cxFoto').innerHTML = urls.map(([x, u]) => /\.(jpe?g|png|webp)$/i.test(x.nome || x.chave)
+        ? `<img src="${u}" alt="${esc(x.nome || 'foto')}">` : `<a class="btn" href="${u}" target="_blank" rel="noopener">${esc(x.nome || 'arquivo')}</a>`).join('');
+    } catch (e) { $('cxFoto').innerHTML = `<span class="dica">${esc(navigator.onLine ? 'Não consegui abrir a foto: ' + (e.message || e) : 'Sem internet: a foto abre quando a conexão voltar.')}</span>`; }
+  });
 }
 
 function cadastroCaixas() {
