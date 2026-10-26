@@ -2064,3 +2064,8 @@ body.ce-apr-aberto{overflow:hidden}
 #navModulos .mod-foco-voltar:hover{border-color:var(--verde);background:var(--verde-fundo)}
 /* Lista mestra: quantidade de documentos de cada tipo na faixa (26/10/2026) */
 .rb-btn .ce-fx-n{font-size:11px;font-weight:600;opacity:.6;margin-left:2px}
+/* Lista mestra: FORM feito no app abre a tela do app, não o PDF (26/10/2026) */
+.ce-dv-app{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:12px 0;
+  padding:18px 20px;border:1px solid var(--linha);border-left:4px solid var(--verde);border-radius:12px;background:var(--verde-fundo)}
+.ce-dv-app>div{display:flex;flex-direction:column;gap:3px}
+.ce-dv-app b{font-size:15px}

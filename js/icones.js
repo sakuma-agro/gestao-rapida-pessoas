@@ -38,6 +38,7 @@ export const ICONES = {
   cargo: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M3 12h18"/>',
   mais: '<path d="M12 5v14M5 12h14"/>',
   'seta-esq': '<path d="M15 5l-7 7 7 7"/>',
+  'seta-dir': '<path d="M9 5l7 7-7 7"/>',
   balanca: '<path d="M12 4v16M7 20h10M5 7h14"/><path d="M5 7l-3 6a3 3 0 006 0zM19 7l-3 6a3 3 0 006 0z"/>',
   /* área Vistorias e Segurança (14/10/2026) — mesmos desenhos das abas de lá */
   antesDepois: '<rect x="2.5" y="6" width="8" height="12" rx="1.5"/><rect x="13.5" y="6" width="8" height="12" rx="1.5"/><path d="M5 14l2-2 2 2M16 12l1.5 1.5L20 11"/>',

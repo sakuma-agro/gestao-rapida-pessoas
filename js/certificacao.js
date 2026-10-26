@@ -869,13 +869,17 @@ async function painelDoc() {
   const g = ++geracaoPainel;
   const celular = matchMedia('(max-width:760px)').matches;
   const refs = codigosDoDoc(d);
+  /* FORM feito no app (26/10/2026, pedido dele): o botão principal abre a tela
+     do app (Biodiversidade, Energia, Balanço…), não o arquivo. */
+  const app = EVID_APP[chaveCodigo(d.codigo)] || null;
   el.innerHTML = `<div class="barra entre" style="margin:0;align-items:flex-start">
       <div><div class="dc-sem">${esc(d.codigo)}${d.revisao != null && d.revisao !== '' ? ' · Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? ' · ' + br(d.data_revisao) : ''}${d.responsavel ? ' · Resp.: ' + esc(d.responsavel) : ''}</div>
         <h3 style="margin:2px 0 0">${esc(d.nome)}</h3></div>
       ${tag(d.situacao, COR_SIT[d.situacao])}
     </div>
     <div class="barra" style="margin:12px 0 4px">
-      <button class="btn principal" type="button" id="ceDvPdf" disabled>${svgIcone('documento')} Abrir PDF</button>
+      ${app ? `<button class="btn principal" type="button" id="ceDvApp" title="${esc(app.nome)}">${svgIcone('seta-dir')} Abrir no app</button>`
+        : `<button class="btn principal" type="button" id="ceDvPdf" disabled>${svgIcone('documento')} Abrir PDF</button>`}
       ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive">${svgIcone('predio')} Abrir local</a>`
         : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">Abrir local</button>'}
       ${d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
@@ -883,7 +887,9 @@ async function painelDoc() {
       <button class="btn" type="button" id="ceDvEditar">${svgIcone('lapis')} Editar</button>
     </div>
     <div class="dc-sem ce-dv-caminho" id="ceDvMsg">${esc(d.caminho || '')}</div>
-    <div class="ce-dv-pdf" id="ceDvVisor"><span class="dc-sem">Procurando o PDF…</span></div>
+    ${app ? `<div class="ce-dv-app"><div><b>Este formulário é preenchido no app</b><span class="dc-sem">${esc(app.nome)}</span></div>
+        <button class="btn principal" type="button" data-dv-app>${svgIcone('seta-dir')} Abrir ${esc(app.nome.split(' — ')[0])}</button></div>`
+      : '<div class="ce-dv-pdf" id="ceDvVisor"><span class="dc-sem">Procurando o PDF…</span></div>'}
     <div class="ce-dv-info">
       <div><h4 class="ac-h4">Normas atendidas</h4>
         ${refs.length ? `<div class="ce-refs" style="max-width:none">${codTags(refs)}</div>
@@ -894,6 +900,7 @@ async function painelDoc() {
     </div>
     <div class="ce-cadeia" id="ceDvCadeia">${htmlCadeia(d)}</div>`;
   ligarCadeia(d);
+  if (app) el.querySelectorAll('#ceDvApp, [data-dv-app]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', app.tela)));
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
   $('ceDvCopiar')?.addEventListener('click', async () => {
@@ -913,6 +920,7 @@ async function painelDoc() {
     : '<p class="dica">Nenhuma no app.</p>';
   $('ceDvRevs').querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.ver)));
   const visor = $('ceDvVisor');
+  if (app || !visor) return;
   if (!vig) {
     visor.innerHTML = `<span class="dc-sem">O PDF ainda não está no app. Use “Importar pasta” ou anexe em Editar.</span>`;
     return;
