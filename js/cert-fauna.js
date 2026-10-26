@@ -19,7 +19,7 @@ import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
-import { campoAnexos, donosComArquivo, enfileirarArquivo, enviarPendentes } from './arquivos.js';
+import { campoAnexos, donosComArquivo, enfileirarArquivo, enviarPendentes, listarArquivos, abrirArquivo } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -631,9 +631,13 @@ function tabelaRegistros() {
     <div class="ac-rola"><table class="dc-planilha"><thead><tr><th class="ce">Data</th><th class="ce">Hora</th><th>Espécie</th><th>Família</th><th>Conservação</th><th>Câmera</th><th>Tipo</th><th>Evidência</th><th></th></tr></thead><tbody>
     ${l.map(r => { const e = espPorId(r.especie_id); return `<tr><td class="ce">${br(r.data)}</td><td class="ce">${hm(r.hora)}</td><td>${nomeEsp(e)}${r.individuos > 1 ? ` <small class="dica">(${r.individuos})</small>` : ''}</td>
       <td>${esc(e?.familia || '')}</td><td>${statusTags(e)}</td><td>${esc(camPorId(r.camera_id)?.nome || '—')}</td><td>${esc(r.tipo)}</td>
-      <td>${linkEvid(r)}${F.arq.has(String(r.id)) ? ' <span title="Tem foto anexada no app">📎</span>' : ''}</td>
+      <td>${F.arq.has(String(r.id)) ? `<button type="button" class="cf-evid ce-link" data-foto="${esc(r.id)}" title="Foto guardada no app (Google Drive)">🖼 Foto</button> ` : ''}${linkEvid(r, r.tipo === 'Vídeo' ? 'Vídeo' : 'OneDrive')}</td>
       <td class="ce"><button class="btn mini" type="button" data-ed="${esc(r.id)}">Abrir</button></td></tr>`; }).join('')}
     </tbody></table></div>` : '<div class="vazio">Nenhum registro com esses filtros.</div>';
+  $('frTabela').querySelectorAll('[data-foto]').forEach(b => b.addEventListener('click', async () => {
+    const l = await listarArquivos('certificacao', 'fauna', b.dataset.foto).catch(() => []);
+    if (l[0]) abrirArquivo(l[0].chave); else alert('A foto ainda está subindo para o Drive.');
+  }));
   $('frTabela').querySelectorAll('[data-ed]').forEach(b => b.addEventListener('click', () => formRegistro(F.regs.find(r => r.id === b.dataset.ed))));
 }
 
