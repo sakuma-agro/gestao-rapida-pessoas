@@ -2092,3 +2092,8 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-aba.on{color:var(--verde-esc);border-bottom-color:#84BD00}
 .mc-aba.on b{background:#84BD00;color:#fff}
 .bm-tab td.mc-fb-conc{white-space:normal;overflow:visible;text-overflow:clip}
+.mc-fazs{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.mc-faz{font:inherit;font-size:12.5px;font-weight:600;border:1px solid var(--linha);background:var(--papel);color:var(--texto);border-radius:20px;padding:5px 12px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.mc-faz b{font-size:11px;color:var(--suave)}
+.mc-faz:hover{border-color:#84BD00}
+.mc-faz.on{background:var(--verde-fundo);border-color:#84BD00;color:var(--verde-esc)}

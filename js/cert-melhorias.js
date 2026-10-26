@@ -264,7 +264,15 @@ function desenharFeedbacks() {
   /* Em aberto × Fechados (26/10/2026, pedido dele): ao concluir, o item sai
      de "Em aberto" e passa para "Fechados". */
   if (f.ver !== 'fechadas') f.ver = 'abertas';
-  const abertas = todas.filter(aberto), fechadas = todas.filter(c => !aberto(c));
+  /* Por fazenda (26/10/2026, pedido dele): o JotForm pergunta o local; aqui
+     filtra por fazenda, com a quantidade de cada uma na aba aberta. */
+  const fazDe = c => c.fazenda || '';
+  const daAba = (f.ver === 'fechadas' ? todas.filter(c => !aberto(c)) : todas.filter(aberto));
+  const contaFaz = k => daAba.filter(c => fazDe(c) === k).length;
+  const fazendasAqui = [...FAZENDAS.filter(k => contaFaz(k)), ...(contaFaz('') ? [''] : [])];
+  if (f.faz != null && f.faz !== 'todas' && !FAZENDAS.includes(f.faz) && f.faz !== '') f.faz = 'todas';
+  const naFaz = c => f.faz == null || f.faz === 'todas' || fazDe(c) === f.faz;
+  const abertas = todas.filter(aberto).filter(naFaz), fechadas = todas.filter(c => !aberto(c)).filter(naFaz);
   const fech = f.ver === 'fechadas';
   const L = (fech ? fechadas : abertas).sort((a, b) => fech
     ? String(b.data_encerramento || b.data_abertura).localeCompare(String(a.data_encerramento || a.data_abertura))
@@ -276,10 +284,14 @@ function desenharFeedbacks() {
       <button type="button" role="tab" class="mc-aba${fech ? '' : ' on'}" data-fver="abertas" aria-selected="${!fech}">Em aberto <b>${abertas.length}</b></button>
       <button type="button" role="tab" class="mc-aba${fech ? ' on' : ''}" data-fver="fechadas" aria-selected="${fech}">Fechados <b>${fechadas.length}</b></button>
     </div>
-    ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Via</th><th>Quem</th>${fech ? '<th class="ce">Fechado em</th><th>Conclusão</th>' : '<th>Situação</th>'}<th></th></tr></thead><tbody>
+    <div class="mc-fazs" aria-label="Fazenda">
+      <button type="button" class="mc-faz${f.faz == null || f.faz === 'todas' ? ' on' : ''}" data-ffaz="todas">Todas as fazendas <b>${daAba.length}</b></button>
+      ${fazendasAqui.map(k => `<button type="button" class="mc-faz${f.faz === k ? ' on' : ''}" data-ffaz="${esc(k)}">${esc(k || 'Sem fazenda')} <b>${contaFaz(k)}</b></button>`).join('')}
+    </div>
+    ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Fazenda</th><th>Via</th><th>Quem</th>${fech ? '<th class="ce">Fechado em</th><th>Conclusão</th>' : '<th>Situação</th>'}<th></th></tr></thead><tbody>
       ${L.map(c => { const g = gerado(c); const desc = c.descricao && so(c.descricao) !== so(c.titulo) && !so(c.descricao).startsWith(so(c.titulo).replace(/…$/, '')) ? c.descricao : '';
-        return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${desc ? `<br><small class="dica">${esc(desc)}</small>` : ''}${c.fazenda ? `<br><small class="dica">${esc(c.fazenda)}</small>` : ''}</td>
-        <td>${esc(c.via || '')}</td><td>${esc(c.solicitante || 'Anônimo')}</td>
+        return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${desc ? `<br><small class="dica">${esc(desc)}</small>` : ''}</td>
+        <td>${esc(c.fazenda || '—')}</td><td>${esc(c.via || '')}</td><td>${esc(c.solicitante || 'Anônimo')}</td>
         ${fech ? `<td class="ce">${br(c.data_encerramento)}</td>` : `<td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td>`}
         ${!fech ? '' : `<td class="mc-fb-conc">${c.etapa === 'TRATADO' ? `${esc(c.conclusao || (g ? '' : '—'))}${g ? `${c.conclusao ? '<br>' : ''}virou <button type="button" class="ce-link" data-caso="${esc(g.id)}">${esc(NOME_NAT[g.natureza])}</button>` : ''}${c.comunicado_como ? `<br><small class="dica">Passado aos funcionários: ${esc(c.comunicado_como)}${c.comunicado_detalhe ? ' — ' + esc(c.comunicado_detalhe) : ''}</small>` : ''}` : '—'}</td>`}
         <td class="ce mc-fb-bt">${c.etapa !== 'TRATADO' ? `<button class="btn mini principal" type="button" data-concluir="${esc(c.id)}">Concluir</button>` : ''}<button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button></td></tr>`; }).join('')}
@@ -289,6 +301,7 @@ function desenharFeedbacks() {
   ligarRodape('FEEDBACK', L);
   $('mcNovoFb').addEventListener('click', () => ficha(null, 'FEEDBACK'));
   tela.querySelectorAll('[data-fver]').forEach(b => b.addEventListener('click', () => { f.ver = b.dataset.fver; desenharFeedbacks(); }));
+  tela.querySelectorAll('[data-ffaz]').forEach(b => b.addEventListener('click', () => { f.faz = b.dataset.ffaz; desenharFeedbacks(); }));
   tela.querySelectorAll('[data-concluir]').forEach(b => b.addEventListener('click', () => concluirFeedback(M.casos.find(c => c.id === b.dataset.concluir))));
   ligarAbrir(tela);
 }
