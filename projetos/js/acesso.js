@@ -46,20 +46,8 @@ export const telasLiberadas = id => {
 let aoTrocar = () => {};
 export const modulosLiberados = () => MODULOS.filter(m => pode(m.id) && telasLiberadas(m.id).length);
 
-/* "Continuar de onde parou" na tela inicial do LOP (26/10/2026): avisa o app
-   principal de qual tela foi aberta, com o nome "Módulo › Tela". */
-function avisarRecente(t) {
-  try {
-    if (window.parent === window) return;
-    const m = MODULOS.find(x => telasDe(x).some(([y]) => y === t));
-    if (!m) return;
-    const rot = String(telasDe(m).find(([y]) => y === t)[1] || '').replace(/ \(.*\)$/, '');
-    window.parent.postMessage({ tipo: 'gr-recente', tela: t, rotulo: m.nome === rot ? rot : m.nome + ' › ' + rot }, location.origin);
-  } catch {}
-}
-
 export function montarMenu(callback) {
-  if (callback) aoTrocar = t => { callback(t); avisarRecente(t); };
+  if (callback) aoTrocar = callback;
   $('navModulos').innerHTML = modulosLiberados().map(m =>
     `<button class="aba" role="tab" data-modulo="${m.id}" aria-selected="false">${svgIcone(m.icone)}<span>${esc(m.nome)}</span></button>`).join('');
   $('navModulos').querySelectorAll('.aba').forEach(b =>

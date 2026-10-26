@@ -53,6 +53,5 @@ montarMenu(abrirAba);
 
 /* O app principal confere isto para saber se a área terminou de abrir, e
    chama voltarAoInicioDaArea quando a pessoa volta para a área já aberta. */
-window.abrirTelaArea = tela => window.abrirTelaCustoBase(tela);  // "Continuar de onde parou" (26/10/2026)
 window.areaPronta = true;
 window.voltarAoInicioDaArea = () => mostrarInicio();

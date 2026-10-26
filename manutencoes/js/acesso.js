@@ -148,21 +148,7 @@ function abrirModulo(id, tela) {
 }
 
 /** Pinta as faixas quando a tela é aberta de fora (atalho, link, botão). */
-/* "Continuar de onde parou" na tela inicial do LOP (26/10/2026): avisa o app
-   principal de qual tela foi aberta, com o nome "Módulo › Tela". */
-function avisarRecente(tela) {
-  try {
-    if (window.parent === window) return;
-    const m = MODULOS.find(x => x.telas.some(([t]) => t === tela));
-    if (!m) return;
-    const rot = String(m.telas.find(([t]) => t === tela)[1] || '');
-    window.parent.postMessage({ tipo: 'gr-recente', tela, rotulo: m.nome === rot ? rot : m.nome + ' › ' + rot }, location.origin);
-  } catch {}
-}
-window.abrirTelaArea = tela => irPara(tela);
-
 function marcarMenu(tela) {
-  avisarRecente(tela);
   const m = moduloDe(tela);
   if (!m) return;
   if (m !== moduloAberto) {
