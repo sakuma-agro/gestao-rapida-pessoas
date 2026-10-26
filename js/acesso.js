@@ -255,7 +255,7 @@ export const MODULOS = [
     ] },
     /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
        trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
-    { id: 'ceFaunaSub', nome: 'Biodiversidade', telas: [
+    { id: 'ceFaunaSub', grupo: 'Forms', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
       ['faPainel',    'Painel'],
       ['faRegistros', 'Registros'],
       ['faEspecies',  'Espécies'],
@@ -263,14 +263,14 @@ export const MODULOS = [
     ] },
     /* Energia (26/10/2026): consumo de energias — o FORM 043 virou painel.
        js/cert-energia.js; tabelas ce_fontes / ce_consumos. */
-    { id: 'ceEnergiaSub', nome: 'Energia', telas: [
+    { id: 'ceEnergiaSub', grupo: 'Forms', codigo: 'FORM 043', nome: 'Energia', telas: [
       ['enPainel',      'Painel'],
       ['enLancamentos', 'Lançamentos'],
       ['enFontes',      'Fontes'],
     ] },
     /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
        e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
-    { id: 'ceBalancoSub', nome: 'Balanço de massa', telas: [
+    { id: 'ceBalancoSub', grupo: 'Forms', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
       ['bmPainel',     'Painel'],
       ['bmRastreio',   'Rastreabilidade'],
       ['bmLotes',      'Boletins e vendas'],
@@ -278,7 +278,7 @@ export const MODULOS = [
     ] },
     /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
        aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
-    { id: 'ceFornSub', nome: 'Fornecedores', telas: [
+    { id: 'ceFornSub', grupo: 'Forms', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
       ['foPainel',     'Painel'],
       ['foAvaliacoes', 'Avaliações'],
       ['foCadastro',   'Cadastro'],
@@ -286,7 +286,7 @@ export const MODULOS = [
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
        manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
-    { id: 'ceMelhSub', nome: 'Melhoria contínua', telas: [
+    { id: 'ceMelhSub', grupo: 'Forms', codigo: 'FORM 020 · 042', nome: 'Melhoria contínua', telas: [
       ['mcPainel',    'Painel'],
       ['mcRegistros', 'Registros'],
     ] },
@@ -700,11 +700,11 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceBalancoSub: 'balanca',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceMelhSub: 'grafico',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
-const faixaEstado = { modulo: null, sub: null, tela: null };
+const faixaEstado = { modulo: null, sub: null, tela: null, grupoHub: null };
 const ultimaTela = {};
 
 function desenharFaixa(id, subs, tela) {
@@ -714,7 +714,7 @@ function desenharFaixa(id, subs, tela) {
   // Veio com tela escolhida (atalho, link de outra tela) e ela mora num
   // submódulo de várias telas: já abre dentro dele. Senão, nível dos submódulos.
   const dentro = subs.length > 1 && tela && subAlvo.telas.length > 1 ? subAlvo.id : null;
-  faixaEstado.modulo = id; faixaEstado.sub = subs.length > 1 ? dentro : subAlvo.id; faixaEstado.tela = alvo;
+  faixaEstado.modulo = id; faixaEstado.sub = subs.length > 1 ? dentro : subAlvo.id; faixaEstado.tela = alvo; faixaEstado.grupoHub = null;
   pintarFaixa(id, subs);
   marcarTela(id, subs, alvo, true);
 }
@@ -743,23 +743,65 @@ function pintarCategoria(id, subs) {
     mod.classList.toggle('sem-fechar', SEMPRE_ABERTO.has(id));
     mod.title = SEMPRE_ABERTO.has(id) ? (modPorId(id)?.nome || '') : 'Fechar ' + (modPorId(id)?.nome || '') + ' e voltar aos módulos';
   }
+  /* Grupos (26/10/2026, pedido dele): submódulos com `grupo` (ex.: os Forms da
+     Certificação — Biodiversidade, Energia, Balanço de massa, Fornecedores,
+     Melhoria contínua) viram um botão só na linha de cima; clicar nele mostra
+     os submódulos do grupo na linha de baixo; dentro de um, "← Forms" volta. */
+  const abrirSub = s => {
+    const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
+    faixaEstado.tela = t; faixaEstado.grupoHub = null;
+    pintarCategoria(id, subs);
+    marcarTela(id, subs, t, true);
+  };
   if (subs.length > 1 && mod) {
     const caixa = document.createElement('span');
     caixa.className = 'mod-subs';
-    caixa.innerHTML = subs.map(s => `<button type="button" class="aba aba-sub" data-sub="${s.id}" aria-selected="${s === atual}" title="${esc(s.nome)}">
-      ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span></button>`).join('');
+    const vistos = new Set();
+    caixa.innerHTML = subs.map(s => {
+      if (s.grupo) {
+        if (vistos.has(s.grupo)) return '';
+        vistos.add(s.grupo);
+        const sel = faixaEstado.grupoHub === s.grupo || (!faixaEstado.grupoHub && atual.grupo === s.grupo);
+        return `<button type="button" class="aba aba-sub" data-grupo="${esc(s.grupo)}" aria-selected="${sel}" title="${esc(s.grupo)}">
+          ${svgIcone('documento')}<span>${esc(s.grupo)}</span></button>`;
+      }
+      return `<button type="button" class="aba aba-sub" data-sub="${s.id}" aria-selected="${!faixaEstado.grupoHub && s === atual}" title="${esc(s.nome)}">
+      ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span></button>`;
+    }).join('');
     mod.after(caixa);
-    caixa.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => {
-      const s = subs.find(x => x.id === b.dataset.sub);
-      const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
-      faixaEstado.tela = t;
+    caixa.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSub(subs.find(x => x.id === b.dataset.sub))));
+    caixa.querySelectorAll('[data-grupo]').forEach(b => b.addEventListener('click', () => {
+      faixaEstado.grupoHub = b.dataset.grupo;
       pintarCategoria(id, subs);
-      marcarTela(id, subs, t, true);
     }));
   }
 
-  // linha de baixo: as telas do submódulo (só quando tem mais de uma)
-  if (atual.telas.length < 2) {
+  // linha de baixo do grupo: os submódulos dele (hub) ou, dentro de um, voltar + as telas
+  if (faixaEstado.grupoHub || atual.grupo) {
+    const g = faixaEstado.grupoHub || atual.grupo;
+    const doGrupo = subs.filter(s => s.grupo === g);
+    faixa.hidden = false;
+    faixa.classList.add('rb');
+    if (faixaEstado.grupoHub) {
+      faixa.innerHTML = `<section class="rb-grupo rb-subs" aria-label="${esc(g)}"><div class="rb-botoes">${doGrupo.map(s => `
+        <button type="button" class="rb-btn rb-sub" data-gsub="${s.id}" aria-selected="${s === atual}" title="${esc(s.nome)}">
+          ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span>${s.codigo ? `<small>${esc(s.codigo)}</small>` : ''}</button>`).join('')}
+      </div><div class="rb-rotulo">${esc(g)}</div></section>`;
+    } else {
+      faixa.innerHTML = `<button type="button" class="rb-voltar" data-gvoltar title="Voltar aos ${esc(g)}">${svgIcone('seta-esq')}<span>${esc(g)}</span></button>
+        <section class="rb-grupo ${CORES_GRUPO[doGrupo.indexOf(atual) % CORES_GRUPO.length]}" aria-label="${esc(atual.nome)}">
+        <div class="rb-botoes">${atual.telas.map(([t, rot]) => `<button type="button" class="rb-btn" role="tab" data-tela="${t}" aria-selected="${t === faixaEstado.tela}" title="${esc(rot)}">
+          ${svgIcone(ICONE_TELA[t] || ICONE_MODULO[id] || 'lista')}<span>${esc(rot)}</span></button>`).join('')}</div>
+        <div class="rb-rotulo">${esc(atual.nome)}${atual.codigo ? ' · ' + esc(atual.codigo) : ''}</div></section>`;
+    }
+    faixa.querySelectorAll('[data-gsub]').forEach(b => b.addEventListener('click', () => abrirSub(subs.find(x => x.id === b.dataset.gsub))));
+    faixa.querySelector('[data-gvoltar]')?.addEventListener('click', () => { faixaEstado.grupoHub = g; pintarCategoria(id, subs); });
+    faixa.querySelectorAll('[data-tela]').forEach(b => b.addEventListener('click', () => {
+      faixaEstado.tela = b.dataset.tela;
+      ultimaTela[atual.id] = b.dataset.tela;
+      marcarTela(id, subs, b.dataset.tela, true);
+    }));
+  } else if (atual.telas.length < 2) {
     faixa.hidden = true;
     faixa.innerHTML = '';
   } else {
@@ -853,11 +895,13 @@ function marcarTela(id, subs, tela, abrir) {
     x.setAttribute('aria-selected', String(x.dataset.tela === tela)));
   const subDaTela = subs.find(s => s.telas.some(([t]) => t === tela));
   document.querySelectorAll('#navTelas [data-sub], #navModulos [data-sub]').forEach(x =>
-    x.setAttribute('aria-selected', String(x.dataset.sub === subDaTela?.id)));
+    x.setAttribute('aria-selected', String(!faixaEstado.grupoHub && x.dataset.sub === subDaTela?.id)));
+  document.querySelectorAll('#navModulos [data-grupo]').forEach(x =>
+    x.setAttribute('aria-selected', String(faixaEstado.grupoHub ? x.dataset.grupo === faixaEstado.grupoHub : x.dataset.grupo === subDaTela?.grupo)));
   const mod = modPorId(id);
   const sub = subs.find(s => s.telas.some(([t]) => t === tela));
   const rot = sub?.telas.find(([t]) => t === tela)?.[1] || '';
-  const partes = [mod?.nome, subs.length > 1 && sub && sub.nome !== rot ? sub.nome : null, rot].filter(Boolean);
+  const partes = [mod?.nome, sub?.grupo || null, subs.length > 1 && sub && sub.nome !== rot ? sub.nome : null, rot].filter(Boolean);
   const cam = $('navSub');
   cam.hidden = false;
   cam.classList.add('rb-caminho');
