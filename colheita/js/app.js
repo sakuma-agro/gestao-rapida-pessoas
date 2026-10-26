@@ -119,5 +119,6 @@ window.addEventListener('colheita-dados', () => {
 
 montarMenu(abrirAba);
 
+window.abrirTelaArea = tela => window.abrirTelaColheita(tela);  // "Continuar de onde parou" (26/10/2026)
 window.areaPronta = true;
 window.voltarAoInicioDaArea = () => mostrarInicio();

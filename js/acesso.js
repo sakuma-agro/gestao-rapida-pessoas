@@ -3,6 +3,7 @@
 // e pode mexer nesta lista; os outros só leem a própria linha.
 import { estado } from './store.js';
 import { ICONE_TELA, ICONE_MODULO, svgIcone } from './icones.js';
+import { registrarRecente } from './recentes.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -910,6 +911,8 @@ function marcarTela(id, subs, tela, abrir) {
   cam.innerHTML = partes.map((p, i) => i === partes.length - 1
     ? `<b>${esc(p)}</b>` : `<span>${esc(p)}</span><span class="rb-sep" aria-hidden="true">›</span>`).join('');
   if (abrir) aoTrocar(tela);
+  // "Continuar de onde parou" na tela inicial (26/10/2026)
+  registrarRecente({ modulo: id, tela, rotulo: partes.slice(-2).join(' › ') });
 }
 
 /* =============== tela de configurações =============== */

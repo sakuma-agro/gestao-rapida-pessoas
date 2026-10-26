@@ -11,6 +11,7 @@
 import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
 import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
+import { lerRecentes, quandoRecente, definirAreaRecente, molduraDaArea } from './recentes.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -19,17 +20,17 @@ const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* Sobe a cada publicação da área Manutenções (e nos ?v= do manutencoes/index.html). */
-const VERSAO_AREA = '47';
+const VERSAO_AREA = '48';
 /* Sobe a cada publicação da área Programação Campo (e nos ?v= do programacao/index.html). */
-const VERSAO_PROG = '13';
+const VERSAO_PROG = '14';
 /* Sobe a cada publicação da área Estoque (e nos ?v= do estoque/index.html). */
-const VERSAO_EST = '31';
+const VERSAO_EST = '32';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
-const VERSAO_CB = '17';
+const VERSAO_CB = '18';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
-const VERSAO_CP = '8';
+const VERSAO_CP = '9';
 /* Sobe a cada publicação da área Projetos (PMBOK) (e nos ?v= do projetos/index.html). */
-const VERSAO_PJ = '1';
+const VERSAO_PJ = '2';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -229,6 +230,7 @@ export function mostrarAreas({ direto = false } = {}) {
      isso não entra mais direto quando a pessoa tem uma área só. */
 
   areaAtual = null;
+  definirAreaRecente(null);
   pintarEtiqueta();
   $('navModulos').hidden = true;
   $('navTelas').hidden = true;
@@ -245,6 +247,8 @@ export function mostrarAreas({ direto = false } = {}) {
     desenharAlertaAtividade($('arAlerta'), { abrir: abrirReu });
     desenharFraseInicio($('arFrase'), { abrir: abrirReu });
   } catch (e) { $('arFrase').hidden = true; }
+
+  desenharRecentes();
 
   // liberadas primeiro, na ordem de AREAS; depois as fantasmas
   const lista = [...AREAS.filter(a => !a.emBreve && liberada(a.id)), ...AREAS.filter(a => a.emBreve || !liberada(a.id))];
@@ -275,6 +279,7 @@ export function mostrarAreas({ direto = false } = {}) {
 export function entrarNaArea(id, tela, extra) {
   if (!liberada(id)) return mostrarAreas();
   areaAtual = id;
+  definirAreaRecente(id);
   pintarEtiqueta();
 
   if (id === 'pessoas') {
@@ -444,6 +449,45 @@ export function entrarNaArea(id, tela, extra) {
       if (!pronta) moldura.src = 'manutencoes/?v=' + VERSAO_AREA + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
+  }
+}
+
+/* ─── Continuar de onde parou (26/10/2026, pedido dele) ───
+   As últimas telas abertas por quem está logado, neste aparelho
+   (js/recentes.js). Só as de áreas que a pessoa ainda pode abrir. */
+function desenharRecentes() {
+  const alvo = $('arRecentes');
+  if (!alvo) return;
+  const lista = lerRecentes().filter(r => liberada(r.area) && AREAS.some(a => a.id === r.area)).slice(0, 6);
+  alvo.hidden = !lista.length;
+  if (!lista.length) { alvo.innerHTML = ''; return; }
+  alvo.innerHTML = `<h3 class="ar-sec">Continuar de onde parou</h3>
+    <div class="ar-rec-lista">${lista.map((r, i) => {
+      const a = AREAS.find(x => x.id === r.area);
+      return `<button type="button" class="ar-rec" data-rec="${i}" title="Abrir ${esc(a.nome)} › ${esc(r.rotulo)}">
+        <img src="${a.icone}" alt=""><span><b>${esc(r.rotulo)}</b><small>${esc(a.nome)} · ${esc(quandoRecente(r.em))}</small></span></button>`;
+    }).join('')}</div>
+    <h3 class="ar-sec">Todas as áreas</h3>`;
+  alvo.querySelectorAll('[data-rec]').forEach(b =>
+    b.addEventListener('click', () => abrirRecente(lista[+b.dataset.rec])));
+}
+
+function abrirRecente(r) {
+  if (!r || !liberada(r.area)) return;
+  const mold = molduraDaArea(r.area);
+  entrarNaArea(r.area);
+  if (mold) {
+    // a moldura pode estar abrindo: espera ela ficar pronta (até 20 s)
+    const fim = Date.now() + 20000;
+    const tentar = () => {
+      let w = null;
+      try { w = $(mold).contentWindow; } catch {}
+      if (w && w.areaPronta && typeof w.abrirTelaArea === 'function') { try { w.abrirTelaArea(r.tela); } catch {} return; }
+      if (Date.now() < fim && areaAtual === r.area) setTimeout(tentar, 200);
+    };
+    tentar();
+  } else if (r.modulo) {
+    abrirModulo(r.modulo, r.tela);
   }
 }
 
