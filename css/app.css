@@ -2047,3 +2047,12 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-mx-rot{width:100%;font-size:12px;font-weight:700;color:#744F28}.mc-mx-rot small{font-weight:400;color:#7d8175;margin-left:4px}
 .mc-chip{font:inherit;font-size:12px;border:1px solid #84BD00;background:#fff;border-radius:999px;padding:3px 9px;cursor:pointer;color:#3E5A00}
 .mc-rel-caso{break-inside:avoid;margin-bottom:10px}
+
+/* Frase da semana mais fina, na altura do "Boa tarde / Em qual área" (26/10/2026, pedido dele) */
+.ar-topo{align-items:stretch}
+.reu-ini{flex:0 1 640px;display:flex;flex-direction:column;justify-content:center;padding:8px 14px;border-radius:10px;
+  border-width:1px;border-left-width:3px;box-shadow:none}
+.reu-ini-rot{font-size:10.5px;letter-spacing:.5px}
+.reu-ini-frase{margin:3px 0 0;font-size:13.5px;line-height:1.35;font-weight:500;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.reu-ini-autor{font-size:12px;margin-top:1px}
