@@ -210,7 +210,7 @@ function botoesLinha(c) {
     if (px) b.push(`<button class="btn mini mc-av" type="button" data-avancar="${esc(c.id)}" title="Passar para a etapa ${esc(rotEtapa(px))}">▸ ${esc(c.etapa === 'AGUARDANDO RECURSO' ? 'Retomar' : rotEtapa(px))}</button>`);
     b.push(`<button class="btn mini" type="button" data-andamento="${esc(c.id)}" title="Registrar um andamento (orçamento, contato, decisão, entrega)">+ Andamento</button>`);
     if (c.natureza === 'MELHORIA') b.push(`<button class="btn mini principal" type="button" data-concluir-me="${esc(c.id)}">Concluir</button>`);
-    if (c.natureza === 'NC' && c.etapa === 'VERIFICAÇÃO') b.push(`<button class="btn mini principal" type="button" data-caso="${esc(c.id)}" title="Registrar a verificação de eficácia e encerrar">Encerrar</button>`);
+    if (c.natureza === 'NC') b.push(`<button class="btn mini principal" type="button" data-encerrar-nc="${esc(c.id)}" title="Registrar a verificação de eficácia e encerrar">Encerrar</button>`);
   }
   b.push(`<button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button>`);
   return b.join('');
@@ -219,6 +219,7 @@ function ligarLinhas(el) {
   el.querySelectorAll('[data-avancar]').forEach(x => x.addEventListener('click', () => avancarEtapa(M.casos.find(c => c.id === x.dataset.avancar), x)));
   el.querySelectorAll('[data-andamento]').forEach(x => x.addEventListener('click', () => andamentoRapido(M.casos.find(c => c.id === x.dataset.andamento))));
   el.querySelectorAll('[data-concluir-me]').forEach(x => x.addEventListener('click', () => concluirMelhoria(M.casos.find(c => c.id === x.dataset.concluirMe))));
+  el.querySelectorAll('[data-encerrar-nc]').forEach(x => x.addEventListener('click', () => encerrarNc(M.casos.find(c => c.id === x.dataset.encerrarNc))));
 }
 async function gravarAndamento(c, reg) {
   const r = await estado.cliente.from('cmc_andamentos').insert({ caso_id: c.id, ...reg }).select().single();
@@ -293,6 +294,48 @@ function concluirMelhoria(c) {
         if (anx.mudou) { await anx.salvar('mc-' + c.id); M.arq.add('mc-' + c.id); }
         salvarCaixa(); fechar(); redesenhar();
       } catch (e) { $('cmOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
+    });
+  });
+}
+/* Encerrar NC pela lista (26/10/2026, "faça o mesmo em não conformidades"):
+   a verificação de eficácia numa janela. Resolveu → ENCERRADA; não resolveu
+   → volta para PLANO DE AÇÃO, com o andamento anotado. */
+function encerrarNc(c) {
+  if (!c) return;
+  const pessoas = [...new Set(M.casos.flatMap(x => [x.responsavel, x.verif_por]).filter(Boolean))].sort();
+  dialogo(`<h3 style="margin:0 0 4px">Encerrar não conformidade</h3><p class="dica" style="margin:0 0 10px">${esc(c.titulo)} · etapa ${esc(rotEtapa(c.etapa))}</p>
+    <div class="aviso erro" id="mcErro" hidden></div>
+    <p class="dica" style="margin:0 0 8px">A certificação pede a <b>verificação de eficácia</b>: conferir depois de um tempo se o problema não voltou.</p>
+    <div class="grade"><label class="campo">Data da verificação <input type="date" id="enData" value="${esc(String(c.verif_data || hoje()).slice(0, 10))}"></label>
+      <label class="campo">Verificado por <input type="text" id="enPor" list="enPessoas" value="${esc(c.verif_por || c.responsavel || '')}"></label>
+      <label class="campo">Resolveu? <select id="enEf">${opcoes([['1', 'Sim — eficaz, encerrar'], ['0', 'Não — voltar para o plano de ação']], '1')}</select></label></div>
+    <label class="campo">Resultado da verificação <textarea id="enRes" rows="2" placeholder="ex.: conferido em campo, o problema não voltou">${esc(c.verif_resultado || '')}</textarea></label>
+    <label class="campo">Padronização (virou POP, IT, treinamento?) <input type="text" id="enPad" value="${esc(c.padronizacao || '')}"></label>
+    <div id="enAnx" style="margin-top:6px"></div>
+    <datalist id="enPessoas">${pessoas.map(p => `<option value="${esc(p)}">`).join('')}</datalist>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="enOk">Confirmar</button></div>`, () => {
+    const anx = campoAnexos($('enAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Evidência', dica: 'foto do depois, relatório, lista de presença' });
+    anx.abrir('mc-' + c.id);
+    const pintarBotao = () => { $('enOk').textContent = $('enEf').value === '1' ? 'Encerrar' : 'Voltar para o plano'; };
+    $('enEf').addEventListener('change', pintarBotao); pintarBotao();
+    $('enOk').addEventListener('click', async () => {
+      const ef = $('enEf').value === '1';
+      const dt = $('enData').value, por = so($('enPor').value), res = so($('enRes').value), pad = so($('enPad').value) || null;
+      if (!dt) return erroDlg('Informe a data da verificação.');
+      if (!por) return erroDlg('Informe quem verificou.');
+      if (!res) return erroDlg('Escreva o resultado da verificação.');
+      if (precisaRede()) return;
+      $('enOk').disabled = true;
+      try {
+        const linha = ef ? { etapa: 'ENCERRADA', verif_data: dt, verif_por: por, verif_eficaz: true, verif_resultado: res, padronizacao: pad, data_encerramento: dt, reavaliar_em: null }
+          : { etapa: 'PLANO DE AÇÃO', verif_data: dt, verif_por: por, verif_eficaz: false, verif_resultado: res, padronizacao: pad, data_encerramento: null };
+        const { data, error } = await estado.cliente.from('cmc_casos').update(linha).eq('id', c.id).select().single();
+        if (error) throw error;
+        const i = M.casos.findIndex(x => x.id === c.id); if (i >= 0) M.casos[i] = data;
+        await gravarAndamento(c, { data: dt, texto: ef ? 'Encerrada — verificação eficaz: ' + res : 'Verificação: não resolveu, voltou para o plano de ação — ' + res });
+        if (anx.mudou) { await anx.salvar('mc-' + c.id); M.arq.add('mc-' + c.id); }
+        salvarCaixa(); fechar(); redesenhar();
+      } catch (e) { $('enOk').disabled = false; erroDlg('Não consegui gravar: ' + esc(e.message || e)); }
     });
   });
 }
