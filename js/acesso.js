@@ -282,6 +282,13 @@ export const MODULOS = [
       ['foPainel',     'Painel'],
       ['foAvaliacoes', 'Avaliações'],
     ] },
+    /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
+       reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
+       manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
+    { id: 'ceMelhSub', nome: 'Melhoria contínua', telas: [
+      ['mcPainel',    'Painel'],
+      ['mcRegistros', 'Registros'],
+    ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],

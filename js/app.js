@@ -57,6 +57,7 @@ import { abrirCaderno, limparCaderno, TELAS_CADERNO, enviarFilaCaderno, recarreg
 import { abrirFauna, limparFauna, TELAS_FAUNA } from './cert-fauna.js';
 import { abrirEnergia, limparEnergia, TELAS_ENERGIA } from './cert-energia.js';
 import { abrirFornecedores, limparFornecedores, TELAS_FORNECEDORES } from './cert-fornecedores.js';
+import { abrirMelhorias, limparMelhorias, TELAS_MELHORIAS } from './cert-melhorias.js';
 import { abrirBalanco, limparBalanco, TELAS_BALANCO } from './cert-balanco.js';
 
 const $ = id => document.getElementById(id);
@@ -238,6 +239,9 @@ function abrirAba(nome) {
   // Certificação › Fornecedores (26/10/2026) — js/cert-fornecedores.js
   for (const t of TELAS_FORNECEDORES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_FORNECEDORES.includes(nome)) abrirFornecedores(nome);
+  // Certificação › Melhoria contínua (26/10/2026) — js/cert-melhorias.js
+  for (const t of TELAS_MELHORIAS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_MELHORIAS.includes(nome)) abrirMelhorias(nome);
   // Certificação › Balanço de massa (26/10/2026) — js/cert-balanco.js
   for (const t of TELAS_BALANCO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_BALANCO.includes(nome)) abrirBalanco(nome);
@@ -301,7 +305,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparFornecedores(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 
