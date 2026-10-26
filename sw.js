@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v407';
+const VERSAO = 'gr-v408';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -92,7 +92,11 @@ self.addEventListener('install', ev => {
   ev.waitUntil(caches.open(VERSAO)
     // cache: 'reload' (15/10/2026): o GitHub Pages manda guardar cada arquivo
     // por 10 min; sem isso a versão nova nascia com o JS da anterior.
-    .then(c => c.addAll(ARQUIVOS.map(u => new Request(u, { cache: 'reload' }))))
+    /* Um a um (26/10/2026): com addAll, um único arquivo faltando no servidor
+       derrubava a instalação inteira e todo mundo ficava preso na versão
+       velha (aconteceu: vistorias/icons/area-vistorias.v2.svg). O que falhar
+       fica de fora do cache e é buscado na rede quando for pedido. */
+    .then(c => Promise.allSettled(ARQUIVOS.map(u => c.add(new Request(u, { cache: 'reload' })))))
     .then(() => self.skipWaiting()));
 });
 
