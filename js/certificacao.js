@@ -125,8 +125,9 @@ const EVID_APP = {
   FORM43: { nome: 'Energia — lançamentos de consumo', tela: 'enPainel' },
   FORM13: { nome: 'Balanço de massa — cargas de abacate', tela: 'bmPainel' },
   FORM23: { nome: 'Fornecedores — avaliações', tela: 'foPainel' },
-  FORM20: { nome: 'Melhoria contínua — não conformidades e melhorias', tela: 'mcPainel' },
-  FORM42: { nome: 'Melhoria contínua — reclamações e sugestões', tela: 'mcFeedbacks' },
+  FORM4: { nome: 'Não conformidades — registro e tratamento', tela: 'mcNcs' },
+  FORM20: { nome: 'Melhorias contínuas — banco e plano de melhorias', tela: 'mcMelhorias' },
+  FORM42: { nome: 'Reclamações e sugestões', tela: 'mcFeedbacks' },
   AN7: { nome: 'Balanço de massa — cargas de abacate', tela: 'bmPainel' },
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
@@ -146,7 +147,8 @@ async function carregarCadeia(c) {
   if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
   if (!bm.error) S.viva.FORM13 = S.viva.AN7 = contaMeses((bm.data || []).map(x => x.data));
   if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
-  if (!mc.error) { S.viva.FORM20 = contaMeses((mc.data || []).map(x => x.data_abertura)); S.viva.FORM42 = contaMeses((mc.data || []).filter(x => x.natureza === 'FEEDBACK').map(x => x.data_abertura)); }
+  if (!mc.error) { const doTipo = n => contaMeses((mc.data || []).filter(x => x.natureza === n).map(x => x.data_abertura));
+    S.viva.FORM4 = doTipo('NC'); S.viva.FORM20 = doTipo('MELHORIA'); S.viva.FORM42 = contaMeses((mc.data || []).filter(x => x.natureza === 'FEEDBACK').map(x => x.data_abertura)); }
   S.evArq = await donosComArquivo('certificacao', 'evidencia').catch(() => new Set());
 }
 const porCodigo = (a, b) => so(a.codigo).localeCompare(so(b.codigo), 'pt-BR', { numeric: true });

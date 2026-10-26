@@ -36,8 +36,14 @@ const num = v => { const t = so(v); if (!t) return null; const n = parseFloat(t.
 const reais = v => v == null || v === '' ? '' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'n' + Date.now() + Math.random());
 
-const FORM = { codigo: 'FORM 020', titulo: 'Melhorias contínuas e não conformidades', data: '01/12/2026', nrev: '01',
-  elaborador: 'Guilherme Ribeiro Lopes', aprovador: 'Produtor – Fabio Massao Sakuma' };
+/* Cada um com o seu FORM (26/10/2026, pedido dele). */
+const ASSIN = { data: '01/12/2026', elaborador: 'Guilherme Ribeiro Lopes', aprovador: 'Produtor – Fabio Massao Sakuma' };
+const FORMS = {
+  NC: { ...ASSIN, codigo: 'FORM 004', titulo: 'Não conformidades', nrev: '02' },
+  MELHORIA: { ...ASSIN, codigo: 'FORM 020', titulo: 'Melhorias contínuas', nrev: '01' },
+  FEEDBACK: { ...ASSIN, codigo: 'FORM 042', titulo: 'Reclamações e sugestões', nrev: '02' },
+};
+const FORM = FORMS.MELHORIA;
 const ETAPAS = {
   NC: ['ABERTA', 'CAUSA ANALISADA', 'PLANO DE AÇÃO', 'EM EXECUÇÃO', 'AGUARDANDO RECURSO', 'VERIFICAÇÃO', 'ENCERRADA'],
   MELHORIA: ['IDEIA', 'AVALIADA', 'APROVADA', 'EM EXECUÇÃO', 'CONCLUÍDA', 'ARQUIVADA'],
@@ -188,13 +194,15 @@ function desenharNcs() {
   L = f.ver === 'abertas' ? L.filter(aberto) : f.ver === 'encerradas' ? L.filter(c => !aberto(c)) : f.ver === 'todas' ? L : L.filter(c => c.etapa === f.ver);
   L = filtroTexto(L, f.q).sort((a, b) => situacao(b).nivel - situacao(a).nivel || String(b.data_abertura).localeCompare(String(a.data_abertura)));
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cab('Não conformidades', 'Cada uma passa pelas etapas: causa raiz → plano de ação → execução → verificação de eficácia. Os andamentos (orçamentos, contatos, decisões) ficam na linha do tempo do caso.', '<button class="btn principal" type="button" id="mcNovaNc">+ Não conformidade</button>')}
+    ${cab('Não conformidades · FORM 004', 'Cada uma passa pelas etapas: causa raiz → plano de ação → execução → verificação de eficácia. Os andamentos (orçamentos, contatos, decisões) ficam na linha do tempo do caso.', '<button class="btn principal" type="button" id="mcNovaNc">+ Não conformidade</button>')}
     <div class="grade larga" style="margin-top:12px">
       <label class="campo">Mostrar <select id="mcFn">${opcoes([['abertas', 'Abertas'], ...ETAPAS.NC.map(e => [e, e[0] + e.slice(1).toLowerCase()]), ['encerradas', 'Encerradas'], ['todas', 'Todas']], f.ver)}</select></label>
       <label class="campo" style="grid-column:span 2">Procurar <input type="search" id="mcFnQ" value="${esc(f.q)}" placeholder="caso, local, responsável…"></label>
     </div>
     <p class="dica" style="margin:8px 0 4px">${L.length} caso(s).</p>${tabelaCasos(L)}
-  </div>`;
+  </div>
+  ${rodapeForm('NC')}`;
+  ligarRodape('NC', L);
   $('mcNovaNc').addEventListener('click', () => ficha(null, 'NC'));
   $('mcFn').addEventListener('change', e => { f.ver = e.target.value; desenharNcs(); });
   $('mcFnQ').addEventListener('input', e => { f.q = e.target.value; const p = e.target.selectionStart; desenharNcs(); const i = $('mcFnQ'); i.focus(); i.setSelectionRange(p, p); });
@@ -229,7 +237,7 @@ function desenharMelhorias() {
       return `<h3 class="bm-h3">${esc(k)} <small style="font-weight:400">— ${g.length} melhoria(s)${tot ? ' · ' + reais(tot) : ''}</small></h3>${tabelaCasos(g, true)}`; }).join('') : '<div class="vazio">Nenhuma melhoria em aberto.</div>';
   }
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cab('Melhorias', 'O banco de melhorias da fazenda: ideia → avaliada (impacto × custo) → aprovada (ano e orçamento) → em execução → concluída.', '<button class="btn principal" type="button" id="mcNovaMe">+ Melhoria</button>')}
+    ${cab('Melhorias contínuas · FORM 020', 'O banco de melhorias da fazenda: ideia → avaliada (impacto × custo) → aprovada (ano e orçamento) → em execução → concluída.', '<button class="btn principal" type="button" id="mcNovaMe">+ Melhoria</button>')}
     <div class="grade larga" style="margin-top:12px">
       <label class="campo">Ver <select id="mcFmVer">${opcoes([['lista', 'Lista'], ['matriz', 'Matriz impacto × custo'], ['plano', 'Plano por ano']], f.ver)}</select></label>
       <label class="campo">Etapa <select id="mcFmEt">${opcoes([['abertas', 'Em aberto'], ...ETAPAS.MELHORIA.map(e => [e, e[0] + e.slice(1).toLowerCase()]), ['todas', 'Todas']], f.etapa)}</select></label>
@@ -237,7 +245,8 @@ function desenharMelhorias() {
     </div>
     <div style="margin-top:10px">${corpo}</div>
   </div>
-  <div class="rodape-fixo naoimprimir"><button class="btn principal" type="button" id="mcImpPl">Imprimir plano de melhorias</button></div>`;
+  ${rodapeForm('MELHORIA', '<button class="btn" type="button" id="mcImpPl">Imprimir plano de melhorias</button>')}`;
+  ligarRodape('MELHORIA', L);
   $('mcNovaMe').addEventListener('click', () => ficha(null, 'MELHORIA'));
   $('mcFmVer').addEventListener('change', e => { f.ver = e.target.value; desenharMelhorias(); });
   $('mcFmEt').addEventListener('change', e => { f.etapa = e.target.value; desenharMelhorias(); });
@@ -255,14 +264,16 @@ function desenharFeedbacks() {
   const L = (f.ver === 'abertas' ? todas.filter(aberto) : todas).sort((a, b) => String(b.data_abertura).localeCompare(String(a.data_abertura)));
   const gerado = c => M.casos.find(x => x.origem_id === c.id);
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cab('Reclamações, sugestões e elogios', 'FORM 042 — o que chega pela caixa de sugestões, quadro, WhatsApp ou conversa. Ao tratar, pode virar uma não conformidade ou uma melhoria.', '<button class="btn principal" type="button" id="mcNovoFb">+ Registrar</button>')}
+    ${cab('Reclamações e sugestões · FORM 042', 'Reclamações, sugestões e elogios — o que chega pela caixa de sugestões, quadro, WhatsApp ou conversa. Ao tratar, pode virar uma não conformidade ou uma melhoria.', '<button class="btn principal" type="button" id="mcNovoFb">+ Registrar</button>')}
     <div class="grade larga" style="margin-top:12px"><label class="campo">Mostrar <select id="mcFf">${opcoes([['abertas', 'Sem tratar'], ['todas', 'Todos']], f.ver)}</select></label></div>
     ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Via</th><th>Quem</th><th>Situação</th><th>Virou</th><th></th></tr></thead><tbody>
       ${L.map(c => { const g = gerado(c); return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${c.descricao ? `<br><small class="dica">${esc(c.descricao)}</small>` : ''}</td>
         <td>${esc(c.via || '')}</td><td>${esc(c.solicitante || 'Anônimo')}</td><td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td><td>${g ? `<button type="button" class="ce-link" data-caso="${esc(g.id)}">${esc(NOME_NAT[g.natureza])}</button>` : '—'}</td>
         <td class="ce"><button class="btn mini" type="button" data-caso="${esc(c.id)}">Abrir</button></td></tr>`; }).join('')}
     </tbody></table></div>` : '<div class="vazio" style="margin-top:10px">Nada registrado.</div>'}
-  </div>`;
+  </div>
+  ${rodapeForm('FEEDBACK')}`;
+  ligarRodape('FEEDBACK', L);
   $('mcNovoFb').addEventListener('click', () => ficha(null, 'FEEDBACK'));
   $('mcFf').addEventListener('change', e => { f.ver = e.target.value; desenharFeedbacks(); });
   ligarAbrir(tela);
@@ -504,14 +515,22 @@ function ficha(c, natNovo, pre) {
 /* ===================================================================
    IMPRESSÃO E EXCEL
    =================================================================== */
-function docCasos(lista, titulo) {
+/* Rodapé de cada tela: imprime o FORM dela (o que está na lista) e o Excel. */
+const rodapeForm = (nat, extra = '') => `<div class="rodape-fixo naoimprimir"><button class="btn principal" type="button" id="mcImpF">Imprimir ${FORMS[nat].codigo}</button>${extra}<button class="btn" type="button" id="mcXlsxF">Excel</button></div>`;
+function ligarRodape(nat, lista) {
+  $('mcImpF')?.addEventListener('click', () => mostrar(docCasos(lista, FORMS[nat].titulo, FORMS[nat]), { barra: true }));
+  $('mcXlsxF')?.addEventListener('click', () => exportar(nat));
+}
+function docCasos(lista, titulo, F) {
+  if (!F) { const nats = [...new Set(lista.map(c => c.natureza))]; F = nats.length === 1 ? FORMS[nats[0]] : FORM; }
+  const FORM_ = F;
   const L = lista.slice().sort((a, b) => a.natureza.localeCompare(b.natureza) || String(a.data_abertura).localeCompare(String(b.data_abertura)));
   return `<article class="rel">
     <header class="rel-cabecalho"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-titulo"><h1>${esc(titulo)}</h1><p>${esc(FORM.titulo)}</p></div>
-      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${FORM.codigo}</span></div></header>
-    <div class="rel-ficha"><div><span>Código</span><b>${FORM.codigo}</b></div><div><span>Data</span><b>${FORM.data}</b></div><div><span>Revisão</span><b>${FORM.nrev}</b></div>
-      <div><span>Elaboração / revisão</span><b>${FORM.elaborador}</b></div><div><span>Aprovação</span><b>${FORM.aprovador}</b></div><div><span>Casos</span><b>${L.length}</b></div></div>
+      <div class="rel-titulo"><h1>${esc(titulo)}</h1><p>${esc(FORM_.titulo)}</p></div>
+      <div class="rel-comp"><span>emitido em</span><strong>${br(hoje())}</strong><span>${FORM_.codigo}</span></div></header>
+    <div class="rel-ficha"><div><span>Código</span><b>${FORM_.codigo}</b></div><div><span>Data</span><b>${FORM_.data}</b></div><div><span>Revisão</span><b>${FORM_.nrev}</b></div>
+      <div><span>Elaboração / revisão</span><b>${FORM_.elaborador}</b></div><div><span>Aprovação</span><b>${FORM_.aprovador}</b></div><div><span>Casos</span><b>${L.length}</b></div></div>
     ${L.map(c => { const ac = acoesDe(c), an = andsDe(c); return `<section class="mc-rel-caso"><h2 class="rel-secao">${esc(NOME_NAT[c.natureza])} · ${esc(c.titulo)}</h2>
       <p class="rel-nota">Abertura ${br(c.data_abertura)} · ${esc([c.via, c.local, c.fazenda].filter(Boolean).join(' · '))} · etapa <b>${esc(c.etapa)}</b> · ${esc(situacao(c).rot)}${c.responsavel ? ' · responsável ' + esc(c.responsavel) : ''}</p>
       ${c.causa_raiz ? `<p class="rel-nota"><b>Causa raiz:</b> ${esc(c.causa_raiz)}</p>` : ''}
@@ -522,19 +541,22 @@ function docCasos(lista, titulo) {
     </section>`; }).join('') || '<p>Nenhum caso.</p>'}
     <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer></article>`;
 }
-async function exportar() {
+async function exportar(nat) {
   const nomeCaso = id => M.casos.find(c => c.id === id)?.titulo || '';
-  await baixarXlsx(`melhoria-continua-${hoje()}`, [
-    { nome: 'Casos', titulo: `${FORM.codigo} — ${FORM.titulo}`, subtitulo: `SAKUMA Agronegócios · emitido em ${br(hoje())}`,
+  const F = nat ? FORMS[nat] : FORM;
+  const casos = nat ? M.casos.filter(c => c.natureza === nat) : M.casos;
+  const ids = new Set(casos.map(c => c.id));
+  await baixarXlsx(`${F.codigo.replace(' ', '-')}-${semAc(F.titulo).toLowerCase().replace(/\s+/g, '-')}-${hoje()}`, [
+    { nome: 'Casos', titulo: `${F.codigo} — ${F.titulo}`, subtitulo: `SAKUMA Agronegócios · emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Natureza', larg: 16 }, { rot: 'Tipo', larg: 18 }, { rot: 'Título', larg: 44 }, { rot: 'Abertura', larg: 11, tipo: 'data' }, { rot: 'Etapa', larg: 18 }, { rot: 'Situação', larg: 30 },
         { rot: 'Via', larg: 18 }, { rot: 'Local', larg: 24 }, { rot: 'Fazenda', larg: 14 }, { rot: 'Responsável', larg: 24 }, { rot: 'Previsão', larg: 11, tipo: 'data' }, { rot: 'Reavaliar em', larg: 11, tipo: 'data' },
         { rot: 'Causa raiz', larg: 40 }, { rot: 'Impacto', larg: 8 }, { rot: 'Custo', larg: 8 }, { rot: 'Custo estimado', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Ano previsto', larg: 8 }, { rot: 'Encerramento', larg: 11, tipo: 'data' }],
-      linhas: M.casos.map(c => [NOME_NAT[c.natureza], c.tipo, c.titulo, c.data_abertura, c.etapa, situacao(c).rot, c.via || '', c.local || '', c.fazenda || '', c.responsavel || '', c.previsao, c.reavaliar_em,
+      linhas: casos.map(c => [NOME_NAT[c.natureza], c.tipo, c.titulo, c.data_abertura, c.etapa, situacao(c).rot, c.via || '', c.local || '', c.fazenda || '', c.responsavel || '', c.previsao, c.reavaliar_em,
         c.causa_raiz || '', NIVEL[c.impacto] || '', NIVEL[c.custo] || '', c.custo_estimado != null ? Number(c.custo_estimado) : null, c.ano_previsto || '', c.data_encerramento]) },
     { nome: 'Plano de ação', colunas: [{ rot: 'Caso', larg: 40 }, { rot: 'Ação', larg: 40 }, { rot: 'Quem', larg: 24 }, { rot: 'Até', larg: 11, tipo: 'data' }, { rot: 'Valor', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Status', larg: 14 }, { rot: 'Resultado', larg: 40 }],
-      linhas: M.acoes.map(a => [nomeCaso(a.caso_id), a.oque, a.quem || '', a.quando, a.quanto != null ? Number(a.quanto) : null, a.status, a.resultado || '']) },
+      linhas: M.acoes.filter(a => ids.has(a.caso_id)).map(a => [nomeCaso(a.caso_id), a.oque, a.quem || '', a.quando, a.quanto != null ? Number(a.quanto) : null, a.status, a.resultado || '']) },
     { nome: 'Andamentos', colunas: [{ rot: 'Caso', larg: 40 }, { rot: 'Data', larg: 11, tipo: 'data' }, { rot: 'Andamento', larg: 60 }, { rot: 'Empresa', larg: 24 }, { rot: 'Valor', larg: 12, tipo: 'num', casas: 2 }, { rot: 'Link', larg: 40 }],
-      linhas: M.ands.map(a => [nomeCaso(a.caso_id), a.data, a.texto, a.empresa || '', a.valor != null ? Number(a.valor) : null, a.link || '']) },
+      linhas: M.ands.filter(a => ids.has(a.caso_id)).map(a => [nomeCaso(a.caso_id), a.data, a.texto, a.empresa || '', a.valor != null ? Number(a.valor) : null, a.link || '']) },
   ]);
 }
 

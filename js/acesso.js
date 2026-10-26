@@ -286,10 +286,15 @@ export const MODULOS = [
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
        manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
-    { id: 'ceMelhSub', grupo: 'Forms', codigo: 'FORM 020 · 042', nome: 'Melhoria contínua', telas: [
-      ['mcPainel',     'Painel'],
+    /* 26/10/2026, pedido dele: cada um independente, com o seu FORM
+       (antes era um submódulo só, "Melhoria contínua · FORM 020 · 042"). */
+    { id: 'ceNcSub', grupo: 'Forms', codigo: 'FORM 004', nome: 'Não conformidades', telas: [
       ['mcNcs',        'Não conformidades'],
-      ['mcMelhorias',  'Melhorias'],
+    ] },
+    { id: 'ceMelhSub', grupo: 'Forms', codigo: 'FORM 020', nome: 'Melhorias contínuas', telas: [
+      ['mcMelhorias',  'Melhorias contínuas'],
+    ] },
+    { id: 'ceFbSub', grupo: 'Forms', codigo: 'FORM 042', nome: 'Reclamações e sugestões', telas: [
       ['mcFeedbacks',  'Reclamações e sugestões'],
     ] },
     { id: 'ceCrono', nome: 'Cronograma', telas: [
@@ -705,7 +710,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceMelhSub: 'grafico',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
