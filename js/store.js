@@ -168,7 +168,8 @@ export async function iniciar() {
   estado.cliente.auth.onAuthStateChange((_evt, sessao) => {
     /* Sem rede, o supabase-js pode responder "sem sessão" a um refresh que
        não chegou ao servidor. Não derruba quem entrou com a sessão guardada. */
-    if (!sessao && _evt !== 'SIGNED_OUT' && sessaoGuardada()) return;
+    if (!sessao && _evt !== 'SIGNED_OUT' && (sessaoGuardada() || estado.entrouOffline)) return;
+    if (sessao) atualizarCopiaOffline(sessao);
     estado.sessao = sessao; avisar();
   });
   return estado.sessao ? { etapa: 'app', semRede } : { etapa: 'login' };
@@ -181,7 +182,7 @@ const pareceEmail = v => /@/.test(String(v || ''));
    função 'entrar' no servidor: a tabela que liga nome e e-mail só é legível
    para quem já está logado, e o e-mail de ninguém pode vazar para quem chuta
    nomes. Por isso ela devolve a sessão pronta, não o e-mail. */
-export async function entrar(login, senha) {
+async function entrarOnline(login, senha) {
   const quem = String(login || '').trim();
 
   if (pareceEmail(quem)) {
@@ -207,7 +208,115 @@ export async function entrar(login, senha) {
   return sessao;
 }
 
+
+/* ---------------- entrar sem internet (26/10/2026) ----------------
+   Pedido: "ele precisa funcionar offline!" — o Matheus, no campo, sem
+   "Manter conectado" marcado, ficava preso no login ("Sem conexão com o
+   Supabase"). Agora, toda vez que alguém entra COM internet, o aparelho
+   guarda um resumo da senha (PBKDF2, 150 mil voltas, sal próprio — a senha
+   em si nunca é guardada) e a sessão do Supabase. Sem internet, o login
+   confere a senha digitada contra esse resumo e abre o app com os dados do
+   aparelho. A regra de 10/10 continua: fechou a janela, pede a senha de
+   novo — só que agora a senha funciona também sem sinal.
+   Quando o sinal volta, a sessão guardada é devolvida ao supabase-js, que
+   renova o token e a fila sobe. "Sair" apaga tudo isso do aparelho. */
+const OFFLINE = 'gr.offline';
+const VOLTAS = 150000;
+const b64 = u8 => btoa(String.fromCharCode(...u8));
+const deB64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+
+async function resumoDaSenha(senha, salB64) {
+  const chave = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(senha)), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: deB64(salB64), iterations: VOLTAS }, chave, 256);
+  return b64(new Uint8Array(bits));
+}
+function lerOffline() {
+  try { const r = JSON.parse(localStorage.getItem(OFFLINE) || 'null'); return r && r.hash && r.sessao ? r : null; }
+  catch { return null; }
+}
+const copiaDaSessao = s => s && s.access_token && s.refresh_token && s.user
+  ? { access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at,
+      expires_in: s.expires_in, token_type: s.token_type, user: s.user }
+  : null;
+
+async function guardarParaOffline(login, senha, sessao) {
+  try {
+    const s = copiaDaSessao(sessao);
+    if (!s || !crypto?.subtle) return;
+    const sal = b64(crypto.getRandomValues(new Uint8Array(16)));
+    const hash = await resumoDaSenha(senha, sal);
+    const logins = [...new Set([String(login || '').trim().toLowerCase(), String(s.user.email || '').toLowerCase()].filter(Boolean))];
+    localStorage.setItem(OFFLINE, JSON.stringify({ logins, sal, hash, sessao: s, em: new Date().toISOString() }));
+  } catch { /* sem espaço ou sem crypto: segue só online */ }
+}
+/* O Supabase troca o refresh token a cada renovação; a cópia guardada tem de
+   acompanhar, senão na próxima volta do sinal ela já estaria vencida. */
+function atualizarCopiaOffline(sessao) {
+  const r = lerOffline(); const s = copiaDaSessao(sessao);
+  if (!r || !s || r.sessao?.user?.id !== s.user.id) return;
+  r.sessao = s;
+  try { localStorage.setItem(OFFLINE, JSON.stringify(r)); } catch {}
+}
+export function esquecerOffline() { try { localStorage.removeItem(OFFLINE); } catch {} }
+
+const ehFalhaDeRede = e => !navigator.onLine
+  || /Failed to fetch|NetworkError|Load failed|network|timeout|timed out|AbortError|\b(502|503|504)\b|falar com o servidor/i.test(String(e?.message || e || ''));
+
+async function entrarOffline(login, senha, erroOriginal) {
+  const r = lerOffline();
+  const quem = String(login || '').trim().toLowerCase();
+  if (!r || !r.logins.includes(quem)) {
+    throw new Error('Sem internet, e este aparelho ainda não tem o acesso de "' + String(login || '').trim()
+      + '" guardado. Entre uma vez com internet neste aparelho — depois ele abre também sem sinal.');
+  }
+  const confere = await resumoDaSenha(senha, r.sal);
+  if (confere !== r.hash) throw new Error('Usuário ou senha incorretos.');
+  estado.sessao = r.sessao;
+  estado.entrouOffline = true;
+  avisar();
+  if (navigator.onLine) setTimeout(religarSessao, 0);   // sinal fraco: tenta já
+  return { offline: true, motivo: erroOriginal ? String(erroOriginal.message || erroOriginal) : '' };
+}
+
+/* Sinal de volta: entrega a sessão guardada ao supabase-js (ele renova o
+   token) e libera a fila. */
+export async function religarSessao() {
+  if (!estado.entrouOffline || !estado.cliente) return;
+  const r = lerOffline(); if (!r) return;
+  try {
+    const { data, error } = await estado.cliente.auth.setSession({
+      access_token: r.sessao.access_token, refresh_token: r.sessao.refresh_token,
+    });
+    if (error || !data?.session) return;      // tenta de novo no próximo 'online'
+    estado.entrouOffline = false;
+    estado.sessao = data.session;
+    atualizarCopiaOffline(data.session);
+    avisar();
+    try { dispatchEvent(new CustomEvent('gr:sessao-religada')); } catch {}
+  } catch { /* ainda sem rede de verdade */ }
+}
+addEventListener('online', () => { setTimeout(religarSessao, 800); });
+
+export async function entrar(login, senha) {
+  if (!navigator.onLine) return entrarOffline(login, senha);
+  try {
+    const r = await Promise.race([
+      entrarOnline(login, senha),
+      new Promise((_, nao) => setTimeout(() => nao(new Error('timeout')), 15000)),
+    ]);
+    estado.entrouOffline = false;
+    guardarParaOffline(login, senha, estado.sessao);
+    return r;
+  } catch (e) {
+    if (!ehFalhaDeRede(e)) throw e;
+    if (!lerOffline()) throw e;                   // nunca entrou neste aparelho: mostra o erro de rede
+    return entrarOffline(login, senha, e);
+  }
+}
+
 export async function sair() {
+  esquecerOffline();
+  estado.entrouOffline = false;
   try { await estado.cliente.auth.signOut(); } catch {}
   estado.sessao = null;
   avisar();

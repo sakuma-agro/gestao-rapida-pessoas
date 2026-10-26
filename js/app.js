@@ -263,8 +263,9 @@ $('formLogin').addEventListener('submit', async ev => {
   const botao = $('btnEntrar'); botao.disabled = true; botao.textContent = 'Entrando...';
   try {
     db.definirManter($('logManter').checked);
-    await db.entrar($('logEmail').value.trim(), $('logSenha').value);
+    const r = await db.entrar($('logEmail').value.trim(), $('logSenha').value);
     mostrar('app');
+    if (r?.offline) mostrarAviso('Sem internet. Entrou com o acesso guardado neste aparelho — o que você lançar fica na fila e sobe quando o sinal voltar.');
     await carregarTudo();
   } catch (e) {
     erro.textContent = traduzirErro(e);
@@ -1912,6 +1913,13 @@ addEventListener('online', () => setTimeout(contarPendentes, 1500));
 /* Voltou o sinal: os parados voltam à fila e sobem junto (19/10/2026). As
    camadas já disparam o próprio envio no 'online'; aqui só liberamos os parados. */
 addEventListener('online', () => nucleo.retentarParados());
+/* Entrou sem internet (26/10/2026): quando a sessão é religada ao voltar o
+   sinal, sobe a fila e atualiza os dados. */
+addEventListener('gr:sessao-religada', () => {
+  db.sincronizar().catch(() => {});
+  nucleo.retentarParados();
+  setTimeout(contarPendentes, 1500);
+});
 setInterval(contarPendentes, 60 * 1000);
 addEventListener('message', ev => {
   if (ev.origin !== location.origin) return;
@@ -2184,7 +2192,7 @@ function telaDeSocorro(texto) {
     const erro = $('erroLogin');
     erro.textContent = navigator.onLine
       ? 'O servidor está demorando para responder. Pode ser o banco pausado — espere um minuto e recarregue.'
-      : 'Sem internet. Para abrir o app sem sinal, entre uma vez com "Manter conectado neste aparelho" marcado.';
+      : 'Sem internet. Entre com seu usuário e senha: se você já entrou neste aparelho com internet, o app abre com os dados guardados.';
     erro.hidden = false;
     arranque.then(x => { if (x?.etapa === 'app') { mostrar('app'); carregarTudo(); } }).catch(() => {});
     return;
