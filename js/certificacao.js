@@ -26,7 +26,8 @@ import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo } from './acesso.js';
-import { campoAnexos, donosComArquivo } from './arquivos.js';
+import { campoAnexos, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquivo, enfileirarArquivo, enviarPendentes, contarPendentes, aoMudarArquivos } from './arquivos.js';
+import { svgIcone } from './icones.js';
 import { itensCaderno } from './cert-caderno.js';
 
 const $ = id => document.getElementById(id);
@@ -80,7 +81,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 const S = {
   carregado: false, certs: [], reqs: [], docs: [], evs: [],
   fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
-  fd: { q: '', cat: '', per: '', sit: '', resp: '' },
+  fd: { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
   anual: { ano: 0, cert: '', docs: false },
 };
@@ -599,14 +600,273 @@ function docFiltrados() {
   });
 }
 
+/* -------------------------------------------------------------------
+   Lista mestra por tipo de documento (26/10/2026, pedido do Guilherme):
+   ao entrar aparecem cartões (POP, IT, RG, CL, AN); no cartão, a lista à
+   esquerda e o documento aberto à direita — PDF vigente dentro do app
+   (arquivo no Google Drive), "Abrir local" (pasta no OneDrive, campo link),
+   "copiar caminho" (C:\NUVEM\OneDrive\…, campo caminho) e as revisões
+   anteriores (arquivos do dono "<id>-rev"). A pasta espelho no computador é
+   6 - Certificações › Certificação - Lop Gestão Rápida: o que está lá é o
+   que já está no app. "Importar pasta" lê uma pasta dessas (uma subpasta
+   por documento, com Revisões dentro) e sobe os PDFs para o Drive.
+   ------------------------------------------------------------------- */
+const TIPOS_DOC = [
+  { id: 'POP', nome: 'POP', desc: 'Procedimentos operacionais', icone: 'documento', cat: 'P.O.Ps' },
+  { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO' },
+  { id: 'RG', nome: 'RG', desc: 'Registros e formulários', icone: 'boletim', cat: 'REGISTROS' },
+  { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST' },
+  { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO' },
+];
+const prefixoDoc = d => (so(d.codigo).toUpperCase().match(/^[A-Z]+/) || [''])[0];
+const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Outros', desc: 'Outros documentos', icone: 'documento', cat: '' };
+const docsDoTipo = id => S.docs.filter(d => (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
+  .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
+/* código comparável: "POP 1", "POP 001" e "POPAGR-01" viram POP1 */
+const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP').replace(/^POAGR/, 'POP').match(/^([A-Z]+)[\s._-]*0*(\d+)/); return m ? m[1] + Number(m[2]) : ''; };
+const revDono = id => `${id}-rev`;
+const ehPdf = x => /pdf$/i.test(x.mime || '') || /\.pdf$/i.test(x.nome || '');
+
 function desenharDocumentos() {
+  const f = S.fd;
+  if (f.modo === 'tabela') return desenharTabelaDocs();
+  if (f.modo === 'tipo') return desenharTipoDocs();
+  desenharTiposDocs();
+}
+
+function desenharTiposDocs() {
+  const tela = $('telaCeDocumentos');
+  const f = S.fd;
+  const outros = docsDoTipo('OUTROS');
+  const tipos = [...TIPOS_DOC, ...(outros.length ? [{ id: 'OUTROS', nome: 'Outros', desc: 'Sem tipo no código', icone: 'documento' }] : [])];
+  const cartao = t => {
+    const l = docsDoTipo(t.id);
+    const n = s => l.filter(d => d.situacao === s).length;
+    const venc = l.filter(docAtrasado).length;
+    return `<button class="ce-tipo" type="button" data-tipo="${t.id}">
+      <span class="ce-tipo-ic">${svgIcone(t.icone)}</span>
+      <b>${esc(t.nome)}</b><span class="dc-sem">${esc(t.desc)} · ${l.length} doc.</span>
+      <span class="ce-tipo-pe">${n('Em dia') ? tag(n('Em dia') + ' em dia', 'ativo') : ''}${n('Revisar') ? tag(n('Revisar') + ' revisar', 'alerta') : ''}${n('Pendente') ? tag(n('Pendente') + ' pendente', 'perigo') : ''}${venc ? tag(venc + ' revisão vencida', 'perigo') : ''}${l.length ? '' : '<span class="dc-sem">nenhum ainda</span>'}</span>
+    </button>`;
+  };
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><h2 style="margin:0">Lista mestra</h2>
+        <p class="dica" style="margin:2px 0 0">Escolha o tipo de documento. Cada um abre com o PDF vigente, a pasta no OneDrive e as revisões anteriores.</p></div>
+      <span class="barra" style="margin:0"><button class="btn" type="button" id="ceDcTabela2">Ver tudo em tabela</button>
+      <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button></span>
+    </div>
+    <label class="campo" style="margin-top:12px">Buscar em todos <input type="text" id="ceDcBusca" value="${esc(f.q2)}" placeholder="Código, nome ou código da norma (ex.: 4.6.1)"></label>
+    <div id="ceDcAchados"></div>
+    <div class="ce-tipos">${tipos.map(cartao).join('')}</div>
+  </div>`;
+  tela.querySelectorAll('[data-tipo]').forEach(b => b.addEventListener('click', () => abrirTipo(b.dataset.tipo)));
+  $('ceDcTabela2').addEventListener('click', () => { f.modo = 'tabela'; desenharDocumentos(); });
+  $('ceDcNovo').addEventListener('click', () => formDocumento(null));
+  const achados = () => {
+    const q = so(f.q2).toLowerCase();
+    const l = q ? S.docs.filter(d => [d.codigo, d.nome, d.responsavel, codTexto(codigosDoDoc(d))].some(t => so(t).toLowerCase().includes(q))) : [];
+    $('ceDcAchados').innerHTML = !q ? '' : l.length ? `<ul class="ce-achados">${l.slice(0, 30).map(d => `<li><button class="ce-link" type="button" data-achado="${d.id}">
+      <b>${esc(d.codigo)}</b> ${esc(d.nome)}</button> ${tag(d.situacao, COR_SIT[d.situacao])} <span class="ce-refs">${codTags(codigosDoDoc(d))}</span></li>`).join('')}</ul>`
+      : '<p class="dica">Nada encontrado.</p>';
+    $('ceDcAchados').querySelectorAll('[data-achado]').forEach(b => b.addEventListener('click', () => {
+      const d = S.docs.find(x => x.id === Number(b.dataset.achado));
+      abrirTipo(TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS', d.id);
+    }));
+  };
+  $('ceDcBusca').addEventListener('input', e => { f.q2 = e.target.value; achados(); });
+  achados();
+}
+
+function abrirTipo(id, sel = null) {
+  Object.assign(S.fd, { modo: 'tipo', tipo: id, sel: sel ?? docsDoTipo(id)[0]?.id ?? null });
+  desenharDocumentos();
+}
+
+function desenharTipoDocs() {
+  const tela = $('telaCeDocumentos');
+  const f = S.fd;
+  const t = tipoDoc(f.tipo);
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0">
+      <div><button class="ce-voltar" type="button" id="ceDcVoltar">← Tipos de documento</button>
+        <h2 style="margin:0">${esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)}</small></h2></div>
+      <span class="barra" style="margin:0">
+        <label class="btn" title="Escolha a pasta do tipo (ex.: Certificação - Lop Gestão Rápida › 1 - POP). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
+          <input type="file" id="ceDcPasta" hidden webkitdirectory multiple></label>
+        <button class="btn principal" type="button" id="ceDcNovo">Novo ${esc(t.nome)}</button></span>
+    </div>
+    <p class="aviso" id="ceDcEnvio" hidden></p>
+    <div class="ce-dv">
+      <div class="ce-dv-lista">
+        <input type="text" id="ceDcQ2" placeholder="Buscar ${esc(t.nome)}" value="">
+        <div id="ceDcItens"></div>
+      </div>
+      <div class="ce-dv-painel" id="ceDcPainel"></div>
+    </div>
+  </div>`;
+  $('ceDcVoltar').addEventListener('click', () => { f.modo = ''; desenharDocumentos(); });
+  $('ceDcNovo').addEventListener('click', () => formDocumento(null, t.cat ? { categoria: t.cat } : {}));
+  $('ceDcPasta').addEventListener('change', e => importarPasta([...e.target.files]).finally(() => { e.target.value = ''; }));
+  const itens = () => {
+    const q = so($('ceDcQ2').value).toLowerCase();
+    const l = docsDoTipo(f.tipo).filter(d => !q || [d.codigo, d.nome, codTexto(codigosDoDoc(d))].some(x => so(x).toLowerCase().includes(q)));
+    $('ceDcItens').innerHTML = l.length ? l.map(d => `<button type="button" class="ce-dv-item${d.id === f.sel ? ' on' : ''}" data-sel="${d.id}">
+        <span><b>${esc(so(d.codigo).replace(/^[A-Z]+\s*/, ''))}</b> ${esc(d.nome)}</span>${tag(d.situacao, COR_SIT[d.situacao])}</button>`).join('')
+      : `<p class="dica" style="padding:8px">${docsDoTipo(f.tipo).length ? 'Nada com essa busca.' : 'Nenhum documento deste tipo ainda.'}</p>`;
+    $('ceDcItens').querySelectorAll('[data-sel]').forEach(b => b.addEventListener('click', () => {
+      f.sel = Number(b.dataset.sel); itens(); painelDoc();
+      if (matchMedia('(max-width:760px)').matches) $('ceDcPainel').scrollIntoView({ behavior: 'smooth' });
+    }));
+  };
+  $('ceDcQ2').addEventListener('input', itens);
+  itens(); painelDoc(); mostrarEnvio();
+}
+
+let geracaoPainel = 0;
+async function painelDoc() {
+  const el = $('ceDcPainel'); if (!el) return;
+  const d = S.docs.find(x => x.id === S.fd.sel);
+  if (!d) { el.innerHTML = '<div class="vazio">Escolha um documento na lista.</div>'; return; }
+  const g = ++geracaoPainel;
+  const celular = matchMedia('(max-width:760px)').matches;
+  const refs = codigosDoDoc(d);
+  el.innerHTML = `<div class="barra entre" style="margin:0;align-items:flex-start">
+      <div><div class="dc-sem">${esc(d.codigo)}${d.revisao != null && d.revisao !== '' ? ' · Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? ' · ' + br(d.data_revisao) : ''}${d.responsavel ? ' · Resp.: ' + esc(d.responsavel) : ''}</div>
+        <h3 style="margin:2px 0 0">${esc(d.nome)}</h3></div>
+      ${tag(d.situacao, COR_SIT[d.situacao])}
+    </div>
+    <div class="barra" style="margin:12px 0 4px">
+      <button class="btn principal" type="button" id="ceDvPdf" disabled>${svgIcone('documento')} Abrir PDF</button>
+      ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive">${svgIcone('predio')} Abrir local</a>`
+        : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">Abrir local</button>'}
+      ${d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
+      <span class="cresce"></span>
+      <button class="btn" type="button" id="ceDvEditar">${svgIcone('lapis')} Editar</button>
+    </div>
+    <div class="dc-sem ce-dv-caminho" id="ceDvMsg">${esc(d.caminho || '')}</div>
+    <div class="ce-dv-pdf" id="ceDvVisor"><span class="dc-sem">Procurando o PDF…</span></div>
+    <div class="ce-dv-info">
+      <div><h4 class="ac-h4">Normas atendidas</h4>
+        ${refs.length ? `<div class="ce-refs" style="max-width:none">${codTags(refs)}</div>
+          <button class="ce-link dc-sem" type="button" id="ceDvReqs">${reqsDoDoc(d).length} requisito(s)</button>`
+          : '<p class="dica">Nenhum requisito ligado ainda. A ligação se faz no requisito, em “Documentos que comprovam”.</p>'}
+        ${d.observacao ? `<h4 class="ac-h4">Observação</h4><p class="dica">${esc(d.observacao)}</p>` : ''}</div>
+      <div><h4 class="ac-h4">Revisões anteriores</h4><div id="ceDvRevs"><span class="dc-sem">…</span></div></div>
+    </div>`;
+  $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
+  $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
+  $('ceDvCopiar')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(d.caminho); $('ceDvMsg').textContent = 'Caminho copiado. No Explorador de Arquivos, clique na barra de endereço, cole (Ctrl+V) e Enter.'; }
+    catch { $('ceDvMsg').textContent = d.caminho; prompt('Copie o caminho:', d.caminho); }
+  });
+  const [arqs, revs] = await Promise.all([
+    listarArquivos('certificacao', 'documento', d.id).catch(() => []),
+    listarArquivos('certificacao', 'documento', revDono(d.id)).catch(() => []),
+  ]);
+  if (g !== geracaoPainel) return;
+  const pdfs = arqs.filter(ehPdf);
+  const vig = pdfs.find(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo)) || pdfs[0] || arqs[0];
+  const extras = arqs.filter(x => x !== vig);
+  $('ceDvRevs').innerHTML = revs.length ? revs.slice().sort((a, b) => so(b.nome).localeCompare(so(a.nome))).map(x =>
+      `<button type="button" class="ce-dv-rev" data-ver="${esc(x.chave)}">${svgIcone('historico')} <span>${esc(x.nome)}</span></button>`).join('')
+    : '<p class="dica">Nenhuma no app.</p>';
+  $('ceDvRevs').querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.ver)));
+  const visor = $('ceDvVisor');
+  if (!vig) {
+    visor.innerHTML = `<span class="dc-sem">O PDF ainda não está no app. Use “Importar pasta” ou anexe em Editar.</span>`;
+    return;
+  }
+  const btn = $('ceDvPdf'); btn.disabled = false;
+  btn.addEventListener('click', () => abrirArquivo(vig.chave));
+  const anexos = extras.length ? `<div class="ce-dv-extras">Também nesta pasta: ${extras.map(x => `<button class="ce-link" type="button" data-ver="${esc(x.chave)}">${esc(x.nome)}</button>`).join(' · ')}</div>` : '';
+  if (celular) {
+    visor.innerHTML = `<span class="dc-sem">${esc(vig.nome)} — toque em “Abrir PDF”.</span>${anexos}`;
+  } else {
+    visor.innerHTML = `<span class="dc-sem">Carregando ${esc(vig.nome)}…</span>`;
+    try {
+      const u = await urlDoArquivo(vig.chave);
+      if (g !== geracaoPainel) return;
+      visor.innerHTML = `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH"></iframe>${anexos}`;
+    } catch (e) {
+      if (g !== geracaoPainel) return;
+      visor.innerHTML = `<span class="dc-sem">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</span>${anexos}`;
+    }
+  }
+  visor.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.ver)));
+}
+
+/* Barra de envio: quantos arquivos ainda sobem para o Drive. */
+let pararAviso = null;
+async function mostrarEnvio() {
+  const el = $('ceDcEnvio'); if (!el) return;
+  const n = await contarPendentes().catch(() => 0);
+  el.hidden = !n;
+  el.textContent = n ? `Enviando para o Google Drive: faltam ${n} arquivo(s). Pode continuar usando o app.` : '';
+  if (!pararAviso) pararAviso = aoMudarArquivos(() => { mostrarEnvio(); if (S.fd.modo === 'tipo') painelDoc(); });
+}
+
+/** Importa uma pasta escolhida no computador (input webkitdirectory). */
+async function importarPasta(arquivos) {
+  if (!arquivos.length) return;
+  const porCod = new Map(S.docs.map(d => [chaveCodigo(d.codigo), d]));
+  const grupos = new Map();                 // doc.id → {d, raiz:[], revs:[]}
+  const semCadastro = new Set();
+  let ignorados = 0;
+  for (const a of arquivos) {
+    const partes = (a.webkitRelativePath || a.name).split('/');
+    const i = partes.findIndex((p, k) => k < partes.length - 1 && chaveCodigo(p));
+    if (i < 0) continue;
+    const d = porCod.get(chaveCodigo(partes[i]));
+    if (!d) { semCadastro.add(partes[i]); continue; }
+    if (!/\.pdf$/i.test(a.name) && !/^image\//.test(a.type)) { ignorados++; continue; }
+    const g = grupos.get(d.id) || { d, raiz: [], revs: [] };
+    if (partes.length === i + 2) g.raiz.push(a);
+    else if (/^revis/i.test(partes[i + 1])) g.revs.push(a);
+    else { ignorados++; continue; }
+    grupos.set(d.id, g);
+  }
+  if (!grupos.size) {
+    alert(semCadastro.size ? `Nenhuma subpasta bate com um código cadastrado: ${[...semCadastro].join(', ')}` : 'Não achei subpastas com código (ex.: "POP 001 - …") nessa pasta.');
+    return;
+  }
+  const dataArq = a => { const x = new Date(a.lastModified); return `${doisD(x.getDate())}-${doisD(x.getMonth() + 1)}-${x.getFullYear()}`; };
+  let novos = 0, jaTinha = 0, erros = [];
+  for (const { d, raiz, revs } of grupos.values()) {
+    const tem = new Set((await listarArquivos('certificacao', 'documento', d.id).catch(() => [])).map(x => so(x.nome)));
+    const temRev = new Set((await listarArquivos('certificacao', 'documento', revDono(d.id)).catch(() => [])).map(x => so(x.nome)));
+    for (const a of raiz) {
+      if (tem.has(a.name)) { jaTinha++; continue; }
+      try { await enfileirarArquivo('certificacao', 'documento', d.id, a, a.name); novos++; S.docArq?.add(String(d.id)); }
+      catch (e) { erros.push(`${a.name}: ${e.message}`); }
+    }
+    for (const a of revs) {
+      const nome = `${dataArq(a)} · ${a.name}`;
+      if (temRev.has(nome)) { jaTinha++; continue; }
+      try { await enfileirarArquivo('certificacao', 'documento', revDono(d.id), a, nome); novos++; }
+      catch (e) { erros.push(`${a.name}: ${e.message}`); }
+    }
+  }
+  enviarPendentes();
+  mostrarEnvio();
+  dialogo(`<h3>Importar pasta</h3>
+    <p><b>${grupos.size}</b> documento(s) encontrados · <b>${novos}</b> arquivo(s) indo para o Google Drive${jaTinha ? ` · ${jaTinha} já estavam no app` : ''}.</p>
+    ${ignorados ? `<p class="dica">${ignorados} arquivo(s) Word/outros ficaram de fora: o editável continua no OneDrive (botão “Abrir local”).</p>` : ''}
+    ${semCadastro.size ? `<p class="dica">Sem cadastro na Lista mestra (não importados): ${esc([...semCadastro].join(', '))}. Cadastre e importe de novo.</p>` : ''}
+    ${erros.length ? `<div class="aviso erro">${erros.map(esc).join('<br>')}</div>` : ''}
+    <p class="dica">Os arquivos sobem um por vez; pode fechar e continuar usando o app.</p>
+    <div class="barra fim"><button class="btn principal" type="button" data-fechar>Ok</button></div>`, () => {});
+}
+
+function desenharTabelaDocs() {
   const tela = $('telaCeDocumentos');
   const f = S.fd;
   const cats = [...new Set([...CATEGORIAS, ...S.docs.map(d => d.categoria)])].sort();
   const pers = [...new Set(S.docs.map(d => d.periodicidade).filter(Boolean))].sort((a, b) => PERIODOS.indexOf(a) - PERIODOS.indexOf(b));
   tela.innerHTML = `<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
-      <div><h2 style="margin:0">Lista mestra</h2>
+      <div><button class="ce-voltar" type="button" id="ceDcVoltar">← Tipos de documento</button>
+        <h2 style="margin:0">Lista mestra · tabela</h2>
         <p class="dica" style="margin:2px 0 0">Anexos, instruções de trabalho, registros, POPs e check lists, com revisão, responsável e os códigos das normas que cada um atende.</p></div>
       <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button>
     </div>
@@ -627,6 +887,7 @@ function desenharDocumentos() {
   const ligarF = (id, campo, ev = 'change') => $(id).addEventListener(ev, e => { f[campo] = e.target.value; tabelaDocumentos(); });
   ligarF('ceDcQ', 'q', 'input'); ligarF('ceDcCat', 'cat'); ligarF('ceDcPer', 'per'); ligarF('ceDcSit', 'sit'); ligarF('ceDcResp', 'resp');
   $('ceDcNovo').addEventListener('click', () => formDocumento(null));
+  $('ceDcVoltar').addEventListener('click', () => { f.modo = ''; desenharDocumentos(); });
   $('ceDcImprimir').addEventListener('click', () => mostrar(docListaDocs(docFiltrados()), { barra: true }));
   $('ceDcExcel').addEventListener('click', () => exportarDocs(docFiltrados()));
   tabelaDocumentos();
@@ -661,9 +922,9 @@ const caixasCert = (marcadas, prefixo) => `<div class="ce-caixas">${S.certs.filt
 const lerCaixas = prefixo => [...document.querySelectorAll(`#dlgCe [data-${prefixo}]`)].filter(x => x.checked).map(x => x.dataset[prefixo]);
 
 let anexosDoc = null;
-function formDocumento(id) {
+function formDocumento(id, preset = {}) {
   const d = id ? S.docs.find(x => x.id === id) : null;
-  const v = d || { categoria: S.fd.cat || 'ANEXO', situacao: 'Em dia', periodicidade: 'Anual', certificacoes: [] };
+  const v = d || { categoria: S.fd.cat || 'ANEXO', situacao: 'Em dia', periodicidade: 'Anual', certificacoes: [], ...preset };
   const val = k => esc(v[k] ?? '');
   dialogo(`<h3>${d ? esc(d.codigo) + ' · documento' : 'Novo documento'}</h3>
     <div class="aviso erro" id="ceErro" hidden></div>
@@ -676,9 +937,11 @@ function formDocumento(id) {
       <label class="campo">Situação <select id="cedSit">${opcoes(SITUACOES_DOC, v.situacao)}</select></label>
       <label class="campo">Revisão nº <input type="text" id="cedRev" maxlength="10" value="${val('revisao')}"></label>
       <label class="campo">Data da revisão <input type="date" id="cedData" value="${val('data_revisao')}"></label>
-      <label class="campo plena">Link no OneDrive <small>da pasta ou do arquivo — no OneDrive: Compartilhar › Copiar link</small>
-        <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://…sharepoint.com/… ou https://1drv.ms/…">
+      <label class="campo plena">Link no OneDrive <small>da pasta — é o que abre no botão “Abrir local”</small>
+        <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://onedrive.live.com/… ou https://1drv.ms/…">
         <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" ${linkOk(v.link) ? `href="${esc(v.link)}"` : 'hidden'}>Abrir ↗</a></span></label>
+      <label class="campo plena">Caminho no computador <small>a pasta no OneDrive do escritório — o app copia para colar no Explorador</small>
+        <input type="text" id="cedCaminho" maxlength="500" value="${val('caminho')}" placeholder="C:\\NUVEM\\OneDrive\\…"></label>
       <div class="plena" id="cedAnexos"></div>
       <p class="dica plena" id="cedProx"></p>
       <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
@@ -707,7 +970,7 @@ function formDocumento(id) {
     });
     document.querySelectorAll('#dlgCe [data-lreq]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.lreq))));
     // Arquivo do documento no Google Drive (15/10/2026) — o link do OneDrive continua valendo.
-    anexosDoc = campoAnexos($('cedAnexos'), { area: 'certificacao', tipo: 'documento', rotulo: 'Arquivo do documento', dica: 'PDF ou foto' });
+    anexosDoc = campoAnexos($('cedAnexos'), { area: 'certificacao', tipo: 'documento', rotulo: 'Arquivo do documento', dica: 'PDF vigente — abre dentro do app' });
     anexosDoc.abrir(d ? d.id : null);
     $('cedGravar').addEventListener('click', () => gravarDocumento(d));
     $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
@@ -725,7 +988,7 @@ async function gravarDocumento(d) {
   const linha = {
     codigo: g('cedCod'), nome: g('cedNome'), categoria: (g('cedCat') || 'ANEXO').toUpperCase(), periodicidade: g('cedPer'),
     responsavel: g('cedResp'), situacao: $('cedSit').value, revisao: g('cedRev'), data_revisao: g('cedData'),
-    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), atualizado_em: new Date().toISOString(),
+    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), caminho: g('cedCaminho'), atualizado_em: new Date().toISOString(),
   };
   if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https:// — copie pelo botão Compartilhar › Copiar link do OneDrive.');
   if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
@@ -1267,7 +1530,7 @@ export function limparCertificacao() {
   S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = [];
   nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
-  Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '' });
+  Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' });
   Object.assign(S.cal, { ano: 0, mes: 0, cert: '', auto: true });
   Object.assign(S.anual, { ano: 0, cert: '', docs: false });
   telaAtual = ''; fechar();

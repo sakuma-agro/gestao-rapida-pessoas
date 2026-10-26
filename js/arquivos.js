@@ -336,6 +336,17 @@ export function campoAnexos(el, { area, tipo, rotulo = 'Anexos', dica = 'PDF ou 
   };
 }
 
+/** Põe um arquivo na fila de envio ao Drive fora de um diálogo (importação de
+    pasta da Lista mestra, 26/10/2026). `nome` é o que aparece na lista.
+    Devolve a chave. Não manda subir: quem chama dispara enviarPendentes(). */
+export async function enfileirarArquivo(area, tipo, dono, arquivo, nome) {
+  const p = await preparar(arquivo);
+  const n = nome || p.nome;
+  const chave = `${area}/${tipo}/${normDono(dono)}/${nomeDeChave(n, p.ext)}`;
+  await porNaFila({ chave, acao: 'enviar', nome: n, mime: p.mime, blob: p.blob, criado: Date.now() });
+  return chave;
+}
+
 /* sobe o que ficou pendente assim que o app abre logado */
 setTimeout(() => enviarPendentes(), 5000);
 export const aoMudarArquivos = fn => { ouvintes.add(fn); return () => ouvintes.delete(fn); };
