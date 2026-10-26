@@ -739,6 +739,12 @@ const SEMPRE_ABERTO = new Set(['cert']);
    verde "Certificação", os outros saem da linha e o que tem dentro fica logo
    abaixo. "← Certificação" (ou o ✕ no verde) volta para a lista. O primeiro
    submódulo (Painel) é o início da área: não entra em foco. */
+/* Faixa própria de uma tela (26/10/2026): submódulo de uma tela só que tem
+   navegação dentro (ex.: Lista mestra › POP · IT · FORM…) pinta a faixa de
+   baixo com o que quiser. A tela registra uma função (faixa) => void. */
+const FAIXA_TELA = {};
+export function registrarFaixaTela(tela, fn) { FAIXA_TELA[tela] = fn; }
+export const faixaDaTelaAtiva = tela => faixaEstado.tela === tela && !$('navTelas').hidden;
 const focoDe = (id, subs, s) => !SEMPRE_ABERTO.has(id) || !s || s === subs[0] ? null : (s.grupo ? 'g:' + s.grupo : 's:' + s.id);
 
 function pintarCategoria(id, subs) {
@@ -833,6 +839,10 @@ function pintarCategoria(id, subs) {
       ultimaTela[atual.id] = b.dataset.tela;
       marcarTela(id, subs, b.dataset.tela, true);
     }));
+  } else if (atual.telas.length < 2 && FAIXA_TELA[atual.telas[0][0]]) {
+    faixa.hidden = false;
+    faixa.classList.add('rb');
+    try { FAIXA_TELA[atual.telas[0][0]](faixa); } catch { faixa.hidden = true; }
   } else if (atual.telas.length < 2) {
     faixa.hidden = true;
     faixa.innerHTML = '';

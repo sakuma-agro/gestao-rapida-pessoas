@@ -2062,3 +2062,5 @@ body.ce-apr-aberto{overflow:hidden}
 #navModulos .mod-foco-voltar{font-size:13px;font-weight:600;padding:7px 13px;background:var(--papel);color:var(--texto);border:1px solid var(--linha)}
 #navModulos .mod-foco-voltar svg{width:16px;height:16px}
 #navModulos .mod-foco-voltar:hover{border-color:var(--verde);background:var(--verde-fundo)}
+/* Lista mestra: quantidade de documentos de cada tipo na faixa (26/10/2026) */
+.rb-btn .ce-fx-n{font-size:11px;font-weight:600;opacity:.6;margin-left:2px}

@@ -25,7 +25,7 @@ import { estado } from './store.js';
 import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
-import { abrirModulo } from './acesso.js';
+import { abrirModulo, registrarFaixaTela } from './acesso.js';
 import { campoAnexos, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquivo, enfileirarArquivo, enviarPendentes, contarPendentes, aoMudarArquivos } from './arquivos.js';
 import { svgIcone } from './icones.js';
 import { itensCaderno } from './cert-caderno.js';
@@ -709,8 +709,47 @@ const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP
 const revDono = id => `${id}-rev`;
 const ehPdf = x => /pdf$/i.test(x.mime || '') || /\.pdf$/i.test(x.nome || '');
 
+/* Tipos na faixa de baixo (26/10/2026, pedido dele — sugestão 2): com a Lista
+   mestra aberta, a faixa logo abaixo do verde mostra Visão geral · POP · IT ·
+   FORM · CL · AN · Tabela, como as telas do Caderno de campo. Substitui o
+   link "← Tipos de documento" dentro do cartão. */
+function pintarFaixaDocs(faixa) {
+  const f = S.fd;
+  const outros = docsDoTipo('OUTROS');
+  const tipos = [...TIPOS_DOC, ...(outros.length ? [{ id: 'OUTROS', nome: 'Outros', icone: 'documento' }] : [])];
+  const atual = f.modo === 'tabela' ? 'tabela' : f.modo === 'tipo' ? f.tipo : 'geral';
+  const btn = (id, rot, ic, n) => `<button type="button" class="rb-btn" role="tab" data-dctipo="${id}" aria-selected="${atual === id}" title="${esc(rot)}">
+    ${svgIcone(ic)}<span>${esc(rot)}${n != null ? ` <small class="ce-fx-n">${n}</small>` : ''}</span></button>`;
+  faixa.innerHTML = `<section class="rb-grupo rb-verde" aria-label="Lista mestra"><div class="rb-botoes">
+    ${btn('geral', 'Visão geral', 'painel')}
+    ${tipos.map(t => btn(t.id, t.nome, t.icone, docsDoTipo(t.id).length)).join('')}
+    ${btn('tabela', 'Tabela', 'lista')}
+    </div><div class="rb-rotulo">Lista mestra</div></section>`;
+  faixa.querySelectorAll('[data-dctipo]').forEach(b => b.addEventListener('click', () => {
+    const v = b.dataset.dctipo;
+    if (v === 'geral') { f.modo = ''; desenharDocumentos(); }
+    else if (v === 'tabela') { f.modo = 'tabela'; desenharDocumentos(); }
+    else abrirTipo(v);
+  }));
+}
+registrarFaixaTela('ceDocumentos', pintarFaixaDocs);
+
+/* Repinta a faixa e o fim do caminho ("Certificação › Lista mestra › POP"). */
+function atualizarFaixaDocs() {
+  const faixa = $('navTelas');
+  if (faixa && !faixa.hidden && faixa.querySelector('[data-dctipo]')) pintarFaixaDocs(faixa);
+  const cam = $('navSub');
+  if (!cam || !/Lista mestra/.test(cam.textContent)) return;
+  const f = S.fd;
+  const extra = f.modo === 'tabela' ? 'Tabela' : f.modo === 'tipo' ? tipoDoc(f.tipo).nome : '';
+  const base = [...cam.querySelectorAll('span:not(.rb-sep), b')].map(x => x.textContent).filter(t => t !== 'Tabela' && !TIPOS_DOC.some(y => y.nome === t) && t !== 'Outros');
+  const partes = extra ? [...base, extra] : base;
+  cam.innerHTML = partes.map((p, i) => i === partes.length - 1 ? `<b>${esc(p)}</b>` : `<span>${esc(p)}</span><span class="rb-sep" aria-hidden="true">›</span>`).join('');
+}
+
 function desenharDocumentos() {
   const f = S.fd;
+  atualizarFaixaDocs();
   if (f.modo === 'tabela') return desenharTabelaDocs();
   if (f.modo === 'tipo') return desenharTipoDocs();
   desenharTiposDocs();
@@ -790,8 +829,7 @@ function desenharTipoDocs() {
   const t = tipoDoc(f.tipo);
   tela.innerHTML = `<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
-      <div><button class="ce-voltar" type="button" id="ceDcVoltar">← Tipos de documento</button>
-        <h2 style="margin:0">${esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)}</small></h2></div>
+      <div><h2 style="margin:0">${esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)} · ${docsDoTipo(f.tipo).length} documento(s)</small></h2></div>
       <span class="barra" style="margin:0">
         <label class="btn" title="Escolha a pasta do tipo (ex.: Certificação - Lop Gestão Rápida › 1 - POP). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
           <input type="file" id="ceDcPasta" hidden webkitdirectory multiple></label>
@@ -806,7 +844,6 @@ function desenharTipoDocs() {
       <div class="ce-dv-painel" id="ceDcPainel"></div>
     </div>
   </div>`;
-  $('ceDcVoltar').addEventListener('click', () => { f.modo = ''; desenharDocumentos(); });
   $('ceDcNovo').addEventListener('click', () => formDocumento(null, t.cat ? { categoria: t.cat } : {}));
   $('ceDcPasta').addEventListener('change', e => importarPasta([...e.target.files]).finally(() => { e.target.value = ''; }));
   const itens = () => {
@@ -1146,8 +1183,7 @@ function desenharTabelaDocs() {
   const pers = [...new Set(S.docs.map(d => d.periodicidade).filter(Boolean))].sort((a, b) => PERIODOS.indexOf(a) - PERIODOS.indexOf(b));
   tela.innerHTML = `<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
-      <div><button class="ce-voltar" type="button" id="ceDcVoltar">← Tipos de documento</button>
-        <h2 style="margin:0">Lista mestra · tabela</h2>
+      <div><h2 style="margin:0">Lista mestra · tabela</h2>
         <p class="dica" style="margin:2px 0 0">Anexos, instruções de trabalho, registros, POPs e check lists, com revisão, responsável e os códigos das normas que cada um atende.</p></div>
       <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button>
     </div>
@@ -1168,7 +1204,6 @@ function desenharTabelaDocs() {
   const ligarF = (id, campo, ev = 'change') => $(id).addEventListener(ev, e => { f[campo] = e.target.value; tabelaDocumentos(); });
   ligarF('ceDcQ', 'q', 'input'); ligarF('ceDcCat', 'cat'); ligarF('ceDcPer', 'per'); ligarF('ceDcSit', 'sit'); ligarF('ceDcResp', 'resp');
   $('ceDcNovo').addEventListener('click', () => formDocumento(null));
-  $('ceDcVoltar').addEventListener('click', () => { f.modo = ''; desenharDocumentos(); });
   $('ceDcImprimir').addEventListener('click', () => mostrar(docListaDocs(docFiltrados()), { barra: true }));
   $('ceDcExcel').addEventListener('click', () => exportarDocs(docFiltrados()));
   tabelaDocumentos();
