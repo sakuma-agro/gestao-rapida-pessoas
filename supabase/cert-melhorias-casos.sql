@@ -143,3 +143,18 @@ do $$ declare c uuid; begin
   values ('MELHORIA','MELHORIA','Blusa de frio para os funcionários (pedido deles)','AUDITORIA INTERNA','Administrativo','LOTE 35 PADAP','GUILHERME RIBEIRO LOPES','GUILHERME RIBEIRO LOPES','MÉDIA','2026-02-18','EM EXECUÇÃO','2026-04-21','importado do FORMAGR-42A') returning id into c;
   insert into public.cmc_andamentos (caso_id,data,texto) values (c,'2026-02-18','Fazendo orçamentos.');
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- JotForm (QR Code) → Reclamações e sugestões (26/10/2026). Migração "cmc_jotform_webhook".
+-- Função: supabase/functions/jotform-feedback (verify_jwt desligado; confere ?k=token).
+alter table public.cmc_casos add column if not exists origem_externa text;
+create unique index if not exists cmc_casos_origem_externa on public.cmc_casos (origem_externa) where origem_externa is not null;
+create table if not exists public.integracoes_tokens (
+  nome text primary key,
+  token text not null,
+  criado_em timestamptz not null default now()
+);
+alter table public.integracoes_tokens enable row level security;   -- sem política: só o servidor lê
+insert into public.integracoes_tokens (nome, token)
+values ('jotform-feedback', replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''))
+on conflict (nome) do nothing;

@@ -52,7 +52,7 @@ const ETAPAS = {
 const FIM = new Set(['ENCERRADA', 'CONCLUÍDA', 'ARQUIVADA', 'TRATADO']);
 const NOME_NAT = { NC: 'Não conformidade', MELHORIA: 'Melhoria', FEEDBACK: 'Reclamação / sugestão' };
 const TIPOS_FB = ['RECLAMAÇÃO', 'SUGESTÃO', 'ELOGIO'];
-const VIAS = ['AUDITORIA INTERNA', 'AUDITORIA EXTERNA', 'QUADRO', 'WHATSAPP', 'DIGITAL', 'VIA PAPEL', 'CAIXA DE SUGESTÕES', 'CHECK LIST'];
+const VIAS = ['AUDITORIA INTERNA', 'AUDITORIA EXTERNA', 'QR CODE (JOTFORM)', 'QUADRO', 'WHATSAPP', 'DIGITAL', 'VIA PAPEL', 'CAIXA DE SUGESTÕES', 'CHECK LIST'];
 const FAZENDAS = ['FACA', 'LOTE 35 PADAP', 'MORRO BRANCO', 'TRÊS RIACHOS', 'QUEBRA COCÃO'];
 const PRIORIDADES = ['URGENTE', 'ALTA', 'MÉDIA', 'BAIXA'];
 const NIVEL = { 1: 'Baixo', 2: 'Médio', 3: 'Alto' };
@@ -264,7 +264,7 @@ function desenharFeedbacks() {
   const L = (f.ver === 'abertas' ? todas.filter(aberto) : todas).sort((a, b) => String(b.data_abertura).localeCompare(String(a.data_abertura)));
   const gerado = c => M.casos.find(x => x.origem_id === c.id);
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cab('Reclamações e sugestões · FORM 042', 'Reclamações, sugestões e elogios — o que chega pela caixa de sugestões, quadro, WhatsApp ou conversa. Ao tratar, pode virar uma não conformidade ou uma melhoria.', '<button class="btn principal" type="button" id="mcNovoFb">+ Registrar</button>')}
+    ${cab('Reclamações e sugestões · FORM 042', 'Reclamações, sugestões e elogios — o que chega pelo QR Code (JotForm, entra sozinho), caixa de sugestões, quadro, WhatsApp ou conversa. Ao tratar, pode virar uma não conformidade ou uma melhoria.', '<button class="btn principal" type="button" id="mcNovoFb">+ Registrar</button>')}
     <div class="grade larga" style="margin-top:12px"><label class="campo">Mostrar <select id="mcFf">${opcoes([['abertas', 'Sem tratar'], ['todas', 'Todos']], f.ver)}</select></label></div>
     ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Via</th><th>Quem</th><th>Situação</th><th>Virou</th><th></th></tr></thead><tbody>
       ${L.map(c => { const g = gerado(c); return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${c.descricao ? `<br><small class="dica">${esc(c.descricao)}</small>` : ''}</td>
