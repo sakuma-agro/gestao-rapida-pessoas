@@ -2083,3 +2083,12 @@ body.ce-apr-aberto{overflow:hidden}
 /* Reclamações e sugestões: coluna Conclusão e botão Concluir (26/10/2026) */
 .mc-fb-conc{min-width:220px;max-width:360px;font-size:12.5px}
 .mc-fb-bt{white-space:nowrap}.mc-fb-bt .btn+.btn{margin-left:4px}
+/* Reclamações e sugestões: abas Em aberto × Fechados (26/10/2026) */
+.mc-abas{display:flex;gap:6px;margin-top:12px;border-bottom:2px solid var(--linha)}
+.mc-aba{font:inherit;font-size:14px;font-weight:700;color:var(--suave);background:none;border:0;border-bottom:3px solid transparent;
+  margin-bottom:-2px;padding:9px 16px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.mc-aba b{font-size:12px;background:var(--fundo);color:var(--suave);border-radius:10px;padding:1px 8px}
+.mc-aba:hover{color:var(--texto)}
+.mc-aba.on{color:var(--verde-esc);border-bottom-color:#84BD00}
+.mc-aba.on b{background:#84BD00;color:#fff}
+.bm-tab td.mc-fb-conc{white-space:normal;overflow:visible;text-overflow:clip}
