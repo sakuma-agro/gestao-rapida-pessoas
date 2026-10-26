@@ -2140,3 +2140,8 @@ body.ce-apr-aberto{overflow:hidden}
 #navModulos .mod-subs .aba-sub[aria-selected="true"]{background:none;color:#4f7300;border-bottom-color:#84BD00}
 #navModulos .mod-subs .aba-sub[aria-selected="true"] svg{color:#84BD00}
 @media (max-width:640px){#navModulos .mod-subs .aba-sub{font-size:13.5px;padding:10px 11px 8px}}
+
+/* Recado da validação do CPF no cadastro (26/10/2026) */
+.cpf-msg{display:block;font-size:11px;margin-top:3px}
+.cpf-msg.erro{color:#c0392b;font-weight:600}
+.cpf-msg.ok{color:#4E7D00}

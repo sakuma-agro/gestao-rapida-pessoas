@@ -1090,6 +1090,7 @@ function abrirFuncionario(id) {
   $('fuTelefone').value = editandoFunc.telefone || '';
   $('fuAdmissao').value = (editandoFunc.admissao || '').slice(0, 10);
   $('fuCpf').value = mascaraCpf(editandoFunc.cpf || '');
+  conferirCampoCpf(false);
   montarListasDoCadastro(editandoFunc);
   $('fuCalcado').value = editandoFunc.tam_calcado || '';
   $('fuCamisa').value = editandoFunc.tam_camisa || '';
@@ -1221,6 +1222,14 @@ $('formFunc').addEventListener('submit', async ev => {
     ...lerFichaCompleta(),
   };
   if (!f.nome) return;
+  /* CPF (26/10/2026): em branco pode; preenchido, tem que ser válido e não
+     pode ser de outro funcionário já cadastrado. */
+  const problemaCpf = conferirCampoCpf(true);
+  if (problemaCpf) {
+    const el = $('fuCpf');
+    el.setCustomValidity(problemaCpf); el.reportValidity(); el.focus();
+    return;
+  }
   // Unidade, setor e função são do módulo Cadastros: quem tem Cadastros grava.
   const temDP = pode('jornada') || pode('pessoas');
 
@@ -1429,7 +1438,46 @@ $('fuCpf').addEventListener('input', ev => {
   const noFim = el.selectionStart === el.value.length;
   el.value = mascaraCpf(el.value);
   if (noFim) el.setSelectionRange(el.value.length, el.value.length);
+  conferirCampoCpf(false);
 });
+
+/* Validação do CPF (pedido dele, 26/10/2026). Regra da Receita: 11 dígitos,
+   não todos iguais, e os dois dígitos verificadores batendo (módulo 11).
+   Em branco é permitido — tem cadastro antigo sem CPF. */
+function cpfValido(v) {
+  const d = String(v || '').replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const dv = n => {
+    let soma = 0;
+    for (let i = 0; i < n; i++) soma += +d[i] * (n + 1 - i);
+    const r = (soma * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(9) === +d[9] && dv(10) === +d[10];
+}
+
+/* Devolve o problema do CPF digitado (ou '' se está tudo certo) e mostra o
+   recado embaixo do campo. Enquanto ainda está digitando (ao salvar = false),
+   não reclama de CPF incompleto. */
+function conferirCampoCpf(aoSalvar) {
+  const el = $('fuCpf'), msg = $('fuCpfMsg');
+  const d = el.value.replace(/\D/g, '');
+  let problema = '';
+  if (d && (d.length === 11 || aoSalvar)) {
+    if (d.length !== 11) problema = 'CPF incompleto: são 11 números.';
+    else if (!cpfValido(d)) problema = 'CPF inválido: confira os números.';
+    else {
+      const outro = estado.funcionarios.find(x => x.id !== editandoFunc?.id &&
+        String(x.cpf || '').replace(/\D/g, '') === d);
+      if (outro) problema = `Este CPF já está no cadastro de ${outro.nome}.`;
+    }
+  }
+  el.setCustomValidity(problema);
+  msg.textContent = problema || (d.length === 11 ? 'CPF válido.' : '');
+  msg.className = 'cpf-msg' + (problema ? ' erro' : ' ok');
+  msg.hidden = !msg.textContent;
+  return problema;
+}
 
 /* =============== aba ANIVERSARIANTES =============== */
 function listaAniversarios() {

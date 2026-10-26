@@ -1792,7 +1792,8 @@ addEventListener('beforeinstallprompt', function (ev) {
       </label>
       <label class="campo">Telefone <input type="text" id="fuTelefone" inputmode="tel" placeholder="(34) 99999-0000"></label>
       <label class="campo">Admissão <input type="date" id="fuAdmissao"></label>
-      <label class="campo">CPF <input type="text" id="fuCpf" inputmode="numeric"></label>
+      <label class="campo">CPF <input type="text" id="fuCpf" inputmode="numeric" placeholder="000.000.000-00">
+        <small class="cpf-msg" id="fuCpfMsg" hidden></small></label>
       <label class="campo plena">Unidade (empregador + fazenda)
         <select id="fuUnidade"></select>
         <small class="dc-sem" id="fuUnidadeAtual"></small>
