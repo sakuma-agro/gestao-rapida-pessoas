@@ -141,8 +141,25 @@ const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', cur
    · Faltas justif. · Faltas não justif. · Saldo devedor (parcela do mês).
    ------------------------------------------------------------------ */
 
-export function relatorioDP(competencia, destinoId) {
-  const c = consolidar(competencia, destinoId);
+/* 27/10/2026: o Relatório Horas Extras mostra cada funcionário só a partir
+   da data do registro (admissão). Os dias anteriores saem no relatório
+   "Horas extras antes do registro" (relatorioAntesRegistro), mesmo formato,
+   uso interno. Os dois saem desta função, com o recorte do consolidar. */
+const diaAntes = iso => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
+
+export function relatorioAntesRegistro(competencia, destinoId) {
+  return relatorioDP(competencia, destinoId, { antes: true });
+}
+
+export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
+  const c = consolidar(competencia, destinoId, { recorte: antes ? 'antes' : 'registrado' });
+  const TITULO = antes ? 'RELATÓRIO HORAS EXTRAS ANTES DO REGISTRO' : 'RELATÓRIO HORAS EXTRAS';
+  const inicioComp = competencia.slice(0, 7) + '-01';
+  // Período de cada pessoa: antes → 1º dia do mês até a véspera do registro;
+  // registrado no mês → do registro ao fim do mês.
+  const periodo = l => antes
+    ? `${dataBR(inicioComp)} a ${dataBR(diaAntes(l.admissao))}`
+    : l.registroNoMes ? `registro em ${dataBR(l.admissao)} — lançamentos a partir dessa data` : '';
   const fmt = c.destino?.formato_horas || 'decimal';
   const comp = jd.competenciaDoDestino(competencia, destinoId);
   const h = m => m ? formatarHoras(m, fmt) : '';
@@ -167,18 +184,19 @@ export function relatorioDP(competencia, destinoId) {
           <th>Funcionário</th><th class="rel-c">Horas extras</th>
           <th class="rel-c rel-justo">Insalubridade</th><th class="rel-c rel-justo">Periculosidade 30%</th>
           <th class="rel-c">Faltas justif.</th><th class="rel-c">Faltas não justif.</th>
-          <th class="rel-c">Saldo devedor</th>
+          ${antes ? '' : '<th class="rel-c">Saldo devedor</th>'}
         </tr></thead>
         <tbody>${g.linhas.map(l => {
-          const parcela = valorParaFolha(l.vinculo.funcionario_id, competencia);
+          const parcela = antes ? 0 : valorParaFolha(l.vinculo.funcionario_id, competencia);
+          const per = periodo(l);
           return `<tr>
-          <td>${esc(l.nome)}${l.atrasados.length ? `<br><span class="rel-mini rel-obs">${esc(obsAnterior(l, fmt))}</span>` : ''}</td>
+          <td>${esc(l.nome)}${per ? `<br><span class="rel-mini rel-obs">${esc(per)}</span>` : ''}${l.atrasados.length ? `<br><span class="rel-mini rel-obs">${esc(obsAnterior(l, fmt))}</span>` : ''}</td>
           <td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
-          <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : l.insalDesconsiderada ? '<span class="rel-mini">não acumula<sup>†</sup></span>' : ''}</td>
+          <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
           <td class="rel-c">${l.faltasInformadas || ''}</td>
-          <td class="rel-c">${parcela > 0.004 ? brl(parcela) : ''}</td>
+          ${antes ? '' : `<td class="rel-c">${parcela > 0.004 ? brl(parcela) : ''}</td>`}
         </tr>`; }).join('')}</tbody>
       </table>`;
 
@@ -186,26 +204,29 @@ export function relatorioDP(competencia, destinoId) {
   const nota = linhas => {
     const atrasadas = linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
       .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
-    const naoAcum = linhas.filter(l => l.insalDesconsiderada).map(l => esc(l.nome)).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    return `${naoAcum.length ? `<div class="rel-resumo"><b>† Insalubridade desconsiderada</b> — recebe periculosidade, e os dois
-      adicionais não acumulam (CLT, art. 193, §2º): ${naoAcum.join(' · ')}.</div>` : ''}${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas do mês anterior</b>, lançadas depois do fechamento
+    /* "não acumula" e a nota † retirados a pedido dele (27/10/2026): quem
+       recebe periculosidade fica com a insalubridade em branco, sem aviso. */
+    return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas do mês anterior</b>, lançadas depois do fechamento
       daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
       Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
     ${''/* nota do intervalo não feito retirada a pedido dele (14/10/2026) — segue no Relatório detalhado */}
 `;   // a frase de explicação das colunas saiu a pedido dele (28/09/2026)
   };
 
+  const notaAntes = antes ? `<p class="rel-nota">Só os dias trabalhados antes da data do registro (admissão). A partir do registro, as horas estão no Relatório Horas Extras.</p>` : '';
+
   if (!paginas.length) return documentoDP({
-    titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino, classe: 'rel-paisagem',
-    versao: comp?.versao || 1, corpo: '<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>', assinaturas: null,
+    titulo: TITULO, competencia, destino: c.destino, classe: 'rel-paisagem', interno: antes,
+    versao: comp?.versao || 1, assinaturas: null,
+    corpo: `<p class="rel-vazio">${antes ? 'Nenhum lançamento antes da data do registro neste mês.' : 'Nenhum funcionário com vínculo neste destino.'}</p>`,
   });
 
   return paginas.map((p, i) => documentoDP({
-    titulo: 'RELATÓRIO HORAS EXTRAS', competencia, destino: c.destino,
+    titulo: TITULO, competencia, destino: c.destino, interno: antes,
     classe: 'rel-paisagem' + (i ? ' folha2' : ''),
     pagina: `${p.k === 'sem' ? 'sem CAEPF' : `CAEPF ${p.k.slice(0, 3)}.${p.k.slice(3)}`}${paginas.length > 1 ? ` · folha ${i + 1} de ${paginas.length}` : ''}`,
     versao: comp?.versao || 1,
-    corpo: p.grupos.map(tabela).join('') + nota(p.grupos.flatMap(g => g.linhas)),
+    corpo: p.grupos.map(tabela).join('') + nota(p.grupos.flatMap(g => g.linhas)) + notaAntes,
     assinaturas: assinaturasDP,
   })).join('');
 }
@@ -755,6 +776,7 @@ export function baixar({ nome, conteudo }) {
 
 export const RELATORIOS_ARQUIVADOS = [
   ['dp',        'Relatório Horas Extras',          (c, d) => relatorioDP(c, d)],
+  ['antesReg',  'Horas extras antes do registro (uso interno)', (c, d) => relatorioAntesRegistro(c, d)],
   ['porMes',    'Horas extras por mês',            (c, d) => relatorioPorMes(c, d)],
   ['faltas',    'Relatório de Faltas',             (c, d) => relatorioFaltas(c, d)],
   ['faltasTot', 'Faltas Totais (uso interno)',     (c, d) => relatorioFaltas(c, d, { totais: true })],

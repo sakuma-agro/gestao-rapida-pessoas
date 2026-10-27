@@ -1853,6 +1853,7 @@ async function desenharFechamento() {
             ? `<button class="btn mini" data-reabrir="${d.id}">Reabrir com motivo</button>` : ''}
           <button class="btn" data-verdp="${d.id}">Visualizar Relatório Horas Extras</button>
           <button class="btn mini" data-imprimirdp="${d.id}">Imprimir</button>
+          <button class="btn" data-verantes="${d.id}" title="Dias trabalhados antes da data do registro (admissão) — uso interno">Horas extras antes do registro</button>
         </div>
       </section>`;
   }));
@@ -1929,6 +1930,9 @@ async function desenharFechamento() {
   document.querySelectorAll('[data-verdp]').forEach(b => b.addEventListener('click', () => {
     rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.verdp), { barra: true });
   }));
+  document.querySelectorAll('[data-verantes]').forEach(b => b.addEventListener('click', () => {
+    rel.mostrar(rel.relatorioAntesRegistro(estadoTela.competencia, b.dataset.verantes), { barra: true });
+  }));
   document.querySelectorAll('[data-imprimirdp]').forEach(b => b.addEventListener('click', () => {
     rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.imprimirdp), { barra: true });
     setTimeout(() => rel.imprimir(), 300);   // deixa a marca carregar antes do papel
@@ -1994,6 +1998,8 @@ function desenharRelatorios() {
     esc: [
       { k: 'dp', nome: 'Relatório Horas Extras', desc: 'Horas extras, insalubridade, periculosidade, faltas e saldo devedor — uma folha por CAEPF', principal: true,
         html: () => rel.relatorioDP(comp(), dest()) },
+      { k: 'antes', nome: 'Horas extras antes do registro', desc: 'Dias trabalhados antes da data do registro (admissão) — uso interno, mesmo formato',
+        html: () => rel.relatorioAntesRegistro(comp(), dest()) },
       { k: 'fal', nome: 'Faltas', desc: 'Só as informadas ao DP, com as datas', html: () => rel.relatorioFaltas(comp(), dest()) },
       { k: 'ate', nome: 'Atestados', desc: 'Períodos e dias, sem motivo', html: () => rel.relatorioAtestados(comp(), dest()) },
       { k: 'csv', nome: 'Baixar dados', desc: 'Planilha do mês para o escritório', csv: () => rel.baixar(rel.planilhaDP(comp(), dest())) },

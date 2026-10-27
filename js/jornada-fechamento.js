@@ -14,7 +14,15 @@ import { apurarCompetencia, minParaHHMM, minParaDecimal } from './jornada-motor.
  * Consolida a competência de um destino: uma linha por funcionário,
  * já com a compensação falta × extras aplicada (Leitura A, RN-23.1).
  */
-export function consolidar(competencia, destinoId) {
+/* Recorte pela data do registro (27/10/2026, pedido dele): quem foi
+   registrado no meio do mês só tem no Relatório Horas Extras os dias a
+   partir da admissão; os dias de antes saem no relatório à parte
+   "Horas extras antes do registro". recorte = 'registrado' (padrão, o que vai
+   ao DP), 'antes' (só os dias anteriores à admissão) ou 'todos'. */
+const admissaoDe = f => (f?.admissao || '').slice(0, 10) || null;
+
+export function consolidar(competencia, destinoId, { recorte = 'registrado' } = {}) {
+  const fimMesComp = new Date(Date.UTC(+competencia.slice(0, 4), +competencia.slice(5, 7), 0)).toISOString().slice(0, 10);
   const unidades = jd.dados.unidades.filter(u => u.destino_id === destinoId);
   const idsUnidade = new Set(unidades.map(u => u.id));
 
@@ -22,10 +30,14 @@ export function consolidar(competencia, destinoId) {
 
   const linhas = vinculos.map(v => {
     const f = jd.pessoasDp().find(x => x.id === v.funcionario_id);
+    const adm = admissaoDe(f);
+    const noRecorte = b => recorte === 'todos' ? true
+      : recorte === 'antes' ? !!adm && b.data_fato < adm
+      : !adm || b.data_fato >= adm;
     const boletins = jd.dados.boletins.filter(b =>
       b.funcionario_id === v.funcionario_id &&
       b.competencia === competencia &&
-      b.situacao !== 'cancelado');
+      b.situacao !== 'cancelado' && noRecorte(b));
 
     /* Falta justificada (28/09/2026) entra na conta das faltas com a dedução
        que teria se não fosse justificada — 8h no Campo, jornada do dia no
@@ -78,8 +90,10 @@ export function consolidar(competencia, destinoId) {
     /* Horas guardadas (01/10/2026). Depois das faltas: o que o analista
        guardou sai das extras deste mês; o que mandou pagar do saldo entra. */
     const mesExtra50 = r.minExtra50, mesExtra100 = r.minExtra100;
-    const g = guardadoEm(v.funcionario_id, competencia);
-    const p = pagoEm(v.funcionario_id, competencia);
+    // Horas guardadas e pagas do saldo valem só para o período registrado.
+    const zero = { min_50: 0, min_100: 0 };
+    const g = recorte === 'antes' ? zero : guardadoEm(v.funcionario_id, competencia);
+    const p = recorte === 'antes' ? zero : pagoEm(v.funcionario_id, competencia);
     const g50 = Math.min(g.min_50, mesExtra50), g100 = Math.min(g.min_100, mesExtra100);
     r.minExtraMes50 = mesExtra50; r.minExtraMes100 = mesExtra100;
     r.minGuardado50 = g50; r.minGuardado100 = g100; r.minGuardado = g50 + g100;
@@ -109,6 +123,10 @@ export function consolidar(competencia, destinoId) {
     return {
       vinculo: v,
       funcionario: f,
+      admissao: adm,
+      recorte,
+      // Registrado depois do 1º dia da competência: o relatório avisa o período.
+      registroNoMes: !!adm && adm > competencia + '-01' && adm <= fimMesComp,
       unidade,
       nome: f?.nome || '—',
       cpf: f?.cpf || '',
@@ -145,7 +163,9 @@ export function consolidar(competencia, destinoId) {
         return { insalubridadePagar: insalMarcada && !peric, insalDesconsiderada: insalMarcada && peric, periculosidade: peric };
       })(),
     };
-  });
+  }).filter(l => recorte === 'antes' ? l.boletins > 0
+    : recorte === 'registrado' ? !l.admissao || l.admissao <= fimMesComp
+    : true);
 
   // Quem tem mais extras primeiro — é onde o olho precisa cair.
   linhas.sort((a, b) => b.minExtraTotal - a.minExtraTotal || a.nome.localeCompare(b.nome, 'pt-BR'));
