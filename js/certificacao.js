@@ -1102,7 +1102,7 @@ function formEvidencia(d, e, itemId = null) {
    OneDrive (3 - AN/<AN>/<FAZENDA>). A evidência pode apontar para o item
    (cert_evidencias.item_id). Na auditoria, filtra a fazenda certificada.
    ------------------------------------------------------------------- */
-const nomeFaz = id => S.faz.find(f => f.id === id)?.nome || 'Sem fazenda';
+const nomeFaz = id => S.faz.find(f => f.id === id)?.nome || (id ? 'Sem fazenda' : 'Geral');
 const rotItem = i => i ? nomeFaz(i.fazenda_id) + (i.local ? ' · ' + i.local : '') : '—';
 const itensDe = d => S.itens.filter(i => i.documento_id === d.id)
   .sort((a, b) => nomeFaz(a.fazenda_id).localeCompare(nomeFaz(b.fazenda_id), 'pt-BR') || so(a.local).localeCompare(so(b.local), 'pt-BR'));
@@ -1129,12 +1129,12 @@ function htmlFazendas(d) {
   const todos = itensDe(d);
   const lista = filtroFaz ? todos.filter(i => i.fazenda_id === filtroFaz) : todos;
   const nV = todos.filter(i => estadoItem(i, d).c === 'perigo').length;
-  return `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">Por fazenda <small class="dc-sem">· ${todos.length} item(ns)${nV ? ` · <b style="color:#a5342a">${nV} pendente(s)</b>` : ''}</small></h4>
+  return `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">${todos.length && todos.every(i => !i.fazenda_id) ? 'Itens' : 'Por fazenda'} <small class="dc-sem">· ${todos.length} item(ns)${nV ? ` · <b style="color:#a5342a">${nV} pendente(s)</b>` : ''}</small></h4>
       <div class="barra" style="margin:0"><select id="ceFzFiltro" title="Mostrar só uma fazenda (ex.: a certificada, na auditoria)">${opcoes(S.faz.map(f => [f.id, f.nome]), filtroFaz, 'Todas as fazendas')}</select>
       <button class="btn mini" type="button" id="ceFzNovo">＋ Ponto / item</button></div></div>
     ${lista.length ? `<div class="ce-fz-lista">${lista.map(i => { const e = estadoItem(i, d); const ult = S.evid.filter(x => x.item_id === i.id).length;
       return `<div class="ce-fz-item">
-        <div class="ce-fz-nome"><b>${esc(nomeFaz(i.fazenda_id))}</b>${i.local ? `<span class="dc-sem">${esc(i.local)}</span>` : ''}</div>
+        <div class="ce-fz-nome">${i.fazenda_id || !i.local ? `<b>${esc(nomeFaz(i.fazenda_id))}</b>${i.local ? `<span class="dc-sem">${esc(i.local)}</span>` : ''}` : `<b>${esc(i.local.split(' · ')[0])}</b>${i.local.includes(' · ') ? `<span class="dc-sem">${esc(i.local.split(' · ').slice(1).join(' · '))}</span>` : ''}`}</div>
         <div class="ce-fz-dados dc-sem">${i.validade ? 'Válido até ' + br(i.validade) : e.v ? 'Próxima ' + br(e.v) : esc(i.periodicidade || d.periodicidade || '')}
           ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}</div>
         ${tag(e.t, e.c)}
@@ -1160,7 +1160,7 @@ function formItem(d, it) {
     <p class="dica">${esc(d.nome)}</p>
     <div class="aviso erro" id="ceErro" hidden></div>
     <div class="grade">
-      <label class="campo">Fazenda <select id="fzFaz">${opcoes(S.faz.map(f => [f.id, f.nome]), v.fazenda_id, '— escolha —')}</select></label>
+      <label class="campo">Fazenda <select id="fzFaz">${opcoes(S.faz.map(f => [f.id, f.nome]), v.fazenda_id, '— geral (sem fazenda) —')}</select></label>
       <label class="campo">Local / ponto <small>(opcional)</small> <input type="text" id="fzLocal" value="${esc(v.local || '')}" placeholder="Ex.: Poço 1, caixa d'água da sede, bebedouro"></label>
       <label class="campo">Periodicidade <select id="fzPer">${opcoes(PERIODOS, v.periodicidade)}</select></label>
       <label class="campo">Válido até <small>(licença, laudo…)</small> <input type="date" id="fzValid" value="${esc(v.validade || '')}"></label>
@@ -1173,7 +1173,7 @@ function formItem(d, it) {
       const linha = { documento_id: d.id, fazenda_id: $('fzFaz').value || null, local: so($('fzLocal').value) || null,
         periodicidade: $('fzPer').value || null, validade: $('fzValid').value || null, link: so($('fzLink').value) || null,
         observacao: so($('fzObs').value) || null, atualizado_em: new Date().toISOString() };
-      if (!linha.fazenda_id) return erroDlg('Escolha a fazenda.');
+      if (!linha.fazenda_id && !linha.local) return erroDlg('Escolha a fazenda ou, num item geral (fornecedor, documento), preencha o Local / item.');
       if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (await salvar('cert_doc_itens', it, linha, S.itens, 'fzOk')) { salvarCaixa(); refazFazendas(d); }
     });
