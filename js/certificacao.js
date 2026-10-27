@@ -79,7 +79,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 
 /* ---------------- estado ---------------- */
 const S = {
-  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {},
+  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [],
   fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
   fd: { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
@@ -92,7 +92,7 @@ const S = {
    (cert_marcar_feito). Cadastrar/editar requisitos continua só com internet. */
 const CAIXA = 'cert.cache';
 const CAMADA = 'cert';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz });
 const CAMADA_DEF = {
   tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, i) => i,
   cliente: () => estado.cliente,
@@ -117,8 +117,9 @@ setInterval(() => { if (nucleo.pendentes(CAMADA) > 0) enviarFilaCert().catch(() 
    cada evidência de um documento (data, descrição, link) com os arquivos no
    Drive em certificacao/evidencia/<id>. Evidência "viva": o FORM 050 e o
    FORM 043 contam como evidenciados nos meses em que o app tem lançamento
-   (Biodiversidade e Energia); o FORM 013 (e o AN 07), nos meses com carga de
-   abacate (Balanço de massa).
+   (Biodiversidade e Energia); o FORM 013, nos meses com carga de abacate
+   (Balanço de massa). Os AN foram refeitos em 27/10/2026 (o antigo AN 07
+   Balanço de massa saiu: já é Form).
    =================================================================== */
 const EVID_APP = {
   FORM50: { nome: 'Biodiversidade — registros das câmeras', tela: 'faPainel' },
@@ -128,11 +129,10 @@ const EVID_APP = {
   FORM4: { nome: 'Não conformidades — registro e tratamento', tela: 'mcNcs' },
   FORM20: { nome: 'Melhorias contínuas — banco e plano de melhorias', tela: 'mcMelhorias' },
   FORM42: { nome: 'Reclamações e sugestões', tela: 'mcFeedbacks' },
-  AN7: { nome: 'Balanço de massa — cargas de abacate', tela: 'bmPainel' },
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc, cxa] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -141,12 +141,16 @@ async function carregarCadeia(c) {
     c.from('cfo_avaliacoes').select('data'),
     c.from('cmc_casos').select('data_abertura, tipo, natureza'),
     c.from('cmc_aberturas').select('data'),
+    c.from('cert_doc_itens').select('*').eq('ativo', true),
+    c.from('jor_fazendas').select('id, nome').eq('ativo', true).order('nome'),
   ]);
+  if (it && !it.error) S.itens = it.data || [];
+  if (fz && !fz.error) S.faz = fz.data || [];
   if (!v.error) S.vinc = v.data || [];
   if (!ev.error) S.evid = ev.data || [];
   if (!fa.error) S.viva.FORM50 = contaMeses((fa.data || []).map(x => x.data));
   if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
-  if (!bm.error) S.viva.FORM13 = S.viva.AN7 = contaMeses((bm.data || []).map(x => x.data));
+  if (!bm.error) S.viva.FORM13 = contaMeses((bm.data || []).map(x => x.data));
   if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
   if (!mc.error) { const doTipo = n => contaMeses((mc.data || []).filter(x => x.natureza === n).map(x => x.data_abertura));
     S.viva.FORM4 = doTipo('NC'); S.viva.FORM20 = doTipo('MELHORIA'); S.viva.FORM42 = contaMeses((mc.data || []).filter(x => x.natureza === 'FEEDBACK').map(x => x.data_abertura)
@@ -195,7 +199,7 @@ async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
   if (c0 && !S.carregado) {
     S.certs = c0.certs || []; S.reqs = c0.reqs || []; S.docs = c0.docs || []; S.evs = c0.evs || [];
-    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {};
+    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || [];
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -902,8 +906,10 @@ async function painelDoc() {
         ${d.observacao ? `<h4 class="ac-h4">Observação</h4><p class="dica">${esc(d.observacao)}</p>` : ''}</div>
       <div><h4 class="ac-h4">Revisões anteriores</h4><div id="ceDvRevs"><span class="dc-sem">…</span></div></div>
     </div>
+    ${d.por_fazenda ? `<div class="ce-faz" id="ceDvFaz">${htmlFazendas(d)}</div>` : ''}
     <div class="ce-cadeia" id="ceDvCadeia">${htmlCadeia(d)}</div>`;
   ligarCadeia(d);
+  if (d.por_fazenda) ligarFazendas(d);
   if (app) el.querySelectorAll('#ceDvApp, [data-dv-app]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', app.tela)));
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
@@ -973,6 +979,7 @@ function htmlCadeia(d) {
       ${cob ? `<div class="ce-janelas">${cob.map(j => `<span class="ce-jan ce-jan-${j.estado}" title="${esc(j.rot)}: ${j.n ? j.n + ' evidência(s)' : j.estado === 'aberto' ? 'período em andamento' : 'sem evidência'}">${esc(j.rot)}</span>`).join('')}</div>
         <p class="dc-sem" style="margin:2px 0 6px">${okN} de ${cob.length} período(s) com evidência.</p>` : '<p class="dc-sem" style="margin:2px 0 6px">Por evento: anexe cada ocorrência.</p>'}
       ${ev.length ? `<ul class="ce-evs">${ev.slice(0, 12).map(e => `<li><b>${br(e.data)}</b> ${esc(e.descricao || '')}
+          ${e.item_id ? `<small class="dc-sem">· ${esc(rotItem(S.itens.find(i => i.id === e.item_id)))}</small>` : ''}
           ${S.evArq?.has(String(e.id)) ? `<button class="ce-link" type="button" data-ev-ver="${e.id}">📎 abrir</button>` : ''}
           ${linkOk(e.link) ? `<a class="ce-link" href="${esc(e.link)}" target="_blank" rel="noopener">OneDrive ↗</a>` : ''}
           <button class="ce-link dc-sem" type="button" data-ev-ed="${e.id}">editar</button></li>`).join('')}</ul>${ev.length > 12 ? `<p class="dc-sem">+ ${ev.length - 12} mais antiga(s).</p>` : ''}`
@@ -1010,8 +1017,9 @@ function ligarCadeia(d) {
 }
 function refazCadeia(d) { const el = $('ceDvCadeia'); if (!el) return; el.innerHTML = htmlCadeia(d); ligarCadeia(d); }
 
-function formEvidencia(d, e) {
-  const v = e || { data: hoje(), descricao: '', link: '' };
+function formEvidencia(d, e, itemId = null) {
+  const v = e || { data: hoje(), descricao: '', link: '', item_id: itemId };
+  const itensDoc = itensDe(d);
   let anx = null;
   dialogo(`<h3>${e ? 'Evidência' : 'Nova evidência'} — ${esc(d.codigo)}</h3>
     <p class="dica">${esc(d.nome)}</p>
@@ -1020,6 +1028,10 @@ function formEvidencia(d, e) {
       <label class="campo">Data (ou mês de referência) <input type="date" id="evData" value="${esc(v.data)}" max="${hoje()}"></label>
       <label class="campo">Descrição <input type="text" id="evDesc" value="${esc(v.descricao || '')}" placeholder="Ex.: FORM preenchido de março, laudo, certificado"></label>
     </div>
+    ${itensDoc.length ? `<div class="grade">
+      <label class="campo">Fazenda / ponto <select id="evItem">${opcoes(itensDoc.map(i => [i.id, rotItem(i)]), v.item_id, '— geral —')}</select></label>
+      <label class="campo">Válido até <small>(laudo, licença…; atualiza a fazenda)</small> <input type="date" id="evValid" value=""></label>
+    </div>` : ''}
     <label class="campo">Link no OneDrive (opcional) <input type="url" id="evLink" value="${esc(v.link || '')}" placeholder="https://…"></label>
     <div id="evAnx" style="margin-top:8px"></div>
     <div class="barra entre"><div>${e ? '<button class="btn perigo" type="button" id="evApagar">Apagar</button>' : ''}</div>
@@ -1027,16 +1039,116 @@ function formEvidencia(d, e) {
     anx = campoAnexos($('evAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Arquivo da evidência', dica: 'PDF ou foto (o FORM preenchido, laudo, certificado…)' });
     anx.abrir(e ? e.id : null);
     $('evOk').addEventListener('click', async () => {
-      const linha = { documento_id: d.id, data: $('evData').value, descricao: so($('evDesc').value) || null, link: so($('evLink').value) || null };
+      const linha = { documento_id: d.id, data: $('evData').value, descricao: so($('evDesc').value) || null, link: so($('evLink').value) || null,
+        item_id: $('evItem')?.value || null };
       if (!linha.data) return erroDlg('Informe a data.');
       if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (!e && !anx.mudou && !linha.link) return erroDlg('Anexe o arquivo ou cole o link da evidência.');
       const salvo = await salvar('cert_evidencias', e, e ? { ...linha, atualizado_por: quem() } : { ...linha, criado_por: quem() }, S.evid, 'evOk');
       if (!salvo) return;
       if (anx.mudou) { await anx.salvar(salvo.id); (S.evArq ||= new Set()).add(String(salvo.id)); }
-      salvarCaixa(); refazCadeia(d);
+      const it = linha.item_id && S.itens.find(i => i.id === linha.item_id);
+      if (it) {   // a fazenda guarda a data da última evidência e, se veio, a nova validade
+        const muda = { ultima_data: !it.ultima_data || linha.data > it.ultima_data ? linha.data : it.ultima_data, atualizado_em: new Date().toISOString() };
+        if ($('evValid')?.value) muda.validade = $('evValid').value;
+        const { error } = await estado.cliente.from('cert_doc_itens').update(muda).eq('id', it.id);
+        if (!error) Object.assign(it, muda);
+      }
+      salvarCaixa(); refazCadeia(d); refazFazendas(d);
     });
     $('evApagar')?.addEventListener('click', () => apagar('cert_evidencias', e.id, `${d.codigo} · ${br(e.data)} ${e.descricao || ''}`, () => { S.evid = S.evid.filter(x => x.id !== e.id); salvarCaixa(); }));
+  });
+}
+
+/* -------------------------------------------------------------------
+   AN POR FAZENDA (27/10/2026, pedido dele). Um AN por assunto e, dentro,
+   um item por fazenda — e, na análise de água, um item por ponto de coleta
+   (poço, caixa d'água, bebedouro). cert_doc_itens guarda fazenda, local,
+   periodicidade, validade, data da última evidência e o link da subpasta no
+   OneDrive (3 - AN/<AN>/<FAZENDA>). A evidência pode apontar para o item
+   (cert_evidencias.item_id). Na auditoria, filtra a fazenda certificada.
+   ------------------------------------------------------------------- */
+const nomeFaz = id => S.faz.find(f => f.id === id)?.nome || 'Sem fazenda';
+const rotItem = i => i ? nomeFaz(i.fazenda_id) + (i.local ? ' · ' + i.local : '') : '—';
+const itensDe = d => S.itens.filter(i => i.documento_id === d.id)
+  .sort((a, b) => nomeFaz(a.fazenda_id).localeCompare(nomeFaz(b.fazenda_id), 'pt-BR') || so(a.local).localeCompare(so(b.local), 'pt-BR'));
+/** Vencimento do item: a validade informada; sem ela, última evidência + periodicidade. */
+function vencItem(i, d) {
+  if (i.validade) return i.validade;
+  const m = MESES_PERIODO[i.periodicidade || d.periodicidade];
+  return m && i.ultima_data ? somaMeses(i.ultima_data, m) : null;
+}
+function estadoItem(i, d) {
+  const v = vencItem(i, d);
+  if (!v) return i.ultima_data ? { t: 'Em dia', c: 'ativo' } : { t: 'Sem evidência', c: 'perigo' };
+  const n = entre(hoje(), v);
+  if (n < 0) return { t: `Vencido há ${-n} d`, c: 'perigo', v };
+  if (n <= 30) return { t: `Vence em ${n} d`, c: 'alerta', v };
+  return { t: 'Em dia', c: 'ativo', v };
+}
+export function pendenciasFazendas() {
+  return S.itens.map(i => ({ i, d: S.docs.find(x => x.id === i.documento_id) })).filter(x => x.d)
+    .map(x => ({ ...x, e: estadoItem(x.i, x.d) })).filter(x => x.e.c !== 'ativo');
+}
+let filtroFaz = '';
+function htmlFazendas(d) {
+  const todos = itensDe(d);
+  const lista = filtroFaz ? todos.filter(i => i.fazenda_id === filtroFaz) : todos;
+  const nV = todos.filter(i => estadoItem(i, d).c === 'perigo').length;
+  return `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">Por fazenda <small class="dc-sem">· ${todos.length} item(ns)${nV ? ` · <b style="color:#a5342a">${nV} pendente(s)</b>` : ''}</small></h4>
+      <div class="barra" style="margin:0"><select id="ceFzFiltro" title="Mostrar só uma fazenda (ex.: a certificada, na auditoria)">${opcoes(S.faz.map(f => [f.id, f.nome]), filtroFaz, 'Todas as fazendas')}</select>
+      <button class="btn mini" type="button" id="ceFzNovo">＋ Ponto / item</button></div></div>
+    ${lista.length ? `<div class="ce-fz-lista">${lista.map(i => { const e = estadoItem(i, d); const ult = S.evid.filter(x => x.item_id === i.id).length;
+      return `<div class="ce-fz-item">
+        <div class="ce-fz-nome"><b>${esc(nomeFaz(i.fazenda_id))}</b>${i.local ? `<span class="dc-sem">${esc(i.local)}</span>` : ''}</div>
+        <div class="ce-fz-dados dc-sem">${i.validade ? 'Válido até ' + br(i.validade) : e.v ? 'Próxima ' + br(e.v) : esc(i.periodicidade || d.periodicidade || '')}
+          ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}</div>
+        ${tag(e.t, e.c)}
+        <div class="ce-fz-acoes">
+          <button class="btn mini principal" type="button" data-fz-ev="${i.id}" title="Anexar evidência desta fazenda">＋ Evidência</button>
+          ${linkOk(i.link) ? `<a class="btn mini" href="${esc(i.link)}" target="_blank" rel="noopener" title="Abrir a pasta desta fazenda no OneDrive">${svgIcone('predio')}</a>` : ''}
+          <button class="btn mini" type="button" data-fz-ed="${i.id}" title="Editar">${svgIcone('lapis')}</button>
+        </div></div>`; }).join('')}</div>`
+      : '<p class="dica">Nenhum item para esta fazenda.</p>'}`;
+}
+function ligarFazendas(d) {
+  const el = $('ceDvFaz'); if (!el) return;
+  $('ceFzFiltro').addEventListener('change', ev => { filtroFaz = ev.target.value; refazFazendas(d); });
+  $('ceFzNovo').addEventListener('click', () => formItem(d, null));
+  el.querySelectorAll('[data-fz-ev]').forEach(b => b.addEventListener('click', () => formEvidencia(d, null, b.dataset.fzEv)));
+  el.querySelectorAll('[data-fz-ed]').forEach(b => b.addEventListener('click', () => formItem(d, S.itens.find(i => i.id === b.dataset.fzEd))));
+}
+function refazFazendas(d) { const el = $('ceDvFaz'); if (!el) return; el.innerHTML = htmlFazendas(d); ligarFazendas(d); }
+
+function formItem(d, it) {
+  const v = it || { fazenda_id: filtroFaz || '', local: '', periodicidade: d.periodicidade, validade: null, link: d.link || '', observacao: '' };
+  dialogo(`<h3>${it ? 'Fazenda / ponto' : 'Novo ponto / item'} — ${esc(d.codigo)}</h3>
+    <p class="dica">${esc(d.nome)}</p>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Fazenda <select id="fzFaz">${opcoes(S.faz.map(f => [f.id, f.nome]), v.fazenda_id, '— escolha —')}</select></label>
+      <label class="campo">Local / ponto <small>(opcional)</small> <input type="text" id="fzLocal" value="${esc(v.local || '')}" placeholder="Ex.: Poço 1, caixa d'água da sede, bebedouro"></label>
+      <label class="campo">Periodicidade <select id="fzPer">${opcoes(PERIODOS, v.periodicidade)}</select></label>
+      <label class="campo">Válido até <small>(licença, laudo…)</small> <input type="date" id="fzValid" value="${esc(v.validade || '')}"></label>
+    </div>
+    <label class="campo">Link da pasta no OneDrive <input type="url" id="fzLink" value="${esc(v.link || '')}" placeholder="https://…"></label>
+    <label class="campo">Observação <input type="text" id="fzObs" value="${esc(v.observacao || '')}" placeholder="Ex.: nº da licença, órgão emissor, laboratório"></label>
+    <div class="barra entre"><div>${it ? '<button class="btn perigo" type="button" id="fzApagar">Tirar da lista</button>' : ''}</div>
+      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="fzOk">Salvar</button></div></div>`, () => {
+    $('fzOk').addEventListener('click', async () => {
+      const linha = { documento_id: d.id, fazenda_id: $('fzFaz').value || null, local: so($('fzLocal').value) || null,
+        periodicidade: $('fzPer').value || null, validade: $('fzValid').value || null, link: so($('fzLink').value) || null,
+        observacao: so($('fzObs').value) || null, atualizado_em: new Date().toISOString() };
+      if (!linha.fazenda_id) return erroDlg('Escolha a fazenda.');
+      if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
+      if (await salvar('cert_doc_itens', it, linha, S.itens, 'fzOk')) { salvarCaixa(); refazFazendas(d); }
+    });
+    $('fzApagar')?.addEventListener('click', async () => {
+      if (!confirm(`Tirar ${rotItem(it)} deste AN? As evidências já anexadas continuam no AN.`)) return;
+      const { error } = await estado.cliente.from('cert_doc_itens').update({ ativo: false }).eq('id', it.id);
+      if (error) return erroDlg('Não consegui: ' + error.message);
+      S.itens = S.itens.filter(x => x.id !== it.id); salvarCaixa(); fechar(); redesenhar();
+    });
   });
 }
 
