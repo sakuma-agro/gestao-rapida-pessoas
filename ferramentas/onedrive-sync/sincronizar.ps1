@@ -5,6 +5,7 @@
 # e manda para o app cada PDF/foto novo ou alterado (até 15 MB):
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
+#   - arquivo na subpasta EVIDÊNCIAS de um documento -> evidência do documento
 # Não apaga nada no app nem no OneDrive. Pastas "bkp" e "HISTÓRICO" ficam de fora (versões antigas não vão para o app).
 # Registro do que já subiu: estado.json; o que aconteceu: sincronizar.log (nesta pasta).
 
@@ -74,7 +75,10 @@ try {
         # dentro da subpasta de uma fazenda de um AN por fazenda?
         $destino = 'doc'; $id = $doc.id
         $resto = $a.FullName.Substring($pasta.FullName.Length + 1)
-        if ($doc.por_fazenda -and $resto.Contains('\')) {
+        if ($resto -match '^EVID[ÊE]NCIAS\\') {
+          # subpasta EVIDÊNCIAS -> evidência do documento (linha do tempo)
+          $destino = 'evid'
+        } elseif ($doc.por_fazenda -and $resto.Contains('\')) {
           $faz = Chave ($resto.Split('\')[0])
           $k = "$($doc.id)|$faz"
           if ($itens.ContainsKey($k)) { $destino = 'item'; $id = $itens[$k] }

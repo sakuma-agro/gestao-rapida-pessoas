@@ -12,6 +12,8 @@
 //   - arquivo dentro da subpasta de uma fazenda num AN por fazenda → uma
 //     evidência (cert_evidencias, item_id = a fazenda) com o arquivo em
 //     certificacao/evidencia/<id>/od-….pdf; a fazenda recebe ultima_data.
+//   - arquivo dentro da subpasta EVIDÊNCIAS de qualquer documento → uma
+//     evidência do documento (sem fazenda), na linha do tempo dele.
 // Nada é apagado aqui: tirar um arquivo do OneDrive não tira do app.
 //
 // Autenticação: cabeçalho x-sync-token, conferido pelo sha-256 na tabela
@@ -19,7 +21,7 @@
 //
 // Ações (?acao=):
 //   mapa                     GET  → documentos (id, codigo, por_fazenda) e itens (id, documento_id, fazenda)
-//   enviar&destino=doc|item&id=&caminho=&nome=&data=   POST corpo = arquivo
+//   enviar&destino=doc|item|evid&id=&caminho=&nome=&data=   POST corpo = arquivo
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -201,6 +203,23 @@ async function enviar(req: Request, u: URL) {
     await gravar(chave, "evidencia", String(evId), nome, mime, corpo, origem);
     if (!item.ultima_data || data > item.ultima_data)
       await db(`cert_doc_itens?id=eq.${item.id}`, { method: "PATCH", body: JSON.stringify({ ultima_data: data, atualizado_em: new Date().toISOString() }) });
+    return json({ ok: true, chave, evidencia: evId });
+  }
+  // arquivo na subpasta EVIDÊNCIAS de um documento (FORM, AN…) → evidência do documento (sem fazenda)
+  if (destino === "evid") {
+    const d = await db(`cert_documentos?select=id&id=eq.${encodeURIComponent(id)}`);
+    if (!d?.length) return json({ erro: "documento-nao-encontrado" }, 404);
+    const partes = caminho.split(/[\\/]/);
+    const i = partes.findIndex(p => /^EVID[ÊE]NCIAS$/i.test(p));
+    const descricao = (i >= 0 ? partes.slice(i + 1) : partes.slice(1)).join(" / ").slice(0, 300) || nome;
+    const ev = await db("cert_evidencias?on_conflict=origem", {
+      method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify({ documento_id: Number(id), item_id: null, data, descricao, origem, criado_por: "onedrive@sakumasrv" }),
+    });
+    const evId = ev?.[0]?.id;
+    if (!evId) throw new Error("evidência não gravada");
+    const chave = `certificacao/evidencia/${evId}/od-${sufixo}-${slug(nome)}.${ext}`;
+    await gravar(chave, "evidencia", String(evId), nome, mime, corpo, origem);
     return json({ ok: true, chave, evidencia: evId });
   }
   return json({ erro: "destino-invalido" }, 400);
