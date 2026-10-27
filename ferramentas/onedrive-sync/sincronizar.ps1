@@ -63,8 +63,9 @@ try {
       $cod = ($pasta.Name -split ' - ')[0]
       $doc = $docs[(Chave $cod)]
       if (-not $doc) { continue }
-      $arqs = Get-ChildItem -LiteralPath $pasta.FullName -File -Recurse |
+      $arqs = Get-ChildItem -LiteralPath $pasta.FullName -File -Recurse -ErrorAction SilentlyContinue -ErrorVariable errLista |
         Where-Object { $_.Extension -match '^\.(pdf|jpe?g|png)$' -and $_.Name -notlike '.*' -and $_.FullName -notmatch '\\(bkp|HIST[ÓO]RICO)\\' }
+      foreach ($e in $errLista) { Log "CAMINHO LONGO OU INACESSÍVEL (pulado): $($e.TargetObject)" }
       foreach ($a in $arqs) {
         $rel = $a.FullName.Substring($Base.Length + 1)
         $assin = "$($a.Length)|$($a.LastWriteTimeUtc.Ticks)"
