@@ -62,7 +62,7 @@ const COR_STATUS = { 'Conforme': 'ativo', 'Em andamento': 'neutra', 'Pendente': 
 const COR_PRIOR = { 'Crítica': 'perigo', 'Maior': 'alerta', 'Menor': 'neutra' };
 const SITUACOES_DOC = ['Em dia', 'Revisar', 'Pendente', 'Obsoleto'];
 const COR_SIT = { 'Em dia': 'ativo', 'Revisar': 'alerta', 'Pendente': 'perigo', 'Obsoleto': 'inativo' };
-const CATEGORIAS = ['ANEXO', 'CHECK LIST', 'INST. TRABALHO', 'P.O.Ps', 'REGISTROS'];
+const CATEGORIAS = ['ANEXO', 'CHECK LIST', 'INST. TRABALHO', 'P.O.Ps', 'POLÍTICAS', 'REGISTROS'];
 const PERIODOS = ['Diário', 'Semanal', 'Mensal', 'Trimestral', 'Semestral', 'Anual', 'A cada 2 anos', 'A cada 3 anos', 'Por evento'];
 /* Quantos meses até a próxima vez (o que é diário ou semanal não vai ao calendário: é rotina). */
 const MESES_PERIODO = { 'Mensal': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12, 'A cada 2 anos': 24, 'A cada 3 anos': 36 };
@@ -705,6 +705,7 @@ const TIPOS_DOC = [
   { id: 'FORM', nome: 'FORM', desc: 'Formulários e registros', icone: 'boletim', cat: 'REGISTROS' },
   { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST' },
   { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO' },
+  { id: 'POL', nome: 'POL', desc: 'Políticas', icone: 'balanca', cat: 'POLÍTICAS' },   // 27/10/2026
 ];
 /* Pasta espelho "Certificação - Lop Gestão Rápida" no OneDrive (link que ele mandou, 26/10/2026). */
 const PASTA_CERT = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida&viewid=076de95f%2D2e95%2D4233%2Da472%2D0c15d08dc08e';
@@ -792,7 +793,7 @@ function desenharTiposDocs() {
     ${resumoCadeia()}
   </div>`;
   tela.querySelectorAll('[data-cad-ir]').forEach(b => b.addEventListener('click', () => {
-    const x = S.docs.find(y => y.id === Number(b.dataset.cadIr)); if (x) abrirTipo(prefixoDoc(x) in { POP: 1, FORM: 1, IT: 1, CL: 1, AN: 1 } ? prefixoDoc(x) : 'OUTROS', x.id);
+    const x = S.docs.find(y => y.id === Number(b.dataset.cadIr)); if (x) abrirTipo(prefixoDoc(x) in { POP: 1, FORM: 1, IT: 1, CL: 1, AN: 1, POL: 1 } ? prefixoDoc(x) : 'OUTROS', x.id);
   }));
   tela.querySelectorAll('[data-tipo]').forEach(b => b.addEventListener('click', () => abrirTipo(b.dataset.tipo)));
   $('ceDcTabela2').addEventListener('click', () => { f.modo = 'tabela'; desenharDocumentos(); });

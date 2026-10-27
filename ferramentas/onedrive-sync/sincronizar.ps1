@@ -1,7 +1,7 @@
 ﻿# LOP - Gestão Rápida — sincroniza a pasta da Certificação no OneDrive com o app.
 # Roda no sakumasrv a cada hora (tarefa agendada "LOP - Sincronizar OneDrive").
 #
-# Varre 1 - POP, 2 - FORM e 3 - AN dentro de "Certificação - Lop Gestão Rápida"
+# Varre 1 - POP, 2 - FORM, 3 - AN e 4 - POLÍTICAS dentro de "Certificação - Lop Gestão Rápida"
 # e manda para o app cada PDF/foto novo ou alterado (até 15 MB):
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Base   = 'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida'
-$Topos  = @('1 - POP', '2 - FORM', '3 - AN')
+$Topos  = @('1 - POP', '2 - FORM', '3 - AN', '4 - POLÍTICAS')
 $Url    = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/onedrive-sync'
 $Aqui   = $PSScriptRoot
 $Token  = (Get-Content -Raw -Encoding UTF8 (Join-Path $Aqui 'token.txt')).Trim()

@@ -3,7 +3,7 @@
 Instalado no sakumasrv em `C:\Users\Sakuma\Documents\LOP-Sync` (fora do OneDrive).
 Tarefa agendada do Windows "LOP - Sincronizar OneDrive", a cada hora.
 
-- `sincronizar.ps1` varre `Certificação - Lop Gestão Rápida\1 - POP, 2 - FORM, 3 - AN`
+- `sincronizar.ps1` varre `Certificação - Lop Gestão Rápida\1 - POP, 2 - FORM, 3 - AN, 4 - POLÍTICAS`
   e manda PDF/JPG/PNG novos ou alterados (até 15 MB) para a função `onedrive-sync`.
 - `token.txt` (só no sakumasrv, não vai para o git): chave conferida pelo sha-256 em
   `public.sync_tokens` (nome `sakumasrv-onedrive`). Para trocar: gerar outra, gravar o
