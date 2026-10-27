@@ -852,7 +852,7 @@ function mostrarDiaAuto() {
   const [a, m, d] = data.split('-').map(Number);
   const dow = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
   const v = jd.vinculoDe($('bFunc').value);
-  const fer = jd.feriadoEm(data, jd.fazendaDe(jd.unidadeDe(v))?.municipio);
+  const fer = jd.feriadoEm(data, jd.fazendaDe(jd.unidadeDe(v))?.municipio, jd.unidadeDe(v)?.destino_id);
   const p = jd.parametrosEm(data);
   const perc = (k, pad) => p[k] != null ? Number(p[k]) : pad;
   let cls = '', txt;
@@ -953,7 +953,7 @@ function preencherJornadaPadrao() {
   }
   // Feriado não tem jornada prevista: deixar 07–16 preenchido viraria 8h de
   // extra a 100% para quem só esqueceu de apagar.
-  const fer = jd.feriadoEm(data, jd.fazendaDe(jd.unidadeDe(v))?.municipio);
+  const fer = jd.feriadoEm(data, jd.fazendaDe(jd.unidadeDe(v))?.municipio, jd.unidadeDe(v)?.destino_id);
   if (fer) {
     $('bIni').value = ''; $('bFim').value = '';
     dica.textContent = 'Feriado: sem jornada prevista — se trabalhou, preencha os horários.';
@@ -1011,7 +1011,7 @@ function entradaDoFormulario() {
       deducao: tipo.deducao, contaDias: tipo.conta_dias,
       percentualForcado: tipo.percentual_forcado,
     } : null,
-    feriado: jd.feriadoEm(data, fazenda?.municipio),
+    feriado: jd.feriadoEm(data, fazenda?.municipio, unidade?.destino_id),
     regimeSetor: setor?.regime || 'boletim',
     funcao: { faixaNoturna: funcao?.faixa_noturna || null },
     parametros: jd.parametrosEm(data),
@@ -1484,15 +1484,14 @@ function desenharConfigJornada() {
       <p class="dc-sem jor-nota">Alterar um parâmetro encerra o período vigente e abre outro — competência
       fechada nunca recalcula. A tela de edição com o botão <b>História</b> entra na etapa J4.</p>
 
-      ${t('Feriados do ano',
-        [...jd.dados.feriados].sort((a, b) => a.data.localeCompare(b.data)).map(f => `<tr>
-          <td>${dataBR(f.data)}</td><td>${esc(f.nome)}</td><td>${esc(f.abrangencia)}</td></tr>`),
-        ['Data', 'Feriado', 'Abrangência'])}
+      <div id="jorCfgFeriados"></div>
     </div>` + assinatura();
 
   // Jornadas, tipos do dia e tipos de hora extra especial: cadastráveis aqui
   // (25/09/2026). O que mudar vale para os próximos lançamentos.
   desenharCadastros('jorCfgCad', ['jornadas', 'tipos', 'tiposHe'], () => {});
+  // Feriados com o DP a que valem (27/10/2026).
+  desenharCadastros('jorCfgFeriados', ['feriados'], () => {});
 }
 
 function resumoJornada(j) {

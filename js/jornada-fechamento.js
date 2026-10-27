@@ -159,7 +159,7 @@ export function consolidar(competencia, destinoId, { recorte = 'registrado' } = 
         const fora = new Set(['FALTA', 'FALTAJ', 'ATESTADO']);
         return new Set(boletins.filter(b => b.data_fato && !fora.has(codigo(b))
           && new Date(b.data_fato + 'T12:00:00Z').getUTCDay() !== 0
-          && !jd.feriadoEm(b.data_fato, mun)).map(b => b.data_fato)).size;
+          && !jd.feriadoEm(b.data_fato, mun, unidade?.destino_id)).map(b => b.data_fato)).size;
       })(),
       // RN-27/RN-28: permanente paga sempre; sem permanente, paga se algum
       // boletim do mês marcou a exposição no dia.

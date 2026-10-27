@@ -319,3 +319,6 @@ create table if not exists public.jor_ticket_emissoes (
 );
 alter table public.jor_ticket_emissoes enable row level security;
 create policy jornada_modulo on public.jor_ticket_emissoes for all using (app_pode('jornada')) with check (app_pode('jornada'));
+
+-- 27/10/2026: feriado que vale só para um destino de DP (null = todos)
+alter table public.jor_feriados add column if not exists destino_id uuid references public.jor_destinos_dp(id);

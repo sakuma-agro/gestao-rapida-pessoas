@@ -88,7 +88,8 @@ export const equipe = () => jd.pessoasDp().filter(f => ativa(f) && doCampo(f))
 const admissao = f => (f?.admissao || '').slice(0, 10) || null;
 
 const municipioDe = fid => jd.fazendaDe(jd.unidadeDe(jd.vinculoDe(fid)))?.municipio || null;
-export const feriado = (d, fid) => jd.feriadoEm(d, fid ? municipioDe(fid) : null);
+const destinoDe = fid => jd.unidadeDe(jd.vinculoDe(fid))?.destino_id || null;
+export const feriado = (d, fid) => jd.feriadoEm(d, fid ? municipioDe(fid) : null, fid ? destinoDe(fid) : null);
 /** Domingo ou feriado: dá para marcar, mas o vazio não é cobrado. */
 export const naoCobra = (d, fid) => dow(d) === 0 || !!feriado(d, fid);
 

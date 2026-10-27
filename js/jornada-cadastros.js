@@ -255,6 +255,39 @@ Object.assign(CADASTROS, {
     },
   },
 
+  /* Feriados (27/10/2026): cadastráveis em DP › Configurações, com o DP a que
+     valem. Em branco = todos os DPs. No dia, todo o tempo trabalhado é extra
+     a 100% para quem está no DP marcado. */
+  feriados: {
+    titulo: 'Feriados do ano',
+    dica: 'Nacional vale para todos. Feriado municipal: escolha o DP (DP 1 = São Gotardo, DP 2 = Bom Despacho). '
+      + 'No dia, todas as horas trabalhadas são extra para os funcionários daquele DP. Vale para os lançamentos novos — boletim já lançado no dia precisa ser regravado.',
+    singular: 'feriado',
+    novo: 'Novo feriado',
+    ordenar: (a, b) => (a.ativo === false) - (b.ativo === false) || String(a.data).localeCompare(String(b.data)),
+    colunas: ['Data', 'Feriado', 'Abrangência', 'Vale para'],
+    linha: x => [
+      esc(dataBr(x.data)), `<b>${esc(x.nome)}</b>`,
+      esc(x.abrangencia + (x.municipio ? ` · ${x.municipio}${x.uf ? '-' + x.uf : ''}` : '')),
+      x.destino_id ? `<b>${esc(jd.dados.destinos.find(d => d.id === x.destino_id)?.nome || '—')}</b>` : 'todos os DPs',
+    ],
+    campos: [
+      { k: 'data', rotulo: 'Data', t: 'd', req: true },
+      { k: 'nome', rotulo: 'Feriado', t: 't', req: true },
+      { k: 'abrangencia', rotulo: 'Abrangência', t: 's', req: true, padrao: 'municipal',
+        opcoes: () => [['nacional', 'Nacional'], ['estadual', 'Estadual'], ['municipal', 'Municipal']] },
+      { k: 'destino_id', rotulo: 'Vale para o DP', t: 's', padrao: '',
+        opcoes: () => ativos(jd.dados.destinos).sort(porNome).map(d => [d.id, d.nome]) },
+      { k: 'municipio', rotulo: 'Município', t: 't' },
+      { k: 'uf', rotulo: 'UF', t: 't' },
+    ],
+    preparar: x => {
+      if (x.abrangencia !== 'nacional' && !x.destino_id)
+        return 'Escolha o DP a que o feriado vale (DP 1 = São Gotardo, DP 2 = Bom Despacho).';
+      if (x.uf) x.uf = x.uf.toUpperCase();
+    },
+  },
+
   tiposHe: {
     titulo: 'Tipos de hora extra especial',
     dica: 'Horas fixas que entram por escolha no lançamento (ex.: Irrigação 1 = 1h). Somam na hora extra, no percentual do dia, sem tolerância.',
@@ -291,7 +324,13 @@ const dataBr = iso => {
 let editando = null;      // { chave, item }
 let aoSalvar = () => {};
 let ultimoAlvo = { alvoId: 'jorCadastros', quais: null };
-const redesenhar = () => desenharCadastros(ultimoAlvo.alvoId, ultimoAlvo.quais);
+/* Mais de um alvo na mesma tela (27/10/2026: DP › Configurações tem os
+   cadastros em cima e os feriados embaixo): salvar redesenha todos os que
+   continuam na tela. */
+const alvos = new Map();
+const redesenhar = () => {
+  for (const [id, q] of [...alvos]) if ($(id)) desenharCadastros(id, q); else alvos.delete(id);
+};
 
 /* `quais` escolhe quais cadastros a tela desenha. É o que deixa o mesmo
    mecanismo servir duas telas diferentes — Funções e setores numa, empregador
@@ -302,6 +341,7 @@ export function desenharCadastros(alvoId, quais, callback) {
   const alvo = $(alvoId);
   if (!alvo) return;
   ultimoAlvo = { alvoId, quais };
+  alvos.set(alvoId, quais);
 
   const lista = (quais || Object.keys(CADASTROS)).filter(k => CADASTROS[k]);
   alvo.innerHTML = lista.map(chave => {

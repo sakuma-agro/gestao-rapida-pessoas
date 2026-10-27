@@ -547,13 +547,19 @@ export function parametrosEm(dataISO) {
   return Object.fromEntries(Object.entries(fora).map(([k, p]) => [k, p.valor]));
 }
 
-/** Feriado aplicável à fazenda daquele vínculo, pelo município (RN-16). */
-export function feriadoEm(dataISO, municipio) {
+/** Feriado aplicável ao funcionário (RN-16).
+    27/10/2026: o feriado pode valer só para um destino de DP (destino_id) —
+    o DP 1 segue os feriados de São Gotardo, o DP 2 os de Bom Despacho. Com
+    destino marcado, vale só para quem está numa unidade daquele DP; sem
+    destino, vale a regra antiga (nacional e estadual para todos, municipal
+    pelo município da fazenda). */
+export function feriadoEm(dataISO, municipio, destinoId) {
   return dados.feriados.find(f =>
     f.ativo !== false && f.data === dataISO &&
-    (f.abrangencia === 'nacional' ||
-     (f.abrangencia === 'municipal' && f.municipio === municipio) ||
-     f.abrangencia === 'estadual')) || null;
+    (f.destino_id ? !!destinoId && f.destino_id === destinoId :
+     (f.abrangencia === 'nacional' ||
+      (f.abrangencia === 'municipal' && f.municipio === municipio) ||
+      f.abrangencia === 'estadual'))) || null;
 }
 
 export const vinculoDe = funcionarioId =>
