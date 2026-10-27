@@ -160,6 +160,7 @@ function resumo(p, fazenda) {
   return { saidas, avals, meses, porMes, porClasse, porTipo, porDestino, porFaz, tot, re, pctRe: tot ? re / tot * 100 : null,
     perigKg: kg(perig), perigN: perig.length, perigSem: perig.filter(s => !temComprovante(s)).length,
     embKg: kg(saidas.filter(s => tipoPorId(s.tipo_id)?.classe === 'Embalagem de agrotóxico')),
+    embUn: saidas.filter(s => tipoPorId(s.tipo_id)?.classe === 'Embalagem de agrotóxico').reduce((t, s) => t + Number(s.unidades || 0), 0),
     embN: new Set(saidas.filter(s => tipoPorId(s.tipo_id)?.classe === 'Embalagem de agrotóxico').map(s => s.data)).size,
     conf: notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null, navals: notas.length,
     semAval, ultima, ncsUlt, ultSaida: E.saidas.filter(s => !fazenda || s.fazenda_id === fazenda).map(s => s.data).sort().pop() || '' };
@@ -256,7 +257,7 @@ function desenharPainel() {
       ${cartao('calma', 'Total destinado', fmt(k.tot) + ' kg', `${k.saidas.length} saída(s) no período`, 'reSaidas')}
       ${cartao(k.pctRe == null ? 'calma' : k.pctRe >= 50 ? 'calma' : 'alerta', 'Reaproveitado', k.pctRe == null ? '—' : fmt(k.pctRe, 1) + '%', `${fmt(k.re)} kg reciclados, compostados ou devolvidos`)}
       ${cartao(k.perigSem ? 'alerta' : 'calma', 'Perigosos', fmt(k.perigKg) + ' kg', k.perigN ? (k.perigSem ? `${k.perigSem} de ${k.perigN} saída(s) sem comprovante` : 'todas com comprovante') : 'nenhuma saída', 'reSaidas')}
-      ${cartao('calma', 'Devoluções de embalagens', String(k.embN), k.embKg ? `${fmt(k.embKg)} kg de embalagens de agrotóxico` : 'dias de entrega na central (registro ADICER, sem kg)', 'reSaidas')}
+      ${cartao('calma', 'Embalagens devolvidas', fmt(k.embUn), `${k.embN} entrega(s) na central${k.embKg ? ' · ' + fmt(k.embKg) + ' kg' : ''}`, 'reSaidas')}
       ${cartao(k.conf == null ? 'atencao' : k.conf >= 90 ? 'calma' : 'alerta', 'Conformidade do manejo', k.conf == null ? '—' : fmt(k.conf) + '%', k.navals ? `média de ${k.navals} avaliação(ões)${k.ncsUlt ? ` · ${k.ncsUlt} NC em ${rotMes(k.ultima)}` : ''}` : 'nenhuma avaliação', 'reAvaliacao')}
       ${cartao(k.semAval.length ? 'alerta' : 'calma', `Avaliação de ${rotMes(ma)}`, k.semAval.length ? `faltam ${k.semAval.length}` : 'em dia', k.semAval.length ? k.semAval.map(f => curtoFaz(f.id)).join(', ') : 'todas as fazendas avaliadas', 'reAvaliacao')}
     </div>
@@ -332,7 +333,7 @@ function tabelaSaidas() {
   $('rsTabela').innerHTML = l.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr><th class="ce">Data</th><th>Fazenda</th><th>Resíduo</th><th>Classe</th><th class="ce">kg</th><th>Destinação</th><th>Recebido por</th><th>Comprovante</th><th></th></tr></thead><tbody>
     ${l.map(s => { const t = tipoPorId(s.tipo_id); const perig = t?.classe === 'Perigoso';
       return `<tr><td class="ce">${br(s.data)}</td><td>${esc(curtoFaz(s.fazenda_id))}</td><td><b>${esc(t?.nome || '?')}</b></td><td>${t ? tagClasse(t.classe) : ''}</td>
-      <td class="ce">${fmt(s.kg, Number(s.kg) % 1 ? 1 : 0)}</td><td>${esc(s.destinacao)}</td><td>${esc(s.destinatario || '')}</td>
+      <td class="ce">${s.unidades != null && !Number(s.kg) ? `${fmt(s.unidades)} emb.` : fmt(s.kg, Number(s.kg) % 1 ? 1 : 0) + (s.unidades != null ? `<br><small class="dica">${fmt(s.unidades)} emb.</small>` : '')}</td><td>${esc(s.destinacao)}</td><td>${esc(s.destinatario || '')}</td>
       <td>${esc(s.comprovante || '')}${E.arq.has(String(s.id)) ? ' <span title="Comprovante anexado">📎</span>' : ''}${!temComprovante(s) ? ' ' + tag('sem comprovante', perig ? 'perigo' : 'alerta') : ''}</td>
       <td class="ce"><button class="btn mini" type="button" data-ed="${esc(s.id)}">Abrir</button></td></tr>`; }).join('')}
     <tr class="en-total"><td colspan="4">Total (${l.length} saída${l.length > 1 ? 's' : ''})</td><td class="ce">${fmt(tot)}</td><td colspan="4"></td></tr></tbody></table></div>`
@@ -351,6 +352,7 @@ function formSaida(r, rascunho = null) {
       <label class="campo">Fazenda <select id="rsFazD">${opcoes(E.faz.map(f => [f.id, f.nome]), v.fazenda_id, 'Escolha…')}</select></label>
       <label class="campo">Resíduo <select id="rsTipoD"><option value="">Escolha…</option>${grupos}</select></label>
       <label class="campo">Quantidade (kg) <input type="text" inputmode="decimal" id="rsKg" value="${esc(v.kg === '' ? '' : String(v.kg).replace('.', ','))}" placeholder="pesado ou estimado"></label>
+      <label class="campo" id="rsUnCampo">Nº de embalagens <input type="number" min="0" step="1" id="rsUn" value="${esc(v.unidades ?? '')}" placeholder="do registro ADICER / notas"></label>
       <label class="campo">Destinação <select id="rsDest">${opcoes(DESTINOS.map(d => d.nome), v.destinacao, 'Escolha…')}</select></label>
       <label class="campo">Recebido / transportado por <input type="text" id="rsDestin" value="${esc(v.destinatario || '')}" list="rsDestins" placeholder="Ex.: central de embalagens, cooperativa, coleta da prefeitura"></label>
       <label class="campo">Nº do comprovante <input type="text" id="rsComp" value="${esc(v.comprovante || '')}" placeholder="MTR, NF de devolução, recibo"></label>
@@ -370,7 +372,9 @@ function formSaida(r, rascunho = null) {
     const avisa = () => { const t = tipoPorId($('rsTipoD').value);
       $('rsAviso').textContent = t?.classe === 'Perigoso' ? 'Resíduo perigoso: guarde o comprovante da empresa licenciada (MTR ou certificado de destinação).'
         : t?.classe === 'Embalagem de agrotóxico' ? 'Embalagens: anexe o comprovante de devolução da central/posto de recebimento.' : ''; };
-    $('rsTipoD').addEventListener('change', () => { const t = tipoPorId($('rsTipoD').value); if (t?.destinacao && !$('rsDest').value) $('rsDest').value = t.destinacao; avisa(); });
+    const mostraUn = () => { $('rsUnCampo').hidden = tipoPorId($('rsTipoD').value)?.classe !== 'Embalagem de agrotóxico'; };
+    $('rsTipoD').addEventListener('change', () => { const t = tipoPorId($('rsTipoD').value); if (t?.destinacao && !$('rsDest').value) $('rsDest').value = t.destinacao; avisa(); mostraUn(); });
+    mostraUn();
     avisa();
     $('rsOk').addEventListener('click', () => salvarSaida(r, false));
     $('rsMais')?.addEventListener('click', () => salvarSaida(r, true));
@@ -384,9 +388,11 @@ async function salvarSaida(atual, outra) {
   if (!faz) return erroDlg('Escolha a fazenda.');
   if (!tipo) return erroDlg('Escolha o resíduo.');
   const semKg = tipoPorId(tipo)?.classe === 'Embalagem de agrotóxico';   // o registro ADICER traz unidades, não kg
-  if (kg == null || kg < 0 || (kg === 0 && !semKg)) return erroDlg('Informe a quantidade em kg.');
+  const un = semKg && so($('rsUn').value) !== '' ? Math.round(Number($('rsUn').value)) : null;
+  if (semKg && (kg == null || kg === 0) && !(un > 0)) return erroDlg('Informe o nº de embalagens (ou o peso em kg).');
+  if (!semKg && (kg == null || kg <= 0)) return erroDlg('Informe a quantidade em kg.');
   if (!dest) return erroDlg('Escolha a destinação.');
-  const l = { data, fazenda_id: faz, tipo_id: tipo, kg, destinacao: dest, destinatario: so($('rsDestin').value) || null,
+  const l = { data, fazenda_id: faz, tipo_id: tipo, kg: kg ?? 0, unidades: un, destinacao: dest, destinatario: so($('rsDestin').value) || null,
     comprovante: so($('rsComp').value) || null, observacao: so($('rsObs').value) || null };
   const salvo = await gravar('cr_saidas', E.saidas, atual, atual ? { ...l, atualizado_por: quem() } : { id: novoId(), ...l, criado_por: quem() }, outra ? 'rsMais' : 'rsOk');
   if (!salvo) return;
@@ -537,9 +543,9 @@ function docForm(k) {
   return documento({ titulo: FORM.titulo, subtitulo: `${rotPeriodo(E.fp.periodo)}${E.fp.fazenda ? ' · ' + nomeFaz(E.fp.fazenda) : ''}`, canto: FORM.codigo, paisagem: true, corpo: `
     ${fichaForm(`<div><span>Referência</span><b>POP 004 · AN 52 · AN 55</b></div>`)}
     <p class="rel-secao">1. Registro de saída de resíduos</p>
-    <table class="rel-tabela"><thead><tr><th>Data</th><th>Fazenda</th><th>Resíduo</th><th>Classe</th><th>kg</th><th>Destinação</th><th>Recebido por</th><th>Comprovante</th></tr></thead><tbody>
+    <table class="rel-tabela"><thead><tr><th>Data</th><th>Fazenda</th><th>Resíduo</th><th>Classe</th><th>kg / emb.</th><th>Destinação</th><th>Recebido por</th><th>Comprovante</th></tr></thead><tbody>
       ${l.length ? l.map(s => { const t = tipoPorId(s.tipo_id); return `<tr><td>${br(s.data)}</td><td>${esc(curtoFaz(s.fazenda_id))}</td><td>${esc(t?.nome || '')}</td><td>${esc(t?.classe || '')}</td>
-        <td class="rel-num">${fmt(s.kg, Number(s.kg) % 1 ? 1 : 0)}</td><td>${esc(s.destinacao)}</td><td>${esc(s.destinatario || '')}</td><td>${esc(s.comprovante || (E.arq.has(String(s.id)) ? 'anexado' : '—'))}</td></tr>`; }).join('')
+        <td class="rel-num">${s.unidades != null && !Number(s.kg) ? fmt(s.unidades) + ' emb.' : fmt(s.kg, Number(s.kg) % 1 ? 1 : 0)}</td><td>${esc(s.destinacao)}</td><td>${esc(s.destinatario || '')}</td><td>${esc(s.comprovante || (E.arq.has(String(s.id)) ? 'anexado' : '—'))}</td></tr>`; }).join('')
         : '<tr><td colspan="8">Nenhuma saída no período.</td></tr>'}
       <tr><td colspan="4"><b>Total</b></td><td class="rel-num"><b>${fmt(k.tot)}</b></td><td colspan="3">Reaproveitado: <b>${k.pctRe == null ? '—' : fmt(k.pctRe, 1) + '%'}</b></td></tr></tbody></table>
     <p class="rel-secao">2. Avaliação do manejo de resíduos</p>
@@ -557,7 +563,7 @@ function docPainel(k) {
       <div><span>Total destinado</span><strong>${fmt(k.tot)}</strong><small>kg</small></div>
       <div class="rel-q--otimo-t"><span>Reaproveitado</span><strong>${k.pctRe == null ? '—' : fmt(k.pctRe, 1) + '%'}</strong><small>${fmt(k.re)} kg</small></div>
       <div><span>Perigosos</span><strong>${fmt(k.perigKg)}</strong><small>kg · ${k.perigSem} sem comprovante</small></div>
-      <div><span>Devoluções de embalagens</span><strong>${k.embN}</strong><small>${k.embKg ? fmt(k.embKg) + ' kg' : 'entregas na central'}</small></div>
+      <div><span>Embalagens devolvidas</span><strong>${fmt(k.embUn)}</strong><small>${k.embN} entrega(s)</small></div>
       <div class="rel-q--bom-t"><span>Conformidade do manejo</span><strong>${k.conf == null ? '—' : fmt(k.conf) + '%'}</strong><small>${k.navals} avaliação(ões)</small></div>
     </div>
     <p class="rel-secao">Resíduos destinados por mês (kg)</p>${grafKg(k.porMes, true)}
@@ -585,13 +591,13 @@ function docChecklist(a) {
 }
 async function exportar(k) {
   const saidas = k.saidas.slice().sort((a, b) => a.data.localeCompare(b.data)).map(s => { const t = tipoPorId(s.tipo_id);
-    return [s.data, nomeFaz(s.fazenda_id), t?.nome || '', t?.classe || '', Number(s.kg), s.destinacao, reaproveita(s.destinacao) ? 'Sim' : 'Não', s.destinatario || '', s.comprovante || '', E.arq.has(String(s.id)) ? 'Sim' : 'Não', s.observacao || '']; });
+    return [s.data, nomeFaz(s.fazenda_id), t?.nome || '', t?.classe || '', Number(s.kg), s.unidades ?? '', s.destinacao, reaproveita(s.destinacao) ? 'Sim' : 'Não', s.destinatario || '', s.comprovante || '', E.arq.has(String(s.id)) ? 'Sim' : 'Não', s.observacao || '']; });
   const avals = k.avals.slice().sort((a, b) => a.competencia.localeCompare(b.competencia)).map(a => [a.competencia, nomeFaz(a.fazenda_id), nota(a.itens),
     ...ITENS.map(([c]) => a.itens?.[c] || ''), a.avaliador || '', a.observacao || '']);
   const sub = `SAKUMA Agronegócios · ${rotPeriodo(E.fp.periodo)} · emitido em ${br(hoje())}`;
   await baixarXlsx(`gestao-residuos-${hoje()}.xlsx`, [
     { nome: 'Saídas', titulo: `${FORM.codigo} — Saída de resíduos`, subtitulo: sub,
-      colunas: [{ rot: 'Data', larg: 12, tipo: 'data' }, { rot: 'Fazenda', larg: 24 }, { rot: 'Resíduo', larg: 32 }, { rot: 'Classe', larg: 20 }, { rot: 'kg', larg: 10, tipo: 'num', casas: 1 },
+      colunas: [{ rot: 'Data', larg: 12, tipo: 'data' }, { rot: 'Fazenda', larg: 24 }, { rot: 'Resíduo', larg: 32 }, { rot: 'Classe', larg: 20 }, { rot: 'kg', larg: 10, tipo: 'num', casas: 1 }, { rot: 'Nº embalagens', larg: 12 },
         { rot: 'Destinação', larg: 26 }, { rot: 'Reaproveita', larg: 11 }, { rot: 'Recebido por', larg: 28 }, { rot: 'Comprovante', larg: 18 }, { rot: 'Anexo', larg: 8 }, { rot: 'Observação', larg: 36 }],
       linhas: saidas },
     { nome: 'Avaliações', titulo: `${FORM.codigo} — Avaliação do manejo`, subtitulo: sub,

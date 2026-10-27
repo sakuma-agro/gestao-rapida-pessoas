@@ -40,6 +40,8 @@ create table if not exists public.cr_saidas (
   atualizado_em timestamptz not null default now(),
   atualizado_por text
 );
+-- Embalagens de agrotóxico: o registro da ADICER conta unidades, não pesa (decisão do Guilherme, 27/10/2026).
+alter table public.cr_saidas add column if not exists unidades integer check (unidades is null or unidades >= 0);
 create index if not exists cr_saidas_data on public.cr_saidas(data desc);
 
 create table if not exists public.cr_avaliacoes (
