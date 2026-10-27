@@ -180,8 +180,9 @@ async function enviar(req: Request, u: URL) {
     if (!d?.length) return json({ erro: "documento-nao-encontrado" }, 404);
     // já foi enviado à mão com o mesmo nome? não duplica
     const igual = await db(`arquivos?select=chave,origem&area=eq.certificacao&tipo=eq.documento&dono_id=eq.${encodeURIComponent(id)}&nome=eq.${encodeURIComponent(nome)}`);
-    if (igual?.length && igual[0].origem !== origem) return json({ ok: true, pulado: "ja-existe-no-app" });
-    const chave = `certificacao/documento/${id}/od-${sufixo}-${slug(nome)}.${ext}`;
+    // mesmo nome enviado à mão (sem origem): o arquivo do OneDrive passa a ser a fonte e atualiza o mesmo registro
+    if (igual?.length && igual[0].origem && igual[0].origem !== origem) return json({ ok: true, pulado: "ja-existe-no-app" });
+    const chave = igual?.length ? igual[0].chave : `certificacao/documento/${id}/od-${sufixo}-${slug(nome)}.${ext}`;
     await gravar(chave, "documento", String(id), nome, mime, corpo, origem);
     return json({ ok: true, chave });
   }
