@@ -160,6 +160,7 @@ function resumo(p, fazenda) {
   return { saidas, avals, meses, porMes, porClasse, porTipo, porDestino, porFaz, tot, re, pctRe: tot ? re / tot * 100 : null,
     perigKg: kg(perig), perigN: perig.length, perigSem: perig.filter(s => !temComprovante(s)).length,
     embKg: kg(saidas.filter(s => tipoPorId(s.tipo_id)?.classe === 'Embalagem de agrotóxico')),
+    embN: new Set(saidas.filter(s => tipoPorId(s.tipo_id)?.classe === 'Embalagem de agrotóxico').map(s => s.data)).size,
     conf: notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null, navals: notas.length,
     semAval, ultima, ncsUlt, ultSaida: E.saidas.filter(s => !fazenda || s.fazenda_id === fazenda).map(s => s.data).sort().pop() || '' };
 }
@@ -255,7 +256,7 @@ function desenharPainel() {
       ${cartao('calma', 'Total destinado', fmt(k.tot) + ' kg', `${k.saidas.length} saída(s) no período`, 'reSaidas')}
       ${cartao(k.pctRe == null ? 'calma' : k.pctRe >= 50 ? 'calma' : 'alerta', 'Reaproveitado', k.pctRe == null ? '—' : fmt(k.pctRe, 1) + '%', `${fmt(k.re)} kg reciclados, compostados ou devolvidos`)}
       ${cartao(k.perigSem ? 'alerta' : 'calma', 'Perigosos', fmt(k.perigKg) + ' kg', k.perigN ? (k.perigSem ? `${k.perigSem} de ${k.perigN} saída(s) sem comprovante` : 'todas com comprovante') : 'nenhuma saída', 'reSaidas')}
-      ${cartao('calma', 'Embalagens devolvidas', fmt(k.embKg) + ' kg', 'embalagens de agrotóxico', 'reSaidas')}
+      ${cartao('calma', 'Devoluções de embalagens', String(k.embN), k.embKg ? `${fmt(k.embKg)} kg de embalagens de agrotóxico` : 'dias de entrega na central (registro ADICER, sem kg)', 'reSaidas')}
       ${cartao(k.conf == null ? 'atencao' : k.conf >= 90 ? 'calma' : 'alerta', 'Conformidade do manejo', k.conf == null ? '—' : fmt(k.conf) + '%', k.navals ? `média de ${k.navals} avaliação(ões)${k.ncsUlt ? ` · ${k.ncsUlt} NC em ${rotMes(k.ultima)}` : ''}` : 'nenhuma avaliação', 'reAvaliacao')}
       ${cartao(k.semAval.length ? 'alerta' : 'calma', `Avaliação de ${rotMes(ma)}`, k.semAval.length ? `faltam ${k.semAval.length}` : 'em dia', k.semAval.length ? k.semAval.map(f => curtoFaz(f.id)).join(', ') : 'todas as fazendas avaliadas', 'reAvaliacao')}
     </div>
@@ -382,7 +383,8 @@ async function salvarSaida(atual, outra) {
   if (data > hoje()) return erroDlg('A data está no futuro.');
   if (!faz) return erroDlg('Escolha a fazenda.');
   if (!tipo) return erroDlg('Escolha o resíduo.');
-  if (kg == null || kg <= 0) return erroDlg('Informe a quantidade em kg.');
+  const semKg = tipoPorId(tipo)?.classe === 'Embalagem de agrotóxico';   // o registro ADICER traz unidades, não kg
+  if (kg == null || kg < 0 || (kg === 0 && !semKg)) return erroDlg('Informe a quantidade em kg.');
   if (!dest) return erroDlg('Escolha a destinação.');
   const l = { data, fazenda_id: faz, tipo_id: tipo, kg, destinacao: dest, destinatario: so($('rsDestin').value) || null,
     comprovante: so($('rsComp').value) || null, observacao: so($('rsObs').value) || null };
@@ -555,7 +557,7 @@ function docPainel(k) {
       <div><span>Total destinado</span><strong>${fmt(k.tot)}</strong><small>kg</small></div>
       <div class="rel-q--otimo-t"><span>Reaproveitado</span><strong>${k.pctRe == null ? '—' : fmt(k.pctRe, 1) + '%'}</strong><small>${fmt(k.re)} kg</small></div>
       <div><span>Perigosos</span><strong>${fmt(k.perigKg)}</strong><small>kg · ${k.perigSem} sem comprovante</small></div>
-      <div><span>Embalagens devolvidas</span><strong>${fmt(k.embKg)}</strong><small>kg</small></div>
+      <div><span>Devoluções de embalagens</span><strong>${k.embN}</strong><small>${k.embKg ? fmt(k.embKg) + ' kg' : 'entregas na central'}</small></div>
       <div class="rel-q--bom-t"><span>Conformidade do manejo</span><strong>${k.conf == null ? '—' : fmt(k.conf) + '%'}</strong><small>${k.navals} avaliação(ões)</small></div>
     </div>
     <p class="rel-secao">Resíduos destinados por mês (kg)</p>${grafKg(k.porMes, true)}
