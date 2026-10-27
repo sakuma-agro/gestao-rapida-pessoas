@@ -119,7 +119,7 @@ function nomeLimpo(nome: string, ext: string) {
   return n;
 }
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
-const slug = (s: string) => semAcento(s).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 70) || "arquivo";
+const slug = (s: string) => semAcento(s).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "arquivo";
 
 /** Grava (ou atualiza) o arquivo no Drive e na tabela arquivos. */
 async function gravar(chave: string, tipo: string, dono: string, nome: string, mime: string, corpo: Uint8Array, origem: string) {
@@ -132,7 +132,7 @@ async function gravar(chave: string, tipo: string, dono: string, nome: string, m
   }
   if (!driveId) {
     const limite = "fronteira" + crypto.randomUUID();
-    const meta = JSON.stringify({ name: nome, parents: [await pastaDe(tipo)], description: `LOP - Gestão Rápida — ${chave} (OneDrive)`, appProperties: { chave } });
+    const meta = JSON.stringify({ name: nome, parents: [await pastaDe(tipo)], description: `LOP - Gestão Rápida — ${chave} (OneDrive)`, ...(new TextEncoder().encode(chave).length <= 110 ? { appProperties: { chave } } : {}) });
     const enc = new TextEncoder();
     const ini = enc.encode(`--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${limite}\r\nContent-Type: ${mime}\r\n\r\n`);
     const fim = enc.encode(`\r\n--${limite}--`);

@@ -84,7 +84,7 @@ try {
              "&caminho=$([uri]::EscapeDataString($rel))&nome=$([uri]::EscapeDataString($a.Name))" +
              "&data=$($a.LastWriteTime.ToString('yyyy-MM-dd'))"
         try {
-          $r = Invoke-RestMethod -Method Post -Uri "$Url`?$q" -Headers $H -ContentType $mime -InFile $a.FullName -TimeoutSec 300
+          $r = Invoke-RestMethod -Method Post -Uri "$Url`?$q" -Headers $H -ContentType $mime -Body ([IO.File]::ReadAllBytes($a.FullName)) -TimeoutSec 300
           if ($r.pulado) { $pul++ } else { $env++ }
           $feito[$rel] = $assin
         } catch {
