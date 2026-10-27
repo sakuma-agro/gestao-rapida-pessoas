@@ -1125,29 +1125,79 @@ export function pendenciasFazendas() {
     .map(x => ({ ...x, e: estadoItem(x.i, x.d) })).filter(x => x.e.c !== 'ativo');
 }
 let filtroFaz = '';
+let agrupaItens = 'forn';   // itens gerais: 'forn' (por fornecedor) ou 'doc' (por tipo de documento)
+let soPendItens = false;
+/** Tipo de documento de um item geral ("FORNECEDOR · Documento"), para agrupar. */
+function tipoDocItem(txt) {
+  const t = so(txt).toLowerCase();
+  if (/bombeiro|avcb/.test(t)) return 'Bombeiros';
+  if (/alvar[aá] sanit/.test(t)) return 'Alvará sanitário';
+  if (/alvar/.test(t)) return 'Alvará de funcionamento';
+  if (/licen|las |dispensa/.test(t)) return 'Licença ambiental';
+  if (/respons|crq|crbio|crea|conselho/.test(t)) return 'Responsável técnico / conselho';
+  if (/globalg|grasp/.test(t)) return 'Certificado GLOBALG.A.P.';
+  if (/treinamento|capacita/.test(t)) return 'Treinamento';
+  if (/anp/.test(t)) return 'Autorização ANP';
+  if (/acredita|17025/.test(t)) return 'Acreditação do laboratório';
+  if (/registro|renasem|inmetro/.test(t)) return 'Registros (Inmetro, RENASEM…)';
+  return so(txt) || 'Outros';
+}
+const partesItem = i => { const p = so(i.local).split(' · '); return { forn: p[0] || 'Geral', doc: p.slice(1).join(' · ') || p[0] || '' }; };
+function linhaItem(i, d, rotulo, sub) {
+  const e = estadoItem(i, d); const ult = S.evid.filter(x => x.item_id === i.id).length;
+  return `<div class="ce-fz-item">
+    <div class="ce-fz-nome"><b>${esc(rotulo)}</b>${sub ? `<span class="dc-sem">${esc(sub)}</span>` : ''}</div>
+    <div class="ce-fz-dados dc-sem">${i.validade ? 'Válido até ' + br(i.validade) : e.v ? 'Próxima ' + br(e.v) : esc(i.periodicidade || d.periodicidade || '')}
+      ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}</div>
+    ${tag(e.t, e.c)}
+    <div class="ce-fz-acoes">
+      <button class="btn mini principal" type="button" data-fz-ev="${i.id}" title="Anexar evidência">＋ Evidência</button>
+      ${linkOk(i.link) ? `<a class="btn mini" href="${esc(i.link)}" target="_blank" rel="noopener" title="Abrir a pasta no OneDrive">${svgIcone('predio')}</a>` : ''}
+      <button class="btn mini" type="button" data-fz-ed="${i.id}" title="Editar">${svgIcone('lapis')}</button>
+    </div></div>`;
+}
 function htmlFazendas(d) {
   const todos = itensDe(d);
-  const lista = filtroFaz ? todos.filter(i => i.fazenda_id === filtroFaz) : todos;
   const nV = todos.filter(i => estadoItem(i, d).c === 'perigo').length;
-  return `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">${todos.length && todos.every(i => !i.fazenda_id) ? 'Itens' : 'Por fazenda'} <small class="dc-sem">· ${todos.length} item(ns)${nV ? ` · <b style="color:#a5342a">${nV} pendente(s)</b>` : ''}</small></h4>
-      <div class="barra" style="margin:0"><select id="ceFzFiltro" title="Mostrar só uma fazenda (ex.: a certificada, na auditoria)">${opcoes(S.faz.map(f => [f.id, f.nome]), filtroFaz, 'Todas as fazendas')}</select>
-      <button class="btn mini" type="button" id="ceFzNovo">＋ Ponto / item</button></div></div>
-    ${lista.length ? `<div class="ce-fz-lista">${lista.map(i => { const e = estadoItem(i, d); const ult = S.evid.filter(x => x.item_id === i.id).length;
-      return `<div class="ce-fz-item">
-        <div class="ce-fz-nome">${i.fazenda_id || !i.local ? `<b>${esc(nomeFaz(i.fazenda_id))}</b>${i.local ? `<span class="dc-sem">${esc(i.local)}</span>` : ''}` : `<b>${esc(i.local.split(' · ')[0])}</b>${i.local.includes(' · ') ? `<span class="dc-sem">${esc(i.local.split(' · ').slice(1).join(' · '))}</span>` : ''}`}</div>
-        <div class="ce-fz-dados dc-sem">${i.validade ? 'Válido até ' + br(i.validade) : e.v ? 'Próxima ' + br(e.v) : esc(i.periodicidade || d.periodicidade || '')}
-          ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}</div>
-        ${tag(e.t, e.c)}
-        <div class="ce-fz-acoes">
-          <button class="btn mini principal" type="button" data-fz-ev="${i.id}" title="Anexar evidência desta fazenda">＋ Evidência</button>
-          ${linkOk(i.link) ? `<a class="btn mini" href="${esc(i.link)}" target="_blank" rel="noopener" title="Abrir a pasta desta fazenda no OneDrive">${svgIcone('predio')}</a>` : ''}
-          <button class="btn mini" type="button" data-fz-ed="${i.id}" title="Editar">${svgIcone('lapis')}</button>
-        </div></div>`; }).join('')}</div>`
-      : '<p class="dica">Nenhum item para esta fazenda.</p>'}`;
+  const gerais = todos.length && todos.every(i => !i.fazenda_id);
+  const cab = (titulo, ctrl) => `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">${titulo} <small class="dc-sem">· ${todos.length} item(ns)${nV ? ` · <b style="color:#a5342a">${nV} pendente(s)</b>` : ''}</small></h4>
+      <div class="barra" style="margin:0">${ctrl}<button class="btn mini" type="button" id="ceFzNovo">＋ ${gerais ? 'Item' : 'Ponto / item'}</button></div></div>`;
+  if (gerais) {
+    const lista = soPendItens ? todos.filter(i => estadoItem(i, d).c === 'perigo') : todos;
+    const grupos = new Map();
+    for (const i of lista) {
+      const p = partesItem(i);
+      const k = agrupaItens === 'doc' ? tipoDocItem(p.doc) : p.forn;
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push(i);
+    }
+    const chaves = [...grupos.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const ctrl = `<div class="ce-seg" role="group" aria-label="Agrupar">
+        <button type="button" class="${agrupaItens === 'forn' ? 'on' : ''}" data-agrupa="forn">Por fornecedor</button>
+        <button type="button" class="${agrupaItens === 'doc' ? 'on' : ''}" data-agrupa="doc">Por documento</button></div>
+      <label class="ce-chk"><input type="checkbox" id="ceFzSoPend" ${soPendItens ? 'checked' : ''}> Só pendentes</label>`;
+    return cab('Itens', ctrl) + (chaves.length ? `<div class="ce-fz-grupos">${chaves.map(k => {
+      const its = grupos.get(k).sort((a, b) => so(a.local).localeCompare(so(b.local), 'pt-BR'));
+      const np = its.filter(i => estadoItem(i, d).c === 'perigo').length;
+      const prox = its.map(i => estadoItem(i, d).v).filter(Boolean).sort()[0];
+      return `<details class="ce-fz-grupo"${soPendItens ? ' open' : ''}>
+        <summary><b>${esc(k)}</b><span class="dc-sem">${its.length} documento(s)${prox ? ` · ${prox < hoje() ? 'venceu em' : 'próximo vencimento'} ${br(prox)}` : ''}</span>
+          ${np ? tag(`${np} pendente(s)`, 'perigo') : tag('Em dia', 'ativo')}</summary>
+        <div class="ce-fz-lista">${its.map(i => { const p = partesItem(i);
+          return agrupaItens === 'doc' ? linhaItem(i, d, p.forn, p.doc === k ? '' : p.doc) : linhaItem(i, d, p.doc || p.forn, ''); }).join('')}</div>
+      </details>`; }).join('')}</div>` : '<p class="dica">Nada pendente.</p>');
+  }
+  const lista = filtroFaz ? todos.filter(i => i.fazenda_id === filtroFaz) : todos;
+  const ctrl = `<select id="ceFzFiltro" title="Mostrar só uma fazenda (ex.: a certificada, na auditoria)">${opcoes(S.faz.map(f => [f.id, f.nome]), filtroFaz, 'Todas as fazendas')}</select>`;
+  return cab('Por fazenda', ctrl) + (lista.length ? `<div class="ce-fz-lista">${lista.map(i =>
+      i.fazenda_id || !i.local ? linhaItem(i, d, nomeFaz(i.fazenda_id), i.local || '') : linhaItem(i, d, partesItem(i).forn, partesItem(i).doc)).join('')}</div>`
+    : '<p class="dica">Nenhum item para esta fazenda.</p>');
 }
 function ligarFazendas(d) {
   const el = $('ceDvFaz'); if (!el) return;
-  $('ceFzFiltro').addEventListener('change', ev => { filtroFaz = ev.target.value; refazFazendas(d); });
+  $('ceFzFiltro')?.addEventListener('change', ev => { filtroFaz = ev.target.value; refazFazendas(d); });
+  $('ceFzSoPend')?.addEventListener('change', ev => { soPendItens = ev.target.checked; refazFazendas(d); });
+  el.querySelectorAll('[data-agrupa]').forEach(b => b.addEventListener('click', () => { agrupaItens = b.dataset.agrupa; refazFazendas(d); }));
   $('ceFzNovo').addEventListener('click', () => formItem(d, null));
   el.querySelectorAll('[data-fz-ev]').forEach(b => b.addEventListener('click', () => formEvidencia(d, null, b.dataset.fzEv)));
   el.querySelectorAll('[data-fz-ed]').forEach(b => b.addEventListener('click', () => formItem(d, S.itens.find(i => i.id === b.dataset.fzEd))));
