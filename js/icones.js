@@ -46,6 +46,7 @@ export const ICONES = {
   capacete: '<path d="M4 17a8 8 0 0116 0"/><path d="M2.5 17h19v2.5h-19z"/><path d="M12 9V6M8.5 10.5L8 8M15.5 10.5L16 8"/>',
   reuniao: '<circle cx="12" cy="7" r="2.6"/><circle cx="5" cy="10" r="2.2"/><circle cx="19" cy="10" r="2.2"/><path d="M7.5 20c0-2.8 2-4.6 4.5-4.6s4.5 1.8 4.5 4.6M1.8 19c0-2 1.3-3.4 3.2-3.4M22.2 19c0-2-1.3-3.4-3.2-3.4"/>',
   aspas: '<path d="M10 7H6a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/><path d="M20 7h-4a2 2 0 00-2 2v3a2 2 0 002 2h2v1a3 3 0 01-3 3"/>',
+  reciclar: '<path d="M7 19H4.8a1.8 1.8 0 0 1-1.6-2.7L5 13"/><path d="M11 19h8.2a1.8 1.8 0 0 0 1.6-2.7L19 13"/><path d="M14 16l-3 3 3 3"/><path d="M8.3 6.3l1.1-1.9a1.8 1.8 0 0 1 3.1 0L16 10"/><path d="M4 9.5l4.3-3.2L9 11"/>',
   vassoura: '<path d="M14 3l-4.5 9"/><path d="M6.5 12h7l2 9h-11z"/><path d="M8 16.5v4M11 16.5v4"/>',
   lapis: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   chama: '<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.3 2.3-5.3 3.6-7.6.4 1.6 1.2 2.6 2.2 3.1C11.6 7.4 13 5 15.2 3c.2 3.4 3.3 6 3.3 10.8 0 4.1-2.6 7.2-6.5 7.2z"/><path d="M12 21c-1.6 0-2.7-1.2-2.7-2.8 0-1.8 1.6-2.8 2.7-4.6 1.1 1.8 2.7 2.8 2.7 4.6 0 1.6-1.1 2.8-2.7 2.8z"/>',
@@ -83,6 +84,7 @@ export const ICONE_TELA = {
   ccPainel: 'painel', ccRegistros: 'boletim', ccPlantios: 'lista', ccInsumos: 'documento', ccAnalises: 'exame', ccCalibracoes: 'ajuste', ccRelatorios: 'grafico',
   faPainel: 'painel', faRegistros: 'boletim', faEspecies: 'lista', faCameras: 'ajuste',
   enPainel: 'painel', enLancamentos: 'boletim', enFontes: 'ajuste',
+  rePainel: 'painel', reSaidas: 'boletim', reAvaliacao: 'check', reTipos: 'ajuste',
   foPainel: 'painel', foAvaliacoes: 'boletim', foCadastro: 'lista', mcPainel: 'painel', mcNcs: 'alerta', mcMelhorias: 'grafico', mcFeedbacks: 'reuniao', mcCaixas: 'armario',
   bmPainel: 'painel', bmRastreio: 'boletim', bmLotes: 'documento', bmFechamento: 'grafico',
 };

@@ -268,6 +268,14 @@ export const MODULOS = [
       ['enLancamentos', 'Lançamentos'],
       ['enFontes',      'Fontes'],
     ] },
+    /* Resíduos (27/10/2026): gestão de resíduos — FORM 053 (POP 004): saídas
+       em kg, avaliação mensal do manejo e indicadores. js/cert-residuos.js; tabelas cr_*. */
+    { id: 'ceResiduosSub', grupo: 'Forms', codigo: 'FORM 053', nome: 'Resíduos', telas: [
+      ['rePainel',    'Painel'],
+      ['reSaidas',    'Saídas'],
+      ['reAvaliacao', 'Avaliação'],
+      ['reTipos',     'Tipos'],
+    ] },
     /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
        e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
     { id: 'ceBalancoSub', grupo: 'Forms', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
@@ -711,7 +719,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

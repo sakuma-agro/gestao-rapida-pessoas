@@ -80,7 +80,7 @@ const GRUPOS = [
   ['DP · Ticket', 'public', ['jor_ticket_mes', 'jor_ticket_emissoes']],
   ['DP · Empréstimo e Férias', 'public', ['jor_emprestimos', 'jor_emprestimo_abatimentos', 'jor_salarios',
     'jor_afastamentos', 'jor_ferias_inicial', 'jor_ferias_gozos', 'jor_ferias_perdas']],
-  ['Certificação', 'public', ['cert_certificacoes', 'cert_requisitos', 'cert_documentos', 'cert_doc_itens', 'cert_vinculos', 'cert_evidencias', 'cert_eventos']],
+  ['Certificação', 'public', ['cert_certificacoes', 'cert_requisitos', 'cert_documentos', 'cert_doc_itens', 'cert_vinculos', 'cert_evidencias', 'cert_eventos', 'cr_tipos', 'cr_saidas', 'cr_avaliacoes']],
   ['Manutenções', 'manutencao', ['equipamentos', 'tipos_equipamento', 'marcas', 'locais', 'setores',
     'planos_manutencao', 'tipos_manutencao', 'manutencoes', 'responsaveis_manutencao',
     'leituras', 'ajustes_contador', 'usos_implemento', 'parametros', 'importacoes']],

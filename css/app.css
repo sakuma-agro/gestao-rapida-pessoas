@@ -2154,3 +2154,4 @@ body.ce-apr-aberto{overflow:hidden}
 .ce-fz-dados{font-size:12px}
 .ce-fz-acoes{display:flex;gap:4px;justify-content:flex-end}
 @media (max-width:760px){.ce-fz-item{grid-template-columns:1fr auto}.ce-fz-dados{grid-column:1/-1}.ce-fz-acoes{grid-column:1/-1;justify-content:flex-start}}
+.ra-op{display:inline-flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
