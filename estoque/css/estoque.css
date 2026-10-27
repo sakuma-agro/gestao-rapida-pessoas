@@ -458,3 +458,8 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ai-novo{margin-top:10px}
 .ct-excluir{border-color:#c0392b !important;color:#a5342a !important}
 .btn.principal.ct-excluir{background:#c0392b !important;color:#fff !important}
+/* botão verde do WhatsApp (27/10/2026), igual ao do Custo Base */
+.btn.btn-zap{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#25D366;border-color:#25D366;color:#fff}
+.btn.btn-zap:hover{background:#1EBE5A;border-color:#1EBE5A;color:#fff}
+.btn.btn-zap:disabled{opacity:.6;cursor:wait}
+.btn.btn-zap .ic-zap{width:20px;height:20px;flex:none;border-radius:5px;background:#fff;display:block}

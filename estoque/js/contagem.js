@@ -13,6 +13,7 @@ import {
   temMinimo, precisaRepor as precisaReporGeral, textoPedido, comMinimoDo,
   mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
 } from './dados.js';
+import { enviarWhatsapp } from './pdf.js';
 /* Só os estoques liberados para esta pessoa (22/10/2026). */
 const locais = () => todosLocais().filter(l => podeLocal(l.id));
 /* Quem pode excluir a contagem de um tipo (pedido dele, 23/10/2026): o
@@ -1543,7 +1544,7 @@ function desenharRepor() {
           <div class="sub">contado ${esc(mostrarNumero(r.qtd))} ${esc(r.item.unidade || '')} · mínimo ${esc(mostrarNumero(r.item.estoque_minimo))}</div></div>
         <div class="acoes"><strong class="rp-pedir">${esc(textoPedido(r.item))}</strong></div>
       </div>`).join('')}</div>`).join('')
-      + `<div class="barra fim"><button class="btn" type="button" id="rpWhats">Enviar no WhatsApp</button>
+      + `<div class="barra fim"><button class="btn btn-zap" type="button" id="rpWhats"><img class="ic-zap" src="img/whatsapp.png" alt="">Enviar PDF no WhatsApp</button>
           <button class="btn principal" type="button" id="rpImprimir">Imprimir o pedido</button></div>`
       : `<div class="vazio">Nada no estoque mínimo nas contagens de ${esc(nomeMes(mesRepor))}${grupoRepor ? ' (' + esc(grupoRepor) + ')' : ''}.</div>`}`;
   $('rpMes').addEventListener('change', e => {
@@ -1551,28 +1552,31 @@ function desenharRepor() {
   });
   $('rpGrupo').addEventListener('change', e => { grupoRepor = e.target.value; desenharRepor(); });
   $('rpImprimir')?.addEventListener('click', () => { montarFolhaRepor(lista); setTimeout(() => window.print(), 50); });
-  $('rpWhats')?.addEventListener('click', () => {
-    window.open('https://wa.me/?text=' + encodeURIComponent(textoWhatsRepor(lista)), '_blank', 'noopener');
-  });
+  $('rpWhats')?.addEventListener('click', ev => enviarWhatsapp(pdfRepor(lista), ev.currentTarget));
 }
 
-/** Texto do pedido para o WhatsApp (pedido dele, 27/10/2026): mesma lista da
-    tela, separada por almoxarifado, com *negrito* no jeito do WhatsApp. O
-    wa.me abre a escolha do contato ou grupo; nada é enviado sozinho. */
-function textoWhatsRepor(lista) {
+/** O mesmo pedido em PDF para o WhatsApp (pedido dele, 27/10/2026: "não
+    precisa mensagem, só enviar o PDF"). Uma tabela por almoxarifado. */
+function pdfRepor(lista) {
   const porLocal = new Map();
   for (const r of lista) {
     if (!porLocal.has(r.local.id)) porLocal.set(r.local.id, []);
     porLocal.get(r.local.id).push(r);
   }
-  const blocos = [...porLocal.values()].map(rs => `*${rs[0].local.nome}*\n` + rs.map(r =>
-    `• ${r.item.nome} — *${textoPedido(r.item)}*`
-    + ` (contado ${mostrarNumero(r.qtd)} ${r.item.unidade || ''} · mín. ${mostrarNumero(r.item.estoque_minimo)})`.replace(/ +\)/, ')')
-  ).join('\n'));
-  return `*Pedido de Reposição — SAKUMA*\n`
-    + `Itens no estoque mínimo · contagem de ${nomeMes(mesRepor)}${grupoRepor ? ' · ' + grupoRepor : ''}\n\n`
-    + blocos.join('\n\n')
-    + `\n\nTotal: ${lista.length} ${lista.length === 1 ? 'item' : 'itens'}`;
+  const un = r => r.item.unidade || '';
+  return {
+    titulo: 'Pedido de Reposição',
+    subtitulo: `Itens no estoque mínimo · contagem de ${nomeMes(mesRepor)}${grupoRepor ? ' · ' + grupoRepor : ''} · emitido em ${new Date().toLocaleDateString('pt-BR')}`,
+    arquivo: `Pedido de Reposicao ${mesRepor}${grupoRepor ? ' ' + grupoRepor : ''}`,
+    secoes: [...porLocal.values()].map(rs => ({
+      titulo: rs[0].local.nome,
+      head: ['Item', 'Grupo', 'Contado', 'Mínimo', 'Pedir'],
+      dir: [2, 3, 4],
+      body: rs.map(r => [r.item.nome, r.item.grupo || '', (mostrarNumero(r.qtd) + ' ' + un(r)).trim(),
+        mostrarNumero(r.item.estoque_minimo),
+        r.item.pedido_reposicao != null && r.item.pedido_reposicao !== '' ? (mostrarNumero(r.item.pedido_reposicao) + ' ' + un(r)).trim() : '—']),
+    })),
+  };
 }
 
 /** Folha A4 do pedido de reposição, no padrão SAKUMA. */
