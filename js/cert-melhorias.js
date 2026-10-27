@@ -180,12 +180,22 @@ function desenharPainel() {
 /* ===================================================================
    TELA · NÃO CONFORMIDADES
    =================================================================== */
+/* Como foi solucionado (27/10/2026, pedido dele): aparece logo abaixo da
+   data de conclusão na lista de encerradas/concluídas. NC → resultado da
+   verificação de eficácia; melhoria → resultado; sem texto → ações concluídas. */
+function solucaoDe(c) {
+  if (aberto(c)) return '';
+  let t = so(c.natureza === 'NC' ? (c.verif_resultado || c.conclusao || '') : (c.padronizacao || c.conclusao || c.verif_resultado || ''));
+  if (!t) t = acoesDe(c).filter(a => a.status === 'CONCLUÍDA').map(a => a.oque).filter(Boolean).join('; ');
+  if (c.natureza === 'NC' && c.padronizacao) t += (t ? ' · ' : '') + 'Padronização: ' + c.padronizacao;
+  return t;
+}
 function tabelaCasos(lista, colunasExtra = '') {
   if (!lista.length) return '<div class="vazio">Nada para mostrar.</div>';
   return `<div class="ac-rola"><table class="dc-planilha bm-tab mc-tab"><thead><tr><th class="ce">Abertura</th><th>Caso</th><th>Local / fazenda</th><th>Etapa</th><th>Situação</th><th class="ce">Ações</th><th>Próximo passo</th><th>Último andamento</th><th>Responsável</th>${colunasExtra ? '<th>Plano</th>' : ''}<th></th></tr></thead><tbody>
     ${lista.map(c => { const s = situacao(c), ac = acoesDe(c), p = proximaAcao(c), an = andsDe(c).slice(-1)[0];
       return `<tr${s.nivel === 2 ? ' class="mc-atrasado"' : ''}><td class="ce">${br(c.data_abertura)}</td><td><b>${esc(c.titulo)}</b>${c.prioridade ? `<br><small class="dica">${esc(c.prioridade)}${c.via ? ' · ' + esc(c.via) : ''}</small>` : ''}</td>
-        <td>${esc([c.local, c.fazenda].filter(Boolean).join(' · '))}</td><td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td><td>${tag(s.rot, s.cor)}</td>
+        <td>${esc([c.local, c.fazenda].filter(Boolean).join(' · '))}</td><td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td><td${aberto(c) ? '' : ' class="mc-sol"'}>${tag(s.rot, s.cor)}${(() => { const so_ = solucaoDe(c); return so_ ? `<div class="mc-sol-txt" title="${esc(so_)}"><b>Como foi solucionado:</b> ${esc(so_)}</div>` : ''; })()}</td>
         <td class="ce">${ac.length ? `${ac.filter(a => a.status === 'CONCLUÍDA').length}/${ac.filter(a => a.status !== 'CANCELADA').length}` : '—'}</td>
         <td>${p ? esc(p.oque) + (p.quando ? `<br><small class="dica">${esc(p.quem || '')} · até ${br(p.quando)}</small>` : p.quem ? `<br><small class="dica">${esc(p.quem)}</small>` : '') : '—'}</td>
         <td>${an ? `<small class="dica">${br(an.data)}</small> ${esc(an.texto)}${an.valor != null ? ' · ' + reais(an.valor) : ''}` : '—'}</td><td>${esc(c.responsavel || '')}</td>

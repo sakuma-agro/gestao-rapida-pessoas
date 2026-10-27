@@ -2155,3 +2155,8 @@ body.ce-apr-aberto{overflow:hidden}
 .ce-fz-acoes{display:flex;gap:4px;justify-content:flex-end}
 @media (max-width:760px){.ce-fz-item{grid-template-columns:1fr auto}.ce-fz-dados{grid-column:1/-1}.ce-fz-acoes{grid-column:1/-1;justify-content:flex-start}}
 .ra-op{display:inline-flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap}
+
+/* Como foi solucionado, abaixo da data de conclusão (27/10/2026) */
+.bm-tab td.mc-sol{white-space:normal;overflow:visible;text-overflow:clip;min-width:240px;max-width:340px}
+.mc-sol-txt{margin-top:5px;font-size:12px;line-height:1.35;color:var(--texto-2,#51534A);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.mc-sol-txt b{color:#744F28;font-weight:700}
