@@ -1143,6 +1143,21 @@ function tipoDocItem(txt) {
   return so(txt) || 'Outros';
 }
 const partesItem = i => { const p = so(i.local).split(' · '); return { forn: p[0] || 'Geral', doc: p.slice(1).join(' · ') || p[0] || '' }; };
+const evidItem = i => S.evid.filter(e => e.item_id === i.id).sort((a, b) => so(b.data).localeCompare(so(a.data)));
+const rotItemCurto = i => i.fazenda_id ? rotItem(i) : so(i.local) || 'Item';
+const slideEv = (d, i, e) => ({ id: 'ev:' + e.id, codigo: `${d.codigo} · ${rotItemCurto(i)}`, nome: `${br(e.data)}${e.descricao ? ' — ' + so(e.descricao).split(' / ').pop() : ''}`, _ev: e });
+/** "Ver": abre o PDF da última evidência do item; as setas passam pelas anteriores. */
+function verItem(d, i) {
+  const l = evidItem(i).map(e => slideEv(d, i, e));
+  if (!l.length) return alert('Este item ainda não tem evidência.');
+  apresentar(l[0].id, l);
+}
+/** "Ver PDFs": a última evidência de cada item da lista, um atrás do outro (para o auditor). */
+function verTodosItens(d, its) {
+  const l = its.map(i => { const e = evidItem(i)[0]; return e ? slideEv(d, i, e) : null; }).filter(Boolean);
+  if (!l.length) return alert('Nenhum item tem evidência ainda.');
+  apresentar(l[0].id, l);
+}
 function linhaItem(i, d, rotulo, sub) {
   const e = estadoItem(i, d); const ult = S.evid.filter(x => x.item_id === i.id).length;
   return `<div class="ce-fz-item">
@@ -1151,6 +1166,7 @@ function linhaItem(i, d, rotulo, sub) {
       ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}</div>
     ${tag(e.t, e.c)}
     <div class="ce-fz-acoes">
+      ${ult ? `<button class="btn mini" type="button" data-fz-ver="${i.id}" title="Ver o PDF da última evidência (setas ← → mostram as anteriores)">${svgIcone('documento')} Ver</button>` : ''}
       <button class="btn mini principal" type="button" data-fz-ev="${i.id}" title="Anexar evidência">＋ Evidência</button>
       ${linkOk(i.link) ? `<a class="btn mini" href="${esc(i.link)}" target="_blank" rel="noopener" title="Abrir a pasta no OneDrive">${svgIcone('predio')}</a>` : ''}
       <button class="btn mini" type="button" data-fz-ed="${i.id}" title="Editar">${svgIcone('lapis')}</button>
@@ -1161,7 +1177,7 @@ function htmlFazendas(d) {
   const nV = todos.filter(i => estadoItem(i, d).c === 'perigo').length;
   const gerais = todos.length && todos.every(i => !i.fazenda_id);
   const cab = (titulo, ctrl) => `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">${titulo} <small class="dc-sem">· ${todos.length} item(ns)${nV ? ` · <b style="color:#a5342a">${nV} pendente(s)</b>` : ''}</small></h4>
-      <div class="barra" style="margin:0">${ctrl}<button class="btn mini" type="button" id="ceFzNovo">＋ ${gerais ? 'Item' : 'Ponto / item'}</button></div></div>`;
+      <div class="barra" style="margin:0">${ctrl}${todos.some(i => S.evid.some(e => e.item_id === i.id)) ? `<button class="btn mini" type="button" id="ceFzVerTodos" title="Mostra a última evidência de cada item, uma depois da outra (setas ← →)">${svgIcone('documento')} Ver PDFs</button>` : ''}<button class="btn mini" type="button" id="ceFzNovo">＋ ${gerais ? 'Item' : 'Ponto / item'}</button></div></div>`;
   if (gerais) {
     const lista = soPendItens ? todos.filter(i => estadoItem(i, d).c === 'perigo') : todos;
     const grupos = new Map();
@@ -1199,6 +1215,12 @@ function ligarFazendas(d) {
   $('ceFzSoPend')?.addEventListener('change', ev => { soPendItens = ev.target.checked; refazFazendas(d); });
   el.querySelectorAll('[data-agrupa]').forEach(b => b.addEventListener('click', () => { agrupaItens = b.dataset.agrupa; refazFazendas(d); }));
   $('ceFzNovo').addEventListener('click', () => formItem(d, null));
+  $('ceFzVerTodos')?.addEventListener('click', () => {
+    let its = itensDe(d);
+    if (filtroFaz && !its.every(i => !i.fazenda_id)) its = its.filter(i => i.fazenda_id === filtroFaz);
+    verTodosItens(d, its);
+  });
+  el.querySelectorAll('[data-fz-ver]').forEach(b => b.addEventListener('click', () => verItem(d, S.itens.find(i => i.id === b.dataset.fzVer))));
   el.querySelectorAll('[data-fz-ev]').forEach(b => b.addEventListener('click', () => formEvidencia(d, null, b.dataset.fzEv)));
   el.querySelectorAll('[data-fz-ed]').forEach(b => b.addEventListener('click', () => formItem(d, S.itens.find(i => i.id === b.dataset.fzEd))));
 }
