@@ -6,6 +6,7 @@
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
 #   - arquivo na subpasta EVIDÊNCIAS de um documento -> evidência do documento
+#   - arquivo em 5 - RG\RG xxx\... -> registro (evidência) do RG xxx
 # Não apaga nada no app nem no OneDrive. Pastas "bkp" e "HISTÓRICO" ficam de fora (versões antigas não vão para o app).
 # Registro do que já subiu: estado.json; o que aconteceu: sincronizar.log (nesta pasta).
 
@@ -13,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Base   = 'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida'
-$Topos  = @('1 - POP', '2 - FORM', '3 - AN', '4 - POLÍTICAS')
+$Topos  = @('1 - POP', '2 - FORM', '3 - AN', '4 - POLÍTICAS', '5 - RG')
 $Url    = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/onedrive-sync'
 $Aqui   = $PSScriptRoot
 $Token  = (Get-Content -Raw -Encoding UTF8 (Join-Path $Aqui 'token.txt')).Trim()
@@ -75,7 +76,7 @@ try {
         # dentro da subpasta de uma fazenda de um AN por fazenda?
         $destino = 'doc'; $id = $doc.id
         $resto = $a.FullName.Substring($pasta.FullName.Length + 1)
-        if ($resto -match '^EVID[ÊE]NCIAS\\') {
+        if ($topo -eq '5 - RG' -or $resto -match '^EVID[ÊE]NCIAS\\') {
           # subpasta EVIDÊNCIAS -> evidência do documento (linha do tempo)
           $destino = 'evid'
         } elseif ($doc.por_fazenda -and $resto.Contains('\')) {

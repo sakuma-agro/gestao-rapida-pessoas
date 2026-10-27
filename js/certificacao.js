@@ -161,7 +161,14 @@ const porCodigo = (a, b) => so(a.codigo).localeCompare(so(b.codigo), 'pt-BR', { 
 const ligadosDe = d => S.vinc.filter(v => v.de_id === d.id).map(v => ({ v, d: S.docs.find(x => x.id === v.para_id) })).filter(x => x.d).sort((a, b) => porCodigo(a.d, b.d));
 const ligadosPara = d => S.vinc.filter(v => v.para_id === d.id).map(v => ({ v, d: S.docs.find(x => x.id === v.de_id) })).filter(x => x.d).sort((a, b) => porCodigo(a.d, b.d));
 const evidDe = d => S.evid.filter(e => e.documento_id === d.id).sort((a, b) => b.data.localeCompare(a.data));
-const vivaDe = d => (EVID_APP[chaveCodigo(d.codigo)] ? { ...EVID_APP[chaveCodigo(d.codigo)], meses: S.viva[chaveCodigo(d.codigo)] || {} } : null);
+/* RG (27/10/2026, pedido dele: "ao preencher os forms temos registros, vamos criar o RG"):
+   RG 0xx = o FORM 0xx preenchido, mesmo número. Os lançamentos feitos no app
+   (EVID_APP) contam como registro do RG; o FORM fica sendo o modelo. */
+const chaveApp = d => chaveCodigo(d.codigo).replace(/^RG/, 'FORM');
+const numDoc = d => (chaveCodigo(d.codigo).match(/\d+$/) || [''])[0];
+const rgDe = d => prefixoDoc(d) === 'FORM' ? S.docs.find(x => prefixoDoc(x) === 'RG' && numDoc(x) === numDoc(d)) || null : null;
+const formDe = d => prefixoDoc(d) === 'RG' ? S.docs.find(x => prefixoDoc(x) === 'FORM' && numDoc(x) === numDoc(d)) || null : null;
+const vivaDe = d => (EVID_APP[chaveApp(d)] ? { ...EVID_APP[chaveApp(d)], meses: S.viva[chaveApp(d)] || {} } : null);
 const ehPop = d => prefixoDoc(d) === 'POP';
 /** Janelas de cobrança da evidência conforme a periodicidade (as mais recentes por último). */
 function janelas(d) {
@@ -702,7 +709,8 @@ function docFiltrados() {
 const TIPOS_DOC = [
   { id: 'POP', nome: 'POP', desc: 'Procedimentos operacionais', icone: 'documento', cat: 'P.O.Ps' },
   { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO' },
-  { id: 'FORM', nome: 'FORM', desc: 'Formulários e registros', icone: 'boletim', cat: 'REGISTROS' },
+  { id: 'FORM', nome: 'FORM', desc: 'Formulários (modelos)', icone: 'boletim', cat: 'FORMULÁRIOS' },
+  { id: 'RG', nome: 'RG', desc: 'Registros — FORMs preenchidos', icone: 'historico', cat: 'REGISTROS' },   // 27/10/2026
   { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST' },
   { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO' },
   { id: 'POL', nome: 'POL', desc: 'Políticas', icone: 'balanca', cat: 'POLÍTICAS' },   // 27/10/2026
@@ -814,17 +822,17 @@ function desenharTiposDocs() {
 }
 
 function resumoCadeia() {
-  const pops = docsDoTipo('POP'), forms = docsDoTipo('FORM');
+  const pops = docsDoTipo('POP'), forms = docsDoTipo('FORM'), regs = docsDoTipo('RG');
   if (!pops.length && !forms.length) return '';
   const popSem = pops.filter(d => !ligadosDe(d).length);
   const formSem = forms.filter(d => !ligadosPara(d).length);
-  const semEvid = forms.filter(d => { const c = cobertura(d); return c && c.length > 1 && c[c.length - 2].estado === 'falta'; });
+  const semEvid = (regs.length ? regs : forms).filter(d => { const c = cobertura(d); return c && c.length > 1 && c[c.length - 2].estado === 'falta'; });
   const lista = (l, max = 14) => l.slice(0, max).map(d => `<button class="ce-link" type="button" data-cad-ir="${d.id}">${esc(d.codigo)}</button>`).join(' · ') + (l.length > max ? ` · +${l.length - max}` : '');
-  return `<div class="ce-cadeia-res"><h4 class="ac-h4">Cadeia POP → FORM → evidências</h4>
-    <p>${tag(S.vinc.length + ' ligações', 'neutra')} ${tag(S.evid.length + ' evidências', 'neutra')}</p>
+  return `<div class="ce-cadeia-res"><h4 class="ac-h4">Cadeia POP → FORM → RG</h4>
+    <p>${tag(S.vinc.length + ' ligações', 'neutra')} ${tag(S.evid.length + ' registros e evidências', 'neutra')}</p>
     ${popSem.length ? `<p><b>POPs sem FORM ligado (${popSem.length}):</b> ${lista(popSem)}</p>` : ''}
     ${formSem.length ? `<p><b>FORMs que nenhum POP exige (${formSem.length}):</b> ${lista(formSem)}</p>` : ''}
-    ${semEvid.length ? `<p><b>Sem evidência no último período fechado (${semEvid.length}):</b> ${lista(semEvid)}</p>` : ''}</div>`;
+    ${semEvid.length ? `<p><b>Sem registro no último período fechado (${semEvid.length}):</b> ${lista(semEvid)}</p>` : ''}</div>`;
 }
 
 function abrirTipo(id, sel = null) {
@@ -880,7 +888,8 @@ async function painelDoc() {
   const refs = codigosDoDoc(d);
   /* FORM feito no app (26/10/2026, pedido dele): o botão principal abre a tela
      do app (Biodiversidade, Energia, Balanço…), não o arquivo. */
-  const app = EVID_APP[chaveCodigo(d.codigo)] || null;
+  const app = EVID_APP[chaveApp(d)] || null;
+  const modelo = formDe(d);   // RG: o modelo é o FORM de mesmo número
   el.innerHTML = `<div class="barra entre" style="margin:0;align-items:flex-start">
       <div><div class="dc-sem">${esc(d.codigo)}${d.revisao != null && d.revisao !== '' ? ' · Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? ' · ' + br(d.data_revisao) : ''}${d.responsavel ? ' · Resp.: ' + esc(d.responsavel) : ''}</div>
         <h3 style="margin:2px 0 0">${esc(d.nome)}</h3></div>
@@ -888,6 +897,7 @@ async function painelDoc() {
     </div>
     <div class="barra" style="margin:12px 0 4px">
       ${app ? `<button class="btn principal" type="button" id="ceDvApp" title="${esc(app.nome)}">${svgIcone('seta-dir')} Abrir no app</button>`
+        : modelo ? `<button class="btn principal" type="button" data-ir-modelo="${modelo.id}">${svgIcone('documento')} Ver o modelo (${esc(modelo.codigo)})</button>`
         : `<button class="btn principal" type="button" id="ceDvPdf" disabled>${svgIcone('documento')} Abrir PDF</button>`}
       ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive">${svgIcone('predio')} Abrir local</a>`
         : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">Abrir local</button>'}
@@ -898,6 +908,7 @@ async function painelDoc() {
     <div class="dc-sem ce-dv-caminho" id="ceDvMsg">${esc(d.caminho || '')}</div>
     ${app ? `<div class="ce-dv-app"><div><b>Este formulário é preenchido no app</b><span class="dc-sem">${esc(app.nome)}</span></div>
         <button class="btn principal" type="button" data-dv-app>${svgIcone('seta-dir')} Abrir ${esc(app.nome.split(' — ')[0])}</button></div>`
+      : prefixoDoc(d) === 'RG' ? `<div class="ce-dv-app"><div><b>Registro: ${esc(modelo ? modelo.codigo : 'FORM')} preenchido</b><span class="dc-sem">Os arquivos ficam em 5 - RG no OneDrive e entram sozinhos na linha do tempo abaixo.</span></div></div>`
       : '<div class="ce-dv-pdf" id="ceDvVisor"><span class="dc-sem">Procurando o PDF…</span></div>'}
     <div class="ce-dv-info">
       <div><h4 class="ac-h4">Normas atendidas</h4>
@@ -913,6 +924,7 @@ async function painelDoc() {
   if (d.por_fazenda) ligarFazendas(d);
   if (app) el.querySelectorAll('#ceDvApp, [data-dv-app]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', app.tela)));
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
+  el.querySelector('[data-ir-modelo]')?.addEventListener('click', () => abrirTipo('FORM', modelo.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
   $('ceDvCopiar')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); $('ceDvMsg').textContent = 'Caminho copiado. No Explorador de Arquivos, clique na barra de endereço, cole (Ctrl+V) e Enter.'; }
@@ -962,9 +974,11 @@ function htmlCadeia(d) {
   const chip = (x, lado) => `<span class="ce-elo"><button type="button" class="ce-link" data-ir-doc="${x.d.id}" title="${esc(x.d.nome)}"><b>${esc(x.d.codigo)}</b> ${esc(x.d.nome)}</button>${x.v.origem === 'texto do POP' ? '<small class="dc-sem" title="Ligação lida do texto do POP">· texto</small>' : ''}<button type="button" class="ce-elo-x" data-desligar="${x.v.id}" title="Desfazer esta ligação">✕</button></span>`;
   const candidatos = S.docs.filter(x => x.id !== d.id && !de.some(y => y.d.id === x.id) && !para.some(y => y.d.id === x.id)
     && (ehPop(d) ? !ehPop(x) : true)).sort(porCodigo);
-  const cob = !ehPop(d) ? cobertura(d) : null;
-  const ev = !ehPop(d) ? evidDe(d) : [];
-  const viva = !ehPop(d) ? vivaDe(d) : null;
+  const alvo = rgDe(d) || d;   // no FORM, os registros são os do RG de mesmo número
+  const cob = !ehPop(d) ? cobertura(alvo) : null;
+  const ev = !ehPop(d) ? evidDe(alvo) : [];
+  const viva = !ehPop(d) ? vivaDe(alvo) : null;
+  const rotEv = prefixoDoc(alvo) === 'RG' ? 'Registros' : 'Evidências';
   const okN = cob ? cob.filter(j => j.estado === 'ok').length : 0;
   return `<div class="ce-cadeia-cab"><h4 class="ac-h4" style="margin:0">${ehPop(d) ? 'Cadeia: formulários deste POP' : 'Cadeia: exigido por / ligado a'}</h4>
       ${ehPop(d) && de.length ? '<button class="btn mini principal" type="button" id="ceCadApr">▶ Apresentar a cadeia</button>' : !ehPop(d) && (ev.length || para.length) ? '<button class="btn mini" type="button" id="ceCadApr">▶ Apresentar com evidências</button>' : ''}</div>
@@ -974,8 +988,8 @@ function htmlCadeia(d) {
          ${de.length ? `<div class="ce-elos">${de.map(x => chip(x)).join('')}</div>` : ''}`}
     <div class="barra" style="margin:6px 0 0"><select id="ceCadSel"><option value="">${ehPop(d) ? '＋ Ligar um FORM / documento…' : '＋ Ligar a um POP / documento…'}</option>${candidatos.map(x => `<option value="${x.id}">${esc(x.codigo)} — ${esc(x.nome)}</option>`).join('')}</select>
       <button class="btn mini" type="button" id="ceCadLigar">Ligar</button></div>
-    ${ehPop(d) ? '' : `<div class="ce-cadeia-cab" style="margin-top:14px"><h4 class="ac-h4" style="margin:0">Evidências${d.periodicidade ? ` <small class="dc-sem">· ${esc(d.periodicidade)}</small>` : ''}</h4>
-        <button class="btn mini principal" type="button" id="ceEvNova">＋ Evidência</button></div>
+    ${ehPop(d) ? '' : `<div class="ce-cadeia-cab" style="margin-top:14px"><h4 class="ac-h4" style="margin:0">${rotEv}${alvo !== d ? ` — <button class="ce-link" type="button" data-ir-doc="${alvo.id}">${esc(alvo.codigo)} ↗</button>` : ''}${alvo.periodicidade ? ` <small class="dc-sem">· ${esc(alvo.periodicidade)}</small>` : ''}</h4>
+        <button class="btn mini principal" type="button" id="ceEvNova">＋ ${rotEv === 'Registros' ? 'Registro' : 'Evidência'}</button></div>
       ${viva ? `<p class="dica" style="margin:4px 0">Gerada no app: <button class="ce-link" type="button" id="ceEvViva">${esc(viva.nome)} ↗</button> — ${Object.keys(viva.meses).length} mês(es) com lançamento.</p>` : ''}
       ${cob ? `<div class="ce-janelas">${cob.map(j => `<span class="ce-jan ce-jan-${j.estado}" title="${esc(j.rot)}: ${j.n ? j.n + ' evidência(s)' : j.estado === 'aberto' ? 'período em andamento' : 'sem evidência'}">${esc(j.rot)}</span>`).join('')}</div>
         <p class="dc-sem" style="margin:2px 0 6px">${okN} de ${cob.length} período(s) com evidência.</p>` : '<p class="dc-sem" style="margin:2px 0 6px">Por evento: anexe cada ocorrência.</p>'}
@@ -984,7 +998,7 @@ function htmlCadeia(d) {
           ${S.evArq?.has(String(e.id)) ? `<button class="ce-link" type="button" data-ev-ver="${e.id}">📎 abrir</button>` : ''}
           ${linkOk(e.link) ? `<a class="ce-link" href="${esc(e.link)}" target="_blank" rel="noopener">OneDrive ↗</a>` : ''}
           <button class="ce-link dc-sem" type="button" data-ev-ed="${e.id}">editar</button></li>`).join('')}</ul>${ev.length > 12 ? `<p class="dc-sem">+ ${ev.length - 12} mais antiga(s).</p>` : ''}`
-        : '<p class="dica">Nenhuma evidência anexada ainda.</p>'}`}`;
+        : `<p class="dica">${rotEv === 'Registros' ? 'Nenhum registro anexado ainda.' : 'Nenhuma evidência anexada ainda.'}</p>`}`}`;
 }
 function ligarCadeia(d) {
   const el = $('ceDvCadeia'); if (!el) return;
@@ -1007,9 +1021,10 @@ function ligarCadeia(d) {
     if (error) return alert(/duplicate/i.test(error.message) ? 'Já estão ligados.' : 'Não consegui ligar: ' + error.message);
     S.vinc.push(data); salvarCaixa(); refazCadeia(d);
   });
-  $('ceEvNova')?.addEventListener('click', () => formEvidencia(d, null));
-  $('ceEvViva')?.addEventListener('click', () => abrirModulo('cert', vivaDe(d).tela));
-  el.querySelectorAll('[data-ev-ed]').forEach(b => b.addEventListener('click', () => formEvidencia(d, S.evid.find(e => e.id === b.dataset.evEd))));
+  const alvo = rgDe(d) || d;
+  $('ceEvNova')?.addEventListener('click', () => formEvidencia(alvo, null));
+  $('ceEvViva')?.addEventListener('click', () => abrirModulo('cert', vivaDe(alvo).tela));
+  el.querySelectorAll('[data-ev-ed]').forEach(b => b.addEventListener('click', () => formEvidencia(alvo, S.evid.find(e => e.id === b.dataset.evEd))));
   el.querySelectorAll('[data-ev-ver]').forEach(b => b.addEventListener('click', async () => {
     const l = await listarArquivos('certificacao', 'evidencia', b.dataset.evVer).catch(() => []);
     if (l[0]) abrirArquivo(l[0].chave); else alert('Arquivo ainda não está no Drive.');
