@@ -1543,13 +1543,36 @@ function desenharRepor() {
           <div class="sub">contado ${esc(mostrarNumero(r.qtd))} ${esc(r.item.unidade || '')} · mínimo ${esc(mostrarNumero(r.item.estoque_minimo))}</div></div>
         <div class="acoes"><strong class="rp-pedir">${esc(textoPedido(r.item))}</strong></div>
       </div>`).join('')}</div>`).join('')
-      + `<div class="barra fim"><button class="btn principal" type="button" id="rpImprimir">Imprimir o pedido</button></div>`
+      + `<div class="barra fim"><button class="btn" type="button" id="rpWhats">Enviar no WhatsApp</button>
+          <button class="btn principal" type="button" id="rpImprimir">Imprimir o pedido</button></div>`
       : `<div class="vazio">Nada no estoque mínimo nas contagens de ${esc(nomeMes(mesRepor))}${grupoRepor ? ' (' + esc(grupoRepor) + ')' : ''}.</div>`}`;
   $('rpMes').addEventListener('change', e => {
     if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesRepor = e.target.value; desenharRepor(); }
   });
   $('rpGrupo').addEventListener('change', e => { grupoRepor = e.target.value; desenharRepor(); });
   $('rpImprimir')?.addEventListener('click', () => { montarFolhaRepor(lista); setTimeout(() => window.print(), 50); });
+  $('rpWhats')?.addEventListener('click', () => {
+    window.open('https://wa.me/?text=' + encodeURIComponent(textoWhatsRepor(lista)), '_blank', 'noopener');
+  });
+}
+
+/** Texto do pedido para o WhatsApp (pedido dele, 27/10/2026): mesma lista da
+    tela, separada por almoxarifado, com *negrito* no jeito do WhatsApp. O
+    wa.me abre a escolha do contato ou grupo; nada é enviado sozinho. */
+function textoWhatsRepor(lista) {
+  const porLocal = new Map();
+  for (const r of lista) {
+    if (!porLocal.has(r.local.id)) porLocal.set(r.local.id, []);
+    porLocal.get(r.local.id).push(r);
+  }
+  const blocos = [...porLocal.values()].map(rs => `*${rs[0].local.nome}*\n` + rs.map(r =>
+    `• ${r.item.nome} — *${textoPedido(r.item)}*`
+    + ` (contado ${mostrarNumero(r.qtd)} ${r.item.unidade || ''} · mín. ${mostrarNumero(r.item.estoque_minimo)})`.replace(/ +\)/, ')')
+  ).join('\n'));
+  return `*Pedido de Reposição — SAKUMA*\n`
+    + `Itens no estoque mínimo · contagem de ${nomeMes(mesRepor)}${grupoRepor ? ' · ' + grupoRepor : ''}\n\n`
+    + blocos.join('\n\n')
+    + `\n\nTotal: ${lista.length} ${lista.length === 1 ? 'item' : 'itens'}`;
 }
 
 /** Folha A4 do pedido de reposição, no padrão SAKUMA. */
