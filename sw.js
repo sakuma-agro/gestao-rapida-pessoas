@@ -24,7 +24,7 @@ const ARQUIVOS = [
   './icons/gr-maskable-192.v2.png', './icons/gr-maskable-512.v2.png',
   // LOP - Gestão Rápida (09/10/2026): a plataforma, as áreas e a área Manutenções,
   // que precisa abrir sem internet no pátio (a base dela mora no IndexedDB).
-  './js/areas.js', './js/certificacao.js', './js/cert-caderno.js', './js/cert-fauna.js', './js/cert-energia.js', './js/cert-residuos.js', './js/cert-balanco.js', './js/cert-fornecedores.js', './js/cert-melhorias.js', './js/arquivos.js', './js/nucleo.js', './js/moldura-nucleo.js',
+  './js/areas.js', './js/certificacao.js', './js/cert-caderno.js', './js/cert-fauna.js', './js/cert-energia.js', './js/cert-residuos.js', './js/cert-grasp.js', './js/cert-balanco.js', './js/cert-fornecedores.js', './js/cert-melhorias.js', './js/arquivos.js', './js/nucleo.js', './js/moldura-nucleo.js',
   // Pergunte ao LOP (13/10/2026)
   './js/assistente.js', './css/assistente.css',
   './icons/lop-gr-favicon.v1.ico', './icons/lop-gr-32.v1.png', './icons/lop-gr-180.v1.png',

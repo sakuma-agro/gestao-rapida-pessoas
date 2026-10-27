@@ -130,10 +130,11 @@ const EVID_APP = {
   FORM4: { nome: 'Não conformidades — registro e tratamento', tela: 'mcNcs' },
   FORM20: { nome: 'Melhorias contínuas — banco e plano de melhorias', tela: 'mcMelhorias' },
   FORM42: { nome: 'Reclamações e sugestões', tela: 'mcFeedbacks' },
+  FORM44: { nome: 'Reunião GRASP — atas realizadas', tela: 'gpPainel' },
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -146,6 +147,7 @@ async function carregarCadeia(c) {
     c.from('jor_fazendas').select('id, nome').eq('ativo', true).order('nome'),
     c.from('cr_saidas').select('data'),
     c.from('cr_avaliacoes').select('competencia'),
+    c.from('cg_reunioes').select('data').eq('situacao', 'Realizada'),
   ]);
   if (it && !it.error) S.itens = it.data || [];
   if (fz && !fz.error) S.faz = fz.data || [];
@@ -154,6 +156,7 @@ async function carregarCadeia(c) {
   if (!fa.error) S.viva.FORM50 = contaMeses((fa.data || []).map(x => x.data));
   if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
   if (rs && !rs.error) S.viva.FORM53 = contaMeses((rs.data || []).map(x => x.data).concat(ra && !ra.error ? (ra.data || []).map(x => x.competencia) : []));
+  if (gp && !gp.error) S.viva.FORM44 = contaMeses((gp.data || []).map(x => x.data));
   if (!bm.error) S.viva.FORM13 = contaMeses((bm.data || []).map(x => x.data));
   if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
   if (!mc.error) { const doTipo = n => contaMeses((mc.data || []).filter(x => x.natureza === n).map(x => x.data_abertura));
@@ -461,11 +464,14 @@ function desenharPainel() {
   ligarItens(tela);
 }
 
-/** Eventos não repetidos cuja data passou sem serem dados como feitos. */
+/** Ocorrências que passaram sem serem dadas como feitas: eventos únicos e,
+ *  desde 27/10/2026 (FORM 044 atrasado sem aviso), também as repetições dos
+ *  últimos 12 meses. */
 function eventosVencidos() {
-  const hj = hoje();
-  return S.evs.filter(ev => !ev.repetir && ev.data < hj && !feito(ev, ev.data))
-    .map(ev => ({ data: ev.data, titulo: ev.titulo, tipo: ev.tipo, resp: ev.responsavel, ev }));
+  const hj = hoje(), de = somaMeses(hj, -12), ontem = somaDias(hj, -1);
+  return S.evs.flatMap(ev => (ev.repetir ? ocorrencias(ev, de, ontem) : (ev.data < hj ? [ev.data] : []))
+    .filter(d => !feito(ev, d))
+    .map(d => ({ data: d, titulo: ev.titulo, tipo: ev.tipo, resp: ev.responsavel, ev })));
 }
 
 function cartaoCert(c) {
