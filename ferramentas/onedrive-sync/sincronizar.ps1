@@ -5,7 +5,7 @@
 # e manda para o app cada PDF/foto novo ou alterado (até 15 MB):
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
-# Não apaga nada no app nem no OneDrive. Pastas "bkp" ficam de fora.
+# Não apaga nada no app nem no OneDrive. Pastas "bkp" e "HISTÓRICO" ficam de fora (versões antigas não vão para o app).
 # Registro do que já subiu: estado.json; o que aconteceu: sincronizar.log (nesta pasta).
 
 $ErrorActionPreference = 'Stop'
@@ -62,7 +62,7 @@ try {
       $doc = $docs[(Chave $cod)]
       if (-not $doc) { continue }
       $arqs = Get-ChildItem -LiteralPath $pasta.FullName -File -Recurse |
-        Where-Object { $_.Extension -match '^\.(pdf|jpe?g|png)$' -and $_.Name -notlike '.*' -and $_.FullName -notmatch '\\bkp\\' }
+        Where-Object { $_.Extension -match '^\.(pdf|jpe?g|png)$' -and $_.Name -notlike '.*' -and $_.FullName -notmatch '\\(bkp|HIST[ÓO]RICO)\\' }
       foreach ($a in $arqs) {
         $rel = $a.FullName.Substring($Base.Length + 1)
         $assin = "$($a.Length)|$($a.LastWriteTimeUtc.Ticks)"
