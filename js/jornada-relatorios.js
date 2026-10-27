@@ -181,7 +181,7 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
       ${blocoEmp(g.rotulo)}
       <table class="rel-tabela rel-tabela-dp rel-he">
         <thead><tr>
-          <th>Funcionário</th><th class="rel-c">Horas extras</th>
+          <th>Funcionário</th>${antes ? '<th class="rel-c" title="Dias com lançamento de segunda a sábado, fora feriado, falta e atestado">Diárias</th>' : ''}<th class="rel-c">Horas extras</th>
           <th class="rel-c rel-justo">Insalubridade</th><th class="rel-c rel-justo">Periculosidade 30%</th>
           <th class="rel-c">Faltas justif.</th><th class="rel-c">Faltas não justif.</th>
           ${antes ? '' : '<th class="rel-c">Saldo devedor</th>'}
@@ -191,7 +191,7 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
           const per = periodo(l);
           return `<tr>
           <td>${esc(l.nome)}${per ? `<br><span class="rel-mini rel-obs">${esc(per)}</span>` : ''}${l.atrasados.length ? `<br><span class="rel-mini rel-obs">${esc(obsAnterior(l, fmt))}</span>` : ''}</td>
-          <td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
+          ${antes ? `<td class="rel-c"><b>${l.diarias || ''}</b></td>` : ''}<td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
@@ -213,7 +213,7 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
 `;   // a frase de explicação das colunas saiu a pedido dele (28/09/2026)
   };
 
-  const notaAntes = antes ? `<p class="rel-nota">Só os dias trabalhados antes da data do registro (admissão). A partir do registro, as horas estão no Relatório Horas Extras.</p>` : '';
+  const notaAntes = antes ? `<p class="rel-nota">Só os dias trabalhados antes da data do registro (admissão). A partir do registro, as horas estão no Relatório Horas Extras. Diárias: dias com lançamento de segunda a sábado — domingo e feriado entram inteiros nas horas extras; falta e atestado não contam.</p>` : '';
 
   if (!paginas.length) return documentoDP({
     titulo: TITULO, competencia, destino: c.destino, classe: 'rel-paisagem', interno: antes,

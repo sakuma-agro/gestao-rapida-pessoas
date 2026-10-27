@@ -151,6 +151,16 @@ export function consolidar(competencia, destinoId, { recorte = 'registrado' } = 
          há déficit — o atestado saía sempre 0 no Detalhado e no Excel.
          O número de dias vem agora direto dos boletins do tipo Atestado. */
       diasAtestado: datasDe('ATESTADO').length,
+      /* Diárias (27/10/2026, relatório antes do registro): dias com lançamento
+         de segunda a sábado, fora feriado, falta, falta justificada e atestado.
+         Domingo e feriado já vão inteiros como horas extras. */
+      diarias: (() => {
+        const mun = jd.fazendaDe(unidade)?.municipio;
+        const fora = new Set(['FALTA', 'FALTAJ', 'ATESTADO']);
+        return new Set(boletins.filter(b => b.data_fato && !fora.has(codigo(b))
+          && new Date(b.data_fato + 'T12:00:00Z').getUTCDay() !== 0
+          && !jd.feriadoEm(b.data_fato, mun)).map(b => b.data_fato)).size;
+      })(),
       // RN-27/RN-28: permanente paga sempre; sem permanente, paga se algum
       // boletim do mês marcou a exposição no dia.
       // 23/10/2026: quem recebe periculosidade (vínculo ou RH › Salários) não
