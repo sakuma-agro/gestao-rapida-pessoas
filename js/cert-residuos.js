@@ -579,7 +579,7 @@ function docChecklist(a) {
     </tbody></table>
     <p class="rel-secao">Observação / ação para os itens NC</p>
     <div style="border:1px solid #c9cbc4;border-radius:4px;min-height:${a ? 30 : 110}px;padding:6px 8px;font-size:11px">${a ? esc(a.observacao || '') : ''}</div>
-    ${a ? `<p class="rel-nota">Nota: ${nota(a.itens) == null ? '—' : fmt(nota(a.itens)) + '% conforme'} (C ÷ C + NC).</p>` : '<p class="rel-nota">C = conforme · NC = não conforme · NA = não se aplica. Lançar depois no app: Certificação › Forms › Resíduos › Avaliação.</p>'}` });
+    ${a ? `<p class="rel-nota">Nota: ${nota(a.itens) == null ? '—' : fmt(nota(a.itens)) + '% conforme'} (C ÷ C + NC).</p>` : '<p class="rel-nota">C = conforme · NC = não conforme · NA = não se aplica. Lançar depois no app: Certificação › FORM DIGITAL › Resíduos › Avaliação.</p>'}` });
 }
 async function exportar(k) {
   const saidas = k.saidas.slice().sort((a, b) => a.data.localeCompare(b.data)).map(s => { const t = tipoPorId(s.tipo_id);

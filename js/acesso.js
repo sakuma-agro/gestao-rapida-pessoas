@@ -255,7 +255,7 @@ export const MODULOS = [
     ] },
     /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
        trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
-    { id: 'ceFaunaSub', grupo: 'Forms', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
+    { id: 'ceFaunaSub', grupo: 'FORM DIGITAL', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
       ['faPainel',    'Painel'],
       ['faRegistros', 'Registros'],
       ['faEspecies',  'Espécies'],
@@ -263,14 +263,14 @@ export const MODULOS = [
     ] },
     /* Energia (26/10/2026): consumo de energias — o FORM 043 virou painel.
        js/cert-energia.js; tabelas ce_fontes / ce_consumos. */
-    { id: 'ceEnergiaSub', grupo: 'Forms', codigo: 'FORM 043', nome: 'Energia', telas: [
+    { id: 'ceEnergiaSub', grupo: 'FORM DIGITAL', codigo: 'FORM 043', nome: 'Energia', telas: [
       ['enPainel',      'Painel'],
       ['enLancamentos', 'Lançamentos'],
       ['enFontes',      'Fontes'],
     ] },
     /* Resíduos (27/10/2026): gestão de resíduos — FORM 053 (POP 004): saídas
        em kg, avaliação mensal do manejo e indicadores. js/cert-residuos.js; tabelas cr_*. */
-    { id: 'ceResiduosSub', grupo: 'Forms', codigo: 'FORM 053', nome: 'Resíduos', telas: [
+    { id: 'ceResiduosSub', grupo: 'FORM DIGITAL', codigo: 'FORM 053', nome: 'Resíduos', telas: [
       ['rePainel',    'Painel'],
       ['reSaidas',    'Saídas'],
       ['reAvaliacao', 'Avaliação'],
@@ -278,7 +278,7 @@ export const MODULOS = [
     ] },
     /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
        e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
-    { id: 'ceBalancoSub', grupo: 'Forms', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
+    { id: 'ceBalancoSub', grupo: 'FORM DIGITAL', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
       ['bmPainel',     'Painel'],
       ['bmRastreio',   'Rastreabilidade'],
       ['bmLotes',      'Boletins e vendas'],
@@ -286,7 +286,7 @@ export const MODULOS = [
     ] },
     /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
        aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
-    { id: 'ceFornSub', grupo: 'Forms', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
+    { id: 'ceFornSub', grupo: 'FORM DIGITAL', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
       ['foPainel',     'Painel'],
       ['foAvaliacoes', 'Avaliações'],
       ['foCadastro',   'Cadastro'],
@@ -296,13 +296,13 @@ export const MODULOS = [
        manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
     /* 26/10/2026, pedido dele: cada um independente, com o seu FORM
        (antes era um submódulo só, "Melhoria contínua · FORM 020 · 042"). */
-    { id: 'ceNcSub', grupo: 'Forms', codigo: 'FORM 004', nome: 'Não conformidades', telas: [
+    { id: 'ceNcSub', grupo: 'FORM DIGITAL', codigo: 'FORM 004', nome: 'Não conformidades', telas: [
       ['mcNcs',        'Não conformidades'],
     ] },
-    { id: 'ceMelhSub', grupo: 'Forms', codigo: 'FORM 020', nome: 'Melhorias contínuas', telas: [
+    { id: 'ceMelhSub', grupo: 'FORM DIGITAL', codigo: 'FORM 020', nome: 'Melhorias contínuas', telas: [
       ['mcMelhorias',  'Melhorias contínuas'],
     ] },
-    { id: 'ceFbSub', grupo: 'Forms', codigo: 'FORM 042', nome: 'Reclamações e sugestões', telas: [
+    { id: 'ceFbSub', grupo: 'FORM DIGITAL', codigo: 'FORM 042', nome: 'Reclamações e sugestões', telas: [
       ['mcFeedbacks',  'Reclamações e sugestões'],
       ['mcCaixas',     'Abertura das caixas'],
     ] },
@@ -780,7 +780,7 @@ function pintarCategoria(id, subs) {
   /* Grupos (26/10/2026, pedido dele): submódulos com `grupo` (ex.: os Forms da
      Certificação — Biodiversidade, Energia, Balanço de massa, Fornecedores,
      Melhoria contínua) viram um botão só na linha de cima; clicar nele mostra
-     os submódulos do grupo na linha de baixo; dentro de um, "← Forms" volta. */
+     os submódulos do grupo na linha de baixo; dentro de um, "← FORM DIGITAL" volta. */
   const abrirSub = s => {
     const t = (ultimaTela[s.id] && s.telas.some(([x]) => x === ultimaTela[s.id])) ? ultimaTela[s.id] : s.telas[0][0];
     faixaEstado.tela = t; faixaEstado.grupoHub = null;
