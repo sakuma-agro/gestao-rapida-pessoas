@@ -309,6 +309,14 @@ function proximaDoc(d) {
   return somaMeses(d.data_revisao, m);
 }
 const docAtrasado = d => { const p = proximaDoc(d); return !!p && p < hoje(); };
+/** Situação mostrada: no AN por fazenda vem das fazendas (Pendente se alguma está sem evidência ou vencida);
+    nos demais, a situação escolhida no cadastro. */
+function sitDoc(d) {
+  if (!d.por_fazenda || d.situacao === 'Obsoleto') return d.situacao;
+  const its = itensDe(d);
+  if (!its.length) return d.situacao;
+  return its.some(i => estadoItem(i, d).c === 'perigo') ? 'Pendente' : 'Em dia';
+}
 
 /** Ocorrências de um evento entre de e ate (inclusive). */
 function ocorrencias(ev, de, ate) {
@@ -401,7 +409,7 @@ function desenharPainel() {
     ...eventosVencidos(),
   ].sort((a, b) => a.data.localeCompare(b.data));
   const criticos = S.reqs.filter(r => emUso(r) && r.prioridade === 'Crítica' && !['Conforme', 'Não se aplica'].includes(r.status));
-  const docsPend = S.docs.filter(d => ['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d));
+  const docsPend = S.docs.filter(d => ['Pendente', 'Revisar'].includes(sitDoc(d)) || docAtrasado(d));
   const emUsoTodos = S.reqs.filter(r => emUso(r) && r.status !== 'Não se aplica');
   const conf = emUsoTodos.filter(r => r.status === 'Conforme').length;
 
@@ -698,7 +706,7 @@ function docFiltrados() {
   return S.docs.filter(d => {
     if (f.cat && d.categoria !== f.cat) return false;
     if (f.per && d.periodicidade !== f.per) return false;
-    if (f.sit === 'semlink' ? linkOk(d.link) : f.sit === 'atencao' ? !(['Pendente', 'Revisar'].includes(d.situacao) || docAtrasado(d)) : f.sit && d.situacao !== f.sit) return false;
+    if (f.sit === 'semlink' ? linkOk(d.link) : f.sit === 'atencao' ? !(['Pendente', 'Revisar'].includes(sitDoc(d)) || docAtrasado(d)) : f.sit && sitDoc(d) !== f.sit) return false;
     if (f.resp && so(d.responsavel) !== f.resp) return false;
     if (q && ![d.codigo, d.nome, d.responsavel, d.observacao, codTexto(codigosDoDoc(d))].some(t => so(t).toLowerCase().includes(q))) return false;
     return true;
@@ -789,7 +797,7 @@ function desenharTiposDocs() {
   const tipos = [...TIPOS_DOC, ...(outros.length ? [{ id: 'OUTROS', nome: 'Outros', desc: 'Sem tipo no código', icone: 'documento' }] : [])];
   const cartao = t => {
     const l = docsDoTipo(t.id);
-    const n = s => l.filter(d => d.situacao === s).length;
+    const n = s => l.filter(d => sitDoc(d) === s).length;
     const venc = l.filter(docAtrasado).length;
     return `<button class="ce-tipo" type="button" data-tipo="${t.id}">
       <span class="ce-tipo-ic">${svgIcone(t.icone)}</span>
@@ -820,7 +828,7 @@ function desenharTiposDocs() {
     const q = so(f.q2).toLowerCase();
     const l = q ? S.docs.filter(d => [d.codigo, d.nome, d.responsavel, codTexto(codigosDoDoc(d))].some(t => so(t).toLowerCase().includes(q))) : [];
     $('ceDcAchados').innerHTML = !q ? '' : l.length ? `<ul class="ce-achados">${l.slice(0, 30).map(d => `<li><button class="ce-link" type="button" data-achado="${d.id}">
-      <b>${esc(d.codigo)}</b> ${esc(d.nome)}</button> ${tag(d.situacao, COR_SIT[d.situacao])} <span class="ce-refs">${codTags(codigosDoDoc(d))}</span></li>`).join('')}</ul>`
+      <b>${esc(d.codigo)}</b> ${esc(d.nome)}</button> ${tag(sitDoc(d), COR_SIT[sitDoc(d)])} <span class="ce-refs">${codTags(codigosDoDoc(d))}</span></li>`).join('')}</ul>`
       : '<p class="dica">Nada encontrado.</p>';
     $('ceDcAchados').querySelectorAll('[data-achado]').forEach(b => b.addEventListener('click', () => {
       const d = S.docs.find(x => x.id === Number(b.dataset.achado));
@@ -877,7 +885,7 @@ function desenharTipoDocs() {
     const q = so($('ceDcQ2').value).toLowerCase();
     const l = docsDoTipo(f.tipo).filter(d => !q || [d.codigo, d.nome, codTexto(codigosDoDoc(d))].some(x => so(x).toLowerCase().includes(q)));
     $('ceDcItens').innerHTML = l.length ? l.map(d => `<button type="button" class="ce-dv-item${d.id === f.sel ? ' on' : ''}" data-sel="${d.id}">
-        <span><b>${esc(so(d.codigo).replace(/^[A-Z]+\s*/, ''))}</b> ${esc(d.nome)}</span>${tag(d.situacao, COR_SIT[d.situacao])}</button>`).join('')
+        <span><b>${esc(so(d.codigo).replace(/^[A-Z]+\s*/, ''))}</b> ${esc(d.nome)}</span>${tag(sitDoc(d), COR_SIT[sitDoc(d)])}</button>`).join('')
       : `<p class="dica" style="padding:8px">${docsDoTipo(f.tipo).length ? 'Nada com essa busca.' : 'Nenhum documento deste tipo ainda.'}</p>`;
     $('ceDcItens').querySelectorAll('[data-sel]').forEach(b => b.addEventListener('click', () => {
       f.sel = Number(b.dataset.sel); itens(); painelDoc();
@@ -903,7 +911,7 @@ async function painelDoc() {
   el.innerHTML = `<div class="barra entre" style="margin:0;align-items:flex-start">
       <div><div class="dc-sem">${esc(d.codigo)}${d.revisao != null && d.revisao !== '' ? ' · Rev. ' + esc(d.revisao) : ''}${d.data_revisao ? ' · ' + br(d.data_revisao) : ''}${d.responsavel ? ' · Resp.: ' + esc(d.responsavel) : ''}</div>
         <h3 style="margin:2px 0 0">${esc(d.nome)}</h3></div>
-      ${tag(d.situacao, COR_SIT[d.situacao])}
+      ${tag(sitDoc(d), COR_SIT[sitDoc(d)])}
     </div>
     <div class="barra" style="margin:12px 0 4px">
       ${app ? `<button class="btn principal" type="button" id="ceDvApp" title="${esc(app.nome)}">${svgIcone('seta-dir')} Abrir no app</button>`
@@ -1361,7 +1369,7 @@ function desenharTabelaDocs() {
 
 function tabelaDocumentos() {
   const lista = docFiltrados();
-  const conta = s => lista.filter(d => d.situacao === s).length;
+  const conta = s => lista.filter(d => sitDoc(d) === s).length;
   $('ceDcResumo').innerHTML = `<span class="contagem"><b>${lista.length}</b> documento(s)</span>
     ${SITUACOES_DOC.map(s => conta(s) ? `<span class="contagem">${tag(s, COR_SIT[s])} <b>${conta(s)}</b></span>` : '').join('')}
     ${lista.filter(docAtrasado).length ? `<span class="contagem">${tag('revisão vencida', 'perigo')} <b>${lista.filter(docAtrasado).length}</b></span>` : ''}
@@ -1376,7 +1384,7 @@ function tabelaDocumentos() {
     <td class="ce">${p ? (p < hoje() ? tag(br(p), 'perigo') : br(p)) : '—'}</td>
     <td>${reqsDoDoc(d).length ? `<div class="ce-refs">${codTags(codigosDoDoc(d))}</div>
       <button class="ce-link dc-sem" type="button" data-dreq="${d.id}" title="Ver os requisitos ligados">${reqsDoDoc(d).length} requisito(s)</button>` : '<span class="dc-sem">—</span>'}</td>
-    <td class="ce">${tag(d.situacao, COR_SIT[d.situacao])}</td>
+    <td class="ce">${tag(sitDoc(d), COR_SIT[sitDoc(d)])}</td>
     <td class="ce"><button class="btn mini" type="button" data-doc="${d.id}">Abrir</button></td></tr>`; }).join('')}
   </tbody></table></div>` : `<div class="vazio">${S.docs.length ? 'Nada com esses filtros.' : 'Nenhum documento cadastrado.'}</div>`;
   $('ceDcTabela').querySelectorAll('[data-doc]').forEach(b => b.addEventListener('click', () => formDocumento(Number(b.dataset.doc))));
@@ -1880,7 +1888,7 @@ function docListaDocs(lista) {
         ${ds.map(d => `<tr><td>${codigoLink(d, 'rel-link')}</td><td>${esc(d.nome)}</td><td>${esc(d.revisao || '')}</td><td>${d.data_revisao ? br(d.data_revisao) : ''}</td>
           <td>${esc(d.periodicidade || '')}</td><td>${esc(d.responsavel || '')}</td>
           <td class="rel-miudo">${esc(codTexto(codigosDoDoc(d)))}</td>
-          <td class="${d.situacao === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : d.situacao === 'Obsoleto' ? '' : 'rel-pend'}">${esc(d.situacao)}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
+          <td class="${sitDoc(d) === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : sitDoc(d) === 'Obsoleto' ? '' : 'rel-pend'}">${esc(sitDoc(d))}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
         || '<tr><td colspan="8" class="rel-vazio">Nenhum documento.</td></tr>'}
       </tbody></table>` });
 }
@@ -1953,7 +1961,7 @@ async function exportarDocs(lista) {
         { rot: 'Responsável', larg: 18 }, { rot: 'Revisão', larg: 8 }, { rot: 'Data da revisão', tipo: 'data', larg: 12 },
         { rot: 'Próxima revisão', tipo: 'data', larg: 12 }, { rot: 'Códigos nas normas', larg: 40 }, { rot: 'Requisitos ligados', tipo: 'num', casas: 0, larg: 10 }, { rot: 'Link OneDrive', larg: 40 }, { rot: 'Situação', larg: 10 }, { rot: 'Certificações', larg: 18 }, { rot: 'Observação', larg: 40 }],
       linhas: lista.map(d => [d.codigo, d.nome, d.categoria, d.periodicidade || '', d.responsavel || '', d.revisao || '', d.data_revisao || '',
-        proximaDoc(d) || '', codTexto(codigosDoDoc(d)), reqsDoDoc(d).length, d.link || '', d.situacao, (d.certificacoes || []).join(', '), d.observacao || '']),
+        proximaDoc(d) || '', codTexto(codigosDoDoc(d)), reqsDoDoc(d).length, d.link || '', sitDoc(d), (d.certificacoes || []).join(', '), d.observacao || '']),
     }]);
   } catch (e) { alert('Não consegui gerar o Excel: ' + (e.message || e)); }
 }
