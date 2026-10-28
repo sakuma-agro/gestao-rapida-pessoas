@@ -1380,3 +1380,11 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .os-como em{font-style:normal;color:#744F28;font-weight:bold}
 .ff-como{background:#F3F8E8;border-left:4px solid #84BD00;border-radius:0;padding:8px 12px;margin:8px 0 12px}
 .ff-como p{margin:4px 0;font-size:15px}
+/* OS simples (28/10/2026) */
+.os-g2{grid-template-columns:repeat(2,1fr)}
+.os-g3{grid-template-columns:2fr 1.2fr 1.2fr}
+.os-ass2{grid-template-columns:repeat(2,1fr)}
+.os-proxima{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;padding:10px 14px;border:2px solid #84BD00;border-radius:8px}
+.os-proxima span{font-size:12px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:#51534A}
+.os-proxima b{font-size:20px;color:#3F5F00}
+@media print{body.imprimindo-os .os-g3{grid-template-columns:2fr 1.2fr 1.2fr}body.imprimindo-os .os-g2{grid-template-columns:repeat(2,1fr)}body.imprimindo-os .os-ass2{grid-template-columns:repeat(2,1fr)}}

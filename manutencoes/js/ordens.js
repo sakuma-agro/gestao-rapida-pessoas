@@ -297,8 +297,6 @@ function abrirOS(idOS) {
   const linhaBranca = '<span class="os-preencher"></span>';
   const val = (v, vazio = linhaBranca) => (v === null || v === undefined || v === '') ? vazio : esc(v);
   const caixa = (rot, conteudo, cls = '') => `<div class="os-cx ${cls}"><span>${rot}</span><b>${conteudo}</b></div>`;
-  const marcaModelo = [q.nome('marcas', e.marca_id), e.modelo].filter(Boolean).join(' ');
-  const serie = [(e.dados_tecnicos || {}).placa, e.numero_serie, e.patrimonio ? 'Pat. ' + e.patrimonio : ''].filter(Boolean).join(' · ');
 
   /* Próxima troca de cada serviço (21/10/2026, pedido dele): na OS feita, a
      conta é com a troca registrada; na aberta, uma previsão "se feita hoje"
@@ -317,67 +315,63 @@ function abrirOS(idOS) {
       : '<small>se feita hoje' + (baseL != null && ph != null && e.unidade_controle !== 'CALENDARIO' ? ' com ' + nHoras(baseL) + ' ' + u : '') + '</small>');
   };
 
+  /* OS simples (28/10/2026, pedido dele: "muitas informações que ninguém vai
+     preencher"). Saíram peças, hora início/fim, marca/série, prazo, "a cada",
+     "última troca", "por que entrou", causa e o check de saída. Ficou: o que
+     fazer, quem fez, quando, e em destaque a PRÓXIMA TROCA — horímetro/km ou
+     data na máquina, só data no que é por calendário. */
+  const medidoOS = e.unidade_controle !== 'CALENDARIO';
+  const temMaterial = itens.some(it => { const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null; return p && p.materiais; });
+  const proxGeral = (() => {
+    let hMin = null, dMin = null;
+    itens.forEach(it => {
+      const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
+      if (!p) return;
+      const baseL = feita && it.feito ? it.leitura_troca : (leituraDe(e) ?? os.leitura_emissao);
+      const baseD = feita && it.feito ? it.data_troca : hoje();
+      if (medidoOS && p.periodicidade_horas != null && baseL != null) { const v = Number(baseL) + Number(p.periodicidade_horas); if (hMin == null || v < hMin) hMin = v; }
+      if (p.periodicidade_dias != null && baseD) { const d = somarDias(String(baseD).slice(0, 10), Math.round(Number(p.periodicidade_dias))); if (!dMin || d < dMin) dMin = d; }
+    });
+    const partes = [];
+    if (hMin != null) partes.push(nHoras(hMin) + ' ' + u);
+    if (dMin) partes.push(formatarData(dMin));
+    return partes.join(' ou ');
+  })();
+
   const blocoPreventiva = `
     <section class="os-bloco">
-      <h3>Serviços a executar <small>marque o quadrado do que for feito</small></h3>
+      <h3>O que fazer <small>marque o que for feito</small></h3>
       <table class="os-tab"><thead><tr>
-        <th class="os-ok">Feito</th><th>Serviço</th><th>A cada</th><th>Material a usar</th><th>Última troca</th><th class="os-prox">Próxima troca</th><th>Por que entrou</th>
+        <th class="os-ok">Feito</th><th>Serviço</th>${temMaterial ? '<th>Material</th>' : ''}<th class="os-prox">Próxima troca</th>
       </tr></thead><tbody>` + itens.map(it => {
         const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
         return `<tr>
           <td class="os-ok"><span class="os-quad${it.feito ? ' on' : ''}">${it.feito ? '✓' : ''}</span></td>
           <td><b>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</b>${tipoComo(it.tipo_manutencao_id)}</td>
-          <td>${p ? esc(periodicidadeTexto(p, e)) : '—'}</td>
-          <td class="os-mat">${p && p.materiais ? esc(p.materiais) : tipoDe(it).instrucao ? '—' : '<i>informar no cadastro da máquina</i>'}</td>
-          <td>${feita && it.data_troca ? 'trocado em ' + formatarData(it.data_troca)
-               : (p && p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '—') +
-                 (p && p.ultima_troca_leitura != null ? '<small>' + nHoras(p.ultima_troca_leitura) + ' ' + u + '</small>' : '')}</td>
+          ${temMaterial ? `<td class="os-mat">${p && p.materiais ? esc(p.materiais) : '—'}</td>` : ''}
           <td class="os-prox">${proximaDaOS(it, p)}</td>
-          <td class="os-motivo">${esc(it.motivo || '')}</td>
         </tr>`;
-      }).join('') + `
-        <tr class="os-extra"><td class="os-ok"><span class="os-quad"></span></td><td colspan="6">Outro serviço: ${linhaBranca}</td></tr>
-      </tbody></table>
+      }).join('') + `</tbody></table>
+      ${proxGeral ? `<div class="os-proxima"><span>Próxima troca${feita ? '' : ' (se feita hoje)'}</span><b>${proxGeral}</b></div>` : ''}
     </section>`;
 
   const blocoCorretiva = `
     <section class="os-bloco">
-      <h3>1 · Problema relatado</h3>
+      <h3>Problema</h3>
       <div class="os-texto">${esc(os.descricao || '')}</div>
       ${ck ? `<p class="os-origem">Apontado no check list ${ck.numero ? 'nº ' + ck.numero : ''} de ${formatarData(ck.data_verificacao)}${ck.operador ? ' · operador ' + esc(ck.operador) : ''}</p>` : ''}
-    </section>
-    <section class="os-bloco">
-      <h3>2 · Causa encontrada <small>o que o mecânico viu</small></h3>
-      <div class="os-linhas">${feita ? '' : '<span></span><span></span>'}</div>
-    </section>`;
-
-  const blocoPecas = `
-    <section class="os-bloco">
-      <h3>Peças e materiais usados</h3>
-      <table class="os-tab os-pecas"><thead><tr>
-        <th style="width:22%">Código / part number</th><th>Descrição</th><th style="width:10%">Qtd</th><th style="width:10%">Unid.</th>
-      </tr></thead><tbody>${'<tr><td></td><td></td><td></td><td></td></tr>'.repeat(4)}</tbody></table>
     </section>`;
 
   const blocoExecucao = `
     <section class="os-bloco">
-      <h3>${corretiva ? '3 · Correção — o que foi feito' : 'Execução'}</h3>
-      <div class="os-grade os-g5">
-        ${caixa('Mecânico', feita ? val(os.executado_por) : linhaBranca)}
+      <h3>Feito por</h3>
+      <div class="os-grade ${medidoOS ? 'os-g3' : 'os-g2'}">
+        ${caixa('Quem fez', feita ? val(os.executado_por) : linhaBranca)}
         ${caixa('Data', feita ? formatarData(os.data_execucao) : '___ /___ /_____')}
-        ${caixa('Hora início', linhaBranca)}
-        ${caixa('Hora fim', linhaBranca)}
-        ${caixa(lt + ' na saída', feita && os.leitura_execucao != null ? nHoras(os.leitura_execucao) + ' ' + u : linhaBranca)}
+        ${medidoOS ? caixa(lt + ' na hora', feita && os.leitura_execucao != null ? nHoras(os.leitura_execucao) + ' ' + u : linhaBranca) : ''}
       </div>
-      <div class="os-obs"><span>${corretiva ? 'O que foi feito' : 'Observações'}</span>
-        ${feita && os.observacao ? `<p>${esc(os.observacao)}</p>` : '<div class="os-linhas"><span></span><span></span></div>'}</div>
-    </section>
-    <section class="os-bloco os-saida">
-      <h3>Antes de liberar a máquina</h3>
-      <div class="os-checks">
-        ${['Sem vazamento', 'Níveis completos', 'Máquina testada', 'Área limpa', corretiva ? 'Problema resolvido' : 'Adesivo de troca colado e fotografado']
-          .map(t => `<span><i class="os-quad"></i>${t}</span>`).join('')}
-      </div>
+      <div class="os-obs"><span>${corretiva ? 'O que foi feito' : 'Observação'}</span>
+        ${feita && os.observacao ? `<p>${esc(os.observacao)}</p>` : '<div class="os-linhas"><span></span></div>'}</div>
     </section>`;
 
   const html = `
@@ -392,26 +386,19 @@ function abrirOS(idOS) {
       </header>
 
       <section class="os-bloco">
-        <h3>Equipamento</h3>
         <div class="os-grade os-g4">
           ${caixa('Código', esc(e.codigo || '—'), 'forte')}
-          ${caixa('Descrição', esc(e.descricao || '—'), 'larga')}
-          ${caixa('Prazo', os.prazo ? formatarData(os.prazo) : linhaBranca)}
+          ${caixa('Equipamento', esc(e.descricao || '—'), 'larga')}
           ${caixa('Fazenda', esc(q.nome('locais', os.local_id) || '—'))}
-          ${caixa('Marca / modelo', marcaModelo ? esc(marcaModelo) : linhaBranca)}
-          ${caixa('Placa / série', serie ? esc(serie) : linhaBranca)}
-          ${caixa(lt + ' na abertura', os.leitura_emissao != null ? nHoras(os.leitura_emissao) + ' ' + u : linhaBranca)}
         </div>
       </section>
 
       ${corretiva ? blocoCorretiva : blocoPreventiva}
-      ${blocoPecas}
       ${blocoExecucao}
 
-      <section class="os-assinaturas">
-        <div><span></span>Mecânico</div>
-        <div><span></span>Responsável pela manutenção</div>
-        <div><span></span>Operador / recebido por</div>
+      <section class="os-assinaturas os-ass2">
+        <div><span></span>Quem fez</div>
+        <div><span></span>Responsável</div>
       </section>
 
       <footer class="os-pe">
@@ -573,7 +560,11 @@ function formFeita(os) {
       }));
 
       fecharModal(); recarregarTela();
-      aviso(App.online ? 'OS registrada como feita. Próximo vencimento recalculado.'
+      // Próxima troca na hora de fechar (28/10/2026): o que vencer primeiro entre os itens feitos.
+      const prox = marcados.map(it => it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null).filter(Boolean)
+        .map(p => calcular(p)).filter(c => c.proximo_hr != null || c.proxima_data)
+        .sort((a, b) => String(a.proxima_data || '9').localeCompare(String(b.proxima_data || '9')))[0];
+      aviso(App.online ? 'OS feita. Próxima troca: ' + (prox ? proximaTroca(prox) : '—') + '.'
                        : 'Salvo no aparelho. Sobe quando a internet voltar.');
     };
   });
