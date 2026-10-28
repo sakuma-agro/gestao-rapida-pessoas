@@ -185,7 +185,7 @@ function fichaMaquina(id) {
       : '<ul class="lista">' + feitas.map(m => `<li><div class="info">
           <strong>${esc(q.nome('tipos_manutencao', m.tipo_manutencao_id))}</strong>
           <small>${formatarData(m.data_manutencao)}${m.leitura != null ? ' · ' + nHoras(m.leitura) + ' ' + u : ''}${m.observacao ? ' · ' + esc(m.observacao) : ''}</small></div>
-          <span class="etq ok">preventiva</span></li>`).join('')
+          <span class="etq ok">preventiva</span>${ehAdmin() ? `<button type="button" class="btn-fantasma mini" data-excluir="${esc(m.id)}" title="Excluir este registro">Excluir</button>` : ''}</li>`).join('')
         + corretivas.map(o => `<li><div class="info"><strong>${esc(o.descricao || 'Corretiva')}</strong>
           <small>${formatarData(o.data_execucao)}${o.observacao ? ' · ' + esc(o.observacao) : ''}</small></div>
           <span class="etq vencido">corretiva</span></li>`).join('') + '</ul>'}
@@ -208,6 +208,7 @@ function fichaMaquina(id) {
     corpo.querySelectorAll('[data-plano]').forEach(tr =>
       tr.onclick = () => formItem(e, q.por_id('planos_manutencao', tr.dataset.plano)));
     corpo.querySelectorAll('[data-os]').forEach(b => b.onclick = () => abrirOS(b.dataset.os));
+    corpo.querySelectorAll('[data-excluir]').forEach(b => b.onclick = () => excluirManutencao(b.dataset.excluir));
   });
 }
 
@@ -599,3 +600,66 @@ function telaTiposMaquina() {
 }
 
 Object.assign(window, { fichaMaquina, formMaquina, formItem, planosDa, limparBem, ehAdmin, ehAdminTotal, locaisEditaveis, telaTiposMaquina });
+
+
+/* ---------------------------------------------------------------- excluir registro (28/10/2026)
+
+   Pedido dele: apagar uma manutenção registrada por engano. Só administrador,
+   com motivo, pela internet (fica na auditoria com o registro inteiro). Se era
+   a troca mais recente daquele item, a "última troca" do item volta para o
+   registro anterior — ou fica vazia — e o vencimento recalcula sozinho. */
+async function excluirManutencao(idReg) {
+  const m = q.por_id('manutencoes', idReg);
+  if (!m) return aviso('Registro não encontrado neste aparelho.', true);
+  if (!ehAdmin()) return aviso('Só administrador exclui registro.', true);
+  const e = q.por_id('equipamentos', m.equipamento_id) || {};
+  const u = unidadeDe(e);
+  const nome = q.nome('tipos_manutencao', m.tipo_manutencao_id);
+  abrirModal('Excluir registro', `
+    <p><strong>${esc(nome)}</strong> — ${formatarData(m.data_manutencao)}${m.leitura != null ? ' · ' + nHoras(m.leitura) + ' ' + u : ''}</p>
+    <p class="sub">${esc(e.codigo || '')} — ${esc(e.descricao || '')}</p>
+    ${campoArea('Motivo', 'motivo', '', 'Ex.: lançado na máquina errada, data errada.')}
+    <p class="ajuda">Se for a troca mais recente, a última troca do item volta para a anterior e o vencimento recalcula.</p>
+    <div class="acoes">
+      <button type="button" class="btn perigo" id="ex-ok">Excluir</button>
+      <button type="button" class="btn neutro" id="ex-voltar">Voltar</button>
+    </div>`, corpo => {
+    corpo.querySelector('#ex-voltar').onclick = () => fichaMaquina(e.id);
+    corpo.querySelector('#ex-ok').onclick = async () => {
+      const d = lerForm(corpo);
+      if (!d.motivo) return aviso('Diga o motivo.', true);
+      if (!App.online) return aviso('Excluir precisa de internet (fica registrado quem excluiu e por quê).', true);
+      const b = corpo.querySelector('#ex-ok'); b.disabled = true; b.textContent = 'Excluindo…';
+      const { error } = await App.sb.from('manutencoes').delete().eq('id', m.id);
+      if (error) { b.disabled = false; b.textContent = 'Excluir'; return aviso('Não consegui excluir: ' + error.message, true); }
+      const { error: ea } = await App.sb.from('auditoria').insert({
+        tabela: 'manutencoes', registro_id: m.id, operacao: 'EXCLUSAO',
+        valor_antigo: m, valor_novo: null, motivo: d.motivo, criado_por: App.usuario.id || null
+      });
+      if (ea) console.warn('auditoria não gravou:', ea.message);
+      // tira daqui também (memória e base local)
+      App.dados.manutencoes = (App.dados.manutencoes || []).filter(x => x.id !== m.id);
+      try { await promessa(tx('cache', 'readwrite').delete(['manutencoes', m.id])); } catch (x) { console.warn(x); }
+
+      // a última troca do item volta para o registro anterior
+      const p = q.ativos('planos_manutencao').find(x => x.equipamento_id === m.equipamento_id && x.tipo_manutencao_id === m.tipo_manutencao_id);
+      if (p && p.ultima_troca_data && String(p.ultima_troca_data).slice(0, 10) === String(m.data_manutencao).slice(0, 10)) {
+        const ant = q.todos('manutencoes').filter(x => x.equipamento_id === m.equipamento_id && x.tipo_manutencao_id === m.tipo_manutencao_id)
+          .sort((a, b2) => String(b2.data_manutencao).localeCompare(String(a.data_manutencao)))[0];
+        await gravar('planos_manutencao', Object.assign(p, {
+          ultima_troca_data: ant ? ant.data_manutencao : null,
+          ultima_troca_leitura: ant ? ant.leitura : null,
+          ultima_os_id: ant ? ant.os_id || null : null
+        }));
+      }
+      // na OS de origem o item deixa de constar como feito
+      if (m.os_id) {
+        const it = q.todos('os_itens').find(i => i.os_id === m.os_id && i.tipo_manutencao_id === m.tipo_manutencao_id && i.feito);
+        if (it) await gravar('os_itens', Object.assign(it, { feito: false }));
+      }
+      aviso('Registro excluído. Vencimento recalculado.');
+      fichaMaquina(e.id);
+    };
+  });
+}
+window.excluirManutencao = excluirManutencao;

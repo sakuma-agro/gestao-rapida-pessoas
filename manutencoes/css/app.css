@@ -1388,3 +1388,6 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .os-proxima span{font-size:12px;font-weight:bold;letter-spacing:.04em;text-transform:uppercase;color:#51534A}
 .os-proxima b{font-size:20px;color:#3F5F00}
 @media print{body.imprimindo-os .os-g3{grid-template-columns:2fr 1.2fr 1.2fr}body.imprimindo-os .os-g2{grid-template-columns:repeat(2,1fr)}body.imprimindo-os .os-ass2{grid-template-columns:repeat(2,1fr)}}
+/* Excluir registro (28/10/2026) */
+.btn.perigo{background:#B3261E;border-color:#B3261E;color:#fff}
+.lista .btn-fantasma.mini{margin-left:8px;padding:4px 10px;min-height:0;font-size:13px;color:#B3261E}
