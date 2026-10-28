@@ -119,7 +119,7 @@ TELAS.painel = el => {
     </div>
     <div class="pv-abas">
       ${aba('fazer', 'pv-a-fazer', fazer.length, 'A fazer', 'vencido ou perto, sem OS')}
-      ${aba('andamento', 'pv-a-and', osAbertas.length, 'Em andamento', 'com OS aberta')}
+      ${aba('andamento', 'pv-a-and', osAbertas.length, 'Em andamento', 'com OS aberta · registrar troca')}
       ${aba('feitas', 'pv-a-feita', feitas.length, 'Feitas no mês', 'OS fechada, troca registrada')}
       ${aba('semdado', 'pv-a-sem', semDado.length, 'Falta cadastrar', 'sem última troca ou horímetro')}
     </div>
