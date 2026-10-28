@@ -75,7 +75,9 @@ TELAS.painel = el => {
   document.body.classList.remove('modo-quadro');
   /* Uma OS por máquina (28/10/2026): se apareceu OS duplicada (dois aparelhos
      sem internet), junta na mais antiga e redesenha. */
-  if (typeof juntarOSDuplicadas === 'function' && temOSDuplicada()) {
+  /* 28/10/2026 (mais tarde): desligado — agora a mesma máquina pode ter
+     mais de uma OS de propósito (serviços que não podem ir juntos). */
+  if (false && typeof juntarOSDuplicadas === 'function' && temOSDuplicada()) {
     juntarOSDuplicadas().then(n => { if (n) aviso(n + ' OS duplicada(s) juntada(s) na OS mais antiga da máquina.'); TELAS.painel(el); });
     return;
   }
@@ -203,14 +205,14 @@ TELAS.painel = el => {
           porMaq.get(id).itens.push(x);
         }
         const maqs = [...porMaq.values()].map(m => Object.assign(m, { vencida: m.itens.some(x => x.c.status === 'VENCIDO') }));
-        const linhaMaq = m => `<div class="pv-linha pv-maq pv-com-sel ${m.vencida ? 'pv-r' : 'pv-y'}">
+        const linhaMaq = m => `<div class="pv-os-bloco" data-bloco-maq="${esc(m.e.id)}"><div class="pv-linha pv-maq pv-com-sel ${m.vencida ? 'pv-r' : 'pv-y'}">
           <label class="pv-sel" title="Marcar para abrir junto"><input type="checkbox" data-sel="${esc(m.itens.map(x => x.p.id).join(','))}"></label>${maq(m.e)}
           <span class="pv-itens">${m.itens.map(({ p, c }) => `<span class="pv-subitem ${c.status === 'VENCIDO' ? 'pv-r' : 'pv-y'}">
             <span class="pv-item">${esc(nomeTipo(p.tipo_manutencao_id))}${ultimaTxt(p, c.equipamento)}</span>
             <span class="pv-sit"><b>${esc(textoSituacao(c))}</b><i class="pv-barra"><i style="width:${usoDoIntervalo(p, c)}%"></i></i></span>
           </span>`).join('')}</span>
           <span class="pv-acao"><button type="button" class="btn" data-abrir-maq="${esc(m.itens.map(x => x.p.id).join(','))}">Abrir OS${m.itens.length > 1 ? ' (' + m.itens.length + ' itens)' : ''}</button></span>
-        </div>`;
+        </div><div class="pv-fecha oculto" data-painel-abrir="${esc(m.e.id)}"></div></div>`;
         const venc = maqs.filter(m => m.vencida), perto = maqs.filter(m => !m.vencida);
         /* Abrir várias de uma vez (28/10/2026): marca as máquinas e sai uma
            OS por máquina, já pronta para imprimir e levar à oficina. */
@@ -268,15 +270,43 @@ TELAS.painel = el => {
       await abrirOSPreventiva(x.dataset.abrir);
       if (document.querySelector('#pv-lista')) TELAS.painel(el);
     });
-    // Uma OS com todos os itens da máquina
-    $$('#pv-lista [data-abrir-maq]').forEach(x => x.onclick = async () => {
-      x.disabled = true;
-      const ids = x.dataset.abrirMaq.split(',');
+    /* Abrir OS (28/10/2026): com um serviço, abre na hora. Com mais de um,
+       abre embaixo da linha a lista dos serviços, todos marcados — desmarca
+       o que não pode ir junto; o que ficar desmarcado continua em A fazer
+       e pode virar outra OS depois. */
+    const abrirComItens = async ids => {
       let os = null;
-      for (const id of ids) os = await abrirOSPreventiva(id, { silencioso: true });
+      for (const id of ids) os = await abrirOSPreventiva(id, os ? { silencioso: true, osAlvo: os } : { silencioso: true, nova: true });
       const e = os && q.por_id('equipamentos', os.equipamento_id);
-      aviso(`OS ${numeroOS(os)} aberta para o ${e ? e.codigo : ''} com ${ids.length} ${ids.length === 1 ? 'item' : 'itens'}. Está em Em andamento.`);
+      aviso(`OS ${numeroOS(os)} aberta para o ${e ? e.codigo : ''} com ${ids.length} ${ids.length === 1 ? 'serviço' : 'serviços'}. Está em Em andamento.`);
       TELAS.painel(el);
+    };
+    $$('#pv-lista [data-abrir-maq]').forEach(x => x.onclick = async () => {
+      const ids = x.dataset.abrirMaq.split(',');
+      if (ids.length === 1) { x.disabled = true; return abrirComItens(ids); }
+      const bloco = x.closest('.pv-os-bloco'), box = bloco.querySelector('[data-painel-abrir]'), lista = bloco.closest('.pv-lista');
+      const fechar = () => {
+        $$('.pv-fecha').forEach(y => { y.classList.add('oculto'); y.innerHTML = ''; });
+        $$('.pv-os-bloco.aberto').forEach(y => y.classList.remove('aberto'));
+        $$('[data-abrir-maq]').forEach(y => { if (y.dataset.rot) y.textContent = y.dataset.rot; });
+        if (lista) lista.classList.remove('tem-aberto');
+      };
+      if (!box.classList.contains('oculto')) return fechar();
+      fechar();
+      bloco.classList.add('aberto'); lista.classList.add('tem-aberto');
+      x.dataset.rot = x.textContent; x.textContent = '✕ Cancelar';
+      box.innerHTML = `<div class="pv-fi-tit">Quais serviços vão nesta OS?</div>
+        <div class="pv-fi-itens">${ids.map(id => { const p = q.por_id('planos_manutencao', id);
+          return `<label class="pv-chip"><input type="checkbox" data-ab="${esc(id)}" checked> ${esc(nomeTipo(p.tipo_manutencao_id))}</label>`; }).join('')}
+          <small>desmarque o que não pode ir junto — fica em A fazer para outra OS</small></div>
+        <div><button type="button" class="btn pv-fi-ok" data-ab-ok>Abrir OS com os marcados</button></div>`;
+      box.classList.remove('oculto');
+      box.querySelector('[data-ab-ok]').onclick = async ev => {
+        const sel = [...box.querySelectorAll('[data-ab]')].filter(c => c.checked).map(c => c.dataset.ab);
+        if (!sel.length) return aviso('Marque pelo menos um serviço.', true);
+        ev.target.disabled = true; ev.target.textContent = 'Abrindo…';
+        await abrirComItens(sel);
+      };
     });
     $$('#pv-lista [data-os]').forEach(x => x.onclick = () => abrirOS(x.dataset.os));
     $$('#pv-lista [data-fechar]').forEach(x => x.onclick = () => {
@@ -312,7 +342,7 @@ TELAS.painel = el => {
       const oss = [];
       for (const c of marcadas) {
         let os = null;
-        for (const id of c.dataset.sel.split(',')) os = await abrirOSPreventiva(id, { silencioso: true });
+        for (const id of c.dataset.sel.split(',')) os = await abrirOSPreventiva(id, os ? { silencioso: true, osAlvo: os } : { silencioso: true, nova: true });
         if (os && !oss.includes(os)) oss.push(os);
       }
       aviso(`${oss.length} OS ${oss.length === 1 ? 'aberta' : 'abertas'}. Estão em Em andamento.`);

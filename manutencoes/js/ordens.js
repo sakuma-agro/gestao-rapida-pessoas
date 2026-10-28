@@ -131,8 +131,12 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
   const agora = new Date().toISOString();
 
   // Sempre a OS aberta mais antiga da máquina: uma OS preventiva por máquina (28/10/2026).
-  let os = q.todos('ordens_servico').filter(o => o.equipamento_id === e.id && o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status))
-    .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')) || (a.numero || 0) - (b.numero || 0))[0];
+  /* Quais serviços vão juntos (28/10/2026, pedido dele: "tem alguns que não
+     podem estar juntos"): quem abre escolhe os serviços. opcoes.nova cria
+     uma OS só com eles; opcoes.osAlvo põe o item nessa OS. Sem nenhuma das
+     duas, entra na OS preventiva aberta mais antiga da máquina. */
+  let os = opcoes.osAlvo || (opcoes.nova ? null : q.todos('ordens_servico').filter(o => o.equipamento_id === e.id && o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status))
+    .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')) || (a.numero || 0) - (b.numero || 0))[0]);
   const juntou = !!os;
   // Item que já está numa OS aberta (ex.: puxado junto com o óleo) não entra de novo.
   const jaAberta = osAbertaDoPlano(p);
