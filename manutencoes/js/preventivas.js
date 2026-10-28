@@ -364,8 +364,23 @@ function temOSDuplicada() {
 function painelFechar(os, esquecida, depois) {
   const box = document.querySelector(`[data-painel="${os.id}"]`);
   if (!box) return formFeita(os);
-  if (!box.classList.contains('oculto')) { box.classList.add('oculto'); box.innerHTML = ''; return; }
-  $$('.pv-fecha').forEach(x => { x.classList.add('oculto'); x.innerHTML = ''; });
+  /* Separação visual (28/10/2026, pedido dele): a máquina que está sendo
+     fechada vira um cartão com borda verde e espaço em volta; as outras
+     linhas ficam apagadas até terminar ou cancelar. */
+  const lista = box.closest('.pv-lista'), bloco = box.closest('.pv-os-bloco');
+  const botaoDe = b => b && b.querySelector('[data-fechar]');
+  const fechar = () => {
+    $$('.pv-fecha').forEach(x => { x.classList.add('oculto'); x.innerHTML = ''; });
+    $$('.pv-os-bloco.aberto').forEach(b => { b.classList.remove('aberto'); const bt = botaoDe(b); if (bt) bt.textContent = bt.dataset.rot; });
+    if (lista) lista.classList.remove('tem-aberto');
+  };
+  if (!box.classList.contains('oculto')) return fechar();
+  fechar();
+  if (bloco) {
+    bloco.classList.add('aberto');
+    const bt = botaoDe(bloco); if (bt) { bt.dataset.rot = bt.textContent; bt.textContent = '✕ Cancelar'; }
+  }
+  if (lista) lista.classList.add('tem-aberto');
   const e = q.por_id('equipamentos', os.equipamento_id);
   const u = unidadeDe(e);
   const medido = e.unidade_controle !== 'CALENDARIO';
@@ -375,6 +390,7 @@ function painelFechar(os, esquecida, depois) {
   const lt = u === 'km' ? 'Km' : 'Horímetro';
   let foto = null;
   box.innerHTML = `
+    <div class="pv-fi-tit">Registrar a OS ${esc(numeroOS(os))} como feita</div>
     ${itens.length > 1 ? `<div class="pv-fi-itens">${itens.map(it => `<label class="pv-chip"><input type="checkbox" data-it="${esc(it.id)}" checked>
       ${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</label>`).join('')}
       <small>desmarque o que não foi feito</small></div>` : ''}

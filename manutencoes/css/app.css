@@ -1459,3 +1459,10 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 }
 .os-quebra{height:28px;border-top:2px dashed var(--linha);margin:20px 0}
 @media print{.os-quebra{height:0;border:0;margin:0;break-after:page;page-break-after:always}}
+/* 28/10/2026: OS sendo fechada separada das outras máquinas */
+.pv-lista.tem-aberto{background:var(--fundo)}
+.pv-lista.tem-aberto .pv-os-bloco:not(.aberto){opacity:.4}
+.pv-os-bloco.aberto{margin:14px 10px;border:2px solid var(--verde);border-radius:10px;overflow:hidden;background:var(--branco);box-shadow:0 4px 14px rgba(27,35,43,.12)}
+.pv-os-bloco.aberto .pv-linha{border-left-color:var(--verde)}
+.pv-os-bloco.aberto .pv-fecha{border-left:0;border-top:1px solid #d7e7b5;background:#F3F8E8}
+.pv-fi-tit{font-weight:bold;color:var(--ok);font-size:14px}
