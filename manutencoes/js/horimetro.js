@@ -481,7 +481,11 @@ function achatarRelatorioRealtec(linhas) {
     // linha do lançamento: data na coluna 4 (lançamento) ou 7 (efetivação)
     if (!c0 && (ehData(l[4]) || ehData(l[7]))) {
       fecha();
-      atual = { linha: [bem, txt(l[4]) || txt(l[7]), txt(l[9]), txt(l[14]), txt(l[18]), txt(l[28])], imps: [] };
+      // A Quantidade não tem coluna fixa (26, 27 ou 28 conforme a linha):
+      // é o primeiro número depois do Fim.
+      let qtd = '';
+      for (let j = 19; j < l.length; j++) if (txt(l[j])) { qtd = txt(l[j]); break; }
+      atual = { linha: [bem, txt(l[4]) || txt(l[7]), txt(l[9]), txt(l[14]), txt(l[18]), qtd], imps: [] };
       continue;
     }
     // linha do implemento, logo embaixo do lançamento
