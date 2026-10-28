@@ -104,6 +104,7 @@ const GRUPOS = [
   ['Projetos (PMBOK)', 'public', ['pj_projetos', 'pj_partes', 'pj_premissas', 'pj_requisitos', 'pj_eap', 'pj_raci', 'pj_riscos',
     'pj_comunicacao', 'pj_reunioes', 'pj_custos', 'pj_mudancas', 'pj_ocorrencias', 'pj_licoes', 'pj_status']],
   ['Reunião semanal', 'public', ['reu_config', 'reu_pessoas', 'reu_atividades', 'reu_semanas']],
+  ['Cronograma geral', 'public', ['cron_tarefas', 'cron_estado', 'cron_config']],
   ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],
 ];

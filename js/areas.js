@@ -73,6 +73,11 @@ export const AREAS = [
      lições aprendidas. Mora em projetos/, numa moldura. */
   { id: 'projetos', nome: 'Projetos (PMBOK)', icone: 'icons/area-projetos.v2.svg',
     desc: 'Painel · Projetos (termo, EAP, rede, riscos, custos, mudanças) · Alertas · Lições aprendidas' },
+  /* Cronograma geral (28/10/2026, pedido dele): as tarefas e os vencimentos
+     de todas as áreas num lugar só, por pessoa do escritório, com Calendário
+     e Kanban. Mora nesta página (js/cronograma.js), sem moldura. */
+  { id: 'cronograma', nome: 'Cronograma geral', icone: 'icons/area-cronograma.v1.svg',
+    desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
@@ -159,6 +164,8 @@ function liberada(id) {
   if (id === 'colheita') return acesso.admin || (acesso.modulos || []).includes('colheita');
   /* Projetos (PMBOK) (23/10/2026): administrador ou módulo 'projetos'. */
   if (id === 'projetos') return acesso.admin || (acesso.modulos || []).includes('projetos');
+  /* Cronograma geral (28/10/2026): administrador ou módulo 'cronograma'. */
+  if (id === 'cronograma') return acesso.admin || (acesso.modulos || []).includes('cronograma');
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -385,6 +392,13 @@ export function entrarNaArea(id, tela, extra) {
       if (!pronta) moldura.src = 'custobase/?v=' + VERSAO_CB + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
+    return;
+  }
+  if (id === 'cronograma') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('cronograma');
     return;
   }
   if (id === 'projetos') {

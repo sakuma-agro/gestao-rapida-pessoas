@@ -1,0 +1,114 @@
+/* Área Cronograma geral (28/10/2026) — js/cronograma.js.
+   Telas aprovadas no artefato "Cronograma Geral LOP": Calendário, Kanban por
+   situação e Kanban por pessoa. Cores e fundos pelos tokens do app (claro e
+   escuro). */
+.cr{max-width:var(--largura-app);margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.cr-cab{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.cr-cab h2{margin:0;font-size:22px}
+.cr-sub{margin:4px 0 0;color:var(--suave);font-size:13px}
+.cr-acoes{display:flex;gap:8px;flex-wrap:wrap}
+
+.cr-seg{display:grid;grid-template-columns:1fr 1fr;max-width:420px;background:var(--linha);border-radius:10px;padding:3px}
+.cr-seg button{font:inherit;font-size:14px;min-height:40px;border:0;border-radius:8px;background:transparent;color:var(--suave);cursor:pointer}
+.cr-seg button[aria-selected="true"]{background:var(--papel);color:var(--texto);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+
+.cr-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cr-filtros select{width:auto;min-height:38px;border-radius:19px;padding:6px 12px;font-size:13px;background:var(--papel)}
+.cr-chip{font:inherit;font-size:13px;min-height:38px;padding:6px 14px;border-radius:19px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);cursor:pointer}
+.cr-chip[aria-pressed="true"]{background:var(--texto);border-color:var(--texto);color:var(--papel)}
+.cr-chip:disabled{opacity:.45;cursor:not-allowed}
+.cr-sep{font-size:12px;color:var(--suave);margin-left:6px}
+
+.cr-tag{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;padding:2px 7px;border-radius:4px;line-height:1.4}
+.cr-av{flex:none;width:28px;height:28px;border-radius:50%;background:var(--linha);color:var(--texto);font-size:10.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.cr-av.g{width:34px;height:34px;font-size:12px;background:var(--texto);color:var(--papel)}
+.cr-av.cr-ninguem{background:transparent;border:1px dashed var(--suave);color:var(--suave)}
+.cr-data{font-size:11.5px;font-weight:700;color:var(--suave);white-space:nowrap}
+.cr-data.hoje{color:var(--verde-esc)}
+.cr-data.atraso{color:var(--erro)}
+.cr-data.ok{color:var(--verde-esc)}
+.cr-vazio{color:var(--suave);font-size:13px;margin:8px 2px}
+
+/* ---- calendário ---- */
+.cr-cal{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@media (min-width:900px){.cr-cal{grid-template-columns:minmax(0,1.25fr) minmax(320px,1fr);align-items:start}}
+.cr-mes{background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:12px}
+.cr-mes-nav{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cr-mes-nav b{flex:1;text-align:center;font-size:16px}
+.cr-mes-nav .btn{min-width:38px;min-height:38px}
+.cr-sem,.cr-grade{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cr-sem span{text-align:center;font-size:11px;font-weight:700;color:var(--suave);padding:4px 0}
+.cr-dia{font:inherit;position:relative;min-height:52px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--texto);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;padding:6px 2px}
+@media (min-width:900px){.cr-dia{min-height:72px}}
+.cr-dia:hover{border-color:var(--linha)}
+.cr-dia .n{font-size:14px}
+.cr-dia.fora{color:var(--suave);opacity:.55}
+.cr-dia.atraso{background:rgba(192,57,43,.10)}
+.cr-dia.hoje{background:var(--verde);color:#1B232B;font-weight:700}
+.cr-dia.hoje .pts i{background:#1B232B !important}
+.cr-dia.sel{border-color:var(--texto)}
+.cr-dia .pts{display:flex;gap:3px;height:7px}
+.cr-dia .pts i{width:7px;height:7px;border-radius:50%}
+.cr-dia .q{position:absolute;top:3px;right:5px;font-size:9.5px;color:var(--suave);font-weight:700}
+.cr-dia.hoje .q{color:#1B232B}
+.cr-alerta{margin:10px 2px 0;font-size:12.5px;color:var(--erro)}
+
+.cr-lista{display:flex;flex-direction:column;gap:8px}
+.cr-lista-cab{display:flex;justify-content:space-between;align-items:baseline;padding:0 2px}
+.cr-lista-cab span{font-size:12px;color:var(--suave)}
+.cr-item{font:inherit;text-align:left;width:100%;display:flex;gap:10px;align-items:center;background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:10px 12px;color:var(--texto);cursor:pointer;min-height:56px}
+.cr-item:hover{border-color:var(--verde)}
+.cr-item.feito{opacity:.6}
+.cr-item.feito b{text-decoration:line-through}
+.cr-barra{width:4px;align-self:stretch;border-radius:2px;flex:none}
+.cr-item-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.cr-item-txt b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr-item-txt small{font-size:11.5px;color:var(--suave)}
+.cr-item-dir{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+
+/* ---- kanban ---- */
+.cr-quadro{display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.cr-col{flex:1 0 270px;max-width:420px;background:var(--fundo);border:1px solid var(--linha);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;scroll-snap-align:start}
+@media (max-width:599px){.cr-col{flex:0 0 82%}}
+.cr-col.alvo{border-color:var(--verde);background:var(--verde-fundo)}
+.cr-col-cab{display:flex;align-items:center;gap:8px}
+.cr-col-cab b{font-size:14px;flex:1}
+.cr-col-cab .cr-quem{display:flex;flex-direction:column;flex:1;min-width:0}
+.cr-col-cab .cr-quem small{font-size:11.5px;color:var(--suave)}
+.cr-pt{width:9px;height:9px;border-radius:50%}
+.cr-cont{font-size:11.5px;color:var(--suave);background:var(--papel);border:1px solid var(--linha);padding:1px 9px;border-radius:10px}
+.cr-col-corpo{display:flex;flex-direction:column;gap:8px;min-height:60px}
+.cr-card{font:inherit;text-align:left;width:100%;background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:10px;color:var(--texto);cursor:pointer;
+  display:flex;flex-direction:column;gap:7px}
+.cr-card:hover{border-color:var(--verde)}
+.cr-card[draggable="true"]{cursor:grab}
+.cr-card b{font-size:13.5px;line-height:1.3}
+.cr-card-top,.cr-card-pe{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cr-auto{font-size:10.5px;color:var(--suave)}
+.cr-sit{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--linha);color:var(--texto)}
+.cr-sit.fazendo{background:rgba(47,111,176,.15);color:#2F6FB0}
+.cr-sit.feito{background:var(--verde-fundo);color:var(--verde-esc)}
+.cr-sit.atraso{background:rgba(192,57,43,.12);color:var(--erro)}
+
+.cr-legenda{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--suave);padding-top:6px;border-top:1px solid var(--linha)}
+.cr-legenda span{display:inline-flex;align-items:center;gap:5px}
+.cr-legenda i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+/* ---- diálogo ---- */
+dialog.cr-dlg{width:min(620px,96vw)}
+dialog.cr-dlg form{max-height:88vh;overflow:auto}
+.cr-dlg-orig{margin:-6px 0 10px;font-size:12.5px;color:var(--suave);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cr-dlg-txt{margin:0 0 10px;font-size:13px}
+.cr-dlg-det{margin:0 0 12px;font-size:13px;background:var(--fundo);border-radius:8px;padding:8px 12px}
+.cr-dlg-det ul{margin:6px 0 0;padding-left:18px;columns:2;column-gap:20px}
+@media (max-width:520px){.cr-dlg-det ul{columns:1}}
+.cr-dlg .grade{margin-bottom:12px}
+.cr-dlg .dica{font-size:12.5px;color:var(--suave);margin:0 0 10px}
+.cr-sits{display:flex;flex-wrap:wrap;gap:6px}
+.cr-sits label{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;cursor:pointer}
+.cr-sits input{width:auto;margin:0}
+.cr-resp-lista{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.cr-resp-linha{display:grid !important;grid-template-columns:minmax(0,1fr) 200px;align-items:center;gap:10px}
+.cr-resp-linha > span{font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+@media (max-width:560px){.cr-resp-linha{grid-template-columns:1fr}}

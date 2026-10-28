@@ -1262,6 +1262,7 @@ function desenharPermissoes() {
     ${blocoCB(e)}
     ${blocoCP(e)}
     ${blocoPJ(e)}
+    ${blocoCron(e)}
     ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
@@ -1322,6 +1323,12 @@ function desenharPermissoes() {
   $('usCP')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('colheita'); else mods.delete('colheita');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usCron')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('cronograma'); else mods.delete('cronograma');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -1457,6 +1464,19 @@ function blocoPJ(e) {
       <input type="checkbox" id="usPJ" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Projetos (PMBOK)</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · todos os projetos, painel e lições aprendidas'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Área Cronograma geral" (28/10/2026): entra ou não. Os vencimentos
+   de cada área só aparecem lá para quem tem acesso a ela. */
+function blocoCron(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('cronograma'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="cronograma">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usCron" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Cronograma geral</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · tarefas e vencimentos das áreas que já acessa'}</span>
     </label>
   </div>`;
 }

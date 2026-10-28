@@ -25,6 +25,7 @@ import { abrirCalendarioSst } from './sst-calendario.js';
 import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanhas.js';
 import { abrirBrigada, limparBrigada, ligarBrigada, avisoDesligamentoBrigada, TELAS_BRIGADA } from './sst-brigada.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
+import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarRelExames, abrirRelExames } from './sst-exames-rel.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
@@ -126,6 +127,8 @@ function abrirAba(nome) {
   $('telaCB').hidden = nome !== 'custobase';
   $('telaCP').hidden = nome !== 'colheita';
   $('telaPJ').hidden = nome !== 'projetos';
+  $('telaCron').hidden = nome !== 'cronograma';
+  if (nome === 'cronograma') abrirCronograma($('crAlvo'));
   document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita', 'projetos'].includes(nome));
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
@@ -1791,7 +1794,7 @@ let contandoPendentes = null;
 async function contarPendentes() {
   if (contandoPendentes) return contandoPendentes;
   contandoPendentes = (async () => {
-    let n = nucleo.pendentes() + pendentesReuniao();   // todas as camadas do núcleo (EPI, DP, SST)
+    let n = nucleo.pendentes() + pendentesReuniao() + pendentesCronograma();   // todas as camadas do núcleo (EPI, DP, SST)
     try { n += await pendentesAnexos(); } catch {}
     for (const k in pendentesMoldura) n += pendentesMoldura[k] || 0;
     estado.pendentesTotal = n;
@@ -1868,7 +1871,7 @@ async function sincronizarTudo() {
   const rotulo = b.textContent; b.textContent = 'Sincronizando…'; b.disabled = true;
   nucleo.retentarParados();   // os parados também voltam à fila neste toque
   try {
-    for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarAnexos()]) {
+    for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarFilaCron(), () => enviarAnexos()]) {
       try { await fn(); } catch {}
     }
     for (const id of ['molduraManut', 'molduraProg', 'molduraEst', 'molduraCB', 'molduraCP', 'molduraPJ']) {

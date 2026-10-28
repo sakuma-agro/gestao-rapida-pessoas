@@ -27,6 +27,7 @@ addEventListener('beforeinstallprompt', function (ev) {
 <link rel="stylesheet" href="css/jornada.css">
 <link rel="stylesheet" href="css/jornada-impressao.css">
 <link rel="stylesheet" href="css/assistente.css">
+<link rel="stylesheet" href="css/cronograma.css">
 </head>
 <body>
 
@@ -188,6 +189,11 @@ addEventListener('beforeinstallprompt', function (ev) {
     <!-- ---- ÁREA PROJETOS (PMBOK): os projetos internos moram em projetos/ e abrem nesta moldura (23/10/2026) ---- -->
     <section class="tela area-manut" id="telaPJ" hidden>
       <iframe id="molduraPJ" class="area-moldura" title="Projetos (PMBOK)"></iframe>
+    </section>
+
+    <!-- ---- ÁREA CRONOGRAMA GERAL: tarefas e vencimentos de todas as áreas, por pessoa (28/10/2026, js/cronograma.js) ---- -->
+    <section class="tela" id="telaCron" hidden>
+      <div id="crAlvo"></div>
     </section>
 
     <!-- ---- ÁREA VISTORIAS E SEGURANÇA: o app de vistorias mora em vistorias/ e abre nesta moldura (14/10/2026) ---- -->
