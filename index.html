@@ -28,8 +28,82 @@ addEventListener('beforeinstallprompt', function (ev) {
 <link rel="stylesheet" href="css/jornada-impressao.css">
 <link rel="stylesheet" href="css/assistente.css">
 <link rel="stylesheet" href="css/cronograma.css">
+<style>
+/* Abertura (28/10/2026, pedido do Guilherme): o lobo se preenche de baixo
+   para cima enquanto o app carrega e o olho acende verde quando está pronto.
+   Fica por cima de tudo e some sozinha — nunca prende a pessoa (teto de 15 s). */
+#abertura{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif;
+  background:radial-gradient(circle at 50% 38%,#2E3A45 0,#1B232B 55%,#12181E 100%);
+  transition:opacity .45s ease;--p:0}
+#abertura.saindo{opacity:0;pointer-events:none}
+#abertura .ab-lobo{position:relative;width:180px;height:180px}
+#abertura .ab-lobo img{position:absolute;inset:0;width:100%;height:100%}
+#abertura .ab-fundo{opacity:.22}
+#abertura .ab-cheio{clip-path:inset(calc((1 - var(--p)) * 100%) 0 0 0);transition:clip-path .5s ease}
+#abertura .ab-olho{opacity:0;transition:opacity .5s ease,filter .5s ease}
+#abertura.pronto .ab-olho{opacity:1;animation:abPulso 1.1s ease-in-out .4s 2;
+  filter:drop-shadow(0 0 4px #3DBD79) drop-shadow(0 0 10px rgba(61,189,121,.8))}
+#abertura.alerta .ab-olho{opacity:1;filter:hue-rotate(-80deg) saturate(1.6) drop-shadow(0 0 8px rgba(232,176,74,.8))}
+@keyframes abPulso{50%{filter:drop-shadow(0 0 6px #3DBD79) drop-shadow(0 0 22px rgba(61,189,121,.95))}}
+#abertura .ab-nome{color:#fff;font-size:34px;font-weight:bold;margin-top:26px;letter-spacing:.02em}
+#abertura .ab-sub{color:#B9C2CA;font-size:14px;letter-spacing:.32em;margin-top:6px}
+#abertura .ab-barra{width:180px;height:4px;border-radius:2px;background:#2C3741;margin-top:30px;overflow:hidden}
+#abertura .ab-barra i{display:block;height:100%;width:calc(var(--p) * 100%);background:#84BD00;border-radius:2px;transition:width .5s ease}
+#abertura .ab-msg{color:#7E8A95;font-size:13px;margin-top:12px;min-height:16px;text-align:center;padding:0 24px}
+#abertura.pronto .ab-msg{color:#84BD00}
+#abertura.alerta .ab-msg{color:#E8B04A}
+@media (prefers-reduced-motion:reduce){#abertura *{transition:none!important;animation:none!important}}
+</style>
 </head>
 <body>
+
+<!-- ============ ABERTURA (lobo carregando, olho acende verde) ============ -->
+<div id="abertura" aria-live="polite">
+  <div class="ab-lobo" aria-hidden="true">
+    <img class="ab-fundo" src="img/abertura-lobo.v1.png" alt="">
+    <img class="ab-cheio" src="img/abertura-lobo.v1.png" alt="">
+    <img class="ab-olho" src="img/abertura-olho.v1.png" alt="">
+  </div>
+  <div class="ab-nome">LOP</div>
+  <div class="ab-sub">GESTÃO RÁPIDA</div>
+  <div class="ab-barra"><i></i></div>
+  <div class="ab-msg" id="aberturaMsg">Conectando…</div>
+</div>
+<script>
+/* Controle da abertura. O js/app.js avisa as etapas por window.grAbertura;
+   enquanto isso a barra anda sozinha devagar (nunca passa de 90%) para não
+   parecer travada. Qualquer caminho termina em fechar(). */
+(function () {
+  var el = document.getElementById('abertura'), msg = document.getElementById('aberturaMsg');
+  var p = 0.08, fim = false, t0 = Date.now();
+  function por(v) { p = Math.max(p, v); el.style.setProperty('--p', p); }
+  function fechar() {
+    if (!el || el.classList.contains('saindo')) return;
+    el.classList.add('saindo');
+    setTimeout(function () { el.remove(); }, 500);
+  }
+  var anda = setInterval(function () { if (!fim) por(Math.min(0.9, p + (0.9 - p) * 0.06)); }, 250);
+  window.grAbertura = {
+    etapa: function (v, texto) { if (fim) return; por(v); if (texto) msg.textContent = texto; },
+    pronto: function () {
+      if (fim) return; fim = true; clearInterval(anda);
+      por(1); msg.textContent = 'Pronto!';
+      /* fica à vista pelo menos ~1,2 s para dar tempo de ver o olho acender */
+      var espera = Math.max(0, 1200 - (Date.now() - t0));
+      setTimeout(function () { el.classList.add('pronto'); setTimeout(fechar, 1300); }, Math.min(espera, 500));
+    },
+    alerta: function (texto) {
+      if (fim) return; fim = true; clearInterval(anda);
+      por(1); msg.textContent = texto; el.classList.add('alerta');
+      setTimeout(fechar, 2600);
+    },
+    fechar: fechar
+  };
+  por(p);
+  setTimeout(function () { if (!fim) window.grAbertura.pronto(); }, 15000);
+})();
+</script>
 
 <!-- ============ TELA: LOGIN ============ -->
 <section class="centro tela" id="telaLogin" hidden>

@@ -2233,6 +2233,7 @@ function telaDeSocorro(texto) {
      entra sozinho. */
   let demorou = false;
   const arranque = db.iniciar();
+  window.grAbertura?.etapa(0.3, 'Conectando ao banco…');
   const r = await Promise.race([
     arranque,
     new Promise(ok => setTimeout(() => { demorou = true; ok({ etapa: 'login' }); }, 12000)),
@@ -2246,6 +2247,7 @@ function telaDeSocorro(texto) {
       ? 'Esse link de recuperação já venceu. Peça outro em "Esqueci minha senha".'
       : 'Não deu para usar esse link de recuperação. Peça outro em "Esqueci minha senha".';
     erro.hidden = false;
+    window.grAbertura?.pronto();
     return;
   }
 
@@ -2254,6 +2256,7 @@ function telaDeSocorro(texto) {
       ? `Login ${estado.sessao.user.email}. Escolha a senha que você vai usar daqui em diante.`
       : 'Escolha a senha que você vai usar daqui em diante.';
     mostrar('novaSenha');
+    window.grAbertura?.pronto();
     return;
   }
 
@@ -2265,13 +2268,21 @@ function telaDeSocorro(texto) {
       ? 'O servidor está demorando para responder. Pode ser o banco pausado — espere um minuto e recarregue.'
       : 'Sem internet. Entre com seu usuário e senha: se você já entrou neste aparelho com internet, o app abre com os dados guardados.';
     erro.hidden = false;
+    window.grAbertura?.alerta(navigator.onLine ? 'O banco está demorando para responder…' : 'Sem internet');
     arranque.then(x => { if (x?.etapa === 'app') { mostrar('app'); carregarTudo(); } }).catch(() => {});
     return;
   }
 
   if (r.etapa === 'app') {
     if (r.semRede) mostrarAviso('Sem internet. Abrindo com os dados guardados neste aparelho — o que você lançar fica na fila e sobe quando o sinal voltar.');
-    await carregarTudo();
+    window.grAbertura?.etapa(0.65, 'Carregando suas áreas…');
+    /* A abertura não espera a carga inteira: no máximo 6 s e o app aparece. */
+    const carga = carregarTudo();
+    Promise.race([carga, new Promise(ok => setTimeout(ok, 6000))])
+      .then(() => window.grAbertura?.pronto(), () => window.grAbertura?.pronto());
+    await carga;
+  } else {
+    window.grAbertura?.pronto();
   }
 
   if (falhasAoLigar.length) {
@@ -2280,6 +2291,7 @@ function telaDeSocorro(texto) {
     aviso.hidden = false;
   }
 })().catch(e => {
+  window.grAbertura?.fechar();
   console.error('[LOP - Gestão Rápida] o arranque parou', e);
   telaDeSocorro(e.message || String(e));
 });

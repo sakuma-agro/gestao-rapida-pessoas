@@ -31,6 +31,7 @@ const ARQUIVOS = [
   './js/assistente.js', './css/assistente.css',
   './icons/lop-gr-favicon.v1.ico', './icons/lop-gr-32.v1.png', './icons/lop-gr-180.v1.png',
   './icons/lop-gr-192.v1.png', './icons/lop-gr-512.v1.png',
+  './img/abertura-lobo.v1.png', './img/abertura-olho.v1.png',
   './icons/lop-gr-maskable-192.v1.png', './icons/lop-gr-maskable-512.v1.png',
   './icons/mod-manutencoes.v1.png', './icons/mod-certificacao.v1.png',
   './js/categoria-moldura.js', './js/hora-maquina.js', './js/insumo-qc.js', './css/categoria-moldura.css',
