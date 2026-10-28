@@ -30,6 +30,7 @@
 // Offline (regra do app): tudo fica em cache; gravação sem rede entra numa
 // fila e sobe sozinha quando a rede voltar.
 
+import { linhasCronograma, textoFreq } from './epi-cronograma-dados.js';
 import { estado, gravarLocal } from './store.js';
 import { acesso } from './acesso.js';
 
@@ -83,6 +84,7 @@ const ORIGENS = {
   'sst-exames': { nome: 'SST › Exames', area: 'sst' },
   'sst-trein':  { nome: 'SST › Treinamentos', area: 'sst' },
   'sst-ca':     { nome: 'SST › EPI\'s (validade do C.A)', area: 'sst' },
+  'sst-epi':    { nome: 'SST › EPI\'s (troca de EPI)', area: 'sst' },
   'sst-acid':   { nome: 'SST › Acidentes (medidas)', area: 'sst' },
   'dp-tarefas': { nome: 'Cadastros › Admissão e demissão', area: 'dp' },
   'dp-ferias':  { nome: 'DP › Férias (prazo de concessão)', area: 'dp' },
@@ -174,6 +176,12 @@ async function deVencimentos(tabela, tabelaTipos, origem, rotulo) {
 const FONTES = [
   ['sst-exames', () => deVencimentos('sst_exames', 'sst_tipos_exame', 'sst-exames', 'Exame')],
   ['sst-trein', () => deVencimentos('sst_treinamentos', 'sst_tipos_treinamento', 'sst-trein', 'Treinamento')],
+  /* Troca de EPI (28/10/2026): próxima troca de cada tipo + para quem, do
+     Cronograma de troca (SST › EPI's). Lê o cadastro local — vale offline. */
+  ['sst-epi', async () => linhasCronograma(estado.epis, estado.epiEntregas)
+    .filter(l => l.proxima && naJanela(l.proxima))
+    .map(l => ({ chave: `sst-epi:${l.chave}:${l.proxima}`, origem: 'sst-epi', data: l.proxima,
+      titulo: `Trocar ${l.tipo.nome}${l.para ? ' — ' + l.para : ''} (entregue ${l.ultima.split('-').reverse().join('/')}, ${textoFreq(l.tipo.qtd, l.tipo.unidade)})` }))],
   ['sst-ca', async () => (await pegar(cli().from('epis').select('id,descricao,ca,ca_validade,ativo')))
     .filter(e => e.ativo !== false && naJanela(e.ca_validade))
     .map(e => ({ chave: `sst-ca:${e.id}:${e.ca_validade}`, origem: 'sst-ca', data: e.ca_validade,

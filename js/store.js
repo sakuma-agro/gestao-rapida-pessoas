@@ -23,6 +23,7 @@ export const estado = {
   funcionarios: [],
   epis: [],
   fichas: [],
+  epiEntregas: [],   // SST › EPI's › Cronograma de troca (28/10/2026)
   modelo: null,
   online: navigator.onLine,
   pendentes: 0,      // fila do EPI (esta camada)
@@ -360,6 +361,7 @@ async function carregarCache() {
   estado.funcionarios = c?.funcionarios ?? [];
   estado.epis = c?.epis ?? [];
   estado.fichas = c?.fichas ?? [];
+  estado.epiEntregas = c?.epiEntregas ?? [];
   estado.modelo = c?.modelo ?? null;
   estado.pendentes = (await nucleo.contarFila(CAMADA)).pendentes;
 }
@@ -369,6 +371,7 @@ function salvarCache() {
     funcionarios: estado.funcionarios,
     epis: estado.epis,
     fichas: estado.fichas,
+    epiEntregas: estado.epiEntregas,
     modelo: estado.modelo,
   });
 }
@@ -389,6 +392,12 @@ export async function sincronizar() {
   ]);
   const erro = f.error || e.error || fi.error || m.error;
   if (erro) throw erro;
+  // Cronograma de troca (28/10/2026): leitura à parte — se a tabela ainda não
+  // existir ou falhar, o resto do cadastro carrega normalmente.
+  try {
+    const en = await estado.cliente.from('epi_entregas').select('*').order('entregue_em', { ascending: false });
+    if (!en.error) estado.epiEntregas = comBase(en.data);
+  } catch {}
 
   estado.funcionarios = comBase(f.data);
   estado.epis = comBase(e.data);
@@ -427,7 +436,7 @@ export async function semear() {
    Rodada B: toda gravação passa pela fila do núcleo, mesmo com rede — assim
    o caminho é um só (ordem garantida, conflito conferido, erro visível). */
 const listaDe = tabela => ({
-  funcionarios: 'funcionarios', epis: 'epis', fichas: 'fichas',
+  funcionarios: 'funcionarios', epis: 'epis', fichas: 'fichas', epi_entregas: 'epiEntregas',
 }[tabela]);
 
 /* O que o núcleo precisa saber desta camada. */
@@ -478,6 +487,8 @@ export const salvarEpi = e => salvarItem('epis', e);
 export const apagarEpi = id => apagarItem('epis', id);
 export const salvarFicha = f => salvarItem('fichas', f);
 export const apagarFicha = id => apagarItem('fichas', id);
+export const salvarEntregaEpi = x => salvarItem('epi_entregas', x);
+export const apagarEntregaEpi = id => apagarItem('epi_entregas', id);
 
 export async function salvarModelo(m) {
   const base = estado.modelo?._base ?? null;

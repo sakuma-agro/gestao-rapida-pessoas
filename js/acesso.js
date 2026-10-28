@@ -76,6 +76,7 @@ export const MODULOS = [
     { id: 'epis', nome: "EPI's", telas: [
       ['fichas', 'Fichas'],
       ['epis', 'Tipos de EPI'],
+      ['epiCrono', 'Cronograma de troca'],
       ['modelo', 'Modelo da ficha'],
     ] },
     { id: 'exames', nome: 'Exames', telas: [

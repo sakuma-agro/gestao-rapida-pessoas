@@ -58,7 +58,7 @@ const $ = id => document.getElementById(id);
    feitas à mão no banco (*_bkp_*). Tabela nova no banco = uma linha aqui. */
 const GRUPOS = [
   ['Funcionários', 'public', ['funcionarios']],
-  ['EPIs', 'public', ['epis', 'fichas', 'modelo']],
+  ['EPIs', 'public', ['epis', 'fichas', 'epi_entregas', 'modelo']],
   ['Exames', 'public', ['sst_tipos_exame', 'sst_exames', 'sst_exames_funcao', 'sst_aso_itens']],
   ['Treinamentos', 'public', ['sst_tipos_treinamento', 'sst_treinamentos', 'sst_treinamentos_funcao']],
   ['Atividades SST', 'public', ['sst_atividades', 'sst_atividade_treinamentos', 'sst_atividade_exames', 'sst_atividade_funcionarios']],

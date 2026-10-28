@@ -26,6 +26,7 @@ const PROPRIOS = {
   aniversarios:  ['bolo', 'Aniversariantes'],
   fichas:        ['escudo', 'Fichas de EPI'],
   epis:          ['escudo', 'Tipos de EPI'],
+  epiCrono:      ['calendario', 'Troca de EPI'],
   exVenc:        ['exame', 'Exames a vencer'],
   exPainel:      ['exame', 'Painel de exames'],
   trVenc:        ['treino', 'Treinamentos a vencer'],

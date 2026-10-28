@@ -24,6 +24,7 @@ import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidente
 import { abrirCalendarioSst } from './sst-calendario.js';
 import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanhas.js';
 import { abrirBrigada, limparBrigada, ligarBrigada, avisoDesligamentoBrigada, TELAS_BRIGADA } from './sst-brigada.js';
+import { abrirEpiCrono, limparEpiCrono, ligarEpiCrono, redesenharEpiCrono } from './sst-epi-crono.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
@@ -144,6 +145,7 @@ function abrirAba(nome) {
   $('telaFolhaPonto').hidden = nome !== 'folhaPonto';
   if (nome === 'folhaPonto') folhaPonto.desenhar($('folhaPontoAlvo'), { aviso: () => {} });
   $('telaEpis').hidden = nome !== 'epis';
+  $('telaEpiCrono').hidden = nome !== 'epiCrono';   // Cronograma de troca (28/10/2026)
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
@@ -187,6 +189,7 @@ function abrirAba(nome) {
   if (nome === 'cadEstrutura') desenharCadastros('cadEstruturaLista',
     ['empregadores', 'fazendas', 'unidades', 'destinos'], desenharFuncionarios);
   if (nome === 'epis') { desenharEpis(); conferirCa(false); }
+  if (nome === 'epiCrono') abrirEpiCrono();
   if (nome === 'modelo') preencherModelo();
   $('telaRhCargos').hidden   = nome !== 'rhCargos';
   $('telaRhProposta').hidden = nome !== 'rhProposta';
@@ -317,7 +320,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 
@@ -1644,7 +1647,7 @@ function desenharEpis() {
       <span>
         <span class="nome">${esc(e.descricao)}</span>
         ${s.rotulo ? `<span class="tag ${s.cor}">${esc(s.rotulo)}</span>` : ''}<br>
-        <span class="sub">${numero}${e.observacao ? ' · ' + esc(e.observacao) : ''}${e.atividade ? ' · ' + esc(e.atividade) : ''} · ${textoTroca(e) ? '<b>' + esc(textoTroca(e)) + '</b>' : 'troca conforme desgaste'}</span>
+        <span class="sub">${numero}${e.observacao ? ' · ' + esc(e.observacao) : ''}${e.atividade ? ' · ' + esc(e.atividade) : ''} · ${textoTroca(e) ? '<b>' + esc(textoTroca(e)) + '</b>' + (e.troca_confirmada ? '' : ' <span class="tag alerta">a confirmar</span>') : 'troca conforme desgaste'}</span>
       </span>
       <span class="acoes"><button class="btn mini" data-editar="${e.id}">Editar</button></span>
     </div>`;
@@ -1721,6 +1724,8 @@ $('formEpi').addEventListener('submit', async ev => {
   const qtd = parseInt($('epTrocaQtd').value, 10);
   e.troca_qtd = qtd > 0 ? qtd : null;
   e.troca_unidade = e.troca_qtd ? $('epTrocaUnidade').value : null;
+  // Salvar aqui confirma a frequência (deixa de ser sugestão no Cronograma de troca).
+  e.troca_confirmada = !!e.troca_qtd;
   if (!e.descricao) return;
   await db.salvarEpi(e);
   $('dlgEpi').close();
@@ -2166,6 +2171,7 @@ ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);
 ligar('atividades do sst', ligarAtividades);
 ligar('brigada e socorros', () => ligarBrigada({ abrir: irParaTela }));
+ligar('cronograma de troca de EPI', () => ligarEpiCrono({ abrir: irParaTela }));
 /* Cadastros › Admissão e demissão (23/10/2026): o botão "Abrir ›" de cada tarefa
    leva à tela que resolve, já com a pessoa escolhida quando dá. */
 const depois = (fn, tentativas = 20) => setTimeout(() => { if (!fn() && tentativas > 0) depois(fn, tentativas - 1); }, 250);

@@ -60,7 +60,7 @@ export const ICONE_TELA = {
   funcionarios: 'pessoa', aniversarios: 'bolo', folhaPonto: 'calendario',
   lista: 'check', termoSindical: 'documento', termoContrato: 'documento', contratoTrab: 'documento',
   cadRelatorios: 'grafico', rhQuadro: 'pizza', cadFerias: 'sol', etqArmarios: 'armario', cadFuncoes: 'cargo', cadEstrutura: 'predio',
-  fichas: 'escudo', epis: 'lista', modelo: 'lapis',
+  fichas: 'escudo', epis: 'lista', epiCrono: 'calendario', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exRel: 'ficha', exFuncoes: 'cargo', exTipos: 'ajuste',
   trPainel: 'painel', trVenc: 'treino', trConsol: 'lista', sstAtv: 'check', trTipos: 'ajuste', trFuncoes: 'cargo', sstCal: 'calendario',
   brPainel: 'painel', brMembros: 'pessoas', brMinimos: 'ajuste',
