@@ -1577,3 +1577,4 @@ tr.ir-volta td{color:var(--cinza-claro)}
   .pv-linha.pv-leve.com-sel{grid-template-columns:26px 62px 1fr}
   .pv-leve .pv-acao,.pv-serv .pv-sit,.pv-serv .pv-acao{grid-column:2 / -1}
 }
+.pv-chip-s i{font-style:normal;font-weight:bold}

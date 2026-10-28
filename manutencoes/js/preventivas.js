@@ -59,11 +59,7 @@ function usoDoIntervalo(p, c) {
 const dataCurta = d => d ? formatarData(d).slice(0, 5) : '';
 const maiuscula = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
-function textoSituacao(c) {
-  let t = maiuscula(c.motivo);
-  if (c.proxima_data) t += (c.status === 'VENCIDO' ? ' · venceu ' : ' · até ') + dataCurta(c.proxima_data);
-  return t;
-}
+function textoSituacao(c) { return textoPorQue(c); }
 
 /* "última: 21/04/2026 · 4.195 h" embaixo do item (21/10/2026) */
 function ultimaTxt(p, e) {
@@ -72,6 +68,23 @@ function ultimaTxt(p, e) {
   if (p.ultima_troca_leitura != null) partes.push(nHoras(p.ultima_troca_leitura) + ' ' + unidadeDe(e));
   return partes.length ? '<small class="pv-ult">última: ' + esc(partes.join(' · ')) + '</small>' : '';
 }
+
+/* Vencido por horímetro (ou km) ou por período? (28/10/2026, pedido dele)
+   O calcular() já diz o motivo: "passou/faltam X h|km" é pelo mostrador;
+   "período vencido há N dias" / "vence em N dias" é pelo calendário. */
+function porQueVence(c) {
+  const m = String(c.motivo || '');
+  const km = / km$/.test(m);
+  const periodoVencido = c.proxima_data && c.proxima_data < hoje();
+  if (/^passou /.test(m)) return periodoVencido
+    ? { tipo: (km ? 'km' : 'horímetro') + ' e período', ic: '⏱📅', txt: 'passou ' + m.slice(7) + ' e venceu ' + dataCurta(c.proxima_data) }
+    : { tipo: km ? 'km' : 'horímetro', ic: '⏱', txt: 'passou ' + m.slice(7) };
+  if (/^faltam /.test(m)) return { tipo: km ? 'km' : 'horímetro', ic: '⏱', txt: m };
+  if (/^período vencido há/.test(m)) return { tipo: 'período', ic: '📅', txt: m.replace(/^período vencido há/, 'venceu há') };
+  if (/^vence /.test(m)) return { tipo: 'período', ic: '📅', txt: m };
+  return { tipo: '', ic: '', txt: m };
+}
+const textoPorQue = c => { const v = porQueVence(c); return v.tipo ? v.ic + ' Por ' + v.tipo + ': ' + v.txt : maiuscula(v.txt); };
 
 TELAS.painel = el => {
   document.body.classList.remove('modo-quadro');
@@ -235,7 +248,7 @@ TELAS.painel = el => {
           porMaq.get(id).itens.push(x);
         }
         const maqs = [...porMaq.values()].map(m => Object.assign(m, { vencida: m.itens.some(x => x.c.status === 'VENCIDO') }));
-        const chip = ({ p, c }) => `<span class="pv-chip-s ${c.status === 'VENCIDO' ? 'r' : 'y'}">${esc(nomeTipo(p.tipo_manutencao_id).toLowerCase().replace(/^./, x => x.toUpperCase()))} · ${esc(String(c.motivo || '').replace(/^passou /, '+').replace(/^período vencido há/, 'vencido há'))}</span>`;
+        const chip = ({ p, c }) => `<span class="pv-chip-s ${c.status === 'VENCIDO' ? 'r' : 'y'}">${esc(nomeTipo(p.tipo_manutencao_id).toLowerCase().replace(/^./, x => x.toUpperCase()))} · ${(() => { const v = porQueVence(c); return v.tipo ? `<i>${v.ic} por ${v.tipo}</i> ${esc(v.txt)}` : esc(v.txt); })()}</span>`;
         const linhaMaq = m => `<div class="pv-os-bloco" data-bloco-maq="${esc(m.e.id)}"><div class="pv-linha pv-leve${modoVarias ? ' com-sel' : ''} ${m.vencida ? 'pv-r' : 'pv-y'}">
           ${modoVarias ? `<label class="pv-sel" title="Marcar para abrir junto"><input type="checkbox" data-sel="${esc(m.itens.map(x => x.p.id).join(','))}"></label>` : ''}
           <button type="button" class="pv-cod" data-maq="${esc(m.e.id)}" title="Abrir a ficha">${esc(m.e.codigo)}</button>
@@ -274,7 +287,7 @@ TELAS.painel = el => {
           return `<div class="pv-linha pv-serv ${cls}">
             <button type="button" class="pv-cod" data-maq="${esc(e.id)}">${esc(e.codigo)}</button>
             <span class="pv-nm2"><b class="pv-abre" data-maq="${esc(e.id)}">${esc(e.descricao)}</b><small>${esc(q.nome('locais', e.local_id))}${ult ? ' · última ' + esc(ult) : ''}</small></span>
-            <span class="pv-sit"><b>${esc(maiuscula(c.motivo || ''))}</b><small>${c.status === 'SEM_DADO' ? '' : 'próxima: ' + proximaTroca(c)}</small></span>
+            <span class="pv-sit"><b>${esc(textoPorQue(c))}</b><small>${c.status === 'SEM_DADO' ? '' : 'próxima: ' + proximaTroca(c)}</small></span>
             <span class="pv-acao">${os ? `<button type="button" class="btn neutro" data-os="${esc(os.id)}">OS ${esc(numeroOS(os))}</button>`
               : ['VENCIDO', 'ATENCAO'].includes(c.status) ? `<button type="button" class="btn" data-abrir="${esc(p.id)}">Abrir OS</button>`
               : c.status === 'SEM_DADO' && ehAdmin() ? `<button type="button" class="btn neutro" data-prox="${esc(p.id)}">Informar troca</button>` : ''}</span>
