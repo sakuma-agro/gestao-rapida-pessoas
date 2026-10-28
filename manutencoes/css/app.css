@@ -1519,3 +1519,19 @@ tr.ir-volta td{color:var(--cinza-claro)}
 .guia-p i{font-style:normal;flex:none;width:26px;height:26px;border-radius:50%;background:var(--verde);color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center}
 .guia-x{position:absolute;top:6px;right:6px;border:0;background:none;color:var(--cinza-claro);font-size:16px;cursor:pointer;padding:4px 8px}
 @media (max-width:720px){.guia{flex-direction:column}}
+/* 28/10/2026: links "Ver também" em Hoje */
+.pv-mais{margin:2px 0 0;font-size:13px;color:var(--cinza-claro)}
+.pv-mais button{border:0;background:none;padding:0;font:inherit;color:var(--cinza);text-decoration:underline;cursor:pointer}
+.pv-mais button:hover{color:var(--verde-escuro)}
+/* 28/10/2026: consertos e tela do auxiliar */
+.pv-a-con strong{color:var(--marrom)}.pv-a-con.ativa{border-color:var(--marrom)}
+.pv-c{border-left-color:var(--marrom)}
+.pv-grupo-acao{display:flex;align-items:center;justify-content:space-between;gap:10px;text-transform:none;letter-spacing:0;font-size:13px}
+.pv-abas{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.aux{max-width:560px;margin:0 auto}
+.aux-bloco{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:var(--branco);border:2px solid var(--c);border-radius:14px;padding:16px 18px;margin:0 0 12px;cursor:pointer;font:inherit}
+.aux-bloco:hover{background:#FAFBF7}
+.aux-n{font-size:36px;font-weight:bold;color:var(--c);min-width:48px;text-align:center}
+.aux-t{flex:1}.aux-t b{display:block;font-size:17px;color:var(--grafite)}.aux-t small{font-size:13px;color:var(--cinza-claro)}
+.aux-go{background:var(--ok);color:#fff;border-radius:10px;padding:12px 18px;font-weight:bold}
+.aux-tudo{text-align:center;margin-top:6px}.aux-tudo button{border:0;background:none;color:var(--cinza);text-decoration:underline;font:inherit;cursor:pointer;font-size:14px}

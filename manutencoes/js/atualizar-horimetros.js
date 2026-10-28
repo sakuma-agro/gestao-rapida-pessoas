@@ -25,8 +25,12 @@ TELAS.atualizar_horimetros = el => {
 
   el.innerHTML = `
     <div id="ah-tela">
-      <h1>Atualizar horímetros</h1>
-      <p class="sub">Escolha a fazenda. Matriz é pelo relatório da Realtec; Quebra Cocão é lançado à mão.</p>
+      <div class="pn-cabeca"><h1>Horímetros</h1>
+        <button type="button" class="btn neutro" id="ah-lancados">Ver horímetros lançados</button></div>
+      ${guiaPassos('horimetros', [
+        'Escolha a fazenda',
+        'Matriz: anexe o <b>relatório da Realtec</b>. Quebra Cocão: escreva o <b>número do painel</b> de cada máquina',
+        'Toque em <b>Gravar</b> / <b>Salvar</b> — os vencimentos se acertam sozinhos'])}
       <div class="ah-faz">
         ${matriz ? `<button type="button" class="ah-op${!ehQC ? ' ativa' : ''}" data-faz="${esc(matriz.id)}">
           <b>${esc(matriz.nome)}</b><small>pelo arquivo</small></button>` : ''}
@@ -35,6 +39,7 @@ TELAS.atualizar_horimetros = el => {
       </div>
       <div id="ah-corpo"></div>
     </div>`;
+  el.querySelector('#ah-lancados').onclick = () => irPara('horimetros');
   el.querySelectorAll('[data-faz]').forEach(b => b.onclick = () => { fazHorimetro = b.dataset.faz; TELAS.atualizar_horimetros(el); });
 
   const corpo = el.querySelector('#ah-corpo');

@@ -1512,8 +1512,8 @@ function blocoSal(e) {
       (nada marcado = todas), lido por manutencoes/js/acesso.js. */
 const MQ_TELA = 'maquinas.tela:';
 const MQ_MODULOS = [
-  ['Manutenções', [['painel', 'Preventivas'], ['maquinas', 'Cadastros'], ['calendario', 'Calendário'],
-    ['ordens', 'Ordens de serviço'], ['checklist', 'Check list'], ['horimetros', 'Horímetros lançados'], ['vencimentos', 'Planilha']]],
+  ['Manutenções', [['painel', 'Hoje'], ['atualizar_horimetros', 'Horímetros'], ['checklist', 'Check list'], ['maquinas', 'Máquinas'],
+    ['calendario', 'Calendário'], ['ordens', 'Todas as OS'], ['horimetros', 'Horímetros lançados'], ['vencimentos', 'Planilha']]],
   ['Patrimônio', [['patrimonio', 'Bens'], ['patrimonio_mov', 'Movimentações']]],
 ];
 const MQ_NIVEIS = [

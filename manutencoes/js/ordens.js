@@ -251,7 +251,7 @@ TELAS.ordens = el => {
 /* Corretiva aberta na mão: a máquina e o que está errado. */
 function formCorretiva(idMaquina) {
   const maquinas = q.ativos('equipamentos').slice().sort(porCodigo);
-  abrirModal('Nova OS corretiva', `
+  abrirModal('Novo conserto (OS corretiva)', `
     ${campoLista('Máquina', 'equipamento_id', maquinas.map(e => ({ id: e.id, nome: e.codigo + ' — ' + e.descricao })), idMaquina)}
     ${campoArea('O que está errado', 'descricao', '', 'Ex.: vazamento de óleo no cubo da roda traseira')}
     <div class="acoes">
@@ -264,8 +264,11 @@ function formCorretiva(idMaquina) {
       if (!d.equipamento_id) return aviso('Escolha a máquina.', true);
       if (!d.descricao) return aviso('Escreva o que está errado.', true);
       const os = await criarCorretiva(q.por_id('equipamentos', d.equipamento_id), d.descricao);
-      irPara('ordens');
-      abrirOS(os.id);
+      fecharModal();
+      // 28/10/2026: o conserto aparece em Hoje › Consertos, com WhatsApp e Fechar.
+      if (document.querySelector('#pv-lista')) { abaPrev = 'consertos'; irPara('painel'); }
+      else { irPara('ordens'); abrirOS(os.id); }
+      aviso('Conserto aberto: OS ' + numeroOS(os) + '.');
     };
   });
 }

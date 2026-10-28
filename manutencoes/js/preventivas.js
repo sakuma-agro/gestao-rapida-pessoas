@@ -81,12 +81,20 @@ TELAS.painel = el => {
     juntarOSDuplicadas().then(n => { if (n) aviso(n + ' OS duplicada(s) juntada(s) na OS mais antiga da máquina.'); TELAS.painel(el); });
     return;
   }
+  // Tela do auxiliar (28/10/2026, aprovada com imagem): quem não é
+  // administrador começa por três blocos grandes; "Ver tudo" abre a lista.
+  if (!ehAdmin() && !listaCompletaAux) return inicioAuxiliar(el);
+  if (!ehAdmin() && abaPrev === 'semdado') abaPrev = 'fazer';
   const planos = planosDaFrota();
   const mes = hoje().slice(0, 7);
 
   // Em andamento: uma linha por OS preventiva aberta (a OS pode ter vários itens)
   const osAbertas = q.todos('ordens_servico')
     .filter(o => o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id))
+    .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')));
+  // Consertos (28/10/2026): OS corretivas abertas, no mesmo fluxo das preventivas
+  const consertos = q.todos('ordens_servico')
+    .filter(o => o.tipo === 'CORRETIVA' && ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id))
     .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')));
   // A fazer: precisa de troca e ninguém abriu OS ainda
   const fazer = planos.filter(x => ['VENCIDO', 'ATENCAO'].includes(x.c.status) && !osAbertaDoPlano(x.p))
@@ -113,19 +121,24 @@ TELAS.painel = el => {
 
   el.innerHTML = `
     <div class="pn-cabeca">
-      <div><h1>Preventivas${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
-        <p class="sub">Cada linha é uma troca: <b>A fazer</b> → abriu a OS → <b>Em andamento</b> → fechou a OS → <b>Feita</b>.</p></div>
-      <span class="pv-cab-acoes"><button type="button" class="btn oculto" id="pv-hm">+ Hora máquina</button>
+      <div><h1>Hoje${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
+        ${ehAdmin() ? `<p class="pv-mais">Ver também: <button type="button" data-ir="calendario">Calendário</button> · <button type="button" data-ir="vencimentos">Planilha</button> · <button type="button" data-ir="ordens">Todas as OS</button></p>` : ''}</div>
+      <span class="pv-cab-acoes">${!ehAdmin() ? '<button type="button" class="btn neutro" id="pv-inicio">← Início</button>' : ''}<button type="button" class="btn oculto" id="pv-hm">+ Hora máquina</button>
       <button type="button" class="btn neutro" id="pv-levant" title="Folha para o responsável escrever a última troca de cada serviço">🖨 Levantamento da última troca</button>
       <button type="button" class="btn neutro" id="pv-atualizar">Atualizar</button></span>
     </div>
+    ${guiaPassos('hoje', [
+      'Em <b>A fazer</b>, toque em <b>Abrir OS</b> na máquina vencida',
+      'Toque em <b>WhatsApp</b> para mandar a OS a quem vai fazer',
+      'Feita a troca, em <b>Em andamento</b> toque em <b>Fechar OS</b> e preencha o horímetro']) }
     <div class="pv-abas">
       ${aba('fazer', 'pv-a-fazer', fazer.length, 'A fazer', 'vencido ou perto, sem OS · clique para abrir uma OS')}
       ${aba('andamento', 'pv-a-and', osAbertas.length, 'Em andamento', 'com OS aberta · registrar troca')}
+      ${aba('consertos', 'pv-a-con', consertos.length, 'Consertos', 'algo quebrou · OS corretiva')}
       ${aba('feitas', 'pv-a-feita', feitas.length, 'Feitas no mês', 'OS fechada, troca registrada')}
-      ${aba('semdado', 'pv-a-sem', semDado.length, 'Falta cadastrar', 'sem última troca ou horímetro')}
+      ${ehAdmin() ? aba('semdado', 'pv-a-sem', semDado.length, 'Falta cadastrar', 'sem última troca ou horímetro') : ''}
     </div>
-    ${velhas.length ? `<p class="pv-ck"><button type="button" class="pv-hor" id="pv-hor">⏱ ${velhas.length} máquina(s) com horímetro sem leitura há mais de ${HORIMETRO_VELHO_DIAS} dias — o "faltam X h" delas pode estar errado. Lançar →</button></p>` : ''}
+    ${velhas.length ? `<p class="pv-ck"><button type="button" class="pv-hor" id="pv-hor">⏱ ${velhas.length} máquina(s) com horímetro de mais de ${HORIMETRO_VELHO_DIAS} dias — atualize para o "faltam X h" ficar certo. Atualizar horímetros →</button></p>` : ''}
     ${ckAtraso ? `<p class="pv-ck"><button type="button" class="btn-fantasma" id="pv-ck">${ckAtraso} máquina(s) com check list atrasado →</button></p>` : ''}
     <div class="filtros">
       <input type="search" id="pv-busca" placeholder="Buscar máquina ou item" value="${esc(filtroPrev.busca)}">
@@ -152,6 +165,7 @@ TELAS.painel = el => {
     const F = {
       fazer: fazer.filter(passaPlano),
       semdado: semDado.filter(passaPlano),
+      consertos: consertos.filter(o => casa(q.por_id('equipamentos', o.equipamento_id), o.descricao || '')),
       andamento: osAbertas.filter(o => (!filtroPrev.item || itensDaOS(o.id).some(i => i.tipo_manutencao_id === filtroPrev.item))
         && casa(q.por_id('equipamentos', o.equipamento_id), resumoOS(o))),
       feitas: feitas.filter(m => (!filtroPrev.item || m.tipo_manutencao_id === filtroPrev.item)
@@ -167,7 +181,7 @@ TELAS.painel = el => {
         ? q.ativos('equipamentos').filter(e => e.local_id === filtroPrev.local && !['VENDIDO', 'BAIXADO'].includes(e.status) && noGrupo(e)).length : null;
       if (maqsNoLocal === 0) return `<div class="pv-alerta pv-alerta-forte"><b>Nenhuma máquina cadastrada em ${esc(q.nome('locais', filtroPrev.local))}${grupoAtual ? ' no grupo ' + esc(nomeGrupo(grupoAtual)) : ''}.</b>
         <span>Confira em Cadastros se as máquinas dessa fazenda estão com o local certo.</span></div>`;
-      const rot = { fazer: 'a fazer', andamento: 'em andamento', feitas: 'feitas no mês', semdado: 'falta cadastrar' };
+      const rot = { fazer: 'a fazer', andamento: 'em andamento', consertos: 'consertos', feitas: 'feitas no mês', semdado: 'falta cadastrar' };
       const outras = Object.keys(F).filter(k => k !== abaPrev && F[k].length);
       return `<div class="pv-alerta"><b>${esc(msg)}${filtrando ? ' — em ' + esc(recorte) : ''}.</b>
         ${outras.length ? `<span>Nas outras abas: ${outras.map(k => `<button type="button" class="pv-ir" data-ir-aba="${k}">${F[k].length} ${rot[k]}</button>`).join(' ')}</span>` : ''}
@@ -227,13 +241,15 @@ TELAS.painel = el => {
       } else {
         html = base.map(linha).join('') || vazio('Todos os itens têm a troca lançada');
       }
-    } else if (abaPrev === 'andamento') {
-      html = F.andamento.map(o => {
+    } else if (abaPrev === 'andamento' || abaPrev === 'consertos') {
+      const conserto = abaPrev === 'consertos';
+      html = (conserto ? `<div class="pv-grupo pv-grupo-acao">Algo quebrou? <button type="button" class="btn" id="pv-novo-conserto">+ Novo conserto</button></div>` : '')
+        + (conserto ? F.consertos : F.andamento).map(o => {
         const e = q.por_id('equipamentos', o.equipamento_id) || { codigo: '—', descricao: '' };
         const d = diasDesde(o.data_emissao);
         const esquecida = d != null && d > OS_ATRASADA_DIAS;
-        return `<div class="pv-os-bloco" data-bloco="${esc(o.id)}"><div class="pv-linha pv-b">${maq(e)}
-          <span class="pv-item">${esc(resumoOS(o))}</span>
+        return `<div class="pv-os-bloco" data-bloco="${esc(o.id)}"><div class="pv-linha ${conserto ? 'pv-c' : 'pv-b'}">${maq(e)}
+          <span class="pv-item">${esc(conserto ? (o.descricao || 'Conserto') : resumoOS(o))}</span>
           <span class="pv-sit"><b class="pv-os">OS ${esc(numeroOS(o))}</b><small>aberta ${esc(dataCurta(o.data_emissao))}
             · <em class="${esquecida ? 'pv-atraso' : ''}">${d == null ? '' : d === 0 ? 'hoje' : d + (d === 1 ? ' dia' : ' dias')}</em></small></span>
           <span class="pv-acao"><button type="button" class="btn neutro" data-os="${esc(o.id)}">Ver OS</button>
@@ -243,7 +259,7 @@ TELAS.painel = el => {
                  <button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}" data-esquecida="1">✓ Já foi feita</button>`
               : `<button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}">✓ Fechar OS</button>`}</span>
         </div><div class="pv-fecha oculto" data-painel="${esc(o.id)}"></div></div>`;
-      }).join('') || vazio('Nenhuma OS preventiva aberta');
+      }).join('') || vazio(conserto ? 'Nenhum conserto em aberto' : 'Nenhuma OS preventiva aberta');
     } else {
       html = F.feitas
         .map(m => {
@@ -309,6 +325,7 @@ TELAS.painel = el => {
       };
     });
     $$('#pv-lista [data-os]').forEach(x => x.onclick = () => abrirOS(x.dataset.os));
+    const bnc = $('#pv-novo-conserto'); if (bnc) bnc.onclick = () => formCorretiva();
     $$('#pv-lista [data-fechar]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.fechar);
       if (os) painelFechar(os, !!x.dataset.esquecida, () => TELAS.painel(el));
@@ -364,7 +381,7 @@ TELAS.painel = el => {
     desenhar();
   });
   ['pv-busca', 'pv-item', 'pv-local'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
-  const bh = $('#pv-hor'); if (bh) bh.onclick = () => listaHorimetroVelho(velhas, () => TELAS.painel(el));
+  const bh = $('#pv-hor'); if (bh) bh.onclick = () => irPara('atualizar_horimetros');
   const ck = $('#pv-ck'); if (ck) ck.onclick = () => { abaChecklist = 'agenda'; irPara('checklist'); };
   // + Hora máquina (Quebra Cocão): mesmo painel do DP › Lançar jornada
   if (window.HoraMaquina && App.sb) window.HoraMaquina.disponivel(App.sb).then(ok => {
@@ -373,6 +390,8 @@ TELAS.painel = el => {
     bhm.onclick = () => window.HoraMaquina.abrir({ cliente: App.sb, aoSalvar: () => { baixarBase().then(() => { if (document.querySelector('#pv-lista')) TELAS.painel(el); }).catch(() => {}); } });
   });
   $('#pv-levant').onclick = () => escolherLevantamento();
+  el.querySelectorAll('.pv-mais [data-ir]').forEach(b => b.onclick = () => irPara(b.dataset.ir));
+  const bini = $('#pv-inicio'); if (bini) bini.onclick = () => { listaCompletaAux = false; TELAS.painel(el); };
   $('#pv-atualizar').onclick = async () => {
     if (!App.online) return aviso('Sem internet: a tela mostra o que está guardado neste aparelho.', true);
     aviso('Atualizando…');
@@ -461,6 +480,38 @@ function enviarOSWhatsApp(os, botao) {
 }
 Object.assign(window, { pdfDeHtml, compartilharPdf });
 
+let listaCompletaAux = false;
+function inicioAuxiliar(el) {
+  const abertas = q.todos('ordens_servico').filter(o => ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id));
+  const nCons = abertas.filter(o => o.tipo === 'CORRETIVA').length;
+  const ck = podeTela('checklist') && typeof agendaChecklists === 'function'
+    ? agendaChecklists().filter(a => ['atrasado', 'hoje', 'nunca'].includes(a.status)) : null;
+  const qc = typeof localPorNome === 'function' ? localPorNome('QUEBRA') : null;
+  const hor = podeTela('atualizar_horimetros') && qc
+    ? q.ativos('equipamentos').filter(e => e.local_id === qc.id && ['HORIMETRO', 'HODOMETRO'].includes(e.unidade_controle)
+        && !['VENDIDO', 'BAIXADO'].includes(e.status) && idadeLeitura(e) >= HORIMETRO_VELHO_DIAS) : null;
+  const nome = String((App.usuario && App.usuario.nome) || '').split(' ')[0];
+  const bloco = (id, n, cor, titulo, dica) => `<button type="button" class="aux-bloco" data-aux="${id}" style="--c:${cor}">
+      <span class="aux-n">${n}</span><span class="aux-t"><b>${titulo}</b><small>${dica}</small></span><span class="aux-go">Abrir</span></button>`;
+  el.innerHTML = `
+    <div class="aux">
+      <h1>${nome ? 'Olá, ' + esc(nome) : 'Hoje'}</h1>
+      <p class="sub">O que tem para fazer hoje. Toque no bloco.</p>
+      ${bloco('os', abertas.length, '#2E6DA4', 'OS para fechar', abertas.length ? 'troca ou conserto feito? registre aqui' + (nCons ? ' · ' + nCons + ' conserto(s)' : '') : 'nenhuma OS aberta')}
+      ${ck ? bloco('ck', ck.length, '#4E8B1F', 'Check list para fazer', ck.length ? ck.slice(0, 3).map(a => a.e.codigo).join(', ') + (ck.length > 3 ? '…' : '') + ' — preencha no celular' : 'tudo em dia') : ''}
+      ${hor ? bloco('hor', hor.length, '#A87508', 'Horímetros para lançar', hor.length ? esc(qc.nome) + ' · escreva o número do painel' : 'tudo em dia') : ''}
+      <p class="aux-tudo"><button type="button" data-aux="tudo">Ver a lista completa (A fazer, consertos, feitas) →</button></p>
+    </div>`;
+  el.querySelectorAll('[data-aux]').forEach(b => b.onclick = () => {
+    const a = b.dataset.aux;
+    if (a === 'ck') return irPara('checklist');
+    if (a === 'hor') { if (typeof fazHorimetro !== 'undefined') fazHorimetro = qc.id; return irPara('atualizar_horimetros'); }
+    listaCompletaAux = true;
+    if (a === 'os') abaPrev = abertas.some(o => o.tipo !== 'CORRETIVA') ? 'andamento' : (nCons ? 'consertos' : 'andamento');
+    TELAS.painel(el);
+  });
+}
+
 function temOSDuplicada() {
   const vistos = new Set();
   return q.todos('ordens_servico').some(o => {
@@ -518,7 +569,7 @@ function painelFechar(os, esquecida, depois) {
         <input type="file" accept="image/*" capture="environment" data-f="foto"></label>
       <button type="button" class="btn pv-fi-ok" data-f="ok">✓ Feito</button>
     </div>
-    <div class="pv-fi-obs"><input type="text" data-f="obs" placeholder="Observação (opcional) — ex.: filtro de ar não precisou"></div>`;
+    <div class="pv-fi-obs"><input type="text" data-f="obs" placeholder="${os.tipo === 'CORRETIVA' ? 'O que foi feito (obrigatório) — ex.: trocado o retentor do cubo' : 'Observação (opcional) — ex.: filtro de ar não precisou'}"></div>`;
   box.classList.remove('oculto');
   const f = k => box.querySelector(`[data-f="${k}"]`);
   (f('leitura') && !acumulado ? f('leitura') : f('quem')).focus();

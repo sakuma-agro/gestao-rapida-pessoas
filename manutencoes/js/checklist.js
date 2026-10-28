@@ -119,9 +119,11 @@ const marcadosCk = new Set();
 
 TELAS.checklist = el => {
   el.innerHTML = `
-    <h1>Check list de campo</h1>
-    <p class="sub">Preencha no celular ou imprima a folha em branco. Ao finalizar, cada item
-       reprovado vira uma OS corretiva aberta e o relatório sai pronto para o WhatsApp.</p>
+    <h1>Check list</h1>
+    ${guiaPassos('checklist', [
+      'Na máquina, toque em <b>Preencher</b> (no celular) ou mande a <b>folha pelo WhatsApp</b>',
+      'Marque cada item: <b>bom</b>, <b>médio</b> ou <b>ruim</b> — ruim pede uma frase do que viu',
+      'Finalize: o que ficou <b>ruim</b> vira um <b>conserto</b> em Hoje'])}
     <div class="abas">
       <button type="button" data-aba="agenda">Agenda</button>
       <button type="button" data-aba="realizados">Realizados</button>

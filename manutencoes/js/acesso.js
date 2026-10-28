@@ -22,12 +22,17 @@ const MODULOS = [
     /* 21/10/2026: o Painel virou "Preventivas" (A fazer / Em andamento /
        Feitas) e Vencimentos virou "Planilha", no fim — pedido dele, a tela
        antiga estava pesada de ler. Os ids não mudaram. */
-    ['painel', 'Preventivas'],
-    ['atualizar_horimetros', 'Atualizar horímetros'],   // 28/10/2026: Matriz pelo arquivo, Quebra Cocão à mão
-    ['maquinas', 'Cadastros'],
-    ['calendario', 'Calendário'], ['ordens', 'Ordens de serviço'], ['checklist', 'Check list'],
-    ['horimetros', 'Horímetros lançados'],   // 21/10/2026: o que vem do + Hora máquina e dos lançamentos
-    ['vencimentos', 'Planilha'],
+    /* 28/10/2026 (lean, aprovado por ele com imagens): o menu ficou com 4
+       telas — Hoje, Horímetros, Check list, Máquinas. As outras continuam
+       existindo (permissões, atalhos e links), mas saem do menu e viram
+       botões dentro de Hoje e de Horímetros (3º campo = fora do menu). */
+    ['painel', 'Hoje'],
+    ['atualizar_horimetros', 'Horímetros'],
+    ['checklist', 'Check list'],
+    ['maquinas', 'Máquinas'],
+    ['calendario', 'Calendário', 1], ['ordens', 'Todas as OS', 1],
+    ['horimetros', 'Horímetros lançados', 1],
+    ['vencimentos', 'Planilha', 1],
   ] },
   { id: 'patrimonio', nome: 'Patrimônio', telas: [
     ['patrimonio', 'Bens'], ['patrimonio_mov', 'Movimentações'],
@@ -66,6 +71,8 @@ function podeTela(tela) {
   return !temRestricao(m) || Acesso.telas.includes(m + ':' + tela);
 }
 
+/* Telas que aparecem na segunda faixa do menu (as marcadas com 1 ficam fora). */
+const telasMenu = id => telasLiberadas(id).filter(t => !t[2]);
 const telasLiberadas = id => {
   const m = MODULOS.find(x => x.id === id);
   return m ? m.telas.filter(([t]) => podeTela(t)) : [];
@@ -143,8 +150,9 @@ function abrirModulo(id, tela) {
   const alvo = telas.some(([t]) => t === tela) ? tela : telas[0][0];
 
   // Módulo de uma tela só não ganha segunda faixa: seria uma aba sozinha.
-  $('#menu2').hidden = telas.length < 2;
-  $('#menu2').innerHTML = telas.map(botaoTela).join('');
+  const noMenu = telasMenu(id);
+  $('#menu2').hidden = noMenu.length < 2;
+  $('#menu2').innerHTML = noMenu.map(botaoTela).join('');
   $$('#menu2 button').forEach(b => b.onclick = () => irPara(b.dataset.tela));
   irPara(alvo);
 }
@@ -156,7 +164,7 @@ function marcarMenu(tela) {
   if (m !== moduloAberto) {
     moduloAberto = m;
     $$('#menu button').forEach(b => b.classList.toggle('ativo', b.dataset.modulo === m));
-    const telas = telasLiberadas(m);
+    const telas = telasMenu(m);
     $('#menu2').hidden = telas.length < 2;
     $('#menu2').innerHTML = telas.map(botaoTela).join('');
     $$('#menu2 button').forEach(b => b.onclick = () => irPara(b.dataset.tela));
@@ -197,14 +205,10 @@ const ICONE_TELA_M = { atualizar_horimetros: 'horimetro', horimetros: 'horimetro
 const botaoTela = ([t, rot]) =>
   `<button type="button" data-tela="${t}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_TELA_M[t]] || ''}</svg><span>${esc(rot)}</span></button>`;
 const ATALHOS_INICIO = [
-  ['painel', 'prev', 'Preventivas', 'prim'],
-  ['atualizar_horimetros', 'horimetro', 'Atualizar horímetros'],
-  ['horimetros', 'horimetro', 'Horímetros lançados'],
-  ['vencimentos', 'planilha', 'Planilha'],
-  ['calendario', 'venc', 'Calendário'],
-  ['ordens', 'os', 'Ordens de serviço'],
-  ['maquinas', 'bens', 'Cadastros'],
+  ['painel', 'prev', 'Hoje', 'prim'],
+  ['atualizar_horimetros', 'horimetro', 'Horímetros'],
   ['checklist', 'check', 'Check list'],
+  ['maquinas', 'bens', 'Máquinas'],
   ['patrimonio', 'patrimonio', 'Patrimônio'],
   ['patrimonio_mov', 'mov', 'Movimentações'],
 ];
