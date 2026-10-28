@@ -394,46 +394,72 @@ function carregarScript(src) {
     s.onerror = () => erro(new Error('não consegui carregar ' + src)); document.head.appendChild(s);
   });
 }
-async function pdfDaOS(os) {
+/* PDF a partir da folha em HTML (a mesma do Imprimir). Folha comprida
+   (check list com fotos) vira várias páginas A4. opts.largura: largura da
+   folha na tela; opts.preparar(caixa): ajuste antes da foto (check list). */
+async function pdfDeHtml(html, opts = {}) {
   if (!window.html2canvas) await carregarScript('../vendor/html2canvas.min.js');
   if (!window.jspdf) await carregarScript('../vendor/jspdf.umd.min.js');
   const caixa = document.createElement('div');
-  caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;background:#fff;padding:0';
-  caixa.innerHTML = folhaOS(os);
+  caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + (opts.largura || '760px') + ';background:#fff;padding:0';
+  caixa.innerHTML = html;
   document.body.appendChild(caixa);
   try {
-    await Promise.all([...caixa.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+    await Promise.all([...caixa.querySelectorAll('img')].map(i => i.complete ? 0
+      : new Promise(r => { i.onload = i.onerror = r; setTimeout(r, 4000); })));
+    if (opts.preparar) opts.preparar(caixa);
+    caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + (opts.largura || '760px') + ';background:#fff;padding:0';
     const cv = await html2canvas(caixa, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
     const doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const M = 10, L = 210 - 2 * M, Amax = 297 - 2 * M;
-    let w = L, h = cv.height * L / cv.width;
-    if (h > Amax) { h = Amax; w = cv.width * Amax / cv.height; }
-    doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', M + (L - w) / 2, M, w, h);
+    const M = 10, L = 210 - 2 * M, A = 297 - 2 * M;
+    const pxPorMm = cv.width / L, fatia = Math.floor(A * pxPorMm);
+    if (cv.height <= fatia * 1.08) {   // cabe numa folha (encolhe um pouco se passar)
+      let w = L, h = cv.height / pxPorMm;
+      if (h > A) { h = A; w = cv.width * A / cv.height; }
+      doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', M + (L - w) / 2, M, w, h);
+    } else {
+      for (let y = 0, pg = 0; y < cv.height; y += fatia, pg++) {
+        const c = document.createElement('canvas'); c.width = cv.width; c.height = Math.min(fatia, cv.height - y);
+        c.getContext('2d').drawImage(cv, 0, y, cv.width, c.height, 0, 0, cv.width, c.height);
+        if (pg) doc.addPage();
+        doc.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', M, M, L, c.height / pxPorMm);
+      }
+    }
     return doc.output('blob');
   } finally { caixa.remove(); }
 }
-async function enviarOSWhatsApp(os, botao) {
-  const e = q.por_id('equipamentos', os.equipamento_id) || {};
-  const nome = ('OS ' + (os.numero || 'nova') + ' - ' + (e.codigo || 'maquina')).replace(/[\\/:*?"<>|]+/g, '-') + '.pdf';
-  const rot = botao && botao.textContent;
+const pdfDaOS = os => pdfDeHtml(folhaOS(os));
+
+/* Só o arquivo, sem texto (pedido dele). Celular: escolhe o contato no
+   WhatsApp; computador: baixa e abre o WhatsApp Web para anexar. */
+async function compartilharPdf(gerar, nome, botao) {
+  nome = nome.replace(/[\\/:*?"<>|]+/g, '-');
+  const rot = botao && botao.innerHTML;
   if (botao) { botao.disabled = true; botao.textContent = 'Preparando…'; }
   try {
-    const arq = new File([await pdfDaOS(os)], nome, { type: 'application/pdf' });
+    const arq = new File([await gerar()], nome, { type: 'application/pdf' });
     if (navigator.canShare && navigator.canShare({ files: [arq] })) {
-      try { await navigator.share({ files: [arq] }); return; }
-      catch (x) { if (x && x.name === 'AbortError') return; }
+      try { await navigator.share({ files: [arq] }); return true; }
+      catch (x) { if (x && x.name === 'AbortError') return false; }
     }
     const url = URL.createObjectURL(arq), a = document.createElement('a');
     a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     window.open('https://web.whatsapp.com/', '_blank', 'noopener');
     aviso('PDF baixado (' + nome + '). Anexe na conversa do WhatsApp.');
+    return true;
   } catch (x) {
     aviso('Não consegui montar o PDF: ' + (x.message || x), true);
+    return false;
   } finally {
-    if (botao) { botao.disabled = false; botao.textContent = rot; }
+    if (botao) { botao.disabled = false; botao.innerHTML = rot; }
   }
 }
+function enviarOSWhatsApp(os, botao) {
+  const e = q.por_id('equipamentos', os.equipamento_id) || {};
+  return compartilharPdf(() => pdfDaOS(os), 'OS ' + (os.numero || 'nova') + ' - ' + (e.codigo || 'maquina') + '.pdf', botao);
+}
+Object.assign(window, { pdfDeHtml, compartilharPdf });
 
 function temOSDuplicada() {
   const vistos = new Set();

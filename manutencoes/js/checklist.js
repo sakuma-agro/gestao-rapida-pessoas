@@ -193,10 +193,19 @@ function desenharAgenda(el) {
           <span class="etq ${etq[0]}">${etq[1]}</span>
           <button type="button" class="btn" data-preencher="${esc(l.e.id)}">Preencher</button>
           <button type="button" class="btn-fantasma" data-branco="${esc(l.e.id)}">Folha em branco</button>
+          <button type="button" class="btn pv-wpp" data-zap="${esc(l.e.id)}" title="Mandar a folha pelo WhatsApp">WhatsApp</button>
         </li>`;
       }).join('');
     $('#ck-lista').querySelectorAll('[data-preencher]').forEach(b => b.onclick = () => preencherChecklist(b.dataset.preencher));
     $('#ck-lista').querySelectorAll('[data-branco]').forEach(b => b.onclick = () => imprimirLote([b.dataset.branco]));
+    /* WhatsApp (28/10/2026, pedido dele): só o PDF da folha, nome
+       "Check list - T.16.pdf", sem texto. */
+    $('#ck-lista').querySelectorAll('[data-zap]').forEach(b => b.onclick = () => {
+      const e = q.por_id('equipamentos', b.dataset.zap); const { modelo } = modeloDaMaquina(e);
+      if (!modelo) return aviso('Máquina sem modelo de check list.', true);
+      compartilharPdf(() => pdfDeHtml(folhaChecklist(e, modelo, {}), { largura: '188mm', preparar: c => ajustarFolhas(c) }),
+        'Check list - ' + e.codigo + '.pdf', b);
+    });
     $('#ck-lista').querySelectorAll('[data-marca]').forEach(c => c.onchange = () => {
       if (c.checked) marcadosCk.add(c.dataset.marca); else marcadosCk.delete(c.dataset.marca);
       c.closest('li').classList.toggle('marcado', c.checked); pintarLote();
@@ -764,7 +773,7 @@ async function abrirRelatorioChecklist(ckId) {
   abrirModal('Check list ' + (ck.numero ? 'nº ' + ck.numero : '') + ' — ' + e.codigo, `
     <div id="os-impresso">${folhaChecklist(e, modelo, { ck })}</div>
     <div class="acoes">
-      <button type="button" class="btn btn-zap" id="rc-zap"><img class="ic-zap" src="../img/whatsapp.png" alt="">Enviar ao responsável</button>
+      <button type="button" class="btn btn-zap" id="rc-zap"><img class="ic-zap" src="../img/whatsapp.png" alt="">WhatsApp</button>
       <button type="button" class="btn btn-pdf" id="rc-imprimir">Imprimir / salvar PDF</button>
       ${corretivas.length ? '<button type="button" class="btn neutro" id="rc-anom">Ver OS corretivas</button>' : ''}
     </div>
@@ -775,7 +784,17 @@ async function abrirRelatorioChecklist(ckId) {
       document.body.classList.add('imprimindo-os'); window.print();
       setTimeout(() => document.body.classList.remove('imprimindo-os'), 500);
     };
-    corpo.querySelector('#rc-zap').onclick = () => enviarWhatsApp(ck, e, corretivas);
+    /* Enviar (28/10/2026, pedido dele): só o PDF do check list preenchido,
+       nome "Check list 45 - T.16.pdf", sem texto. O envio fica registrado. */
+    corpo.querySelector('#rc-zap').onclick = async ev => {
+      const ok = await compartilharPdf(() => pdfDeHtml(corpo.querySelector('#os-impresso').innerHTML, { largura: '188mm' }),
+        'Check list ' + (ck.numero ? ck.numero + ' ' : '') + '- ' + e.codigo + '.pdf', ev.currentTarget);
+      if (!ok) return;
+      const resp = responsavelDe(e);
+      ck.enviado_whatsapp_em = new Date().toISOString();
+      ck.enviado_whatsapp_para = resp ? resp.nome : '(WhatsApp)';
+      await gravar('checklists', ck);
+    };
     const ba = corpo.querySelector('#rc-anom');
     if (ba) ba.onclick = () => { fecharModal(); irPara('ordens'); };
   });
