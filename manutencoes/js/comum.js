@@ -194,3 +194,19 @@ Object.assign(window, {
   formatarData, parametro, porCodigo, rotuloUnidade, unidadeDe, leituraDe, nHoras,
   calcular, etq, proximaTroca, periodicidadeTexto
 });
+
+/* Passo a passo no alto da tela (28/10/2026, pedido dele: "instrutivo" — quem
+   usa é básico). Faixa verde com os passos numerados; o ✕ esconde e ela não
+   volta neste aparelho. */
+function guiaPassos(id, passos) {
+  try { if (localStorage.getItem('gr.guia.' + id) === 'x') return ''; } catch (e) {}
+  return `<div class="guia" data-guia="${id}">${passos.map((t, i) => `<span class="guia-p"><i>${i + 1}</i><span>${t}</span></span>`).join('')}
+    <button type="button" class="guia-x" title="Entendi, esconder" aria-label="Esconder o passo a passo">✕</button></div>`;
+}
+document.addEventListener('click', ev => {
+  const x = ev.target.closest && ev.target.closest('.guia-x');
+  if (!x) return;
+  const g = x.closest('.guia');
+  try { localStorage.setItem('gr.guia.' + g.dataset.guia, 'x'); } catch (e) {}
+  g.remove();
+});

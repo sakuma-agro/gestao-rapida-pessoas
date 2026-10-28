@@ -57,12 +57,14 @@ let filtroMaq = { busca: '', local: '', tipo: '' };
 TELAS.maquinas = el => {
   el.innerHTML = `
     <h1>Cadastros${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
-    <p class="sub">Cadastro das máquinas e dos itens de manutenção de cada uma — a cada quantas
-       horas ou dias, e qual óleo e filtro ela usa.</p>
+    ${ehAdmin() ? guiaPassos('cadastros', [
+      'Toque em <b>Cadastrar máquina</b> — se tiver uma igual, escolha <b>Copiar os serviços de</b>',
+      'Na máquina, toque em <b>+ Serviço</b> e diga <b>a cada quantas horas</b> (ou dias)',
+      'Informe a <b>próxima troca</b> — pronto, ela aparece nas Preventivas quando vencer']) : ''}
     <div class="acoes">
       ${ehAdmin() ? '<button type="button" class="btn" id="mq-nova">Cadastrar máquina</button>' : ''}
       ${'' /* 14/10/2026: importação Realtec foi só a carga inicial; horímetro agora é lançado no app. Para voltar: botão #mq-importar (ver git). */}
-      ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de itens de manutenção</button>' : ''}
+      ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de serviços</button>' : ''}
       ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
     </div>
     <div class="filtros">
@@ -158,20 +160,21 @@ function fichaMaquina(id) {
     </div>
 
     ${window.alertaLaudo && ehVaso(e) ? alertaLaudo(e) : ''}
-    <h2 class="fm-titulo">Itens de manutenção
-      ${ehAdmin() ? '<button type="button" class="btn" id="fm-item">+ Item</button>' : ''}</h2>
+    <h2 class="fm-titulo">Serviços de manutenção
+      ${ehAdmin() ? '<button type="button" class="btn" id="fm-item">+ Serviço</button>' : ''}</h2>
     ${planos.length === 0
-      ? '<div class="vazio"><p>Nenhum item cadastrado. Ex.: Óleo e filtro de motor — a cada 500 h ou 180 dias.</p></div>'
+      ? `<div class="vazio"><p><b>Nenhum serviço ainda.</b> Toque em <b>+ Serviço</b> e diga a cada quantas ${u === 'km' ? 'km' : 'horas'} ou dias ele vence. Ex.: Óleo e filtro motor — a cada 250 h.</p></div>`
       : `<table class="tabela"><thead><tr>
-          <th>Item</th><th>A cada</th><th>O que usa</th><th>Última troca</th><th>Próxima</th><th>Situação</th>
+          <th>Serviço</th><th>A cada</th><th>Próxima troca</th><th>Situação</th>
         </tr></thead><tbody>` + planos.map(p => {
           const c = calcular(p);
+          /* 28/10/2026 (lean): tabela com o que importa; o que usa e a última
+             troca ficam embaixo do nome, pequenos. */
+          const ult = [p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '', p.ultima_troca_leitura != null ? nHoras(p.ultima_troca_leitura) + ' ' + u : ''].filter(Boolean).join(' · ');
           return `<tr ${ehAdmin() ? `data-plano="${esc(p.id)}" class="clicavel"` : ''}>
-            <td><strong>${esc(q.nome('tipos_manutencao', p.tipo_manutencao_id))}</strong></td>
+            <td><strong>${esc(q.nome('tipos_manutencao', p.tipo_manutencao_id))}</strong>
+              ${ult ? '<small>última: ' + esc(ult) + '</small>' : ''}${p.materiais ? '<small>' + esc(p.materiais) + '</small>' : ''}</td>
             <td>${esc(periodicidadeTexto(p, e))}</td>
-            <td class="fm-usa">${p.materiais ? esc(p.materiais) : '<span class="falta">não informado</span>'}</td>
-            <td>${p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '—'}
-                ${p.ultima_troca_leitura != null ? '<small>' + nHoras(p.ultima_troca_leitura) + ' ' + u + '</small>' : ''}</td>
             <td>${proximaTroca(c)}</td>
             <td>${etq(c.status)}<small>${esc(c.motivo)}</small></td>
           </tr>`;
@@ -231,40 +234,64 @@ function formMaquina(e, modelo) {
                             : { unidade_controle: 'HORIMETRO', rege_preventiva: 'HORAS', patrimonio: proximoPatrimonio() });
   const titulo = novo ? (modelo ? 'Duplicar ' + modelo.codigo : 'Cadastrar máquina') : 'Editar ' + e.codigo;
 
+  /* Cadastro enxuto (28/10/2026, pedido dele: "o objetivo principal é
+     cadastrar máquinas e o tipo de manutenção… está bem fácil assim"): na
+     frente só o que precisa — código, nome, fazenda, tipo, como conta e o
+     horímetro de hoje. Numa máquina nova, "Copiar os serviços de" traz os
+     serviços de uma máquina igual. Patrimônio, marca, modelo e observações
+     ficam em "Mais dados". */
+  const tiposEq = q.ordenado('tipos_equipamento').map(t => ({ id: t.id, nome: t.nome + ' — ' + nomeGrupo(t.grupo || 'outros') }));
+  const comoConta = [
+    ['HORIMETRO', 'Horímetro', 'horas do painel'], ['HODOMETRO', 'Km', 'hodômetro do veículo'],
+    ['CALENDARIO', 'Só por data', 'vaso, tanque, extintor…'], ['ACUMULADO', 'Implemento', 'soma as horas do trator']];
+  const comServicos = q.ativos('equipamentos').filter(x => planosDa(x.id).length).sort(porCodigo);
   abrirModal(titulo, `
-    ${modelo ? `<p class="sub">A nova máquina já nasce com os ${planosDa(modelo.id).length} itens de manutenção do ${esc(modelo.codigo)}.
-       A última troca fica em branco para você preencher.</p>` : ''}
+    ${modelo ? `<p class="sub">A nova máquina já nasce com os ${planosDa(modelo.id).length} serviços do ${esc(modelo.codigo)}.
+       A última troca fica em branco.</p>` : ''}
     <div class="colunas">
-      ${campoTexto('Código', 'codigo', base.codigo, 'text', 'Ex.: T.01, P.28, V.04, C.06')}
-      ${campoTexto('Descrição', 'descricao', base.descricao)}
-      ${campoTexto('Código de patrimônio', 'patrimonio', base.patrimonio, 'text',
-        novo ? 'Próximo número livre já preenchido. Único entre máquinas e bens.' : 'Único entre máquinas e bens.')}
-      ${campoLista('Tipo', 'tipo_equipamento_id',
-          q.ordenado('tipos_equipamento').map(t => ({ id: t.id, nome: t.nome + ' — ' + nomeGrupo(t.grupo || 'outros') })),
+      ${campoTexto('Código', 'codigo', base.codigo, 'text', 'Ex.: T.01, V.04, F.05')}
+      ${campoTexto('Nome', 'descricao', base.descricao, 'text', 'Ex.: Trator John Deere 5080E')}
+      ${campoLista('Fazenda', 'local_id', locaisEditaveis(), base.local_id)}
+      ${campoLista('Tipo', 'tipo_equipamento_id', tiposEq,
           base.tipo_equipamento_id || (grupoAtual ? (q.ordenado('tipos_equipamento').find(t => (t.grupo || 'outros') === grupoAtual) || {}).id : ''))}
-      ${campoLista('Local', 'local_id', locaisEditaveis(), base.local_id)}
-      ${campoLista('Marca', 'marca_id', q.ordenado('marcas'), base.marca_id, '—')}
-      ${campoTexto('Modelo', 'modelo', base.modelo)}
-      ${campoLista('Como é medido', 'unidade_controle', [
-        { id: 'HORIMETRO', nome: 'Horímetro (horas)' },
-        { id: 'HODOMETRO', nome: 'Hodômetro (km)' },
-        { id: 'ACUMULADO', nome: 'Implemento — horas acumuladas' },
-        { id: 'CALENDARIO', nome: 'Só por data' }], base.unidade_controle, null)}
-      ${novo ? campoTexto('Horímetro / km atual', 'leitura_atual', base.leitura_atual, 'number', 'Depois disso, use "Lançar horímetro"') : ''}
     </div>
-    ${campoArea('Observações', 'observacoes', base.observacoes)}
+    <div class="campo"><label>Como a manutenção conta</label>
+      <div class="fq-conta">${comoConta.map(([v, r, d]) => `<label><input type="radio" name="unidade_controle" value="${v}"${(base.unidade_controle || 'HORIMETRO') === v ? ' checked' : ''}>
+        <b>${r}</b><small>${d}</small></label>`).join('')}</div></div>
+    ${novo ? `<div class="colunas">
+      <div id="fq-leit">${campoTexto('Horímetro / km de hoje', 'leitura_atual', base.leitura_atual, 'number', 'O número do painel agora')}</div>
+      ${!modelo ? `<div class="campo"><label for="fq-copiar">Copiar os serviços de</label>
+        <select id="fq-copiar"><option value="">— nenhuma, cadastro depois —</option>
+          ${comServicos.map(x => `<option value="${esc(x.id)}">${esc(x.codigo)} — ${esc(x.descricao)} (${planosDa(x.id).length})</option>`).join('')}</select>
+        <p class="ajuda">Escolha uma máquina igual: os serviços e intervalos vêm prontos.</p></div>` : ''}
+    </div>` : ''}
+    <details class="fq-mais"${!novo && (base.marca_id || base.modelo || base.observacoes) ? ' open' : ''}><summary>Mais dados (patrimônio, marca, modelo, observações)</summary>
+      <div class="colunas">
+        ${campoTexto('Código de patrimônio', 'patrimonio', base.patrimonio, 'text',
+          novo ? 'Próximo número livre já preenchido.' : 'Único entre máquinas e bens.')}
+        ${campoLista('Marca', 'marca_id', q.ordenado('marcas'), base.marca_id, '—')}
+        ${campoTexto('Modelo', 'modelo', base.modelo)}
+      </div>
+      ${campoArea('Observações', 'observacoes', base.observacoes)}
+    </details>
     <div class="acoes">
       <button type="button" class="btn" id="fq-salvar">Salvar</button>
       <button type="button" class="btn neutro" id="fq-cancelar">Cancelar</button>
       ${!novo ? '<button type="button" class="btn-fantasma" id="fq-inativar" style="margin-left:auto">Tirar da frota</button>' : ''}
     </div>`, corpo => {
+    const conta = () => (corpo.querySelector('[name="unidade_controle"]:checked') || {}).value;
+    const vl = () => { const b = corpo.querySelector('#fq-leit'); if (b) b.classList.toggle('oculto', !['HORIMETRO', 'HODOMETRO'].includes(conta())); };
+    corpo.querySelectorAll('[name="unidade_controle"]').forEach(r => r.onchange = vl); vl();
     corpo.querySelector('#fq-cancelar').onclick = () => (novo ? fecharModal() : fichaMaquina(e.id));
     corpo.querySelector('#fq-salvar').onclick = async () => {
       const d = lerForm(corpo);
+      d.unidade_controle = conta() || 'HORIMETRO';
+      if (d.unidade_controle === 'ACUMULADO' && !d.rege_preventiva) d.rege_preventiva = base.rege_preventiva || 'HORAS';
+      const copiarDe = !modelo && corpo.querySelector('#fq-copiar') ? corpo.querySelector('#fq-copiar').value : '';
       d.codigo = (d.codigo || '').toUpperCase();
-      if (!d.codigo || !d.descricao) return aviso('Código e descrição são obrigatórios.', true);
+      if (!d.codigo || !d.descricao) return aviso('Preencha o código e o nome.', true);
+      if (!d.local_id) return aviso('Escolha a fazenda.', true);
       if (!d.tipo_equipamento_id) return aviso('Escolha o tipo.', true);
-      if (!d.local_id) return aviso('Escolha o local.', true);
       const dup = q.todos('equipamentos').find(x => x.codigo === d.codigo && x.id !== (e && e.id));
       if (dup) return aviso('Já existe uma máquina com o código ' + d.codigo + '.', true);
       d.patrimonio = normalizarPatrimonio(d.patrimonio) || null;
@@ -283,8 +310,9 @@ function formMaquina(e, modelo) {
       // a cópia da tela continua mostrando o acumulado do implemento
       if (!novo) { reg.horas_acumuladas = e.horas_acumuladas; reg.km_acumulados = e.km_acumulados; }
 
-      if (modelo) {
-        for (const p of planosDa(modelo.id)) {
+      const origem = modelo || (copiarDe ? q.por_id('equipamentos', copiarDe) : null);
+      if (origem) {
+        for (const p of planosDa(origem.id)) {
           await gravar('planos_manutencao', {
             id: crypto.randomUUID(), equipamento_id: reg.id, tipo_manutencao_id: p.tipo_manutencao_id,
             periodicidade_horas: p.periodicidade_horas, periodicidade_dias: p.periodicidade_dias,
@@ -294,7 +322,8 @@ function formMaquina(e, modelo) {
       }
       aviso(App.online ? 'Máquina salva.' : 'Salva no aparelho. Sobe quando a internet voltar.');
       irPara('maquinas');
-      fichaMaquina(reg.id);
+      // Máquina nova sem serviço: já abre o "+ Serviço" (o próximo passo natural).
+      if (novo && !origem) formItem(reg); else fichaMaquina(reg.id);
     };
     const bx = corpo.querySelector('#fq-inativar');
     if (bx) bx.onclick = async () => {
@@ -321,25 +350,23 @@ function formItem(e, p, opcoes = {}) {
   const jaTem = planosDa(e.id).map(x => x.tipo_manutencao_id);
   const tipos = q.ordenado('tipos_manutencao').filter(t => !novo ? true : !jaTem.includes(t.id));
 
-  abrirModal((novo ? 'Novo item — ' : 'Item — ') + e.codigo, `
-    <div class="campo"><label for="f-tipo_manutencao_id">Item de manutenção</label>
+  abrirModal((novo ? 'Novo serviço — ' : 'Serviço — ') + e.codigo, `
+    <div class="campo"><label for="f-tipo_manutencao_id">Serviço</label>
       <select id="f-tipo_manutencao_id" name="tipo_manutencao_id" ${novo ? '' : 'disabled'}>
         <option value="">— selecione —</option>
         ${tipos.map(t => `<option value="${esc(t.id)}"${t.id === p.tipo_manutencao_id ? ' selected' : ''}>${esc(t.nome)}</option>`).join('')}
-        ${novo ? '<option value="__novo">+ Criar um item novo…</option>' : ''}
+        ${novo ? '<option value="__novo">+ Criar um serviço novo…</option>' : ''}
       </select></div>
-    <div class="campo oculto" id="fi-novo-campo"><label for="fi-novo">Nome do item novo</label>
+    <div class="campo oculto" id="fi-novo-campo"><label for="fi-novo">Nome do serviço novo</label>
       <input type="text" id="fi-novo" placeholder="Ex.: CORREIA DO ALTERNADOR"></div>
 
     <div class="colunas">
       ${e.unidade_controle === 'CALENDARIO' ? '' :
         campoTexto('A cada quantas ' + (u === 'km' ? 'km' : 'horas'), 'periodicidade_horas', p.periodicidade_horas, 'number', 'Ex.: 500')}
-      ${campoTexto('E/ou a cada quantos dias', 'periodicidade_dias', p.periodicidade_dias, 'number', 'Ex.: 180 — o que vencer primeiro manda')}
+      ${campoTexto('E/ou a cada quantos dias', 'periodicidade_dias', p.periodicidade_dias, 'number', e.unidade_controle === 'CALENDARIO' ? 'Ex.: 30 (todo mês), 365 (todo ano)' : 'Opcional. Ex.: 180 — o que vencer primeiro manda')}
     </div>
-    ${campoArea('O que usa', 'materiais', p.materiais,
-      'Tipo de óleo e litragem, número do filtro… Ex.: Óleo 15W40 — 12 L · Filtro RE504836. Sai impresso na OS.')}
 
-    <fieldset><legend>Quando é a troca</legend>
+    <fieldset><legend>Quando vence</legend>
       <div class="fi-modo" role="radiogroup">
         <label><input type="radio" name="fi-modo" value="ultima"> Sei a <b>última</b> troca</label>
         <label><input type="radio" name="fi-modo" value="proxima"> Sei a <b>próxima</b> troca</label>
@@ -358,7 +385,10 @@ function formItem(e, p, opcoes = {}) {
       <p class="fi-previa" id="fi-previa"></p>
       <p class="ajuda">Depois de cada OS concluída o app atualiza sozinho.</p>
     </fieldset>
-    ${!novo ? campoTexto('Motivo da alteração', 'motivo', '', 'text', 'Obrigatório se mexer na última troca') : ''}
+    <details class="fq-mais"${p.materiais ? ' open' : ''}><summary>O que usa (óleo, filtro — sai na OS)</summary>
+      ${campoArea('O que usa', 'materiais', p.materiais, 'Ex.: Óleo 15W40 — 12 L · Filtro RE504836')}
+    </details>
+    ${!novo ? campoTexto('Motivo da alteração', 'motivo', '', 'text', 'Só se mexer na última troca') : ''}
 
     <div class="acoes">
       <button type="button" class="btn" id="fi-salvar">Salvar</button>
@@ -406,7 +436,7 @@ function formItem(e, p, opcoes = {}) {
       let idTipo = novo ? sel.value : p.tipo_manutencao_id;
       if (idTipo === '__novo') {
         const nome = corpo.querySelector('#fi-novo').value.trim().toUpperCase();
-        if (!nome) return aviso('Escreva o nome do item novo.', true);
+        if (!nome) return aviso('Escreva o nome do serviço novo.', true);
         const existe = q.todos('tipos_manutencao').find(t => t.nome.toUpperCase() === nome);
         if (existe) { idTipo = existe.id; if (existe.ativo === false) { existe.ativo = true; await gravar('tipos_manutencao', existe); } }
         else {
@@ -415,7 +445,7 @@ function formItem(e, p, opcoes = {}) {
           idTipo = t.id;
         }
       }
-      if (!idTipo) return aviso('Escolha o item de manutenção.', true);
+      if (!idTipo) return aviso('Escolha o serviço.', true);
       const horas = num(d.periodicidade_horas), dias = num(d.periodicidade_dias);
       if (horas == null && dias == null) return aviso('Informe a cada quantas horas e/ou dias.', true);
 
@@ -452,13 +482,13 @@ function formItem(e, p, opcoes = {}) {
         });
         if (error) console.warn('auditoria não gravou:', error.message);
       }
-      aviso('Item salvo.');
+      aviso('Serviço salvo. Ele já aparece nas Preventivas quando vencer.');
       depois();
     };
 
     const br = corpo.querySelector('#fi-remover');
     if (br) br.onclick = async () => {
-      if (!confirm('Parar de controlar este item nesta máquina? O histórico fica guardado.')) return;
+      if (!confirm('Parar de controlar este serviço nesta máquina? O histórico fica guardado.')) return;
       await gravar('planos_manutencao', Object.assign({}, p, { ativo: false }));
       fichaMaquina(e.id);
     };
