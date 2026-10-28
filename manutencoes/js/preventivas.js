@@ -315,7 +315,7 @@ TELAS.painel = el => {
     });
     $$('#pv-lista [data-wpp]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.wpp);
-      if (os) enviarOSWhatsApp(os);
+      if (os) enviarOSWhatsApp(os, x);
     });
     $$('#pv-lista [data-naofeita]').forEach(x => x.onclick = async () => {
       const os = q.por_id('ordens_servico', x.dataset.naofeita);
@@ -382,27 +382,57 @@ TELAS.painel = el => {
   desenhar();
 };
 
-/* Enviar pelo WhatsApp (28/10/2026, pedido dele): na lista Em andamento,
-   cada OS vai como texto curto para quem vai fazer — máquina, fazenda, o
-   que trocar e o que anotar na volta. A pessoa escolhe o contato no WhatsApp. */
-function enviarOSWhatsApp(os) {
+/* Enviar pelo WhatsApp (28/10/2026, pedido dele: "somente o PDF, saindo o
+   número da OS e a máquina, nada de texto"). Monta o PDF da própria folha da
+   OS (a mesma do Imprimir), com o nome "OS 12 - T.16.pdf", e compartilha só
+   o arquivo. No celular abre direto a escolha do WhatsApp; no computador
+   baixa o PDF e abre o WhatsApp Web para anexar. */
+function carregarScript(src) {
+  return new Promise((ok, erro) => {
+    if (document.querySelector(`script[src="${src}"]`)) return ok();
+    const s = document.createElement('script'); s.src = src; s.onload = ok;
+    s.onerror = () => erro(new Error('não consegui carregar ' + src)); document.head.appendChild(s);
+  });
+}
+async function pdfDaOS(os) {
+  if (!window.html2canvas) await carregarScript('../vendor/html2canvas.min.js');
+  if (!window.jspdf) await carregarScript('../vendor/jspdf.umd.min.js');
+  const caixa = document.createElement('div');
+  caixa.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;background:#fff;padding:0';
+  caixa.innerHTML = folhaOS(os);
+  document.body.appendChild(caixa);
+  try {
+    await Promise.all([...caixa.querySelectorAll('img')].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+    const cv = await html2canvas(caixa, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    const doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const M = 10, L = 210 - 2 * M, Amax = 297 - 2 * M;
+    let w = L, h = cv.height * L / cv.width;
+    if (h > Amax) { h = Amax; w = cv.width * Amax / cv.height; }
+    doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', M + (L - w) / 2, M, w, h);
+    return doc.output('blob');
+  } finally { caixa.remove(); }
+}
+async function enviarOSWhatsApp(os, botao) {
   const e = q.por_id('equipamentos', os.equipamento_id) || {};
-  const u = unidadeDe(e);
-  const itens = itensDaOS(os.id).filter(i => !i.feito);
-  const trocas = itens.filter(it => !tipoDe(it).acompanha), checks = itens.filter(it => tipoDe(it).acompanha);
-  const nome = it => q.nome('tipos_manutencao', it.tipo_manutencao_id).replace(/^VASO\s*·\s*/i, '');
-  const medido = e.unidade_controle !== 'CALENDARIO';
-  const msg = [
-    `*OS ${numeroOS(os)} · Preventiva*`,
-    `*${e.codigo || ''}* ${e.descricao || ''}`,
-    `Fazenda: ${q.nome('locais', os.local_id || e.local_id) || '—'}${medido && leituraDe(e) != null ? ` · último ${u === 'km' ? 'km' : 'horímetro'}: ${nHoras(leituraDe(e))} ${u}` : ''}`,
-    '',
-    trocas.length ? '*Trocar:*\n' + trocas.map(it => '▢ ' + nome(it)).join('\n') : '',
-    checks.length ? '*Conferir:*\n' + checks.map(it => '▢ ' + nome(it)).join('\n') : '',
-    '',
-    `Ao terminar, mande: ${medido ? (u === 'km' ? 'km' : 'horímetro') + ', ' : ''}quem fez${pedeAdesivo(itens) ? ' e a foto do adesivo' : ''}.`
-  ].filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n').trim();
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+  const nome = ('OS ' + (os.numero || 'nova') + ' - ' + (e.codigo || 'maquina')).replace(/[\\/:*?"<>|]+/g, '-') + '.pdf';
+  const rot = botao && botao.textContent;
+  if (botao) { botao.disabled = true; botao.textContent = 'Preparando…'; }
+  try {
+    const arq = new File([await pdfDaOS(os)], nome, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+      try { await navigator.share({ files: [arq] }); return; }
+      catch (x) { if (x && x.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(arq), a = document.createElement('a');
+    a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    window.open('https://web.whatsapp.com/', '_blank', 'noopener');
+    aviso('PDF baixado (' + nome + '). Anexe na conversa do WhatsApp.');
+  } catch (x) {
+    aviso('Não consegui montar o PDF: ' + (x.message || x), true);
+  } finally {
+    if (botao) { botao.disabled = false; botao.textContent = rot; }
+  }
 }
 
 function temOSDuplicada() {
