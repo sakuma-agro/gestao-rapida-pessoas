@@ -1478,3 +1478,25 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .ir-arq input{display:none}
 .ir-faz-ok{background:#F3F8E8;border-left:4px solid var(--verde);padding:8px 12px;margin:8px 0}
 tr.ir-volta td{color:var(--cinza-claro)}
+/* 28/10/2026: Atualizar horímetros — Matriz pelo arquivo, Quebra Cocão à mão */
+.ah-faz{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0 16px}
+.ah-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:200px;border:2px solid var(--linha);border-radius:12px;padding:14px 20px;background:var(--branco);cursor:pointer;font:inherit;text-align:left}
+.ah-op b{font-size:17px;color:var(--grafite)}.ah-op small{color:var(--cinza-claro);font-size:13px}
+.ah-op.ativa{border-color:var(--verde);background:#F3F8E8}
+.ah-cartao{background:var(--branco);border:1px solid var(--linha);border-radius:10px;padding:16px 18px}
+.ah-topo{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:end;margin-bottom:12px}
+.ah-topo label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:bold}
+.ah-topo input{min-height:var(--toque);border:1px solid var(--linha);border-radius:8px;padding:6px 10px;font:inherit;font-size:15px}
+.ah-lista{border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+.ah-linha{display:grid;grid-template-columns:70px minmax(0,1fr) 170px;gap:6px 14px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--linha)}
+.ah-linha:last-child{border-bottom:0}
+.ah-linha:nth-child(even){background:#FAFBF7}
+.ah-cod{font-weight:bold;font-size:16px;color:var(--grafite)}
+.ah-nm b{display:block;font-size:14px}.ah-nm small{font-size:12px;color:var(--cinza-claro)}
+.ah-nm em{font-style:normal}.ah-velho{color:#A87508;font-weight:bold}
+.ah-linha input{min-height:var(--toque);border:1px solid var(--linha);border-radius:8px;padding:6px 10px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
+.ah-linha input:not(:placeholder-shown){border-color:var(--verde);background:#F3F8E8}
+.ah-msg{grid-column:3;font-size:12px;color:var(--urgente)}.ah-msg:empty{display:none}
+.ah-linha.ah-erro input{border-color:var(--urgente);background:#FDEDEC}
+.btn.ah-salvar{background:var(--ok);border-color:var(--ok);min-height:var(--toque);font-size:15px;padding:0 24px}
+@media (max-width:620px){.ah-linha{grid-template-columns:56px 1fr}.ah-linha input,.ah-msg{grid-column:1 / -1}.ah-op{min-width:0;flex:1}}

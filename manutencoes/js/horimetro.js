@@ -811,7 +811,7 @@ async function gravarImportacao(alvo, ctx, r) {
         <button type="button" class="btn" id="fi-vencimentos">Ver as preventivas</button>
         <button type="button" class="btn neutro" id="fi-fechar">Fechar</button>
       </div>`;
-    alvo.querySelector('#fi-fechar').onclick = () => { fecharModal(); recarregarTela(); };
+    alvo.querySelector('#fi-fechar').onclick = () => { fecharModal(); if (document.querySelector('#ah-tela')) irPara('atualizar_horimetros'); else recarregarTela(); };
     alvo.querySelector('#fi-vencimentos').onclick = () => { fecharModal(); irPara('painel'); };
 
   } catch (e) {
@@ -850,7 +850,14 @@ async function historicoImportacoes() {
 }
 
 /* Publica o que as outras telas usam. */
+/* Tela Atualizar horímetros: importa já sabendo a fazenda. */
+function importarHorimetrosArquivo(arquivo, alvo, localId) {
+  localImportacao = localId || '';
+  return lerArquivoRealtec(arquivo, alvo);
+}
+
 Object.assign(window, {
+  importarHorimetrosArquivo, salvarLeitura,
   formLeitura, formAjusteContador, historicoLeituras,
   telaImportarRealtec, numeroBR, dataISO, unidadeDoBem
 });
