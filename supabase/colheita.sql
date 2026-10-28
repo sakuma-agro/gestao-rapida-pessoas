@@ -279,3 +279,37 @@ alter table public.cp_cargas add column if not exists frete_situacao text;   -- 
 alter table public.cp_cargas add column if not exists frete_pago_em date;
 alter table public.cp_cargas add column if not exists frete_forma text;      -- PIX, Transferência, Boleto, Dinheiro, Cheque
 alter table public.cp_cargas add column if not exists frete_obs text;
+
+-- ---------------------------------------------------------------- 28/10/2026
+-- Cadastros › Pivôs / talhões e Variedades: o plantio escolhe nessas listas
+-- (guarda o nome em cp_plantios.setor e .variedade, como antes). Aplicado no
+-- banco em 28/10/2026 e semeado com os valores que já existiam nos plantios.
+create table if not exists public.cp_pivos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  area numeric,
+  fazenda text,
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+create table if not exists public.cp_variedades (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  cultura_id uuid references public.cp_culturas(id),
+  ativo boolean not null default true,
+  atualizado_em timestamptz not null default now()
+);
+do $$ declare t text; begin
+  foreach t in array array['cp_pivos','cp_variedades'] loop
+    if not exists (select 1 from pg_trigger where tgname='marcar_atualizacao' and tgrelid=('public.'||t)::regclass) then
+      execute format('create trigger marcar_atualizacao before insert or update on public.%I for each row execute function public.marcar_atualizacao()', t);
+    end if;
+    execute format('alter table public.%I enable row level security', t);
+    if not exists (select 1 from pg_policies where schemaname='public' and tablename=t and policyname='cp_ler') then
+      execute format('create policy cp_ler on public.%I for select to authenticated using (public.app_pode(''colheita''))', t);
+      execute format('create policy cp_gravar on public.%I for insert to authenticated with check (public.app_pode(''colheita''))', t);
+      execute format('create policy cp_trocar on public.%I for update to authenticated using (public.app_pode(''colheita'')) with check (public.app_pode(''colheita''))', t);
+    end if;
+    execute format('grant select, insert, update on public.%I to authenticated', t);
+  end loop;
+end $$;

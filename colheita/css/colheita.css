@@ -123,3 +123,6 @@
 .cp-etapas>summary{cursor:pointer;font-weight:600;color:#51534A}
 .cp-bf-cargas{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto}
 .cb-tab input.cp-fr-valor{width:110px;max-width:110px;text-align:right;padding:4px 8px;min-height:0}
+
+/* Talhão no 1º lançamento da carga com o dobro da largura (28/10/2026): mostra o nome inteiro do plantio. */
+.cp-etapa1-grade .cp-cg-talhao{grid-column:span 2}

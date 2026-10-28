@@ -27,7 +27,7 @@ const VERSAO_EST = '35';
 /* Sobe a cada publicação da área Custo Base (e nos ?v= do custobase/index.html). */
 const VERSAO_CB = '19';
 /* Sobe a cada publicação da área Colheita e Produção (e nos ?v= do colheita/index.html). */
-const VERSAO_CP = '10';
+const VERSAO_CP = '11';
 /* Sobe a cada publicação da área Projetos (PMBOK) (e nos ?v= do projetos/index.html). */
 const VERSAO_PJ = '3';
 

@@ -28,6 +28,8 @@ const ICONES = {
   lavador: '<path d="M4 10h16l-1.5 10h-13z"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M9 14h6M10 17h4"/>',
   nota: '<path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><path d="M9 13h7M9 17h7"/>',
   venda: '<path d="M3 3h2l2.5 12h11L21 7H6.2"/><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/>',
+  pivo: '<circle cx="12" cy="12" r="9"/><path d="M12 12L19 7"/><circle cx="12" cy="12" r="1.5"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>',
+  variedade: '<path d="M12 21V10"/><path d="M12 10c-3 0-5-2.5-5-6 3 0 5 2.5 5 6z"/><path d="M12 14c3 0 5-2.5 5-6-3 0-5 2.5-5 6z"/><path d="M8 21h8"/>',
   carga_inicial: '<path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/><path d="M12 12v6M9 15l3 3 3-3"/>',
 };
 export const svgIcone = nome =>
@@ -71,6 +73,8 @@ export const MODULOS = [
     { id: 'cpSubCad', nome: 'Cadastros', icone: 'cadastros', telas: [
       ['cpPlantios', 'Plantios / quadras', 'plantio'],
       ['cpSafras',   'Safras',             'safra'],
+      ['cpPivos',    'Pivôs / talhões',    'pivo'],
+      ['cpVariedades', 'Variedades',       'variedade'],
       ['cpVeiculos', 'Placas e motoristas', 'caminhao'],
       ['cpHistCad',  'Histórico de safras', 'historico'],
     ] },

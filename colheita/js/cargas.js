@@ -6,7 +6,7 @@
 // classe e a situação do pagamento; café, peso de entrada, lote e BX/BM/ESC;
 // milho e trigo, ticket da balança, NF e % da carga (os pesos vêm da balança
 // na Conciliação); abacate, turmeiro e caixas.
-import { $, esc, pronto, carregando, todos, ativos, gravar, aviso, culturaSel, safraSel, campos, classes, unidadeRot, rotArea,
+import { $, esc, pronto, carregando, todos, ativos, gravar, aviso, culturaSel, safraSel, safrasDe, campos, classes, unidadeRot, rotArea,
   Maiusc, plantiosDa, plantio, nomePlantio, cargasDa, unidadesDe, kgDe, conferir, seloSt, dataBR, num, lerNumero, semAcento, meuNome,
   porPeso, somaClasses } from './dados.js';
 
@@ -76,7 +76,7 @@ function desenhar() {
   $('cpCgNova').addEventListener('click', () => editar(null));
   $('cpCgRepetir')?.addEventListener('click', () => {
     const ult = cargasDa(saf.id)[0];
-    editar(null, ult ? { data: ult.data, placa: ult.placa, motorista: ult.motorista, turmeiro: ult.turmeiro, plantio_id: ult.plantio_id, tipo: ult.tipo, frete_tipo: ult.frete_tipo } : null);
+    editar(null, ult ? { data: ult.data, placa: ult.placa, motorista: ult.motorista, turmeiro: ult.turmeiro, plantio_id: ult.plantio_id, tipo: ult.tipo, frete_tipo: ult.frete_tipo, safra_id: ult.safra_id } : null);
   });
   $('cpCgBusca').addEventListener('input', e => { busca = e.target.value; const pos = e.target.selectionStart; desenhar(); const el = $('cpCgBusca'); el.focus(); el.setSelectionRange(pos, pos); });
   $('cpCgPl').addEventListener('change', e => { filtroPl = e.target.value; desenhar(); });
@@ -96,20 +96,29 @@ export function editar(id, pre = null) {
   const cp = campos(cult), cls = classes(cult);
   const c = id ? todos('cp_cargas').find(x => x.id === id) : { data: hoje(), pct_carga: 100, classes: {}, ...(pre || {}) };
   if (!c) return;
-  const pls = plantiosDa(saf.id).filter(p => p.ativo !== false || p.id === c.plantio_id);
+  /* Abacate (28/10/2026, pedido dele): a carga escolhe a safra que está sendo
+     colhida; "Salvar e lançar outra" repete a da última carga. */
+  const escolheSafra = cult.slug === 'abacate';
+  const safC = (escolheSafra && safrasDe(cult.id).find(s => s.id === (c.safra_id || '')))  || saf;
+  const plsDe = sid => plantiosDa(sid).filter(p => p.ativo !== false || p.id === c.plantio_id);
+  const pls = plsDe(safC.id);
   const veics = ativos('cp_veiculos');
   const fin = cp.financeiro || [];
   const cf = id ? conferir(c, cult) : null;
-  const opPl = `<option value="">— escolha —</option>` + pls.map(p => `<option value="${esc(p.id)}"${p.id === c.plantio_id ? ' selected' : ''}>${esc(nomePlantio(p))}${p.variedade ? ' · ' + esc(p.variedade) : ''}</option>`).join('');
+  const opPlDe = l => `<option value="">— escolha —</option>` + l.map(p => `<option value="${esc(p.id)}"${p.id === c.plantio_id ? ' selected' : ''}>${esc(nomePlantio(p))}${p.variedade ? ' · ' + esc(p.variedade) : ''}</option>`).join('');
+  const opPl = opPlDe(pls);
   window.abrirModal(id ? 'Editar carga' : 'Nova carga · ' + cult.nome, `
     <form class="grade" id="cpCgForm" autocomplete="off">
       <fieldset class="plena cp-fs cp-etapa1"><legend>1º lançamento da carga</legend>
         <div class="cp-etapa1-grade">
           <label class="campo">Data <input type="date" name="data" required value="${esc(String(c.data || '').slice(0, 10))}"></label>
-          <label class="campo">${esc(Maiusc(rotArea(cult)))} <select name="plantio_id">${opPl}</select></label>
+          ${escolheSafra ? `<label class="campo">Safra <select name="safra_id" required>${safrasDe(cult.id).map(s => `<option value="${esc(s.id)}"${s.id === safC.id ? ' selected' : ''}>${esc(s.nome)}</option>`).join('')}</select></label>` : ''}
+          <label class="campo cp-cg-talhao">${esc(Maiusc(rotArea(cult)))} <select name="plantio_id">${opPl}</select></label>
+          ${escolheSafra ? '<span class="cp-quebra"></span>' : ''}
           ${campoTxt('ticket_faz', 'Ticket fazenda', c.ticket_faz, 'inputmode="numeric"')}
+          ${escolheSafra ? '' : '<span class="cp-quebra"></span>'}
           ${campoNum('quantidade', 'Qtde ' + String(cp.quantidade || 'caixas').toLowerCase() + (porPeso(cult) ? ' (contadas)' : ''), c.quantidade)}
-          <span class="cp-quebra"></span>
+          ${escolheSafra ? '' : '<span class="cp-quebra"></span>'}
           ${campoTxt('ticket_balanca', 'Ticket balança', c.ticket_balanca, 'inputmode="numeric"')}
           ${campoTxt('turmeiro', 'Turmeiro', c.turmeiro)}
           <span class="cp-quebra"></span>
@@ -152,6 +161,13 @@ export function editar(id, pre = null) {
     </form>`, corpo => {
     const f = corpo.querySelector('#cpCgForm');
     corpo.querySelector('#cpCgCancelar').onclick = () => window.fecharModal();
+    // trocar a safra troca a lista de talhões
+    f.querySelector('[name=safra_id]')?.addEventListener('change', e => {
+      const sel = f.querySelector('[name=plantio_id]'), antes = sel.value;
+      const l = plsDe(e.target.value);
+      sel.innerHTML = opPlDe(l);
+      if (l.some(p => p.id === antes)) sel.value = antes;
+    });
     const placa = f.querySelector('[name=placa]');
     placa.addEventListener('change', () => {
       const v = veics.find(x => semAcento(x.placa) === semAcento(placa.value));
@@ -185,13 +201,15 @@ export function editar(id, pre = null) {
       r.classes = cl;
       if (somaClasses(cult)) r.quantidade = Object.values(cl).reduce((s, v) => s + v, 0) || r.quantidade || null;
       r.conferido = fd.get('conferido') === 'on';
+      const safId = escolheSafra && fd.get('safra_id') ? String(fd.get('safra_id')) : (id ? c.safra_id : saf.id);
       if (!r.data) { aviso('Informe a data.', true); return; }
       if (!id) {
-        if (r.ticket_faz && cargasDa(saf.id).some(x => String(x.ticket_faz || '') === r.ticket_faz && Number(x.pct_carga || 100) === 100 && Number(r.pct_carga) === 100)) {
+        if (r.ticket_faz && cargasDa(safId).some(x => String(x.ticket_faz || '') === r.ticket_faz && Number(x.pct_carga || 100) === 100 && Number(r.pct_carga) === 100)) {
           if (!confirmar(corpo, 'Já existe carga com o ticket ' + r.ticket_faz + ' nesta safra. Lançar mesmo assim?')) return;
         }
-        Object.assign(r, { cultura_id: cult.id, safra_id: saf.id, ativo: true, criado_por: meuNome() || null });
+        Object.assign(r, { cultura_id: cult.id, ativo: true, criado_por: meuNome() || null });
       }
+      r.safra_id = safId;
       if (!r.plantio_id) aviso('Carga salva sem ' + rotArea(cult) + ': ela não entra na produtividade até você escolher.', true);
       await gravar('cp_cargas', r);
       // placa nova vira cadastro (motorista junto)
@@ -200,7 +218,7 @@ export function editar(id, pre = null) {
       }
       if (outra) {
         window.fecharModal(); aviso('Carga salva.');
-        editar(null, { data: r.data, placa: r.placa, motorista: r.motorista, turmeiro: r.turmeiro, plantio_id: r.plantio_id, tipo: r.tipo, frete_tipo: r.frete_tipo });
+        editar(null, { data: r.data, placa: r.placa, motorista: r.motorista, turmeiro: r.turmeiro, plantio_id: r.plantio_id, tipo: r.tipo, frete_tipo: r.frete_tipo, safra_id: r.safra_id });
       } else { window.fecharModal(); aviso('Carga salva.'); }
       desenhar();
     });

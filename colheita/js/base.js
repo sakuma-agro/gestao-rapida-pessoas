@@ -9,7 +9,7 @@
    aviso…) e pelo evento 'colheita-dados', disparado quando a base local muda.
    ===================================================================== */
 
-const TABELAS_BASE = ['cp_culturas', 'cp_safras', 'cp_plantios', 'cp_cargas', 'cp_balanca', 'cp_cooperativa', 'cp_historico', 'cp_custos', 'cp_veiculos', 'cp_lotes_venda', 'cp_notas_fiscais'];
+const TABELAS_BASE = ['cp_culturas', 'cp_safras', 'cp_plantios', 'cp_cargas', 'cp_balanca', 'cp_cooperativa', 'cp_historico', 'cp_custos', 'cp_veiculos', 'cp_pivos', 'cp_variedades', 'cp_lotes_venda', 'cp_notas_fiscais'];
 const GERADAS_NO_BANCO = {};
 const CHAVE_PK = {};
 /* Todas as tabelas desta área têm id uuid gerado no aparelho: o núcleo confere

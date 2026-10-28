@@ -12,7 +12,7 @@ import { $, esc, pronto, carregando, culturas, culturaSel, safraSel, safrasDe, e
 import { abrirPainel, abrirHistorico } from './painel.js';
 import { abrirCargas } from './cargas.js';
 import { abrirConferencia, abrirImportar, abrirImportarCoop } from './conciliacao.js';
-import { abrirPlantios, abrirSafras, abrirVeiculos, abrirHistCad } from './cadastros.js';
+import { abrirPlantios, abrirSafras, abrirVeiculos, abrirPivos, abrirVariedades, abrirHistCad } from './cadastros.js';
 import { abrirFretes } from './fretes.js';
 import { abrirBeneficiamento, abrirComercializacao, temBeneficiamento } from './venda.js';
 import { abrirCulturas, abrirCargaInicial } from './parametros.js';
@@ -20,12 +20,12 @@ import { abrirCulturas, abrirCargaInicial } from './parametros.js';
 const TELAS = ['inicio', ...MODULOS.flatMap(m => telasDe(m).map(([t]) => t))];
 const idDaTela = t => 'tela' + t.charAt(0).toUpperCase() + t.slice(1);
 /* Telas que não dependem da cultura escolhida: a faixa do topo some nelas. */
-const SEM_SELETOR = new Set(['inicio', 'cpVeiculos', 'cpCulturas', 'cpCargaInicial']);
+const SEM_SELETOR = new Set(['inicio', 'cpVeiculos', 'cpPivos', 'cpCulturas', 'cpCargaInicial']);
 const ABRIR = {
   cpPainel: abrirPainel, cpHistorico: abrirHistorico, cpCargas: abrirCargas,
   cpConferencia: abrirConferencia, cpImportar: abrirImportar,
   cpBenef: abrirBeneficiamento, cpCom: abrirComercializacao, cpImpCoop: abrirImportarCoop,
-  cpPlantios: abrirPlantios, cpSafras: abrirSafras, cpVeiculos: abrirVeiculos, cpHistCad: abrirHistCad,
+  cpPlantios: abrirPlantios, cpSafras: abrirSafras, cpVeiculos: abrirVeiculos, cpPivos: abrirPivos, cpVariedades: abrirVariedades, cpHistCad: abrirHistCad,
   cpFretes: abrirFretes, cpCulturas: abrirCulturas, cpCargaInicial: abrirCargaInicial,
 };
 let telaAtual = 'inicio';

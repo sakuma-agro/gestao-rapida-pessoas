@@ -100,7 +100,7 @@ const GRUPOS = [
     'est_contagem_lotes', 'est_contagens', 'est_contagem_itens', 'est_compras', 'est_compra_itens',
     'est_compra_estoques']],
   ['Custo Base', 'public', ['cb_culturas', 'cb_talhoes', 'cb_meses', 'cb_itens', 'cb_hh_parametros', 'cb_hh_meses', 'cb_hh_itens']],
-  ['Colheita e Produção', 'public', ['cp_culturas', 'cp_safras', 'cp_plantios', 'cp_cargas', 'cp_balanca', 'cp_cooperativa', 'cp_historico', 'cp_custos', 'cp_veiculos', 'cp_lotes_venda', 'cp_vendas_itens', 'cp_notas_fiscais']],
+  ['Colheita e Produção', 'public', ['cp_culturas', 'cp_safras', 'cp_plantios', 'cp_cargas', 'cp_balanca', 'cp_cooperativa', 'cp_historico', 'cp_custos', 'cp_veiculos', 'cp_pivos', 'cp_variedades', 'cp_lotes_venda', 'cp_vendas_itens', 'cp_notas_fiscais']],
   ['Projetos (PMBOK)', 'public', ['pj_projetos', 'pj_partes', 'pj_premissas', 'pj_requisitos', 'pj_eap', 'pj_raci', 'pj_riscos',
     'pj_comunicacao', 'pj_reunioes', 'pj_custos', 'pj_mudancas', 'pj_ocorrencias', 'pj_licoes', 'pj_status']],
   ['Reunião semanal', 'public', ['reu_config', 'reu_pessoas', 'reu_atividades', 'reu_semanas']],
