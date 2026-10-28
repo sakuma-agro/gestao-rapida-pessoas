@@ -2173,17 +2173,8 @@ body.ce-apr-aberto{overflow:hidden}
 .mc-sol-txt{margin-top:5px;font-size:12px;line-height:1.35;color:var(--texto-2,#51534A);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .mc-sol-txt b{color:#744F28;font-weight:700}
 
-/* Certificação › Higienização dos EPIs (FORM 007, 28/10/2026) — js/cert-lavagem.js.
-   Grade da tela: meses × dias, toque no dia troca vazio → 1 → 2 → 1·2. */
-.lv-grade{border-collapse:collapse;font-size:12px;min-width:860px;width:100%}
-.lv-grade th,.lv-grade td{border:1px solid var(--linha);text-align:center;padding:0;height:28px;min-width:22px}
-.lv-grade thead th{background:#84BD00;color:#fff;font-size:11px}
-.lv-grade th.lv-mes{text-align:left;padding:0 8px;width:92px;white-space:nowrap;font-weight:600}
-.lv-grade tbody th.lv-mes{background:var(--fundo2,#F4F8EA);color:inherit}
-.lv-grade td.lv-dia{cursor:pointer;user-select:none;font-weight:700;color:#4E7D00}
-.lv-grade td.lv-dia:hover{outline:2px solid #84BD00;outline-offset:-2px}
-.lv-grade td.lv-sim{background:#E9F3CF}
-.lv-grade td.lv-fora{background:repeating-linear-gradient(45deg,transparent 0 4px,rgba(127,127,127,.18) 4px 5px)}
-.lv-grade td.lv-futuro{color:var(--suave);opacity:.6}
-.lv-grade td.lv-gravando{opacity:.4}
-.lv-grade .lv-n{width:46px;font-weight:700}
+/* Certificação › Banho e higiene pessoal (FORM 054, 28/10/2026) — js/cert-banho.js */
+.bh-lista{max-height:300px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:6px 8px}
+.bh-item{display:flex;gap:8px;align-items:center;padding:3px 0;flex-wrap:wrap}
+.bh-item select{width:auto}
+.bh-item input[type=text]{flex:1;min-width:160px}

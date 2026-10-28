@@ -298,12 +298,11 @@ export const MODULOS = [
       ['gpPainel',    'Painel'],
       ['gpReunioes',  'Reuniões'],
     ] },
-    /* Higienização dos EPIs (28/10/2026): FORM 007 — lavagem dos conjuntos de
-       aplicação APL 01/02 por aplicador; ficha por funcionário para imprimir
-       (era a planilha "RG 29 - Registro de Lavagem de EPI"). js/cert-lavagem.js; tabelas cl_*. */
-    { id: 'ceLavSub', grupo: 'FORMS Digital', codigo: 'FORM 007', nome: 'Higienização dos EPIs', telas: [
-      ['lvPainel', 'Painel'],
-      ['lvFicha',  'Ficha por funcionário'],
+    /* Banho e higiene pessoal (28/10/2026): FORM 054 — ficha mensal por trabalhador
+       da aplicação (início/fim, banho tomado, observações). js/cert-banho.js; tabela cb_banhos. */
+    { id: 'ceBanhoSub', grupo: 'FORMS Digital', codigo: 'FORM 054', nome: 'Banho e higiene pessoal', telas: [
+      ['bhRegistros', 'Registros'],
+      ['bhFicha',     'Ficha por funcionário'],
     ] },
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
@@ -733,7 +732,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceLavSub: 'vassoura',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
