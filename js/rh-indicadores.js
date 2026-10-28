@@ -11,6 +11,7 @@ import { estado } from './store.js';
 import { pode, podeTela, acesso } from './acesso.js';
 import { mostrar, imprimir } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
+import { MOTIVOS_AUSENCIA } from './motivos-ausencia.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -54,8 +55,70 @@ async function carregar() {
   (mt.data || []).forEach(m => { if (METAS[m.indicador]) METAS[m.indicador] = { verde: +m.verde, atencao: +m.atencao }; });
   est.lacunas = new Set((lc.data || []).map(l => ym(l.mes)));
   est.motivoLacuna = lc.data?.[0]?.motivo || '';
+  await carregarAusencias(c);
   est.carregado = true; est.carregadoEm = new Date();
 }
+
+/* ---------------- ausências por motivo (28/10/2026) ----------------
+   Certificação: falta, falta justificada e atestado lançados na Gestão de
+   jornada levam o motivo (pessoal, doença, funeral, casamento,
+   maternidade/paternidade). Aqui só se conta — dias lançados por motivo e por
+   tipo, sem nome de ninguém. Lançamento antigo, sem motivo, aparece como
+   "Não classificado". O retrato da pessoa (empregador, fazenda, sexo…) vem do
+   cadastro de hoje. Se a consulta falhar, o resto dos indicadores segue. */
+const TIPOS_AUS = [['ATESTADO', 'Atestado'], ['FALTAJ', 'Falta justificada'], ['FALTA', 'Falta']];
+async function carregarAusencias(c) {
+  est.aus = []; est.ausErro = '';
+  try {
+    const t = await c.from('jor_tipos_ocorrencia').select('id,codigo').in('codigo', TIPOS_AUS.map(x => x[0]));
+    if (t.error) throw t.error;
+    const cod = new Map((t.data || []).map(x => [x.id, x.codigo]));
+    if (!cod.size) return;
+    const linhas = [];
+    for (let de = 0; ; de += 1000) {
+      const r = await c.from('jor_boletins').select('data_fato,funcionario_id,tipo_id,motivo_tipo,situacao')
+        .in('tipo_id', [...cod.keys()]).neq('situacao', 'cancelado').range(de, de + 999);
+      if (r.error) throw r.error;
+      linhas.push(...(r.data || []));
+      if (!r.data || r.data.length < 1000) break;
+    }
+    const func = new Map((estado.funcionarios || []).map(f => [f.id, f]));
+    est.aus = linhas.map(b => {
+      const f = func.get(b.funcionario_id) || {};
+      return { m: ym(b.data_fato), tipo: cod.get(b.tipo_id), motivo: b.motivo_tipo || '',
+        empregador: f.empregador, fazenda: f.fazenda, sexo: f.sexo, setor: f.setor, funcao: f.cargo };
+    });
+  } catch (e) { est.ausErro = e.message || String(e); }
+}
+
+/** Matriz motivo × tipo nos meses dados. O filtro de contrato não se aplica. */
+function ausencias(meses, f) {
+  const set = new Set(meses);
+  const L = (est.aus || []).filter(r => set.has(r.m) && (!f || passa(r, { ...f, contrato: '' })));
+  const motivos = [...MOTIVOS_AUSENCIA, ['', 'Não classificado']];
+  const linhas = motivos.map(([k, rot]) => {
+    const por = Object.fromEntries(TIPOS_AUS.map(([t]) => [t, L.filter(r => r.motivo === k && r.tipo === t).length]));
+    return { rot, por, total: TIPOS_AUS.reduce((a, [t]) => a + por[t], 0), sem: k === '' };
+  }).filter(l => !l.sem || l.total);
+  const tot = Object.fromEntries(TIPOS_AUS.map(([t]) => [t, L.filter(r => r.tipo === t).length]));
+  return { linhas, tot, total: L.length };
+}
+const pctDe = (v, t) => t ? pct(v / t) : '—';
+function tabelaAusencias(a, doc = false) {
+  if (est.ausErro) return `<p class="${doc ? 'rel-nota' : 'dica'}">Não foi possível ler as ausências: ${esc(est.ausErro)}</p>`;
+  if (!a.total) return `<p class="${doc ? 'rel-nota' : 'dica'}">Nenhuma falta ou atestado lançado na Gestão de jornada neste recorte.</p>`;
+  const n = doc ? 'rel-num' : '';
+  return `<${doc ? 'table class="rel-tabela"' : 'div class="ind-rolagem"><table class="ind-tab"'}>
+    <thead><tr><th>Motivo</th>${TIPOS_AUS.map(([, r]) => `<th class="${n}">${r}</th>`).join('')}<th class="${n}">Total (dias)</th><th class="${n}">%</th></tr></thead>
+    <tbody>${a.linhas.map(l => `<tr><${doc ? 'td' : 'th scope="row"'}>${esc(l.rot)}</${doc ? 'td' : 'th'}>${TIPOS_AUS.map(([t]) => `<td class="${n}">${l.por[t]}</td>`).join('')}
+      <td class="${n}"><b>${l.total}</b></td><td class="${n}">${pctDe(l.total, a.total)}</td></tr>`).join('')}</tbody>
+    <${doc ? 'tfoot' : 'tbody'}><tr class="ind-forte"><${doc ? 'td' : 'th scope="row"'}>Total</${doc ? 'td' : 'th'}>${TIPOS_AUS.map(([t]) => `<td class="${n}">${a.tot[t]}</td>`).join('')}
+      <td class="${n}">${a.total}</td><td class="${n}">100,0%</td></tr></${doc ? 'tfoot' : 'tbody'}>
+  </table>${doc ? '' : '</div>'}`;
+}
+const NOTA_AUS = 'Dias lançados na Gestão de jornada (falta, falta justificada e atestado), por motivo. Lançamentos de antes de 28/10/2026 não têm motivo e aparecem como "Não classificado".';
+const linhasAusXlsx = a => [...a.linhas.map(l => [l.rot, ...TIPOS_AUS.map(([t]) => l.por[t]), l.total]),];
+const colsAusXlsx = () => [{ rot: 'Motivo', larg: 26 }, ...TIPOS_AUS.map(([, r]) => ({ rot: r, tipo: 'num' })), { rot: 'Total (dias)', tipo: 'num' }];
 
 /* Meses SEM DADOS de faltas ficam fora do absenteísmo (senão entrariam com
    0%). São declarados em rh_ind_lacunas (hoje: 2025 inteiro, faltas ainda não
@@ -289,6 +352,11 @@ function desenhar() {
   <div class="cartao"><h2>Por sexo</h2>
     <p class="dica">Período escolhido e últimos 3 meses. Os outros filtros valem aqui também; o filtro de sexo não.</p>
     ${tabelaSexo(f, semFaltas)}
+  </div>
+
+  <div class="cartao"><h2>Ausências por motivo</h2>
+    <p class="dica">${esc(NOTA_AUS)} Período e filtros acima (menos o de contrato).</p>
+    ${tabelaAusencias(ausencias(mesesEntre(f.de, f.ate), f))}
   </div>`;
 
   ['indDe', 'indAte', 'indEmp', 'indFaz', 'indSexo', 'indContrato', 'indSetor', 'indFuncao'].forEach(id =>
@@ -352,6 +420,9 @@ function relatorioPainel() {
       <div class="rel-comp"><span>período</span><strong>${esc(rotMes(f.de))} a ${esc(rotMes(f.ate))}</strong><span>emitido em ${hojeBr()}</span></div>
     </header>
     <table class="rel-tabela"><thead>${cab}</thead><tbody>${corpo}</tbody></table>
+    <h2 class="rel-secao">Ausências por motivo</h2>
+    ${tabelaAusencias(ausencias(mesesEntre(f.de, f.ate), f), true)}
+    <p class="rel-nota">${esc(NOTA_AUS)}</p>
     <p class="rel-nota">Absenteísmo = horas ausentes ÷ (horas previstas − férias); total = falta não justificada + justificada + atestado; "com afastamento" soma afastamentos e licenças.
       Turnover = ((admissões + desligamentos) ÷ 2) ÷ quadro médio; quadro médio = (início + fim) ÷ 2; transferência entre unidades não conta. A faixa da meta do turnover usa a média mensal.
       Administrativo: dia sem lançamento conta como presente. Até 09/2026: histórico importado (P07 + Contagri); a partir de 10/2026: Gestão de jornada.
@@ -378,6 +449,9 @@ async function excelPainel() {
     notas: ['Percentuais já multiplicados por 100 (3,1 = 3,1%).', 'Faixas da meta: absenteísmo total até ' + pct(METAS.absTotal.verde) + ' verde / até ' + pct(METAS.absTotal.atencao) + ' atenção; turnover (média mensal) até ' + pct(METAS.turnover.verde) + ' / ' + pct(METAS.turnover.atencao) + '.',
       cols.some(c => c.apuracao) ? '* mês em apuração.' : ''].filter(Boolean),
   }];
+  const aus = ausencias(mesesEntre(f.de, f.ate), f);
+  abas.push({ nome: 'Ausências por motivo', titulo: 'Ausências por motivo', subtitulo: `${descFiltros(f)} · ${rotMes(f.de)} a ${rotMes(f.ate)}`,
+    colunas: colsAusXlsx(), linhas: linhasAusXlsx(aus), total: ['Total', ...TIPOS_AUS.map(([t]) => aus.tot[t]), aus.total], notas: [NOTA_AUS] });
   await baixarXlsx(`indicadores-rh-${f.de}-a-${f.ate}`, abas);
 }
 
@@ -436,6 +510,9 @@ function desenharCert() {
     <div class="ind-rolagem"><table class="ind-tab"><thead><tr><th>Fazenda</th><th>Homens</th><th>Mulheres</th></tr></thead>
       <tbody>${d.linhas.map(x => linSx(x)).join('')}${linSx(d.total, true)}</tbody></table></div>
     <p class="dica">Recorte com menos de 3 pessoas fica oculto para não identificar ninguém. A faixa do turnover usa a média mensal dos 3 meses.</p>
+    <h3 class="ind-h3">Ausências por motivo</h3>
+    ${tabelaAusencias(ausencias(meses))}
+    <p class="dica">${esc(NOTA_AUS)}</p>
   </div>`;
   $('certRel').addEventListener('click', () => mostrar(relatorioCert(d), { barra: true }));
   $('certExcel').addEventListener('click', () => excelCert(d).catch(e => alert(e.message)));
@@ -461,6 +538,9 @@ function relatorioCert(d) {
     <table class="rel-tabela"><thead><tr><th>Fazenda</th><th>Homens</th><th>Mulheres</th></tr></thead>
       <tbody>${d.linhas.map(x => `<tr><td>${esc(x.fazenda)}</td><td>${sx(x.M)}</td><td>${sx(x.F)}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td>Total</td><td>${sx(tot.M)}</td><td>${sx(tot.F)}</td></tr></tfoot></table>
+    <h2 class="rel-secao">Ausências por motivo</h2>
+    ${tabelaAusencias(ausencias(d.meses), true)}
+    <p class="rel-nota">${esc(NOTA_AUS)}</p>
     <p class="rel-nota">Recorte com menos de 3 pessoas fica oculto. Faixas da meta: absenteísmo total verde até ${pct(METAS.absTotal.verde)}, atenção até ${pct(METAS.absTotal.atencao)};
       não justificado ${pct(METAS.absNj.verde)} / ${pct(METAS.absNj.atencao)}; turnover (média mensal) ${pct(METAS.turnover.verde)} / ${pct(METAS.turnover.atencao)}.</p>
     <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>
@@ -478,7 +558,9 @@ async function excelCert(d) {
       { rot: 'Homens · absent.', tipo: 'pct' }, { rot: 'Homens · turnover', tipo: 'pct' }, { rot: 'Mulheres · absent.', tipo: 'pct' }, { rot: 'Mulheres · turnover', tipo: 'pct' }],
     linhas: d.linhas.map(linha), total: linha(d.total),
     notas: ['Recorte com menos de 3 pessoas fica oculto para não identificar ninguém.'],
-  }]);
+  }, (() => { const a = ausencias(d.meses); return { nome: 'Ausências por motivo', titulo: 'Ausências por motivo',
+    subtitulo: `3 últimos meses fechados: ${d.meses.map(rotMes).join(', ')}`, colunas: colsAusXlsx(), linhas: linhasAusXlsx(a),
+    total: ['Total', ...TIPOS_AUS.map(([t]) => a.tot[t]), a.total], notas: [NOTA_AUS] }; })()]);
 }
 
 /* ---------------- Por pessoa (D-30: permissão própria) ---------------- */

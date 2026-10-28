@@ -717,3 +717,8 @@
 .jor-oc-tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
 .jor-oc-tag.faltou { background: #F8E1DE; color: #A93226; }
 .jor-oc-tag.atestado { background: #E3EEF7; color: #2C6A9A; }
+
+/* Motivo da ausência (28/10/2026): lista obrigatória + detalhe opcional, lado a lado */
+.jl-motivo { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); }
+.jl-motivo[hidden] { display: none !important; }
+@media (max-width: 640px) { .jl-motivo { grid-template-columns: 1fr; } }

@@ -4,6 +4,7 @@
 // limparJornada(). O cálculo não mora aqui — mora em jornada-motor.js,
 // que é função pura e tem os 13 casos de aceite.
 
+import { MOTIVOS_AUSENCIA, rotMotivo } from './motivos-ausencia.js';
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
 import { ligarCadastros, desenharCadastros } from './jornada-cadastros.js';
@@ -430,7 +431,7 @@ function tabelaDestinos() {
    formulário em modo Editar não vira rascunho nem recebe o rascunho — ao
    terminar a edição, o lançamento que estava pela metade volta. "Limpar"
    apaga o rascunho junto. Fica só na memória da aba: fechar o app zera. */
-const CAMPOS_RASCUNHO = ['bCadastro','bFunc','bNumero','bData','bTipo','bMotivo','bIni','bFim','bInterv',
+const CAMPOS_RASCUNHO = ['bCadastro','bFunc','bNumero','bData','bTipo','bMotivoTipo','bMotivo','bIni','bFim','bInterv',
   'bMIni','bMFim','bMInterv','bMOrigem','bMMotivo','bEspecial','bObs'];
 let rascunho = null;
 
@@ -454,7 +455,7 @@ function restaurarRascunho() {
   $('bJorPadrao').textContent = r.dica || '';
   if (r.cadAviso) $('bCadAviso').innerHTML = r.cadAviso;
   mostrarDiaAuto(); mostrarMotivo();
-  if (!$('bMotivoRot').hidden) $('bMotivo').value = r.valores.bMotivo || '';
+  if (!$('bMotivoRot').hidden) { $('bMotivo').value = r.valores.bMotivo || ''; $('bMotivoTipo').value = r.valores.bMotivoTipo || ''; }
   mostrarMarcado();
   return true;
 }
@@ -503,9 +504,17 @@ function desenharLancar() {
           <label>Saída <input type="time" id="bFim"></label>
           <label>Intervalo (min) <input type="number" id="bInterv" min="0" step="5" value="60"></label>
         </div>
-        <label id="bMotivoRot" hidden>Motivo
-          <input type="text" id="bMotivo" maxlength="200" placeholder="Ex.: consulta médica, doença na família, não justificou…">
-        </label>
+        <div id="bMotivoRot" class="jl-linha jl-motivo" hidden>
+          <label>Motivo da ausência <b class="jor-obrig">*</b>
+            <select id="bMotivoTipo">
+              <option value="">Escolha…</option>
+              ${MOTIVOS_AUSENCIA.map(([k, r]) => `<option value="${k}">${r}</option>`).join('')}
+            </select>
+          </label>
+          <label>Detalhe (opcional)
+            <input type="text" id="bMotivo" maxlength="200" placeholder="Ex.: consulta médica, doença na família, não justificou…">
+          </label>
+        </div>
         <small class="jor-dica" id="bJorPadrao"></small>
         <div class="jl-linha jl-3">
           <label>Hora extra especial
@@ -824,6 +833,7 @@ function prepararEdicao() {
   document.querySelectorAll('input[name="bNivel"]').forEach(r => { r.checked = r.value === b.qualidade; });
   mostrarMotivo();
   $('bMotivo').value = b.motivo || '';
+  $('bMotivoTipo').value = b.motivo_tipo || '';
   form.querySelector('[type=submit]').textContent = 'Salvar alteração';
   // Editar tem a mesma caixa do Lançar: marcado × correto só quando você marca.
   const mc = b.marcado;
@@ -889,12 +899,19 @@ function mostrarDiaAuto() {
   alvo.innerHTML = txt;
 }
 
-/* Falta, falta justificada e atestado (tipos que não apuram horas) pedem o motivo. */
-function mostrarMotivo() {
+/* Falta, falta justificada e atestado (tipos que não apuram horas) pedem o motivo.
+   28/10/2026 (pedido dele, certificação): o motivo da ausência é escolhido numa
+   lista e é OBRIGATÓRIO quando o campo aparece; o texto livre virou detalhe
+   opcional. Os lançamentos alimentam RH › Indicadores (Ausências por motivo). */
+function pedeMotivo() {
   const tipo = jd.dados.tipos.find(t => t.id === $('bTipo').value);
-  const pede = !!tipo && tipo.apura === false;
+  return !!tipo && tipo.apura === false;
+}
+function mostrarMotivo() {
+  const pede = pedeMotivo();
   $('bMotivoRot').hidden = !pede;
-  if (!pede) $('bMotivo').value = '';
+  $('bMotivoTipo').required = pede;
+  if (!pede) { $('bMotivo').value = ''; $('bMotivoTipo').value = ''; }
 }
 
 /* ---------- Nº do cadastro → funcionário (25/09/2026) ----------
@@ -1105,6 +1122,11 @@ async function gravarBoletim(ev) {
     if (motivoAlt.length < 5) { aviso('Escreva o motivo da alteração (pelo menos 5 letras).'); $('bMotivoAlt').focus(); return; }
   }
 
+  if (pedeMotivo() && !$('bMotivoTipo').value) {
+    aviso('Escolha o motivo da ausência (pessoal, doença, funeral, casamento ou maternidade/paternidade).');
+    $('bMotivoTipo').focus(); return;
+  }
+
   let marcadoNovo = null;
   if ($('bDif').checked) {
     const em = entradaMarcada(entrada);
@@ -1148,6 +1170,7 @@ async function gravarBoletim(ev) {
     observacao: $('bObs').value || null,
     qualidade: nivelMarcado(),
     motivo: $('bMotivoRot').hidden ? null : ($('bMotivo').value.trim() || null),
+    motivo_tipo: $('bMotivoRot').hidden ? null : ($('bMotivoTipo').value || null),
     situacao: original ? 'corrigido' : 'lancado',
     criado_por: original ? original.criado_por : (estado.sessao?.user?.email || null),
     criado_em: original ? original.criado_em : new Date().toISOString(),
@@ -1193,7 +1216,7 @@ async function gravarBoletim(ev) {
   }
 
   $('bNumero').value = '';
-  $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = '';
+  $('bEspecial').value = ''; $('bInsal').checked = false; $('bObs').value = ''; $('bMotivo').value = ''; $('bMotivoTipo').value = '';
   $('bDif').checked = false; ['bMIni','bMFim','bMInterv','bMOrigem','bMMotivo'].forEach(id => { $(id).value = ''; });
   document.querySelectorAll('input[name="bNivel"]').forEach(r => { r.checked = false; });
   mostrarMarcado();
@@ -1375,7 +1398,7 @@ function desenharBoletins() {
           <td>${dataBR(b.data_fato)}${jd.deCompetenciaAnterior(b) ? `<br><span class="jor-pend">pago em ${esc(rotuloCompetencia(b.competencia))}</span>` : ''}</td>
           <td>${esc(b.numero || '—')}${b.qualidade ? `<br><span class="jor-nivel-tag jor-nivel--${b.qualidade}">${nivelTexto(b.qualidade)}</span>` : ''}</td>
           <td>${esc(f?.nome || '—')}</td>
-          <td>${horarioTxt(b)}${b.motivo ? `<br><span class="dc-sem">${esc(b.motivo)}</span>` : ''}${b.marcado?.hora_ini
+          <td>${horarioTxt(b)}${b.motivo_tipo || b.motivo ? `<br><span class="dc-sem">${esc([rotMotivo(b.motivo_tipo), b.motivo].filter(Boolean).join(' · '))}</span>` : ''}${b.marcado?.hora_ini
               ? `<br><span class="dc-sem">marcado ${b.marcado.hora_ini.slice(0,5)}–${(b.marcado.hora_fim||'').slice(0,5)} · marcou diferente</span>` : ''}</td>
           <td class="ce">${horas((a?.min_extra_50 || 0) + (a?.min_extra_100 || 0))}</td>
           <td class="ce">${b.insalubridade_dia ? 'Sim' : '—'}</td>
