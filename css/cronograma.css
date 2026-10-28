@@ -112,3 +112,13 @@ dialog.cr-dlg form{max-height:88vh;overflow:auto}
 .cr-resp-linha{display:grid !important;grid-template-columns:minmax(0,1fr) 200px;align-items:center;gap:10px}
 .cr-resp-linha > span{font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 @media (max-width:560px){.cr-resp-linha{grid-template-columns:1fr}}
+/* vários responsáveis no mesmo item (28/10/2026) */
+.cr-avs{display:inline-flex}
+.cr-avs .cr-av{border:2px solid var(--papel)}
+.cr-avs .cr-av + .cr-av{margin-left:-8px}
+.cr-resp-pessoas{display:flex;flex-wrap:wrap;gap:4px 12px;font-weight:400}
+.cr-resp-pessoas label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.cr-resp-exc{margin:10px 0}
+.cr-resp-exc summary{cursor:pointer;font-weight:600}
+div.cr-resp-linha{grid-template-columns:170px minmax(0,1fr)}
+@media (max-width:560px){div.cr-resp-linha{grid-template-columns:1fr}}

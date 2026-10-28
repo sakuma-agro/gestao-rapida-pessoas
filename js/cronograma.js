@@ -25,7 +25,9 @@
 // Pessoas = as do escritório (reu_pessoas, as mesmas da reunião semanal).
 // Responsável do item automático, nesta ordem: o que foi escolhido no card
 // (cron_estado) → o nome escrito na origem, quando bate com alguém do
-// escritório → o responsável padrão da origem (cron_config 'responsaveis').
+// escritório → o responsável padrão da origem (cron_config 'responsaveis') →
+// os responsáveis da área/unidade (cron_config 'responsaveis_area'; padrão
+// RESP_AREA_PADRAO, definido pelo Guilherme em 28/10/2026).
 //
 // Offline (regra do app): tudo fica em cache; gravação sem rede entra numa
 // fila e sobe sozinha quando a rede voltar.
@@ -76,8 +78,28 @@ export const AREAS_C = {
   cert: { nome: 'Certificação', cor: '#5E8A00' },
   proj: { nome: 'Projetos', cor: '#7A4FB5' },
   esc:  { nome: 'Escritório', cor: '#C2185B' },
+  cad:  { nome: 'Cadastros', cor: '#0E7490' },
+  custo: { nome: 'Custo Base', cor: '#8A6D1F' },
+  colh: { nome: 'Colheita e Produção', cor: '#C2410C' },
 };
 const areaDe = k => AREAS_C[k] || AREAS_C.esc;
+
+/* Responsável de cada área (28/10/2026, definido pelo Guilherme). Máquinas e
+   DP se dividem por unidade: Matriz (Vinícius) e Quebra Cocão (Laís). Vale
+   para os itens automáticos e para as tarefas lançadas sem responsável. O
+   admin muda no botão "Responsáveis" (cron_config 'responsaveis_area'). */
+const UNIDADES = ['Matriz', 'Quebra Cocão'];
+const LINHAS_AREA = [
+  ['custo'], ['colh'], ['maq', 'Matriz'], ['maq', 'Quebra Cocão'], ['cad'], ['rh'], ['sst'],
+  ['dp', 'Matriz'], ['dp', 'Quebra Cocão'], ['vist'], ['cert'], ['proj'], ['esc'],
+];
+const RESP_AREA_PADRAO = {
+  custo: ['reu-lincoln'], colh: ['reu-lincoln'],
+  'maq@Matriz': ['reu-vinicius'], 'maq@Quebra Cocão': ['reu-lais'], maq: ['reu-vinicius', 'reu-lais'],
+  cad: ['reu-lincoln', 'reu-vinicius'], rh: ['reu-guilherme'], sst: ['reu-vinicius'],
+  'dp@Matriz': ['reu-vinicius'], 'dp@Quebra Cocão': ['reu-lais'], dp: ['reu-vinicius', 'reu-lais'],
+};
+const unidadeDeTexto = s => /quebra\s*coc/i.test(norm(s)) ? 'Quebra Cocão' : (s ? 'Matriz' : null);
 
 /* Origens automáticas — a chave é a usada em cron_config 'responsaveis'. */
 const ORIGENS = {
@@ -86,7 +108,7 @@ const ORIGENS = {
   'sst-ca':     { nome: 'SST › EPI\'s (validade do C.A)', area: 'sst' },
   'sst-epi':    { nome: 'SST › EPI\'s (troca de EPI)', area: 'sst' },
   'sst-acid':   { nome: 'SST › Acidentes (medidas)', area: 'sst' },
-  'dp-tarefas': { nome: 'Cadastros › Admissão e demissão', area: 'dp' },
+  'dp-tarefas': { nome: 'Cadastros › Admissão e demissão', area: 'cad' },
   'dp-ferias':  { nome: 'DP › Férias (prazo de concessão)', area: 'dp' },
   'maq-os':     { nome: 'Máquinas › Ordens de serviço', area: 'maq' },
   'maq-ck':     { nome: 'Máquinas › Check list', area: 'maq' },
@@ -133,11 +155,23 @@ function pessoaPorTexto(txt) {
 }
 const eu = () => pessoaPorTexto(acesso.nome || '');
 const responsaveisPadrao = () => dados.config.find(c => c.chave === 'responsaveis')?.valor || {};
+/* Responsáveis da área (e da unidade, quando a área se divide por unidade). */
+const respAreaCfg = () => dados.config.find(c => c.chave === 'responsaveis_area')?.valor || RESP_AREA_PADRAO;
+function respsDaArea(area, unid) {
+  const cfg = respAreaCfg();
+  const ids = (unid && cfg[`${area}@${unid}`]) || cfg[area]
+    || (cfg[`${area}@Matriz`] || cfg[`${area}@Quebra Cocão`]
+      ? [...new Set([...(cfg[`${area}@Matriz`] || []), ...(cfg[`${area}@Quebra Cocão`] || [])])] : []);
+  return ids.filter(id => pessoa(id) && pessoa(id).ativo !== false);
+}
+const nomesDe = ids => ids.map(id => pessoa(id)?.nome).filter(Boolean).join(' e ');
 const estadoDe = chave => dados.estados.find(e => e.chave === chave) || null;
 
 /* ---------------- fontes automáticas ---------------- */
 const cli = () => estado.cliente;
 const nomeFunc = id => estado.funcionarios.find(f => f.id === id)?.nome || '';
+/* Unidade (DP) do funcionário: Quebra Cocão ou Matriz, pela fazenda do cadastro. */
+const unidFunc = id => unidadeDeTexto(estado.funcionarios.find(f => f.id === id)?.fazenda || '') || 'Matriz';
 const funcAtivo = id => {
   const f = estado.funcionarios.find(x => x.id === id);
   return !!f && !/inativ|deslig/i.test(f.situacao || '');
@@ -173,6 +207,17 @@ async function deVencimentos(tabela, tabelaTipos, origem, rotulo) {
   }));
 }
 
+/* Unidade do equipamento (Matriz / Quebra Cocão) pelo local do cadastro. */
+async function unidadeEquip(eq) {
+  let locais = [];
+  try { locais = await pegar(cli().schema('manutencao').from('locais').select('id,nome')); } catch {}
+  return id => {
+    const e = eq.find(x => x.id === id);
+    const l = e && locais.find(x => x.id === e.local_id);
+    return l ? unidadeDeTexto(l.nome) : null;
+  };
+}
+
 const FONTES = [
   ['sst-exames', () => deVencimentos('sst_exames', 'sst_tipos_exame', 'sst-exames', 'Exame')],
   ['sst-trein', () => deVencimentos('sst_treinamentos', 'sst_tipos_treinamento', 'sst-trein', 'Treinamento')],
@@ -194,7 +239,7 @@ const FONTES = [
   ['dp-tarefas', async () => (await pegar(cli().from('jor_tarefas').select('chave,funcionario_id,evento,titulo,prazo,situacao')))
     .filter(t => t.prazo && naJanela(t.prazo) && !resolvido(t.situacao) && t.situacao !== 'dispensada')
     .map(t => ({ chave: `dp-tarefas:${t.chave}:${t.prazo}`, origem: 'dp-tarefas', data: t.prazo,
-      titulo: `${t.titulo} — ${nomeFunc(t.funcionario_id) || 'funcionário'}`,
+      titulo: `${t.titulo} — ${nomeFunc(t.funcionario_id) || 'funcionário'}`, unid: unidFunc(t.funcionario_id),
       texto: t.evento ? `Tarefa de ${t.evento}` : '' }))],
   ['dp-ferias', async () => {
     const { podeTela } = await import('./acesso.js');
@@ -206,27 +251,29 @@ const FONTES = [
     return fer.concessao().abertas
       .filter(x => naJanela(x.p.limite))
       .map(x => ({ chave: `dp-ferias:${x.f.id}:${x.p.limite}`, origem: 'dp-ferias', data: x.p.limite,
-        titulo: `Prazo para conceder férias — ${x.f.nome}`,
+        titulo: `Prazo para conceder férias — ${x.f.nome}`, unid: unidFunc(x.f.id),
         texto: `Período aquisitivo ${br(x.p.iniAq)} a ${br(x.p.fimAq)} · saldo de ${x.p.saldo} dias` }));
   }],
   ['maq-os', async () => {
     const sc = cli().schema('manutencao');
     const [os, eq] = await Promise.all([
       pegar(sc.from('ordens_servico').select('id,numero,equipamento_id,prazo,status,descricao,tipo')),
-      pegar(sc.from('equipamentos').select('id,codigo,descricao,apelido')),
+      pegar(sc.from('equipamentos').select('id,codigo,descricao,apelido,local_id')),
     ]);
+    const unidEq = await unidadeEquip(eq);
     const nomeEq = id => { const e = eq.find(x => x.id === id); return e ? [e.codigo, e.apelido || e.descricao].filter(Boolean).join(' · ') : ''; };
     return os.filter(o => ['ABERTA', 'EM_EXECUCAO'].includes(o.status) && naJanela(o.prazo))
       .map(o => ({ chave: `maq-os:${o.id}:${o.prazo}`, origem: 'maq-os', data: o.prazo,
-        titulo: `OS ${o.numero || ''} — ${nomeEq(o.equipamento_id) || 'equipamento'}`,
+        titulo: `OS ${o.numero || ''} — ${nomeEq(o.equipamento_id) || 'equipamento'}`, unid: unidEq(o.equipamento_id),
         texto: [o.status === 'EM_EXECUCAO' ? 'Em execução' : 'Aberta', o.descricao].filter(Boolean).join(' · ') }));
   }],
   ['maq-ck', async () => {
     const sc = cli().schema('manutencao');
     const [ck, eq] = await Promise.all([
       pegar(sc.from('checklists').select('equipamento_id,data_verificacao,proximo_vencimento')),
-      pegar(sc.from('equipamentos').select('id,codigo,descricao,apelido,ativo')),
+      pegar(sc.from('equipamentos').select('id,codigo,descricao,apelido,ativo,local_id')),
     ]);
+    const unidEq = await unidadeEquip(eq);
     const ult = new Map();
     for (const c of ck) {
       const u = ult.get(c.equipamento_id);
@@ -235,7 +282,7 @@ const FONTES = [
     return [...ult.values()].filter(c => naJanela(c.proximo_vencimento)).map(c => {
       const e = eq.find(x => x.id === c.equipamento_id);
       if (e && e.ativo === false) return null;
-      return { chave: `maq-ck:${c.equipamento_id}:${c.proximo_vencimento}`, origem: 'maq-ck', data: c.proximo_vencimento,
+      return { chave: `maq-ck:${c.equipamento_id}:${c.proximo_vencimento}`, origem: 'maq-ck', data: c.proximo_vencimento, unid: unidEq(c.equipamento_id),
         titulo: `Check list — ${e ? [e.codigo, e.apelido || e.descricao].filter(Boolean).join(' · ') : 'equipamento'}` };
     }).filter(Boolean);
   }],
@@ -412,9 +459,11 @@ function todosItens() {
   for (const a of dados.auto) {
     const o = ORIGENS[a.origem] || { nome: a.origem, area: 'esc' };
     const e = estadoDe(a.chave);
-    const resp = e?.responsavel_id || a.respId || pessoaPorTexto(a.respTexto)?.id || padrao[a.origem] || null;
+    const explicito = e?.responsavel_id || a.respId || pessoaPorTexto(a.respTexto)?.id || null;
+    const resps = explicito ? [explicito] : padrao[a.origem] ? [padrao[a.origem]] : respsDaArea(o.area, a.unid);
     let sit = e?.situacao || (a.feitoNaOrigem ? 'feito' : 'afazer');
-    itens.push({ ...a, area: o.area, origemNome: o.nome, auto: true, resp, sit, feitaEm: e?.feita_em || null });
+    itens.push({ ...a, area: o.area, origemNome: o.nome + (a.unid ? ' · ' + a.unid : ''), auto: true,
+      resp: resps[0] || null, resps, explicito, sit, feitaEm: e?.feita_em || null });
   }
   for (const t of dados.tarefas) {
     if (t.ativo === false) continue;
@@ -422,10 +471,12 @@ function todosItens() {
     for (const d of ocorrencias(t)) {
       const chave = rep ? `t:${t.id}:${d}` : `t:${t.id}`;
       const e = rep ? estadoDe(chave) : null;
+      const explicito = e?.responsavel_id || t.responsavel_id || null;
+      const resps = explicito ? [explicito] : respsDaArea(t.area || 'esc', null);
       itens.push({
         chave, tarefa: t, data: d, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
         origemNome: rep ? (t.recorrencia === 'semanal' ? 'Tarefa · toda semana' : 'Tarefa · todo mês') : 'Tarefa',
-        auto: false, resp: (e?.responsavel_id) || t.responsavel_id || null,
+        auto: false, resp: resps[0] || null, resps, explicito,
         sit: rep ? (e?.situacao || 'afazer') : (t.situacao || 'afazer'),
         feitaEm: rep ? e?.feita_em : t.feita_em,
       });
@@ -460,9 +511,9 @@ export function abrirCronograma(el) {
 function filtrados() {
   const meu = eu();
   return todosItens().filter(it => {
-    if (est.filtro === 'minhas' && (!meu || it.resp !== meu.id)) return false;
-    if (est.pessoa === '-' && it.resp) return false;
-    if (est.pessoa && est.pessoa !== '-' && it.resp !== est.pessoa) return false;
+    if (est.filtro === 'minhas' && (!meu || !it.resps.includes(meu.id))) return false;
+    if (est.pessoa === '-' && it.resps.length) return false;
+    if (est.pessoa && est.pessoa !== '-' && !it.resps.includes(est.pessoa)) return false;
     if (est.area && it.area !== est.area) return false;
     return true;
   });
@@ -473,6 +524,8 @@ const avatar = (id, grande) => {
   const p = pessoa(id);
   return `<span class="cr-av${grande ? ' g' : ''}${p ? '' : ' cr-ninguem'}" title="${esc(p ? p.nome : 'Sem responsável')}">${esc(iniciais(p))}</span>`;
 };
+const avatares = it => it.resps.length > 1
+  ? `<span class="cr-avs">${it.resps.map(id => avatar(id)).join('')}</span>` : avatar(it.resp);
 function rotuloData(it) {
   if (it.sit === 'feito') return { txt: it.feitaEm ? 'feito ' + brCurto(it.feitaEm) : brCurto(it.data), cls: 'ok' };
   const n = diasAte(it.data);
@@ -587,7 +640,7 @@ function linha(it) {
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
     <span class="cr-item-txt"><b>${esc(it.titulo)}</b><small>${esc(it.origemNome)}${it.auto ? ' · automático' : ''}${it.sit === 'fazendo' ? ' · fazendo' : ''}</small></span>
-    <span class="cr-item-dir">${avatar(it.resp)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span></span>
+    <span class="cr-item-dir">${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span></span>
   </button>`;
 }
 
@@ -596,7 +649,7 @@ function card(it, { semResp = false, comSit = false } = {}) {
   return `<button type="button" class="cr-card" draggable="true" data-item="${esc(it.chave)}">
     <span class="cr-card-top">${tagArea(it.area)}${comSit ? `<span class="cr-sit ${it.sit}${atrasado(it) ? ' atraso' : ''}">${atrasado(it) && it.sit === 'afazer' ? 'Atrasado' : SIT[it.sit]}</span>` : (it.auto ? '<span class="cr-auto">⟳ automático</span>' : '')}</span>
     <b>${esc(it.titulo)}</b>
-    <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span>${semResp ? '' : avatar(it.resp)}</span>
+    <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span>${semResp ? '' : avatares(it)}</span>
   </button>`;
 }
 
@@ -607,8 +660,8 @@ function kanban() {
   let cols;
   if (est.colunas === 'pessoa') {
     const ps = pessoasAtivas();
-    cols = [...ps.map(p => ({ id: p.id, nome: p.nome, cab: avatar(p.id, true), itens: itens.filter(i => i.resp === p.id && i.sit !== 'feito') })),
-      { id: '-', nome: 'Sem responsável', cab: avatar(null, true), itens: itens.filter(i => (!i.resp || !pessoa(i.resp)) && i.sit !== 'feito') }]
+    cols = [...ps.map(p => ({ id: p.id, nome: p.nome, cab: avatar(p.id, true), itens: itens.filter(i => i.resps.includes(p.id) && i.sit !== 'feito') })),
+      { id: '-', nome: 'Sem responsável', cab: avatar(null, true), itens: itens.filter(i => !i.resps.length && i.sit !== 'feito') }]
       .filter(c => c.id !== '-' || c.itens.length);
     return `<div class="cr-quadro">${cols.map(c => {
       const at = c.itens.filter(atrasado).length;
@@ -675,7 +728,7 @@ function ligarTela() {
 }
 
 async function mudar(it, { sit, resp }) {
-  const novaSit = sit ?? it.sit, novoResp = resp === undefined ? it.resp : resp;
+  const novaSit = sit ?? it.sit, novoResp = resp === undefined ? it.explicito : resp;
   const feita = novaSit === 'feito' ? (it.sit === 'feito' ? it.feitaEm || hoje() : hoje()) : null;
   let r;
   if (!it.auto && !(it.tarefa.recorrencia && it.tarefa.recorrencia !== 'nenhuma')) {
@@ -705,7 +758,7 @@ function dialogo() {
   }
   return d;
 }
-const opcoesPessoas = sel => `<option value="">Sem responsável</option>` +
+const opcoesPessoas = (sel, padrao) => `<option value="">${padrao ? esc('Responsável da área — ' + padrao) : 'Sem responsável'}</option>` +
   pessoasAtivas().map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
 
 function abrirItem(chave) {
@@ -735,12 +788,12 @@ function abrirItem(chave) {
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
     </div>` : ''}
     <div class="grade">
-      <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? it.resp : (eu()?.id || ''))}</select></label>
+      <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? (it.explicito || '') : '', nomesDe(respsDaArea(it ? it.area : (t?.area || 'esc'), it?.unid)))}</select></label>
       ${it ? `<div class="campo">Situação${rep ? ' (desta vez)' : ''}<div class="cr-sits">${Object.entries(SIT).map(([k, n]) =>
         `<label><input type="radio" name="crSit" value="${k}" ${it.sit === k ? 'checked' : ''}> ${n}</label>`).join('')}</div></div>` : ''}
     </div>
     ${rep && it ? `<p class="dica">Para mudar o responsável de todas as vezes, edite a tarefa e escolha em "Responsável padrão" abaixo.</p>
-      <label class="campo">Responsável padrão (todas as vezes)<select id="crRespPadrao">${opcoesPessoas(t.responsavel_id)}</select></label>` : ''}
+      <label class="campo">Responsável padrão (todas as vezes)<select id="crRespPadrao">${opcoesPessoas(t.responsavel_id, nomesDe(respsDaArea(t.area || 'esc', null)))}</select></label>` : ''}
     ${it?.auto ? '<p class="dica">Este item vem sozinho da área de origem e some quando ela for atualizada (exame renovado, OS concluída…). Aqui você marca o andamento e quem cuida.</p>' : ''}
     <div class="barra entre">
       ${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : '<span></span>'}
@@ -751,6 +804,11 @@ function abrirItem(chave) {
     </div>
   </form>`;
   d.showModal();
+  // trocar a área da tarefa mostra quem é o responsável da área
+  if ($('crAreaT')) $('crAreaT').onchange = () => {
+    const o = $('crRespSel').options[0], n = nomesDe(respsDaArea($('crAreaT').value, null));
+    o.textContent = n ? 'Responsável da área — ' + n : 'Sem responsável';
+  };
   const rep2 = $('crRep');
   if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; };
   $('crSalvar').onclick = async () => {
@@ -776,7 +834,7 @@ function abrirItem(chave) {
       if (!nova && rep && it) {
         // ocorrência desta vez
         const e = estadoDe(it.chave);
-        if (sit !== it.sit || resp !== it.resp || e)
+        if (sit !== it.sit || resp !== it.explicito || e)
           r = await gravar('cron_estado', 'chave', { chave: it.chave, situacao: sit, responsavel_id: resp,
             feita_em: sit === 'feito' ? (it.feitaEm || hoje()) : null });
       }
@@ -795,27 +853,45 @@ function abrirItem(chave) {
   };
 }
 
-/* ---------------- responsável padrão de cada origem (admin) ---------------- */
+/* ---------------- responsáveis por área e por origem (admin) ---------------- */
 function abrirResponsaveis() {
   const d = dialogo();
   const atual = responsaveisPadrao();
+  const porArea = respAreaCfg();
+  const ps = pessoasAtivas();
   d.innerHTML = `<form method="dialog">
-    <h3>Quem cuida de cada origem</h3>
-    <p class="dica">Os itens automáticos vão para esta pessoa quando a área de origem não diz quem é o responsável (ou o nome escrito lá não é de ninguém do escritório). No card dá para trocar caso a caso. As pessoas são as da Reunião semanal.</p>
+    <h3>Quem cuida de cada área</h3>
+    <p class="dica">Os itens automáticos e as tarefas lançadas sem responsável vão para estas pessoas. Máquinas e DP se dividem por unidade (Matriz e Quebra Cocão). Com duas pessoas marcadas, o item aparece para as duas. No card dá para trocar caso a caso.</p>
     <div class="cr-resp-lista">
+      ${LINHAS_AREA.map(([a, u]) => {
+        const k = u ? `${a}@${u}` : a, sel = porArea[k] || [];
+        return `<div class="campo cr-resp-linha"><span>${tagArea(a)}${u ? ' ' + esc(u) : ''}</span>
+          <span class="cr-resp-pessoas">${ps.map(p => `<label><input type="checkbox" data-area="${esc(k)}" value="${esc(p.id)}" ${sel.includes(p.id) ? 'checked' : ''}> ${esc(p.nome)}</label>`).join('')}</span></div>`;
+      }).join('')}
+    </div>
+    <details class="cr-resp-exc"><summary>Exceção por origem (opcional)</summary>
+      <p class="dica">Só quando uma origem precisa de alguém diferente do responsável da área dela.</p>
+      <div class="cr-resp-lista">
       ${Object.entries(ORIGENS).map(([k, o]) => `<label class="campo cr-resp-linha">
         <span>${tagArea(o.area)} ${esc(o.nome)}</span>
-        <select data-origem="${k}">${opcoesPessoas(atual[k] || '')}</select></label>`).join('')}
-    </div>
+        <select data-origem="${k}">${opcoesPessoas(atual[k] || '', 'mesmo da área')}</select></label>`).join('')}
+      </div>
+    </details>
     <div class="barra entre"><span></span><span class="barra">
       <button class="btn" value="cancelar">Fechar</button>
       <button type="button" class="btn principal" id="crRespSalvar">Salvar</button></span></div>
   </form>`;
   d.showModal();
   $('crRespSalvar').onclick = async () => {
-    const valor = {};
+    const valor = {}, area = {};
     d.querySelectorAll('select[data-origem]').forEach(s => { if (s.value) valor[s.dataset.origem] = s.value; });
-    const r = await gravar('cron_config', 'chave', { chave: 'responsaveis', valor });
+    d.querySelectorAll('input[data-area]').forEach(c => {
+      area[c.dataset.area] = area[c.dataset.area] || [];
+      if (c.checked) area[c.dataset.area].push(c.value);
+    });
+    let r = await gravar('cron_config', 'chave', { chave: 'responsaveis', valor });
+    const r2 = await gravar('cron_config', 'chave', { chave: 'responsaveis_area', valor: area });
+    if (r2 !== 'ok') r = r2;
     d.close(); recado(r);
   };
 }

@@ -6,7 +6,8 @@
 --   cron_estado  : situação (a fazer / fazendo / feito) e responsável de cada
 --                  item automático (vencimento vindo de outra área) e de cada
 --                  ocorrência de tarefa que repete. chave = 'origem:id[:data]'
---   cron_config  : responsável padrão de cada origem automática
+--   cron_config  : responsável padrão de cada origem automática ('responsaveis')
+--                  e de cada área/unidade ('responsaveis_area')
 --
 -- As pessoas são as do escritório (reu_pessoas, as mesmas da reunião
 -- semanal). Quem entra: administrador ou módulo 'cronograma'
@@ -17,7 +18,7 @@ create table if not exists public.cron_tarefas (
   titulo text not null,
   descricao text,
   area text not null default 'escritorio',
-  responsavel_id uuid references public.reu_pessoas(id),
+  responsavel_id text references public.reu_pessoas(id),
   data date not null,
   recorrencia text not null default 'nenhuma'
     check (recorrencia in ('nenhuma','semanal','mensal')),
@@ -36,7 +37,7 @@ create table if not exists public.cron_estado (
   chave text primary key,
   situacao text not null default 'afazer'
     check (situacao in ('afazer','fazendo','feito')),
-  responsavel_id uuid references public.reu_pessoas(id),
+  responsavel_id text references public.reu_pessoas(id),
   feita_em date,
   atualizado_em timestamptz not null default now(),
   atualizado_por text
