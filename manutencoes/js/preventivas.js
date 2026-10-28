@@ -114,6 +114,7 @@ TELAS.painel = el => {
       <div><h1>Preventivas${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
         <p class="sub">Cada linha é uma troca: <b>A fazer</b> → abriu a OS → <b>Em andamento</b> → fechou a OS → <b>Feita</b>.</p></div>
       <span class="pv-cab-acoes"><button type="button" class="btn oculto" id="pv-hm">+ Hora máquina</button>
+      ${ehAdmin() ? '<button type="button" class="btn neutro" id="pv-importar" title="Anexar o relatório da Realtec e atualizar os horímetros">⬆ Importar horímetros</button>' : ''}
       <button type="button" class="btn neutro" id="pv-levant" title="Folha para o responsável escrever a última troca de cada serviço">🖨 Levantamento da última troca</button>
       <button type="button" class="btn neutro" id="pv-atualizar">Atualizar</button></span>
     </div>
@@ -338,6 +339,7 @@ TELAS.painel = el => {
     bhm.onclick = () => window.HoraMaquina.abrir({ cliente: App.sb, aoSalvar: () => { baixarBase().then(() => { if (document.querySelector('#pv-lista')) TELAS.painel(el); }).catch(() => {}); } });
   });
   $('#pv-levant').onclick = () => escolherLevantamento();
+  const bimp = $('#pv-importar'); if (bimp) bimp.onclick = () => telaImportarRealtec();
   $('#pv-atualizar').onclick = async () => {
     if (!App.online) return aviso('Sem internet: a tela mostra o que está guardado neste aparelho.', true);
     aviso('Atualizando…');

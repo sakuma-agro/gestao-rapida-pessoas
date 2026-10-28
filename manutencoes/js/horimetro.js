@@ -402,20 +402,28 @@ async function guardarMapa(mapa) {
   await gravar('parametros', Object.assign({}, p, { valor: JSON.stringify(mapa) }));
 }
 
+/* Importar horímetros (28/10/2026, pedido dele): um lugar só para anexar o
+   relatório e dizer de qual fazenda ele é — Matriz ou Quebra Cocão. Só as
+   máquinas da fazenda escolhida são atualizadas; as outras linhas do
+   arquivo ficam de fora. Simples para quem lança: escolhe, anexa, confere, grava. */
+let localImportacao = '';
 function telaImportarRealtec() {
-  abrirModal('Importar relatório Realtec', `
-    <p class="sub">Exporte o relatório <strong>OPERAÇÕES MECANIZADAS ANALÍTICO</strong> em
-       CSV ou Excel e escolha o arquivo aqui. A leitura da máquina vem do campo
-       <strong>Fim</strong>; as horas do implemento vêm da <strong>Quantidade</strong>.
-       Nenhum lançamento é descartado, inclusive os de documento "hrm".</p>
-    <div class="campo">
-      <input type="file" id="ir-arq" accept=".csv,.txt,.xlsx,.xls">
-      <p class="ajuda">Precisa de internet. Reimportar o mesmo arquivo não soma de novo.</p>
-    </div>
+  const locais = q.ordenado('locais').filter(l => q.ativos('equipamentos').some(e => e.local_id === l.id));
+  abrirModal('Importar horímetros', `
+    <div class="ir-passo"><b>1</b> De qual fazenda é o relatório?</div>
+    <div class="ir-faz">${locais.map(l => `<label><input type="radio" name="ir-local" value="${esc(l.id)}"${localImportacao === l.id ? ' checked' : ''}>
+      <span>${esc(l.nome)}</span></label>`).join('')}</div>
+    <div class="ir-passo"><b>2</b> Anexe o relatório da Realtec <small>(Operações mecanizadas analítico, CSV ou Excel)</small></div>
+    <label class="ir-arq">📎 Escolher o arquivo<input type="file" id="ir-arq" accept=".csv,.txt,.xlsx,.xls"></label>
+    <p class="ajuda">Precisa de internet. Importar o mesmo arquivo de novo não soma duas vezes.</p>
     <div id="ir-passo"></div>`, corpo => {
+    corpo.querySelectorAll('[name="ir-local"]').forEach(r => r.onchange = () => { localImportacao = r.value; });
     corpo.querySelector('#ir-arq').onchange = ev => {
       const arq = ev.target.files[0];
-      if (arq) lerArquivoRealtec(arq, corpo.querySelector('#ir-passo'));
+      if (!arq) return;
+      if (!localImportacao) { ev.target.value = ''; return aviso('Escolha primeiro a fazenda do relatório.', true); }
+      corpo.querySelector('.ir-arq').firstChild.textContent = '📎 ' + arq.name;
+      lerArquivoRealtec(arq, corpo.querySelector('#ir-passo'));
     };
   });
 }
@@ -499,6 +507,10 @@ function passoMapear(alvo, ctx) {
     if (i >= 0) palpite[id] = i;
   });
 
+  // Já sabe todas as colunas obrigatórias? Vai direto para a conferência.
+  if (!ctx.mapearDeNovo && CAMPOS_REALTEC.every(([id, , , obrig]) => !obrig || palpite[id] !== undefined)) {
+    return passoConferir(alvo, ctx, palpite);
+  }
   const opcoes = ctx.cabecalho.map((c, i) =>
     `<option value="${i}">${esc(c || 'coluna ' + (i + 1))}</option>`).join('');
 
@@ -559,18 +571,21 @@ function passoConferir(alvo, ctx, mapa) {
 
   const lanc = [];
   const naoAchados = {};
-  let semData = 0;
+  let semData = 0, outraFazenda = 0;
+  const nomeFaz = localImportacao ? q.nome('locais', localImportacao) : '';
 
   ctx.dados.forEach((l, i) => {
     const cod = l[mapa.bem];
     const data = dataISO(l[mapa.data]);
     const bem = achar(cod);
     if (!bem) { const k = chave(cod); if (k) naoAchados[k] = (naoAchados[k] || 0) + 1; return; }
+    if (localImportacao && bem.local_id !== localImportacao) { outraFazenda++; return; }
     if (!data) { semData++; return; }
 
     const implementos = ['implemento1', 'implemento2', 'implemento3']
       .filter(c => mapa[c] !== undefined)
       .map(c => ({ texto: l[mapa[c]], bem: achar(l[mapa[c]]) }))
+      .map(x => (x.bem && localImportacao && x.bem.local_id !== localImportacao) ? { texto: '', bem: null } : x)
       .filter(x => chave(x.texto));
 
     implementos.forEach(x => { if (!x.bem) { const k = chave(x.texto); naoAchados[k] = (naoAchados[k] || 0) + 1; } });
@@ -625,6 +640,17 @@ function passoConferir(alvo, ctx, mapa) {
     </div>
     <p class="sub">Período do arquivo: ${datas.length ? formatarData(datas[0]) + ' a ' +
       formatarData(datas[datas.length - 1]) : '—'}${semData ? ' · ' + semData + ' linhas sem data foram puladas' : ''}.</p>
+    ${nomeFaz ? `<p class="ir-faz-ok">Só máquinas de <b>${esc(nomeFaz)}</b>${outraFazenda ? ` · ${outraFazenda} linhas de outra fazenda ficaram de fora` : ''}.</p>` : ''}
+    ${Object.keys(leituraPorBem).length ? `
+      <h2>Horímetros que vão entrar</h2>
+      <table class="tabela"><thead><tr><th>Máquina</th><th class="num">No app</th><th class="num">Novo</th><th>Data</th></tr></thead><tbody>
+        ${Object.values(leituraPorBem).sort((a, b) => a.bem.codigo.localeCompare(b.bem.codigo, 'pt-BR', { numeric: true })).map(x => {
+          const volta = x.bem.leitura_atual != null && x.valor < Number(x.bem.leitura_atual);
+          return `<tr${volta ? ' class="ir-volta"' : ''}><td><span class="codigo">${esc(x.bem.codigo)}</span> ${esc(x.bem.descricao || '')}</td>
+            <td class="num">${x.bem.leitura_atual != null ? numBR(x.bem.leitura_atual) : '—'}</td>
+            <td class="num"><b>${numBR(x.valor)}</b>${volta ? ' <small>(menor — não entra)</small>' : ''}</td>
+            <td>${formatarData(x.data)}</td></tr>`; }).join('')}
+      </tbody></table>` : ''}
 
     ${recuos.length ? `
       <h2>Leituras que andaram para trás</h2>
@@ -656,6 +682,7 @@ function passoConferir(alvo, ctx, mapa) {
         <button type="button" class="btn secundario" id="cf-vincular">Salvar os vínculos e ler de novo</button>
       </div>` : ''}
 
+    <p class="ajuda"><button type="button" class="btn-fantasma" id="cf-colunas">Conferir de qual coluna vem cada informação</button></p>
     <div class="acoes">
       <button type="button" class="btn" id="cf-gravar"
         ${lanc.length === 0 ? 'disabled' : ''}>Gravar a importação</button>
@@ -677,6 +704,7 @@ function passoConferir(alvo, ctx, mapa) {
   };
 
   document.getElementById('cf-cancelar').onclick = fecharModal;
+  document.getElementById('cf-colunas').onclick = () => passoMapear(alvo, Object.assign(ctx, { mapearDeNovo: true }));
   document.getElementById('cf-gravar').onclick = () =>
     gravarImportacao(alvo, ctx, { lanc, usos, leituraPorBem, datas });
 }
@@ -780,11 +808,11 @@ async function gravarImportacao(alvo, ctx, r) {
       <p class="sub">Os ${linhas.length - novos} repetidos são a prova de que reimportar não soma
          duas vezes. Os contadores dos implementos já subiram só com o que era novo.</p>
       <div class="acoes">
-        <button type="button" class="btn" id="fi-vencimentos">Ver o painel de vencimentos</button>
+        <button type="button" class="btn" id="fi-vencimentos">Ver as preventivas</button>
         <button type="button" class="btn neutro" id="fi-fechar">Fechar</button>
       </div>`;
-    alvo.querySelector('#fi-fechar').onclick = () => { fecharModal(); irPara('maquinas'); };
-    alvo.querySelector('#fi-vencimentos').onclick = () => { fecharModal(); irPara('vencimentos'); };
+    alvo.querySelector('#fi-fechar').onclick = () => { fecharModal(); recarregarTela(); };
+    alvo.querySelector('#fi-vencimentos').onclick = () => { fecharModal(); irPara('painel'); };
 
   } catch (e) {
     alvo.innerHTML = `<div class="vazio" style="border-color:var(--urgente)">

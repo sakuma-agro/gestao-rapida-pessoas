@@ -1466,3 +1466,15 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .pv-os-bloco.aberto .pv-linha{border-left-color:var(--verde)}
 .pv-os-bloco.aberto .pv-fecha{border-left:0;border-top:1px solid #d7e7b5;background:#F3F8E8}
 .pv-fi-tit{font-weight:bold;color:var(--ok);font-size:14px}
+/* 28/10/2026: Importar horímetros — escolhe a fazenda e anexa */
+.ir-passo{display:flex;align-items:center;gap:8px;font-weight:bold;margin:6px 0 8px;color:var(--grafite)}
+.ir-passo b{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--verde);color:#fff;align-items:center;justify-content:center;font-size:13px}
+.ir-passo small{font-weight:normal;color:var(--cinza-claro)}
+.ir-faz{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.ir-faz label{display:flex;align-items:center;gap:8px;border:2px solid var(--linha);border-radius:10px;padding:12px 18px;cursor:pointer;background:var(--branco);min-height:var(--toque);font-size:15px}
+.ir-faz label:has(input:checked){border-color:var(--verde);background:#F3F8E8;font-weight:bold}
+.ir-faz input{width:20px;height:20px;accent-color:var(--verde-escuro)}
+.ir-arq{display:inline-flex;align-items:center;min-height:var(--toque);border:2px dashed var(--cinza-claro);border-radius:10px;padding:0 18px;cursor:pointer;background:var(--branco);font-size:15px}
+.ir-arq input{display:none}
+.ir-faz-ok{background:#F3F8E8;border-left:4px solid var(--verde);padding:8px 12px;margin:8px 0}
+tr.ir-volta td{color:var(--cinza-claro)}
