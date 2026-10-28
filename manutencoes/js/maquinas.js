@@ -152,10 +152,12 @@ function fichaMaquina(id) {
     <div class="acoes">
       ${medido ? `<button type="button" class="btn" id="fm-leitura">${e.unidade_controle === 'ACUMULADO' ? 'Ajustar contador' : 'Lançar horímetro'}</button>` : ''}
       ${medido ? '<button type="button" class="btn-fantasma" id="fm-hist">Histórico de leituras</button>' : ''}
+      ${window.ehVaso && ehVaso(e) ? '<button type="button" class="btn" id="fm-nr13">Dados técnicos NR-13</button><button type="button" class="btn neutro" id="fm-livro">Livro de registro</button>' : ''}
       ${ehAdmin() ? '<button type="button" class="btn neutro" id="fm-editar">Editar cadastro</button>' : ''}
       ${ehAdmin() ? '<button type="button" class="btn-fantasma" id="fm-duplicar">Duplicar</button>' : ''}
     </div>
 
+    ${window.alertaLaudo && ehVaso(e) ? alertaLaudo(e) : ''}
     <h2 class="fm-titulo">Itens de manutenção
       ${ehAdmin() ? '<button type="button" class="btn" id="fm-item">+ Item</button>' : ''}</h2>
     ${planos.length === 0
@@ -208,6 +210,8 @@ function fichaMaquina(id) {
     corpo.querySelectorAll('[data-plano]').forEach(tr =>
       tr.onclick = () => formItem(e, q.por_id('planos_manutencao', tr.dataset.plano)));
     corpo.querySelectorAll('[data-os]').forEach(b => b.onclick = () => abrirOS(b.dataset.os));
+    const bn13 = corpo.querySelector('#fm-nr13'); if (bn13) bn13.onclick = () => formDadosVaso(e.id);
+    const blv = corpo.querySelector('#fm-livro'); if (blv) blv.onclick = () => livroVaso(e.id);
     corpo.querySelectorAll('[data-excluir]').forEach(b => b.onclick = () => excluirManutencao(b.dataset.excluir));
   });
 }

@@ -1391,3 +1391,12 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 /* Excluir registro (28/10/2026) */
 .btn.perigo{background:#B3261E;border-color:#B3261E;color:#fff}
 .lista .btn-fantasma.mini{margin-left:8px;padding:4px 10px;min-height:0;font-size:13px;color:#B3261E}
+/* Vasos de pressão: dados técnicos, laudo e livro de registro (28/10/2026) */
+.lv-dados{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid #D9DCCF;border-radius:6px}
+.lv-dado{padding:6px 10px;border-bottom:1px solid #E7E9DF;border-right:1px solid #E7E9DF}
+.lv-dado span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#7A7C72}
+.lv-dado b{font-size:13px;color:#51534A}
+.lv-branca td{height:26px}
+.lv-alerta{border:2px solid #B3261E;border-radius:8px;padding:10px 12px;color:#7A1A14;background:#FDF1F0;margin:12px 0}
+@media (max-width:640px){.lv-dados{grid-template-columns:repeat(2,1fr)}}
+@media print{body.imprimindo-os .lv-dados{grid-template-columns:repeat(3,1fr)}}
