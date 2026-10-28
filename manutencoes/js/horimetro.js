@@ -432,7 +432,8 @@ async function lerArquivoRealtec(arquivo, alvo) {
   alvo.innerHTML = '<p class="sub">Lendo o arquivo…</p>';
   let linhas;
   try {
-    linhas = /\.xlsx?$/i.test(arquivo.name) ? await lerExcel(arquivo) : lerCSV(await arquivo.text());
+    linhas = /\.xlsx?$/i.test(arquivo.name) ? await lerExcel(arquivo) : lerCSV(await textoDoArquivo(arquivo));
+    linhas = achatarRelatorioRealtec(linhas);
   } catch (e) {
     alvo.innerHTML = `<div class="vazio"><p>Não consegui ler o arquivo: ${esc(e.message)}</p>
       <p class="sub">Se for Excel, salve como CSV separado por ponto e vírgula e tente de novo.</p></div>`;
@@ -446,7 +447,53 @@ async function lerArquivoRealtec(arquivo, alvo) {
   const hash = await hashArquivo(arquivo);
   const cabecalho = linhas[0].map(c => String(c || '').trim());
   const dados = linhas.slice(1).filter(l => l.some(c => String(c || '').trim() !== ''));
-  passoMapear(alvo, { arquivo, hash, cabecalho, dados });
+  passoMapear(alvo, { arquivo, hash, cabecalho, dados, formatoRealtec: !!linhas.formatoRealtec });
+}
+
+/* Acentos (28/10/2026): a Realtec grava o CSV no padrão do Windows
+   (LANÇAMENTO virava LAN�AMENTO). Tenta UTF-8 e, se não for, Windows-1252. */
+async function textoDoArquivo(arquivo) {
+  const buf = await arquivo.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch (e) { return new TextDecoder('windows-1252').decode(buf); }
+}
+
+/* Relatório "OPERAÇÕES MECANIZADAS ANALÍTICO" do jeito que a Realtec exporta
+   (28/10/2026): não é uma tabela — vem o cabeçalho da empresa, um bloco por
+   máquina ("Bem: T.16 - Trator…"), uma linha por lançamento (data, documento,
+   início, fim, quantidade) e, embaixo dela, a linha de cada implemento
+   ("S.26 - Bico/Riscador"), e no fim Total geral e Média. Aqui ele vira uma
+   tabela simples, que o resto da importação já entende sem perguntar nada.
+   Se o arquivo já for uma tabela, volta como veio. */
+function achatarRelatorioRealtec(linhas) {
+  const txt = c => String(c ?? '').trim();
+  const ehRelatorio = linhas.some(l => /^Bem:\s*/i.test(txt(l[0])));
+  if (!ehRelatorio) return linhas;
+  const ehData = v => /^\d{2}\/\d{2}\/\d{4}$/.test(txt(v));
+  const saida = [['Bem', 'Data', 'Documento', 'Início', 'Fim', 'Quantidade', 'Implemento 1', 'Implemento 2', 'Implemento 3']];
+  let bem = '', atual = null;
+  const fecha = () => { if (atual) { saida.push(atual.linha.concat(atual.imps.slice(0, 3), ['', '', ''].slice(Math.min(3, atual.imps.length)))); atual = null; } };
+  for (const l of linhas) {
+    const c0 = txt(l[0]);
+    const mb = c0.match(/^Bem:\s*(.+)$/i);
+    if (mb) { fecha(); bem = mb[1].split(/\s+-\s+/)[0].trim(); continue; }
+    if (!bem) continue;
+    // linha do lançamento: data na coluna 4 (lançamento) ou 7 (efetivação)
+    if (!c0 && (ehData(l[4]) || ehData(l[7]))) {
+      fecha();
+      atual = { linha: [bem, txt(l[4]) || txt(l[7]), txt(l[9]), txt(l[14]), txt(l[18]), txt(l[28])], imps: [] };
+      continue;
+    }
+    // linha do implemento, logo embaixo do lançamento
+    if (atual && c0 && /^[A-Z]{1,4}\.?\s*\d+/i.test(c0) && !/^(total|\*?m[eé]dia)/i.test(c0)) {
+      atual.imps.push(c0.split(/\s+-\s+/)[0].trim());
+      continue;
+    }
+    if (/^(total geral|\*?m[eé]dia)/i.test(c0)) { fecha(); bem = ''; }
+  }
+  fecha();
+  saida.formatoRealtec = true;   // colunas conhecidas: não usa o mapa salvo de outro formato
+  return saida;
 }
 
 /* Excel só quando for preciso. A biblioteca é a cópia do app em vendor/
@@ -496,7 +543,7 @@ async function hashArquivo(arquivo) {
 /* ---- passo 1: dizer qual coluna é o quê (o app chuta e você confirma) ---- */
 
 function passoMapear(alvo, ctx) {
-  const salvo = mapaSalvo();
+  const salvo = ctx.formatoRealtec ? {} : mapaSalvo();
   const normalizado = ctx.cabecalho.map(chave);
 
   const palpite = {};
