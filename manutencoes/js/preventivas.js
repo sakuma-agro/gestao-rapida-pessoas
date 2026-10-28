@@ -235,6 +235,7 @@ TELAS.painel = el => {
           <span class="pv-sit"><b class="pv-os">OS ${esc(numeroOS(o))}</b><small>aberta ${esc(dataCurta(o.data_emissao))}
             · <em class="${esquecida ? 'pv-atraso' : ''}">${d == null ? '' : d === 0 ? 'hoje' : d + (d === 1 ? ' dia' : ' dias')}</em></small></span>
           <span class="pv-acao"><button type="button" class="btn neutro" data-os="${esc(o.id)}">Ver OS</button>
+            <button type="button" class="btn pv-wpp" data-wpp="${esc(o.id)}" title="Enviar pelo WhatsApp">WhatsApp</button>
             ${esquecida
               ? `<button type="button" class="btn neutro" data-naofeita="${esc(o.id)}">Não foi feita</button>
                  <button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}" data-esquecida="1">✓ Já foi feita</button>`
@@ -281,6 +282,10 @@ TELAS.painel = el => {
     $$('#pv-lista [data-fechar]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.fechar);
       if (os) painelFechar(os, !!x.dataset.esquecida, () => TELAS.painel(el));
+    });
+    $$('#pv-lista [data-wpp]').forEach(x => x.onclick = () => {
+      const os = q.por_id('ordens_servico', x.dataset.wpp);
+      if (os) enviarOSWhatsApp(os);
     });
     $$('#pv-lista [data-naofeita]').forEach(x => x.onclick = async () => {
       const os = q.por_id('ordens_servico', x.dataset.naofeita);
@@ -346,6 +351,29 @@ TELAS.painel = el => {
   };
   desenhar();
 };
+
+/* Enviar pelo WhatsApp (28/10/2026, pedido dele): na lista Em andamento,
+   cada OS vai como texto curto para quem vai fazer — máquina, fazenda, o
+   que trocar e o que anotar na volta. A pessoa escolhe o contato no WhatsApp. */
+function enviarOSWhatsApp(os) {
+  const e = q.por_id('equipamentos', os.equipamento_id) || {};
+  const u = unidadeDe(e);
+  const itens = itensDaOS(os.id).filter(i => !i.feito);
+  const trocas = itens.filter(it => !tipoDe(it).acompanha), checks = itens.filter(it => tipoDe(it).acompanha);
+  const nome = it => q.nome('tipos_manutencao', it.tipo_manutencao_id).replace(/^VASO\s*·\s*/i, '');
+  const medido = e.unidade_controle !== 'CALENDARIO';
+  const msg = [
+    `*OS ${numeroOS(os)} · Preventiva*`,
+    `*${e.codigo || ''}* ${e.descricao || ''}`,
+    `Fazenda: ${q.nome('locais', os.local_id || e.local_id) || '—'}${medido && leituraDe(e) != null ? ` · último ${u === 'km' ? 'km' : 'horímetro'}: ${nHoras(leituraDe(e))} ${u}` : ''}`,
+    '',
+    trocas.length ? '*Trocar:*\n' + trocas.map(it => '▢ ' + nome(it)).join('\n') : '',
+    checks.length ? '*Conferir:*\n' + checks.map(it => '▢ ' + nome(it)).join('\n') : '',
+    '',
+    `Ao terminar, mande: ${medido ? (u === 'km' ? 'km' : 'horímetro') + ', ' : ''}quem fez${pedeAdesivo(itens) ? ' e a foto do adesivo' : ''}.`
+  ].filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n').trim();
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+}
 
 function temOSDuplicada() {
   const vistos = new Set();

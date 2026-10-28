@@ -1500,3 +1500,6 @@ tr.ir-volta td{color:var(--cinza-claro)}
 .ah-linha.ah-erro input{border-color:var(--urgente);background:#FDEDEC}
 .btn.ah-salvar{background:var(--ok);border-color:var(--ok);min-height:var(--toque);font-size:15px;padding:0 24px}
 @media (max-width:620px){.ah-linha{grid-template-columns:56px 1fr}.ah-linha input,.ah-msg{grid-column:1 / -1}.ah-op{min-width:0;flex:1}}
+/* 28/10/2026: enviar OS pelo WhatsApp */
+.btn.pv-wpp{background:#25D366;border-color:#25D366;color:#fff}
+.btn.pv-wpp:hover{background:#1EBE5A;border-color:#1EBE5A}
