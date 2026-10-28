@@ -321,10 +321,16 @@ function abrirOS(idOS) {
      fazer, quem fez, quando, e em destaque a PRÓXIMA TROCA — horímetro/km ou
      data na máquina, só data no que é por calendário. */
   const medidoOS = e.unidade_controle !== 'CALENDARIO';
-  const temMaterial = itens.some(it => { const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null; return p && p.materiais; });
-  const proxGeral = (() => {
+  const ehVasoOS = window.ehVaso ? ehVaso(e) : false;
+  /* Troca x check list (28/10/2026, pedido dele): a OS fala da TROCA (óleo,
+     filtros, serviço de empresa) e os itens "acompanha" do vaso viram um
+     CHECK LIST à parte, com OK / Problema — o operador confere e marca. */
+  const trocas = itens.filter(it => !tipoDe(it).acompanha);
+  const checks = itens.filter(it => tipoDe(it).acompanha);
+  const temMaterial = trocas.some(it => { const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null; return p && p.materiais; });
+  const proxDe = lista => {
     let hMin = null, dMin = null;
-    itens.forEach(it => {
+    lista.forEach(it => {
       const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
       if (!p) return;
       const baseL = feita && it.feito ? it.leitura_troca : (leituraDe(e) ?? os.leitura_emissao);
@@ -336,14 +342,16 @@ function abrirOS(idOS) {
     if (hMin != null) partes.push(nHoras(hMin) + ' ' + u);
     if (dMin) partes.push(formatarData(dMin));
     return partes.join(' ou ');
-  })();
+  };
+  const proxTroca = proxDe(trocas), proxCheck = proxDe(checks);
+  const hojeTxt = feita ? '' : ' (se feita hoje)';
 
-  const blocoPreventiva = `
+  const blocoTroca = !trocas.length ? '' : `
     <section class="os-bloco">
-      <h3>O que fazer <small>marque o que for feito</small></h3>
+      <h3>Troca / serviço <small>marque o que for feito</small></h3>
       <table class="os-tab"><thead><tr>
         <th class="os-ok">Feito</th><th>Serviço</th>${temMaterial ? '<th>Material</th>' : ''}<th class="os-prox">Próxima troca</th>
-      </tr></thead><tbody>` + itens.map(it => {
+      </tr></thead><tbody>` + trocas.map(it => {
         const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
         return `<tr>
           <td class="os-ok"><span class="os-quad${it.feito ? ' on' : ''}">${it.feito ? '✓' : ''}</span></td>
@@ -352,8 +360,25 @@ function abrirOS(idOS) {
           <td class="os-prox">${proximaDaOS(it, p)}</td>
         </tr>`;
       }).join('') + `</tbody></table>
-      ${proxGeral ? `<div class="os-proxima"><span>Próxima troca${feita ? '' : ' (se feita hoje)'}</span><b>${proxGeral}</b></div>` : ''}
+      ${proxTroca ? `<div class="os-proxima"><span>Próxima troca${hojeTxt}</span><b>${proxTroca}</b></div>` : ''}
     </section>`;
+
+  const nomeCheck = t => String(t).replace(/^VASO\s*·\s*/i, '');
+  const blocoCheck = !checks.length ? '' : `
+    <section class="os-bloco">
+      <h3>Check list${ehVasoOS ? ' do vaso de pressão' : ''} <small>confira e marque OK ou Problema</small></h3>
+      <table class="os-tab os-check"><thead><tr>
+        <th>Item</th><th class="os-ok">OK</th><th class="os-ok">Problema</th>
+      </tr></thead><tbody>` + checks.map(it => `<tr>
+          <td><b>${esc(nomeCheck(q.nome('tipos_manutencao', it.tipo_manutencao_id)))}</b>${tipoComo(it.tipo_manutencao_id)}</td>
+          <td class="os-ok"><span class="os-quad${it.feito ? ' on' : ''}">${it.feito ? '✓' : ''}</span></td>
+          <td class="os-ok"><span class="os-quad"></span></td>
+        </tr>`).join('') + `</tbody></table>
+      <p class="os-como">Marcou Problema? Escreva na observação o que viu.</p>
+      ${proxCheck ? `<div class="os-proxima"><span>Próximo check list${hojeTxt}</span><b>${proxCheck}</b></div>` : ''}
+    </section>`;
+
+  const blocoPreventiva = blocoTroca + blocoCheck;
 
   const blocoCorretiva = `
     <section class="os-bloco">
@@ -464,7 +489,7 @@ function formFeita(os) {
 
   abrirModal('Registrar OS ' + numeroOS(os) + ' como feita', `
     <p class="sub"><strong>${esc(e.codigo)}</strong> — ${esc(e.descricao)}</p>
-    ${!corretiva && itens.length > 1 ? `<fieldset><legend>O que foi feito</legend>${itens.map(it => `
+    ${!corretiva && itens.length > 1 ? `<fieldset><legend>O que foi feito e conferido</legend>${itens.map(it => `
       <label class="ff-item"><input type="checkbox" data-item="${esc(it.id)}" checked>
         ${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</label>`).join('')}
       <p class="ajuda">Desmarque o que não foi feito: ele continua vencido no painel.</p></fieldset>` : ''}
