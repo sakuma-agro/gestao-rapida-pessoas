@@ -467,9 +467,15 @@ function escolherLevantamento() {
 function imprimirLevantamento(localId) {
   const tipo = id => q.por_id('tipos_manutencao', id) || {};
   const planos = planosDaFrota().filter(x => (!localId || x.c.equipamento.local_id === localId) && !tipo(x.p.tipo_manutencao_id).acompanha);
-  if (!planos.length) return aviso('Nenhuma máquina com serviço cadastrado nessa fazenda.', true);
   const porMaq = new Map();
   planos.forEach(x => { const e = x.c.equipamento; if (!porMaq.has(e.id)) porMaq.set(e.id, { e, itens: [] }); porMaq.get(e.id).itens.push(x.p); });
+  /* 28/10/2026 (pedido dele: "até os que tiverem sem dados"): máquina ativa
+     sem nenhum serviço cadastrado também entra, com linhas em branco para o
+     responsável escrever o serviço e a última troca. */
+  q.ativos('equipamentos').filter(e => e.ativo !== false && !['VENDIDO', 'BAIXADO'].includes(e.status) && noGrupo(e)
+      && (!localId || e.local_id === localId) && !porMaq.has(e.id))
+    .forEach(e => porMaq.set(e.id, { e, itens: [], semCadastro: true }));
+  if (!porMaq.size) return aviso('Nenhuma máquina nessa fazenda.', true);
   const grupos = [...porMaq.values()].sort((a, b) => porCodigo(a.e, b.e));
   const ordem = p => Number(tipo(p.tipo_manutencao_id).ordem ?? 999);
   grupos.forEach(g => g.itens.sort((a, b) => ordem(a) - ordem(b) || String(q.nome('tipos_manutencao', a.tipo_manutencao_id)).localeCompare(q.nome('tipos_manutencao', b.tipo_manutencao_id))));
@@ -483,12 +489,17 @@ function imprimirLevantamento(localId) {
     return partes.join(' / ') || '—';
   };
   const leituraHoje = e => e.unidade_controle === 'HORIMETRO' ? 'Horímetro hoje' : e.unidade_controle === 'HODOMETRO' ? 'Km hoje' : '';
-  const corpo = grupos.map(({ e, itens }) => {
+  const LINHAS_VAZIAS = 3;
+  const corpo = grupos.map(({ e, itens, semCadastro }) => {
     const rot = leituraHoje(e);
     const medido = e.unidade_controle !== 'CALENDARIO';
     return `<tbody><tr class="maq"><td colspan="7"><b>${esc(e.codigo || '')} — ${esc(e.descricao || '')}</b>
         ${!localId ? `<span>${esc(q.nome('locais', e.local_id) || '')}</span>` : ''}
-        ${rot ? `<span>${rot}: <i class="hj"></i></span>` : ''}</td></tr>` +
+        ${rot ? `<span>${rot}: <i class="hj"></i></span>` : ''}
+        ${semCadastro ? '<span class="sc">sem serviço cadastrado — escreva os serviços</span>' : ''}</td></tr>` +
+      (semCadastro ? Array.from({ length: LINHAS_VAZIAS }, () => `<tr><td>${linha}</td><td>${linha}</td>
+          <td class="f">${medido ? linha : ''}</td><td class="f dt">____/____/______</td>
+          <td class="f c">${quad}</td><td class="f c">${quad}</td><td>${linha}</td></tr>`).join('') : '') +
       itens.map(p => {
         const semHora = !medido || p.periodicidade_horas == null;
         return `<tr><td>${esc(q.nome('tipos_manutencao', p.tipo_manutencao_id))}</td><td class="nw">${esc(aCada(p, e))}</td>
@@ -521,6 +532,7 @@ function imprimirLevantamento(localId) {
       td{border:1px solid #d7d9cf;padding:3px 7px;height:31px;vertical-align:bottom}
       tr.maq td{background:#eef5de;color:#3d3f38;height:25px;vertical-align:middle}
       tr.maq span{margin-left:16px}
+      .sc{color:#A0662E;font-style:italic}
       .hj{display:inline-block;width:120px;border-bottom:1px solid #9a9c92;height:12px;vertical-align:bottom}
       .ln{border-bottom:1px solid #9a9c92;height:16px;margin-bottom:3px}
       .f{background:#fbfcf8}.f.cinza{background:#eeeee9}
