@@ -239,6 +239,7 @@ TELAS.ordens = el => {
               ? 'aberta em ' + formatarData(o.data_emissao) + (dias > 0 ? ` (há ${dias} ${dias === 1 ? 'dia' : 'dias'})` : ' (hoje)')
               : 'feita em ' + formatarData(o.data_execucao) + (o.executado_por ? ' por ' + esc(o.executado_por) : '')}</small>
           </div>
+          ${filtroOS.aba === 'abertas' && dias > 15 ? '<span class="etq urgente">ATRASADA</span>' : ''}
           <span class="etq ${o.tipo === 'CORRETIVA' ? 'vencido' : 'ok'}">${o.tipo === 'CORRETIVA' ? 'CORRETIVA' : 'PREVENTIVA'}</span>
         </li>`;
       }).join('');

@@ -135,8 +135,12 @@ TELAS.painel = el => {
      links; só a busca à vista (fazenda e serviço em "Filtros ▾"); caixinhas
      de marcar só em "Abrir várias"; uma linha por máquina. E a aba
      "Por serviço": escolhe o serviço e vê o vencimento de todas as máquinas. */
+  /* OS atrasada (28/10/2026, pedido dele): aberta há mais de 15 dias fica
+     escrita "ATRASADA", com a linha em vermelho, e aparece na aba e nos avisos. */
+  const atrasadas = [...osAbertas, ...consertos].filter(o => { const d = diasDesde(o.data_emissao); return d != null && d > OS_ATRASADA_DIAS; });
   const aba = (id, cls, n, rot) => `<button type="button" class="pv-aba ${cls}${abaPrev === id ? ' ativa' : ''}" data-aba="${id}">${n === null ? '' : `<strong>${n}</strong>`}<b>${rot}</b></button>`;
   const avisos = [
+    atrasadas.length ? `<button type="button" class="pv-av-r" data-ir-aba="${atrasadas.some(o => o.tipo !== 'CORRETIVA') ? 'andamento' : 'consertos'}">⚠ ${atrasadas.length} OS atrasada(s) — aberta(s) há mais de ${OS_ATRASADA_DIAS} dias</button>` : '',
     velhas.length ? `<button type="button" id="pv-hor">⏱ ${velhas.length} horímetro(s) com mais de ${HORIMETRO_VELHO_DIAS} dias</button>` : '',
     ckAtraso ? `<button type="button" id="pv-ck">☑ ${ckAtraso} check list(s) atrasado(s)</button>` : '',
     ehAdmin() && semDado.length ? `<button type="button" data-ir-aba="semdado">✎ ${semDado.length} sem a troca cadastrada</button>` : ''
@@ -159,7 +163,7 @@ TELAS.painel = el => {
       'Feita a troca, em <b>Em andamento</b> toque em <b>Fechar OS</b> e preencha o horímetro']) }
     <div class="pv-tabs">
       ${aba('fazer', 'pv-a-fazer', fazer.length, 'A fazer')}
-      ${aba('andamento', 'pv-a-and', osAbertas.length, 'Em andamento')}
+      ${aba('andamento', 'pv-a-and', osAbertas.length, 'Em andamento' + (atrasadas.filter(o => o.tipo !== 'CORRETIVA').length ? ` <em class="pv-aba-atr">${atrasadas.filter(o => o.tipo !== 'CORRETIVA').length} atrasada(s)</em>` : ''))}
       ${aba('consertos', 'pv-a-con', consertos.length, 'Consertos')}
       ${aba('feitas', 'pv-a-feita', feitas.length, 'Feitas no mês')}
       ${aba('servico', 'pv-a-serv', null, '⚙ Por serviço')}
@@ -300,9 +304,9 @@ TELAS.painel = el => {
         const e = q.por_id('equipamentos', o.equipamento_id) || { codigo: '—', descricao: '' };
         const d = diasDesde(o.data_emissao);
         const esquecida = d != null && d > OS_ATRASADA_DIAS;
-        return `<div class="pv-os-bloco" data-bloco="${esc(o.id)}"><div class="pv-linha ${conserto ? 'pv-c' : 'pv-b'}">${maq(e)}
+        return `<div class="pv-os-bloco" data-bloco="${esc(o.id)}"><div class="pv-linha ${esquecida ? 'pv-r pv-atrasada' : conserto ? 'pv-c' : 'pv-b'}">${maq(e)}
           <span class="pv-item">${esc(conserto ? (o.descricao || 'Conserto') : resumoOS(o))}</span>
-          <span class="pv-sit"><b class="pv-os">OS ${esc(numeroOS(o))}</b><small>aberta ${esc(dataCurta(o.data_emissao))}
+          <span class="pv-sit">${esquecida ? '<span class="pv-tag-atr">ATRASADA</span> ' : ''}<b class="pv-os">OS ${esc(numeroOS(o))}</b><small>aberta ${esc(dataCurta(o.data_emissao))}
             · <em class="${esquecida ? 'pv-atraso' : ''}">${d == null ? '' : d === 0 ? 'hoje' : d + (d === 1 ? ' dia' : ' dias')}</em></small></span>
           <span class="pv-acao"><button type="button" class="btn neutro" data-os="${esc(o.id)}">Ver OS</button>
             <button type="button" class="btn pv-wpp" data-wpp="${esc(o.id)}" title="Enviar pelo WhatsApp">WhatsApp</button>
