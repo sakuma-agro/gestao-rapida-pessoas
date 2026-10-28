@@ -27,6 +27,17 @@ function osAbertaDoPlano(plano) {
   return it ? q.por_id('ordens_servico', it.os_id) : null;
 }
 
+/* Como fazer (28/10/2026): instrução simples do item, para quem é leigo. */
+const tipoDe = it => q.por_id('tipos_manutencao', it.tipo_manutencao_id) || {};
+function tipoComo(idTipo) {
+  const t = q.por_id('tipos_manutencao', idTipo) || {};
+  if (!t.instrucao && !t.terceirizado) return '';
+  return '<small class="os-como">' + (t.terceirizado ? '<em>Empresa contratada</em> · ' : '') + esc(t.instrucao || '') + '</small>';
+}
+/* Precisa da foto do adesivo? Só quando a OS tem troca de verdade — itens do
+   vaso feitos pelo operador e serviços de empresa contratada não têm adesivo. */
+const pedeAdesivo = itens => itens.some(it => { const t = tipoDe(it); return !t.acompanha && !t.terceirizado; });
+
 function numeroOS(o) { return o.numero ? 'nº ' + o.numero : '(aguardando envio)'; }
 
 /* ================================================================ VENCIMENTOS */
@@ -121,6 +132,14 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
 
   let os = q.todos('ordens_servico').find(o => o.equipamento_id === e.id && o.tipo === 'PREVENTIVA' && ABERTAS.includes(o.status));
   const juntou = !!os;
+  // Item que já está numa OS aberta (ex.: puxado junto com o óleo) não entra de novo.
+  const jaAberta = osAbertaDoPlano(p);
+  if (jaAberta) {
+    if (opcoes.silencioso) return jaAberta;
+    aviso('Esse item já está na OS ' + numeroOS(jaAberta) + '.');
+    irPara('painel'); abrirOS(jaAberta.id);
+    return jaAberta;
+  }
   if (!os) {
     os = await gravar('ordens_servico', {
       id: crypto.randomUUID(), uuid_dispositivo: crypto.randomUUID(), tipo: 'PREVENTIVA',
@@ -134,6 +153,21 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
     plano_id: p.id, motivo: c.motivo, periodicidade_horas: p.periodicidade_horas,
     periodicidade_dias: p.periodicidade_dias, horas_restantes: c.horas_restantes, feito: false
   });
+  /* Vasos de pressão (28/10/2026, pedido dele): os itens marcados "acompanha"
+     (esgotar, manômetro, vazamento, limpeza, ferrugem) entram juntos em
+     qualquer OS preventiva da mesma máquina — vencida a troca de óleo do
+     compressor, o operador faz tudo numa ida só e o mês do vaso conta feito. */
+  for (const pj of q.ativos('planos_manutencao').filter(x => x.equipamento_id === e.id && x.id !== p.id)) {
+    const tj = q.por_id('tipos_manutencao', pj.tipo_manutencao_id);
+    if (!tj || !tj.acompanha || tj.ativo === false || osAbertaDoPlano(pj)) continue;
+    const cj = calcular(pj);
+    await gravar('os_itens', {
+      id: crypto.randomUUID(), os_id: os.id, equipamento_id: e.id, tipo_manutencao_id: pj.tipo_manutencao_id,
+      plano_id: pj.id, motivo: ['VENCIDO', 'ATENCAO'].includes(cj.status) ? cj.motivo : 'junto com a preventiva',
+      periodicidade_horas: pj.periodicidade_horas, periodicidade_dias: pj.periodicidade_dias,
+      horas_restantes: cj.horas_restantes, feito: false
+    });
+  }
   // Vários itens marcados na planilha geram as OS de uma vez: aí quem avisa e
   // abre a tela é quem chamou.
   if (opcoes.silencioso) return os;
@@ -292,9 +326,9 @@ function abrirOS(idOS) {
         const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
         return `<tr>
           <td class="os-ok"><span class="os-quad${it.feito ? ' on' : ''}">${it.feito ? '✓' : ''}</span></td>
-          <td><b>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</b></td>
+          <td><b>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</b>${tipoComo(it.tipo_manutencao_id)}</td>
           <td>${p ? esc(periodicidadeTexto(p, e)) : '—'}</td>
-          <td class="os-mat">${p && p.materiais ? esc(p.materiais) : '<i>informar no cadastro da máquina</i>'}</td>
+          <td class="os-mat">${p && p.materiais ? esc(p.materiais) : tipoDe(it).instrucao ? '—' : '<i>informar no cadastro da máquina</i>'}</td>
           <td>${feita && it.data_troca ? 'trocado em ' + formatarData(it.data_troca)
                : (p && p.ultima_troca_data ? formatarData(p.ultima_troca_data) : '—') +
                  (p && p.ultima_troca_leitura != null ? '<small>' + nHoras(p.ultima_troca_leitura) + ' ' + u + '</small>' : '')}</td>
@@ -438,6 +472,7 @@ function formFeita(os) {
   const itens = itensDaOS(os.id).filter(i => !i.feito);
   const corretiva = os.tipo === 'CORRETIVA';
   const medido = e.unidade_controle !== 'CALENDARIO';
+  const adesivo = !corretiva && pedeAdesivo(itens);
   let foto = null;
 
   abrirModal('Registrar OS ' + numeroOS(os) + ' como feita', `
@@ -459,7 +494,10 @@ function formFeita(os) {
         <p class="ajuda">Toque para ver os nomes já usados.</p></div>
     </div>
     ${campoArea(corretiva ? 'O que foi feito' : 'Observação', 'observacao', '')}
-    <div class="campo"><label>${corretiva ? 'Foto (opcional)' : 'Foto do adesivo de troca (obrigatória)'}</label>
+    ${itens.some(it => tipoDe(it).instrucao) ? `<div class="ff-como">${itens.filter(it => tipoDe(it).instrucao).map(it =>
+      `<p><b>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</b> — ${esc(tipoDe(it).instrucao)}</p>`).join('')}
+      ${itens.some(it => tipoDe(it).acompanha) ? '<p class="ajuda">Achou algum problema? Escreva na observação e avise a manutenção.</p>' : ''}</div>` : ''}
+    <div class="campo"><label>${corretiva || !adesivo ? 'Foto (opcional)' : 'Foto do adesivo de troca (obrigatória)'}</label>
       <label class="ck-foto">📷 Tirar / escolher foto<input type="file" accept="image/*" capture="environment" id="ff-foto"></label>
       <div class="ck-miniaturas" id="ff-min"></div></div>
     <div class="acoes">
@@ -479,7 +517,7 @@ function formFeita(os) {
       if (medido && !corretiva && leitura == null) return aviso('Informe o ' + (u === 'km' ? 'km' : 'horímetro') + ' na hora do serviço.', true);
       if (!d.executado_por) return aviso('Diga quem fez o serviço.', true);
       if (corretiva && !d.observacao) return aviso('Escreva o que foi feito.', true);
-      if (!corretiva && !foto) return aviso('A foto do adesivo de troca é obrigatória.', true);
+      if (adesivo && !foto) return aviso('A foto do adesivo de troca é obrigatória.', true);
 
       const marcados = itens.length > 1
         ? itens.filter(it => corpo.querySelector(`[data-item="${it.id}"]`).checked) : itens;

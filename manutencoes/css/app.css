@@ -1375,3 +1375,8 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 .hl-o-hora{background:#F1F7E3;color:var(--verde-lop)}
 .hl-o-importacao{background:#EAF2FB;color:#2E6DA4}
 .hl-bol{color:var(--marrom);white-space:nowrap}
+/* Vasos de pressão (28/10/2026): instrução simples do item na OS e no "feita" */
+.os-como{display:block;font-weight:normal;font-size:.85em;color:#51534A;margin-top:2px;line-height:1.3}
+.os-como em{font-style:normal;color:#744F28;font-weight:bold}
+.ff-como{background:#F3F8E8;border-left:4px solid #84BD00;border-radius:0;padding:8px 12px;margin:8px 0 12px}
+.ff-como p{margin:4px 0;font-size:15px}
