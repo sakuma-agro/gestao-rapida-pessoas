@@ -27,10 +27,14 @@ const CAMPOS_NR13 = [
   ['inspetor', 'Empresa do laudo', 'text', 'Inspec Caldeiras'],
 ];
 
-function ehVaso(e) {
+/* Vaso de pressão ou tanque de diesel (28/10/2026): os dois são NR-13 e têm
+   dados técnicos, laudo e livro de registro. */
+function grupoDe(e) {
   const t = e && q.por_id('tipos_equipamento', e.tipo_equipamento_id);
-  return !!(t && t.grupo === 'vasos');
+  return t ? t.grupo : '';
 }
+function ehVaso(e) { return ['vasos', 'diesel'].includes(grupoDe(e)); }
+const ehTanque = e => grupoDe(e) === 'diesel';
 const nr13De = e => ((e && e.dados_tecnicos) || {}).nr13 || {};
 
 /* ---------------------------------------------------------------- dados técnicos */
@@ -41,7 +45,7 @@ function formDadosVaso(idMaquina) {
   const d = nr13De(e);
   const pode = typeof ehAdmin === 'function' && ehAdmin();
   abrirModal('Dados técnicos — ' + e.codigo, `
-    <p class="sub">${esc(e.descricao)} · como está na folha "Dados técnicos" do laudo NR-13.</p>
+    <p class="sub">${esc(e.descricao)} · como está no laudo NR-13${ehTanque(e) ? ' (tanque: deixe as pressões em branco)' : ''}.</p>
     <div class="colunas">
       ${campoTexto('Fabricante', 'fabricante', d.fabricante || '', 'text')}
       ${campoTexto('Série', 'numero_serie', e.numero_serie || '', 'text')}
@@ -104,7 +108,7 @@ function formDadosVaso(idMaquina) {
       for (const p of q.ativos('planos_manutencao').filter(x => x.equipamento_id === e.id)) {
         const nome = q.nome('tipos_manutencao', p.tipo_manutencao_id);
         const muda = {};
-        if (/EXAME EXTERNO/.test(nome)) {
+        if (/EXAME EXTERNO|TANQUE · INSPEÇÃO/.test(nome)) {
           if (ult) Object.assign(muda, { ultima_troca_data: ult.data, periodicidade_dias: diasEntre(ult.data, ult.proxima) });
           else if (anos) muda.periodicidade_dias = anos[0] * 365;
         } else if (/EXAME INTERNO/.test(nome)) {
@@ -170,8 +174,8 @@ function livroVaso(idMaquina) {
     <div id="os-impresso" class="os-folha lv-folha">
       <header class="os-cab">
         <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios" class="os-logo">
-        <div class="os-titulo"><h2>Livro de registro</h2><span class="os-tipo prev">Vaso de pressão · NR-13</span></div>
-        <div class="os-numero"><span>Vaso</span><b>${esc(e.codigo)}</b><small>${esc(q.nome('locais', e.local_id) || '')}</small></div>
+        <div class="os-titulo"><h2>Livro de registro</h2><span class="os-tipo prev">${ehTanque(e) ? 'Tanque de armazenamento' : 'Vaso de pressão'} · NR-13</span></div>
+        <div class="os-numero"><span>${ehTanque(e) ? 'Tanque' : 'Vaso'}</span><b>${esc(e.codigo)}</b><small>${esc(q.nome('locais', e.local_id) || '')}</small></div>
       </header>
 
       <section class="os-bloco">
@@ -242,4 +246,4 @@ function livroVaso(idMaquina) {
   });
 }
 
-Object.assign(window, { ehVaso, formDadosVaso, livroVaso, alertaLaudo, CATEGORIA_NR13 });
+Object.assign(window, { ehVaso, ehTanque, formDadosVaso, livroVaso, alertaLaudo, ultimoLaudo, CATEGORIA_NR13 });

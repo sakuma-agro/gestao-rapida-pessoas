@@ -177,6 +177,8 @@ function fichaMaquina(id) {
           </tr>`;
         }).join('') + '</tbody></table>'}
 
+    ${window.blocoLaudos ? blocoLaudos(e) : ''}
+
     ${osAbertas.length ? `<h2 class="fm-titulo">OS abertas</h2><ul class="lista">` + osAbertas.map(o => `
       <li><div class="info"><strong>OS ${o.numero ? 'nº ' + o.numero : '(aguardando envio)'}</strong>
         <small>${o.tipo === 'CORRETIVA' ? 'Corretiva' : 'Preventiva'} · aberta em ${formatarData(o.data_emissao)} · ${esc(resumoOS(o))}</small></div>
@@ -212,6 +214,7 @@ function fichaMaquina(id) {
     corpo.querySelectorAll('[data-os]').forEach(b => b.onclick = () => abrirOS(b.dataset.os));
     const bn13 = corpo.querySelector('#fm-nr13'); if (bn13) bn13.onclick = () => formDadosVaso(e.id);
     const blv = corpo.querySelector('#fm-livro'); if (blv) blv.onclick = () => livroVaso(e.id);
+    const blf = corpo.querySelector('#fm-laudo'); if (blf) blf.onclick = () => formLaudo(e.id);
     corpo.querySelectorAll('[data-excluir]').forEach(b => b.onclick = () => excluirManutencao(b.dataset.excluir));
   });
 }

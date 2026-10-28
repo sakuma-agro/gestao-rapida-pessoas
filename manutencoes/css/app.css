@@ -1401,3 +1401,5 @@ button.pv-cod:hover,.pv-abre:hover{color:var(--verde-escuro)}
 @media (max-width:640px){.lv-dados{grid-template-columns:repeat(2,1fr)}}
 @media print{body.imprimindo-os .lv-dados{grid-template-columns:repeat(3,1fr)}}
 .os-check td.os-ok,.os-check th.os-ok{width:70px;text-align:center}
+/* Laudos (28/10/2026) */
+.lv-antigo td{opacity:.6}
