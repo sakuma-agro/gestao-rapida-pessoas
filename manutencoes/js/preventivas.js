@@ -108,6 +108,7 @@ TELAS.painel = el => {
       <div><h1>Preventivas${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
         <p class="sub">Cada linha é uma troca: <b>A fazer</b> → abriu a OS → <b>Em andamento</b> → fechou a OS → <b>Feita</b>.</p></div>
       <span class="pv-cab-acoes"><button type="button" class="btn oculto" id="pv-hm">+ Hora máquina</button>
+      <button type="button" class="btn neutro" id="pv-levant" title="Folha para o responsável escrever a última troca de cada serviço">🖨 Levantamento da última troca</button>
       <button type="button" class="btn neutro" id="pv-atualizar">Atualizar</button></span>
     </div>
     <div class="pv-abas">
@@ -285,6 +286,7 @@ TELAS.painel = el => {
     bhm.classList.toggle('oculto', !ok);
     bhm.onclick = () => window.HoraMaquina.abrir({ cliente: App.sb, aoSalvar: () => { baixarBase().then(() => { if (document.querySelector('#pv-lista')) TELAS.painel(el); }).catch(() => {}); } });
   });
+  $('#pv-levant').onclick = () => escolherLevantamento();
   $('#pv-atualizar').onclick = async () => {
     if (!App.online) return aviso('Sem internet: a tela mostra o que está guardado neste aparelho.', true);
     aviso('Atualizando…');
@@ -307,4 +309,112 @@ function listaHorimetroVelho(velhas, depois) {
       formLeitura(e, () => { fecharModal(); depois(); });
     });
   });
+}
+
+/* =====================================================================
+   LEVANTAMENTO DA ÚLTIMA TROCA (28/10/2026, pedido dele: "estamos
+   desatualizados"). Folha A4 em paisagem, por fazenda, para o responsável
+   escrever à mão o horímetro de hoje de cada máquina e, em cada serviço, o
+   horímetro e a data da última troca, se tem o adesivo dessa troca e se tirou
+   a foto, e Obs. A folha NÃO mostra o que o app tem hoje — só os campos.
+   Entram todas as máquinas ativas da fazenda; os itens "acompanha" do vaso
+   (check list) ficam de fora, porque não são troca.
+   ===================================================================== */
+function escolherLevantamento() {
+  abrirModal('Levantamento da última troca', `
+    <p class="sub">Folha em paisagem para o responsável escrever a última troca de cada serviço, com o adesivo e a foto.</p>
+    <div class="campo"><label for="lv-local">Fazenda</label>
+      <select id="lv-local"><option value="">Todas as fazendas</option>
+        ${q.ordenado('locais').map(l => `<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</select></div>
+    <div class="acoes"><button type="button" class="btn" id="lv-imp">Imprimir</button>
+      <button type="button" class="btn neutro" id="lv-voltar">Voltar</button></div>`, corpo => {
+    corpo.querySelector('#lv-local').value = filtroPrev.local || '';
+    corpo.querySelector('#lv-voltar').onclick = fecharModal;
+    corpo.querySelector('#lv-imp').onclick = () => imprimirLevantamento(corpo.querySelector('#lv-local').value);
+  });
+}
+
+function imprimirLevantamento(localId) {
+  const tipo = id => q.por_id('tipos_manutencao', id) || {};
+  const planos = planosDaFrota().filter(x => (!localId || x.c.equipamento.local_id === localId) && !tipo(x.p.tipo_manutencao_id).acompanha);
+  if (!planos.length) return aviso('Nenhuma máquina com serviço cadastrado nessa fazenda.', true);
+  const porMaq = new Map();
+  planos.forEach(x => { const e = x.c.equipamento; if (!porMaq.has(e.id)) porMaq.set(e.id, { e, itens: [] }); porMaq.get(e.id).itens.push(x.p); });
+  const grupos = [...porMaq.values()].sort((a, b) => porCodigo(a.e, b.e));
+  const ordem = p => Number(tipo(p.tipo_manutencao_id).ordem ?? 999);
+  grupos.forEach(g => g.itens.sort((a, b) => ordem(a) - ordem(b) || String(q.nome('tipos_manutencao', a.tipo_manutencao_id)).localeCompare(q.nome('tipos_manutencao', b.tipo_manutencao_id))));
+  const fazenda = localId ? q.nome('locais', localId) : 'Todas as fazendas';
+  const linha = '<div class="ln"></div>';
+  const quad = '<i class="ck"></i>';
+  const aCada = (p, e) => {
+    const u = unidadeDe(e), partes = [];
+    if (p.periodicidade_horas != null && e.unidade_controle !== 'CALENDARIO') partes.push(nHoras(p.periodicidade_horas).replace(',0', '') + ' ' + u);
+    if (p.periodicidade_dias != null) partes.push(p.periodicidade_dias + ' d');
+    return partes.join(' / ') || '—';
+  };
+  const leituraHoje = e => e.unidade_controle === 'HORIMETRO' ? 'Horímetro hoje' : e.unidade_controle === 'HODOMETRO' ? 'Km hoje' : '';
+  const corpo = grupos.map(({ e, itens }) => {
+    const rot = leituraHoje(e);
+    const medido = e.unidade_controle !== 'CALENDARIO';
+    return `<tbody><tr class="maq"><td colspan="7"><b>${esc(e.codigo || '')} — ${esc(e.descricao || '')}</b>
+        ${!localId ? `<span>${esc(q.nome('locais', e.local_id) || '')}</span>` : ''}
+        ${rot ? `<span>${rot}: <i class="hj"></i></span>` : ''}</td></tr>` +
+      itens.map(p => {
+        const semHora = !medido || p.periodicidade_horas == null;
+        return `<tr><td>${esc(q.nome('tipos_manutencao', p.tipo_manutencao_id))}</td><td class="nw">${esc(aCada(p, e))}</td>
+          <td class="f${semHora ? ' cinza' : ''}">${semHora ? '' : linha}</td><td class="f dt">____/____/______</td>
+          <td class="f c">${quad}</td><td class="f c">${quad}</td><td>${linha}</td></tr>`;
+      }).join('') + '</tbody>';
+  }).join('');
+  const nServ = planos.length;
+  const w = window.open('', '_blank');
+  if (!w) return aviso('O navegador bloqueou a janela de impressão.', true);
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+    <title>Levantamento da última troca — ${esc(fazenda)}</title>
+    <style>
+      @page{size:A4 landscape;margin:9mm 10mm}
+      *{box-sizing:border-box}
+      body{font-family:Arial,Helvetica,sans-serif;color:#51534A;margin:0;font-size:11px}
+      .top{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #c9dfa0;padding-bottom:7px}
+      .top img{height:40px}
+      .tit{text-align:center}.tit h1{margin:0;font-size:17px;letter-spacing:1.2px;color:#3d3f38;text-transform:uppercase}
+      .tit p{margin:3px 0 0;font-size:10.5px;color:#7a7c72}
+      .inf{border:1px solid #d7d9cf;border-radius:7px;padding:5px 9px;font-size:10.5px;text-align:right;line-height:1.5}
+      .inf b{color:#3d3f38}
+      .aviso{margin:7px 0 6px;background:#f1f6e6;border-left:4px solid #84BD00;padding:5px 9px;font-size:10.5px}
+      .aviso b{color:#744F28}
+      table{width:100%;border-collapse:collapse}
+      thead{display:table-header-group}
+      tbody{break-inside:avoid;page-break-inside:avoid}
+      th{background:#f4f5f0;font-size:8.5px;text-transform:uppercase;text-align:left;padding:4px 5px;border:1px solid #cfd2c7;letter-spacing:.3px}
+      th.g{background:#eaf3d6;text-align:center;color:#4f7300}
+      td{border:1px solid #d7d9cf;padding:3px 7px;height:31px;vertical-align:bottom}
+      tr.maq td{background:#eef5de;color:#3d3f38;height:25px;vertical-align:middle}
+      tr.maq span{margin-left:16px}
+      .hj{display:inline-block;width:120px;border-bottom:1px solid #9a9c92;height:12px;vertical-align:bottom}
+      .ln{border-bottom:1px solid #9a9c92;height:16px;margin-bottom:3px}
+      .f{background:#fbfcf8}.f.cinza{background:#eeeee9}
+      .dt{color:#9a9c92;text-align:center;letter-spacing:2px;font-size:12px;padding-bottom:5px}
+      .c{text-align:center;vertical-align:middle}
+      .nw{white-space:nowrap}
+      .ck{display:inline-block;width:14px;height:14px;border:1.4px solid #51534A;border-radius:2px}
+      .pe{display:flex;justify-content:space-between;align-items:flex-end;margin-top:20px;font-size:11px;break-inside:avoid}
+      .ass{width:320px;text-align:center;border-top:1px solid #51534A;padding-top:4px}
+      .ft{text-align:right;margin-top:8px}.ft img{height:18px}
+      th,td,.f,.aviso,tr.maq td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    </style></head><body>
+    <div class="top"><img src="${new URL('../img/sakuma-logo.png', location.href)}" alt="SAKUMA Agronegócios">
+      <div class="tit"><h1>Levantamento da última troca</h1><p>Escreva quando foi a última troca de cada serviço — pelo adesivo da máquina, caderno ou nota da peça</p></div>
+      <div class="inf">Fazenda: <b>${esc(fazenda)}</b><br>Emitido em <b>${formatarData(hoje())}</b><br>${grupos.length} ${grupos.length === 1 ? 'máquina' : 'máquinas'} · ${nServ} ${nServ === 1 ? 'serviço' : 'serviços'}</div></div>
+    <div class="aviso"><b>Como preencher:</b> em cada máquina, o horímetro de hoje. Depois, em cada serviço, o horímetro e a data da última troca, se tem o adesivo dessa troca na máquina e se tirou a foto do adesivo. Não sabe? Escreva em Obs.</div>
+    <table><thead>
+      <tr><th rowspan="2" style="width:20%">Serviço</th><th rowspan="2" style="width:9%">A cada</th>
+        <th colspan="2" class="g">Última troca de verdade</th><th colspan="2" class="g">Adesivo</th><th rowspan="2">Obs.</th></tr>
+      <tr><th class="g" style="width:16%">Horímetro</th><th class="g" style="width:16%">Data</th><th class="g" style="width:5.5%">Tem</th><th class="g" style="width:5.5%">Foto</th></tr>
+    </thead>${corpo}</table>
+    <div class="pe"><span>Data do levantamento: ____/____/_______</span><div class="ass">Responsável</div></div>
+    <div class="ft"><img src="${new URL('../img/lop-marca.png', location.href)}" alt="LOP"></div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>
+    </body></html>`);
+  w.document.close();
 }
