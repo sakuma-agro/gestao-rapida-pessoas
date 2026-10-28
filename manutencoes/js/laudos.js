@@ -37,9 +37,9 @@ function todosLaudos(e) {
 }
 
 /* O mais recente de cada tipo — é ele que vale. */
-function laudosVigentes(e) {
+function laudosVigentes(e, todos) {
   const vistos = new Set();
-  return todosLaudos(e).filter(l => { const k = l.nome; if (vistos.has(k)) return false; vistos.add(k); return true; });
+  return (todos || todosLaudos(e)).filter(l => { const k = l.nome; if (vistos.has(k)) return false; vistos.add(k); return true; });
 }
 
 function situacaoLaudo(l) {
@@ -51,7 +51,8 @@ function situacaoLaudo(l) {
 
 /* Bloco da ficha da máquina. */
 function blocoLaudos(e) {
-  const vig = laudosVigentes(e);
+  const todos = todosLaudos(e);
+  const vig = laudosVigentes(e, todos);
   const pode = typeof ehAdmin === 'function' && ehAdmin();
   const alerta = vig.filter(l => l.situacao === 'Não aprovado' || diasEntre(hoje(), l.proxima) < 0);
   return `
@@ -61,7 +62,7 @@ function blocoLaudos(e) {
       (diasEntre(hoje(), l.proxima) < 0 ? 'Vencido desde ' + formatarData(l.proxima) + '.' : '')).join('<br>')}</p>` : ''}
     ${vig.length === 0 ? '<p class="sub">Nenhum laudo cadastrado.</p>' : `<table class="tabela"><thead><tr>
       <th>Laudo</th><th>Data</th><th>Resultado</th><th>Vence</th><th>Situação</th></tr></thead><tbody>` +
-      todosLaudos(e).map(l => { const s = situacaoLaudo(l); const vale = vig.includes(l);
+      todos.map(l => { const s = situacaoLaudo(l); const vale = vig.includes(l);
         return `<tr${vale ? '' : ' class="lv-antigo"'}>
           <td><strong>${esc(l.nome)}</strong><small>${esc([l.empresa, l.relatorio ? 'nº ' + l.relatorio : '', l.art ? 'ART ' + l.art : ''].filter(Boolean).join(' · '))}</small></td>
           <td>${formatarData(l.data)}</td>
