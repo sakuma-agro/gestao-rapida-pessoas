@@ -322,3 +322,8 @@ create policy jornada_modulo on public.jor_ticket_emissoes for all using (app_po
 
 -- 27/10/2026: feriado que vale só para um destino de DP (null = todos)
 alter table public.jor_feriados add column if not exists destino_id uuid references public.jor_destinos_dp(id);
+
+-- 28/10/2026 · origem do trabalhador (certificação GRASP 4.2 — quantidades de migrantes e regionais)
+alter table public.funcionarios add column if not exists origem text;
+alter table public.funcionarios drop constraint if exists funcionarios_origem_chk;
+alter table public.funcionarios add constraint funcionarios_origem_chk check (origem is null or origem in ('REGIONAL','MIGRANTE'));

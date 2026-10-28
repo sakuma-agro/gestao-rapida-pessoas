@@ -1105,6 +1105,7 @@ function abrirFuncionario(id) {
   $('fuCadastro').value = editandoFunc.cadastro || '';
   $('fuNascimento').value = (editandoFunc.nascimento || '').slice(0, 10);
   $('fuSexo').value = editandoFunc.sexo || '';
+  $('fuOrigem').value = editandoFunc.origem || '';
   $('fuTelefone').value = editandoFunc.telefone || '';
   $('fuAdmissao').value = (editandoFunc.admissao || '').slice(0, 10);
   $('fuCpf').value = mascaraCpf(editandoFunc.cpf || '');
@@ -1231,6 +1232,7 @@ $('formFunc').addEventListener('submit', async ev => {
     cadastro: $('fuCadastro').value.trim(),
     nascimento: $('fuNascimento').value || null,
     sexo: $('fuSexo').value || null,
+    origem: $('fuOrigem').value || null,
     telefone: $('fuTelefone').value.trim(),
     admissao: $('fuAdmissao').value || null,
     cpf: mascaraCpf($('fuCpf').value),

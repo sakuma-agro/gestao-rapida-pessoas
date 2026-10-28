@@ -892,11 +892,15 @@ function numeros() {
   const h = gente.filter(f => f.sexo === 'M').length;
   const mu = gente.filter(f => f.sexo === 'F').length;
   const semSexo = total - h - mu;
+  // Origem dos trabalhadores (GRASP 4.2, 28/10/2026)
+  const reg = gente.filter(f => f.origem === 'REGIONAL').length;
+  const mig = gente.filter(f => f.origem === 'MIGRANTE').length;
+  const semOrigem = total - reg - mig;
   const idades = gente.map(f => anosDesde(f.nascimento)).filter(v => v != null);
   const casas = gente.map(f => anosDesde(f.admissao)).filter(v => v != null);
   const media = l => l.length ? (l.reduce((a, b) => a + b, 0) / l.length) : null;
   return {
-    gente, total, h, mu, semSexo,
+    gente, total, h, mu, semSexo, reg, mig, semOrigem,
     idadeMedia: media(idades), semNascimento: total - idades.length,
     casaMedia: media(casas), semAdmissao: total - casas.length,
   };
@@ -979,6 +983,34 @@ function roscaSexo(n) {
     </div>`;
 }
 
+/* Origem dos trabalhadores — certificação GRASP, item 4.2 (28/10/2026).
+   O auditor pediu as QUANTIDADES de migrantes e regionais, não só um "sim".
+   A classificação é marcada pessoa a pessoa (Cadastro ou o painel abaixo do
+   quadro); a naturalidade aparece só como pista, porque quem nasceu longe e
+   mora aqui há anos é regional. */
+const ORIGENS = [
+  ['Regionais', 'reg', CORES.homem],
+  ['Migrantes', 'mig', CORES.mulher],
+  ['Não classificado', 'semOrigem', CORES.semSexo],
+];
+const DEF_ORIGEM = 'Regional: mora na região da fazenda. Migrante: veio de outra região ou estado para trabalhar.';
+
+function tabelaOrigem(n, doc) {
+  const linhas = ORIGENS.filter(([, k]) => k !== 'semOrigem' || n.semOrigem);
+  const cl = doc ? 'rel-num' : 'ce';
+  return `
+    <table class="${doc ? 'rel-tabela' : 'dc-planilha'} g-tab">
+      ${doc ? '<colgroup><col><col style="width:16mm"><col style="width:16mm"><col style="width:42mm"></colgroup>' : ''}
+      <thead><tr><th>Origem</th><th class="${cl}">Pessoas</th><th class="${cl}">%</th><th></th></tr></thead>
+      <tbody>${linhas.map(([r, k]) => `<tr><td>${esc(r)}</td>
+        <td class="${cl}">${n[k]}</td><td class="${cl}">${pct(n[k], n.total)}</td>
+        <td class="g-cel">${barra(n[k], n.total)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total</td><td class="${cl}">${n.total}</td><td class="${cl}">${n.total ? '100,0%' : '—'}</td><td></td></tr></tfoot>
+    </table>
+    <p class="g-nota">${esc(DEF_ORIGEM)}${n.semOrigem
+      ? ` Ainda faltam ${n.semOrigem} pessoa(s) sem classificação neste recorte.` : ''}</p>`;
+}
+
 /** Enche os dois filtros. As fazendas seguem o empregador escolhido. */
 function preencherFiltros() {
   /* O valor da opção é a CHAVE do grupo, não a grafia: assim escolher
@@ -1030,6 +1062,8 @@ function desenharQuadro() {
     // percentual sobre o total, igual ao da rosca — indicador só pode ter um valor
     um('Homens', `${n.h}`, pct(n.h, n.total)),
     um('Mulheres', `${n.mu}`, pct(n.mu, n.total)),
+    um('Regionais', `${n.reg}`, pct(n.reg, n.total)),
+    um('Migrantes', `${n.mig}`, pct(n.mig, n.total)),
     um('Idade média', n.idadeMedia == null ? '—' : `${n.idadeMedia.toFixed(1).replace('.', ',')} anos`,
       n.semNascimento ? `${n.semNascimento} sem data de nascimento` : ''),
     um('Tempo de casa', n.casaMedia == null ? '—' : `${n.casaMedia.toFixed(1).replace('.', ',')} anos`,
@@ -1037,6 +1071,7 @@ function desenharQuadro() {
   ].join('');
 
   $('rhGraficoSexo').innerHTML = roscaSexo(n);
+  $('rhOrigem').innerHTML = tabelaOrigem(n, false);
 
   const tabela = (titulo, linhas, total) => `
     <div class="qp-bloco">
@@ -1057,6 +1092,31 @@ function desenharQuadro() {
     tabela(titulo, linhas, n.total)).join('');
 
   desenharMarcacaoSexo();
+  desenharMarcacaoOrigem();
+}
+
+/** Painel para classificar a origem de quem ainda não tem (GRASP 4.2). */
+function desenharMarcacaoOrigem() {
+  const faltam = estado.funcionarios
+    .filter(f => f.situacao === 'ATIVO' && !f.origem)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+  $('rhCartaoOrigem').hidden = !faltam.length;
+  if (!faltam.length) return;
+
+  $('rhFaltamOrigem').textContent =
+    `${faltam.length} pessoa(s) ativa(s) sem origem classificada. ${DEF_ORIGEM} A naturalidade aparece só como pista.`;
+
+  $('rhListaOrigem').innerHTML = faltam.map(f => `
+    <div class="item" style="grid-template-columns:1fr auto">
+      <span><span class="nome">${esc(f.nome)}</span><br>
+        <span class="sub">${esc(f.cargo || '')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}${
+          f.naturalidade ? ' · natural de ' + esc(f.naturalidade) : ''}${f.municipio ? ' · mora em ' + esc(f.municipio) : ''}</span></span>
+      <span class="acoes">
+        <button class="btn mini" data-origem="REGIONAL" data-id="${f.id}">Regional</button>
+        <button class="btn mini" data-origem="MIGRANTE" data-id="${f.id}">Migrante</button>
+      </span>
+    </div>`).join('');
 }
 
 /** Painel para marcar o sexo de quem ainda não tem — sem ele não sai o %. */
@@ -1101,6 +1161,8 @@ function documentoQuadro() {
       <div><span>Pessoas</span><b>${n.total}</b></div>
       <div><span>Homens</span><b>${n.h} · ${pct(n.h, n.total)}</b></div>
       <div><span>Mulheres</span><b>${n.mu} · ${pct(n.mu, n.total)}</b></div>
+      <div><span>Regionais</span><b>${n.reg} · ${pct(n.reg, n.total)}</b></div>
+      <div><span>Migrantes</span><b>${n.mig} · ${pct(n.mig, n.total)}</b></div>
       <div><span>Idade média</span><b>${n.idadeMedia == null ? '—' : n.idadeMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Tempo de casa</span><b>${n.casaMedia == null ? '—' : n.casaMedia.toFixed(1).replace('.', ',') + ' anos'}</b></div>
       <div><span>Situação</span><b>${esc(fora ? fora.situacao : ($('qpSituacao').value || 'todas'))}</b></div>
@@ -1108,6 +1170,8 @@ function documentoQuadro() {
     </div>
     <h2 class="rel-secao">Homens e mulheres</h2>
     ${roscaSexo(n)}
+    <h2 class="rel-secao">Origem dos trabalhadores</h2>
+    ${tabelaOrigem(n, true)}
     ${blocosDe(g).map(([titulo, linhas]) => bloco(titulo, linhas)).join('')}`;
 
   return documento({
@@ -1126,6 +1190,7 @@ function csvQuadro() {
     linhas.push([titulo, k, v, pct(v, n.total)]));
   linhas.push(['Recorte', recorte(), n.total, '100,0%']);
   juntar('Sexo', [['Homens', n.h], ['Mulheres', n.mu], ['Não informado', n.semSexo]]);
+  juntar('Origem', [['Regionais', n.reg], ['Migrantes', n.mig], ['Não classificado', n.semOrigem]]);
   blocosDe(n.gente).forEach(([titulo, dados]) => juntar(titulo, dados));
   return linhas;
 }
@@ -1331,6 +1396,18 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   $('bPreviaQuadro').addEventListener('click', () => verPrevia(documentoQuadro(), `Quadro de pessoal - ${recorte()}`));
   $('bCsvQuadro').addEventListener('click', () =>
     baixarCsv(`quadro-de-pessoal-${recorte().replace(/\W+/g, '-').toLowerCase()}-${hoje()}.csv`, csvQuadro()));
+
+  $('rhListaOrigem').addEventListener('click', async ev => {
+    const b = ev.target.closest('[data-origem]');
+    if (!b) return;
+    b.disabled = true;
+    const f = estado.funcionarios.find(x => x.id === b.dataset.id);
+    if (!f) return;
+    await salvarFuncionario({ ...f, origem: b.dataset.origem });
+    f.origem = b.dataset.origem;
+    desenharQuadro();
+    redesenharFuncionarios();
+  });
 
   $('rhListaSexo').addEventListener('click', async ev => {
     const b = ev.target.closest('[data-sexo]');

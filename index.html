@@ -1623,7 +1623,14 @@ addEventListener('beforeinstallprompt', function (ev) {
 
         <div class="qp-cards" id="rhQuadroResumo" style="margin-top:14px"></div>
         <div class="qp-bloco"><h3>Homens e mulheres</h3><div id="rhGraficoSexo"></div></div>
+        <div class="qp-bloco"><h3>Origem dos trabalhadores</h3><div id="rhOrigem"></div></div>
         <div id="rhQuadroTabelas" style="margin-top:6px"></div>
+      </div>
+
+      <div class="cartao" id="rhCartaoOrigem" hidden>
+        <h2 style="margin:0 0 4px">Falta classificar a origem</h2>
+        <p class="dica" id="rhFaltamOrigem" style="margin:0"></p>
+        <div class="lista rolagem" id="rhListaOrigem" style="margin-top:12px"></div>
       </div>
 
       <div class="cartao" id="rhCartaoSexo" hidden>
@@ -1808,6 +1815,13 @@ addEventListener('beforeinstallprompt', function (ev) {
           <option value="">Escolha…</option>
           <option value="M">Masculino</option>
           <option value="F">Feminino</option>
+        </select>
+      </label>
+      <label class="campo" title="Certificação GRASP 4.2 · origem dos trabalhadores">Origem
+        <select id="fuOrigem">
+          <option value="">Não classificado</option>
+          <option value="REGIONAL">Regional (mora na região)</option>
+          <option value="MIGRANTE">Migrante (veio de outra região)</option>
         </select>
       </label>
       <label class="campo">Telefone <input type="text" id="fuTelefone" inputmode="tel" placeholder="(34) 99999-0000"></label>

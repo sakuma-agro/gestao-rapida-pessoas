@@ -195,7 +195,7 @@ function aniversariantes() {
 
 /* O que falta no cadastro — para completar antes que outro módulo precise. */
 const CAMPOS = [
-  ['admissao', 'admissão'], ['nascimento', 'nascimento'], ['sexo', 'sexo'], ['cpf', 'CPF'],
+  ['admissao', 'admissão'], ['nascimento', 'nascimento'], ['sexo', 'sexo'], ['origem', 'origem (regional/migrante)'], ['cpf', 'CPF'],
   ['pis', 'PIS'], ['cargo', 'cargo'], ['setor', 'setor'], ['empregador', 'empregador'],
   ['fazenda', 'fazenda'], ['telefone', 'telefone'], ['emergencia_telefone', 'contato de emergência'],
 ];
