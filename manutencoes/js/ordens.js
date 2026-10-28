@@ -346,21 +346,63 @@ function abrirOS(idOS) {
   const proxTroca = proxDe(trocas), proxCheck = proxDe(checks);
   const hojeTxt = feita ? '' : ' (se feita hoje)';
 
+  /* Troca / serviço (28/10/2026, pedido dele): na frente de cada serviço,
+     campos para o mecânico preencher à mão — troca feita (horímetro e data) e
+     próxima troca (horímetro e data) — e uma Obs. ("não precisou"). Sem
+     previsão impressa: quem preenche é ele, conferindo o adesivo. Na OS já
+     feita, as colunas vêm com o que foi registrado. */
+  const dataBranca = '<span class="os-data-br">___/___/_____</span>';
+  const proxValores = (it, p) => {
+    if (!p || !(feita && it.feito)) return { h: '', d: '' };
+    const ph = p.periodicidade_horas != null ? Number(p.periodicidade_horas) : null;
+    const pd = p.periodicidade_dias != null ? Number(p.periodicidade_dias) : null;
+    return {
+      h: medidoOS && ph != null && it.leitura_troca != null ? nHoras(Number(it.leitura_troca) + ph) + ' ' + u : '—',
+      d: pd != null && it.data_troca ? formatarData(somarDias(String(it.data_troca).slice(0, 10), Math.round(pd))) : '—'
+    };
+  };
+  const celH = v => `<td class="os-campo">${v || linhaBranca}</td>`;
+  const celD = v => `<td class="os-campo">${v || dataBranca}</td>`;
   const blocoTroca = !trocas.length ? '' : `
     <section class="os-bloco">
-      <h3>Troca / serviço <small>marque o que for feito</small></h3>
-      <table class="os-tab"><thead><tr>
-        <th class="os-ok">Feito</th><th>Serviço</th>${temMaterial ? '<th>Material</th>' : ''}<th class="os-prox">Próxima troca</th>
-      </tr></thead><tbody>` + trocas.map(it => {
+      <h3>Troca / serviço <small>marque o que foi feito e preencha a troca e a próxima troca; se não precisou trocar, escreva em Obs.</small></h3>
+      <table class="os-tab os-troca"><thead>
+        <tr><th class="os-ok" rowspan="2">Feito</th><th rowspan="2">Serviço</th>${temMaterial ? '<th rowspan="2">Material</th>' : ''}
+          <th class="os-grp" colspan="${medidoOS ? 2 : 1}">Troca feita</th><th class="os-grp" colspan="${medidoOS ? 2 : 1}">Próxima troca</th>
+          <th rowspan="2" class="os-obs-col">Obs. <small>(ex.: não precisou)</small></th></tr>
+        <tr>${medidoOS ? `<th class="os-grp">${lt}</th>` : ''}<th class="os-grp">Data</th>${medidoOS ? `<th class="os-grp">${lt}</th>` : ''}<th class="os-grp">Data</th></tr>
+      </thead><tbody>` + trocas.map(it => {
         const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
+        const fz = feita && it.feito, px = proxValores(it, p);
         return `<tr>
           <td class="os-ok"><span class="os-quad${it.feito ? ' on' : ''}">${it.feito ? '✓' : ''}</span></td>
           <td><b>${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</b>${tipoComo(it.tipo_manutencao_id)}</td>
           ${temMaterial ? `<td class="os-mat">${p && p.materiais ? esc(p.materiais) : '—'}</td>` : ''}
-          <td class="os-prox">${proximaDaOS(it, p)}</td>
+          ${medidoOS ? celH(fz && it.leitura_troca != null ? nHoras(it.leitura_troca) + ' ' + u : (feita ? '—' : '')) : ''}
+          ${celD(fz && it.data_troca ? formatarData(it.data_troca) : (feita ? '—' : ''))}
+          ${medidoOS ? celH(fz ? px.h : (feita ? '—' : '')) : ''}
+          ${celD(fz ? px.d : (feita ? '—' : ''))}
+          <td class="os-campo">${feita && !it.feito ? 'não feito' : (feita ? '' : linhaBranca)}</td>
         </tr>`;
       }).join('') + `</tbody></table>
-      ${proxTroca ? `<div class="os-proxima"><span>Próxima troca${hojeTxt}</span><b>${proxTroca}</b></div>` : ''}
+    </section>`;
+
+  /* Conferência da máquina (28/10/2026, pedido dele): adesivo de troca e
+     vazamentos, com espaço para detalhar. Não vai na OS do vaso de pressão. */
+  const quad = t => `<span><i class="os-quad"></i>${t}</span>`;
+  const blocoConferencia = !trocas.length || ehVasoOS ? '' : `
+    <section class="os-bloco">
+      <h3>Conferência da máquina</h3>
+      <div class="os-conf">
+        <div class="os-conf-cx"><b>Adesivo de troca</b>
+          <div class="os-checks os-checks-col">${quad('Adesivo novo colado na máquina (com ' + lt.toLowerCase() + ' e data)')}${quad('Foto do adesivo tirada')}
+            <span><i class="os-quad"></i>Sem adesivo — motivo: <em class="os-preencher"></em></span></div></div>
+        <div class="os-conf-cx"><b>Vazamentos</b>
+          <div class="os-checks">${quad('Sem vazamento')}${quad('Tem vazamento — onde:')}</div>
+          <div class="os-checks os-checks-3">${['Motor', 'Transmissão', 'Hidráulico', 'Radiador', 'Combustível', 'Outro'].map(quad).join('')}</div></div>
+      </div>
+      <div class="os-obs"><span>Detalhe do vazamento <small>(onde, o quê — óleo, água, diesel — e se precisa de OS corretiva)</small></span>
+        <div class="os-linhas"><span></span><span></span></div></div>
     </section>`;
 
   const nomeCheck = t => String(t).replace(/^VASO\s*·\s*/i, '');
@@ -375,10 +417,10 @@ function abrirOS(idOS) {
           <td class="os-ok"><span class="os-quad"></span></td>
         </tr>`).join('') + `</tbody></table>
       <p class="os-como">Marcou Problema? Escreva na observação o que viu.</p>
-      ${proxCheck ? `<div class="os-proxima"><span>Próximo check list${hojeTxt}</span><b>${proxCheck}</b></div>` : ''}
+      ${proxCheck && feita ? `<div class="os-proxima"><span>Próximo check list</span><b>${proxCheck}</b></div>` : ''}
     </section>`;
 
-  const blocoPreventiva = blocoTroca + blocoCheck;
+  const blocoPreventiva = blocoTroca + blocoConferencia + blocoCheck;
 
   const blocoCorretiva = `
     <section class="os-bloco">
@@ -390,11 +432,12 @@ function abrirOS(idOS) {
   const blocoExecucao = `
     <section class="os-bloco">
       <h3>Feito por</h3>
+      ${!corretiva ? `<div class="os-grade os-g1">${caixa('Quem fez', feita ? val(os.executado_por) : linhaBranca)}</div>` : `
       <div class="os-grade ${medidoOS ? 'os-g3' : 'os-g2'}">
         ${caixa('Quem fez', feita ? val(os.executado_por) : linhaBranca)}
         ${caixa('Data', feita ? formatarData(os.data_execucao) : '___ /___ /_____')}
         ${medidoOS ? caixa(lt + ' na hora', feita && os.leitura_execucao != null ? nHoras(os.leitura_execucao) + ' ' + u : linhaBranca) : ''}
-      </div>
+      </div>`}
       <div class="os-obs"><span>${corretiva ? 'O que foi feito' : 'Observação'}</span>
         ${feita && os.observacao ? `<p>${esc(os.observacao)}</p>` : '<div class="os-linhas"><span></span></div>'}</div>
     </section>`;
@@ -421,8 +464,8 @@ function abrirOS(idOS) {
       ${corretiva ? blocoCorretiva : blocoPreventiva}
       ${blocoExecucao}
 
-      <section class="os-assinaturas os-ass2">
-        <div><span></span>Quem fez</div>
+      <section class="os-assinaturas os-ass2${corretiva ? '' : ' os-ass-resp'}">
+        ${corretiva ? '<div><span></span>Quem fez</div>' : ''}
         <div><span></span>Responsável</div>
       </section>
 
