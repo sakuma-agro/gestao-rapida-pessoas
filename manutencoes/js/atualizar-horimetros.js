@@ -59,7 +59,8 @@ function horimetroArquivo(corpo, local) {
       <p class="ajuda">${ult ? 'Última leitura na Matriz: ' + formatarData(ult) + '. ' : ''}Precisa de internet. Importar o mesmo arquivo de novo não soma duas vezes.</p>
       <div class="ir-passo"><b>2</b> Confira a lista e toque em <em>Gravar</em></div>
       <div id="ir-passo"></div>
-    </div>`;
+    </div>
+    ${painelUltimos(local)}`;
   corpo.querySelector('#ah-arq').onchange = ev => {
     const arq = ev.target.files[0];
     if (!arq) return;
@@ -67,6 +68,29 @@ function horimetroArquivo(corpo, local) {
     corpo.querySelector('.ir-arq').firstChild.textContent = '📎 ' + arq.name;
     importarHorimetrosArquivo(arq, corpo.querySelector('#ir-passo'), local.id);
   };
+}
+
+/* Painel do último horímetro (28/10/2026, pedido dele: "painel de último
+   horímetro com data"). Cada máquina com horímetro ou km da fazenda: o último
+   número, a data da leitura e há quantos dias — as mais velhas no topo,
+   amarelo a partir de 7 dias, vermelho a partir de 30. */
+function painelUltimos(local) {
+  const maqs = maquinasComMostrador(local.id).filter(e => typeof noGrupo !== 'function' || noGrupo(e));
+  if (!maqs.length) return '';
+  const idade = e => e.leitura_data ? diasEntre(String(e.leitura_data).slice(0, 10), hoje()) : Infinity;
+  const lista = maqs.slice().sort((a, b) => idade(b) - idade(a) || porCodigo(a, b));
+  const velhas = lista.filter(e => idade(e) >= 7).length;
+  return `<div class="ah-cartao ah-painel">
+    <div class="ah-painel-top"><b>Último horímetro de cada máquina · ${esc(local.nome)}</b>
+      <span>${lista.length} máquinas${velhas ? ` · <em class="ah-velho">${velhas} com mais de 7 dias</em>` : ' · todas em dia'}</span></div>
+    <table class="tabela ah-tab"><thead><tr><th>Máquina</th><th class="num">Último</th><th>Data</th><th>Há</th></tr></thead><tbody>
+    ${lista.map(e => { const d = idade(e), u = unidadeDe(e);
+      const cls = d === Infinity || d >= 30 ? 'ah-r' : d >= 7 ? 'ah-y' : '';
+      return `<tr class="${cls}"><td><span class="codigo">${esc(e.codigo)}</span> ${esc(e.descricao || '')}</td>
+        <td class="num"><b>${leituraDe(e) != null ? nHoras(leituraDe(e)) + ' ' + u : '—'}</b></td>
+        <td>${e.leitura_data ? formatarData(e.leitura_data) : '—'}</td>
+        <td>${d === Infinity ? 'nunca lançado' : d === 0 ? 'hoje' : d === 1 ? 'ontem' : d + ' dias'}</td></tr>`; }).join('')}
+    </tbody></table></div>`;
 }
 
 /* ---- Quebra Cocão: à mão ---- */
@@ -93,7 +117,7 @@ function horimetroManual(corpo, local, depois) {
           return `<div class="ah-linha" data-id="${esc(e.id)}">
             <span class="ah-cod">${esc(e.codigo)}</span>
             <span class="ah-nm"><b>${esc(e.descricao || '')}</b>
-              <small>último: ${leituraDe(e) != null ? nHoras(leituraDe(e)) + ' ' + u : '—'}${d == null ? ' · nunca lançado'
+              <small>último: ${leituraDe(e) != null ? nHoras(leituraDe(e)) + ' ' + u : '—'}${e.leitura_data ? ' em ' + formatarData(e.leitura_data) : ''}${d == null ? ' · nunca lançado'
                 : ` · <em class="${d >= 7 ? 'ah-velho' : ''}">${d === 0 ? 'hoje' : d === 1 ? 'ontem' : 'há ' + d + ' dias'}</em>`}</small></span>
             <input type="number" inputmode="decimal" step="0.1" placeholder="novo (${u})" data-valor>
             <span class="ah-msg"></span>

@@ -1583,3 +1583,11 @@ tr.ir-volta td{color:var(--cinza-claro)}
 .pv-atrasada{background:#FFF7F6}
 .pv-aba-atr{font-style:normal;color:var(--urgente);font-weight:bold;font-size:12px}
 .pv-avisos .pv-av-r{color:var(--urgente);font-weight:bold}
+/* 28/10/2026: painel do último horímetro */
+.ah-painel{margin-top:14px;padding:0;overflow:hidden}
+.ah-painel-top{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--fundo);border-bottom:1px solid var(--linha);font-size:14px}
+.ah-painel-top span{font-size:13px;color:var(--cinza-claro)}
+.ah-tab{margin:0;border:0}
+.ah-tab td,.ah-tab th{padding:8px 14px}
+.ah-tab tr.ah-y td{background:#FFF8E6}.ah-tab tr.ah-y td:last-child{color:#A87508;font-weight:bold}
+.ah-tab tr.ah-r td{background:#FDF0EE}.ah-tab tr.ah-r td:last-child{color:var(--urgente);font-weight:bold}
