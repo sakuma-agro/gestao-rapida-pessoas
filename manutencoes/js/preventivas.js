@@ -73,6 +73,12 @@ function ultimaTxt(p, e) {
 
 TELAS.painel = el => {
   document.body.classList.remove('modo-quadro');
+  /* Uma OS por máquina (28/10/2026): se apareceu OS duplicada (dois aparelhos
+     sem internet), junta na mais antiga e redesenha. */
+  if (typeof juntarOSDuplicadas === 'function' && temOSDuplicada()) {
+    juntarOSDuplicadas().then(n => { if (n) aviso(n + ' OS duplicada(s) juntada(s) na OS mais antiga da máquina.'); TELAS.painel(el); });
+    return;
+  }
   const planos = planosDaFrota();
   const mes = hoje().slice(0, 7);
 
@@ -197,7 +203,8 @@ TELAS.painel = el => {
           porMaq.get(id).itens.push(x);
         }
         const maqs = [...porMaq.values()].map(m => Object.assign(m, { vencida: m.itens.some(x => x.c.status === 'VENCIDO') }));
-        const linhaMaq = m => `<div class="pv-linha pv-maq ${m.vencida ? 'pv-r' : 'pv-y'}">${maq(m.e)}
+        const linhaMaq = m => `<div class="pv-linha pv-maq pv-com-sel ${m.vencida ? 'pv-r' : 'pv-y'}">
+          <label class="pv-sel" title="Marcar para abrir junto"><input type="checkbox" data-sel="${esc(m.itens.map(x => x.p.id).join(','))}"></label>${maq(m.e)}
           <span class="pv-itens">${m.itens.map(({ p, c }) => `<span class="pv-subitem ${c.status === 'VENCIDO' ? 'pv-r' : 'pv-y'}">
             <span class="pv-item">${esc(nomeTipo(p.tipo_manutencao_id))}${ultimaTxt(p, c.equipamento)}</span>
             <span class="pv-sit"><b>${esc(textoSituacao(c))}</b><i class="pv-barra"><i style="width:${usoDoIntervalo(p, c)}%"></i></i></span>
@@ -205,7 +212,14 @@ TELAS.painel = el => {
           <span class="pv-acao"><button type="button" class="btn" data-abrir-maq="${esc(m.itens.map(x => x.p.id).join(','))}">Abrir OS${m.itens.length > 1 ? ' (' + m.itens.length + ' itens)' : ''}</button></span>
         </div>`;
         const venc = maqs.filter(m => m.vencida), perto = maqs.filter(m => !m.vencida);
-        html = (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
+        /* Abrir várias de uma vez (28/10/2026): marca as máquinas e sai uma
+           OS por máquina, já pronta para imprimir e levar à oficina. */
+        const barraSel = maqs.length ? `<div class="pv-barra-sel">
+            <label><input type="checkbox" id="pv-sel-todas"> Marcar todas</label>
+            <span id="pv-sel-n">nenhuma marcada</span>
+            <button type="button" class="btn neutro" id="pv-abrir-sel" disabled>Abrir marcadas</button>
+            <button type="button" class="btn" id="pv-imp-sel" disabled>Abrir e imprimir marcadas</button></div>` : '';
+        html = barraSel + (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
              + (perto.length ? `<div class="pv-grupo">Perto de vencer · ${perto.length} máquina(s)</div>` + perto.map(linhaMaq).join('') : '');
         if (!html) html = vazio('Nada a fazer: as trocas estão em dia ou já têm OS aberta');
       } else {
@@ -215,13 +229,17 @@ TELAS.painel = el => {
       html = F.andamento.map(o => {
         const e = q.por_id('equipamentos', o.equipamento_id) || { codigo: '—', descricao: '' };
         const d = diasDesde(o.data_emissao);
-        return `<div class="pv-linha pv-b">${maq(e)}
+        const esquecida = d != null && d > OS_ATRASADA_DIAS;
+        return `<div class="pv-os-bloco" data-bloco="${esc(o.id)}"><div class="pv-linha pv-b">${maq(e)}
           <span class="pv-item">${esc(resumoOS(o))}</span>
           <span class="pv-sit"><b class="pv-os">OS ${esc(numeroOS(o))}</b><small>aberta ${esc(dataCurta(o.data_emissao))}
-            · <em class="${d > OS_ATRASADA_DIAS ? 'pv-atraso' : ''}">${d == null ? '' : d === 0 ? 'hoje' : d + (d === 1 ? ' dia' : ' dias')}</em></small></span>
+            · <em class="${esquecida ? 'pv-atraso' : ''}">${d == null ? '' : d === 0 ? 'hoje' : d + (d === 1 ? ' dia' : ' dias')}</em></small></span>
           <span class="pv-acao"><button type="button" class="btn neutro" data-os="${esc(o.id)}">Ver OS</button>
-            <button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}">✓ Fechar OS</button></span>
-        </div>`;
+            ${esquecida
+              ? `<button type="button" class="btn neutro" data-naofeita="${esc(o.id)}">Não foi feita</button>
+                 <button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}" data-esquecida="1">✓ Já foi feita</button>`
+              : `<button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}">✓ Fechar OS</button>`}</span>
+        </div><div class="pv-fecha oculto" data-painel="${esc(o.id)}"></div></div>`;
       }).join('') || vazio('Nenhuma OS preventiva aberta');
     } else {
       html = F.feitas
@@ -256,15 +274,48 @@ TELAS.painel = el => {
       let os = null;
       for (const id of ids) os = await abrirOSPreventiva(id, { silencioso: true });
       const e = os && q.por_id('equipamentos', os.equipamento_id);
-      aviso(`OS ${numeroOS(os)} aberta para o ${e ? e.codigo : ''} com ${ids.length} ${ids.length === 1 ? 'item' : 'itens'}.`);
+      aviso(`OS ${numeroOS(os)} aberta para o ${e ? e.codigo : ''} com ${ids.length} ${ids.length === 1 ? 'item' : 'itens'}. Está em Em andamento.`);
       TELAS.painel(el);
-      if (os) abrirOS(os.id);
     });
     $$('#pv-lista [data-os]').forEach(x => x.onclick = () => abrirOS(x.dataset.os));
     $$('#pv-lista [data-fechar]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.fechar);
-      if (os) formFeita(os);
+      if (os) painelFechar(os, !!x.dataset.esquecida, () => TELAS.painel(el));
     });
+    $$('#pv-lista [data-naofeita]').forEach(x => x.onclick = async () => {
+      const os = q.por_id('ordens_servico', x.dataset.naofeita);
+      if (!os || !confirm(`A OS ${numeroOS(os)} não foi feita? Ela é cancelada e os serviços voltam para A fazer.`)) return;
+      await cancelarOS(os);
+      aviso(`OS ${numeroOS(os)} cancelada. Os serviços voltaram para A fazer.`);
+      TELAS.painel(el);
+    });
+    // Caixinhas de A fazer
+    const sels = $$('#pv-lista [data-sel]');
+    const contarSel = () => {
+      const n = sels.filter(c => c.checked).length;
+      const t = $('#pv-sel-n'); if (!t) return;
+      t.textContent = n ? n + (n === 1 ? ' máquina marcada' : ' máquinas marcadas') : 'nenhuma marcada';
+      $('#pv-abrir-sel').disabled = !n; $('#pv-imp-sel').disabled = !n;
+      $('#pv-sel-todas').checked = n > 0 && n === sels.length;
+    };
+    sels.forEach(c => c.onchange = contarSel);
+    const st = $('#pv-sel-todas'); if (st) st.onchange = () => { sels.forEach(c => c.checked = st.checked); contarSel(); };
+    const abrirMarcadas = async imprimir => {
+      const marcadas = sels.filter(c => c.checked);
+      if (!marcadas.length) return;
+      $('#pv-abrir-sel').disabled = $('#pv-imp-sel').disabled = true;
+      const oss = [];
+      for (const c of marcadas) {
+        let os = null;
+        for (const id of c.dataset.sel.split(',')) os = await abrirOSPreventiva(id, { silencioso: true });
+        if (os && !oss.includes(os)) oss.push(os);
+      }
+      aviso(`${oss.length} OS ${oss.length === 1 ? 'aberta' : 'abertas'}. Estão em Em andamento.`);
+      TELAS.painel(el);
+      if (imprimir) imprimirVariasOS(oss);
+    };
+    const bas = $('#pv-abrir-sel'); if (bas) bas.onclick = () => abrirMarcadas(false);
+    const bis = $('#pv-imp-sel'); if (bis) bis.onclick = () => abrirMarcadas(true);
     $$('#pv-lista [data-maq]').forEach(x => x.onclick = () => fichaMaquina(x.dataset.maq));
     $$('#pv-lista [data-prox]').forEach(x => x.onclick = () => {
       const p = q.por_id('planos_manutencao', x.dataset.prox);
@@ -295,6 +346,69 @@ TELAS.painel = el => {
   };
   desenhar();
 };
+
+function temOSDuplicada() {
+  const vistos = new Set();
+  return q.todos('ordens_servico').some(o => {
+    if (o.tipo === 'CORRETIVA' || !ABERTAS.includes(o.status)) return false;
+    if (vistos.has(o.equipamento_id)) return true;
+    vistos.add(o.equipamento_id); return false;
+  });
+}
+
+/* Fechar OS na própria linha (28/10/2026, pedido dele: "mais simples, lean,
+   prático"). Abre embaixo da linha: os serviços já marcados como feitos,
+   horímetro, quem fez, data, foto do adesivo e o botão Feito. Sem janela.
+   esquecida = OS aberta há mais de 15 dias ("Já foi feita"): a data vem em
+   branco para informar quando foi e a foto fica opcional. */
+function painelFechar(os, esquecida, depois) {
+  const box = document.querySelector(`[data-painel="${os.id}"]`);
+  if (!box) return formFeita(os);
+  if (!box.classList.contains('oculto')) { box.classList.add('oculto'); box.innerHTML = ''; return; }
+  $$('.pv-fecha').forEach(x => { x.classList.add('oculto'); x.innerHTML = ''; });
+  const e = q.por_id('equipamentos', os.equipamento_id);
+  const u = unidadeDe(e);
+  const medido = e.unidade_controle !== 'CALENDARIO';
+  const acumulado = e.unidade_controle === 'ACUMULADO';
+  const itens = itensDaOS(os.id).filter(i => !i.feito);
+  const fotoObrig = !esquecida && pedeAdesivo(itens);
+  const lt = u === 'km' ? 'Km' : 'Horímetro';
+  let foto = null;
+  box.innerHTML = `
+    ${itens.length > 1 ? `<div class="pv-fi-itens">${itens.map(it => `<label class="pv-chip"><input type="checkbox" data-it="${esc(it.id)}" checked>
+      ${esc(q.nome('tipos_manutencao', it.tipo_manutencao_id))}</label>`).join('')}
+      <small>desmarque o que não foi feito</small></div>` : ''}
+    <div class="pv-fi-campos">
+      ${medido ? `<label>${lt} ${esquecida ? 'quando foi feita' : 'agora'}<input type="number" inputmode="decimal" step="0.1" data-f="leitura"
+        value="${acumulado && leituraDe(e) != null ? esc(leituraDe(e)) : ''}" placeholder="${leituraDe(e) != null ? 'último: ' + esc(nHoras(leituraDe(e))) : 'do mostrador'}"></label>` : ''}
+      <label>Quem fez<input type="text" data-f="quem" list="pv-mecanicos" autocomplete="off" value="${esc(ultimoMecanico())}" placeholder="nome">
+        <datalist id="pv-mecanicos">${mecanicos().map(n => `<option value="${esc(n)}">`).join('')}</datalist></label>
+      <label>${esquecida ? 'Quando foi feita' : 'Data'}<input type="date" data-f="data" max="${hoje()}" value="${esquecida ? '' : hoje()}"></label>
+      <label class="pv-fi-foto${fotoObrig ? ' obrig' : ''}"><span data-f="foto-txt">📷 ${fotoObrig ? 'Foto do adesivo' : 'Foto (opcional)'}</span>
+        <input type="file" accept="image/*" capture="environment" data-f="foto"></label>
+      <button type="button" class="btn pv-fi-ok" data-f="ok">✓ Feito</button>
+    </div>
+    <div class="pv-fi-obs"><input type="text" data-f="obs" placeholder="Observação (opcional) — ex.: filtro de ar não precisou"></div>`;
+  box.classList.remove('oculto');
+  const f = k => box.querySelector(`[data-f="${k}"]`);
+  (f('leitura') && !acumulado ? f('leitura') : f('quem')).focus();
+  f('foto').onchange = ev => {
+    foto = ev.target.files[0] || null;
+    f('foto-txt').textContent = foto ? '✓ Foto escolhida' : '📷 ' + (fotoObrig ? 'Foto do adesivo' : 'Foto (opcional)');
+    f('foto').parentElement.classList.toggle('feita', !!foto);
+  };
+  f('ok').onclick = async () => {
+    const marcados = itens.length > 1 ? itens.filter(it => box.querySelector(`[data-it="${it.id}"]`).checked) : itens;
+    const b = f('ok');
+    const r = await registrarFeita(os, {
+      data: f('data').value, leitura: medido ? num(f('leitura').value) : null, executado_por: f('quem').value,
+      observacao: f('obs').value.trim(), foto, marcados
+    }, () => { b.disabled = true; b.textContent = 'Salvando…'; }, { fotoOpcional: esquecida });
+    if (r.erro) { b.disabled = false; b.textContent = '✓ Feito'; return aviso(r.erro, true); }
+    aviso(r.msg);
+    if (depois) depois();
+  };
+}
 
 /* Lista das máquinas com o horímetro velho, cada uma com "Lançar" (21/10/2026). */
 function listaHorimetroVelho(velhas, depois) {

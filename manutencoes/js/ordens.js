@@ -130,14 +130,15 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
   const c = calcular(p);
   const agora = new Date().toISOString();
 
-  let os = q.todos('ordens_servico').find(o => o.equipamento_id === e.id && o.tipo === 'PREVENTIVA' && ABERTAS.includes(o.status));
+  // Sempre a OS aberta mais antiga da máquina: uma OS preventiva por máquina (28/10/2026).
+  let os = q.todos('ordens_servico').filter(o => o.equipamento_id === e.id && o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status))
+    .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')) || (a.numero || 0) - (b.numero || 0))[0];
   const juntou = !!os;
   // Item que já está numa OS aberta (ex.: puxado junto com o óleo) não entra de novo.
   const jaAberta = osAbertaDoPlano(p);
   if (jaAberta) {
     if (opcoes.silencioso) return jaAberta;
     aviso('Esse item já está na OS ' + numeroOS(jaAberta) + '.');
-    irPara('painel'); abrirOS(jaAberta.id);
     return jaAberta;
   }
   if (!os) {
@@ -171,10 +172,11 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
   // Vários itens marcados na planilha geram as OS de uma vez: aí quem avisa e
   // abre a tela é quem chamou.
   if (opcoes.silencioso) return os;
-  aviso(juntou ? `Item incluído na OS ${numeroOS(os)} que já estava aberta para o ${e.codigo}.`
-               : `OS preventiva aberta para o ${e.codigo}.`);
-  if (document.querySelector('#vc-lista')) irPara(window.modoVenc === 'calendario' || (typeof modoVenc !== 'undefined' && modoVenc === 'calendario') ? 'calendario' : 'vencimentos');
-  abrirOS(os.id);
+  /* Abrir sem abrir o documento (28/10/2026, "mais simples, lean"): a OS é
+     criada, a lista anda e quem quiser imprime pelo "Ver OS". */
+  aviso(juntou ? `Item incluído na OS ${numeroOS(os)} do ${e.codigo}.`
+               : `OS ${numeroOS(os)} aberta para o ${e.codigo}. Está em Em andamento.`);
+  recarregarTela();
   return os;
 }
 
@@ -276,9 +278,9 @@ async function criarCorretiva(e, descricao, extra = {}) {
 
 /* ---------------------------------------------------------------- a OS (tela e impressão) */
 
-function abrirOS(idOS) {
-  const os = q.por_id('ordens_servico', idOS);
-  if (!os) return aviso('OS não encontrada neste aparelho.', true);
+/* A folha da OS (28/10/2026): separada da tela para poder imprimir várias
+   OS de uma vez (A fazer › "Abrir e imprimir marcadas"). */
+function folhaOS(os) {
   const e = q.por_id('equipamentos', os.equipamento_id) || {};
   const u = unidadeDe(e);
   const itens = itensDaOS(os.id);
@@ -442,8 +444,8 @@ function abrirOS(idOS) {
         ${feita && os.observacao ? `<p>${esc(os.observacao)}</p>` : '<div class="os-linhas"><span></span></div>'}</div>
     </section>`;
 
-  const html = `
-    <div id="os-impresso" class="os-folha">
+  return `
+    <div class="os-folha">
       <header class="os-cab">
         <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios" class="os-logo">
         <div class="os-titulo">
@@ -473,7 +475,16 @@ function abrirOS(idOS) {
         <img src="../img/lop-marca.png" alt="LOP">
         <span>Inteligência para o agronegócio</span>
       </footer>
-    </div>
+    </div>`;
+}
+
+function abrirOS(idOS) {
+  const os = q.por_id('ordens_servico', idOS);
+  if (!os) return aviso('OS não encontrada neste aparelho.', true);
+  const e = q.por_id('equipamentos', os.equipamento_id) || {};
+  const feita = os.status === 'CONCLUIDA';
+  const html = `
+    <div id="os-impresso">${folhaOS(os)}</div>
 
     <div class="acoes">
       ${feita ? '' : '<button type="button" class="btn" id="os-feita">Registrar como feita</button>'}
@@ -495,6 +506,58 @@ function abrirOS(idOS) {
       fecharModal(); recarregarTela(); aviso('OS cancelada.');
     };
   });
+}
+
+/* Várias OS numa impressão só (28/10/2026): uma folha por máquina, para levar à oficina. */
+function imprimirVariasOS(lista) {
+  lista = lista.filter(Boolean);
+  if (!lista.length) return;
+  abrirModal(lista.length === 1 ? 'OS ' + numeroOS(lista[0]) : lista.length + ' OS para imprimir', `
+    <div id="os-impresso">${lista.map(folhaOS).join('<div class="os-quebra"></div>')}</div>
+    <div class="acoes"><button type="button" class="btn btn-pdf" id="ov-imp">Imprimir</button>
+      <button type="button" class="btn neutro" id="ov-fechar">Fechar</button></div>`, corpo => {
+    const imp = () => {
+      document.body.classList.add('imprimindo-os');
+      window.print();
+      setTimeout(() => document.body.classList.remove('imprimindo-os'), 500);
+    };
+    corpo.querySelector('#ov-imp').onclick = imp;
+    corpo.querySelector('#ov-fechar').onclick = fecharModal;
+    setTimeout(imp, 300);
+  });
+}
+
+/* OS que não foi feita: cancela e os itens voltam para A fazer. */
+async function cancelarOS(os) {
+  await gravar('ordens_servico', Object.assign(os, { status: 'CANCELADA', atualizado_em: new Date().toISOString() }));
+}
+
+/* Uma OS preventiva aberta por máquina (28/10/2026). Se dois aparelhos
+   abriram ao mesmo tempo (sem internet, por exemplo), os itens vão para a
+   OS mais antiga e as outras são canceladas. Item que já estava na mais
+   antiga não entra de novo. Devolve quantas OS foram juntadas. */
+async function juntarOSDuplicadas() {
+  const porMaq = new Map();
+  q.todos('ordens_servico').filter(o => o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status))
+    .forEach(o => { if (!porMaq.has(o.equipamento_id)) porMaq.set(o.equipamento_id, []); porMaq.get(o.equipamento_id).push(o); });
+  let n = 0;
+  for (const lista of porMaq.values()) {
+    if (lista.length < 2) continue;
+    lista.sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')) || (a.numero || 0) - (b.numero || 0));
+    const fica = lista[0];
+    const jaTem = new Set(itensDaOS(fica.id).map(i => i.plano_id || i.tipo_manutencao_id));
+    for (const sai of lista.slice(1)) {
+      for (const it of itensDaOS(sai.id)) {
+        const k = it.plano_id || it.tipo_manutencao_id;
+        if (it.feito || jaTem.has(k)) continue;
+        jaTem.add(k);
+        await gravar('os_itens', Object.assign(it, { os_id: fica.id }));
+      }
+      await gravar('ordens_servico', Object.assign(sai, { status: 'CANCELADA', observacao: 'Juntada na OS ' + numeroOS(fica), atualizado_em: new Date().toISOString() }));
+      n++;
+    }
+  }
+  return n;
 }
 
 /* Redesenha a tela aberta, para a lista refletir o que mudou */
@@ -566,76 +629,94 @@ function formFeita(os) {
     };
     corpo.querySelector('#ff-salvar').onclick = async () => {
       const d = lerForm(corpo);
-      const leitura = medido ? num(d.leitura) : null;
-      if (!d.data) return aviso('Informe a data do serviço.', true);
-      if (d.data > hoje()) return aviso('A data não pode ser no futuro.', true);
-      if (medido && !corretiva && leitura == null) return aviso('Informe o ' + (u === 'km' ? 'km' : 'horímetro') + ' na hora do serviço.', true);
-      if (!d.executado_por) return aviso('Diga quem fez o serviço.', true);
-      if (corretiva && !d.observacao) return aviso('Escreva o que foi feito.', true);
-      if (adesivo && !foto) return aviso('A foto do adesivo de troca é obrigatória.', true);
-
       const marcados = itens.length > 1
         ? itens.filter(it => corpo.querySelector(`[data-item="${it.id}"]`).checked) : itens;
-      if (!corretiva && marcados.length === 0) return aviso('Marque pelo menos um item feito.', true);
-
-      const atual = leituraDe(e);
-      const ehMostrador = e.unidade_controle === 'HORIMETRO' || e.unidade_controle === 'HODOMETRO';
-      if (ehMostrador && leitura != null && atual != null && leitura < atual &&
-          !confirm(`O ${u === 'km' ? 'km' : 'horímetro'} informado (${nHoras(leitura)}) é menor que o atual da máquina (${nHoras(atual)}). ` +
-                   'Ele fica na OS, mas não muda o horímetro da máquina. Continuar?')) return;
-
-      try { localStorage.setItem('gr.manut.ultimoMecanico', d.executado_por.trim()); } catch (e) {}
-      const b = corpo.querySelector('#ff-salvar'); b.disabled = true; b.textContent = 'Salvando…';
-      const agora = new Date().toISOString();
-      const caminho = foto ? await guardarFoto(foto, 'manutencao-ordens-servico', 'os/' + e.codigo.replace(/[^\w.-]/g, '_')) : null;
-
-      // 1. horímetro novo da máquina (o gatilho do banco atualiza o bem)
-      if (ehMostrador && leitura != null && (atual == null || leitura >= atual)) {
-        await gravar('leituras', {
-          id: crypto.randomUUID(), uuid_dispositivo: crypto.randomUUID(), equipamento_id: e.id,
-          data_leitura: d.data, valor: leitura, origem: 'ORDEM_SERVICO',
-          observacao: 'OS ' + numeroOS(os), registrado_em: agora, criado_por: App.usuario.id || null
-        });
-        if (!e.leitura_data || d.data >= e.leitura_data) {
-          await gravar('equipamentos', Object.assign(limparBem(e), { leitura_atual: leitura, leitura_data: d.data }));
-          Object.assign(q.por_id('equipamentos', e.id), { horas_acumuladas: e.horas_acumuladas, km_acumulados: e.km_acumulados });
-        }
-      }
-
-      // 2. cada item feito vira a "última troca" do plano — é o que recalcula o vencimento
-      for (const it of marcados) {
-        await gravar('os_itens', Object.assign(it, { feito: true, data_troca: d.data, leitura_troca: leitura }));
-        await gravar('manutencoes', {
-          id: crypto.randomUUID(), uuid_dispositivo: crypto.randomUUID(), equipamento_id: e.id,
-          tipo_manutencao_id: it.tipo_manutencao_id, local_id: e.local_id, data_manutencao: d.data,
-          leitura, os_id: os.id, observacao: [d.executado_por ? 'Feito por ' + d.executado_por : '', d.observacao || ''].filter(Boolean).join(' · ') || null,
-          foto_adesivo_path: caminho, registrado_em: agora, custo_pecas: 0, custo_servico: 0,
-          criado_por: App.usuario.id || null
-        });
-        const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
-        if (p && (!p.ultima_troca_data || d.data >= p.ultima_troca_data)) {
-          await gravar('planos_manutencao', Object.assign(p, {
-            ultima_troca_data: d.data, ultima_troca_leitura: leitura ?? p.ultima_troca_leitura, ultima_os_id: os.id
-          }));
-        }
-      }
-
-      // 3. a OS fecha
-      await gravar('ordens_servico', Object.assign(os, {
-        status: 'CONCLUIDA', data_execucao: d.data, leitura_execucao: leitura,
-        executado_por: d.executado_por, observacao: d.observacao || null,
-        foto_adesivo: caminho, concluida_em: agora, finalizada_em: agora, atualizado_em: agora
-      }));
-
-      fecharModal(); recarregarTela();
-      // Próxima troca na hora de fechar (28/10/2026): o que vencer primeiro entre os itens feitos.
-      const prox = marcados.map(it => it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null).filter(Boolean)
-        .map(p => calcular(p)).filter(c => c.proximo_hr != null || c.proxima_data)
-        .sort((a, b) => String(a.proxima_data || '9').localeCompare(String(b.proxima_data || '9')))[0];
-      aviso(App.online ? 'OS feita. Próxima troca: ' + (prox ? proximaTroca(prox) : '—') + '.'
-                       : 'Salvo no aparelho. Sobe quando a internet voltar.');
+      const b = corpo.querySelector('#ff-salvar');
+      const r = await registrarFeita(os, {
+        data: d.data, leitura: medido ? num(d.leitura) : null, executado_por: d.executado_por,
+        observacao: d.observacao, foto, marcados
+      }, () => { b.disabled = true; b.textContent = 'Salvando…'; });
+      if (r.erro) { b.disabled = false; b.textContent = 'Salvar'; return aviso(r.erro, true); }
+      fecharModal(); recarregarTela(); aviso(r.msg);
     };
   });
+}
+
+/* Fecha a OS (28/10/2026): uma função só, usada pela tela da OS e pelo
+   "Fechar OS" na própria linha de Preventivas. Confere, grava o horímetro,
+   vira a última troca de cada item feito e fecha a OS. Devolve {erro} ou {msg}.
+   opcoes.fotoOpcional: OS esquecida ("Já foi feita") — a foto pode não existir. */
+async function registrarFeita(os, d, aoComecar, opcoes = {}) {
+  const e = q.por_id('equipamentos', os.equipamento_id);
+  const u = unidadeDe(e);
+  const corretiva = os.tipo === 'CORRETIVA';
+  const medido = e.unidade_controle !== 'CALENDARIO';
+  const marcados = d.marcados || [];
+  const leitura = medido ? d.leitura : null;
+  const quem = String(d.executado_por || '').trim();
+  if (!d.data) return { erro: 'Informe a data do serviço.' };
+  if (d.data > hoje()) return { erro: 'A data não pode ser no futuro.' };
+  if (medido && !corretiva && leitura == null) return { erro: 'Informe o ' + (u === 'km' ? 'km' : 'horímetro') + ' na hora do serviço.' };
+  if (!quem) return { erro: 'Diga quem fez o serviço.' };
+  if (corretiva && !d.observacao) return { erro: 'Escreva o que foi feito.' };
+  if (!corretiva && marcados.length === 0) return { erro: 'Marque pelo menos um item feito.' };
+  if (!corretiva && !opcoes.fotoOpcional && pedeAdesivo(marcados) && !d.foto) return { erro: 'A foto do adesivo de troca é obrigatória.' };
+
+  const atual = leituraDe(e);
+  const ehMostrador = e.unidade_controle === 'HORIMETRO' || e.unidade_controle === 'HODOMETRO';
+  if (ehMostrador && leitura != null && atual != null && leitura < atual &&
+      !confirm(`O ${u === 'km' ? 'km' : 'horímetro'} informado (${nHoras(leitura)}) é menor que o atual da máquina (${nHoras(atual)}). ` +
+               'Ele fica na OS, mas não muda o horímetro da máquina. Continuar?')) return { erro: 'Confira o ' + (u === 'km' ? 'km' : 'horímetro') + '.' };
+
+  if (aoComecar) aoComecar();
+  try { localStorage.setItem('gr.manut.ultimoMecanico', quem); } catch (x) {}
+  const agora = new Date().toISOString();
+  const caminho = d.foto ? await guardarFoto(d.foto, 'manutencao-ordens-servico', 'os/' + e.codigo.replace(/[^\w.-]/g, '_')) : null;
+
+  // 1. horímetro novo da máquina (o gatilho do banco atualiza o bem)
+  if (ehMostrador && leitura != null && (atual == null || leitura >= atual)) {
+    await gravar('leituras', {
+      id: crypto.randomUUID(), uuid_dispositivo: crypto.randomUUID(), equipamento_id: e.id,
+      data_leitura: d.data, valor: leitura, origem: 'ORDEM_SERVICO',
+      observacao: 'OS ' + numeroOS(os), registrado_em: agora, criado_por: App.usuario.id || null
+    });
+    if (!e.leitura_data || d.data >= e.leitura_data) {
+      await gravar('equipamentos', Object.assign(limparBem(e), { leitura_atual: leitura, leitura_data: d.data }));
+      Object.assign(q.por_id('equipamentos', e.id), { horas_acumuladas: e.horas_acumuladas, km_acumulados: e.km_acumulados });
+    }
+  }
+
+  // 2. cada item feito vira a "última troca" do plano — é o que recalcula o vencimento
+  for (const it of marcados) {
+    await gravar('os_itens', Object.assign(it, { feito: true, data_troca: d.data, leitura_troca: leitura }));
+    await gravar('manutencoes', {
+      id: crypto.randomUUID(), uuid_dispositivo: crypto.randomUUID(), equipamento_id: e.id,
+      tipo_manutencao_id: it.tipo_manutencao_id, local_id: e.local_id, data_manutencao: d.data,
+      leitura, os_id: os.id, observacao: ['Feito por ' + quem, d.observacao || ''].filter(Boolean).join(' · ') || null,
+      foto_adesivo_path: caminho, registrado_em: agora, custo_pecas: 0, custo_servico: 0,
+      criado_por: App.usuario.id || null
+    });
+    const p = it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null;
+    if (p && (!p.ultima_troca_data || d.data >= p.ultima_troca_data)) {
+      await gravar('planos_manutencao', Object.assign(p, {
+        ultima_troca_data: d.data, ultima_troca_leitura: leitura ?? p.ultima_troca_leitura, ultima_os_id: os.id
+      }));
+    }
+  }
+
+  // 3. a OS fecha
+  await gravar('ordens_servico', Object.assign(os, {
+    status: 'CONCLUIDA', data_execucao: d.data, leitura_execucao: leitura,
+    executado_por: quem, observacao: d.observacao || null,
+    foto_adesivo: caminho, concluida_em: agora, finalizada_em: agora, atualizado_em: agora
+  }));
+
+  // Próxima troca na hora de fechar (28/10/2026): o que vencer primeiro entre os itens feitos.
+  const prox = marcados.map(it => it.plano_id ? q.por_id('planos_manutencao', it.plano_id) : null).filter(Boolean)
+    .map(p => calcular(p)).filter(c => c.proximo_hr != null || c.proxima_data)
+    .sort((a, b) => String(a.proxima_data || '9').localeCompare(String(b.proxima_data || '9')))[0];
+  return { msg: App.online ? `OS ${numeroOS(os)} fechada. Próxima troca: ` + (prox ? proximaTroca(prox) : '—') + '.'
+                           : 'Salvo no aparelho. Sobe quando a internet voltar.' };
 }
 
 Object.assign(window, { abrirOS, abrirOSPreventiva, criarCorretiva, formCorretiva, resumoOS, osAbertaDoPlano });
