@@ -131,10 +131,11 @@ const EVID_APP = {
   FORM20: { nome: 'Melhorias contínuas — banco e plano de melhorias', tela: 'mcMelhorias' },
   FORM42: { nome: 'Reclamações e sugestões', tela: 'mcFeedbacks' },
   FORM44: { nome: 'Reunião GRASP — atas realizadas', tela: 'gpPainel' },
+  FORM7: { nome: 'Higienização dos EPIs — lavagens lançadas', tela: 'lvPainel' },
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, lv] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -148,6 +149,7 @@ async function carregarCadeia(c) {
     c.from('cr_saidas').select('data'),
     c.from('cr_avaliacoes').select('competencia'),
     c.from('cg_reunioes').select('data').eq('situacao', 'Realizada'),
+    c.from('cl_lavagens').select('data'),
   ]);
   if (it && !it.error) S.itens = it.data || [];
   if (fz && !fz.error) S.faz = fz.data || [];
@@ -157,6 +159,7 @@ async function carregarCadeia(c) {
   if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
   if (rs && !rs.error) S.viva.FORM53 = contaMeses((rs.data || []).map(x => x.data).concat(ra && !ra.error ? (ra.data || []).map(x => x.competencia) : []));
   if (gp && !gp.error) S.viva.FORM44 = contaMeses((gp.data || []).map(x => x.data));
+  if (lv && !lv.error) S.viva.FORM7 = contaMeses((lv.data || []).map(x => x.data));
   if (!bm.error) S.viva.FORM13 = contaMeses((bm.data || []).map(x => x.data));
   if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
   if (!mc.error) { const doTipo = n => contaMeses((mc.data || []).filter(x => x.natureza === n).map(x => x.data_abertura));

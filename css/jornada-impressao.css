@@ -374,3 +374,34 @@
   .et-folha + .et-folha { break-before: page; page-break-before: always; }
   .et-etq { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---- Higienização dos EPIs · FORM 007 (28/10/2026, js/cert-lavagem.js) ----
+   Uma folha A4 deitada por funcionário, igual à planilha "RG 29": meses nas
+   linhas, dias 1–31, assinatura, data do fornecimento e da troca do EPI.
+   A folha usa a .rel-paisagem (página "paisagem" do app.css). */
+.lv-folha .rel-cabecalho { margin-bottom: 8px; padding-bottom: 6px; }
+.lv-folha .rel-cabecalho img { height: 38px; }
+.lv-folha .rel-ficha { padding: 5px 10px; margin-bottom: 6px; gap: 3px 14px; }
+.lv-folha .lv-ficha-form { grid-template-columns: .7fr .7fr .5fr 1.4fr 1.6fr; }
+.lv-folha .lv-ficha-func { grid-template-columns: 2.2fr 1.2fr 1.2fr 1fr 1fr; background: #fff; border-color: #84BD00; }
+.lv-folha .lv-ficha-func b { font-size: 12px; }
+.lv-imp { width: 100%; border-collapse: collapse; table-layout: fixed; margin-bottom: 6px; }
+.lv-imp col.c-mes { width: 21mm; } .lv-imp col.c-dia { width: 5.6mm; }
+.lv-imp col.c-ass { width: 32mm; } .lv-imp col.c-dt { width: 23mm; }
+.lv-imp th, .lv-imp td { border: 1px solid #A9AE9F; text-align: center; padding: 0 1px; font-size: 9.5px; height: 8.2mm; }
+.lv-imp thead th { background: #84BD00; color: #fff; height: 7mm; font-size: 8.5px; line-height: 1.1; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.lv-imp tbody th { text-align: left; padding-left: 4px; font-size: 10px; color: #744F28; }
+.lv-imp tbody tr:nth-child(odd) th, .lv-imp tbody tr:nth-child(odd) td { background: #F4F8EA; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.lv-imp tbody td { font-weight: 700; color: #4E7D00; }
+.lv-imp tbody td:nth-last-child(-n+2) { font-size: 8px; font-weight: 400; color: #51534A; }
+.lv-imp td.lv-x { background: repeating-linear-gradient(45deg, #fff 0 3px, #D6D8D2 3px 4px) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.lv-textos { font-size: 8.8px; line-height: 1.35; }
+.lv-textos p { margin: 0 0 3px; }
+.lv-textos b { color: #744F28; }
+.lv-pe { display: flex; gap: 18px; margin-top: 4px; align-items: flex-end; }
+.lv-obs { flex: 1.4; border: 1px solid #A9AE9F; height: 13mm; padding: 2px 6px; }
+.lv-obs span { font-size: 9px; color: #744F28; font-weight: 700; }
+.lv-ass { flex: 1; text-align: center; }
+.lv-ass span { display: block; border-top: 1px solid #51534A; margin-top: 8mm; margin-bottom: 2px; }
+.lv-ass small { font-size: 9px; color: #8A8D86; }
+.lv-folha .rel-rodape { margin-top: 4px; padding-top: 3px; }
