@@ -215,6 +215,7 @@ function formAval(r, catId, fornPre) {
     <label><input type="radio" name="fo_${k}" value="0" ${val === false ? 'checked' : ''}> NÃO</label></span>`;
   dialogo(`<h3>${r ? 'Avaliação de ' + esc(r.fornecedor) : 'Nova avaliação'} · ${FORM.codigo}</h3>
     <div class="aviso erro" id="foErro" hidden></div>
+    <div class="np-passo">1 · Quem e quando</div>
     <div class="grade">
       <label class="campo">Categoria <select id="foCatF" ${r ? 'disabled' : ''}>${CATS.map(x => `<option value="${x.id}"${x.id === c.id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
       <label class="campo">Data da entrega / visita <input type="date" id="foData" value="${esc(String(v.data || '').slice(0, 10))}"></label>
@@ -223,16 +224,17 @@ function formAval(r, catId, fornPre) {
       ${c.nf ? `<label class="campo">${esc(c.rotNf || 'Nota fiscal')} <input type="text" id="foNf" value="${esc(v.nf || '')}"></label>` : ''}
     </div>
     <datalist id="foForns">${forns.map(f => `<option value="${esc(f)}">`).join('')}</datalist>
-    <fieldset class="cp-fs"><legend>Perguntas do FORM 023 <span class="dica" id="foConf"></span></legend>
+    <fieldset class="cp-fs"><legend>2 · Perguntas do FORM 023 <span class="dica" id="foConf"></span></legend>
       ${c.itens.map(([k, rot]) => `<div class="cfo-perg"><span>${esc(rot)}</span>${radio(k, (v.itens || {})[k])}</div>`).join('')}
     </fieldset>
     <label class="campo">Justificativa (obrigatória se alguma resposta for NÃO) <input type="text" id="foJust" value="${esc(v.justificativa || '')}"></label>
-    <fieldset class="cp-fs"><legend>Evidências (links do OneDrive)</legend><div id="foLinks"></div>
+    <div class="np-passo">3 · Evidência (opcional)</div>
+    <fieldset class="cp-fs"><legend>Links do OneDrive</legend><div id="foLinks"></div>
       <button class="btn mini" type="button" id="foLinkMais">＋ Link</button></fieldset>
     <div id="foAnx" style="margin-top:8px"></div>
     <label class="campo">Observação <input type="text" id="foObs" value="${esc(v.observacao || '')}"></label>
     <div class="barra entre"><div>${r ? '<button class="btn perigo" type="button" id="foApagar">Apagar</button>' : ''}</div>
-      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="foOk">Salvar</button></div></div>`, d => {
+      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="foOk">Gravar</button></div></div>`, d => {
     anexos = campoAnexos($('foAnx'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Evidência (arquivo)', dica: 'PDF ou foto — relatório, FISPQ, NF, declaração' });
     anexos.abrir(r ? 'f23-' + r.id : null);
     $('foCatF').addEventListener('change', e => formAval(null, e.target.value));

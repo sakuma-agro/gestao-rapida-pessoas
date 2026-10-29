@@ -2345,3 +2345,19 @@ body.ce-apr-aberto{overflow:hidden}
 /* Certificação, etapa 2: histórico logo abaixo do painel, na aba Registros (29/10/2026) */
 .tela-junta{margin-top:16px;scroll-margin-top:130px}
 .tela-junta > .cartao:first-child > .barra:first-child .btn.principal{display:none}
+
+/* Certificação, etapa 2 (parte 2, 29/10/2026): Imprimir/Excel no alto dos forms, no mesmo lugar em todos */
+:is(#telaFoPainel,#telaFaPainel,#telaEnPainel,#telaRePainel,#telaGpPainel,#telaBmPainel,#telaBhRegistros,#telaMcNcs,#telaMcMelhorias,#telaMcFeedbacks,.tela-junta):not([hidden]){display:flex;flex-direction:column}
+:is(#telaFoPainel,#telaFaPainel,#telaEnPainel,#telaRePainel,#telaGpPainel,#telaBmPainel,#telaBhRegistros,#telaMcNcs,#telaMcMelhorias,#telaMcFeedbacks,.tela-junta) > .rodape-fixo{
+  order:-1;position:static;margin:0 0 10px;padding:0;border:0;background:transparent;justify-content:flex-end}
+/* Balanço de massa: o painel não tem botão de novo, então o "Novo boletim / lote" do histórico fica */
+#telaBmLotes.tela-junta > .cartao:first-child > .barra:first-child .btn.principal{display:inline-flex}
+/* Novo registro em passos + Sim/Não em botões (Fornecedores, modelo para os outros) */
+.np-passo{font-size:13px;font-weight:700;color:var(--marrom);margin:14px 0 6px}
+.cfo-sn{display:inline-flex;gap:8px}
+.cfo-sn label{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:68px;min-height:40px;padding:0 12px;
+  border:1px solid var(--linha);border-radius:8px;background:var(--papel);font-weight:700;cursor:pointer}
+.cfo-sn input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.cfo-sn label:has(input[value="1"]:checked){background:var(--verde);border-color:var(--verde);color:#1B232B}
+.cfo-sn label:has(input[value="0"]:checked){background:var(--erro);border-color:var(--erro);color:#fff}
+.cfo-sn label:focus-within{outline:2px solid var(--verde);outline-offset:2px}

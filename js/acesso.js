@@ -315,9 +315,8 @@ export const MODULOS = [
     /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
        e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
     { id: 'ceBalancoSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
-      ['bmPainel',     'Painel'],
+      ['bmPainel',     'Registros'],
       ['bmRastreio',   'Rastreabilidade'],
-      ['bmLotes',      'Boletins e vendas'],
       ['bmFechamento', 'Fechamento'],
     ] },
     /* Banho e higiene pessoal (28/10/2026): FORM 054 — ficha mensal por trabalhador
@@ -720,7 +719,7 @@ export function mostrarInicio() {
 /* Telas que viraram parte de outra (etapa 2 da Certificação, 29/10/2026): o
    histórico mora embaixo do painel, na aba Registros. Link antigo cai lá e
    rola até o histórico. */
-const TELA_JUNTA = { foAvaliacoes: 'foPainel', faRegistros: 'faPainel', enLancamentos: 'enPainel', reSaidas: 'rePainel', gpReunioes: 'gpPainel' };
+const TELA_JUNTA = { bmLotes: 'bmPainel', foAvaliacoes: 'foPainel', faRegistros: 'faPainel', enLancamentos: 'enPainel', reSaidas: 'rePainel', gpReunioes: 'gpPainel' };
 export const TELAS_JUNTAS = Object.fromEntries(Object.entries(TELA_JUNTA).map(([h, p]) => [p, h]));
 
 export function abrirModulo(id, tela) {

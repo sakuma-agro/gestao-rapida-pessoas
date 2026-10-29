@@ -878,7 +878,8 @@ async function exportar(k) {
 
    =================================================================== */
 export const TELAS_BALANCO = ['bmPainel', 'bmRastreio', 'bmLotes', 'bmFechamento'];
-const DESENHO = { bmPainel: desenharPainel, bmRastreio: desenharRastreio, bmLotes: desenharLotes, bmFechamento: desenharFechamento };
+/* Etapa 2 (29/10/2026, claude/cert-redesenho-lean.md): Registros = painel + boletins e vendas. */
+const DESENHO = { bmPainel: () => { desenharPainel(); desenharLotes(); }, bmRastreio: desenharRastreio, bmLotes: desenharLotes, bmFechamento: desenharFechamento };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }
