@@ -260,8 +260,52 @@
     doc.triangle(cx - larg / 2, aBot - cab, cx + larg / 2, aBot - cab, cx, aBot, 'F');
   }
 
+  /* ---------------- adesivo ENTRADA / SAÍDA ----------------
+     Pedido dele (29/10/2026): "faça menor, para eu fazer adesivos — entrada e
+     saída somente, azul e vermelho, com a logo". Logo da SAKUMA no alto, em
+     fundo branco (sem mexer na logo), e a palavra em branco na faixa colorida. */
+  const TAM_ADESIVO = { p: [45, 30], m: [60, 40], g: [90, 60] };
+  function adesivo(doc, img, x, y, w, h, mov) {
+    const cfg = MOV[mov], COR = cfg.cor, cx = x + w / 2, r = Math.min(w, h) * 0.08;
+    doc.setDrawColor(CORTE); doc.setLineWidth(0.15);
+    [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(([px, py]) =>
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => doc.line(px + dx * 1, py + dy * 1, px + dx * 2.8, py + dy * 2.8)));
+    const lw = Math.max(0.8, w * 0.018);
+    doc.setDrawColor(COR); doc.setLineWidth(lw); doc.setFillColor('#FFFFFF');
+    doc.roundedRect(x + lw / 2, y + lw / 2, w - lw, h - lw, r, r, 'FD');
+    const faixa = h * 0.55;
+    doc.setFillColor(COR);
+    doc.roundedRect(x, y + h - faixa, w, faixa, r, r, 'F');
+    doc.rect(x, y + h - faixa, w, r, 'F');
+    // logo no branco de cima, centralizada
+    const area = h - faixa, lh = Math.min(area * 0.72, (w * 0.62) * img.sakuma.h / img.sakuma.w), lwid = lh * img.sakuma.w / img.sakuma.h;
+    doc.addImage(img.sakuma.url, 'PNG', cx - lwid / 2, y + (area - lh) / 2 + lw / 2, lwid, lh);
+    let fs = 60;
+    doc.setFont('helvetica', 'bold');
+    while (fs > 6) { doc.setFontSize(fs); if (doc.getTextWidth(cfg.titulo) <= w * 0.84 && fs * 0.3528 <= faixa * 0.62) break; fs -= 0.5; }
+    doc.setTextColor('#FFFFFF');
+    doc.text(cfg.titulo, cx, y + h - faixa / 2, { align: 'center', baseline: 'middle' });
+  }
+
   /* ---------------- PDF ---------------- */
   async function montar(o) {
+    if (o.adesivos) {
+      await carregarJsPdf();
+      const img = { sakuma: await imagem('sakuma-logo.png') };
+      const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      const [w, h] = TAM_ADESIVO[o.tam] || TAM_ADESIVO.m;
+      const gap = 5, marg = 8;
+      const cols = Math.floor((210 - 2 * marg + gap) / (w + gap)), lins = Math.floor((297 - 2 * marg + gap) / (h + gap));
+      const x0 = (210 - cols * w - (cols - 1) * gap) / 2, y0 = (297 - lins * h - (lins - 1) * gap) / 2;
+      const lista = [...Array(o.qEnt).fill('entrada'), ...Array(o.qSai).fill('saida')];
+      lista.forEach((m, i) => {
+        const k = i % (cols * lins);
+        if (i && k === 0) doc.addPage('a4', 'portrait');
+        adesivo(doc, img, x0 + (k % cols) * (w + gap), y0 + Math.floor(k / cols) * (h + gap), w, h, m);
+      });
+      doc.setProperties({ title: o.titulo, author: 'SAKUMA Agronegócios' });
+      return doc;
+    }
     if (o.etiquetas) {
       await carregarJsPdf();
       const img = { sakuma: await imagem('sakuma-logo.png') };
@@ -359,12 +403,60 @@
 
   /**
    * Desenha a tela dentro de `el`.
-   * opcoes = { tela: 'folhas' | 'placas' | 'etiquetas', estoques: [nomes] (padrão: os 5) }
+   * opcoes = { tela: 'folhas' | 'placas' | 'etiquetas' | 'adesivos', estoques: [nomes] (padrão: os 5) }
    */
+  /* Por folha A4, em cada tamanho (o mesmo cálculo do montar). */
+  function porFolha(tam) {
+    const [w, h] = TAM_ADESIVO[tam] || TAM_ADESIVO.m, gap = 5, marg = 8;
+    return Math.floor((210 - 2 * marg + gap) / (w + gap)) * Math.floor((297 - 2 * marg + gap) / (h + gap));
+  }
+  function desenharAdesivos(el) {
+    const op = t => `<option value="${t}"${t === 'm' ? ' selected' : ''}>${{ p: 'Pequeno', m: 'Médio', g: 'Grande' }[t]} — ${TAM_ADESIVO[t][0]} × ${TAM_ADESIVO[t][1]} mm (${porFolha(t)} por folha)</option>`;
+    el.innerHTML = `
+<div class="cartao">
+  <h2>Adesivos entrada e saída</h2>
+  <p class="dica">Adesivo só com <strong>ENTRADA</strong> (azul) ou <strong>SAÍDA</strong> (vermelho) e a logo da SAKUMA, para colar na pasta, na prancheta ou na porta. Folha A4 com marcas de corte; imprima em <strong>tamanho real (100%)</strong>, em papel adesivo.</p>
+  <div class="fe-grade">
+    <div class="fe-bloco"><h3>Tamanho</h3>
+      <label class="campo">Tamanho do adesivo<select name="tam">${['p', 'm', 'g'].map(op).join('')}</select></label></div>
+    <div class="fe-bloco"><h3>Quantidade</h3>
+      <label class="campo"><span><span class="fe-tag" style="background:#1F5FA8;display:inline-block"></span> Entrada</span><input class="fe-num" type="number" name="qEnt" min="0" max="200" value="6"></label>
+      <label class="campo" style="margin-top:8px"><span><span class="fe-tag" style="background:#C62828;display:inline-block"></span> Saída</span><input class="fe-num" type="number" name="qSai" min="0" max="200" value="6"></label>
+      <button type="button" class="fe-todos" data-cheia>encher a folha (metade de cada)</button></div>
+  </div>
+  <p class="fe-resumo" data-resumo></p>
+  <div class="barra fim">
+    <button type="button" class="btn" data-acao="baixar">Baixar PDF</button>
+    <button type="button" class="btn principal" data-acao="abrir">Abrir para imprimir</button>
+  </div>
+</div>`;
+    const v = n => Math.max(0, Math.min(200, Number(el.querySelector(`[name=${n}]`).value) || 0));
+    const ler = () => {
+      const tam = el.querySelector('[name=tam]').value, qEnt = v('qEnt'), qSai = v('qSai'), n = qEnt + qSai;
+      return { adesivos: true, tam, qEnt, qSai, n, paginas: Math.ceil(n / porFolha(tam)),
+        titulo: 'Adesivos entrada e saída', arquivo: 'Adesivos_Entrada_Saida_' + TAM_ADESIVO[tam].join('x') };
+    };
+    const resumo = () => {
+      const o = ler();
+      el.querySelector('[data-resumo]').innerHTML = o.n
+        ? `Vão sair <strong>${o.n} adesivo${o.n > 1 ? 's' : ''}</strong> (${o.qEnt} de entrada e ${o.qSai} de saída) em ${o.paginas} folha${o.paginas > 1 ? 's' : ''} A4.`
+        : 'Coloque a quantidade de entrada ou de saída.';
+      el.querySelectorAll('[data-acao]').forEach(b => { b.disabled = !o.n; });
+    };
+    el.querySelector('[data-cheia]').addEventListener('click', () => {
+      const n = porFolha(el.querySelector('[name=tam]').value);
+      el.querySelector('[name=qEnt]').value = Math.ceil(n / 2); el.querySelector('[name=qSai]').value = Math.floor(n / 2); resumo();
+    });
+    el.addEventListener('change', resumo); el.addEventListener('input', resumo);
+    el.querySelectorAll('[data-acao]').forEach(b => b.addEventListener('click', () => { const o = ler(); if (o.n) entregar(o, b.dataset.acao, b); }));
+    resumo();
+  }
+
   function desenhar(el, opcoes) {
     if (!el) return;
     estilo();
     const op = opcoes || {};
+    if (op.tela === 'adesivos') return desenharAdesivos(el);
     const est = (op.estoques && op.estoques.length) ? op.estoques : ESTOQUES;
     const placas = op.tela === 'placas';
     const etiq = op.tela === 'etiquetas';

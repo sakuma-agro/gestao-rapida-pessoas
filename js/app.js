@@ -263,7 +263,9 @@ function abrirAba(nome) {
   if (TELAS_BANHO.includes(nome)) abrirBanho(nome);
   // Certificação › Folhas de estoque (29/10/2026) — js/folhas-estoque.js (o mesmo da área Estoque)
   // e Certificação › Sinalética › Placas do estoque (29/10/2026) — mesmo arquivo
-  for (const t of ['feFolhas', 'siPlacasEstoque', 'siPlacas', 'siEtiquetasL']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  for (const t of ['feFolhas', 'siPlacasEstoque', 'siPlacas', 'siEtiquetasL', 'siAdesivos']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  // Sinalética › Adesivos entrada e saída (29/10/2026) — só a palavra e a logo, js/folhas-estoque.js
+  if (nome === 'siAdesivos' && window.FolhasEstoque) window.FolhasEstoque.desenhar($('telaSiAdesivos'), { tela: 'adesivos' });
   // Sinalética › Etiquetas da pasta L (29/10/2026) — 80 × 110 mm, js/folhas-estoque.js
   if (nome === 'siEtiquetasL' && window.FolhasEstoque) window.FolhasEstoque.desenhar($('telaSiEtiquetasL'), { tela: 'etiquetas' });
   // Sinalética › Placas (29/10/2026) — as placas da pasta 18 - Placas, js/sinaletica.js
