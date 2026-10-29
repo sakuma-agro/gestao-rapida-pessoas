@@ -33,6 +33,13 @@ export const MODULOS = [
     ['qcSaida',    'Saídas'],
     ['qcPendencias', 'Pendências'],
   ] },
+  /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
+     estoque (FORM 048, 049, 055, 056, 057) e as placas das pranchetas. Ficam
+     aqui porque nem todos têm acesso à Certificação — ../js/folhas-estoque.js. */
+  { id: 'forms', nome: 'Formulários', telas: [
+    ['fmFolhas', 'Folhas de entrada e saída'],
+    ['fmPlacas', 'Placas das pranchetas'],
+  ] },
   { id: 'acerto', nome: 'Acerto', telas: [
     ['acSaldo',           'Saldo do sistema'],
     ['acPainel',          'Painel'],
@@ -77,7 +84,9 @@ export function aplicarUsuario(u) {
     .map(x => String(x).slice(PREFIXO_MODULO.length)).filter(id => MODULOS.some(m => m.id === id));
   const locs = u.admin ? [] : (u.telas || []).filter(x => String(x).startsWith('estoque.local:'));
   acesso.email = u.email || '';
-  if (mods.length) { acesso.admin = false; acesso.modulos = mods; return; }
+  /* Formulários (29/10/2026) é só impressão das folhas e placas: aparece para
+     todo mundo que entra na área, qualquer que seja o recorte. */
+  if (mods.length) { acesso.admin = false; acesso.modulos = [...mods, 'forms']; return; }
   if (locs.length) {
     /* Só alguns estoques e nenhum módulo marcado (22/10/2026): Acerto e Compra
        inteligente comparam todas as fazendas, então ficam de fora; o Estoque
@@ -86,7 +95,7 @@ export function aplicarUsuario(u) {
       .filter(l => locs.includes('estoque.local:' + l.id)).map(l => String(l.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase());
     const temQc = !nomes.length || nomes.some(n => n.includes('QUEBRA COCAO'));
     acesso.admin = false;
-    acesso.modulos = ['contagem', ...(temQc ? ['qc'] : []), 'cadastros'];
+    acesso.modulos = ['contagem', ...(temQc ? ['qc'] : []), 'forms', 'cadastros'];
     return;
   }
   acesso.admin = true;   // sem recorte = enxerga a área toda, como antes

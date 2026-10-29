@@ -310,6 +310,13 @@ export const MODULOS = [
       ['bhRegistros', 'Registros'],
       ['bhFicha',     'Ficha por funcionário'],
     ] },
+    /* Folhas de estoque (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de
+       cada estoque e as placas — as mesmas da área Estoque › Formulários
+       (nem todos têm acesso à Certificação). js/folhas-estoque.js. */
+    { id: 'ceFolhasEstSub', grupo: 'FORMS Digital', codigo: 'FORM 048 · 049 · 055–057', nome: 'Folhas de estoque', telas: [
+      ['feFolhas', 'Folhas de entrada e saída'],
+      ['fePlacas', 'Placas das pranchetas'],
+    ] },
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
        manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
@@ -738,7 +745,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

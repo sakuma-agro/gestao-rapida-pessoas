@@ -47,7 +47,7 @@
     <!-- ---- ENTRADA: nenhum módulo aberto (as marcas estão no topo do LOP) ---- -->
     <section class="tela inicio" id="telaInicio">
       <h2>Estoque <span>Balanço e acerto</span></h2>
-      <p class="in-dica">Escolha um módulo no menu acima: <strong>Contagem</strong>, <strong>Compra inteligente</strong>, <strong>Acerto</strong> ou <strong>Cadastros</strong>.</p>
+      <p class="in-dica">Escolha um módulo no menu acima: <strong>Contagem</strong>, <strong>Compra inteligente</strong>, <strong>Formulários</strong>, <strong>Acerto</strong> ou <strong>Cadastros</strong>.</p>
       <p class="in-dica">Todo mês: <strong>Contagem › Contar</strong>, escolha o almoxarifado e digite o total na frente de cada item.</p>
     </section>
 
@@ -100,6 +100,10 @@
     <section class="tela" id="telaQcEntrada" hidden><div id="qcEntradaCorpo"></div></section>
     <section class="tela" id="telaQcSaida" hidden><div id="qcSaidaCorpo"></div></section>
     <section class="tela" id="telaQcPendencias" hidden><div id="qcPendCorpo"></div><div class="previa" id="qcPendFolha"></div></section>
+
+    <!-- =================== FORMULÁRIOS (29/10/2026) =================== -->
+    <section class="tela" id="telaFmFolhas" hidden><div id="fmFolhasCorpo"></div></section>
+    <section class="tela" id="telaFmPlacas" hidden><div id="fmPlacasCorpo"></div></section>
 
     <!-- =================== ACERTO =================== -->
     <section class="tela" id="telaAcSaldo" hidden>
@@ -226,12 +230,13 @@
 <div id="aviso" class="est-toast oculto naoimprimir" role="status"></div>
 
 <script src="../js/categoria-moldura.js?v=1"></script>
+<script src="../js/folhas-estoque.js?v=1"></script>
 <script src="../vendor/supabase.js"></script>
 <script src="../vendor/jspdf.umd.min.js"></script>
 <script src="../vendor/jspdf.plugin.autotable.min.js"></script>
 <script src="js/config.js?v=3"></script>
 <script src="../js/moldura-nucleo.js?v=6"></script>
 <script src="js/base.js?v=6"></script>
-<script type="module" src="js/app.js?v=17"></script>
+<script type="module" src="js/app.js?v=18"></script>
 </body>
 </html>

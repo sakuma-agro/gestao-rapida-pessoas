@@ -11,6 +11,7 @@ import { abrirCadastro, soltarCadastro } from './cadastros.js';
 import { abrirCompra, soltarCompra } from './compra.js';
 import { abrirSaldo, soltarSaldo } from './saldo.js';
 import { abrirQc, soltarQc } from './qc.js';
+import { locaisDoUsuario } from './dados.js';
 
 const $ = id => document.getElementById(id);
 
@@ -31,6 +32,15 @@ function abrirAba(nome) {
   if (nome.startsWith('cad')) abrirCadastro(nome);
   if (nome.startsWith('ci')) abrirCompra(nome);
   if (nome.startsWith('qc')) abrirQc(nome);
+  // Formulários (29/10/2026): folhas da prancheta e placas — ../js/folhas-estoque.js
+  if (nome === 'fmFolhas' || nome === 'fmPlacas') {
+    const el = $(nome === 'fmFolhas' ? 'fmFolhasCorpo' : 'fmPlacasCorpo');
+    if (window.FolhasEstoque) window.FolhasEstoque.desenhar(el, {
+      tela: nome === 'fmFolhas' ? 'folhas' : 'placas',
+      estoques: locaisDoUsuario().map(l => l.nome),
+    });
+    else el.innerHTML = '<div class="aviso erro">Não carregou o gerador das folhas. Feche e abra o app com internet.</div>';
+  }
   // a tela nova começa do alto, não no meio da anterior
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
