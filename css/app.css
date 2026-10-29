@@ -2261,3 +2261,33 @@ body.ce-apr-aberto{overflow:hidden}
 .nr-ano{display:inline-block;min-width:38px;font-weight:700;color:var(--suave)}
 .nr-sub span{font-weight:400;text-transform:none;letter-spacing:0}
 @media (max-width:600px){.nr-topo-acoes{align-items:stretch;width:100%}.nr-pi-linha span{display:block}}
+
+/* Certificação › Check List Digital (29/10/2026) — js/cert-checklist.js */
+.cl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:14px}
+.cl-card{border:1px solid var(--linha);border-radius:12px;padding:14px;background:var(--papel)}
+.cl-card-topo{display:flex;gap:8px;align-items:baseline}
+.cl-cod{background:var(--verde);color:#fff;font-weight:700;font-size:12px;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.cl-card-num{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.cl-card-num div{border:1px solid var(--linha);border-radius:8px;padding:6px 8px;text-align:center}
+.cl-card-num strong{display:block;font-size:20px}.cl-card-num span{font-size:11.5px;color:var(--suave)}
+.cl-card-num .cl-ruim strong{color:var(--perigo,#b42318)}
+.cl-itens{border:1px solid var(--linha);border-radius:10px;overflow:hidden}
+.cl-it{padding:8px 10px;border-bottom:1px solid var(--linha)}
+.cl-it:nth-child(odd){background:var(--verde-fundo,#F4F8EA)}
+.cl-it:last-child{border-bottom:0}
+.cl-it-topo{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.cl-it-txt{font-weight:600;font-size:14px}
+.cl-st{display:flex;gap:4px;flex:none}
+.cl-b{min-width:46px;height:38px;border:1px solid var(--linha);border-radius:8px;background:#fff;font-weight:700;font-size:14px;color:var(--suave);cursor:pointer}
+.cl-b.on.cl-b-c{background:#84BD00;border-color:#84BD00;color:#fff}
+.cl-b.on.cl-b-nc{background:#c0392b;border-color:#c0392b;color:#fff}
+.cl-b.on.cl-b-na{background:#51534A;border-color:#51534A;color:#fff}
+.cl-it-mais{display:flex;gap:8px;margin-top:6px}
+.cl-it-mais input{flex:1;min-width:0;margin:0}
+.cl-it-nc{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:6px;padding:6px 8px;border-left:3px solid #c0392b;background:#fff}
+.cl-it-nc .dica{flex:1 1 100%;margin:0}
+.cl-it-nc .campo{flex:1 1 140px;margin:0}
+.cl-it-foto{margin-top:6px}
+.cl-it-nc[hidden],.cl-it-foto[hidden]{display:none}
+.cl-leg{margin:6px 0 10px}
+@media (max-width:600px){.cl-it-topo{flex-direction:column;align-items:stretch}.cl-st{justify-content:stretch}.cl-b{flex:1}}

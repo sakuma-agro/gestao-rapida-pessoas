@@ -265,6 +265,15 @@ export const MODULOS = [
        as placas das pranchetas de ENTRADA e SAÍDA do estoque (js/folhas-estoque.js).
        Placas (29/10/2026): as da pasta 18 - Placas, com miniatura para marcar e
        imprimir — js/sinaletica.js, arquivos em sinaletica/. */
+    /* Check List Digital (29/10/2026, pedido dele: "igual Forms digital, agora vamos
+       criar Check list digitais, aonde tem como pôr foto e deixar registrado"):
+       C/NC/NA por item com foto, NC abre não conformidade no FORM 004, cada um
+       conta como RG CL nn. js/cert-checklist.js; tabelas ccl_modelos e ccl_registros. */
+    { id: 'ceClSub', nome: 'Check List Digital', telas: [
+      ['clLista',     'Check lists'],
+      ['clRegistros', 'Registros'],
+      ['clModelos',   'Modelos'],
+    ] },
     { id: 'ceSinalSub', nome: 'Sinalética', telas: [
       ['siPlacas',        'Placas'],
       ['siPlacasEstoque', 'Placas do estoque'],
@@ -755,7 +764,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */

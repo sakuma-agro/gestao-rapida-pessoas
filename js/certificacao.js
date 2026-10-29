@@ -135,7 +135,7 @@ const EVID_APP = {
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, bh] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, bh, ccl] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -150,6 +150,7 @@ async function carregarCadeia(c) {
     c.from('cr_avaliacoes').select('competencia'),
     c.from('cg_reunioes').select('data').eq('situacao', 'Realizada'),
     c.from('cb_banhos').select('data'),
+    c.from('ccl_registros').select('data, documento_id'),
   ]);
   if (it && !it.error) S.itens = it.data || [];
   if (fz && !fz.error) S.faz = fz.data || [];
@@ -160,6 +161,16 @@ async function carregarCadeia(c) {
   if (rs && !rs.error) S.viva.FORM53 = contaMeses((rs.data || []).map(x => x.data).concat(ra && !ra.error ? (ra.data || []).map(x => x.competencia) : []));
   if (gp && !gp.error) S.viva.FORM44 = contaMeses((gp.data || []).map(x => x.data));
   if (bh && !bh.error) S.viva.FORM54 = contaMeses((bh.data || []).map(x => x.data));
+  // Check List Digital (29/10/2026): cada CL preenchido no app conta como registro do RG CL nn.
+  if (ccl && !ccl.error) {
+    const porDoc = {};
+    (ccl.data || []).forEach(x => { (porDoc[x.documento_id] = porDoc[x.documento_id] || []).push(x.data); });
+    S.docs.filter(d => prefixoDoc(d) === 'CL').forEach(d => {
+      const k = chaveCodigo(d.codigo);
+      EVID_APP[k] = { nome: 'Check List Digital — preenchimentos no app', tela: 'clRegistros' };
+      S.viva[k] = contaMeses(porDoc[d.id] || []);
+    });
+  }
   if (!bm.error) S.viva.FORM13 = contaMeses((bm.data || []).map(x => x.data));
   if (!fo.error) S.viva.FORM23 = contaMeses((fo.data || []).map(x => x.data));
   if (!mc.error) { const doTipo = n => contaMeses((mc.data || []).filter(x => x.natureza === n).map(x => x.data_abertura));
@@ -174,10 +185,15 @@ const evidDe = d => S.evid.filter(e => e.documento_id === d.id).sort((a, b) => b
 /* RG (27/10/2026, pedido dele: "ao preencher os forms temos registros, vamos criar o RG"):
    RG 0xx = o FORM 0xx preenchido, mesmo número. Os lançamentos feitos no app
    (EVID_APP) contam como registro do RG; o FORM fica sendo o modelo. */
-const chaveApp = d => chaveCodigo(d.codigo).replace(/^RG/, 'FORM');
+const chaveApp = d => chaveCodigo(d.codigo).replace(/^RGCL/, 'CL').replace(/^RG(?=\d)/, 'FORM');
+/* RG CL nn (29/10/2026): o registro de um check list é "RG CL nn" e o modelo é o CL nn. */
+const ehRgCl = d => /^RGCL\d/.test(chaveCodigo(d.codigo));
 const numDoc = d => (chaveCodigo(d.codigo).match(/\d+$/) || [''])[0];
-const rgDe = d => prefixoDoc(d) === 'FORM' ? S.docs.find(x => prefixoDoc(x) === 'RG' && numDoc(x) === numDoc(d)) || null : null;
-const formDe = d => prefixoDoc(d) === 'RG' ? S.docs.find(x => prefixoDoc(x) === 'FORM' && numDoc(x) === numDoc(d)) || null : null;
+const rgDe = d => prefixoDoc(d) === 'FORM' ? S.docs.find(x => prefixoDoc(x) === 'RG' && !ehRgCl(x) && numDoc(x) === numDoc(d)) || null
+  : prefixoDoc(d) === 'CL' ? S.docs.find(x => ehRgCl(x) && numDoc(x) === numDoc(d)) || null : null;
+const formDe = d => prefixoDoc(d) !== 'RG' ? null
+  : ehRgCl(d) ? S.docs.find(x => prefixoDoc(x) === 'CL' && numDoc(x) === numDoc(d)) || null
+  : S.docs.find(x => prefixoDoc(x) === 'FORM' && numDoc(x) === numDoc(d)) || null;
 const vivaDe = d => (EVID_APP[chaveApp(d)] ? { ...EVID_APP[chaveApp(d)], meses: S.viva[chaveApp(d)] || {} } : null);
 const ehPop = d => prefixoDoc(d) === 'POP';
 /** Janelas de cobrança da evidência conforme a periodicidade (as mais recentes por último). */
@@ -743,7 +759,7 @@ const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Out
 const docsDoTipo = id => S.docs.filter(d => (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
   .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 /* código comparável: "POP 1", "POP 001" e "POPAGR-01" viram POP1 */
-const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP').replace(/^POAGR/, 'POP').replace(/^FORMAGR/, 'FORM').match(/^([A-Z]+)[\s._-]*0*(\d+)/); return m ? m[1] + Number(m[2]) : ''; };
+const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP').replace(/^POAGR/, 'POP').replace(/^FORMAGR/, 'FORM').replace(/^RG\s+CL\b/, 'RGCL').match(/^([A-Z]+)[\s._-]*0*(\d+)/); return m ? m[1] + Number(m[2]) : ''; };
 const revDono = id => `${id}-rev`;
 const ehPdf = x => /pdf$/i.test(x.mime || '') || /\.pdf$/i.test(x.nome || '');
 

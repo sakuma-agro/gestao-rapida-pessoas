@@ -63,6 +63,7 @@ import { abrirEnergia, limparEnergia, TELAS_ENERGIA } from './cert-energia.js';
 import { abrirResiduos, limparResiduos, TELAS_RESIDUOS } from './cert-residuos.js';
 import { abrirGrasp, limparGrasp, TELAS_GRASP } from './cert-grasp.js';
 import { abrirBanho, limparBanho, TELAS_BANHO } from './cert-banho.js';
+import { abrirChecklist, limparChecklist, TELAS_CHECKLIST } from './cert-checklist.js';
 import { abrirFornecedores, limparFornecedores, TELAS_FORNECEDORES } from './cert-fornecedores.js';
 import { abrirMelhorias, limparMelhorias, TELAS_MELHORIAS } from './cert-melhorias.js';
 import { abrirBalanco, limparBalanco, TELAS_BALANCO } from './cert-balanco.js';
@@ -261,6 +262,9 @@ function abrirAba(nome) {
   // Certificação › Banho e higiene pessoal (28/10/2026) — js/cert-banho.js
   for (const t of TELAS_BANHO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_BANHO.includes(nome)) abrirBanho(nome);
+  // Certificação › Check List Digital (29/10/2026) — js/cert-checklist.js
+  for (const t of TELAS_CHECKLIST) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_CHECKLIST.includes(nome)) abrirChecklist(nome);
   // Certificação › Folhas de estoque (29/10/2026) — js/folhas-estoque.js (o mesmo da área Estoque)
   // e Certificação › Sinalética › Placas do estoque (29/10/2026) — mesmo arquivo
   for (const t of ['feFolhas', 'siPlacasEstoque', 'siPlacas', 'siEtiquetasL', 'siAdesivos']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
@@ -342,7 +346,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparNrs(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparBanho(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparNrs(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparBanho(); limparChecklist(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 

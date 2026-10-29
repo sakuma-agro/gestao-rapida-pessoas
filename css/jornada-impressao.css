@@ -432,3 +432,30 @@
 @media print {
   .ev-etq, .ev-quadro th, .ev-fora td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* ---- Check List Digital · CL nn (29/10/2026, js/cert-checklist.js) ----
+   A4 em pé, igual ao check list em papel; as fotos dos itens vão no fim. */
+.cl-folha { padding: 9mm 11mm; font-family: Arial, Helvetica, sans-serif; color: #2b2d26; }
+.cl-cab { display: grid; grid-template-columns: 34mm 1fr 62mm; border: 1px solid #51534A; align-items: center; }
+.cl-cab img { max-width: 30mm; max-height: 15mm; height: auto; justify-self: center; }
+.cl-cab h1 { margin: 0; text-align: center; font-size: 20px; line-height: 1.15; color: #744F28; font-weight: 700; border-left: 1px solid #51534A; border-right: 1px solid #51534A; padding: 4mm 2mm; }
+.cl-id { font-size: 8.5px; } .cl-id div { border-bottom: 1px solid #A9AE9F; padding: 1px 4px; } .cl-id div:last-child { border-bottom: 0; }
+.cl-linha, .cl-dupla > div { border: 1px solid #51534A; border-top: 0; padding: 3px 6px; font-size: 10px; min-height: 5.5mm; }
+.cl-dupla { display: grid; grid-template-columns: 1fr 1fr; } .cl-dupla > div + div { border-left: 0; }
+.cl-fz { margin-right: 10px; white-space: nowrap; }
+.cl-imp { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 3mm; }
+.cl-imp col.c-st { width: 10mm; } .cl-imp col.c-it { width: 74mm; }
+.cl-imp th, .cl-imp td { border: 1px solid #A9AE9F; font-size: 9.5px; height: 6.4mm; padding: 0 4px; text-align: center; }
+.cl-imp thead th { background: #84BD00; color: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cl-imp tbody tr:nth-child(odd) td { background: #F4F8EA; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cl-imp td.cl-t { text-align: left; font-weight: 700; } .cl-imp td.cl-o { text-align: left; font-size: 8.5px; }
+.cl-imp td b { color: #4E7D00; } .cl-imp td.cl-nc b { color: #b42318; }
+.cl-plano { border: 1px solid #51534A; padding: 4px 6px; font-size: 9.5px; min-height: 12mm; margin-top: 3mm; }
+.cl-plano b, .cl-legenda b { color: #744F28; }
+.cl-legenda { font-size: 9px; line-height: 1.4; margin: 2mm 0 0; }
+.cl-fotos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin-top: 4mm; break-before: auto; }
+.cl-fotos figure { margin: 0; border: 1px solid #A9AE9F; padding: 2px; break-inside: avoid; }
+.cl-fotos img { width: 100%; height: 45mm; object-fit: cover; display: block; }
+.cl-fotos figcaption { font-size: 8px; padding: 2px; }
+.cl-folha .rel-rodape { margin-top: 4mm; }
+@media print { .rel.cl-folha { width: 210mm; box-sizing: border-box; max-width: none; border: 0; } }
