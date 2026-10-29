@@ -41,7 +41,11 @@
     { id: 'fer', nome: 'Fertilizantes', form: 'FORM 049',
       destino: 'Destino: plantio / talhão (e quadra do barracão).' },
     { id: 'epi', nome: 'EPI', form: 'FORM 055',
-      destino: 'Destino: nome do funcionário que recebeu.' },
+      destino: 'Destino: nome do funcionário que recebeu.',
+      legendas: {
+        entrada: 'CA: nº do Certificado de Aprovação (vem no EPI ou na embalagem).   Origem: fornecedor ou estoque de onde veio.   NF / Transf: nº da nota ou da transferência.',
+        saida: 'Funcionário: quem recebeu o EPI e assina na frente.   CA: nº do Certificado de Aprovação.   Transferência: escrever o estoque de destino em Funcionário.',
+      } },
     { id: 'lim', nome: 'Material de limpeza', form: 'FORM 056',
       destino: 'Destino: local ou setor (sede, banheiros, refeitório, packing...).' },
     { id: 'lub', nome: 'Lubrificantes', form: 'FORM 057',
@@ -59,6 +63,15 @@
   const W = 297, H = 210, M = 5;   // A4 deitado, margem mínima
 
   function colunas(mov, tipo) {
+    /* EPI é diferente (pedido dele, 29/10/2026: "preciso colocar CA e o
+       funcionário"): a saída é entrega ao funcionário, que assina na frente. */
+    if (tipo.id === 'epi') {
+      const cols = mov === 'entrada'
+        ? [['Data', 34], ['EPI', 70], ['CA', 24], ['Qtd', 20], ['Origem', 56], ['NF / Transf', 30], ['Recebido por', 38]]
+        : [['Data', 34], ['Funcionário', 58], ['EPI', 52], ['CA', 22], ['Qtd', 16], ['Assinatura do funcionário', 52], ['Entregue por', 38]];
+      cols.push(['Lanç.', W - 2 * M - cols.reduce((s, c) => s + c[1], 0)]);
+      return cols;
+    }
     const meio = mov === 'entrada'
       ? [['Origem', 66], ['NF / Transf', 34], ['Recebido por', 40]]
       : [['Destino', 66], [tipo.id === 'def' ? 'Receit. / Transf' : 'Doc. / Transf', 34], ['Retirado por', 40]];
@@ -126,7 +139,7 @@
     doc.text('SAKUMA Agronegócios', M, H - M - 2);
     const ly = H - M - 7.5;
     doc.setFontSize(8.5);
-    doc.text(cfg.legenda + (mov === 'saida' ? tipo.destino : '') + '   Lanç.: já lançado no app.', M, ly);
+    doc.text((tipo.legendas ? tipo.legendas[mov] : cfg.legenda + (mov === 'saida' ? tipo.destino : '')) + '   Lanç.: já lançado no app.', M, ly);
 
     // tabela
     const cols = colunas(mov, tipo);
@@ -313,7 +326,8 @@
   </div>
   ${placas ? '' : `<div class="fe-amostra">
     <div style="border-color:#1F5FA8;color:#1F5FA8">ENTRADA DO ESTOQUE<small>Data · Produto · Qtd · Origem · NF / Transf · Recebido por · Lanç.</small></div>
-    <div style="border-color:#C62828;color:#C62828">SAÍDA DO ESTOQUE<small>Data · Produto · Qtd · Destino · Receit. ou Doc. / Transf · Retirado por · Lanç.</small></div></div>`}
+    <div style="border-color:#C62828;color:#C62828">SAÍDA DO ESTOQUE<small>Data · Produto · Qtd · Destino · Receit. ou Doc. / Transf · Retirado por · Lanç.</small></div></div>
+  <p class="dica" style="margin:8px 0 0">EPI tem folha própria: na entrada, EPI e CA; na saída, Funcionário, EPI, CA e a assinatura de quem recebeu.</p>`}
   <p class="fe-resumo" data-resumo></p>
   <div class="barra fim">
     <button type="button" class="btn" data-acao="baixar">Baixar PDF</button>
