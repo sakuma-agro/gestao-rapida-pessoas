@@ -347,6 +347,7 @@ function formSaida(r, rascunho = null) {
     return l.length ? `<optgroup label="${esc(c)}">${l.map(t => `<option value="${esc(t.id)}" ${t.id === v.tipo_id ? 'selected' : ''}>${esc(t.nome)}</option>`).join('')}</optgroup>` : ''; }).join('');
   dialogo(`<h3>${r ? 'Saída de resíduo' : 'Nova saída de resíduo'}</h3>
     <div class="aviso erro" id="reErro" hidden></div>
+    <div class="np-passo">1 · O que saiu e para onde</div>
     <div class="grade">
       <label class="campo">Data <input type="date" id="rsData" value="${esc(v.data)}" max="${hoje()}"></label>
       <label class="campo">Fazenda <select id="rsFazD">${opcoes(E.faz.map(f => [f.id, f.nome]), v.fazenda_id, 'Escolha…')}</select></label>
@@ -359,13 +360,14 @@ function formSaida(r, rascunho = null) {
     </div>
     <datalist id="rsDestins">${[...new Set(E.saidas.map(x => x.destinatario).filter(Boolean))].map(o => `<option value="${esc(o)}">`).join('')}</datalist>
     <p class="dica" id="rsAviso" style="margin:4px 0 0"></p>
+    <div class="np-passo">2 · Evidência (opcional)</div>
     <div id="rsAnexos" style="margin-top:8px"></div>
     <label class="campo">Observação <textarea id="rsObs" rows="2">${esc(v.observacao || '')}</textarea></label>
     <div class="barra entre">
       <div>${r ? '<button class="btn perigo" type="button" id="rsApagar">Apagar</button>' : ''}</div>
       <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button>
-        ${r ? '' : '<button class="btn" type="button" id="rsMais">Salvar e lançar outra</button>'}
-        <button class="btn principal" type="button" id="rsOk">Salvar</button></div>
+        ${r ? '' : '<button class="btn" type="button" id="rsMais">Gravar e lançar outra</button>'}
+        <button class="btn principal" type="button" id="rsOk">Gravar</button></div>
     </div>`, () => {
     anexos = campoAnexos($('rsAnexos'), { area: 'certificacao', tipo: 'residuo', rotulo: 'Comprovante', dica: 'PDF ou foto — vira evidência do RG 053' });
     anexos.abrir(r ? r.id : null);

@@ -234,6 +234,7 @@ function formReuniao(r, pre = {}) {
     <td><select data-k="situacao">${opcoes(SIT_ENC, e.situacao || 'Aberto')}</select></td><td class="ce"><button class="btn mini" type="button" data-tira="${i}">✕</button></td></tr>`;
   dialogo(`<h3>${r ? 'Reunião GRASP' : pre.situacao === 'Agendada' ? 'Agendar reunião GRASP' : 'Lançar reunião GRASP'} <small class="dica">${FORM.codigo}</small></h3>
     <div class="aviso erro" id="gpErro" hidden></div>
+    <div class="np-passo">1 · Dados da reunião</div>
     <div class="grade">
       <label class="campo">Data <input type="date" id="gfData" value="${esc(v.data)}"></label>
       <label class="campo">Horário <input type="text" id="gfHora" value="${esc(v.horario || '')}" placeholder="07:00"></label>
@@ -262,10 +263,11 @@ function formReuniao(r, pre = {}) {
       <table class="dc-planilha"><thead><tr><th>Ação</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th></th></tr></thead><tbody id="gfEncs"></tbody></table>
       <button class="btn mini" type="button" id="gfMaisEnc" style="margin-top:6px">＋ Encaminhamento</button></div>
     <label class="campo">Observação <textarea id="gfObs" rows="2">${esc(v.observacao || '')}</textarea></label>
+    <div class="np-passo">2 · Evidência (opcional)</div>
     <div id="gfAnx" style="margin-top:8px"></div>
     <div class="barra entre">
       <div>${r ? '<button class="btn perigo" type="button" id="gfApagar">Apagar</button> ' : ''}<button class="btn" type="button" id="gfImp">Imprimir ata e lista</button></div>
-      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="gfOk">Salvar</button></div>
+      <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="gfOk">Gravar</button></div>
     </div>`, d => {
     const conta = () => { $('gfConta').textContent = `· ${d.querySelectorAll('#gfLista input:checked').length} marcado(s)`; };
     d.querySelectorAll('#gfLista input').forEach(x => x.addEventListener('change', conta)); conta();

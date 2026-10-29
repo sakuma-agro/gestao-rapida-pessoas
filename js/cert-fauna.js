@@ -648,6 +648,7 @@ function formRegistro(r, rascunho = null) {
   const v = rascunho || r || { data: hoje(), hora: '', especie_id: '', camera_id: ult?.camera_id || '', tipo: 'Foto', individuos: '', evidencia: '', observacao: '' };
   dialogo(`<h3>${r ? 'Registro de fauna' : 'Novo registro de fauna'}</h3>
     <div class="aviso erro" id="cfErro" hidden></div>
+    <div class="np-passo">1 · Quando, onde e qual animal</div>
     <div class="grade">
       <label class="campo">Data <input type="date" id="rgData" value="${esc(v.data)}" max="${hoje()}" required></label>
       <label class="campo">Hora <input type="time" id="rgHora" value="${esc(hm(v.hora))}"></label>
@@ -657,14 +658,15 @@ function formRegistro(r, rascunho = null) {
       <label class="campo">Indivíduos <input type="number" min="1" id="rgInd" value="${esc(v.individuos ?? '')}" placeholder="1"></label>
     </div>
     <label class="campo">Link da evidência (OneDrive) <input type="url" id="rgEvid" value="${esc(v.evidencia || '')}" placeholder="https://1drv.ms/… — botão direito no arquivo › Compartilhar › Copiar link"></label>
+    <div class="np-passo">2 · Evidência (opcional)</div>
     <div id="rgAnexos" style="margin-top:8px"></div>
     <label class="campo">Observação <textarea id="rgObs" rows="2">${esc(v.observacao || '')}</textarea></label>
     ${r ? `<p class="dica">Lançado ${r.criado_por ? 'por ' + esc(r.criado_por) + ' ' : ''}em ${br(String(r.criado_em).slice(0, 10))}.</p>` : ''}
     <div class="barra entre">
       <div>${r ? '<button class="btn perigo" type="button" id="rgApagar">Apagar</button>' : ''}</div>
       <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button>
-        ${r ? '' : '<button class="btn" type="button" id="rgMais">Salvar e lançar outro</button>'}
-        <button class="btn principal" type="button" id="rgOk">Salvar</button></div>
+        ${r ? '' : '<button class="btn" type="button" id="rgMais">Gravar e lançar outro</button>'}
+        <button class="btn principal" type="button" id="rgOk">Gravar</button></div>
     </div>`, () => {
     anexosReg = campoAnexos($('rgAnexos'), { area: 'certificacao', tipo: 'fauna', rotulo: 'Foto no app', dica: 'opcional — além do link' });
     anexosReg.abrir(r ? r.id : null);

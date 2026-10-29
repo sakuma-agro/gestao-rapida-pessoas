@@ -252,6 +252,7 @@ function formLanc(r, rascunho = null) {
   const v = rascunho || r || { competencia: `${mesAnterior()}-01`, fonte_id: '', quantidade: '', origem: '', fazenda: '', observacao: '' };
   dialogo(`<h3>${r ? 'Lançamento de consumo' : 'Novo lançamento de consumo'}</h3>
     <div class="aviso erro" id="enErro" hidden></div>
+    <div class="np-passo">1 · Mês, fonte e quantidade</div>
     <div class="grade">
       <label class="campo">Mês <input type="month" id="lcMes" value="${esc(String(v.competencia).slice(0, 7))}" max="${mesAtual()}"></label>
       <label class="campo">Fonte <select id="lcFonte">${opcoes(E.fontes.filter(f => f.ativa || f.id === v.fonte_id).map(f => [f.id, `${f.nome} (${f.unidade})`]), v.fonte_id, 'Escolha…')}</select></label>
@@ -262,13 +263,14 @@ function formLanc(r, rascunho = null) {
     </div>
     <datalist id="lcOrigs">${[...new Set(E.regs.map(x => x.origem).filter(Boolean))].map(o => `<option value="${esc(o)}">`).join('')}</datalist>
     <datalist id="lcFazs">${[...new Set(E.regs.map(x => x.fazenda).filter(Boolean))].map(o => `<option value="${esc(o)}">`).join('')}</datalist>
+    <div class="np-passo">2 · Evidência (opcional)</div>
     <div id="lcAnexos" style="margin-top:8px"></div>
     <label class="campo">Observação <textarea id="lcObs" rows="2">${esc(v.observacao || '')}</textarea></label>
     <div class="barra entre">
       <div>${r ? '<button class="btn perigo" type="button" id="lcApagar">Apagar</button>' : ''}</div>
       <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button>
-        ${r ? '' : '<button class="btn" type="button" id="lcMais">Salvar e lançar outro</button>'}
-        <button class="btn principal" type="button" id="lcOk">Salvar</button></div>
+        ${r ? '' : '<button class="btn" type="button" id="lcMais">Gravar e lançar outro</button>'}
+        <button class="btn principal" type="button" id="lcOk">Gravar</button></div>
     </div>`, () => {
     anexos = campoAnexos($('lcAnexos'), { area: 'certificacao', tipo: 'energia', rotulo: 'Fatura / nota', dica: 'PDF ou foto — vira evidência do FORM 043' });
     anexos.abrir(r ? r.id : null);
