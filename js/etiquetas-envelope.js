@@ -6,6 +6,8 @@
 // holerite, folha de ponto e recibo.
 // Legenda: x = arquivado · o = não tem.
 //
+// Logo da SAKUMA (img/sakuma-logo.png, como enviada) no canto do topo,
+// ao lado do nome (pedido de 29/10/2026).
 // Medidas: etiqueta 100 mm de largura (pedido dele) × 120 mm de altura.
 // Folha A4 em pé com 2 etiquetas, uma embaixo da outra, centralizadas.
 // Os meses antes da admissão (no ano escolhido) saem em cinza, sem caixinha.
@@ -149,7 +151,10 @@ function etiquetaHtml(f) {
     ? `<tr class="ev-fora"><td>${m}/${ano}</td>${DOCS.map(() => '<td>—</td>').join('')}</tr>`
     : `<tr><td>${m}/${ano}</td>${DOCS.map(() => '<td><span class="ev-cx"></span></td>').join('')}</tr>`).join('');
   return `<div class="ev-etq" style="width:${ETQ.w}mm;height:${ETQ.h}mm">
-    <div class="ev-nome">${esc(f.nome)}</div>
+    <div class="ev-topo">
+      <img class="ev-logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="ev-nome"><span>${esc(f.nome)}</span></div>
+    </div>
     <div class="ev-dados">
       ${linha('ADMISSÃO', dataBr(f.admissao))}
       ${linha('FICHA', f.cadastro)}
@@ -182,12 +187,17 @@ function gerar(paraImprimir) {
   if (paraImprimir) setTimeout(imprimirSemTitulo, 400);
 }
 
-/* Nome comprido: diminui a letra até caber numa linha. */
+/* Nome comprido: quebra em até duas linhas e, se ainda não couber,
+   diminui a letra. Medido com folga, porque a impressora desenha a letra
+   um pouco maior que a tela (o nome saía cortado em 29/10/2026). */
 function caberNome() {
-  document.querySelectorAll('#jorImpressao .ev-nome').forEach(n => {
-    let pt = 15;
-    n.style.fontSize = pt + 'pt';
-    while (n.scrollWidth > n.clientWidth && pt > 9) { pt -= 0.5; n.style.fontSize = pt + 'pt'; }
+  document.querySelectorAll('#jorImpressao .ev-nome').forEach(box => {
+    const s = box.firstElementChild;
+    let pt = 13;
+    s.style.fontSize = pt + 'pt';
+    const cabe = () => s.scrollWidth <= s.clientWidth &&
+      s.getBoundingClientRect().height <= box.clientHeight * 0.88;
+    while (!cabe() && pt > 8) { pt -= 0.5; s.style.fontSize = pt + 'pt'; }
   });
 }
 
