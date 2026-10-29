@@ -1055,12 +1055,13 @@ function ligarCadeia(d) {
 function refazCadeia(d) { const el = $('ceDvCadeia'); if (!el) return; el.innerHTML = htmlCadeia(d); ligarCadeia(d); }
 
 function formEvidencia(d, e, itemId = null) {
-  const v = e || { data: hoje(), descricao: '', link: '', item_id: itemId };
-  const itensDoc = itensDe(d); const rd = rotDatas(d);
-  const itAtual = S.itens.find(i => i.id === v.item_id);
+  const rd = rotDatas(d);
+  const itAtual = S.itens.find(i => i.id === (e?.item_id ?? itemId));
+  const v = e || { data: (rd.entrega && itAtual?.aguardando_data) || hoje(), descricao: '', link: '', item_id: itemId };
+  const itensDoc = itensDe(d);
   let anx = null;
-  dialogo(`<h3>${e ? 'Evidência' : 'Nova evidência'} — ${esc(d.codigo)}</h3>
-    <p class="dica">${esc(d.nome)}</p>
+  dialogo(`<h3>${rd.entrega ? (e ? 'Documentos' : 'Chegaram os documentos') : e ? 'Evidência' : 'Nova evidência'} — ${esc(d.codigo)}${rd.entrega && itAtual ? ' · ' + esc(rotItem(itAtual)) : ''}</h3>
+    <p class="dica">${rd.entrega ? 'Anexe as notas carimbadas da devolução.' : esc(d.nome)}</p>
     <div class="aviso erro" id="ceErro" hidden></div>
     <div class="grade">
       <label class="campo">${rd.doc} <input type="date" id="evData" value="${esc(v.data)}" max="${hoje()}"></label>
@@ -1068,7 +1069,7 @@ function formEvidencia(d, e, itemId = null) {
     </div>
     ${itensDoc.length ? `<div class="grade">
       <label class="campo">Fazenda / ponto <select id="evItem">${opcoes(itensDoc.map(i => [i.id, rotItem(i)]), v.item_id, '— geral —')}</select></label>
-      <label class="campo">${rd.prox} <small>${rd.entrega ? `(data já marcada com a central${itAtual?.validade ? '; hoje: ' + br(itAtual.validade) : ''})` : '(laudo, licença…; atualiza a fazenda)'}</small> <input type="date" id="evValid" value=""></label>
+      <label class="campo">${rd.prox} <small>${rd.entrega ? '(confira; dá para mudar depois no ✎)' : '(laudo, licença…; atualiza a fazenda)'}</small> <input type="date" id="evValid" value="${rd.entrega && !e ? esc(itAtual?.validade || '') : ''}"></label>
     </div>` : ''}
     <label class="campo">Link no OneDrive (opcional) <input type="url" id="evLink" value="${esc(v.link || '')}" placeholder="https://…"></label>
     <div id="evAnx" style="margin-top:8px"></div>
@@ -1079,9 +1080,8 @@ function formEvidencia(d, e, itemId = null) {
     $('evOk').addEventListener('click', async () => {
       const linha = { documento_id: d.id, data: $('evData').value, descricao: so($('evDesc').value) || null, link: so($('evLink').value) || null,
         item_id: $('evItem')?.value || null };
-      if (!linha.data) return erroDlg(rd.entrega ? 'Informe a data da última devolução (a do carimbo).' : 'Informe a data.');
-      if (rd.entrega && !e && linha.item_id && !$('evValid')?.value) return erroDlg('Informe a data da próxima devolução agendada.');
-      if (rd.entrega && $('evValid')?.value && $('evValid').value <= linha.data) return erroDlg('A próxima devolução precisa ser depois da última.');
+      if (!linha.data) return erroDlg(rd.entrega ? 'Informe a data da devolução destes documentos.' : 'Informe a data.');
+      if (rd.entrega && $('evValid')?.value && $('evValid').value <= linha.data) return erroDlg('A próxima devolução precisa ser depois desta.');
       if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (!e && !anx.mudou && !linha.link) return erroDlg('Anexe o arquivo ou cole o link da evidência.');
       const salvo = await salvar('cert_evidencias', e, e ? { ...linha, atualizado_por: quem() } : { ...linha, criado_por: quem() }, S.evid, 'evOk');
@@ -1091,6 +1091,8 @@ function formEvidencia(d, e, itemId = null) {
       if (it) {   // a fazenda guarda a data da última evidência e, se veio, a nova validade
         const muda = { ultima_data: !it.ultima_data || linha.data > it.ultima_data ? linha.data : it.ultima_data, atualizado_em: new Date().toISOString() };
         if ($('evValid')?.value) muda.validade = $('evValid').value;
+        // AN 55: chegaram os documentos da devolução que estava aguardando → sai do "aguardando"
+        if (rd.entrega && it.aguardando_data && linha.data >= it.aguardando_data) muda.aguardando_data = null;
         const { error } = await estado.cliente.from('cert_doc_itens').update(muda).eq('id', it.id);
         if (!error) Object.assign(it, muda);
       }
@@ -1117,10 +1119,13 @@ const itensDe = d => S.itens.filter(i => i.documento_id === d.id)
  *  "validade" é a próxima devolução agendada. Nos outros AN segue "Válido até". */
 function rotDatas(d) {
   return /devolu[cç][aã]o de embalage/i.test(so(d?.nome))
-    ? { entrega: true, doc: 'Última devolução (data do carimbo)', docCurto: 'Última devolução', prox: 'Próxima devolução agendada', proxCurto: 'Próxima devolução' }
+    ? { entrega: true, doc: 'Documentos da devolução de', docCurto: 'Documentos em mãos', prox: 'Próxima devolução programada', proxCurto: 'Próxima devolução' }
     : { entrega: false, doc: 'Data (ou mês de referência)', docCurto: 'última', prox: 'Válido até', proxCurto: 'Válido até' };
 }
-/** Depois da devolução, a central devolve as notas carimbadas em até 7 dias (29/10/2026). */
+/** AN 55 tem três datas por fazenda (29/10/2026, pedido dele):
+ *  ultima_data = documentos em mãos · aguardando_data = devolução feita, aguardando os
+ *  documentos carimbados · validade = próxima devolução programada.
+ *  Depois da devolução, os documentos carimbados voltam em até 7 dias. */
 const PRAZO_NOTAS = 7;
 /** Vencimento do item: a validade informada; sem ela, última evidência + periodicidade. */
 function vencItem(i, d) {
@@ -1129,13 +1134,25 @@ function vencItem(i, d) {
   return m && i.ultima_data ? somaMeses(i.ultima_data, m) : null;
 }
 function estadoItem(i, d) {
+  if (rotDatas(d).entrega) return estadoEntrega(i);
   const v = vencItem(i, d);
   if (!v) return i.ultima_data ? { t: 'Em dia', c: 'ativo' } : { t: 'Sem evidência', c: 'perigo' };
   const n = entre(hoje(), v);
-  const ent = rotDatas(d).entrega;
-  if (ent && n < 0 && -n <= PRAZO_NOTAS) return { t: 'Aguardando notas carimbadas', c: 'alerta', v };
-  if (n < 0) return { t: ent ? `Notas atrasadas ${-n - PRAZO_NOTAS} d` : `Vencido há ${-n} d`, c: 'perigo', v };
-  if (n <= 30) return { t: ent ? `Devolução em ${n} d` : `Vence em ${n} d`, c: 'alerta', v };
+  if (n < 0) return { t: `Vencido há ${-n} d`, c: 'perigo', v };
+  if (n <= 30) return { t: `Vence em ${n} d`, c: 'alerta', v };
+  return { t: 'Em dia', c: 'ativo', v };
+}
+/** Situação no AN 55: falta próxima data → aguardando documentos → devolução passou sem registro → em dia. */
+function estadoEntrega(i) {
+  const v = i.validade || null;
+  if (!v) return { t: 'Sem próxima data', c: 'perigo' };
+  if (i.aguardando_data) {
+    const n = entre(i.aguardando_data, hoje());
+    return n > PRAZO_NOTAS ? { t: `Documentos atrasados ${n - PRAZO_NOTAS} d`, c: 'perigo', v } : { t: 'Aguardando documentos', c: 'alerta', v };
+  }
+  const n = entre(hoje(), v);
+  if (n < 0) return { t: 'Devolução passou — atualizar ✎', c: 'perigo', v };
+  if (n <= 30) return { t: `Devolução em ${n} d`, c: 'alerta', v };
   return { t: 'Em dia', c: 'ativo', v };
 }
 export function pendenciasFazendas() {
@@ -1181,13 +1198,15 @@ function linhaItem(i, d, rotulo, sub) {
   return `<div class="ce-fz-item">
     <div class="ce-fz-nome"><b>${esc(rotulo)}</b>${sub ? `<span class="dc-sem">${esc(sub)}</span>` : ''}</div>
     <div class="ce-fz-dados dc-sem">${rd.entrega
-      ? `${rd.docCurto} <b>${i.ultima_data ? br(i.ultima_data) : '—'}</b> · ${rd.proxCurto} <b>${i.validade ? br(i.validade) : 'não informada'}</b>${ult ? ` · ${ult} evid.` : ''}`
+      ? `<div class="ce-3d"><div class="ok"><small>Documentos em mãos</small><b>${i.ultima_data ? br(i.ultima_data) : '—'}</b></div>
+        <div class="esp"><small>Devolvido, aguardando docs</small><b>${i.aguardando_data ? br(i.aguardando_data) : '—'}</b></div>
+        <div class="pro"><small>Próxima devolução</small><b>${i.validade ? br(i.validade) : '<span class="vz">não marcada</span>'}</b></div></div>`
       : `${i.validade ? 'Válido até ' + br(i.validade) : e.v ? 'Próxima ' + br(e.v) : esc(i.periodicidade || d.periodicidade || '')}
       ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}`}</div>
     ${tag(e.t, e.c)}
     <div class="ce-fz-acoes">
       ${ult ? `<button class="btn mini" type="button" data-fz-ver="${i.id}" title="Ver o PDF da última evidência (setas ← → mostram as anteriores)">${svgIcone('documento')} Ver</button>` : ''}
-      <button class="btn mini principal" type="button" data-fz-ev="${i.id}" title="Anexar evidência">＋ Evidência</button>
+      <button class="btn mini principal" type="button" data-fz-ev="${i.id}" title="${rd.entrega ? 'Chegaram os documentos carimbados' : 'Anexar evidência'}">＋ ${rd.entrega ? 'Documentos' : 'Evidência'}</button>
       ${linkOk(i.link) ? `<a class="btn mini" href="${esc(i.link)}" target="_blank" rel="noopener" title="Abrir a pasta no OneDrive">${svgIcone('predio')}</a>` : ''}
       <button class="btn mini" type="button" data-fz-ed="${i.id}" title="Editar">${svgIcone('lapis')}</button>
     </div></div>`;
@@ -1255,8 +1274,13 @@ function formItem(d, it) {
       <label class="campo">Fazenda <select id="fzFaz">${opcoes(S.faz.map(f => [f.id, f.nome]), v.fazenda_id, '— geral (sem fazenda) —')}</select></label>
       <label class="campo">Local / ponto <small>(opcional)</small> <input type="text" id="fzLocal" value="${esc(v.local || '')}" placeholder="Ex.: Poço 1, caixa d'água da sede, bebedouro"></label>
       <label class="campo">Periodicidade <select id="fzPer">${opcoes(PERIODOS, v.periodicidade)}</select></label>
-      <label class="campo">${rotDatas(d).prox} <small>${rotDatas(d).entrega ? '(data marcada)' : '(licença, laudo…)'}</small> <input type="date" id="fzValid" value="${esc(v.validade || '')}"></label>
+      ${rotDatas(d).entrega ? '' : `<label class="campo">Válido até <small>(licença, laudo…)</small> <input type="date" id="fzValid" value="${esc(v.validade || '')}"></label>`}
     </div>
+    ${rotDatas(d).entrega ? `<div class="grade">
+      <label class="campo">Documentos em mãos <small>(data do documento)</small> <input type="date" id="fzUlt" value="${esc(v.ultima_data || '')}"></label>
+      <label class="campo">Devolução feita, aguardando documentos <input type="date" id="fzAg" value="${esc(v.aguardando_data || '')}"></label>
+      <label class="campo">Próxima devolução programada <input type="date" id="fzValid" value="${esc(v.validade || '')}"></label>
+    </div>` : ''}
     <label class="campo">Link da pasta no OneDrive <input type="url" id="fzLink" value="${esc(v.link || '')}" placeholder="https://…"></label>
     <label class="campo">Observação <input type="text" id="fzObs" value="${esc(v.observacao || '')}" placeholder="Ex.: nº da licença, órgão emissor, laboratório"></label>
     <div class="barra entre"><div>${it ? '<button class="btn perigo" type="button" id="fzApagar">Tirar da lista</button>' : ''}</div>
@@ -1265,6 +1289,7 @@ function formItem(d, it) {
       const linha = { documento_id: d.id, fazenda_id: $('fzFaz').value || null, local: so($('fzLocal').value) || null,
         periodicidade: $('fzPer').value || null, validade: $('fzValid').value || null, link: so($('fzLink').value) || null,
         observacao: so($('fzObs').value) || null, atualizado_em: new Date().toISOString() };
+      if (rotDatas(d).entrega) { linha.ultima_data = $('fzUlt').value || null; linha.aguardando_data = $('fzAg').value || null; }
       if (!linha.fazenda_id && !linha.local) return erroDlg('Escolha a fazenda ou, num item geral (fornecedor, documento), preencha o Local / item.');
       if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (await salvar('cert_doc_itens', it, linha, S.itens, 'fzOk')) { salvarCaixa(); refazFazendas(d); }

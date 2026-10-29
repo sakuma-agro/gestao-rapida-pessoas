@@ -2178,3 +2178,9 @@ body.ce-apr-aberto{overflow:hidden}
 .bh-item{display:flex;gap:8px;align-items:center;padding:3px 0;flex-wrap:wrap}
 .bh-item select{width:auto}
 .bh-item input[type=text]{flex:1;min-width:160px}
+
+/* AN 55 — três datas por fazenda (29/10/2026, gr-v466) */
+.ce-3d{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ce-3d small{display:block;font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;color:var(--suave)}
+.ce-3d b{font-size:13.5px}.ce-3d .ok b{color:#4E7D00}.ce-3d .esp b{color:#8a5f00}.ce-3d .pro b{color:var(--marrom)}.ce-3d .vz{color:var(--suave);font-weight:400}
+@media (max-width:700px){.ce-3d{grid-template-columns:1fr 1fr}}
