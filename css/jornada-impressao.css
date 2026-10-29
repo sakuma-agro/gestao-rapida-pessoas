@@ -403,3 +403,26 @@
 }
 .rel.bh-folha + .rel.bh-folha { margin-top: 14px; }
 @media print { .rel.bh-folha + .rel.bh-folha { margin-top: 0; } }
+
+/* ---- Etiquetas de envelope (29/10/2026, js/etiquetas-envelope.js) ----
+   100 × 120 mm, 2 por A4. Quadro mês a mês: holerite, folha de ponto, recibo. */
+.ev-linha { grid-template-columns: 26px minmax(0, 1.3fr) minmax(0, 1fr) 90px; }
+.ev-pos { position: absolute; }
+.ev-etq { box-sizing: border-box; display: flex; flex-direction: column; padding: 4mm 5mm 3mm;
+  border: 0.3mm dashed #A8AA9E; background: #fff; font-family: Arial, Helvetica, sans-serif; color: #1B232B; overflow: hidden; }
+.ev-nome { font-weight: 700; font-size: 15pt; text-align: center; white-space: nowrap; overflow: hidden;
+  padding-bottom: 1.5mm; border-bottom: 0.6mm solid #84BD00; margin-bottom: 2mm; }
+.ev-dados { font-size: 9.5pt; line-height: 1.38; margin-bottom: 2.5mm; }
+.ev-dado { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-dado b { font-weight: 700; }
+.ev-quadro { width: 100%; border-collapse: collapse; font-size: 8.5pt; table-layout: fixed; }
+.ev-quadro th { background: #E8F3D1; font-weight: 700; padding: 1mm 0.5mm; border: 0.25mm solid #51534A; text-align: center; }
+.ev-quadro th:first-child { width: 22%; }
+.ev-quadro td { height: 5.6mm; padding: 0 1mm; border: 0.25mm solid #51534A; text-align: center; }
+.ev-quadro td:first-child { text-align: left; font-weight: 700; }
+.ev-cx { display: inline-block; width: 3.6mm; height: 3.6mm; border: 0.3mm solid #1B232B; vertical-align: middle; }
+.ev-fora td { color: #A8AA9E; background: #F2F2EF; }
+.ev-legenda { margin-top: auto; padding-top: 1.5mm; font-size: 8.5pt; text-align: center; color: #51534A; }
+@media print {
+  .ev-etq, .ev-quadro th, .ev-fora td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

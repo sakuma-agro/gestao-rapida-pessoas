@@ -60,10 +60,11 @@ export const MODULOS = [
       /* Férias do mês (15/10/2026): só consulta, lê o DP › Férias. */
       ['cadFerias', 'Férias do mês'],
     ] },
-    /* Etiquetas (23/10/2026): etiquetas impressas para plastificar. Por
-       enquanto só Armários (js/etiquetas.js). */
+    /* Etiquetas (23/10/2026): Armários (js/etiquetas.js) e, desde
+       29/10/2026, Envelopes (js/etiquetas-envelope.js). */
     { id: 'etiquetas', nome: 'Etiquetas', telas: [
       ['etqArmarios', 'Armários'],
+      ['etqEnvelopes', 'Envelopes'],
     ] },
     /* "Estrutura" (29/09/2026): Funções e setores e Empregador e fazenda viraram
        um submódulo só, a pedido dele. As chaves das telas não mudaram. */

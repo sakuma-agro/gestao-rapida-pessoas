@@ -46,6 +46,7 @@ import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as env
   fotosDe, urlDoArquivo } from './arquivos.js';
 import { desenharCadRelatorios, desenharCadFerias } from './cad-relatorios.js';
 import { abrirEtiquetas } from './etiquetas.js';
+import { abrirEnvelopes } from './etiquetas-envelope.js';
 import { abrirOrganograma, limparOrganograma } from './organograma.js';
 import { abrirIndicadores, limparIndicadores, TELAS_INDICADORES } from './rh-indicadores.js';
 import { abrirSalarios, limparSalarios, TELAS_SALARIOS, _sal } from './rh-salarios.js';
@@ -211,6 +212,8 @@ function abrirAba(nome) {
   if (nome === 'cadFerias') desenharCadFerias();
   $('telaEtqArmarios').hidden = nome !== 'etqArmarios';
   if (nome === 'etqArmarios') abrirEtiquetas();
+  $('telaEtqEnvelopes').hidden = nome !== 'etqEnvelopes';
+  if (nome === 'etqEnvelopes') abrirEnvelopes();
   if (nome === 'disc') abrirDisc();
   if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();
