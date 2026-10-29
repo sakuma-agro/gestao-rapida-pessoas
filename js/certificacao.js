@@ -453,8 +453,8 @@ function abrirSubDaPorta(id) {
   if (s) abrirModulo('cert', s.telas[0][0]);
 }
 
-function desenharPainel() {
-  const tela = $('telaCePainel');
+/* Atrasados, próximos 60 dias e números da certificação — usados na entrada e em Pendências. */
+function dadosPendencias() {
   const hj = hoje();
   const prox = itensEntre(hj, somaDias(hj, 60)).filter(i => !i.feito);
   const atrasados = [
@@ -469,6 +469,12 @@ function desenharPainel() {
 
   const cartao = (cor, rot, n, dica, alvo) => `<button type="button" class="pv-card pv-${cor}${n ? '' : ' pv-zero'}" ${alvo ? `data-ir="${alvo}"` : ''}>
     <span>${esc(rot)}</span><strong>${n}</strong><small>${esc(dica)}</small></button>`;
+  return { hj, prox, atrasados, criticos, docsPend, emUsoTodos, conf, cartao };
+}
+
+function desenharPainel() {
+  const tela = $('telaCePainel');
+  const { prox, atrasados } = dadosPendencias();
 
 
   const porta = PORTAS.some(p => p.g === grupoAberto()) ? grupoAberto() : null;
@@ -505,15 +511,41 @@ function desenharPainel() {
         }).join('')}</div>`}
     </div>
     <aside class="ce-ent-lado" id="ceEntLado">
-      <div class="ce-ent-lado-topo"><b>Atrasados · ${atrasados.length}</b><button type="button" class="btn mini" id="ceEntCal">Ver no calendário</button></div>
+      <div class="ce-ent-lado-topo"><b>Atrasados · ${atrasados.length}</b><button type="button" class="btn mini" id="ceEntCal">Ver pendências</button></div>
       ${atrasoLinhas || '<div class="vazio">Nada atrasado.</div>'}
       ${atrasados.length > 6 ? `<p class="dica" style="margin:8px 0 0">e mais ${atrasados.length - 6} no calendário.</p>` : ''}
     </aside>
   </div>
-  <details class="ce-ent-resumo"${porta ? ' hidden' : ''}><summary>Resumo completo da certificação</summary>
+`;
+  tela.querySelectorAll('[data-porta]').forEach(b => b.addEventListener('click', () => b.dataset.porta === 'Pendências' ? abrirModulo('cert', 'cePendencias') : abrirGrupo('cert', b.dataset.porta)));
+  tela.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSubDaPorta(b.dataset.sub)));
+  $('ceEntVoltar')?.addEventListener('click', () => abrirModulo('cert', 'cePainel'));
+  $('ceEntAtr')?.addEventListener('click', () => abrirModulo('cert', 'cePendencias'));
+  $('ceEntCal')?.addEventListener('click', () => abrirModulo('cert', 'cePendencias'));
+  tela.querySelectorAll('[data-atr-tipo]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', 'cePendencias')));
+}
+
+/* ===================================================================
+   TELA · PENDÊNCIAS (etapa 3, 29/10/2026 — claude/cert-redesenho-lean.md)
+   Tudo que precisa de atenção num lugar: números, atrasados, o que vence
+   e os atalhos para o calendário, o cronograma anual e os indicadores.
+   =================================================================== */
+function desenharPendencias() {
+  const tela = $('telaCePendencias');
+  const { prox, atrasados, criticos, docsPend, emUsoTodos, conf, cartao } = dadosPendencias();
+  tela.innerHTML = `<div class="ce-pend-topo naoimprimir">
+      <div><h2 style="margin:0">Pendências</h2>
+        <p class="dica" style="margin:2px 0 0">O que está atrasado, o que vence logo e como está cada certificação.</p></div>
+      <div class="barra" style="margin:0">
+        <button class="btn" type="button" data-ir-tela="ceCalendario">Calendário</button>
+        <button class="btn" type="button" data-ir-tela="ceAnual">Cronograma anual</button>
+        <button class="btn" type="button" data-ir-tela="ceIndPainel">Indicadores</button>
+      </div>
+    </div>
+
 <div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
-      <div><h2 style="margin:0">Painel da certificação</h2>
+      <div><h3 style="margin:0">Situação das certificações</h3>
         <p class="dica" style="margin:2px 0 0">${ativas().map(c => esc(c.nome)).join(' · ') || 'Nenhuma certificação ligada'}</p></div>
       <button class="btn" type="button" id="cePnNovo">Marcar no calendário</button>
     </div>
@@ -528,11 +560,11 @@ function desenharPainel() {
       ${cartao(atrasados.length ? 'perigo' : 'ok', 'Atrasados', atrasados.length, 'prazos e revisões que passaram', 'cal')}
     </div>
 
+    ${atrasados.length ? `<div class="qp-bloco"><h3>Atrasados</h3>${tabelaItens(atrasados, '')}</div>` : ''}
     <div class="qp-bloco">
       <h3>Próximos 60 dias</h3>
       ${tabelaItens(prox, 'Nada marcado para os próximos 60 dias.')}
     </div>
-    ${atrasados.length ? `<div class="qp-bloco"><h3>Atrasados</h3>${tabelaItens(atrasados, '')}</div>` : ''}
     <div class="qp-bloco">
       <h3>Requisitos críticos em aberto</h3>
       ${criticos.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr><th>Requisito</th><th>Tema</th><th>Códigos</th><th class="ce">Status</th><th></th></tr></thead><tbody>
@@ -546,13 +578,8 @@ function desenharPainel() {
   <div class="rodape-fixo naoimprimir">
     <button class="btn principal" type="button" id="cePnImprimir">Imprimir o painel</button>
   </div>
-  </details>`;
-  tela.querySelectorAll('[data-porta]').forEach(b => b.addEventListener('click', () => abrirGrupo('cert', b.dataset.porta)));
-  tela.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSubDaPorta(b.dataset.sub)));
-  $('ceEntVoltar')?.addEventListener('click', () => abrirModulo('cert', 'cePainel'));
-  $('ceEntAtr')?.addEventListener('click', () => $('ceEntLado')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  $('ceEntCal')?.addEventListener('click', () => abrirModulo('cert', 'ceCalendario'));
-  tela.querySelectorAll('[data-atr-tipo]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', 'ceCalendario')));
+`;
+  tela.querySelectorAll('[data-ir-tela]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', b.dataset.irTela)));
   $('cePnNovo').addEventListener('click', () => formEvento(null, hoje()));
   $('cePnImprimir').addEventListener('click', () => mostrar(docPainel(prox, atrasados, criticos), { barra: true }));
   tela.querySelectorAll('[data-req]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.req))));
@@ -572,6 +599,7 @@ function desenharPainel() {
   }));
   ligarItens(tela);
 }
+
 
 /** Ocorrências que passaram sem serem dadas como feitas: eventos únicos e,
  *  desde 27/10/2026 (FORM 044 atrasado sem aviso), também as repetições dos
@@ -2222,9 +2250,9 @@ async function exportarAnual(ano, linhas) {
 /* ===================================================================
    ENTRADA
    =================================================================== */
-export const TELAS_CERT = ['cePainel', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
+export const TELAS_CERT = ['cePainel', 'cePendencias', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
 const DESENHO = {
-  cePainel: desenharPainel, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
+  cePainel: desenharPainel, cePendencias: desenharPendencias, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
   ceCalendario: desenharCalendario, ceAnual: desenharAnual, ceCertificacoes: desenharCertificacoes,
 };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);

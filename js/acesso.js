@@ -351,6 +351,10 @@ export const MODULOS = [
       ['ccCalibracoes', 'Calibrações'],
       ['ccRelatorios',  'Relatórios'],
     ] },
+    /* Pendências (etapa 3, 29/10/2026): atrasados, o que vence e a situação das certificações. */
+    { id: 'cePendSub', grupo: 'Pendências', nome: 'Pendências', telas: [
+      ['cePendencias', 'Pendências'],
+    ] },
     { id: 'ceCrono', grupo: 'Pendências', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
@@ -772,7 +776,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
 };
 /* Ícone das portas da Certificação (29/10/2026). */
 const ICONE_GRUPO = { 'Documentos': 'documento', 'Registros': 'lapis', 'Pendências': 'calendario' };

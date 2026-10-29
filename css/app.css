@@ -2347,8 +2347,8 @@ body.ce-apr-aberto{overflow:hidden}
 .tela-junta > .cartao:first-child > .barra:first-child .btn.principal{display:none}
 
 /* Certificação, etapa 2 (parte 2, 29/10/2026): Imprimir/Excel no alto dos forms, no mesmo lugar em todos */
-:is(#telaFoPainel,#telaFaPainel,#telaEnPainel,#telaRePainel,#telaGpPainel,#telaBmPainel,#telaBhRegistros,#telaMcNcs,#telaMcMelhorias,#telaMcFeedbacks,.tela-junta):not([hidden]){display:flex;flex-direction:column}
-:is(#telaFoPainel,#telaFaPainel,#telaEnPainel,#telaRePainel,#telaGpPainel,#telaBmPainel,#telaBhRegistros,#telaMcNcs,#telaMcMelhorias,#telaMcFeedbacks,.tela-junta) > .rodape-fixo{
+:is(#telaFoPainel,#telaFaPainel,#telaEnPainel,#telaRePainel,#telaGpPainel,#telaBmPainel,#telaBhRegistros,#telaMcNcs,#telaMcMelhorias,#telaMcFeedbacks,#telaCePendencias,.tela-junta):not([hidden]){display:flex;flex-direction:column}
+:is(#telaFoPainel,#telaFaPainel,#telaEnPainel,#telaRePainel,#telaGpPainel,#telaBmPainel,#telaBhRegistros,#telaMcNcs,#telaMcMelhorias,#telaMcFeedbacks,#telaCePendencias,.tela-junta) > .rodape-fixo{
   order:-1;position:static;margin:0 0 10px;padding:0;border:0;background:transparent;justify-content:flex-end}
 /* Balanço de massa: o painel não tem botão de novo, então o "Novo boletim / lote" do histórico fica */
 #telaBmLotes.tela-junta > .cartao:first-child > .barra:first-child .btn.principal{display:inline-flex}
@@ -2361,3 +2361,7 @@ body.ce-apr-aberto{overflow:hidden}
 .cfo-sn label:has(input[value="1"]:checked){background:var(--verde);border-color:var(--verde);color:#1B232B}
 .cfo-sn label:has(input[value="0"]:checked){background:var(--erro);border-color:var(--erro);color:#fff}
 .cfo-sn label:focus-within{outline:2px solid var(--verde);outline-offset:2px}
+
+/* Certificação › Pendências (etapa 3, 29/10/2026) */
+.ce-pend-topo{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.ce-pend-topo h2{font-size:24px}
