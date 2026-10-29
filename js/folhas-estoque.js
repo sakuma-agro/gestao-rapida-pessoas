@@ -60,6 +60,9 @@
       legenda: 'Transferência: escrever o estoque de destino.   Descarte: escrever "vencido" ou "descarte" no Destino.   ',
       frase: 'Vai retirar produto? Anote aqui antes de levar.' },
   };
+  /* Controle do documento (Lista mestra: FORM 048 e 049, rev. 02 de 01/12/2026),
+     no mesmo padrão dos outros FORMs da Certificação. */
+  const REV = { data: '01/12/2026', rev: '02', elab: 'Guilherme Ribeiro Lopes', aprov: 'Produtor – Fabio Massao Sakuma' };
   const CINZA = '#51534A', GRADE = '#888780', LISTRA = '#EFEFED', CORTE = '#B4B2A9';
   const W = 297, H = 210, M = 5;   // A4 deitado, margem mínima
 
@@ -119,18 +122,32 @@
     doc.text('Estoque:', tx, M + 14);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
     doc.text(estoque || '______________________________', tx + 16, M + 14);
-    doc.text(cfg.form, tx + 70, M + 14);
-    // quadro do tipo, à direita
-    const bw = 62, bh = 14, bx = W - M - bw, by = M + 1;
+    /* Quadro de controle do documento, como nos outros FORMs da Certificação
+       (pedido dele, 29/10/2026: "nos forms precisamos criar data de revisão e etc"):
+       Código | Data | Revisão | Página. */
+    const cw = 56, cx0 = W - M - cw, rh4 = 4.1, cy0 = M;
+    const linhas = [['Código', cfg.form], ['Data', REV.data], ['Revisão', REV.rev], ['Página', '1 / 1']];
+    doc.setLineWidth(0.25); doc.setDrawColor(COR);
+    linhas.forEach(([r, v], i) => {
+      const y = cy0 + i * rh4;
+      doc.setFillColor(cfg.claro); doc.rect(cx0, y, 20, rh4, 'FD');
+      doc.setFillColor('#FFFFFF'); doc.rect(cx0 + 20, y, cw - 20, rh4, 'FD');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(CINZA);
+      doc.text(r, cx0 + 2, y + rh4 - 1.2);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(i === 0 ? COR : CINZA);
+      doc.text(v, cx0 + 22, y + rh4 - 1.1);
+    });
+    // quadro do tipo, à esquerda do controle
+    const bw = 50, bh = 4 * rh4, bx = cx0 - 4 - bw, by = cy0;
     doc.setDrawColor(COR); doc.setLineWidth(1.2); doc.setFillColor('#FFFFFF');
     doc.rect(bx, by, bw, bh, 'FD');
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(CINZA);
-    doc.text('TIPO DE ESTOQUE', bx + bw / 2, by + 4, { align: 'center' });
+    doc.text('TIPO DE ESTOQUE', bx + bw / 2, by + 4.2, { align: 'center' });
     let fs = 16;
     doc.setFont('helvetica', 'bold');
     while (fs > 8) { doc.setFontSize(fs); if (doc.getTextWidth(tipo.nome.toUpperCase()) <= bw - 4) break; fs -= 0.5; }
     doc.setTextColor(COR);
-    doc.text(tipo.nome.toUpperCase(), bx + bw / 2, by + bh - 3, { align: 'center' });
+    doc.text(tipo.nome.toUpperCase(), bx + bw / 2, by + bh - 3.2, { align: 'center' });
     const hb = M + lh + 2;
     doc.setDrawColor(COR); doc.setLineWidth(1.6); doc.line(M, hb, W - M, hb);
 
@@ -138,7 +155,7 @@
     const sh = 7, sw = sh * img.lop.w / img.lop.h;
     doc.addImage(img.lop.url, 'PNG', W - M - sw, H - M + 1 - sh, sw, sh);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(CINZA);
-    doc.text('SAKUMA Agronegócios', M, H - M - 2);
+    doc.text(`Elaboração/Revisão: ${REV.elab}     Aprovação: ${REV.aprov}     SAKUMA Agronegócios`, M, H - M - 2);
     const ly = H - M - 7.5;
     doc.setFontSize(8.5);
     doc.text((tipo.legendas ? tipo.legendas[mov] : cfg.legenda + (mov === 'saida' ? tipo.destino : '')) + '   Lanç.: já lançado no app.', M, ly);
