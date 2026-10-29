@@ -48,14 +48,22 @@
 //  · O banco diz quais tabelas existem (public.backup_tabelas()); se alguma
 //    não está na lista abaixo, a aba Resumo avisa em vermelho. Foi assim que
 //    Programação Campo, Estoque e Reunião ficaram 5 dias fora do backup.
+//
+// Backup que se atualiza sozinho (29/10/2026, pedido dele: "já pensando em
+// criar outros módulos e já entrar sempre no bkp"): mesmo com o aviso, 34
+// tabelas de módulos novos ficaram fora. Agora a lista vem do banco e TUDO
+// entra, menos o que motivoFora() exclui de propósito (chaves, sobras,
+// Outorga). O Resumo mostra o que entrou sozinho e o que ficou fora e por quê.
 import { estado } from './store.js';
 
 const $ = id => document.getElementById(id);
 
-/* [grupo, esquema, tabelas], na ordem em que fazem sentido para quem abre a
-   planilha. Fica de fora só o que não é deste app: out_* (Controle de Outorga,
-   outro sistema no mesmo banco), integracao_privada e cópias de segurança
-   feitas à mão no banco (*_bkp_*). Tabela nova no banco = uma linha aqui. */
+/* [grupo, esquema, tabelas]: só NOME DE MÓDULO e ORDEM das abas. Desde
+   29/10/2026 não é mais esta lista que decide o que entra no backup — é o
+   banco (public.backup_tabelas): tabela que existe entra, a não ser que caia
+   na regra motivoFora() logo abaixo. Módulo novo sem linha aqui entra igual,
+   no grupo da tabela irmã ou em "Módulo novo · prefixo_". Pôr a linha aqui
+   é só para a aba ficar com nome bonito. */
 const GRUPOS = [
   ['Funcionários', 'public', ['funcionarios']],
   ['EPIs', 'public', ['epis', 'fichas', 'epi_entregas', 'modelo']],
@@ -63,6 +71,9 @@ const GRUPOS = [
   ['Treinamentos', 'public', ['sst_tipos_treinamento', 'sst_treinamentos', 'sst_treinamentos_funcao']],
   ['Atividades SST', 'public', ['sst_atividades', 'sst_atividade_treinamentos', 'sst_atividade_exames', 'sst_atividade_funcionarios']],
   ['Acidentes e CAT', 'public', ['sst_acidentes']],
+  ['Campanhas SST', 'public', ['sst_campanhas', 'sst_campanha_temas', 'sst_campanha_atividades']],
+  ['Brigada e socorros', 'public', ['sst_brigada_config']],
+  ['NRs', 'public', ['sst_nrs_portal']],
   ['DISC', 'public', ['disc_perfis', 'disc_combinacoes', 'disc_avaliacoes', 'disc_marcacoes',
     'disc_cargos_esperado', 'disc_acesso']],
   ['RH', 'public', ['rh_cargos', 'rh_propostas', 'rh_modelo', 'rh_reajustes']],
@@ -75,12 +86,21 @@ const GRUPOS = [
     'jor_decisoes', 'jor_competencias', 'jor_emissoes', 'jor_tipos_ocorrencia',
     'jor_feriados', 'jor_parametros', 'jor_perfis', 'jor_auditoria',
     'jor_fechamentos', 'jor_tipos_he_especial']],
+  ['Admissão e demissão', 'public', ['jor_tarefa_modelos', 'jor_tarefas']],
   ['DP · Entregas', 'public', ['jor_bol_entregas', 'jor_doc_entregas']],
   ['DP · Folha de ponto', 'public', ['jor_folha_ponto_config', 'jor_folha_ponto_impressos']],
   ['DP · Ticket', 'public', ['jor_ticket_mes', 'jor_ticket_emissoes']],
   ['DP · Empréstimo e Férias', 'public', ['jor_emprestimos', 'jor_emprestimo_abatimentos', 'jor_salarios',
     'jor_afastamentos', 'jor_ferias_inicial', 'jor_ferias_gozos', 'jor_ferias_perdas']],
   ['Certificação', 'public', ['cert_certificacoes', 'cert_requisitos', 'cert_documentos', 'cert_doc_itens', 'cert_vinculos', 'cert_evidencias', 'cert_eventos', 'cr_tipos', 'cr_saidas', 'cr_avaliacoes']],
+  ['Certificação · Caderno de campo', 'public', ['cc_config', 'cc_plantios', 'cc_insumos', 'cc_registros',
+    'cc_registro_versoes', 'cc_analises', 'cc_calibracoes']],
+  ['Certificação · Melhoria contínua', 'public', ['cmc_casos', 'cmc_andamentos', 'cmc_acoes', 'cmc_registros',
+    'cmc_caixas', 'cmc_aberturas']],
+  ['Certificação · Fauna', 'public', ['cf_especies', 'cf_cameras', 'cf_registros', 'cf_ia_uso']],
+  ['Certificação · Fornecedores', 'public', ['cfo_fornecedores', 'cfo_avaliacoes']],
+  ['Certificação · Energia', 'public', ['ce_fontes', 'ce_consumos']],
+  ['Certificação · Banho e lavagem de EPI', 'public', ['cb_banhos', 'cl_conjuntos', 'cl_lavagens']],
   ['Manutenções', 'manutencao', ['equipamentos', 'tipos_equipamento', 'marcas', 'locais', 'setores',
     'planos_manutencao', 'tipos_manutencao', 'manutencoes', 'responsaveis_manutencao',
     'leituras', 'ajustes_contador', 'usos_implemento', 'parametros', 'importacoes']],
@@ -98,7 +118,7 @@ const GRUPOS = [
   // programacao.contadores e _pacotes_antigo: internos, fechados para o app.
   ['Estoque', 'public', ['est_locais', 'est_itens', 'est_saldos_sistema', 'est_movimentos',
     'est_contagem_lotes', 'est_contagens', 'est_contagem_itens', 'est_compras', 'est_compra_itens',
-    'est_compra_estoques']],
+    'est_compra_estoques', 'est_minimos', 'est_mapas', 'est_contagem_grupos', 'est_contagem_quadras']],
   ['Custo Base', 'public', ['cb_culturas', 'cb_talhoes', 'cb_meses', 'cb_itens', 'cb_hh_parametros', 'cb_hh_meses', 'cb_hh_itens']],
   ['Colheita e Produção', 'public', ['cp_culturas', 'cp_safras', 'cp_plantios', 'cp_cargas', 'cp_balanca', 'cp_cooperativa', 'cp_historico', 'cp_custos', 'cp_veiculos', 'cp_pivos', 'cp_variedades', 'cp_lotes_venda', 'cp_vendas_itens', 'cp_notas_fiscais']],
   ['Projetos (PMBOK)', 'public', ['pj_projetos', 'pj_partes', 'pj_premissas', 'pj_requisitos', 'pj_eap', 'pj_raci', 'pj_riscos',
@@ -108,21 +128,73 @@ const GRUPOS = [
   ['Anexos no Drive (lista)', 'public', ['arquivos']],
   ['Acesso', 'public', ['app_usuarios', 'app_preferencias', 'ia_uso']],
 ];
-/* Tabelas que existem no banco e ficam de fora de propósito: o aviso de
-   "tabela esquecida" não reclama destas. */
-const FORA_DE_PROPOSITO = new Set([
-  'vistorias.importacao_chave', 'programacao.contadores', 'programacao._pacotes_antigo',
-  'public.backup_config', 'public.drive_autorizacao', 'public.drive_autorizacao_estado',
-  'public.integracao_privada',
-]);
-const foraDeProposito = (esq, t) => FORA_DE_PROPOSITO.has(`${esq}.${t}`)
-  || t.startsWith('out_') || t.includes('_bkp_');
+/* O que fica de fora de PROPÓSITO (29/10/2026). É uma REGRA, não uma lista:
+   tabela nova só fica fora se cair nela. Tudo o mais entra sozinho.
+   A mesma regra mora no banco, em public.backup_fora() (supabase/
+   backup-automatico.sql); quando o banco já a tiver, vale a do banco. */
+function motivoFora(esq, t) {
+  if (esq === 'integracao_privada') return 'integração interna (só no esquema.sql)';
+  if (t.startsWith('out_')) return 'Controle de Outorga (outro sistema)';
+  if (t.startsWith('_') || t.startsWith('tmp_') || t.includes('_bkp_') || /_\d{8}$/.test(t)) return 'cópia ou sobra temporária';
+  if (/(token|senha|segredo|autorizacao)/.test(t) || ['public.backup_config', 'vistorias.importacao_chave'].includes(`${esq}.${t}`))
+    return 'chave/senha — não vai para planilha';
+  if (`${esq}.${t}` === 'programacao.contadores') return 'interno do banco';
+  return null;
+}
 /* A chave de cada tabela no .json e o nome da aba: as do Pessoas ficam com o
    nome de sempre (o .json antigo continua lendo igual); as das outras áreas
-   ganham prefixo, porque "administradores" existe nas duas. */
+   ganham prefixo, porque "administradores" existe nas duas. Esquema novo
+   ganha o próprio nome como prefixo. */
 const PREFIXO = { public: '', manutencao: 'man_', vistorias: 'vis_', programacao: 'prog_' };
-const TABELAS = GRUPOS.flatMap(([grupo, esquema, ts]) =>
-  ts.map(t => ({ grupo, esquema, tabela: t, chave: PREFIXO[esquema] + t })));
+const prefixo = esq => PREFIXO[esq] ?? `${esq}_`;
+const LISTA_FIXA = GRUPOS.flatMap(([grupo, esquema, ts]) =>
+  ts.map(t => ({ grupo, esquema, tabela: t, chave: prefixo(esquema) + t })));
+const GRUPO_DE = new Map(LISTA_FIXA.map(t => [`${t.esquema}.${t.tabela}`, t.grupo]));
+/* Tabela que entrou sozinha (módulo novo): o grupo sai do começo do nome,
+   pela tabela irmã que já tem grupo (cp_pivos → Colheita e Produção); sem
+   irmã, "Módulo novo · cc_". */
+function grupoDe(esq, t) {
+  const g = GRUPO_DE.get(`${esq}.${t}`);
+  if (g) return g;
+  const pre = t.includes('_') ? t.slice(0, t.indexOf('_') + 1) : t;
+  const irma = LISTA_FIXA.find(x => x.esquema === esq && x.tabela.startsWith(pre));
+  return irma ? irma.grupo : `Módulo novo · ${esq === 'public' ? '' : esq + '.'}${pre}`;
+}
+
+/* Monta a lista do backup a partir do que o BANCO diz que existe.
+   Volta { tabelas, novas, fora, conferiu }:
+   · tabelas — tudo o que vai ser lido, na ordem das abas;
+   · novas   — as que entraram sozinhas (não têm grupo escrito aqui);
+   · fora    — as deixadas de fora de propósito, com o motivo;
+   · conferiu=false — o banco não respondeu: usa a lista escrita aqui e avisa. */
+async function montarLista() {
+  const { data, error } = await estado.cliente.rpc('backup_tabelas');
+  if (error || !Array.isArray(data) || !data.length) {
+    return { tabelas: LISTA_FIXA, novas: [], fora: [], conferiu: false };
+  }
+  const existe = new Set(data.map(t => `${t.esquema}.${t.tabela}`));
+  const fora = [], entram = [];
+  for (const t of data) {
+    const motivo = 'fora' in t ? t.fora : motivoFora(t.esquema, t.tabela);
+    if (motivo) fora.push({ tabela: `${t.esquema}.${t.tabela}`, motivo });
+    else entram.push(t);
+  }
+  const ordem = new Map(LISTA_FIXA.map((t, i) => [`${t.esquema}.${t.tabela}`, i]));
+  const tabelas = [], novas = [];
+  // as conhecidas, na ordem de sempre (só as que existem de fato)
+  for (const t of LISTA_FIXA) if (existe.has(`${t.esquema}.${t.tabela}`) && !fora.some(f => f.tabela === `${t.esquema}.${t.tabela}`)) tabelas.push(t);
+  // as novas, logo depois, cada uma no grupo da irmã ou em "Módulo novo"
+  for (const t of entram) {
+    if (ordem.has(`${t.esquema}.${t.tabela}`)) continue;
+    const item = { grupo: grupoDe(t.esquema, t.tabela), esquema: t.esquema, tabela: t.tabela,
+      chave: prefixo(t.esquema) + t.tabela };
+    tabelas.push(item); novas.push(`${t.esquema}.${t.tabela}`);
+  }
+  // ordena por grupo, mantendo a ordem de sempre dentro de cada um
+  const posGrupo = new Map(); tabelas.forEach((t, i) => { if (!posGrupo.has(t.grupo)) posGrupo.set(t.grupo, i); });
+  tabelas.sort((x, y) => posGrupo.get(x.grupo) - posGrupo.get(y.grupo));
+  return { tabelas, novas, fora, conferiu: true };
+}
 
 const doisDig = n => String(n).padStart(2, '0');
 const carimbo = d => `${d.getFullYear()}-${doisDig(d.getMonth() + 1)}-${doisDig(d.getDate())}`;
@@ -143,7 +215,7 @@ async function lerTabela(esquema, tabela) {
   return todas;
 }
 
-async function lerTudo(passo = () => {}) {
+async function lerTudo(TABELAS, passo = () => {}) {
   const dados = {}, resumo = [];
   for (let i = 0; i < TABELAS.length; i++) {
     const { grupo, esquema, tabela, chave } = TABELAS[i];
@@ -157,18 +229,6 @@ async function lerTudo(passo = () => {}) {
     }
   }
   return { dados, resumo };
-}
-
-/* Pergunta ao banco quais tabelas existem e devolve as que não estão na
-   lista deste arquivo (e não são "fora de propósito"). Lista vazia = em dia.
-   Se a pergunta falhar, devolve null: o Resumo diz que não conferiu. */
-async function tabelasEsquecidas() {
-  const { data, error } = await estado.cliente.rpc('backup_tabelas');
-  if (error) return null;
-  const temos = new Set(TABELAS.map(t => `${t.esquema}.${t.tabela}`));
-  return (data || [])
-    .filter(t => !temos.has(`${t.esquema}.${t.tabela}`) && !foraDeProposito(t.esquema, t.tabela))
-    .map(t => `${t.esquema}.${t.tabela}`);
 }
 
 /* A estrutura do banco, em SQL. Falhou? Devolve null e o backup segue só
@@ -333,10 +393,12 @@ function planilha(abas) {           // [{nome, linhas}]
 
 /** Cada tabela vira uma aba: as colunas são a união das chaves das linhas. */
 function abasDoBackup(dados, resumo, quando, extras = {}) {
-  const { esquecidas, temEsquema } = extras;
+  const { lista, temEsquema } = extras;
+  const TABELAS = lista.tabelas;
   const avisos = [];
-  if (esquecidas === null) avisos.push(['ATENÇÃO', 'Não deu para conferir se há tabela nova fora do backup.']);
-  else if (esquecidas?.length) avisos.push(['ATENÇÃO', `Tabelas que existem no banco e NÃO estão neste backup: ${esquecidas.join(', ')}. Pedir ao Claude para incluir em js/backup.js.`]);
+  if (!lista.conferiu) avisos.push(['ATENÇÃO', 'O banco não disse quais tabelas existem: este backup usou a lista fixa do app e pode ter deixado módulo novo de fora.']);
+  if (lista.novas.length) avisos.push(['Entraram sozinhas', `${lista.novas.length} tabela(s) de módulo novo, já incluídas: ${lista.novas.join(', ')}.`]);
+  if (lista.fora.length) avisos.push(['Fora de propósito', lista.fora.map(f => `${f.tabela} (${f.motivo})`).join('; ')]);
   if (!temEsquema) avisos.push(['ATENÇÃO', 'O arquivo …-esquema.sql (estrutura do banco) não foi gerado. Só com os dados não dá para reconstruir o sistema.']);
   const abas = [{
     nome: 'Resumo',
@@ -449,22 +511,24 @@ export async function gerarBackup(passo = () => {}, { usarPasta = true } = {}) {
   }
 
   const quando = new Date();
-  const { dados, resumo } = await lerTudo(passo);
-  passo('Conferindo se há tabela nova fora do backup…');
-  const esquecidas = await tabelasEsquecidas();
+  passo('Perguntando ao banco quais tabelas existem…');
+  const lista = await montarLista();
+  const { dados, resumo } = await lerTudo(lista.tabelas, passo);
   passo('Lendo a estrutura do banco (esquema)…');
   const esquemaSql = await lerEsquema();
 
   passo('Montando a planilha…');
-  const xlsx = planilha(abasDoBackup(dados, resumo, quando, { esquecidas, temEsquema: !!esquemaSql }));
+  const xlsx = planilha(abasDoBackup(dados, resumo, quando, { lista, temEsquema: !!esquemaSql }));
   const json = new Blob([JSON.stringify({
     app: 'LOP - Gestão Rápida · SAKUMA',
-    versao_backup: 3,
+    versao_backup: 4,
     gerado_em: quando.toISOString(),
     gerado_por: estado.sessao?.user?.email || null,
     esquema_no_arquivo: esquemaSql ? '-esquema.sql ao lado deste .json' : null,
-    tabelas_fora_do_backup: esquecidas,
-    origem: Object.fromEntries(TABELAS.map(t => [t.chave, `${t.esquema}.${t.tabela}`])),
+    lista_conferida_no_banco: lista.conferiu,
+    tabelas_novas_incluidas: lista.novas,
+    tabelas_fora_de_proposito: lista.fora,
+    origem: Object.fromEntries(lista.tabelas.map(t => [t.chave, `${t.esquema}.${t.tabela}`])),
     tabelas: dados,
   }, null, 2)], { type: 'application/json' });
   const sql = esquemaSql ? new Blob([esquemaSql], { type: 'application/sql' }) : null;
@@ -500,8 +564,7 @@ export async function gerarBackup(passo = () => {}, { usarPasta = true } = {}) {
   const falhas = resumo.filter(r => r.obs);
   const avisos = [];
   if (!sql) avisos.push('a estrutura do banco (-esquema.sql) não foi gerada');
-  if (esquecidas === null) avisos.push('não deu para conferir tabelas novas');
-  else if (esquecidas.length) avisos.push(`${esquecidas.length} tabela(s) do banco estão fora do backup: ${esquecidas.join(', ')}`);
+  if (!lista.conferiu) avisos.push('o banco não disse quais tabelas existem (usou a lista fixa)');
   gravarUltimo({ quando: quando.toISOString(), total, falhas: falhas.length + avisos.length, destino,
     pasta: destino === 'pasta' ? pasta.name : '' });
   return { resumo, total, falhas, avisos, temEsquema: !!sql, destino, pasta: pasta?.name || '', nome, motivoSemPasta };
