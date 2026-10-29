@@ -759,6 +759,7 @@ const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Out
 const docsDoTipo = id => S.docs.filter(d => (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
   .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 /* código comparável: "POP 1", "POP 001" e "POPAGR-01" viram POP1 */
+const EMAIL_PC_LOCAL = 'escritoriosakuma@hotmail.com';   // login do Guilherme
 const chaveCodigo = c => { const m = so(c).toUpperCase().replace(/^POPAGR/, 'POP').replace(/^POAGR/, 'POP').replace(/^FORMAGR/, 'FORM').replace(/^RG\s+CL\b/, 'RGCL').match(/^([A-Z]+)[\s._-]*0*(\d+)/); return m ? m[1] + Number(m[2]) : ''; };
 const revDono = id => `${id}-rev`;
 const ehPdf = x => /pdf$/i.test(x.mime || '') || /\.pdf$/i.test(x.nome || '');
@@ -922,6 +923,9 @@ async function painelDoc() {
   if (!d) { el.innerHTML = '<div class="vazio">Escolha um documento na lista.</div>'; return; }
   const g = ++geracaoPainel;
   const celular = matchMedia('(max-width:760px)').matches;
+  /* "No computador" só para o Guilherme, no computador dele (29/10/2026: "esse de abrir no local
+     no computador será somente no meu, o restante será em nuvem"). Os outros veem só "Na nuvem". */
+  const pcLocal = !celular && so(estado.sessao?.user?.email).toLowerCase() === EMAIL_PC_LOCAL;
   const refs = codigosDoDoc(d);
   /* FORM feito no app (26/10/2026, pedido dele): o botão principal abre a tela
      do app (Biodiversidade, Energia, Balanço…), não o arquivo. */
@@ -936,11 +940,10 @@ async function painelDoc() {
       ${app ? `<button class="btn principal" type="button" id="ceDvApp" title="${esc(app.nome)}">${svgIcone('seta-dir')} Abrir no app</button>`
         : modelo ? `<button class="btn principal" type="button" data-ir-modelo="${modelo.id}">${svgIcone('documento')} Ver o modelo (${esc(modelo.codigo)})</button>`
         : `<button class="btn principal" type="button" id="ceDvPdf" disabled>${svgIcone('documento')} Abrir PDF</button>`}
-      ${d.caminho ? `<button class="btn" type="button" id="ceDvPc" title="Abre a pasta no Explorador de Arquivos deste computador">💻 No computador</button>`
-        : '<button class="btn" type="button" disabled title="Sem caminho da pasta — preencha em Editar">💻 No computador</button>'}
+      ${pcLocal && d.caminho ? `<button class="btn" type="button" id="ceDvPc" title="Abre a pasta no Explorador de Arquivos deste computador">💻 No computador</button>` : ''}
       ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive pela internet">☁ Na nuvem</a>`
         : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">☁ Na nuvem</button>'}
-      ${d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
+      ${pcLocal && d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
       <span class="cresce"></span>
       <button class="btn" type="button" id="ceDvEditar">${svgIcone('lapis')} Editar</button>
     </div>
@@ -973,8 +976,8 @@ async function painelDoc() {
   $('ceDvPc')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); } catch { /* sem permissão: segue */ }
     const a = document.createElement('a'); a.href = 'lop-pasta:' + encodeURIComponent(d.caminho); a.click();
-    $('ceDvMsg').innerHTML = 'Abrindo a pasta no Explorador… Se não abriu, o caminho já está copiado: no Explorador, clique na barra de endereço, cole (Ctrl+V) e Enter. '
-      + 'Para abrir direto, instale uma vez neste computador o <b>instalar.bat</b> de <i>Certificação - Lop Gestão Rápida › _ferramentas › Abrir pasta no computador</i>.';
+    $('ceDvMsg').innerHTML = 'Abrindo a pasta no Explorador… Se não abriu, o caminho já está copiado (cole na barra de endereço do Explorador). '
+      + 'Para abrir direto, rode uma vez o <b>instalar.bat</b> de <i>Certificação - Lop Gestão Rápida › _ferramentas › Abrir pasta no computador</i>.';
   });
   $('ceDvCopiar')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); $('ceDvMsg').textContent = 'Caminho copiado. No Explorador de Arquivos, clique na barra de endereço, cole (Ctrl+V) e Enter.'; }
