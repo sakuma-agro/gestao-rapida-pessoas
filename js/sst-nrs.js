@@ -8,6 +8,8 @@
 // Fica tudo no código (sem banco): abre sem internet; só o botão do portal
 // precisa de conexão. Para atualizar a lista, editar NRS / MUDANCAS abaixo.
 
+import { estado } from './store.js';
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -19,6 +21,19 @@ export const TELAS_NRS = ['sstNrs'];
 export const PORTAL_NRS = 'https://www.gov.br/trabalho-e-emprego/pt-br/acesso-a-informacao/participacao-social/conselhos-e-orgaos-colegiados/comissao-tripartite-partitaria-permanente/normas-regulamentadora/normas-regulamentadoras-vigentes';
 
 const ATUALIZADO = '28/10/2026';
+
+/* ---- Portal (botão "Atualizar do portal", 29/10/2026) ----
+   Igual à consulta de CA: a função "consulta-nrs" do Supabase lê o gov.br (lista
+   das NRs vigentes + página de cada uma) e o app grava em sst_nrs_portal:
+   data "Atualizado em" do portal, PDF do texto oficial, portarias. Quando a data,
+   o PDF ou a última portaria mudam em relação à conferência anterior, grava
+   mudou_em e a NR ganha o aviso "Mudou no portal" (por DIAS_MUDOU dias).
+   Confere sozinho ao abrir a tela se a última conferência tem mais de
+   DIAS_RECONFERIR dias. O resumo "o que exige na prática" é nosso, não vem do portal. */
+const DIAS_RECONFERIR = 7;
+const DIAS_MUDOU = 60;
+const CACHE = 'lop.sstNrsPortal.v1';
+const P = { linhas: new Map(), carregado: false, rodando: false, msg: null, conferido: null };
 
 const PRIOR = {
   alta:  { nome: 'Alta para a fazenda', curto: 'Alta', cor: 'nr-p-alta' },
@@ -90,11 +105,113 @@ function botaoPortal(classe = 'btn principal') {
     Portal oficial das NRs (gov.br)</a>`;
 }
 
+const br = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '—';
+const brHora = iso => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${br(d.toISOString())} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+const diasDesde = iso => iso ? (Date.now() - Date.parse(iso)) / 86400000 : Infinity;
+const mudouRecente = l => l?.mudou_em && diasDesde(l.mudou_em) <= DIAS_MUDOU;
+
+function guardarCache() {
+  try { localStorage.setItem(CACHE, JSON.stringify([...P.linhas.values()])); } catch { /* sem armazenamento */ }
+}
+function lerCache() {
+  try { (JSON.parse(localStorage.getItem(CACHE) || '[]') || []).forEach(l => P.linhas.set(l.nr, l)); } catch { /* */ }
+}
+function ultimaConferencia() {
+  let m = null;
+  for (const l of P.linhas.values()) if (l.conferido_em && (!m || l.conferido_em > m)) m = l.conferido_em;
+  return m;
+}
+
+async function carregarPortal() {
+  const c = estado.cliente;
+  if (!c || !estado.sessao || !navigator.onLine) { if (!P.linhas.size) lerCache(); return; }
+  const { data, error } = await c.from('sst_nrs_portal').select('*').order('nr');
+  if (error) { if (!P.linhas.size) lerCache(); return; }
+  P.linhas.clear();
+  (data || []).forEach(l => P.linhas.set(l.nr, l));
+  P.carregado = true;
+  guardarCache();
+}
+
+/** Lê o portal (função consulta-nrs) e grava o que mudou. */
+async function atualizarPortal({ automatico = false } = {}) {
+  if (P.rodando) return;
+  const c = estado.cliente;
+  if (!c || !estado.sessao) { P.msg = { tipo: 'erro', txt: 'Entre no app para atualizar do portal.' }; desenhar(); return; }
+  if (!navigator.onLine) { P.msg = { tipo: 'erro', txt: 'Sem internet: não dá para consultar o portal agora.' }; desenhar(); return; }
+  P.rodando = true; P.msg = null; desenhar();
+  try {
+    const { data, error } = await c.functions.invoke('consulta-nrs', { body: {} });
+    if (error) throw new Error(error.message || 'não deu para consultar o portal');
+    if (data?.erro) throw new Error(data.erro);
+    const agora = new Date().toISOString();
+    const quem = estado.sessao?.user?.email || null;
+    const primeira = !P.linhas.size;
+    const mudaram = [], falhas = [], novas = [];
+    const gravar = [];
+    for (const r of data?.nrs || []) {
+      if (!r.ok) { falhas.push(r.nr); continue; }
+      const antes = P.linhas.get(r.nr);
+      const assinatura = x => [x?.atualizado_portal || '', x?.texto_pdf || '', x?.ultima_portaria_link || ''].join('|');
+      const mudou = antes && assinatura(antes) !== assinatura(r);
+      if (mudou) mudaram.push(r.nr);
+      if (!NRS.some(x => x.n === r.nr) && !REVOGADAS.some(x => x.n === r.nr)) novas.push(r.nr);
+      gravar.push({
+        nr: r.nr, titulo: r.titulo || null, pagina: r.pagina || null, texto_pdf: r.texto_pdf || null,
+        texto_ano: r.texto_ano || null, atualizado_portal: r.atualizado_portal || null,
+        ultima_portaria: r.ultima_portaria || null, ultima_portaria_link: r.ultima_portaria_link || null,
+        portarias: r.portarias || [], revogada: !!r.revogada,
+        mudou_em: mudou ? agora : (antes?.mudou_em || null),
+        conferido_em: agora, conferido_por: quem,
+      });
+    }
+    if (!gravar.length) throw new Error('o portal não devolveu nenhuma NR');
+    gravar.forEach(l => P.linhas.set(l.nr, l));
+    guardarCache();
+    const { error: eg } = await c.from('sst_nrs_portal').upsert(gravar, { onConflict: 'nr' });
+    const partes = [`${gravar.length} NRs conferidas no portal.`];
+    if (primeira) partes.push('Primeira conferência: a partir de agora o app avisa quando alguma mudar.');
+    else partes.push(mudaram.length ? `Mudaram desde a última conferência: ${mudaram.map(n => 'NR-' + n).join(', ')}.` : 'Nenhuma mudança desde a última conferência.');
+    if (novas.length) partes.push(`NR nova no portal: ${novas.map(n => 'NR-' + n).join(', ')}.`);
+    if (falhas.length) partes.push(`Não consegui ler: ${falhas.map(n => 'NR-' + n).join(', ')} (tente de novo mais tarde).`);
+    if (eg) partes.push('Não gravou no banco (sem permissão de SST?) — o resultado vale só neste aparelho.');
+    P.msg = { tipo: mudaram.length || novas.length ? 'alerta' : 'ok', txt: partes.join(' ') };
+    if (automatico && !mudaram.length && !novas.length && !primeira && !falhas.length && !eg) P.msg = null;
+  } catch (e) {
+    P.msg = { tipo: 'erro', txt: 'Não consegui atualizar do portal: ' + (e?.message || e) };
+  } finally {
+    P.rodando = false;
+    desenhar();
+  }
+}
+
+function blocoPortal(n) {
+  const l = P.linhas.get(n);
+  if (!l) return `<div class="nr-portal-info vazio">Ainda sem dados do portal para esta NR — toque em <b>Atualizar do portal</b>.</div>`;
+  const port = (l.portarias || []);
+  return `<div class="nr-portal-info ${mudouRecente(l) ? 'mudou' : ''}">
+    ${mudouRecente(l) ? `<p class="nr-aviso">Mudou no portal (notado em ${br(l.mudou_em)}). Confira o texto oficial e, se precisar, revise o resumo abaixo.</p>` : ''}
+    <div class="nr-pi-linha"><span>No portal</span><b>Atualizado em ${br(l.atualizado_portal)}</b>${l.texto_ano ? ` · texto oficial versão ${l.texto_ano}` : ''}</div>
+    ${l.ultima_portaria ? `<div class="nr-pi-linha"><span>Última portaria</span><a href="${esc(l.ultima_portaria_link)}" target="_blank" rel="noopener noreferrer">${esc(l.ultima_portaria)}</a></div>` : ''}
+    <div class="nr-pi-botoes">
+      ${l.texto_pdf ? `<a class="btn principal" href="${esc(l.texto_pdf)}" target="_blank" rel="noopener noreferrer">Texto oficial (PDF)</a>` : ''}
+      ${l.pagina ? `<a class="btn" href="${esc(l.pagina)}" target="_blank" rel="noopener noreferrer">Página da NR-${n} no gov.br</a>` : ''}
+    </div>
+    ${port.length ? `<details class="nr-port"><summary>Portarias citadas no portal (${port.length})</summary><ul>${port.map(p =>
+      `<li><span class="nr-ano">${p.ano || '—'}</span> <a href="${esc(p.link)}" target="_blank" rel="noopener noreferrer">${esc(p.texto)}</a>${p.revogada ? ' <span class="nr-p nr-p-baixa">revogada</span>' : ''}</li>`).join('')}</ul></details>` : ''}
+  </div>`;
+}
+
 function filtradas() {
   const b = semAcento(S.busca).trim();
   return NRS.filter(x => {
-    if (S.filtro !== 'todas' && S.filtro !== 'revogadas' && x.p !== S.filtro) return false;
+    if (!['todas', 'revogadas', 'mudou'].includes(S.filtro) && x.p !== S.filtro) return false;
     if (S.filtro === 'revogadas') return false;
+    if (S.filtro === 'mudou' && !mudouRecente(P.linhas.get(x.n))) return false;
     if (!b) return true;
     const alvo = semAcento(`nr-${x.n} nr ${x.n} nr${x.n} ${x.t} ${x.r} ${x.i.join(' ')}`);
     return b.split(/\s+/).every(p => alvo.includes(p));
@@ -109,14 +226,14 @@ function cartao(x) {
     <button type="button" class="nr-cab" data-nr="${x.n}" aria-expanded="${aberta}">
       <span class="nr-num">NR-${x.n}</span>
       <span class="nr-tit"><b>${esc(x.t)}</b><small>${esc(x.r)}</small></span>
-      <span class="nr-tags">${temMudanca(x.n) ? '<span class="nr-novo" title="Mudança recente registrada">Mudança recente</span>' : ''}<span class="nr-p ${pr.cor}">${pr.curto}</span></span>
+      <span class="nr-tags">${mudouRecente(P.linhas.get(x.n)) ? '<span class="nr-mudou" title="O portal mudou desde a conferência anterior">Mudou no portal</span>' : ''}${temMudanca(x.n) ? '<span class="nr-novo" title="Mudança recente registrada">Mudança recente</span>' : ''}${P.linhas.get(x.n)?.atualizado_portal ? `<span class="nr-data" title="Data de atualização da página da NR no portal">portal ${br(P.linhas.get(x.n).atualizado_portal)}</span>` : ''}<span class="nr-p ${pr.cor}">${pr.curto}</span></span>
       <svg class="nr-seta" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     ${aberta ? `<div class="nr-corpo">
+      ${blocoPortal(x.n)}
       ${avisos.map(m => `<p class="nr-aviso">${esc(m.t)}</p>`).join('')}
-      <p class="nr-sub">O que exige na prática</p>
+      <p class="nr-sub">O que exige na prática <span>(resumo da SAKUMA)</span></p>
       <ul>${x.i.map(i => `<li>${esc(i)}</li>`).join('')}</ul>
-      <div class="nr-acoes">${botaoPortal('btn')}</div>
     </div>` : ''}
   </article>`;
 }
@@ -128,8 +245,10 @@ function desenhar() {
   for (const x of NRS) cont[x.p]++;
   const lista = filtradas();
   const grupos = ['alta', 'media', 'baixa'].map(p => ({ p, l: lista.filter(x => x.p === p) })).filter(g => g.l.length);
-  const fil = [['todas', `Todas (${NRS.length})`], ['alta', `Alta (${cont.alta})`], ['media', `Média (${cont.media})`],
+  let fil = [['todas', `Todas (${NRS.length})`], ['alta', `Alta (${cont.alta})`], ['media', `Média (${cont.media})`],
     ['baixa', `Baixa (${cont.baixa})`], ['revogadas', `Revogadas (${REVOGADAS.length})`]];
+  const nMudou = NRS.filter(x => mudouRecente(P.linhas.get(x.n))).length;
+  if (nMudou) fil.push(['mudou', `Mudaram no portal (${nMudou})`]);
   alvo.innerHTML = `
   <div class="cartao">
     <div class="barra entre" style="margin:0;align-items:flex-start;gap:12px;flex-wrap:wrap">
@@ -138,8 +257,15 @@ function desenhar() {
         <p class="dica" style="margin:4px 0 0">Resumo para o dia a dia da fazenda, atualizado em ${ATUALIZADO}.
           A prioridade é <b>sugerida</b> para o trabalho rural, não oficial. Antes de usar em documento, confirme o texto no portal oficial.</p>
       </div>
-      ${botaoPortal()}
+      <div class="nr-topo-acoes">
+        ${botaoPortal()}
+        <button type="button" class="btn" id="nrAtualizar" ${P.rodando ? 'disabled' : ''}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="${P.rodando ? 'nr-gira' : ''}"><path d="M20 11a8 8 0 10-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          ${P.rodando ? 'Consultando o portal…' : 'Atualizar do portal'}</button>
+        <span class="nr-conf">${ultimaConferencia() ? `Última conferência: ${brHora(ultimaConferencia())}` : 'Ainda não conferido no portal'}</span>
+      </div>
     </div>
+    ${P.msg ? `<div class="aviso ${P.msg.tipo === 'erro' ? 'erro' : ''} nr-msg nr-msg-${P.msg.tipo}">${esc(P.msg.txt)}</div>` : ''}
     <div class="nr-kpis">
       <div><b>${NRS.length + REVOGADAS.length}</b><span>NRs na lista oficial</span></div>
       <div><b>${NRS.length}</b><span>vigentes</span></div>
@@ -164,17 +290,23 @@ function desenhar() {
       </span>
     </div>
     ${S.filtro === 'revogadas'
-      ? `<ul class="nr-rev">${REVOGADAS.map(r => `<li><b>NR-${r.n}</b> – ${esc(r.t)} <span class="nr-p nr-p-baixa">Revogada</span></li>`).join('')}</ul>`
+      ? `<ul class="nr-rev">${REVOGADAS.map(r => `<li><b>NR-${r.n}</b> – ${esc(r.t)} <span class="nr-p nr-p-baixa">Revogada</span>${P.linhas.get(r.n)?.pagina ? ` · <a href="${esc(P.linhas.get(r.n).pagina)}" target="_blank" rel="noopener noreferrer">página no gov.br</a>` : ''}</li>`).join('')}</ul>`
       : grupos.length
         ? grupos.map(g => `<h3 class="nr-grupo">Prioridade ${PRIOR[g.p].nome.toLowerCase()} <span>${g.l.length}</span></h3>
             <div class="nr-lista">${g.l.map(cartao).join('')}</div>`).join('')
-        : `<p class="dica" style="margin:14px 0 0">Nenhuma NR encontrada para "${esc(S.busca)}".</p>`}
+        : `<p class="dica" style="margin:14px 0 0">Nenhuma NR encontrada${S.busca ? ` para "${esc(S.busca)}"` : ''}.</p>`}
+    ${S.filtro === 'todas' && novasNoPortal().length ? `<h3 class="nr-grupo">Novas no portal, ainda sem resumo <span>${novasNoPortal().length}</span></h3>
+      <div class="nr-lista">${novasNoPortal().map(l => `<article class="nr-card aberta"><div class="nr-corpo" style="padding:12px 14px">
+        <p style="margin:0 0 6px"><b>${esc(l.titulo || 'NR-' + l.nr)}</b></p>${blocoPortal(l.nr)}</div></article>`).join('')}</div>` : ''}
   </div>
   <p class="dica nr-pe">Documento de uso interno. O texto oficial e atualizado das normas está no portal do Ministério do Trabalho e Emprego.</p>`;
   ligarTela(alvo);
 }
 
+const novasNoPortal = () => [...P.linhas.values()].filter(l => !NRS.some(x => x.n === l.nr) && !REVOGADAS.some(x => x.n === l.nr) && !l.revogada);
+
 function ligarTela(alvo) {
+  $('nrAtualizar')?.addEventListener('click', () => atualizarPortal());
   const b = $('nrBusca');
   if (b) b.addEventListener('input', () => {
     const pos = b.selectionStart;
@@ -195,5 +327,11 @@ function ligarTela(alvo) {
   }));
 }
 
-export function abrirNrs() { desenhar(); }
-export function limparNrs() { S.busca = ''; S.filtro = 'todas'; S.abertas.clear(); const a = $('telaSstNrs'); if (a) a.innerHTML = ''; }
+export async function abrirNrs() {
+  desenhar();
+  await carregarPortal().catch(() => {});
+  desenhar();
+  const ult = ultimaConferencia();
+  if (navigator.onLine && estado.sessao && (!ult || diasDesde(ult) > DIAS_RECONFERIR)) atualizarPortal({ automatico: true });
+}
+export function limparNrs() { S.busca = ''; S.filtro = 'todas'; S.abertas.clear(); P.linhas.clear(); P.msg = null; P.carregado = false; const a = $('telaSstNrs'); if (a) a.innerHTML = ''; }

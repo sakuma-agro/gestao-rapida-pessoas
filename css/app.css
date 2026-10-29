@@ -2195,7 +2195,7 @@ body.ce-apr-aberto{overflow:hidden}
 .nr-mud{border-left:4px solid var(--alerta)}
 .nr-mud ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.5}
 .nr-filtros{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.nr-filtros input[type=search]{flex:1 1 260px;min-width:0;margin:0}
+.nr-filtros input[type=search]{flex:1 1 100%;min-width:0;margin:0}
 .nr-chips{display:flex;flex-wrap:wrap;gap:6px}
 .nr-chip{border:1px solid var(--linha);background:var(--papel);color:var(--texto);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}
 .nr-chip.ativo{background:var(--verde);border-color:var(--verde);color:#fff;font-weight:700}
@@ -2235,3 +2235,29 @@ body.ce-apr-aberto{overflow:hidden}
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .nr-novo,:root:not([data-theme="light"]) .nr-aviso{background:rgba(224,172,58,.16);color:#e0ac3a}}
 :root[data-theme="dark"] .nr-novo,:root[data-theme="dark"] .nr-aviso{background:rgba(224,172,58,.16);color:#e0ac3a}
+/* SST › NRs · Atualizar do portal (29/10/2026, gr-v473) */
+.nr-topo-acoes{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.nr-topo-acoes .btn{display:inline-flex;align-items:center;gap:8px}
+.nr-conf{font-size:12px;color:var(--suave)}
+.nr-gira{animation:nrGira 1s linear infinite}
+@keyframes nrGira{to{transform:rotate(360deg)}}
+.nr-msg{margin-top:12px}
+.nr-msg-ok{background:var(--verde-fundo);color:var(--verde-esc);border-color:var(--verde)}
+.nr-msg-alerta{background:#fff4dc;color:#744F28;border-color:#e0ac3a}
+.nr-data{font-size:11.5px;border-radius:999px;padding:2px 9px;white-space:nowrap;border:1px solid var(--linha);color:var(--suave)}
+.nr-mudou{font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px;background:#c0392b;color:#fff;white-space:nowrap}
+.nr-portal-info{border:1px solid var(--linha);border-radius:8px;padding:10px 12px;margin:0 0 10px;background:var(--fundo)}
+.nr-portal-info.mudou{border-color:#e0ac3a}
+.nr-portal-info.vazio{font-size:12.5px;color:var(--suave)}
+.nr-pi-linha{font-size:13px;line-height:1.5}
+.nr-pi-linha span{display:inline-block;min-width:110px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--suave)}
+.nr-pi-linha a{color:var(--verde-esc)}
+.nr-pi-botoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.nr-pi-botoes .btn{font-size:12.5px;padding:5px 10px;text-decoration:none}
+.nr-port{margin-top:8px;font-size:12.5px}
+.nr-port summary{cursor:pointer;color:var(--suave)}
+.nr-port ul{margin:6px 0 0;padding-left:0;list-style:none;line-height:1.7}
+.nr-port a{color:var(--texto)}
+.nr-ano{display:inline-block;min-width:38px;font-weight:700;color:var(--suave)}
+.nr-sub span{font-weight:400;text-transform:none;letter-spacing:0}
+@media (max-width:600px){.nr-topo-acoes{align-items:stretch;width:100%}.nr-pi-linha span{display:block}}
