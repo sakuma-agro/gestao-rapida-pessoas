@@ -197,9 +197,11 @@
   }
 
   /* ---------------- placa da prancheta ---------------- */
+  const PL = 220;   // largura da placa da prancheta, em mm
   function placa(doc, img, y0, h, tipo, mov, estoque) {
     const cfg = MOV[mov], COR = cfg.cor;
-    const x0 = 6, x1 = W - 6, top = y0 + 4, alt = h - 8, bot = top + alt;
+    /* 22 cm de largura, a largura da prancheta (pedido dele, 29/10/2026). */
+    const x0 = (W - PL) / 2, x1 = x0 + PL, top = y0 + 4, alt = h - 8, bot = top + alt;
     doc.setDrawColor(COR); doc.setLineWidth(2.2); doc.setFillColor('#FFFFFF');
     doc.roundedRect(x0, top, x1 - x0, alt, 4, 4, 'FD');
     // faixa com a seta
@@ -221,7 +223,10 @@
     if (estoque) { doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text(estoque, x1 - fw - 8, top + 20, { align: 'right' }); }
     // palavra grande, tipo e a frase
     const tx = x0 + 8;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(82); doc.setTextColor(COR);
+    let fp = 82;
+    doc.setFont('helvetica', 'bold');
+    while (fp > 30) { doc.setFontSize(fp); if (doc.getTextWidth(cfg.titulo) <= x1 - fw - tx - 6) break; fp -= 1; }
+    doc.setTextColor(COR);
     doc.text(cfg.titulo, tx, bot - 30);
     let fs = 30;
     while (fs > 12) { doc.setFontSize(fs); if (doc.getTextWidth(tipo.nome.toUpperCase()) <= x1 - fw - tx - 8) break; fs -= 1; }
@@ -351,9 +356,11 @@
           placa(doc, img, 0, H / 2, t, 'entrada', o.estoquePlaca);
           placa(doc, img, H / 2, H / 2, t, 'saida', o.estoquePlaca);
           doc.setDrawColor(CORTE); doc.setLineWidth(0.2); doc.setLineDashPattern([1.5, 1], 0);
-          doc.line(0, H / 2, W, H / 2); doc.setLineDashPattern([], 0);
+          const xa = (W - PL) / 2, xb = xa + PL;
+          doc.line(0, H / 2, W, H / 2); doc.line(xa, 0, xa, H); doc.line(xb, 0, xb, H); doc.setLineDashPattern([], 0);
           doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(CORTE);
           doc.text('cortar aqui', 3, H / 2 - 1);
+          doc.text('placa com 22 cm de largura — imprimir em tamanho real (100%)', W / 2, H - 1.5, { align: 'center' });
         }
       }
     } else {
@@ -487,7 +494,7 @@
   <p class="dica">${etiq
     ? 'Etiqueta de 80 × 110 mm para a pasta L transparente onde ficam as folhas da prancheta: ENTRADA em azul e SAÍDA em vermelho, com o tipo e o FORM. Saem 4 por folha A4, com marcas de corte. Imprima em <strong>tamanho real (100%)</strong>, sem "ajustar à página".'
     : placas
-    ? 'Placa para pendurar em cima da prancheta: ENTRADA em azul e SAÍDA em vermelho, com a seta para a folha. Sai uma folha A4 por tipo, com as duas placas e a linha de corte. Plastifique para durar.'
+    ? 'Placa para pendurar em cima da prancheta: ENTRADA em azul e SAÍDA em vermelho, com a seta para a folha. Cada placa tem 22 cm de largura (a largura da prancheta). Sai uma folha A4 por tipo, com as duas placas e as linhas de corte; imprima em tamanho real (100%) e plastifique para durar.'
     : 'As folhas da prancheta de cada estoque: ENTRADA em azul e SAÍDA em vermelho, uma por tipo, com o nome do estoque e o FORM da Certificação já impressos (entrada FORM 048, saída FORM 049, para todos os tipos). A4 deitado, 15 linhas por folha, corpo em cinza e branco para gastar pouca tinta.'}</p>
   <div class="fe-grade">
     ${placas || etiq ? '' : `<div class="fe-bloco" data-grupo="est"><h3>Estoque</h3>
