@@ -282,10 +282,16 @@
 .fe-resumo{margin-top:12px;font-size:13px;color:#51534A}
 .fe-resumo strong{color:#744F28}
 .fe-num{width:70px}
-.fe-amostra{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.fe-amostra div{border:2px solid;border-radius:8px;padding:8px 10px;font-weight:700;font-size:13px}
-.fe-amostra small{display:block;font-weight:400;color:#51534A;font-size:11.5px;margin-top:2px}
-@media (max-width:560px){.fe-amostra{grid-template-columns:1fr}}`;
+.fe-sub{margin:16px 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#51534A}
+.fe-colunas{overflow-x:auto}
+.fe-colunas table{border-collapse:collapse;width:100%;font-size:12.5px;min-width:560px}
+.fe-colunas th,.fe-colunas td{border:1px solid #DFE2D8;padding:6px 8px;text-align:left;vertical-align:top}
+.fe-colunas th{background:#F6F7F2;color:#51534A;font-size:11.5px}
+.fe-colunas th.ent{color:#1F5FA8;background:#E6EEF8}.fe-colunas th.sai{color:#C62828;background:#FBE7E7}
+.fe-colunas td small{display:block;color:#8A8C83;font-size:11px}
+.fe-colunas tr.dif td:first-child{border-left:3px solid #744F28}
+.fe-colunas b{color:#744F28}
+.fe-colunas .fe-tagdif{display:inline-block;margin-top:3px;font-size:10.5px;font-weight:700;color:#744F28;background:#F3EBDF;border-radius:4px;padding:1px 6px}`;
     document.head.appendChild(s);
   }
 
@@ -325,10 +331,7 @@
         <input class="fe-num" type="number" name="copias" min="1" max="20" value="1"></label>
     </div>
   </div>
-  ${placas ? '' : `<div class="fe-amostra">
-    <div style="border-color:#1F5FA8;color:#1F5FA8">ENTRADA DO ESTOQUE<small>Data · Produto · Qtd · Origem · NF / Transf · Recebido por · Lanç.</small></div>
-    <div style="border-color:#C62828;color:#C62828">SAÍDA DO ESTOQUE<small>Data · Produto · Qtd · Destino · Receit. ou Doc. / Transf · Retirado por · Lanç.</small></div></div>
-  <p class="dica" style="margin:8px 0 0">EPI tem folha própria: na entrada, EPI e CA; na saída, o Funcionário que recebeu, EPI, CA e quem entregou.</p>`}
+  ${placas ? '' : `<h3 class="fe-sub">O que vai em cada folha</h3><div class="fe-colunas" data-colunas></div>`}
   <p class="fe-resumo" data-resumo></p>
   <div class="barra fim">
     <button type="button" class="btn" data-acao="baixar">Baixar PDF</button>
@@ -353,8 +356,24 @@
         arquivo: 'Folhas_Estoque' + so + (tipos.length === 1 ? '_' + tipos[0].nome : '') +
           (movs.length === 1 ? '_' + (movs[0] === 'saida' ? 'Saida' : 'Entrada') : '') };
     };
+    /* Colunas de cada tipo marcado (pedido dele, 29/10/2026: "como ficou em forms,
+       para saber diferenciar?"): o que difere do padrão aparece em marrom. */
+    const PADRAO = new Set(['Data', 'Produto', 'Qtd', 'Origem', 'NF / Transf', 'Recebido por', 'Destino', 'Doc. / Transf', 'Retirado por', 'Lanç.']);
+    const listaCols = (mov, t) => colunas(mov, t).map(([n]) => n).filter(n => n !== 'Data' && n !== 'Lanç.')
+      .map(n => PADRAO.has(n) ? esc(n) : `<b>${esc(n)}</b>`).join(' · ');
+    const desenharColunas = tipos => {
+      const alvo = el.querySelector('[data-colunas]');
+      if (!alvo) return;
+      if (!tipos.length) { alvo.innerHTML = ''; return; }
+      alvo.innerHTML = `<table><thead><tr><th>Tipo</th><th class="ent">Entrada (azul)</th><th class="sai">Saída (vermelho)</th></tr></thead><tbody>${
+        tipos.map(t => `<tr class="${t.id === 'epi' ? 'dif' : ''}"><td><strong>${esc(t.nome)}</strong><small>${esc(t.form)}</small>${
+          t.id === 'epi' ? '<span class="fe-tagdif">folha própria</span>' : ''}</td>
+          <td>${listaCols('entrada', t)}</td><td>${listaCols('saida', t)}</td></tr>`).join('')}</tbody></table>
+        <p class="dica" style="margin:6px 0 0">Todas têm Data no começo e Lanç. no fim. Em <b style="color:#744F28">marrom</b>, o que muda em relação às outras folhas.</p>`;
+    };
     const resumo = () => {
       const o = ler();
+      if (!placas) desenharColunas(o.tipos);
       el.querySelector('[data-resumo]').innerHTML = o.paginas
         ? `Vai sair <strong>${o.paginas} folha${o.paginas > 1 ? 's' : ''} A4</strong> deitada${o.paginas > 1 ? 's' : ''}${placas ? ` (${o.paginas * 2} placas)` : ''}.`
         : 'Marque pelo menos um item em cada bloco.';
