@@ -297,7 +297,7 @@ function abrirAba(nome) {
   // Certificação, etapa 4 (29/10/2026): modo auditor só vale dentro da Certificação
   document.body.classList.toggle('modo-auditor', auditorLigado() && moduloDe(nome) === 'cert');
   // Certificação, etapa 2 (29/10/2026): o histórico aparece logo abaixo do painel, na mesma aba
-  for (const [painel, hist] of Object.entries(TELAS_JUNTAS)) {
+  for (const [painel, hists] of Object.entries(TELAS_JUNTAS)) for (const hist of hists) {
     const el = $('tela' + hist[0].toUpperCase() + hist.slice(1));
     if (!el) continue;
     el.classList.toggle('tela-junta', nome === painel);

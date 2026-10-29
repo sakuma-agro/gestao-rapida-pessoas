@@ -1294,7 +1294,9 @@ async function exportarRegistros(regs) {
    ENTRADA DO MÓDULO
    =================================================================== */
 export const TELAS_CADERNO = ['ccPainel', 'ccRegistros', 'ccPlantios', 'ccInsumos', 'ccAnalises', 'ccCalibracoes', 'ccRelatorios'];
-const DESENHO = { ccPainel: desenharPainel, ccRegistros: desenharRegistros, ccPlantios: desenharPlantios, ccInsumos: desenharInsumos, ccAnalises: desenharAnalises, ccCalibracoes: desenharCalibracoes, ccRelatorios: desenharRelatorios };
+/* Etapa 5 (29/10/2026, claude/cert-redesenho-lean.md): Lançamentos = painel + lançamentos; Cadastros = plantios + insumos + calibrações. */
+const DESENHO = { ccPainel: () => { desenharPainel(); desenharRegistros(); }, ccRegistros: desenharRegistros,
+  ccPlantios: () => { desenharPlantios(); desenharInsumos(); desenharCalibracoes(); }, ccInsumos: desenharInsumos, ccAnalises: desenharAnalises, ccCalibracoes: desenharCalibracoes, ccRelatorios: desenharRelatorios };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }

@@ -61,7 +61,7 @@ const COR_ETAPA = e => FIM.has(e) ? 'ativo' : e === 'AGUARDANDO RECURSO' ? 'aler
 
 /* ---------------- estado ---------------- */
 const M = { carregado: false, casos: [], acoes: [], ands: [], caixas: [], aberturas: [], arq: new Set(), fc: { ano: new Date().getFullYear() },
-  fn: { ver: 'abertas', q: '' }, fm: { ver: 'lista', etapa: 'abertas', q: '' }, ff: { ver: 'abertas' } };
+  fn: { ver: 'abertas', q: '', modo: 'quadro' }, fm: { ver: 'quadro', etapa: 'abertas', q: '' }, ff: { ver: 'abertas' } };
 const CAIXA = 'melhorias2.cache';
 const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { casos: M.casos, acoes: M.acoes, ands: M.ands, caixas: M.caixas, aberturas: M.aberturas });
 
@@ -202,6 +202,24 @@ function tabelaCasos(lista, colunasExtra = '') {
         ${colunasExtra ? `<td>${c.ano_previsto ? esc(c.ano_previsto) + (c.trimestre_previsto ? ' · T' + c.trimestre_previsto : '') : '—'}${c.custo_estimado != null ? '<br><small class="dica">' + reais(c.custo_estimado) + '</small>' : ''}</td>` : ''}
         <td class="ce mc-acoes-lin">${botoesLinha(c)}</td></tr>`; }).join('')}
   </tbody></table></div>`;
+}
+
+/* Quadro por etapa (etapa 5 do desenho lean, 29/10/2026 — claude/cert-redesenho-lean.md):
+   uma coluna por etapa em aberto, um cartão por caso, com os mesmos botões da
+   linha da tabela (▸ próxima etapa, + Andamento, Encerrar/Concluir, Abrir). */
+function quadroCasos(lista, etapas) {
+  const cols = etapas.filter(e => !FIM.has(e));
+  return `<div class="mc-quadro">${cols.map(e => {
+    const L = lista.filter(c => c.etapa === e);
+    return `<section class="mc-col" aria-label="${esc(rotEtapa(e))}"><header><span>${esc(rotEtapa(e))}</span><b>${L.length}</b></header>
+      ${L.map(c => { const s = situacao(c), p = proximaAcao(c), ac = acoesDe(c).filter(a => a.status !== 'CANCELADA');
+        return `<article class="mc-card${s.nivel === 2 ? ' mc-card-atr' : ''}">
+          <button type="button" class="mc-card-tit" data-caso="${esc(c.id)}">${esc(c.titulo)}</button>
+          ${c.local || c.fazenda ? `<small>${esc([c.local, c.fazenda].filter(Boolean).join(' · '))}</small>` : ''}
+          ${p ? `<small>Próximo: ${esc(p.oque)}${p.quando ? ' · até ' + br(p.quando) : ''}</small>` : ''}
+          <div class="mc-card-pe">${tag(s.rot, s.cor)}${ac.length ? `<small>${ac.filter(a => a.status === 'CONCLUÍDA').length}/${ac.length} ações</small>` : ''}</div>
+          <div class="mc-card-bt">${botoesLinha(c)}</div></article>`; }).join('') || '<p class="dica mc-col-vazia">Nada nesta etapa.</p>'}
+    </section>`; }).join('')}</div>`;
 }
 
 /* Mudar de etapa sem abrir a ficha (26/10/2026, pedido dele: "vamos deixar
@@ -364,13 +382,15 @@ function desenharNcs() {
     ${cab('Não conformidades · FORM 004', 'Cada uma passa pelas etapas: causa raiz → plano de ação → execução → verificação de eficácia. Os andamentos (orçamentos, contatos, decisões) ficam na linha do tempo do caso.', '<button class="btn principal" type="button" id="mcNovaNc">+ Não conformidade</button>')}
     ${abasAbertoFechado(abNc.length, feNc.length, f.ver === 'fechadas', 'Encerradas')}
     <div class="grade larga" style="margin-top:12px">
+      ${f.ver === 'fechadas' ? '' : `<label class="campo">Ver <select id="mcFnModo">${opcoes([['quadro', 'Quadro por etapa'], ['lista', 'Lista']], f.modo)}</select></label>`}
       <label class="campo" style="grid-column:span 2">Procurar <input type="search" id="mcFnQ" value="${esc(f.q)}" placeholder="caso, local, responsável…"></label>
     </div>
-    <p class="dica" style="margin:8px 0 4px">${L.length} caso(s).</p>${tabelaCasos(L)}
+    <p class="dica" style="margin:8px 0 4px">${L.length} caso(s).</p>${f.ver !== 'fechadas' && f.modo === 'quadro' ? quadroCasos(L, ETAPAS.NC) : tabelaCasos(L)}
   </div>
   ${rodapeForm('NC')}`;
   ligarRodape('NC', L);
   $('mcNovaNc').addEventListener('click', () => ficha(null, 'NC'));
+  $('mcFnModo')?.addEventListener('change', e => { f.modo = e.target.value; desenharNcs(); });
   tela.querySelectorAll('[data-aba]').forEach(b => b.addEventListener('click', () => { f.ver = b.dataset.aba; desenharNcs(); }));
   ligarLinhas(tela);
   $('mcFnQ').addEventListener('input', e => { f.q = e.target.value; const p = e.target.selectionStart; desenharNcs(); const i = $('mcFnQ'); i.focus(); i.setSelectionRange(p, p); });
@@ -388,6 +408,7 @@ function desenharMelhorias() {
   let L = f.etapa === 'fechadas' ? feMe.sort((a, b) => String(b.data_encerramento || '').localeCompare(String(a.data_encerramento || ''))) : abMe;
   let corpo = '';
   if (f.ver === 'lista' || f.etapa === 'fechadas') corpo = tabelaCasos(L.sort((a, b) => ETAPAS.MELHORIA.indexOf(a.etapa) - ETAPAS.MELHORIA.indexOf(b.etapa) || String(a.previsao || '9').localeCompare(String(b.previsao || '9'))), true);
+  else if (f.ver === 'quadro') corpo = quadroCasos(L, ETAPAS.MELHORIA);
   else if (f.ver === 'matriz') {
     const vivas = L.filter(aberto);
     const sem = vivas.filter(c => !c.impacto || !c.custo);
@@ -409,7 +430,7 @@ function desenharMelhorias() {
     ${cab('Melhorias contínuas · FORM 020', 'O banco de melhorias da fazenda: ideia → avaliada (impacto × custo) → aprovada (ano e orçamento) → em execução → concluída.', '<button class="btn principal" type="button" id="mcNovaMe">+ Melhoria</button>')}
     ${abasAbertoFechado(abMe.length, feMe.length, f.etapa === 'fechadas', 'Concluídas')}
     <div class="grade larga" style="margin-top:12px">
-      ${f.etapa === 'fechadas' ? '' : `<label class="campo">Ver <select id="mcFmVer">${opcoes([['lista', 'Lista'], ['matriz', 'Matriz impacto × custo'], ['plano', 'Plano por ano']], f.ver)}</select></label>`}
+      ${f.etapa === 'fechadas' ? '' : `<label class="campo">Ver <select id="mcFmVer">${opcoes([['quadro', 'Quadro por etapa'], ['lista', 'Lista'], ['matriz', 'Matriz impacto × custo'], ['plano', 'Plano por ano']], f.ver)}</select></label>`}
       <label class="campo">Procurar <input type="search" id="mcFmQ" value="${esc(f.q)}" placeholder="melhoria, local…"></label>
     </div>
     <div style="margin-top:10px">${corpo}</div>

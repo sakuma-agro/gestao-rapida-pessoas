@@ -343,12 +343,11 @@ export const MODULOS = [
     /* Caderno de campo (19/10/2026): registros por plantio para a auditoria
        IFA. js/cert-caderno.js; tabelas cc_*; mesma permissão 'cert'. */
     { id: 'ceCadSub', grupo: 'Registros', secao: 'Check lists e caderno', codigo: 'IFA', nome: 'Caderno de campo', telas: [
-      ['ccPainel',      'Painel'],
-      ['ccRegistros',   'Lançamentos'],
-      ['ccPlantios',    'Plantios'],
-      ['ccInsumos',     'Insumos'],
+      /* Etapa 5 (29/10/2026): 7 abas viraram 4. Lançamentos = painel + lançamentos;
+         Cadastros = plantios + insumos + calibrações (TELA_JUNTA). */
+      ['ccPainel',      'Lançamentos'],
       ['ccAnalises',    'Análises'],
-      ['ccCalibracoes', 'Calibrações'],
+      ['ccPlantios',    'Cadastros'],
       ['ccRelatorios',  'Relatórios'],
     ] },
     /* Pendências (etapa 3, 29/10/2026): atrasados, o que vence e a situação das certificações. */
@@ -723,8 +722,10 @@ export function mostrarInicio() {
 /* Telas que viraram parte de outra (etapa 2 da Certificação, 29/10/2026): o
    histórico mora embaixo do painel, na aba Registros. Link antigo cai lá e
    rola até o histórico. */
-const TELA_JUNTA = { bmLotes: 'bmPainel', foAvaliacoes: 'foPainel', faRegistros: 'faPainel', enLancamentos: 'enPainel', reSaidas: 'rePainel', gpReunioes: 'gpPainel' };
-export const TELAS_JUNTAS = Object.fromEntries(Object.entries(TELA_JUNTA).map(([h, p]) => [p, h]));
+const TELA_JUNTA = { ccRegistros: 'ccPainel', ccInsumos: 'ccPlantios', ccCalibracoes: 'ccPlantios', bmLotes: 'bmPainel', foAvaliacoes: 'foPainel', faRegistros: 'faPainel', enLancamentos: 'enPainel', reSaidas: 'rePainel', gpReunioes: 'gpPainel' };
+/** painel → [telas que aparecem embaixo dele] */
+export const TELAS_JUNTAS = {};
+for (const [h, p] of Object.entries(TELA_JUNTA)) (TELAS_JUNTAS[p] ||= []).push(h);
 
 export function abrirModulo(id, tela) {
   if (!id) return;
