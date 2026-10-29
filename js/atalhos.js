@@ -72,6 +72,7 @@ const PROPRIOS = {
   trConsol:      ['lista', 'Treinamentos consolidados'],
   sstAtv:        ['check', 'Atividades e exigências'],
   brPainel:      ['chama', 'Brigada e socorros'],
+  sstNrs:        ['livro', 'NRs'],
   ferPrev:       ['sol', 'Previsão de férias'],
   ferLanc:       ['sol', 'Lançar férias'],
   ferAfast:      ['sol', 'Afastamentos'],

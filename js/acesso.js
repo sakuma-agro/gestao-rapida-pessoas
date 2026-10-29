@@ -124,6 +124,11 @@ export const MODULOS = [
       ['camCal', 'Calendário anual'],
       ['camTemas', 'Catálogo de temas'],
     ] },
+    /* NRs (29/10/2026, pedido dele): painel das Normas Regulamentadoras com
+       botão para o portal oficial do MTE (gov.br) — js/sst-nrs.js, sem banco. */
+    { id: 'nrs', nome: 'NRs', telas: [
+      ['sstNrs', 'Normas regulamentadoras'],
+    ] },
   ] },
   { id: 'rh', nome: 'RH', subs: [
     { id: 'disc', nome: 'DISC', telas: [
@@ -725,7 +730,7 @@ const CORES_GRUPO = ['rb-verde', 'rb-marrom', 'rb-cinza'];
    Módulo de um submódulo só continua mostrando as telas. */
 const ICONE_SUB = {
   gente: 'pessoa', folhaPonto: 'calendario', certificacao: 'check', relatoriosCad: 'grafico', etiquetas: 'etiqueta', estrutura: 'predio',
-  epis: 'escudo', exames: 'exame', treinamentos: 'treino', campanhas: 'megafone', brigada: 'chama',
+  epis: 'escudo', exames: 'exame', treinamentos: 'treino', campanhas: 'megafone', brigada: 'chama', nrs: 'livro',
   disc: 'disc', cargos: 'cargo', organograma: 'organograma', indicadores: 'grafico', salarioDigno: 'balanca',
   dpPainel: 'painel', gestaoJornada: 'relogio', boletinsDiarios: 'boletim', docMensais: 'recibo', ticket: 'cartao',
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',

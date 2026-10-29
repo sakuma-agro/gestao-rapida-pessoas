@@ -53,6 +53,7 @@ export const ICONES = {
   etiqueta: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
   envelope: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 7l9 6 9-6"/>',
   armario: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M12 3v18M9.5 11v2M14.5 11v2M7 7h3M14 7h3"/>',
+  livro: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 21V5M8 7h7M8 11h5"/>',
   megafone: '<path d="M3 10v4a1 1 0 001 1h3l8 4V5L7 9H4a1 1 0 00-1 1z"/><path d="M18 9a4 4 0 010 6"/><path d="M7 15l1 5h3l-1-5"/>',
 };
 
@@ -64,7 +65,7 @@ export const ICONE_TELA = {
   fichas: 'escudo', epis: 'lista', epiCrono: 'calendario', modelo: 'lapis',
   exPainel: 'painel', exVenc: 'exame', exRel: 'ficha', exFuncoes: 'cargo', exTipos: 'ajuste',
   trPainel: 'painel', trVenc: 'treino', trConsol: 'lista', sstAtv: 'check', trTipos: 'ajuste', trFuncoes: 'cargo', sstCal: 'calendario',
-  brPainel: 'painel', brMembros: 'pessoas', brMinimos: 'ajuste',
+  brPainel: 'painel', brMembros: 'pessoas', brMinimos: 'ajuste', sstNrs: 'livro',
   bhRegistros: 'lista', bhFicha: 'ficha',
   camPainel: 'painel', camLista: 'megafone', camCal: 'calendario', camTemas: 'ajuste',
   disc: 'disc', rhCargos: 'cargo', sdQuadro: 'balanca', sdPlanos: 'check', sdConfig: 'config', rhProposta: 'documento', rhOrganograma: 'organograma',

@@ -24,6 +24,7 @@ import { abrirAcidentes, limparAcidentes, TELAS_ACIDENTES } from './sst-acidente
 import { abrirCalendarioSst } from './sst-calendario.js';
 import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanhas.js';
 import { abrirBrigada, limparBrigada, ligarBrigada, avisoDesligamentoBrigada, TELAS_BRIGADA } from './sst-brigada.js';
+import { abrirNrs, limparNrs } from './sst-nrs.js';
 import { abrirEpiCrono, limparEpiCrono, ligarEpiCrono, redesenharEpiCrono } from './sst-epi-crono.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
@@ -231,6 +232,9 @@ function abrirAba(nome) {
   // SST › Brigada e primeiros socorros (22/10/2026) — js/sst-brigada.js
   for (const t of TELAS_BRIGADA) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_BRIGADA.includes(nome)) abrirBrigada(nome);
+  // SST › NRs (29/10/2026) — js/sst-nrs.js; funciona sem internet (só o botão do portal precisa)
+  $('telaSstNrs').hidden = nome !== 'sstNrs';
+  if (nome === 'sstNrs') abrirNrs();
   $('telaSstCal').hidden = nome !== 'sstCal';
   if (nome === 'sstCal') abrirCalendarioSst();
   // Reunião semanal (15/10/2026) — js/reuniao.js
@@ -327,7 +331,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparBanho(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparNrs(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparBanho(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 
