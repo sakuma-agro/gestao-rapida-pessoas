@@ -2365,3 +2365,11 @@ body.ce-apr-aberto{overflow:hidden}
 /* Certificação › Pendências (etapa 3, 29/10/2026) */
 .ce-pend-topo{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .ce-pend-topo h2{font-size:24px}
+
+/* Certificação › Modo auditor (etapa 4, 29/10/2026): mesmas telas, só leitura */
+.ce-aud-chave[aria-pressed="true"]{background:#744F28 !important;color:#fff !important;border-color:#744F28 !important}
+.ce-aud-chave[aria-pressed="true"] svg{color:#fff}
+body.modo-auditor main::before{content:"Modo auditor · só leitura";display:block;background:#744F28;color:#fff;font-weight:700;
+  font-size:14px;padding:9px 14px;border-radius:10px;margin-bottom:12px}
+body.modo-auditor :is(main,dialog) :is([id*="Novo"],[id*="Nova"],[id*="Agendar"],[id*="Apagar"],[id$="Ok"],[id$="Gravar"],[id$="Mais"],
+  [data-editar],.btn.perigo,.anx-botao,.anx-apagar){display:none !important}

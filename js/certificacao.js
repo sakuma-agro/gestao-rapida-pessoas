@@ -2259,6 +2259,34 @@ const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }
 
+/* Modo auditor (etapa 4, 29/10/2026 — claude/cert-redesenho-lean.md): uma chave
+   no alto da Certificação. Ligada, as mesmas telas ficam só de leitura (somem
+   novo, editar, gravar, apagar e anexar — css .modo-auditor) e aparece a faixa
+   marrom. Fica guardada neste aparelho. Quem protege os dados continua sendo o RLS. */
+const CHAVE_AUD = 'gr.cert.auditor';
+let auditor = (() => { try { return localStorage.getItem(CHAVE_AUD) === '1'; } catch { return false; } })();
+export const auditorLigado = () => auditor;
+function pintarChaveAuditor() {
+  const nav = $('navModulos');
+  if (!nav || !nav.querySelector('.aba[data-modulo="cert"]')) return;
+  let b = $('ceAudChave');
+  if (!b) {
+    b = document.createElement('button');
+    b.type = 'button'; b.id = 'ceAudChave'; b.className = 'aba aba-config ce-aud-chave';
+    b.addEventListener('click', () => {
+      auditor = !auditor;
+      try { localStorage.setItem(CHAVE_AUD, auditor ? '1' : '0'); } catch {}
+      document.body.classList.toggle('modo-auditor', auditor);
+      pintarChaveAuditor();
+    });
+    nav.appendChild(b);
+  }
+  b.setAttribute('aria-pressed', String(auditor));
+  b.title = auditor ? 'Sair do modo auditor' : 'Mostrar as telas só para leitura, para o auditor';
+  b.innerHTML = `${svgIcone('escudo')}<span>${auditor ? 'Modo auditor · sair' : 'Modo auditor'}</span>`;
+}
+aoMudarGrupo(id => { if (id === 'cert') { pintarChaveAuditor(); document.body.classList.toggle('modo-auditor', auditor); } });
+
 /* Porta aberta ou fechada na faixa de cima enquanto a entrada está na tela:
    redesenha a entrada (lista da porta ou as três portas). */
 let ultimaPorta = null;
