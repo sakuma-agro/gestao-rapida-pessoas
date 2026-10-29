@@ -60,9 +60,9 @@
       legenda: 'Transferência: escrever o estoque de destino.   Descarte: escrever "vencido" ou "descarte" no Destino.   ',
       frase: 'Vai retirar produto? Anote aqui antes de levar.' },
   };
-  /* Controle do documento (Lista mestra: FORM 048 e 049, rev. 02 de 01/12/2026),
+  /* Controle do documento (Lista mestra: FORM 048 e 049, rev. 02 de 01/11/2026),
      no mesmo padrão dos outros FORMs da Certificação. */
-  const REV = { data: '01/12/2026', rev: '02', elab: 'Guilherme Ribeiro Lopes', aprov: 'Produtor – Fabio Massao Sakuma' };
+  const REV = { data: '01/11/2026', rev: '02', elab: 'Guilherme Ribeiro Lopes', aprov: 'Produtor – Fabio Massao Sakuma' };
   const CINZA = '#51534A', GRADE = '#888780', LISTRA = '#EFEFED', CORTE = '#B4B2A9';
   const W = 297, H = 210, M = 5;   // A4 deitado, margem mínima
 
