@@ -72,6 +72,47 @@ try {
     if (-not $itens.ContainsKey($k) -or -not $i.local) { $itens[$k] = $i.id }
   }
 
+  # Arquivos movidos por organização (29/10/2026, pastas de ano nos AN): movidos.json nesta pasta traz
+  # [{de, para}] (caminhos "onedrive:..."). O app troca o caminho sem reenviar e o "já enviado" acompanha.
+  $MovArq = Join-Path $Aqui 'movidos.json'
+  if (Test-Path $MovArq) {
+    try {
+      $corpoM = [IO.File]::ReadAllBytes($MovArq)
+      $rm = Invoke-RestMethod -Method Post -Uri "$Url`?acao=mover" -Headers $H -ContentType 'application/json; charset=utf-8' -Body $corpoM -TimeoutSec 300
+      $movs = Get-Content -Raw -Encoding UTF8 $MovArq | ConvertFrom-Json
+      foreach ($m in $movs) {
+        $de = ([string]$m.de).Substring(9).Replace('/', '\'); $para = ([string]$m.para).Substring(9).Replace('/', '\')
+        if ($feito.ContainsKey($de)) { $feito[$para] = $feito[$de]; $feito.Remove($de) }
+      }
+      $feito | ConvertTo-Json -Depth 2 | Set-Content -Encoding UTF8 $Estado
+      Move-Item -Force $MovArq (Join-Path $Aqui ("movidos-feito-{0:yyyyMMdd-HHmm}.json" -f (Get-Date)))
+      Log "Arquivos movidos: $($rm.arquivos) arquivo(s) e $($rm.evidencias) evidência(s) com caminho novo no app ($($rm.lista) movidos)."
+    } catch { Log "Movidos não aplicados (tenta na próxima hora): $($_.Exception.Message)" }
+  }
+
+  # Lista dos arquivos (29/10/2026), ANTES de enviar: manda caminho e data de todos os arquivos. O app grava a
+  # data (abre o PDF da pasta de ano mais nova / o mais novo), tira os PDFs que saíram da pasta (movidos para
+  # a pasta do ano, renomeados ou apagados; só limpa se a lista vier completa) e devolve os que estão na
+  # pasta mas não no app — esses saem do "já enviado" e sobem nesta rodada.
+  $lista = foreach ($topo in $Topos) {
+    $raiz = Join-Path $Base $topo
+    if (Test-Path $raiz) {
+      Get-ChildItem -LiteralPath $raiz -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension -match '^\.(pdf|jpe?g|png)$' } |
+        ForEach-Object { @{ o = 'onedrive:' + $_.FullName.Substring($Base.Length + 1).Replace('\', '/'); d = $_.LastWriteTime.ToString('yyyy-MM-dd') } }
+    }
+  }
+  try {
+    $corpo = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @($lista) -Depth 3 -Compress))
+    $r = Invoke-RestMethod -Method Post -Uri "$Url`?acao=datas" -Headers $H -ContentType 'application/json; charset=utf-8' -Body $corpo -TimeoutSec 300
+    $refaz = 0
+    foreach ($o in @($r.faltando)) {
+      $rel = ([string]$o).Substring(9).Replace('/', '\')
+      if ($feito.ContainsKey($rel) -and -not ([string]$feito[$rel]).StartsWith('grande|')) { $feito.Remove($rel); $refaz++ }
+    }
+    if ($r.datas -or $r.removidos -or $refaz) { Log "Lista dos arquivos: $($r.datas) data(s) atualizada(s), $($r.removidos) arquivo(s) que saíram da pasta tirados do app, $refaz arquivo(s) que faltavam no app vão subir de novo ($($r.lista) na pasta)." }
+  } catch { Log "Lista dos arquivos não enviada: $($_.Exception.Message)" }
+
   $env = 0; $pul = 0; $err = 0
   foreach ($topo in $Topos) {
     $raiz = Join-Path $Base $topo
@@ -125,22 +166,6 @@ try {
   $feito | ConvertTo-Json -Depth 2 | Set-Content -Encoding UTF8 $Estado
   if ($env -or $pul -or $err) { Log "Fim: $env enviado(s), $pul já estavam no app, $err erro(s)." }
 
-  # Lista dos arquivos (29/10/2026): a cada rodada manda caminho e data de todos os arquivos. O app grava a
-  # data (abre o PDF mais novo / da pasta de ano mais novo) e tira os PDFs que saíram da pasta (movidos para
-  # a pasta do ano, renomeados ou apagados). Só limpa se a lista vier completa (proteção no banco).
-  if ($true) {
-    $lista = foreach ($topo in $Topos) {
-      $raiz = Join-Path $Base $topo
-      if (Test-Path $raiz) {
-        Get-ChildItem -LiteralPath $raiz -File -Recurse -ErrorAction SilentlyContinue |
-          Where-Object { $_.Extension -match '^\.(pdf|jpe?g|png)$' } |
-          ForEach-Object { @{ o = 'onedrive:' + $_.FullName.Substring($Base.Length + 1).Replace('\', '/'); d = $_.LastWriteTime.ToString('yyyy-MM-dd') } }
-      }
-    }
-    $corpo = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @($lista) -Depth 3 -Compress))
-    $r = Invoke-RestMethod -Method Post -Uri "$Url`?acao=datas" -Headers $H -ContentType 'application/json; charset=utf-8' -Body $corpo -TimeoutSec 300
-    if ($r.datas -or $r.removidos) { Log "Lista dos arquivos: $($r.datas) data(s) atualizada(s), $($r.removidos) arquivo(s) que saíram da pasta tirados do app ($($r.lista) na pasta)." }
-  }
 } catch {
   if ("$_" -ne 'parar') { Log "FALHOU: $($_.Exception.Message)" }
   if ($feito) { $feito | ConvertTo-Json -Depth 2 | Set-Content -Encoding UTF8 $Estado }

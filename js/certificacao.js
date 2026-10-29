@@ -79,7 +79,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 
 /* ---------------- estado ---------------- */
 const S = {
-  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [],
+  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [], docArq: [],
   fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
   fd: { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
@@ -92,7 +92,7 @@ const S = {
    (cert_marcar_feito). Cadastrar/editar requisitos continua só com internet. */
 const CAIXA = 'cert.cache';
 const CAMADA = 'cert';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz, docArq: S.docArq });
 const CAMADA_DEF = {
   tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, i) => i,
   cliente: () => estado.cliente,
@@ -135,7 +135,7 @@ const EVID_APP = {
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, bh, ccl] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, bh, ccl, darq] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -151,8 +151,10 @@ async function carregarCadeia(c) {
     c.from('cg_reunioes').select('data').eq('situacao', 'Realizada'),
     c.from('cb_banhos').select('data'),
     c.from('ccl_registros').select('data, documento_id'),
+    c.from('arquivos').select('dono_id, chave, nome, origem, data_arquivo, criado_em').eq('area', 'certificacao').eq('tipo', 'documento').not('origem', 'is', null),
   ]);
   if (it && !it.error) S.itens = it.data || [];
+  if (darq && !darq.error) S.docArq = darq.data || [];
   if (fz && !fz.error) S.faz = fz.data || [];
   if (!v.error) S.vinc = v.data || [];
   if (!ev.error) S.evid = ev.data || [];
@@ -181,7 +183,20 @@ async function carregarCadeia(c) {
 const porCodigo = (a, b) => so(a.codigo).localeCompare(so(b.codigo), 'pt-BR', { numeric: true });
 const ligadosDe = d => S.vinc.filter(v => v.de_id === d.id).map(v => ({ v, d: S.docs.find(x => x.id === v.para_id) })).filter(x => x.d).sort((a, b) => porCodigo(a.d, b.d));
 const ligadosPara = d => S.vinc.filter(v => v.para_id === d.id).map(v => ({ v, d: S.docs.find(x => x.id === v.de_id) })).filter(x => x.d).sort((a, b) => porCodigo(a.d, b.d));
-const evidDe = d => S.evid.filter(e => e.documento_id === d.id).sort((a, b) => b.data.localeCompare(a.data));
+/* Evidências por ano (29/10/2026, pedido dele: "já coloca todas as evidências aqui"): nos AN, IT e POL os
+   arquivos da pasta do documento no OneDrive contam como evidência do ano da pasta (AN xx\2025\…) — ou, sem
+   pasta de ano, da data do arquivo. Não são editáveis aqui: o arquivo manda (OneDrive). */
+const TIPOS_EV_ARQ = new Set(['AN', 'IT', 'POL']);
+function dataEvArq(x) {
+  const ano = anoDaPasta(x), da = String(x.data_arquivo || '').slice(0, 10), cr = String(x.criado_em || '').slice(0, 10);
+  if (ano !== '0000') return da.startsWith(ano) ? da : (ano + '-12-31' > hoje() ? hoje() : ano + '-12-31');
+  return da || cr;
+}
+const evArqDe = d => TIPOS_EV_ARQ.has(prefixoDoc(d))
+  ? (S.docArq || []).filter(x => x.dono_id === String(d.id)).map(x => ({ id: 'arq:' + x.chave, documento_id: d.id, data: dataEvArq(x), _arq: x.chave,
+      descricao: String(x.origem || '').split('/').slice(2).join(' / ') || x.nome, item_id: null }))
+  : [];
+const evidDe = d => [...S.evid.filter(e => e.documento_id === d.id), ...evArqDe(d)].sort((a, b) => b.data.localeCompare(a.data));
 /* RG (27/10/2026, pedido dele: "ao preencher os forms temos registros, vamos criar o RG"):
    RG 0xx = o FORM 0xx preenchido, mesmo número. Os lançamentos feitos no app
    (EVID_APP) contam como registro do RG; o FORM fica sendo o modelo. */
@@ -232,7 +247,7 @@ async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
   if (c0 && !S.carregado) {
     S.certs = c0.certs || []; S.reqs = c0.reqs || []; S.docs = c0.docs || []; S.evs = c0.evs || [];
-    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || [];
+    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || []; S.docArq = c0.docArq || [];
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -1023,7 +1038,7 @@ async function painelDoc() {
 /* ---- Cadeia no painel do documento ---- */
 function htmlCadeia(d) {
   const de = ligadosDe(d), para = ligadosPara(d);
-  const chip = (x, lado) => `<span class="ce-elo"><button type="button" class="ce-link" data-ir-doc="${x.d.id}" title="${esc(x.d.nome)}"><b>${esc(x.d.codigo)}</b> ${esc(x.d.nome)}</button>${x.v.origem === 'texto do POP' ? '<small class="dc-sem" title="Ligação lida do texto do POP">· texto</small>' : ''}<button type="button" class="ce-elo-x" data-desligar="${x.v.id}" title="Desfazer esta ligação">✕</button></span>`;
+  const chip = (x, lado) => `<span class="ce-elo"><button type="button" class="ce-link" data-ir-doc="${x.d.id}" title="${esc(x.d.nome)}"><b>${esc(x.d.codigo)}</b> ${esc(x.d.nome)}</button>${x.v.origem === 'texto do POP' ? '<small class="dc-sem" title="Ligação lida do texto do POP">· texto</small>' : x.v.origem === 'relação' ? '<small class="dc-sem" title="Ligação pelo assunto (29/10/2026) — desfaça no ✕ se não fizer sentido">· assunto</small>' : ''}<button type="button" class="ce-elo-x" data-desligar="${x.v.id}" title="Desfazer esta ligação">✕</button></span>`;
   const candidatos = S.docs.filter(x => x.id !== d.id && !de.some(y => y.d.id === x.id) && !para.some(y => y.d.id === x.id)
     && (ehPop(d) ? !ehPop(x) : true)).sort(porCodigo);
   const alvo = rgDe(d) || d;   // no FORM, os registros são os do RG de mesmo número
@@ -1036,7 +1051,7 @@ function htmlCadeia(d) {
       ${ehPop(d) && de.length ? '<button class="btn mini principal" type="button" id="ceCadApr">▶ Apresentar a cadeia</button>' : !ehPop(d) && (ev.length || para.length) ? '<button class="btn mini" type="button" id="ceCadApr">▶ Apresentar com evidências</button>' : ''}</div>
     ${ehPop(d)
       ? (de.length ? `<div class="ce-elos">${de.map(x => chip(x)).join('')}</div>` : '<p class="dica">Nenhum FORM ligado a este POP ainda.</p>')
-      : `${para.length ? `<div class="ce-elos">${para.map(x => chip(x)).join('')}</div>` : '<p class="dica">Nenhum POP exige este documento ainda.</p>'}
+      : `${para.length ? `<div class="ce-elos">${para.map(x => chip(x)).join('')}</div>` : (de.length ? '' : '<p class="dica">Nenhum documento ligado a este ainda.</p>')}
          ${de.length ? `<div class="ce-elos">${de.map(x => chip(x)).join('')}</div>` : ''}`}
     <div class="barra" style="margin:6px 0 0"><select id="ceCadSel"><option value="">${ehPop(d) ? '＋ Ligar um FORM / documento…' : '＋ Ligar a um POP / documento…'}</option>${candidatos.map(x => `<option value="${x.id}">${esc(x.codigo)} — ${esc(x.nome)}</option>`).join('')}</select>
       <button class="btn mini" type="button" id="ceCadLigar">Ligar</button></div>
@@ -1047,9 +1062,10 @@ function htmlCadeia(d) {
         <p class="dc-sem" style="margin:2px 0 6px">${okN} de ${cob.length} período(s) com evidência.</p>` : '<p class="dc-sem" style="margin:2px 0 6px">Por evento: anexe cada ocorrência.</p>'}
       ${ev.length ? `<ul class="ce-evs">${ev.slice(0, 12).map(e => `<li><b>${br(e.data)}</b> ${esc(e.descricao || '')}
           ${e.item_id ? `<small class="dc-sem">· ${esc(rotItem(S.itens.find(i => i.id === e.item_id)))}</small>` : ''}
-          ${S.evArq?.has(String(e.id)) ? `<button class="ce-link" type="button" data-ev-ver="${e.id}">📎 abrir</button>` : ''}
+          ${e._arq ? `<button class="ce-link" type="button" data-arq-ver="${esc(e._arq)}">📎 abrir</button> <small class="dc-sem">· pasta</small>`
+            : `${S.evArq?.has(String(e.id)) ? `<button class="ce-link" type="button" data-ev-ver="${e.id}">📎 abrir</button>` : ''}
           ${linkOk(e.link) ? `<a class="ce-link" href="${esc(e.link)}" target="_blank" rel="noopener">OneDrive ↗</a>` : ''}
-          <button class="ce-link dc-sem" type="button" data-ev-ed="${e.id}">editar</button></li>`).join('')}</ul>${ev.length > 12 ? `<p class="dc-sem">+ ${ev.length - 12} mais antiga(s).</p>` : ''}`
+          <button class="ce-link dc-sem" type="button" data-ev-ed="${e.id}">editar</button>`}</li>`).join('')}</ul>${ev.length > 12 ? `<p class="dc-sem">+ ${ev.length - 12} mais antiga(s).</p>` : ''}`
         : `<p class="dica">${rotEv === 'Registros' ? 'Nenhum registro anexado ainda.' : 'Nenhuma evidência anexada ainda.'}</p>`}`}`;
 }
 function ligarCadeia(d) {
@@ -1077,6 +1093,7 @@ function ligarCadeia(d) {
   $('ceEvNova')?.addEventListener('click', () => formEvidencia(alvo, null));
   $('ceEvViva')?.addEventListener('click', () => abrirModulo('cert', vivaDe(alvo).tela));
   el.querySelectorAll('[data-ev-ed]').forEach(b => b.addEventListener('click', () => formEvidencia(alvo, S.evid.find(e => e.id === b.dataset.evEd))));
+  el.querySelectorAll('[data-arq-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.arqVer)));
   el.querySelectorAll('[data-ev-ver]').forEach(b => b.addEventListener('click', async () => {
     const l = await listarArquivos('certificacao', 'evidencia', b.dataset.evVer).catch(() => []);
     if (l[0]) abrirArquivo(l[0].chave); else alert('Arquivo ainda não está no Drive.');
@@ -1414,7 +1431,7 @@ async function mostrarApr(i) {
   $('ceAprNome').textContent = d.nome;
   const box = $('ceAprPdf'); box.innerHTML = '<p class="ce-apr-msg">Carregando…</p>'; apr.chave = null;
   try {
-    const v = d._ev ? (await listarArquivos('certificacao', 'evidencia', d._ev.id).catch(() => []))[0] || null : await pdfVigente(d);
+    const v = d._ev ? (d._ev._arq ? { chave: d._ev._arq, nome: d._ev.descricao } : (await listarArquivos('certificacao', 'evidencia', d._ev.id).catch(() => []))[0] || null) : await pdfVigente(d);
     if (!apr || g !== apr.g) return;
     if (!v) {
       box.innerHTML = d._ev && linkOk(d._ev.link) ? `<p class="ce-apr-msg">Evidência no OneDrive: <a href="${esc(d._ev.link)}" target="_blank" rel="noopener">abrir ↗</a></p>`
@@ -2160,7 +2177,7 @@ export async function abrirCertificacao(tela) {
 }
 
 export function limparCertificacao() {
-  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {};
+  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = [];
   nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' });

@@ -23,6 +23,7 @@
 //   mapa                     GET  → documentos (id, codigo, por_fazenda) e itens (id, documento_id, fazenda)
 //   enviar&destino=doc|item|evid&id=&caminho=&nome=&data=   POST corpo = arquivo
 //   datas                    POST [{o: origem, d: data}] → arquivos.data_arquivo; tira os PDFs de documento que saíram da pasta
+//   mover                    POST [{de, para}] → troca o caminho de arquivos/evidências movidos
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -240,6 +241,13 @@ Deno.serve(async (req) => {
       const l = await req.json();
       if (!Array.isArray(l) || l.length > 5000) return json({ erro: "lista-invalida" }, 400);
       const n = await db("rpc/arquivos_marcar_datas", { method: "POST", body: JSON.stringify({ l }) });
+      return json({ ok: true, ...(n || {}) });
+    }
+    // mover (29/10/2026): [{de, para}] → troca o caminho dos arquivos e evidências movidos no OneDrive (sem reenviar)
+    if (acao === "mover" && req.method === "POST") {
+      const l = await req.json();
+      if (!Array.isArray(l) || l.length > 10000) return json({ erro: "lista-invalida" }, 400);
+      const n = await db("rpc/arquivos_mover", { method: "POST", body: JSON.stringify({ l }) });
       return json({ ok: true, ...(n || {}) });
     }
     return json({ erro: "acao-invalida" }, 400);
