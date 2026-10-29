@@ -1068,7 +1068,7 @@ function formEvidencia(d, e, itemId = null) {
     </div>
     ${itensDoc.length ? `<div class="grade">
       <label class="campo">Fazenda / ponto <select id="evItem">${opcoes(itensDoc.map(i => [i.id, rotItem(i)]), v.item_id, '— geral —')}</select></label>
-      <label class="campo">${rd.prox} <small>${rd.entrega ? `(data marcada para a próxima devolução${itAtual?.validade ? '; hoje: ' + br(itAtual.validade) : ''})` : '(laudo, licença…; atualiza a fazenda)'}</small> <input type="date" id="evValid" value=""></label>
+      <label class="campo">${rd.prox} <small>${rd.entrega ? `(data já marcada com a central${itAtual?.validade ? '; hoje: ' + br(itAtual.validade) : ''})` : '(laudo, licença…; atualiza a fazenda)'}</small> <input type="date" id="evValid" value=""></label>
     </div>` : ''}
     <label class="campo">Link no OneDrive (opcional) <input type="url" id="evLink" value="${esc(v.link || '')}" placeholder="https://…"></label>
     <div id="evAnx" style="margin-top:8px"></div>
@@ -1079,9 +1079,9 @@ function formEvidencia(d, e, itemId = null) {
     $('evOk').addEventListener('click', async () => {
       const linha = { documento_id: d.id, data: $('evData').value, descricao: so($('evDesc').value) || null, link: so($('evLink').value) || null,
         item_id: $('evItem')?.value || null };
-      if (!linha.data) return erroDlg(rd.entrega ? 'Informe a data do documento.' : 'Informe a data.');
-      if (rd.entrega && !e && linha.item_id && !$('evValid')?.value) return erroDlg('Informe a data da próxima entrega das embalagens.');
-      if (rd.entrega && $('evValid')?.value && $('evValid').value <= linha.data) return erroDlg('A próxima entrega precisa ser depois da data do documento.');
+      if (!linha.data) return erroDlg(rd.entrega ? 'Informe a data da última devolução (a do carimbo).' : 'Informe a data.');
+      if (rd.entrega && !e && linha.item_id && !$('evValid')?.value) return erroDlg('Informe a data da próxima devolução agendada.');
+      if (rd.entrega && $('evValid')?.value && $('evValid').value <= linha.data) return erroDlg('A próxima devolução precisa ser depois da última.');
       if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (!e && !anx.mudou && !linha.link) return erroDlg('Anexe o arquivo ou cole o link da evidência.');
       const salvo = await salvar('cert_evidencias', e, e ? { ...linha, atualizado_por: quem() } : { ...linha, criado_por: quem() }, S.evid, 'evOk');
@@ -1113,13 +1113,15 @@ const rotItem = i => i ? nomeFaz(i.fazenda_id) + (i.local ? ' · ' + i.local : '
 const itensDe = d => S.itens.filter(i => i.documento_id === d.id)
   .sort((a, b) => nomeFaz(a.fazenda_id).localeCompare(nomeFaz(b.fazenda_id), 'pt-BR') || so(a.local).localeCompare(so(b.local), 'pt-BR'));
 /** Rótulos das duas datas do item (29/10/2026, pedido dele): no AN 55 (devolução de
- *  embalagens) a evidência é o documento de uma devolução (data do documento) e a
- *  "validade" é a data marcada para a próxima entrega. Nos outros AN segue "Válido até". */
+ *  embalagens) a evidência são as notas carimbadas da última devolução (data do carimbo) e a
+ *  "validade" é a próxima devolução agendada. Nos outros AN segue "Válido até". */
 function rotDatas(d) {
   return /devolu[cç][aã]o de embalage/i.test(so(d?.nome))
-    ? { entrega: true, doc: 'Data do documento', docCurto: 'Documento', prox: 'Próxima entrega' }
-    : { entrega: false, doc: 'Data (ou mês de referência)', docCurto: 'última', prox: 'Válido até' };
+    ? { entrega: true, doc: 'Última devolução (data do carimbo)', docCurto: 'Última devolução', prox: 'Próxima devolução agendada', proxCurto: 'Próxima devolução' }
+    : { entrega: false, doc: 'Data (ou mês de referência)', docCurto: 'última', prox: 'Válido até', proxCurto: 'Válido até' };
 }
+/** Depois da devolução, a central devolve as notas carimbadas em até 7 dias (29/10/2026). */
+const PRAZO_NOTAS = 7;
 /** Vencimento do item: a validade informada; sem ela, última evidência + periodicidade. */
 function vencItem(i, d) {
   if (i.validade) return i.validade;
@@ -1131,8 +1133,9 @@ function estadoItem(i, d) {
   if (!v) return i.ultima_data ? { t: 'Em dia', c: 'ativo' } : { t: 'Sem evidência', c: 'perigo' };
   const n = entre(hoje(), v);
   const ent = rotDatas(d).entrega;
-  if (n < 0) return { t: ent ? `Entrega atrasada ${-n} d` : `Vencido há ${-n} d`, c: 'perigo', v };
-  if (n <= 30) return { t: ent ? `Entrega em ${n} d` : `Vence em ${n} d`, c: 'alerta', v };
+  if (ent && n < 0 && -n <= PRAZO_NOTAS) return { t: 'Aguardando notas carimbadas', c: 'alerta', v };
+  if (n < 0) return { t: ent ? `Notas atrasadas ${-n - PRAZO_NOTAS} d` : `Vencido há ${-n} d`, c: 'perigo', v };
+  if (n <= 30) return { t: ent ? `Devolução em ${n} d` : `Vence em ${n} d`, c: 'alerta', v };
   return { t: 'Em dia', c: 'ativo', v };
 }
 export function pendenciasFazendas() {
@@ -1178,7 +1181,7 @@ function linhaItem(i, d, rotulo, sub) {
   return `<div class="ce-fz-item">
     <div class="ce-fz-nome"><b>${esc(rotulo)}</b>${sub ? `<span class="dc-sem">${esc(sub)}</span>` : ''}</div>
     <div class="ce-fz-dados dc-sem">${rd.entrega
-      ? `${rd.docCurto} <b>${i.ultima_data ? br(i.ultima_data) : '—'}</b> · ${rd.prox} <b>${i.validade ? br(i.validade) : 'não informada'}</b>${ult ? ` · ${ult} evid.` : ''}`
+      ? `${rd.docCurto} <b>${i.ultima_data ? br(i.ultima_data) : '—'}</b> · ${rd.proxCurto} <b>${i.validade ? br(i.validade) : 'não informada'}</b>${ult ? ` · ${ult} evid.` : ''}`
       : `${i.validade ? 'Válido até ' + br(i.validade) : e.v ? 'Próxima ' + br(e.v) : esc(i.periodicidade || d.periodicidade || '')}
       ${i.ultima_data ? ' · última ' + br(i.ultima_data) : ''}${ult ? ` · ${ult} evid.` : ''}`}</div>
     ${tag(e.t, e.c)}
