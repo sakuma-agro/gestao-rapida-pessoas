@@ -240,18 +240,115 @@ export const MODULOS = [
   /* Área Certificação (13/10/2026): o módulo mora na área dela (`area`), não
      no menu de Pessoas. js/certificacao.js; tabelas cert_*; permissão 'cert'. */
   { id: 'cert', nome: 'Certificação', area: 'certificacao', subs: [
-    { id: 'cePainelSub', nome: 'Painel', telas: [
-      ['cePainel', 'Painel'],
+    { id: 'cePainelSub', nome: 'Início', telas: [
+      ['cePainel', 'Início'],
     ] },
-    { id: 'ceReqSub', nome: 'Requisitos', telas: [
+    /* Três portas (29/10/2026, desenho aprovado — claude/cert-redesenho-lean.md):
+       Início + Documentos · Registros · Pendências. `grupo` junta os submódulos
+       numa porta; `secao` separa os FORMS Digital dos check lists na lista da porta. */
+    { id: 'ceDocSub', grupo: 'Documentos', nome: 'Lista mestra', telas: [
+      ['ceDocumentos', 'Lista mestra'],
+    ] },
+    { id: 'ceReqSub', grupo: 'Documentos', nome: 'Requisitos', telas: [
       ['ceRequisitos', 'Requisitos'],
     ] },
-    { id: 'ceDocSub', nome: 'Lista mestra', telas: [
-      ['ceDocumentos', 'Lista mestra'],
+    /* Sinalética (29/10/2026, pedido dele: "as placas crie em certificação, o
+       módulo sinalética, e já coloca essas"): placas para imprimir. Começa com
+       as placas das pranchetas de ENTRADA e SAÍDA do estoque (js/folhas-estoque.js).
+       Placas (29/10/2026): as da pasta 18 - Placas, com miniatura para marcar e
+       imprimir — js/sinaletica.js, arquivos em sinaletica/. */
+    { id: 'ceSinalSub', grupo: 'Documentos', nome: 'Sinalética', telas: [
+      ['siPlacas',        'Placas'],
+      ['siPlacasEstoque', 'Placas do estoque'],
+      ['siEtiquetasL',    'Etiquetas da pasta L'],
+      ['siAdesivos',      'Adesivos entrada e saída'],
+    ] },
+    { id: 'ceCertSub', grupo: 'Documentos', nome: 'Certificações', telas: [
+      ['ceCertificacoes', 'Certificações'],
+    ] },
+    /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
+       reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
+       manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
+    /* 26/10/2026, pedido dele: cada um independente, com o seu FORM
+       (antes era um submódulo só, "Melhoria contínua · FORM 020 · 042"). */
+    { id: 'ceNcSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 004', nome: 'Não conformidades', telas: [
+      ['mcNcs',        'Não conformidades'],
+    ] },
+    { id: 'ceMelhSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 020', nome: 'Melhorias contínuas', telas: [
+      ['mcMelhorias',  'Melhorias contínuas'],
+    ] },
+    { id: 'ceFbSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 042', nome: 'Reclamações e sugestões', telas: [
+      ['mcFeedbacks',  'Reclamações e sugestões'],
+      ['mcCaixas',     'Abertura das caixas'],
+    ] },
+    /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
+       aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
+    { id: 'ceFornSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
+      ['foPainel',     'Painel'],
+      ['foAvaliacoes', 'Avaliações'],
+      ['foCadastro',   'Cadastro'],
+    ] },
+    /* Reunião GRASP (27/10/2026): FORM 044 — ata da reunião mensal com o
+       representante dos trabalhadores e lista de presença. js/cert-grasp.js; tabela cg_reunioes. */
+    { id: 'ceGraspSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 044', nome: 'Reunião GRASP', telas: [
+      ['gpPainel',    'Painel'],
+      ['gpReunioes',  'Reuniões'],
+    ] },
+    /* Resíduos (27/10/2026): gestão de resíduos — FORM 053 (POP 004): saídas
+       em kg, avaliação mensal do manejo e indicadores. js/cert-residuos.js; tabelas cr_*. */
+    { id: 'ceResiduosSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 053', nome: 'Resíduos', telas: [
+      ['rePainel',    'Painel'],
+      ['reSaidas',    'Saídas'],
+      ['reAvaliacao', 'Avaliação'],
+      ['reTipos',     'Tipos'],
+    ] },
+    /* Energia (26/10/2026): consumo de energias — o FORM 043 virou painel.
+       js/cert-energia.js; tabelas ce_fontes / ce_consumos. */
+    { id: 'ceEnergiaSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 043', nome: 'Energia', telas: [
+      ['enPainel',      'Painel'],
+      ['enLancamentos', 'Lançamentos'],
+      ['enFontes',      'Fontes'],
+    ] },
+    /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
+       trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
+    { id: 'ceFaunaSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
+      ['faPainel',    'Painel'],
+      ['faRegistros', 'Registros'],
+      ['faEspecies',  'Espécies'],
+      ['faCameras',   'Câmeras'],
+    ] },
+    /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
+       e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
+    { id: 'ceBalancoSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
+      ['bmPainel',     'Painel'],
+      ['bmRastreio',   'Rastreabilidade'],
+      ['bmLotes',      'Boletins e vendas'],
+      ['bmFechamento', 'Fechamento'],
+    ] },
+    /* Banho e higiene pessoal (28/10/2026): FORM 054 — ficha mensal por trabalhador
+       da aplicação (início/fim, banho tomado, observações). js/cert-banho.js; tabela cb_banhos. */
+    { id: 'ceBanhoSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 054', nome: 'Banho e higiene pessoal', telas: [
+      ['bhRegistros', 'Registros'],
+      ['bhFicha',     'Ficha por funcionário'],
+    ] },
+    /* Folhas de estoque (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de
+       cada estoque e as placas — as mesmas da área Estoque › Formulários
+       (nem todos têm acesso à Certificação). js/folhas-estoque.js. */
+    { id: 'ceFolhasEstSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 048 · 049', nome: 'Folhas de estoque', telas: [
+      ['feFolhas', 'Folhas de entrada e saída'],
+    ] },
+    /* Check List Digital (29/10/2026, pedido dele: "igual Forms digital, agora vamos
+       criar Check list digitais, aonde tem como pôr foto e deixar registrado"):
+       C/NC/NA por item com foto, NC abre não conformidade no FORM 004, cada um
+       conta como RG CL nn. js/cert-checklist.js; tabelas ccl_modelos e ccl_registros. */
+    { id: 'ceClSub', grupo: 'Registros', secao: 'Check lists e caderno', codigo: 'CL', nome: 'CHECKS Digital', telas: [
+      ['clLista',     'Check lists'],
+      ['clRegistros', 'Registros'],
+      ['clModelos',   'Modelos'],
     ] },
     /* Caderno de campo (19/10/2026): registros por plantio para a auditoria
        IFA. js/cert-caderno.js; tabelas cc_*; mesma permissão 'cert'. */
-    { id: 'ceCadSub', nome: 'Caderno de campo', telas: [
+    { id: 'ceCadSub', grupo: 'Registros', secao: 'Check lists e caderno', codigo: 'IFA', nome: 'Caderno de campo', telas: [
       ['ccPainel',      'Painel'],
       ['ccRegistros',   'Lançamentos'],
       ['ccPlantios',    'Plantios'],
@@ -260,112 +357,18 @@ export const MODULOS = [
       ['ccCalibracoes', 'Calibrações'],
       ['ccRelatorios',  'Relatórios'],
     ] },
-    /* Sinalética (29/10/2026, pedido dele: "as placas crie em certificação, o
-       módulo sinalética, e já coloca essas"): placas para imprimir. Começa com
-       as placas das pranchetas de ENTRADA e SAÍDA do estoque (js/folhas-estoque.js).
-       Placas (29/10/2026): as da pasta 18 - Placas, com miniatura para marcar e
-       imprimir — js/sinaletica.js, arquivos em sinaletica/. */
-    /* Check List Digital (29/10/2026, pedido dele: "igual Forms digital, agora vamos
-       criar Check list digitais, aonde tem como pôr foto e deixar registrado"):
-       C/NC/NA por item com foto, NC abre não conformidade no FORM 004, cada um
-       conta como RG CL nn. js/cert-checklist.js; tabelas ccl_modelos e ccl_registros. */
-    { id: 'ceClSub', nome: 'CHECKS Digital', telas: [
-      ['clLista',     'Check lists'],
-      ['clRegistros', 'Registros'],
-      ['clModelos',   'Modelos'],
-    ] },
-    { id: 'ceSinalSub', nome: 'Sinalética', telas: [
-      ['siPlacas',        'Placas'],
-      ['siPlacasEstoque', 'Placas do estoque'],
-      ['siEtiquetasL',    'Etiquetas da pasta L'],
-      ['siAdesivos',      'Adesivos entrada e saída'],
-    ] },
-    /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
-       trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
-    { id: 'ceFaunaSub', grupo: 'FORMS Digital', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
-      ['faPainel',    'Painel'],
-      ['faRegistros', 'Registros'],
-      ['faEspecies',  'Espécies'],
-      ['faCameras',   'Câmeras'],
-    ] },
-    /* Energia (26/10/2026): consumo de energias — o FORM 043 virou painel.
-       js/cert-energia.js; tabelas ce_fontes / ce_consumos. */
-    { id: 'ceEnergiaSub', grupo: 'FORMS Digital', codigo: 'FORM 043', nome: 'Energia', telas: [
-      ['enPainel',      'Painel'],
-      ['enLancamentos', 'Lançamentos'],
-      ['enFontes',      'Fontes'],
-    ] },
-    /* Resíduos (27/10/2026): gestão de resíduos — FORM 053 (POP 004): saídas
-       em kg, avaliação mensal do manejo e indicadores. js/cert-residuos.js; tabelas cr_*. */
-    { id: 'ceResiduosSub', grupo: 'FORMS Digital', codigo: 'FORM 053', nome: 'Resíduos', telas: [
-      ['rePainel',    'Painel'],
-      ['reSaidas',    'Saídas'],
-      ['reAvaliacao', 'Avaliação'],
-      ['reTipos',     'Tipos'],
-    ] },
-    /* Balanço de massa (26/10/2026): FORM 013 do abacate — cargas da Colheita
-       e Produção + lotes de venda. js/cert-balanco.js; tabela cp_lotes_venda. */
-    { id: 'ceBalancoSub', grupo: 'FORMS Digital', codigo: 'FORM 013', nome: 'Balanço de massa', telas: [
-      ['bmPainel',     'Painel'],
-      ['bmRastreio',   'Rastreabilidade'],
-      ['bmLotes',      'Boletins e vendas'],
-      ['bmFechamento', 'Fechamento'],
-    ] },
-    /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
-       aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
-    { id: 'ceFornSub', grupo: 'FORMS Digital', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
-      ['foPainel',     'Painel'],
-      ['foAvaliacoes', 'Avaliações'],
-      ['foCadastro',   'Cadastro'],
-    ] },
-    /* Reunião GRASP (27/10/2026): FORM 044 — ata da reunião mensal com o
-       representante dos trabalhadores e lista de presença. js/cert-grasp.js; tabela cg_reunioes. */
-    { id: 'ceGraspSub', grupo: 'FORMS Digital', codigo: 'FORM 044', nome: 'Reunião GRASP', telas: [
-      ['gpPainel',    'Painel'],
-      ['gpReunioes',  'Reuniões'],
-    ] },
-    /* Banho e higiene pessoal (28/10/2026): FORM 054 — ficha mensal por trabalhador
-       da aplicação (início/fim, banho tomado, observações). js/cert-banho.js; tabela cb_banhos. */
-    { id: 'ceBanhoSub', grupo: 'FORMS Digital', codigo: 'FORM 054', nome: 'Banho e higiene pessoal', telas: [
-      ['bhRegistros', 'Registros'],
-      ['bhFicha',     'Ficha por funcionário'],
-    ] },
-    /* Folhas de estoque (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de
-       cada estoque e as placas — as mesmas da área Estoque › Formulários
-       (nem todos têm acesso à Certificação). js/folhas-estoque.js. */
-    { id: 'ceFolhasEstSub', grupo: 'FORMS Digital', codigo: 'FORM 048 · 049', nome: 'Folhas de estoque', telas: [
-      ['feFolhas', 'Folhas de entrada e saída'],
-    ] },
-    /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
-       reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
-       manutenções de máquinas (FORM 020 / FORM 042). js/cert-melhorias.js. */
-    /* 26/10/2026, pedido dele: cada um independente, com o seu FORM
-       (antes era um submódulo só, "Melhoria contínua · FORM 020 · 042"). */
-    { id: 'ceNcSub', grupo: 'FORMS Digital', codigo: 'FORM 004', nome: 'Não conformidades', telas: [
-      ['mcNcs',        'Não conformidades'],
-    ] },
-    { id: 'ceMelhSub', grupo: 'FORMS Digital', codigo: 'FORM 020', nome: 'Melhorias contínuas', telas: [
-      ['mcMelhorias',  'Melhorias contínuas'],
-    ] },
-    { id: 'ceFbSub', grupo: 'FORMS Digital', codigo: 'FORM 042', nome: 'Reclamações e sugestões', telas: [
-      ['mcFeedbacks',  'Reclamações e sugestões'],
-      ['mcCaixas',     'Abertura das caixas'],
-    ] },
-    { id: 'ceCrono', nome: 'Cronograma', telas: [
+    { id: 'ceCrono', grupo: 'Pendências', nome: 'Cronograma', telas: [
       ['ceCalendario', 'Calendário'],
       ['ceAnual', 'Cronograma anual'],
     ] },
     /* Absenteísmo e turnover dos 3 últimos meses fechados — a mesma tela de
        RH › Indicadores › Certificação (js/rh-indicadores.js). Os números vêm
        do rh_ind_base, que o banco só abre para quem tem o módulo RH. */
-    { id: 'ceIndSub', nome: 'Indicadores', telas: [
+    { id: 'ceIndSub', grupo: 'Pendências', nome: 'Indicadores', telas: [
       ['ceIndPainel', 'Painel'],
       ['ceIndPessoa', 'Por pessoa'],
       ['ceIndRh', 'Certificação'],
       ['ceIndMetas', 'Metas'],
-    ] },
-    { id: 'ceCertSub', nome: 'Certificações', telas: [
-      ['ceCertificacoes', 'Certificações'],
     ] },
   ] },
 ];
@@ -766,6 +769,23 @@ const ICONE_SUB = {
   reuSub: 'reuniao',
   cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
 };
+/* Ícone das portas da Certificação (29/10/2026). */
+const ICONE_GRUPO = { 'Documentos': 'documento', 'Registros': 'lapis', 'Pendências': 'calendario' };
+const iconeGrupo = g => ICONE_GRUPO[g] || 'documento';
+/* Quem quer saber quando uma porta (grupo) abre ou fecha — a entrada da
+   Certificação desenha a lista da porta escolhida. */
+const ouvintesGrupo = [];
+export function aoMudarGrupo(fn) { ouvintesGrupo.push(fn); }
+/** Porta (grupo) aberta agora na faixa, ou null. */
+export const grupoAberto = () => faixaEstado.grupoHub;
+/** Abre uma porta (grupo) do módulo: os submódulos dela na linha de baixo. */
+export function abrirGrupo(id, g) {
+  const subs = subsLiberados(id);
+  if (!subs.some(s => s.grupo === g)) return;
+  faixaEstado.grupoHub = g;
+  if (SEMPRE_ABERTO.has(id)) faixaEstado.foco = 'g:' + g;
+  pintarCategoria(id, subs);
+}
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
 const faixaEstado = { modulo: null, sub: null, tela: null, grupoHub: null, foco: null };
@@ -802,7 +822,19 @@ const SEMPRE_ABERTO = new Set(['cert']);
    navegação dentro (ex.: Lista mestra › POP · IT · FORM…) pinta a faixa de
    baixo com o que quiser. A tela registra uma função (faixa) => void. */
 const FAIXA_TELA = {};
-export function registrarFaixaTela(tela, fn) { FAIXA_TELA[tela] = fn; }
+export function registrarFaixaTela(tela, fn) {
+  /* Dentro de uma porta (29/10/2026): a faixa própria ganha o "← Porta" na frente.
+     Devolve a versão embrulhada, para a tela usar quando repinta a faixa sozinha. */
+  const embrulhada = faixa => {
+    fn(faixa);
+    const g = faixaEstado.modulo && subsLiberados(faixaEstado.modulo).find(s => s.telas.some(([t]) => t === tela))?.grupo;
+    if (!g || faixaEstado.grupoHub || faixa.querySelector('.rb-voltar')) return;
+    faixa.insertAdjacentHTML('afterbegin', `<button type="button" class="rb-voltar" title="Voltar aos ${esc(g)}">${svgIcone('seta-esq')}<span>${esc(g)}</span></button>`);
+    faixa.querySelector('.rb-voltar').addEventListener('click', () => abrirGrupo(faixaEstado.modulo, g));
+  };
+  FAIXA_TELA[tela] = embrulhada;
+  return embrulhada;
+}
 export const faixaDaTelaAtiva = tela => faixaEstado.tela === tela && !$('navTelas').hidden;
 const focoDe = (id, subs, s) => !SEMPRE_ABERTO.has(id) || !s || s === subs[0] ? null : (s.grupo ? 'g:' + s.grupo : 's:' + s.id);
 
@@ -843,7 +875,7 @@ function pintarCategoria(id, subs) {
     const verde = document.createElement('button');
     verde.type = 'button'; verde.className = 'aba mod-foco'; verde.setAttribute('aria-selected', 'true');
     verde.title = 'Fechar e voltar para a lista de ' + nomeMod;
-    verde.innerHTML = `${svgIcone(grupo ? 'documento' : iconeSub(atual, id))}<span>${esc(grupo || atual.nome)}</span>`;
+    verde.innerHTML = `${svgIcone(grupo ? iconeGrupo(grupo) : iconeSub(atual, id))}<span>${esc(grupo || atual.nome)}</span>`;
     mod.classList.add('foco-oculto');
     mod.before(voltar, verde);
     const sair = () => { faixaEstado.foco = null; faixaEstado.grupoHub = null; pintarCategoria(id, subs); };
@@ -859,7 +891,7 @@ function pintarCategoria(id, subs) {
         vistos.add(s.grupo);
         const sel = faixaEstado.grupoHub === s.grupo || (!faixaEstado.grupoHub && atual.grupo === s.grupo);
         return `<button type="button" class="aba aba-sub" data-grupo="${esc(s.grupo)}" aria-selected="${sel}" title="${esc(s.grupo)}">
-          ${svgIcone('documento')}<span>${esc(s.grupo)}</span></button>`;
+          ${svgIcone(iconeGrupo(s.grupo))}<span>${esc(s.grupo)}</span></button>`;
       }
       return `<button type="button" class="aba aba-sub" data-sub="${s.id}" aria-selected="${!faixaEstado.grupoHub && s === atual}" title="${esc(s.nome)}">
       ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span></button>`;
@@ -884,6 +916,9 @@ function pintarCategoria(id, subs) {
         <button type="button" class="rb-btn rb-sub" data-gsub="${s.id}" aria-selected="${s === atual}" title="${esc(s.nome)}">
           ${svgIcone(iconeSub(s, id))}<span>${esc(s.nome)}</span>${s.codigo ? `<small>${esc(s.codigo)}</small>` : ''}</button>`).join('')}
       </div><div class="rb-rotulo">${esc(g)}</div></section>`;
+    } else if (atual.telas.length < 2 && FAIXA_TELA[atual.telas[0][0]]) {
+      // dentro da porta, submódulo com faixa própria (Lista mestra › POP · IT…): voltar + a faixa dele
+      try { FAIXA_TELA[atual.telas[0][0]](faixa); } catch { faixa.innerHTML = ''; }
     } else {
       faixa.innerHTML = `<button type="button" class="rb-voltar" data-gvoltar title="Voltar aos ${esc(g)}">${svgIcone('seta-esq')}<span>${esc(g)}</span></button>
         <section class="rb-grupo ${CORES_GRUPO[doGrupo.indexOf(atual) % CORES_GRUPO.length]}" aria-label="${esc(atual.nome)}">
@@ -919,6 +954,7 @@ function pintarCategoria(id, subs) {
     }));
   }
   aposFaixa(id);
+  ouvintesGrupo.forEach(fn => { try { fn(id, faixaEstado.grupoHub, faixaEstado.tela); } catch {} });
   nav.querySelector('.aba-sub[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   sombraFaixa();
 }

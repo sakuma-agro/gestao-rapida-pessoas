@@ -25,7 +25,7 @@ import { estado } from './store.js';
 import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
-import { abrirModulo, registrarFaixaTela } from './acesso.js';
+import { abrirModulo, registrarFaixaTela, subsLiberados, abrirGrupo, grupoAberto, aoMudarGrupo } from './acesso.js';
 import { campoAnexos, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquivo, enfileirarArquivo, enviarPendentes, contarPendentes, aoMudarArquivos } from './arquivos.js';
 import { svgIcone } from './icones.js';
 import { itensCaderno } from './cert-caderno.js';
@@ -433,6 +433,26 @@ const datalist = (id, itens) => `<datalist id="${id}">${itens.map(i => `<option 
 /* ===================================================================
    TELA · PAINEL
    =================================================================== */
+/* Entrada da Certificação (29/10/2026, desenho aprovado — claude/cert-redesenho-lean.md):
+   "O que você quer fazer?" com três portas (Documentos · Registros · Pendências)
+   e os atrasados ao lado. Clicar numa porta abre a lista dela aqui mesmo (e os
+   ícones dela na faixa de cima). O painel antigo fica em "Resumo completo". */
+const PORTAS = [
+  { g: 'Documentos', icone: 'documento', desc: 'Ver e imprimir o que a fazenda tem por escrito' },
+  { g: 'Registros', icone: 'lapis', desc: 'Preencher o que acontece no dia a dia' },
+  { g: 'Pendências', icone: 'calendario', desc: 'O que está atrasado ou vence logo' },
+];
+/* "FORMS Digital · Check lists e caderno" quando a porta tem seções; senão os nomes. */
+const resumoPorta = subs => {
+  const sec = [...new Set(subs.map(s => s.secao).filter(Boolean))];
+  return sec.length ? sec.join(' · ') : subs.map(s => s.nome).join(' · ');
+};
+const subsDaPorta = g => subsLiberados('cert').filter(s => s.grupo === g);
+function abrirSubDaPorta(id) {
+  const s = subsLiberados('cert').find(x => x.id === id);
+  if (s) abrirModulo('cert', s.telas[0][0]);
+}
+
 function desenharPainel() {
   const tela = $('telaCePainel');
   const hj = hoje();
@@ -450,7 +470,48 @@ function desenharPainel() {
   const cartao = (cor, rot, n, dica, alvo) => `<button type="button" class="pv-card pv-${cor}${n ? '' : ' pv-zero'}" ${alvo ? `data-ir="${alvo}"` : ''}>
     <span>${esc(rot)}</span><strong>${n}</strong><small>${esc(dica)}</small></button>`;
 
-  tela.innerHTML = `<div class="cartao naoimprimir">
+
+  const porta = PORTAS.some(p => p.g === grupoAberto()) ? grupoAberto() : null;
+  ultimaPorta = porta;
+  const listaPorta = g => {
+    const subs = subsDaPorta(g);
+    const secoes = [...new Set(subs.map(s => s.secao || ''))];
+    return secoes.map(sec => `${sec ? `<div class="ce-ent-secao">${esc(sec)}</div>` : ''}
+      <div class="ce-ent-lista">${subs.filter(s => (s.secao || '') === sec).map(s => `
+        <button type="button" class="ce-ent-item" data-sub="${s.id}">
+          <span class="ce-ent-nome">${esc(s.nome)}</span>${s.codigo ? `<span class="ce-ent-cod">${esc(s.codigo)}</span>` : ''}
+          ${svgIcone('seta-dir')}</button>`).join('')}</div>`).join('');
+  };
+  const atrasoLinhas = atrasados.slice(0, 6).map(i => `<button type="button" class="ce-ent-atr" data-atr-tipo="${esc(i.tipo)}">
+      <span><b>${esc(i.titulo)}</b><small>${esc(i.tipo)} · desde ${br(i.data)}${i.resp ? ' · ' + esc(i.resp) : ''}</small></span>
+      <span class="ce-ent-pilula">Atrasado</span></button>`).join('');
+
+  tela.innerHTML = `<div class="ce-ent naoimprimir">
+    <div class="ce-ent-princ">
+      ${porta ? `<div class="ce-ent-topo"><button type="button" class="btn ce-ent-voltar" id="ceEntVoltar">${svgIcone('seta-esq')}<span>Voltar</span></button>
+          <h2>${esc(porta)}</h2></div>
+        <p class="dica" style="margin:0 0 10px">${esc(PORTAS.find(p => p.g === porta).desc)}</p>
+        ${listaPorta(porta)}`
+      : `<div class="ce-ent-topo"><h2>O que você quer fazer?</h2>
+          <div class="ce-ent-chips">${ativas().map(c => `<span>${esc(c.nome)}</span>`).join('')}</div></div>
+        ${atrasados.length ? `<button type="button" class="ce-ent-alerta" id="ceEntAtr">${svgIcone('alerta')}<span>${atrasados.length} ${atrasados.length === 1 ? 'item atrasado' : 'itens atrasados'}</span><b>Ver</b></button>` : ''}
+        <div class="ce-ent-portas">${PORTAS.map(p => {
+          const subs = subsDaPorta(p.g);
+          if (!subs.length) return '';
+          return `<button type="button" class="ce-ent-porta" data-porta="${esc(p.g)}">
+            <span class="ce-ent-ico">${svgIcone(p.icone)}</span>
+            <span class="ce-ent-txt"><b>${esc(p.g)}</b><span>${esc(p.desc)}</span>
+              <small>${esc(resumoPorta(subs))}</small></span></button>`;
+        }).join('')}</div>`}
+    </div>
+    <aside class="ce-ent-lado" id="ceEntLado">
+      <div class="ce-ent-lado-topo"><b>Atrasados · ${atrasados.length}</b><button type="button" class="btn mini" id="ceEntCal">Ver no calendário</button></div>
+      ${atrasoLinhas || '<div class="vazio">Nada atrasado.</div>'}
+      ${atrasados.length > 6 ? `<p class="dica" style="margin:8px 0 0">e mais ${atrasados.length - 6} no calendário.</p>` : ''}
+    </aside>
+  </div>
+  <details class="ce-ent-resumo"${porta ? ' hidden' : ''}><summary>Resumo completo da certificação</summary>
+<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">Painel da certificação</h2>
         <p class="dica" style="margin:2px 0 0">${ativas().map(c => esc(c.nome)).join(' · ') || 'Nenhuma certificação ligada'}</p></div>
@@ -484,8 +545,14 @@ function desenharPainel() {
   </div>
   <div class="rodape-fixo naoimprimir">
     <button class="btn principal" type="button" id="cePnImprimir">Imprimir o painel</button>
-  </div>`;
-
+  </div>
+  </details>`;
+  tela.querySelectorAll('[data-porta]').forEach(b => b.addEventListener('click', () => abrirGrupo('cert', b.dataset.porta)));
+  tela.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSubDaPorta(b.dataset.sub)));
+  $('ceEntVoltar')?.addEventListener('click', () => abrirModulo('cert', 'cePainel'));
+  $('ceEntAtr')?.addEventListener('click', () => $('ceEntLado')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  $('ceEntCal')?.addEventListener('click', () => abrirModulo('cert', 'ceCalendario'));
+  tela.querySelectorAll('[data-atr-tipo]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', 'ceCalendario')));
   $('cePnNovo').addEventListener('click', () => formEvento(null, hoje()));
   $('cePnImprimir').addEventListener('click', () => mostrar(docPainel(prox, atrasados, criticos), { barra: true }));
   tela.querySelectorAll('[data-req]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.req))));
@@ -802,12 +869,12 @@ function pintarFaixaDocs(faixa) {
     else abrirTipo(v);
   }));
 }
-registrarFaixaTela('ceDocumentos', pintarFaixaDocs);
+const pintarFaixaDocsNaPorta = registrarFaixaTela('ceDocumentos', pintarFaixaDocs);
 
 /* Repinta a faixa e o fim do caminho ("Certificação › Lista mestra › POP"). */
 function atualizarFaixaDocs() {
   const faixa = $('navTelas');
-  if (faixa && !faixa.hidden && faixa.querySelector('[data-dctipo]')) pintarFaixaDocs(faixa);
+  if (faixa && !faixa.hidden && faixa.querySelector('[data-dctipo]')) pintarFaixaDocsNaPorta(faixa);
   const cam = $('navSub');
   if (!cam || !/Lista mestra/.test(cam.textContent)) return;
   const f = S.fd;
@@ -2163,6 +2230,17 @@ const DESENHO = {
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }
+
+/* Porta aberta ou fechada na faixa de cima enquanto a entrada está na tela:
+   redesenha a entrada (lista da porta ou as três portas). */
+let ultimaPorta = null;
+aoMudarGrupo((id, g, t) => {
+  if (id !== 'cert' || telaAtual !== 'cePainel' || t !== 'cePainel' || !S.carregado) return;
+  const porta = PORTAS.some(p => p.g === g) ? g : null;
+  if (porta === ultimaPorta) return;
+  ultimaPorta = porta;
+  desenharPainel();
+});
 
 export async function abrirCertificacao(tela) {
   const alvo = $(idTela(tela));
