@@ -34,7 +34,8 @@
 
 import { linhasCronograma, textoFreq } from './epi-cronograma-dados.js';
 import { estado, gravarLocal } from './store.js';
-import { acesso } from './acesso.js';
+import { acesso, abrirModulo, moduloDe, podeTela } from './acesso.js';
+import { entrarNaArea, areasLiberadas } from './areas.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -81,6 +82,8 @@ export const AREAS_C = {
   cad:  { nome: 'Cadastros', cor: '#0E7490' },
   custo: { nome: 'Custo Base', cor: '#8A6D1F' },
   colh: { nome: 'Colheita e Produção', cor: '#C2410C' },
+  prog: { nome: 'Programação Campo', cor: '#3F7D20' },
+  est:  { nome: 'Estoque', cor: '#6B5B95' },
 };
 const areaDe = k => AREAS_C[k] || AREAS_C.esc;
 
@@ -91,7 +94,7 @@ const areaDe = k => AREAS_C[k] || AREAS_C.esc;
 const UNIDADES = ['Matriz', 'Quebra Cocão'];
 const LINHAS_AREA = [
   ['custo'], ['colh'], ['maq', 'Matriz'], ['maq', 'Quebra Cocão'], ['cad'], ['rh'], ['sst'],
-  ['dp', 'Matriz'], ['dp', 'Quebra Cocão'], ['vist'], ['cert'], ['proj'], ['esc'],
+  ['dp', 'Matriz'], ['dp', 'Quebra Cocão'], ['vist'], ['cert'], ['proj'], ['prog'], ['est'], ['esc'],
 ];
 const RESP_AREA_PADRAO = {
   custo: ['reu-lincoln'], colh: ['reu-lincoln'],
@@ -102,25 +105,46 @@ const RESP_AREA_PADRAO = {
 const unidadeDeTexto = s => /quebra\s*coc/i.test(norm(s)) ? 'Quebra Cocão' : (s ? 'Matriz' : null);
 
 /* Origens automáticas — a chave é a usada em cron_config 'responsaveis'. */
+/* Origens automáticas — a chave é a usada em cron_config 'responsaveis'.
+   ir: onde fica a origem, para o botão "Ir para" do card (29/10/2026, pedido
+   dele). a = área (entrarNaArea), t = tela, x = parâmetro da moldura,
+   m = módulo (Vistorias). Um item pode trazer o seu próprio "ir". */
 const ORIGENS = {
-  'sst-exames': { nome: 'SST › Exames', area: 'sst' },
-  'sst-trein':  { nome: 'SST › Treinamentos', area: 'sst' },
-  'sst-ca':     { nome: 'SST › EPI\'s (validade do C.A)', area: 'sst' },
-  'sst-epi':    { nome: 'SST › EPI\'s (troca de EPI)', area: 'sst' },
-  'sst-acid':   { nome: 'SST › Acidentes (medidas)', area: 'sst' },
-  'dp-tarefas': { nome: 'Cadastros › Admissão e demissão', area: 'cad' },
-  'dp-ferias':  { nome: 'DP › Férias (prazo de concessão)', area: 'dp' },
-  'maq-os':     { nome: 'Máquinas › Ordens de serviço', area: 'maq' },
-  'maq-ck':     { nome: 'Máquinas › Check list', area: 'maq' },
-  'vist-ext':   { nome: 'Vistorias › Extintores', area: 'vist' },
-  'vist-pend':  { nome: 'Vistorias › Anomalias em aberto', area: 'vist' },
-  'cert-req':   { nome: 'Certificação › Requisitos', area: 'cert' },
-  'cert-aud':   { nome: 'Certificação › Auditorias e certificados', area: 'cert' },
-  'cert-acoes': { nome: 'Certificação › Ações de melhoria', area: 'cert' },
-  'cert-docs':  { nome: 'Certificação › Documentos por fazenda (AN)', area: 'cert' },
-  'proj':       { nome: 'Projetos (PMBOK)', area: 'proj' },
-  'rh-sd':      { nome: 'RH › Salário digno (planos de ação)', area: 'rh' },
-  'reuniao':    { nome: 'Reunião semanal › Atividades do escritório', area: 'esc' },
+  'sst-exames': { nome: 'SST › Exames', area: 'sst', ir: { a: 'pessoas', t: 'exVenc' } },
+  'sst-trein':  { nome: 'SST › Treinamentos', area: 'sst', ir: { a: 'pessoas', t: 'trVenc' } },
+  'sst-ca':     { nome: 'SST › EPI\'s (validade do C.A)', area: 'sst', ir: { a: 'pessoas', t: 'epis' } },
+  'sst-epi':    { nome: 'SST › EPI\'s (troca de EPI)', area: 'sst', ir: { a: 'pessoas', t: 'epiCrono' } },
+  'sst-acid':   { nome: 'SST › Acidentes', area: 'sst', ir: { a: 'pessoas', t: 'acLista' } },
+  'sst-camp':   { nome: 'SST › Campanhas', area: 'sst', ir: { a: 'pessoas', t: 'camCal' } },
+  'dp-tarefas': { nome: 'Cadastros › Admissão e demissão', area: 'cad', ir: { a: 'pessoas', t: 'tfPainel' } },
+  'cad-aniv':   { nome: 'Cadastros › Aniversariantes', area: 'cad', ir: { a: 'pessoas', t: 'aniversarios' } },
+  'dp-ferias':  { nome: 'DP › Férias (prazo de concessão)', area: 'dp', ir: { a: 'pessoas', t: 'ferPainel' } },
+  'dp-gozo':    { nome: 'DP › Férias (gozo lançado)', area: 'dp', ir: { a: 'pessoas', t: 'ferPainel' } },
+  'dp-afast':   { nome: 'DP › Afastamentos (retorno)', area: 'dp', ir: { a: 'pessoas', t: 'ferAfast' } },
+  'dp-feriado': { nome: 'DP › Feriados', area: 'dp' },
+  'maq-os':     { nome: 'Máquinas › Ordens de serviço', area: 'maq', ir: { a: 'manutencoes', x: 'acao=ordens' } },
+  'maq-ck':     { nome: 'Máquinas › Check list', area: 'maq', ir: { a: 'manutencoes', x: 'acao=checklist' } },
+  'maq-gar':    { nome: 'Máquinas › Garantia', area: 'maq', ir: { a: 'manutencoes', x: 'acao=maquinas' } },
+  'vist-ext':   { nome: 'Vistorias › Extintores', area: 'vist', ir: { a: 'vistorias', m: 'vsEquip', t: 'vsEx' } },
+  'vist-pend':  { nome: 'Vistorias › Anomalias em aberto', area: 'vist', ir: { a: 'vistorias', m: 'vsAnom', t: 'vsAnAberto' } },
+  'cert-req':   { nome: 'Certificação › Requisitos', area: 'cert', ir: { a: 'certificacao', t: 'ceRequisitos' } },
+  'cert-aud':   { nome: 'Certificação › Auditorias e certificados', area: 'cert', ir: { a: 'certificacao', t: 'ceCertificacoes' } },
+  'cert-acoes': { nome: 'Certificação › Ações de melhoria', area: 'cert', ir: { a: 'certificacao', t: 'mcMelhorias' } },
+  'cert-docs':  { nome: 'Certificação › Documentos por fazenda (AN)', area: 'cert', ir: { a: 'certificacao', t: 'ceDocumentos' } },
+  'cert-rev':   { nome: 'Certificação › Revisão de documentos', area: 'cert', ir: { a: 'certificacao', t: 'ceDocumentos' } },
+  'cert-ev':    { nome: 'Certificação › Calendário', area: 'cert', ir: { a: 'certificacao', t: 'ceCalendario' } },
+  'cert-forn':  { nome: 'Certificação › Fornecedores', area: 'cert', ir: { a: 'certificacao', t: 'foPainel' } },
+  'cert-cad':   { nome: 'Certificação › Caderno de campo', area: 'cert', ir: { a: 'certificacao', t: 'ccPainel' } },
+  'cert-melh':  { nome: 'Certificação › NC, melhorias e feedbacks', area: 'cert', ir: { a: 'certificacao', t: 'mcPainel' } },
+  'proj':       { nome: 'Projetos (PMBOK)', area: 'proj', ir: { a: 'projetos' } },
+  'rh-sd':      { nome: 'RH › Salário digno', area: 'rh', ir: { a: 'pessoas', t: 'sdPlanos' } },
+  'rh-reaj':    { nome: 'RH › Reajuste anual', area: 'rh', ir: { a: 'pessoas', t: 'rhReajuste' } },
+  'rh-prop':    { nome: 'RH › Propostas (início)', area: 'rh', ir: { a: 'pessoas', t: 'rhProposta' } },
+  'reuniao':    { nome: 'Reunião semanal › Atividades do escritório', area: 'esc', ir: { a: 'pessoas', t: 'reuSemana' } },
+  'prog-ativ':  { nome: 'Programação Campo › Atividades', area: 'prog', ir: { a: 'programacao', x: 'acao=atividades' } },
+  'prog-reu':   { nome: 'Programação Campo › Reunião', area: 'prog', ir: { a: 'programacao' } },
+  'est-pend':   { nome: 'Estoque › Saídas pendentes', area: 'est', ir: { a: 'estoque' } },
+  'colh-pag':   { nome: 'Colheita › Pagamento de cargas', area: 'colh', ir: { a: 'colheita', t: 'cpCargas' } },
 };
 
 const SIT = { afazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito' };
@@ -236,7 +260,11 @@ const FONTES = [
     .filter(a => naJanela(a.medidas_prazo) && !resolvido(a.situacao))
     .map(a => ({ chave: `sst-acid:${a.id}:${a.medidas_prazo}`, origem: 'sst-acid', data: a.medidas_prazo,
       titulo: `Medidas do acidente de ${br(a.data)} — ${nomeFunc(a.funcionario_id) || 'funcionário'}`,
-      texto: a.medidas, respTexto: a.medidas_responsavel }))],
+      texto: a.medidas, respTexto: a.medidas_responsavel }))
+    .concat((await pegar(cli().from('sst_acidentes').select('id,funcionario_id,data,retorno_previsto,retorno_em')))
+      .filter(a => !a.retorno_em && naJanela(a.retorno_previsto))
+      .map(a => ({ chave: `sst-acid:r:${a.id}:${a.retorno_previsto}`, origem: 'sst-acid', data: a.retorno_previsto,
+        titulo: `Retorno previsto após acidente — ${nomeFunc(a.funcionario_id) || 'funcionário'}`, texto: `Acidente de ${br(a.data)}` })))],
   ['dp-tarefas', async () => (await pegar(cli().from('jor_tarefas').select('chave,funcionario_id,evento,titulo,prazo,situacao')))
     .filter(t => t.prazo && naJanela(t.prazo) && !resolvido(t.situacao) && t.situacao !== 'dispensada')
     .map(t => ({ chave: `dp-tarefas:${t.chave}:${t.prazo}`, origem: 'dp-tarefas', data: t.prazo,
@@ -365,6 +393,238 @@ const FONTES = [
       detalhes: g.onde.sort((a, b) => a.localeCompare(b, 'pt-BR')), detRot: ['local', 'locais'],
     }));
   }],
+  /* ---- 29/10/2026, pedido dele: "tudo que tiver data no app, entrar no
+     cronograma". Prazos, vencimentos e programações de todas as áreas.
+     Datas que só registram algo que já aconteceu não entram; as datas que
+     só informam (feriado, aniversário, início de férias) entram já como
+     feitas quando passam, para não encher o "Atrasado". ---- */
+  ['sst-camp', async () => {
+    const [cs, at] = await Promise.all([
+      pegar(cli().from('sst_campanhas').select('id,nome,inicio,fim,situacao,responsavel')),
+      pegar(cli().from('sst_campanha_atividades').select('id,campanha_id,data,hora,tipo,titulo,local,situacao')),
+    ]);
+    const out = [];
+    for (const c of cs) {
+      if (/cancel/i.test(c.situacao || '')) continue;
+      if (naJanela(c.inicio)) out.push({ chave: `sst-camp:c:${c.id}:${c.inicio}`, origem: 'sst-camp', data: c.inicio,
+        titulo: `Início da campanha: ${c.nome}`, respTexto: c.responsavel, feitoNaOrigem: c.inicio < hoje(),
+        texto: c.fim ? `De ${br(c.inicio)} a ${br(c.fim)}` : '' });
+    }
+    for (const a of at) {
+      if (!naJanela(a.data) || /cancel/i.test(a.situacao || '')) continue;
+      const c = cs.find(x => x.id === a.campanha_id);
+      if (c && /cancel/i.test(c.situacao || '')) continue;
+      out.push({ chave: `sst-camp:a:${a.id}:${a.data}`, origem: 'sst-camp', data: a.data,
+        titulo: `${a.titulo || a.tipo || 'Atividade'}${c ? ' — ' + c.nome : ''}`, respTexto: c?.responsavel,
+        texto: [a.hora, a.local].filter(Boolean).join(' · '), feitoNaOrigem: resolvido(a.situacao) });
+    }
+    return out;
+  }],
+  ['cad-aniv', async () => {
+    const out = [], ini = addDias(hoje(), -JANELA_ATRAS), fim = addDias(hoje(), JANELA_FRENTE);
+    const grupos = new Map();
+    for (const f of estado.funcionarios) {
+      if (!f.nascimento || /inativ|deslig/i.test(f.situacao || '')) continue;
+      const md = f.nascimento.slice(5);
+      for (const ano of [+ini.slice(0, 4), +fim.slice(0, 4)]) {
+        const d = md === '02-29' ? `${ano}-02-28` : `${ano}-${md}`;
+        if (d < ini || d > fim) continue;
+        if (!grupos.has(d)) grupos.set(d, []);
+        if (!grupos.get(d).includes(f.nome)) grupos.get(d).push(f.nome);
+      }
+    }
+    for (const [d, nomes] of grupos) out.push({ chave: `cad-aniv:${d}`, origem: 'cad-aniv', data: d,
+      titulo: nomes.length > 1 ? `Aniversário — ${nomes.length} funcionários` : `Aniversário — ${nomes[0]}`,
+      detalhes: nomes.sort((a, b) => a.localeCompare(b, 'pt-BR')), feitoNaOrigem: d < hoje() });
+    return out;
+  }],
+  ['dp-gozo', async () => (await pegar(cli().from('jor_ferias_gozos').select('id,funcionario_id,data_ini,data_fim,dias,situacao')))
+    .filter(g => naJanela(g.data_ini) && !/cancel/i.test(g.situacao || ''))
+    .map(g => ({ chave: `dp-gozo:${g.id}:${g.data_ini}`, origem: 'dp-gozo', data: g.data_ini,
+      titulo: `Férias — ${nomeFunc(g.funcionario_id) || 'funcionário'}`, unid: unidFunc(g.funcionario_id),
+      texto: `De ${br(g.data_ini)} a ${br(g.data_fim)}${g.dias ? ` · ${g.dias} dias` : ''}`, feitoNaOrigem: g.data_ini < hoje() }))],
+  ['dp-afast', async () => (await pegar(cli().from('jor_afastamentos').select('id,funcionario_id,tipo,data_ini,fim_previsto,fim_real,situacao')))
+    .filter(a => !a.fim_real && naJanela(a.fim_previsto) && !/cancel/i.test(a.situacao || ''))
+    .map(a => ({ chave: `dp-afast:${a.id}:${a.fim_previsto}`, origem: 'dp-afast', data: a.fim_previsto,
+      titulo: `Retorno previsto do afastamento — ${nomeFunc(a.funcionario_id) || 'funcionário'}`, unid: unidFunc(a.funcionario_id),
+      texto: [a.tipo, a.data_ini ? 'desde ' + br(a.data_ini) : ''].filter(Boolean).join(' · ') }))],
+  ['dp-feriado', async () => {
+    const fs = (await pegar(cli().from('jor_feriados').select('id,data,nome,abrangencia,municipio,ativo')))
+      .filter(f => f.ativo !== false && naJanela(f.data));
+    const g = new Map();
+    for (const f of fs) {
+      const k = f.data + '|' + norm(f.nome);
+      if (!g.has(k)) g.set(k, { ...f, onde: new Set() });
+      g.get(k).onde.add(f.abrangencia === 'municipal' ? (f.municipio || 'municipal') : (f.abrangencia || ''));
+    }
+    return [...g.values()].map(f => ({ chave: `dp-feriado:${f.data}:${norm(f.nome)}`, origem: 'dp-feriado', data: f.data,
+      titulo: `Feriado: ${f.nome}`, texto: [...f.onde].filter(Boolean).join(', '), feitoNaOrigem: f.data < hoje() }));
+  }],
+  ['maq-gar', async () => (await pegar(cli().schema('manutencao').from('equipamentos').select('id,codigo,descricao,apelido,ativo,garantia_fim,local_id')))
+    .filter(e => e.ativo !== false && naJanela(e.garantia_fim))
+    .map(e => ({ chave: `maq-gar:${e.id}:${e.garantia_fim}`, origem: 'maq-gar', data: e.garantia_fim,
+      titulo: `Garantia termina — ${[e.codigo, e.apelido || e.descricao].filter(Boolean).join(' · ')}` }))],
+  ['cert-ev', async () => {
+    const PASSO = { 'Mensal': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12 };
+    const ini = addDias(hoje(), -JANELA_ATRAS), fim = addDias(hoje(), JANELA_FRENTE);
+    const out = [];
+    for (const ev of await pegar(cli().from('cert_eventos').select('id,data,data_fim,tipo,titulo,responsavel,repetir,feitos'))) {
+      const passo = PASSO[ev.repetir];
+      const datas = [];
+      if (!passo) { if (ev.data >= ini && ev.data <= fim) datas.push(ev.data); }
+      else for (let i = 0, d = ev.data; i < 600 && d <= fim; i++, d = addMeses(ev.data, i * passo)) if (d >= ini) datas.push(d);
+      for (const d of datas) out.push({ chave: `cert-ev:${ev.id}:${d}`, origem: 'cert-ev', data: d,
+        titulo: `${ev.tipo ? ev.tipo + ': ' : ''}${ev.titulo}`, respTexto: ev.responsavel,
+        texto: !passo && ev.data_fim && ev.data_fim !== ev.data ? `Até ${br(ev.data_fim)}` : (passo ? `Repete: ${ev.repetir.toLowerCase()}` : ''),
+        feitoNaOrigem: (ev.feitos || []).includes(d) });
+    }
+    return out;
+  }],
+  ['cert-rev', async () => {
+    const MESES_P = { 'Mensal': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12, 'A cada 2 anos': 24, 'A cada 3 anos': 36 };
+    const g = new Map();
+    for (const d of await pegar(cli().from('cert_documentos').select('id,codigo,nome,periodicidade,situacao,data_revisao,responsavel'))) {
+      const m = MESES_P[d.periodicidade];
+      if (!m || !d.data_revisao || d.situacao === 'Obsoleto') continue;
+      const p = addMeses(d.data_revisao, m);
+      if (!naJanela(p)) continue;
+      if (!g.has(p)) g.set(p, []);
+      g.get(p).push(d);
+    }
+    return [...g.entries()].map(([p, ds]) => ({ chave: `cert-rev:${p}:${ds.map(d => d.id).sort().join('.')}`, origem: 'cert-rev', data: p,
+      titulo: ds.length > 1 ? `Revisão de documentos — ${ds.length} documentos` : `Revisão: ${ds[0].codigo} · ${ds[0].nome}`,
+      detalhes: ds.map(d => `${d.codigo} · ${d.nome}`).sort((a, b) => a.localeCompare(b, 'pt-BR')), detRot: ['documento', 'documentos'],
+      respTexto: ds.length === 1 ? ds[0].responsavel : null }));
+  }],
+  ['cert-forn', async () => {
+    const PER = { 'Mensal': 1, 'Bimestral': 2, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12, 'A cada entrega': 0 };
+    const [fs, av] = await Promise.all([
+      pegar(cli().from('cfo_fornecedores').select('id,categoria,nome,periodicidade,cert_validade,ativo')),
+      pegar(cli().from('cfo_avaliacoes').select('categoria,fornecedor,data')),
+    ]);
+    const out = [];
+    for (const f of fs.filter(x => x.ativo !== false)) {
+      const meses = PER[f.periodicidade] ?? 12;
+      const ult = av.filter(a => a.categoria === f.categoria && norm(a.fornecedor) === norm(f.nome))
+        .map(a => a.data).sort().pop();
+      const prox = meses && ult ? addMeses(ult, meses) : null;
+      if (naJanela(prox)) out.push({ chave: `cert-forn:a:${f.id}:${prox}`, origem: 'cert-forn', data: prox,
+        titulo: `Avaliar fornecedor — ${f.nome}`, texto: `${f.categoria || ''} · última avaliação ${br(ult)}` });
+      if (naJanela(f.cert_validade)) out.push({ chave: `cert-forn:c:${f.id}:${f.cert_validade}`, origem: 'cert-forn', data: f.cert_validade,
+        titulo: `Certificado do fornecedor vence — ${f.nome}` });
+    }
+    return out;
+  }],
+  ['cert-cad', async () => {
+    const [an, ca, rg, pl] = await Promise.all([
+      pegar(cli().from('cc_analises').select('id,tipo,ponto,fazenda,vence')),
+      pegar(cli().from('cc_calibracoes').select('id,equipamento,proxima,responsavel')),
+      pegar(cli().from('cc_registros').select('id,tipo,situacao,dados,responsavel')),
+      pegar(cli().from('cc_plantios').select('id,codigo,local,fazenda,cultura,variedade,status,previsao_colheita')),
+    ]);
+    const ir = t => ({ a: 'certificacao', t });
+    const out = [];
+    for (const a of an) if (naJanela(a.vence)) out.push({ chave: `cert-cad:an:${a.id}:${a.vence}`, origem: 'cert-cad', data: a.vence,
+      titulo: `Análise vence: ${a.tipo} · ${a.ponto}${a.fazenda ? ' — ' + a.fazenda : ''}`, ir: ir('ccAnalises') });
+    for (const c of ca) if (naJanela(c.proxima)) out.push({ chave: `cert-cad:ca:${c.id}:${c.proxima}`, origem: 'cert-cad', data: c.proxima,
+      titulo: `Calibração: ${c.equipamento}`, respTexto: c.responsavel, ir: ir('ccCalibracoes') });
+    for (const r of rg) {
+      const pz = r.dados?.prazo;
+      if (r.tipo !== 'ocorrencia' || r.situacao === 'Cancelado' || r.dados?.status === 'Encerrada' || !naJanela(pz)) continue;
+      out.push({ chave: `cert-cad:nc:${r.id}:${pz}`, origem: 'cert-cad', data: pz,
+        titulo: `Ação corretiva: ${r.dados.descricao || ''}`, respTexto: r.dados?.responsavel || r.responsavel, ir: ir('ccRegistros') });
+    }
+    for (const p of pl) if (p.status === 'Em campo' && naJanela(p.previsao_colheita))
+      out.push({ chave: `cert-cad:pl:${p.id}:${p.previsao_colheita}`, origem: 'cert-cad', data: p.previsao_colheita,
+        titulo: `Colheita prevista: ${[p.codigo, p.cultura, p.variedade, p.local || p.fazenda].filter(Boolean).join(' · ')}`, ir: ir('ccPlantios') });
+    return out;
+  }],
+  ['cert-melh', async () => {
+    const [cs, rg] = await Promise.all([
+      pegar(cli().from('cmc_casos').select('id,natureza,tipo,titulo,responsavel,etapa,previsao,reavaliar_em,verif_data,verif_eficaz,data_encerramento')),
+      pegar(cli().from('cmc_registros').select('id,status,tipo,descricao,local,previsao,resp_resolucao,data_fechamento')),
+    ]);
+    const out = [];
+    for (const c of cs) {
+      if (c.data_encerramento || /encerr|conclu|cancel/i.test(c.etapa || '')) continue;
+      const nome = `${c.natureza ? c.natureza + ': ' : ''}${c.titulo || c.tipo || 'caso'}`;
+      if (naJanela(c.previsao)) out.push({ chave: `cert-melh:p:${c.id}:${c.previsao}`, origem: 'cert-melh', data: c.previsao,
+        titulo: `Previsão — ${nome}`, texto: c.etapa ? 'Etapa: ' + c.etapa.toLowerCase() : '', respTexto: c.responsavel });
+      if (naJanela(c.reavaliar_em)) out.push({ chave: `cert-melh:r:${c.id}:${c.reavaliar_em}`, origem: 'cert-melh', data: c.reavaliar_em,
+        titulo: `Reavaliar — ${nome}`, respTexto: c.responsavel });
+      if (c.verif_eficaz == null && naJanela(c.verif_data)) out.push({ chave: `cert-melh:v:${c.id}:${c.verif_data}`, origem: 'cert-melh', data: c.verif_data,
+        titulo: `Verificar eficácia — ${nome}`, respTexto: c.responsavel });
+    }
+    for (const r of rg) if (!r.data_fechamento && !resolvido(r.status) && naJanela(r.previsao))
+      out.push({ chave: `cert-melh:f:${r.id}:${r.previsao}`, origem: 'cert-melh', data: r.previsao,
+        titulo: `${r.tipo || 'Registro'}: ${r.descricao || ''}${r.local ? ' — ' + r.local : ''}`, respTexto: r.resp_resolucao });
+    return out;
+  }],
+  ['rh-reaj', async () => (await pegar(cli().from('rh_reajustes').select('id,vigencia,pct,situacao,aplicado_em')))
+    .filter(r => !r.aplicado_em && !/aplic|cancel/i.test(r.situacao || '') && naJanela(r.vigencia))
+    .map(r => ({ chave: `rh-reaj:${r.id}:${r.vigencia}`, origem: 'rh-reaj', data: r.vigencia,
+      titulo: `Reajuste anual vigora${r.pct != null ? ` (${String(r.pct).replace('.', ',')}%)` : ''}` }))],
+  ['rh-prop', async () => (await pegar(cli().from('rh_propostas').select('id,tipo,funcionario_id,nome,cargo_nome,data_inicio')))
+    .filter(p => naJanela(p.data_inicio))
+    .map(p => ({ chave: `rh-prop:${p.id}:${p.data_inicio}`, origem: 'rh-prop', data: p.data_inicio,
+      titulo: `Início — ${p.nome || nomeFunc(p.funcionario_id) || 'proposta'}${p.cargo_nome ? ' (' + p.cargo_nome + ')' : ''}`,
+      texto: p.tipo ? 'Proposta: ' + p.tipo : '', feitoNaOrigem: p.data_inicio < hoje() }))],
+  ['rh-sdrev', async () => (await pegar(cli().from('rh_sd_parametros').select('id,chave,proxima_revisao')))
+    .filter(p => naJanela(p.proxima_revisao))
+    .map(p => ({ chave: `rh-sdrev:${p.id}:${p.proxima_revisao}`, origem: 'rh-sd', data: p.proxima_revisao,
+      titulo: `Salário digno: revisar o parâmetro ${p.chave}`, ir: { a: 'pessoas', t: 'sdConfig' } }))],
+  ['prog-ativ', async () => {
+    const sc = cli().schema('programacao');
+    const [at, tp, lc, op, fz] = await Promise.all([
+      pegar(sc.from('atividades').select('id,data,local_id,tipo_id,operador_id,status,concluida_em,plantio,prioridade,ativo')),
+      pegar(sc.from('tipos_atividade').select('id,nome')),
+      pegar(sc.from('locais').select('id,nome,fazenda_id')),
+      pegar(sc.from('operadores').select('id,nome')).catch(() => []),
+      pegar(sc.from('fazendas').select('id,nome')).catch(() => []),
+    ]);
+    const nome = (l, id) => l.find(x => x.id === id)?.nome || '';
+    const g = new Map();
+    for (const a of at) {
+      if (a.ativo === false || a.concluida_em || /conclu|cancel/i.test(a.status || '') || !naJanela(a.data)) continue;
+      const loc = lc.find(x => x.id === a.local_id);
+      const faz = loc ? nome(fz, loc.fazenda_id) : '';
+      const k = a.data + '|' + faz;
+      if (!g.has(k)) g.set(k, { data: a.data, faz, l: [] });
+      g.get(k).l.push([nome(tp, a.tipo_id) || 'Atividade', loc?.nome, a.plantio, nome(op, a.operador_id), a.prioridade ? 'prioridade ' + a.prioridade.toLowerCase() : ''].filter(Boolean).join(' · '));
+    }
+    return [...g.values()].map(x => ({ chave: `prog-ativ:${x.data}:${norm(x.faz)}`, origem: 'prog-ativ', data: x.data,
+      unid: unidadeDeTexto(x.faz) || undefined,
+      titulo: x.l.length > 1 ? `Programação Campo — ${x.l.length} atividades${x.faz ? ' · ' + x.faz : ''}` : `${x.l[0]}${x.faz ? ' — ' + x.faz : ''}`,
+      detalhes: x.l.sort((a, b) => a.localeCompare(b, 'pt-BR')), detRot: ['atividade', 'atividades'] }));
+  }],
+  ['prog-reu', async () => {
+    const sc = cli().schema('programacao');
+    const [rs, fz] = await Promise.all([
+      pegar(sc.from('reunioes').select('id,fazenda_id,data_reuniao,ativo')),
+      pegar(sc.from('fazendas').select('id,nome')).catch(() => []),
+    ]);
+    return rs.filter(r => r.ativo !== false && naJanela(r.data_reuniao)).map(r => {
+      const faz = fz.find(f => f.id === r.fazenda_id)?.nome || '';
+      return { chave: `prog-reu:${r.id}:${r.data_reuniao}`, origem: 'prog-reu', data: r.data_reuniao,
+        titulo: `Reunião da programação${faz ? ' — ' + faz : ''}`, feitoNaOrigem: r.data_reuniao < hoje() };
+    });
+  }],
+  ['est-pend', async () => {
+    const [mv, it] = await Promise.all([
+      pegar(cli().from('est_movimentos').select('id,item_id,quantidade,tipo,pendente,pendente_desde,data,equipamento,funcionario,ativo').eq('pendente', true)),
+      pegar(cli().from('est_itens').select('id,nome,unidade')),
+    ]);
+    return mv.filter(m => m.ativo !== false).map(m => {
+      const i = it.find(x => x.id === m.item_id);
+      const d = m.pendente_desde || m.data;
+      return { chave: `est-pend:${m.id}`, origem: 'est-pend', data: d, unid: 'Quebra Cocão',
+        titulo: `Saída pendente — ${i?.nome || 'item'} (${String(m.quantidade).replace('.', ',')}${i?.unidade ? ' ' + i.unidade : ''})${m.equipamento || m.funcionario ? ' → ' + (m.equipamento || m.funcionario) : ''}` };
+    });
+  }],
+  ['colh-pag', async () => (await pegar(cli().from('cp_cargas').select('id,data,placa,nf,lote,situacao_pagto,data_pagto,ativo')))
+    .filter(c => c.ativo !== false && naJanela(c.data_pagto) && !/pago|receb/i.test(c.situacao_pagto || ''))
+    .map(c => ({ chave: `colh-pag:${c.id}:${c.data_pagto}`, origem: 'colh-pag', data: c.data_pagto,
+      titulo: `Pagamento da carga de ${br(c.data)}${c.nf ? ' · NF ' + c.nf : ''}${c.placa ? ' · ' + c.placa : ''}` }))],
   ['proj', async () => {
     const [pjs, eap, oc] = await Promise.all([
       pegar(cli().from('pj_projetos').select('id,nome,codigo,fim_previsto,situacao,ativo')),
@@ -378,6 +638,14 @@ const FONTES = [
       out.push({ chave: `proj:p:${p.id}:${p.fim_previsto}`, origem: 'proj', data: p.fim_previsto, titulo: `Fim previsto do projeto — ${nomeP(p.id)}` });
     for (const e of eap) if (vivos.has(e.projeto_id) && e.ativo !== false && !e.fim_real && (e.pct ?? 0) < 100 && naJanela(e.fim))
       out.push({ chave: `proj:e:${e.id}:${e.fim}`, origem: 'proj', data: e.fim, titulo: `${e.nome} — ${nomeP(e.projeto_id)}`, respTexto: e.responsavel });
+    const [rc, rn] = await Promise.all([
+      pegar(cli().from('pj_riscos').select('id,projeto_id,descricao,dono,prazo,situacao,ativo')).catch(() => []),
+      pegar(cli().from('pj_reunioes').select('id,projeto_id,data,titulo,ativo')).catch(() => []),
+    ]);
+    for (const r of rc) if (vivos.has(r.projeto_id) && r.ativo !== false && !resolvido(r.situacao) && !/fechad|ocorreu/i.test(r.situacao || '') && naJanela(r.prazo))
+      out.push({ chave: `proj:r:${r.id}:${r.prazo}`, origem: 'proj', data: r.prazo, titulo: `Risco: ${r.descricao || ''} — ${nomeP(r.projeto_id)}`, respTexto: r.dono });
+    for (const r of rn) if (vivos.has(r.projeto_id) && r.ativo !== false && naJanela(r.data))
+      out.push({ chave: `proj:n:${r.id}:${r.data}`, origem: 'proj', data: r.data, titulo: `Reunião: ${r.titulo || 'do projeto'} — ${nomeP(r.projeto_id)}`, feitoNaOrigem: r.data < hoje() });
     for (const o of oc) if (vivos.has(o.projeto_id) && o.ativo !== false && !o.resolvida_em && !resolvido(o.situacao) && naJanela(o.prazo))
       out.push({ chave: `proj:o:${o.id}:${o.prazo}`, origem: 'proj', data: o.prazo, titulo: `Problema: ${o.descricao || ''} — ${nomeP(o.projeto_id)}`, respTexto: o.responsavel });
     return out;
@@ -504,7 +772,7 @@ function todosItens() {
     const explicito = e?.responsavel_id || a.respId || pessoaPorTexto(a.respTexto)?.id || null;
     const resps = explicito ? [explicito] : padrao[a.origem] ? [padrao[a.origem]] : respsDaArea(o.area, a.unid);
     let sit = e?.situacao || (a.feitoNaOrigem ? 'feito' : 'afazer');
-    itens.push({ ...a, area: o.area, origemNome: o.nome + (a.unid ? ' · ' + a.unid : ''), auto: true,
+    itens.push({ ...a, ir: a.ir || o.ir || null, area: o.area, origemNome: o.nome + (a.unid ? ' · ' + a.unid : ''), auto: true,
       resp: resps[0] || null, resps, explicito, sit, feitaEm: e?.feita_em || null });
   }
   for (const t of dados.tarefas) {
@@ -677,12 +945,42 @@ function calendario() {
 }
 const ordemItens = (a, b) => (a.sit === 'feito') - (b.sit === 'feito') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
 
+/* ---------------- ir para a origem (29/10/2026, pedido dele) ----------------
+   "Coloque um botão para ir para o local da atividade": o card e o detalhe
+   ganham "Ir para", que abre a área e a tela de onde o item veio. */
+function podeIr(ir) {
+  if (!ir) return false;
+  if (!areasLiberadas().some(a => a.id === ir.a)) return false;
+  if (ir.a === 'pessoas') return !!ir.t && podeTela(ir.t) && !!moduloDe(ir.t);
+  return true;
+}
+function quandoPronta(idMoldura, fn, tentativas = 60) {
+  let w = null;
+  try { w = $(idMoldura)?.contentWindow; } catch {}
+  if (w && w.areaPronta) { try { fn(w); } catch (e) { console.warn('[Cronograma] ir para', e); } return; }
+  if (tentativas > 0) setTimeout(() => quandoPronta(idMoldura, fn, tentativas - 1), 250);
+}
+function irPara(ir) {
+  if (!podeIr(ir)) return;
+  const d = $('dlgCron'); if (d?.open) d.close();
+  if (ir.a === 'pessoas') { entrarNaArea('pessoas'); abrirModulo(moduloDe(ir.t), ir.t); }
+  else if (ir.a === 'certificacao') entrarNaArea('certificacao', ir.t);
+  else if (ir.a === 'vistorias') { entrarNaArea('vistorias'); if (ir.m) abrirModulo(ir.m, ir.t); }
+  else {
+    entrarNaArea(ir.a, undefined, ir.x);
+    if (ir.a === 'colheita' && ir.t) quandoPronta('molduraCP', w => w.abrirTelaColheita?.(ir.t));
+  }
+  window.scrollTo?.(0, 0);
+}
+const botaoIr = it => podeIr(it.ir)
+  ? `<span class="cr-ir" role="button" tabindex="0" data-ir="${esc(it.chave)}" title="Ir para ${esc(ORIGENS[it.origem]?.nome || '')}">Ir para ↗</span>` : '';
+
 function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
     <span class="cr-item-txt"><b>${esc(it.titulo)}</b><small>${esc(it.origemNome)}${it.auto ? ' · automático' : ''}${it.sit === 'fazendo' ? ' · fazendo' : ''}</small></span>
-    <span class="cr-item-dir">${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span></span>
+    <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span></span>
   </button>`;
 }
 
@@ -691,7 +989,7 @@ function card(it, { semResp = false, comSit = false } = {}) {
   return `<button type="button" class="cr-card" draggable="true" data-item="${esc(it.chave)}">
     <span class="cr-card-top">${tagArea(it.area)}${comSit ? `<span class="cr-sit ${it.sit}${atrasado(it) ? ' atraso' : ''}">${atrasado(it) && it.sit === 'afazer' ? 'Atrasado' : SIT[it.sit]}</span>` : (it.auto ? '<span class="cr-auto">⟳ automático</span>' : '')}</span>
     <b>${esc(it.titulo)}</b>
-    <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span>${semResp ? '' : avatares(it)}</span>
+    <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span><span class="cr-card-dir">${botaoIr(it)}${semResp ? '' : avatares(it)}</span></span>
   </button>`;
 }
 
@@ -749,7 +1047,15 @@ function ligarTela() {
     desenhar();
     if (matchMedia('(max-width: 899px)').matches) r.querySelector('.cr-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  r.querySelectorAll('[data-item]').forEach(b => b.onclick = () => abrirItem(b.dataset.item));
+  r.querySelectorAll('[data-item]').forEach(b => b.onclick = ev => {
+    const ir = ev.target.closest('[data-ir]');
+    if (ir) { ev.preventDefault(); ev.stopPropagation(); irPara(todosItens().find(x => x.chave === ir.dataset.ir)?.ir); return; }
+    abrirItem(b.dataset.item);
+  });
+  r.querySelectorAll('[data-ir]').forEach(b => b.onkeydown = ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault(); ev.stopPropagation(); irPara(todosItens().find(x => x.chave === b.dataset.ir)?.ir);
+  });
 
   // arrastar entre colunas (computador)
   r.querySelectorAll('.cr-card[draggable]').forEach(c => c.addEventListener('dragstart', ev => {
@@ -838,7 +1144,7 @@ function abrirItem(chave) {
       <label class="campo">Responsável padrão (todas as vezes)<select id="crRespPadrao">${opcoesPessoas(t.responsavel_id, nomesDe(respsDaArea(t.area || 'esc', null)))}</select></label>` : ''}
     ${it?.auto ? '<p class="dica">Este item vem sozinho da área de origem e some quando ela for atualizada (exame renovado, OS concluída…). Aqui você marca o andamento e quem cuida.</p>' : ''}
     <div class="barra entre">
-      ${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : '<span></span>'}
+      ${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : (it && podeIr(it.ir) ? `<button type="button" class="btn" id="crIr">Ir para ${esc(ORIGENS[it.origem]?.nome || 'a origem')} ↗</button>` : '<span></span>')}
       <span class="barra">
         <button class="btn" value="cancelar">Fechar</button>
         <button type="button" class="btn principal" id="crSalvar">${nova ? 'Lançar' : 'Salvar'}</button>
@@ -846,6 +1152,7 @@ function abrirItem(chave) {
     </div>
   </form>`;
   d.showModal();
+  if ($('crIr')) $('crIr').onclick = () => irPara(it.ir);
   // trocar a área da tarefa mostra quem é o responsável da área
   if ($('crAreaT')) $('crAreaT').onchange = () => {
     const o = $('crRespSel').options[0], n = nomesDe(respsDaArea($('crAreaT').value, null));

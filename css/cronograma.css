@@ -122,3 +122,10 @@ dialog.cr-dlg form{max-height:88vh;overflow:auto}
 .cr-resp-exc summary{cursor:pointer;font-weight:600}
 div.cr-resp-linha{grid-template-columns:170px minmax(0,1fr)}
 @media (max-width:560px){div.cr-resp-linha{grid-template-columns:1fr}}
+
+/* Ir para a origem (29/10/2026) */
+.cr-card-dir{display:inline-flex;align-items:center;gap:6px}
+.cr-ir{display:inline-flex;align-items:center;font-size:11px;font-weight:600;color:var(--cor-link, #2F6FB0);
+  border:1px solid currentColor;border-radius:999px;padding:2px 8px;line-height:1.4;cursor:pointer;white-space:nowrap;background:transparent}
+.cr-ir:hover,.cr-ir:focus-visible{background:rgba(47,111,176,.1);outline:none}
+.cr-item-dir .cr-ir{margin-right:4px}
