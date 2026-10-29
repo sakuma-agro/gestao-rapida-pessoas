@@ -44,7 +44,7 @@
       destino: 'Destino: nome do funcionário que recebeu.',
       legendas: {
         entrada: 'CA: nº do Certificado de Aprovação (vem no EPI ou na embalagem).   Origem: fornecedor ou estoque de onde veio.   NF / Transf: nº da nota ou da transferência.',
-        saida: 'Funcionário: quem recebeu o EPI e assina na frente.   CA: nº do Certificado de Aprovação.   Transferência: escrever o estoque de destino em Funcionário.',
+        saida: 'Funcionário: quem recebeu o EPI.   Entregue por: quem entregou.   CA: nº do Certificado de Aprovação.   Transferência: escrever o estoque de destino em Funcionário.',
       } },
     { id: 'lim', nome: 'Material de limpeza', form: 'FORM 056',
       destino: 'Destino: local ou setor (sede, banheiros, refeitório, packing...).' },
@@ -64,11 +64,12 @@
 
   function colunas(mov, tipo) {
     /* EPI é diferente (pedido dele, 29/10/2026: "preciso colocar CA e o
-       funcionário"): a saída é entrega ao funcionário, que assina na frente. */
+       funcionário"): a saída é entrega ao funcionário — sem assinatura dele
+       (pedido dele: "somente para qual funcionário recebeu e quem entregou"). */
     if (tipo.id === 'epi') {
       const cols = mov === 'entrada'
         ? [['Data', 34], ['EPI', 70], ['CA', 24], ['Qtd', 20], ['Origem', 56], ['NF / Transf', 30], ['Recebido por', 38]]
-        : [['Data', 34], ['Funcionário', 58], ['EPI', 52], ['CA', 22], ['Qtd', 16], ['Assinatura do funcionário', 52], ['Entregue por', 38]];
+        : [['Data', 34], ['Funcionário', 80], ['EPI', 74], ['CA', 26], ['Qtd', 20], ['Entregue por', 38]];
       cols.push(['Lanç.', W - 2 * M - cols.reduce((s, c) => s + c[1], 0)]);
       return cols;
     }
@@ -327,7 +328,7 @@
   ${placas ? '' : `<div class="fe-amostra">
     <div style="border-color:#1F5FA8;color:#1F5FA8">ENTRADA DO ESTOQUE<small>Data · Produto · Qtd · Origem · NF / Transf · Recebido por · Lanç.</small></div>
     <div style="border-color:#C62828;color:#C62828">SAÍDA DO ESTOQUE<small>Data · Produto · Qtd · Destino · Receit. ou Doc. / Transf · Retirado por · Lanç.</small></div></div>
-  <p class="dica" style="margin:8px 0 0">EPI tem folha própria: na entrada, EPI e CA; na saída, Funcionário, EPI, CA e a assinatura de quem recebeu.</p>`}
+  <p class="dica" style="margin:8px 0 0">EPI tem folha própria: na entrada, EPI e CA; na saída, o Funcionário que recebeu, EPI, CA e quem entregou.</p>`}
   <p class="fe-resumo" data-resumo></p>
   <div class="barra fim">
     <button type="button" class="btn" data-acao="baixar">Baixar PDF</button>
