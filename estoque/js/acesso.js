@@ -34,7 +34,7 @@ export const MODULOS = [
     ['qcPendencias', 'Pendências'],
   ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
-     estoque (FORM 048, 049, 055, 056, 057) e as placas das pranchetas. Ficam
+     estoque (FORM 048 entrada, FORM 049 saída) e as placas das pranchetas. Ficam
      aqui porque nem todos têm acesso à Certificação — ../js/folhas-estoque.js. */
   { id: 'forms', nome: 'Formulários', telas: [
     ['fmFolhas', 'Folhas de entrada e saída'],

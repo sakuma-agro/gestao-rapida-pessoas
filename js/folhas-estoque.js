@@ -4,10 +4,11 @@
    Pedido do Guilherme: "crie em estoque esses FORM para impressão e também na
    certificação! Colocamos em estoque pq nem todos têm acesso à certificação".
    As folhas ficam na prancheta de cada estoque, uma para ENTRADA (azul) e uma
-   para SAÍDA (vermelho), por tipo de estoque, cada tipo com o seu FORM da
-   Lista mestra:
-     Defensivos FORM 048 · Fertilizantes FORM 049 · EPI FORM 055 ·
-     Material de limpeza FORM 056 · Lubrificantes FORM 057.
+   para SAÍDA (vermelho), por tipo de estoque. FORM da Lista mestra (decisão
+   dele, 29/10/2026 à tarde: "um número de FORM para entrada e outro para
+   saída, pra o pessoal não se confundir; um geral para todos os tipos"):
+     ENTRADA = FORM 048 · SAÍDA = FORM 049 (os FORM 055–057 por tipo, criados
+     de manhã, foram apagados).
    Decisões dele, na conversa do dia 29/10:
      - A4 deitado, margem mínima (5 mm), letra do pessoal é grande: linhas de
        ~1 cm, Data larga com "  /  /    " para escrever o ano inteiro;
@@ -36,26 +37,26 @@
 
   const ESTOQUES = ['Lote 35 PADAP', 'Faz. Faca', 'Faz. Morro Branco', 'Faz. Três Riachos', 'Faz. Quebra Cocão'];
   const TIPOS = [
-    { id: 'def', nome: 'Defensivos', form: 'FORM 048',
+    { id: 'def', nome: 'Defensivos',
       destino: 'Destino: plantio / talhão.   Informar o nº do receituário.' },
-    { id: 'fer', nome: 'Fertilizantes', form: 'FORM 049',
+    { id: 'fer', nome: 'Fertilizantes',
       destino: 'Destino: plantio / talhão (e quadra do barracão).' },
-    { id: 'epi', nome: 'EPI', form: 'FORM 055',
+    { id: 'epi', nome: 'EPI',
       destino: 'Destino: nome do funcionário que recebeu.',
       legendas: {
         entrada: 'CA: nº do Certificado de Aprovação (vem no EPI ou na embalagem).   Origem: fornecedor ou estoque de onde veio.   NF / Transf: nº da nota ou da transferência.',
         saida: 'Funcionário: quem recebeu o EPI.   Entregue por: quem entregou.   CA: nº do Certificado de Aprovação.   Transferência: escrever o estoque de destino em Funcionário.',
       } },
-    { id: 'lim', nome: 'Material de limpeza', form: 'FORM 056',
+    { id: 'lim', nome: 'Material de limpeza',
       destino: 'Destino: local ou setor (sede, banheiros, refeitório, packing...).' },
-    { id: 'lub', nome: 'Lubrificantes', form: 'FORM 057',
+    { id: 'lub', nome: 'Lubrificantes',
       destino: 'Destino: máquina ou implemento (e horímetro, se tiver).' },
   ];
   const MOV = {
-    entrada: { titulo: 'ENTRADA', cor: '#1F5FA8', claro: '#E6EEF8',
+    entrada: { titulo: 'ENTRADA', form: 'FORM 048', cor: '#1F5FA8', claro: '#E6EEF8',
       legenda: 'Origem: fornecedor ou estoque de onde veio.   NF / Transf: nº da nota ou da transferência (devolução de sobra: escrever "devolução").',
       frase: 'Chegou produto? Anote aqui antes de guardar.' },
-    saida: { titulo: 'SAÍDA', cor: '#C62828', claro: '#FBE7E7',
+    saida: { titulo: 'SAÍDA', form: 'FORM 049', cor: '#C62828', claro: '#FBE7E7',
       legenda: 'Transferência: escrever o estoque de destino.   Descarte: escrever "vencido" ou "descarte" no Destino.   ',
       frase: 'Vai retirar produto? Anote aqui antes de levar.' },
   };
@@ -118,7 +119,7 @@
     doc.text('Estoque:', tx, M + 14);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
     doc.text(estoque || '______________________________', tx + 16, M + 14);
-    doc.text(tipo.form, tx + 70, M + 14);
+    doc.text(cfg.form, tx + 70, M + 14);
     // quadro do tipo, à direita
     const bw = 62, bh = 14, bx = W - M - bw, by = M + 1;
     doc.setDrawColor(COR); doc.setLineWidth(1.2); doc.setFillColor('#FFFFFF');
@@ -199,7 +200,7 @@
     const lh = 15, lw = lh * img.sakuma.w / img.sakuma.h;
     doc.addImage(img.sakuma.url, 'PNG', x0 + 8, top + 6, lw, lh);
     doc.setTextColor(CINZA); doc.setFontSize(14);
-    doc.text(tipo.form, x1 - fw - 8, top + 13, { align: 'right' });
+    doc.text(cfg.form, x1 - fw - 8, top + 13, { align: 'right' });
     if (estoque) { doc.setFont('helvetica', 'normal'); doc.setFontSize(12); doc.text(estoque, x1 - fw - 8, top + 20, { align: 'right' }); }
     // palavra grande, tipo e a frase
     const tx = x0 + 8;
@@ -248,7 +249,7 @@
     doc.setTextColor(CINZA);
     doc.text(tipo.nome.toUpperCase(), cx, ty, { align: 'center' });
     doc.setFontSize(11); doc.setTextColor(COR);
-    doc.text(tipo.form, cx, ty + 7, { align: 'center' });
+    doc.text(cfg.form, cx, ty + 7, { align: 'center' });
     doc.setFontSize(10.5); doc.setTextColor(CINZA);
     doc.text(FRASES[mov][0], cx, ty + 15, { align: 'center' });
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
@@ -470,20 +471,20 @@
     ? 'Etiqueta de 80 × 110 mm para a pasta L transparente onde ficam as folhas da prancheta: ENTRADA em azul e SAÍDA em vermelho, com o tipo e o FORM. Saem 4 por folha A4, com marcas de corte. Imprima em <strong>tamanho real (100%)</strong>, sem "ajustar à página".'
     : placas
     ? 'Placa para pendurar em cima da prancheta: ENTRADA em azul e SAÍDA em vermelho, com a seta para a folha. Sai uma folha A4 por tipo, com as duas placas e a linha de corte. Plastifique para durar.'
-    : 'As folhas da prancheta de cada estoque: ENTRADA em azul e SAÍDA em vermelho, uma por tipo, com o nome do estoque e o FORM da Certificação já impressos. A4 deitado, 15 linhas por folha, corpo em cinza e branco para gastar pouca tinta.'}</p>
+    : 'As folhas da prancheta de cada estoque: ENTRADA em azul e SAÍDA em vermelho, uma por tipo, com o nome do estoque e o FORM da Certificação já impressos (entrada FORM 048, saída FORM 049, para todos os tipos). A4 deitado, 15 linhas por folha, corpo em cinza e branco para gastar pouca tinta.'}</p>
   <div class="fe-grade">
     ${placas || etiq ? '' : `<div class="fe-bloco" data-grupo="est"><h3>Estoque</h3>
       ${est.map(e => chk('est', e, esc(e), '', est.length === 1 || !op.estoqueUnico)).join('')}
       ${est.length > 1 ? '<button type="button" class="fe-todos" data-alternar="est">marcar / desmarcar todos</button>' : ''}</div>`}
     <div class="fe-bloco" data-grupo="tipo"><h3>Tipo de estoque</h3>
-      ${TIPOS.map(t => chk('tipo', t.id, esc(t.nome), t.form)).join('')}
+      ${TIPOS.map(t => chk('tipo', t.id, esc(t.nome), '')).join('')}
       <button type="button" class="fe-todos" data-alternar="tipo">marcar / desmarcar todos</button></div>
     <div class="fe-bloco"><h3>${placas ? 'Opções' : etiq ? 'Etiquetas' : 'Folhas'}</h3>
       ${placas && !etiq
         ? `<label class="campo">Nome do estoque na placa (opcional)
              <select name="estPlaca"><option value="">Sem nome — serve em qualquer estoque</option>${est.map(e => `<option>${esc(e)}</option>`).join('')}</select></label>`
-        : `${chk('mov', 'entrada', '<span class="fe-tag" style="background:#1F5FA8"></span> Entrada', 'azul')}
-           ${chk('mov', 'saida', '<span class="fe-tag" style="background:#C62828"></span> Saída', 'vermelho')}`}
+        : `${chk('mov', 'entrada', '<span class="fe-tag" style="background:#1F5FA8"></span> Entrada', 'FORM 048 · azul')}
+           ${chk('mov', 'saida', '<span class="fe-tag" style="background:#C62828"></span> Saída', 'FORM 049 · vermelho')}`}
       <label class="campo" style="margin-top:8px">Cópias de cada ${etiq ? 'etiqueta' : placas ? 'folha de placas' : 'folha'}
         <input class="fe-num" type="number" name="copias" min="1" max="20" value="1"></label>
     </div>
@@ -528,8 +529,8 @@
       const alvo = el.querySelector('[data-colunas]');
       if (!alvo) return;
       if (!tipos.length) { alvo.innerHTML = ''; return; }
-      alvo.innerHTML = `<table><thead><tr><th>Tipo</th><th class="ent">Entrada (azul)</th><th class="sai">Saída (vermelho)</th></tr></thead><tbody>${
-        tipos.map(t => `<tr class="${t.id === 'epi' ? 'dif' : ''}"><td><strong>${esc(t.nome)}</strong><small>${esc(t.form)}</small>${
+      alvo.innerHTML = `<table><thead><tr><th>Tipo</th><th class="ent">Entrada (azul) · FORM 048</th><th class="sai">Saída (vermelho) · FORM 049</th></tr></thead><tbody>${
+        tipos.map(t => `<tr class="${t.id === 'epi' ? 'dif' : ''}"><td><strong>${esc(t.nome)}</strong>${
           t.id === 'epi' ? '<span class="fe-tagdif">folha própria</span>' : ''}</td>
           <td>${listaCols('entrada', t)}</td><td>${listaCols('saida', t)}</td></tr>`).join('')}</tbody></table>
         <p class="dica" style="margin:6px 0 0">Todas têm Data no começo e Lanç. no fim. Em <b style="color:#744F28">marrom</b>, o que muda em relação às outras folhas.</p>`;

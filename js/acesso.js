@@ -324,7 +324,7 @@ export const MODULOS = [
     /* Folhas de estoque (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de
        cada estoque e as placas — as mesmas da área Estoque › Formulários
        (nem todos têm acesso à Certificação). js/folhas-estoque.js. */
-    { id: 'ceFolhasEstSub', grupo: 'FORMS Digital', codigo: 'FORM 048 · 049 · 055–057', nome: 'Folhas de estoque', telas: [
+    { id: 'ceFolhasEstSub', grupo: 'FORMS Digital', codigo: 'FORM 048 · 049', nome: 'Folhas de estoque', telas: [
       ['feFolhas', 'Folhas de entrada e saída'],
     ] },
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
