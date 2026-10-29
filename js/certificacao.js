@@ -441,6 +441,7 @@ const PORTAS = [
   { g: 'Documentos', icone: 'documento', desc: 'Ver e imprimir o que a fazenda tem por escrito' },
   { g: 'Registros', icone: 'lapis', desc: 'Preencher o que acontece no dia a dia' },
   { g: 'Pendências', icone: 'calendario', desc: 'O que está atrasado ou vence logo' },
+  { g: 'Indicadores', icone: 'grafico', desc: 'Absenteísmo e turnover do DP, para apresentar na auditoria' },
 ];
 /* "FORMS Digital · Check lists e caderno" quando a porta tem seções; senão os nomes. */
 const resumoPorta = subs => {
@@ -539,7 +540,7 @@ function desenharPendencias() {
       <div class="barra" style="margin:0">
         <button class="btn" type="button" data-ir-tela="ceCalendario">Calendário</button>
         <button class="btn" type="button" data-ir-tela="ceAnual">Cronograma anual</button>
-        <button class="btn" type="button" data-ir-tela="ceIndPainel">Indicadores</button>
+        <button class="btn" type="button" data-ir-tela="ceIndAbs">Indicadores</button>
       </div>
     </div>
 

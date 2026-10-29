@@ -83,7 +83,7 @@ export const ICONE_TELA = {
   vsAdNovo: 'mais', vsAdAberto: 'relogio', vsAdFechados: 'check', vsAdHist: 'historico',
   vsEx: 'extintor', vsPainel: 'painel', vsRelatorio: 'documento', vsConfig: 'config',
   reuSemana: 'reuniao', reuFrases: 'aspas', reuResp: 'pessoas', reuAtiv: 'vassoura',
-  cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
+  cePainel: 'painel', ceRequisitos: 'check', ceDocumentos: 'documento', ceCalendario: 'calendario', ceAnual: 'grafico', ceIndAbs: 'relogio', ceIndTurn: 'pessoas', ceIndPainel: 'painel', ceIndPessoa: 'pessoa', ceIndRh: 'check', ceIndMetas: 'ajuste', ceCertificacoes: 'escudo',
   ccPainel: 'painel', ccRegistros: 'boletim', ccPlantios: 'lista', ccInsumos: 'documento', ccAnalises: 'exame', ccCalibracoes: 'ajuste', ccRelatorios: 'grafico',
   faPainel: 'painel', faRegistros: 'boletim', faEspecies: 'lista', faCameras: 'ajuste',
   enPainel: 'painel', enLancamentos: 'boletim', enFontes: 'ajuste',

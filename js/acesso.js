@@ -361,10 +361,19 @@ export const MODULOS = [
     /* Absenteísmo e turnover dos 3 últimos meses fechados — a mesma tela de
        RH › Indicadores › Certificação (js/rh-indicadores.js). Os números vêm
        do rh_ind_base, que o banco só abre para quem tem o módulo RH. */
-    { id: 'ceIndSub', grupo: 'Pendências', nome: 'Indicadores', telas: [
-      ['ceIndPainel', 'Painel'],
+    /* Indicadores como porta própria (29/10/2026, pedido dele: "informações do DP vão
+       para a certificação, objetivo é apresentar na certificação"): Absenteísmo e
+       Turnover separados; o resto do painel do RH em "Resumo e metas". */
+    { id: 'ceIndAbsSub', grupo: 'Indicadores', nome: 'Absenteísmo', telas: [
+      ['ceIndAbs', 'Absenteísmo'],
+    ] },
+    { id: 'ceIndTurnSub', grupo: 'Indicadores', nome: 'Turnover', telas: [
+      ['ceIndTurn', 'Turnover'],
+    ] },
+    { id: 'ceIndSub', grupo: 'Indicadores', nome: 'Resumo e metas', telas: [
+      ['ceIndRh', 'Últimos 3 meses'],
+      ['ceIndPainel', 'Painel geral'],
       ['ceIndPessoa', 'Por pessoa'],
-      ['ceIndRh', 'Certificação'],
       ['ceIndMetas', 'Metas'],
     ] },
   ] },
@@ -777,10 +786,10 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceIndAbsSub: 'relogio', ceIndTurnSub: 'pessoas', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
 };
 /* Ícone das portas da Certificação (29/10/2026). */
-const ICONE_GRUPO = { 'Documentos': 'documento', 'Registros': 'lapis', 'Pendências': 'calendario' };
+const ICONE_GRUPO = { 'Documentos': 'documento', 'Registros': 'lapis', 'Pendências': 'calendario', 'Indicadores': 'grafico' };
 const iconeGrupo = g => ICONE_GRUPO[g] || 'documento';
 /* Quem quer saber quando uma porta (grupo) abre ou fecha — a entrada da
    Certificação desenha a lista da porta escolhida. */

@@ -39,7 +39,10 @@ const est = { linhas: [], lacunas: new Set(), carregado: false, erro: '', carreg
 /* O submódulo Indicadores inteiro aparece também na área Certificação
    (13/10/2026, pedido dele). Cada tela de lá é o espelho de uma daqui e
    desenha no próprio <section>; as contas, filtros e o banco são os mesmos. */
-const ESPELHO = { ceIndPainel: 'rhIndPainel', ceIndPessoa: 'rhIndPessoa', ceIndRh: 'rhIndCert', ceIndMetas: 'rhIndMetas' };
+/* Absenteísmo e Turnover separados (29/10/2026, pedido dele: "crie o submódulo turnover e
+   outro absenteísmo", para apresentar na Certificação): rhIndAbs/rhIndTurn só existem
+   como base dos espelhos ceIndAbs/ceIndTurn — o mesmo painel com um indicador só. */
+const ESPELHO = { ceIndAbs: 'rhIndAbs', ceIndTurn: 'rhIndTurn', ceIndPainel: 'rhIndPainel', ceIndPessoa: 'rhIndPessoa', ceIndRh: 'rhIndCert', ceIndMetas: 'rhIndMetas' };
 const base = t => ESPELHO[t] || t;
 /** O <section> da tela aberta, se ela for (o espelho de) `b`. */
 const telaDe = b => base(est.tela) === b ? $(TELA_ID[est.tela]) : $(TELA_ID[b]);
@@ -294,8 +297,8 @@ function grafico(titulo, meses, valores, meta, rotulos) {
   </figure>`;
 }
 
-function desenhar() {
-  const tela = telaDe('rhIndPainel');
+function desenhar(foco = '') {
+  const tela = telaDe(foco === 'abs' ? 'rhIndAbs' : foco === 'turn' ? 'rhIndTurn' : 'rhIndPainel');
   if (!tela) return;
   if (est.erro) { tela.innerHTML = `<div class="cartao"><div class="aviso erro">${esc(est.erro)}</div></div>`; return; }
   if (!est.carregado) { tela.innerHTML = '<div class="cartao"><p class="dica">Carregando os indicadores…</p></div>'; return; }
@@ -312,7 +315,7 @@ function desenhar() {
   tela.innerHTML = `
   <div class="cartao">
     <div class="barra entre" style="margin:0">
-      <div><h2 style="margin:0">Indicadores · absenteísmo e turnover</h2>
+      <div><h2 style="margin:0">${foco === 'abs' ? 'Absenteísmo' : foco === 'turn' ? 'Turnover' : 'Indicadores · absenteísmo e turnover'}</h2>
         <p class="dica" style="margin:2px 0 0">Dados de ${esc(rotMes(f.de))} a ${esc(rotMes(f.ate))} · atualizado às ${hora}</p></div>
       <span class="acoes"><button class="btn" id="indRecarregar">Atualizar</button>
         <button class="btn" id="indExcel">Excel</button>
@@ -337,30 +340,30 @@ function desenhar() {
     </div>
   </div>
 
-  <div class="cartao"><h2>Absenteísmo</h2>
+  ${foco === 'turn' ? '' : `<div class="cartao"><h2>Absenteísmo</h2>
     <p class="dica">Total = falta não justificada + falta justificada + atestado. "Com afastamento" soma também afastamentos e licenças (como na P07). Férias saem do cálculo.</p>
     ${tabelaAbs(cols)}
     ${grafico('Absenteísmo total (com afastamento) · últimos 12 meses', ult12, porMes.map(r => r.absCom), METAS.absTotal, porMes.map(r => `${num(r.horasAus)} h de ${num(r.horasBase)} h`))}
-  </div>
+  </div>`}
 
-  <div class="cartao"><h2>Turnover</h2>
+  ${foco === 'abs' ? '' : `<div class="cartao"><h2>Turnover</h2>
     <p class="dica">Turnover = ((admissões + desligamentos) ÷ 2) ÷ quadro médio. Quadro médio = (início + fim) ÷ 2. Transferência entre unidades não conta. A cor compara a média mensal com a meta.</p>
     ${tabelaTurn(cols)}
     ${grafico('Turnover mensal · últimos 12 meses', ult12, porMes.map(r => r.turnover), METAS.turnover, porMes.map(r => `${r.adm} adm · ${r.desl} desl · quadro ${num(r.qm, 1)}`))}
-  </div>
+  </div>`}
 
   <div class="cartao"><h2>Por sexo</h2>
     <p class="dica">Período escolhido e últimos 3 meses. Os outros filtros valem aqui também; o filtro de sexo não.</p>
     ${tabelaSexo(f, semFaltas)}
   </div>
 
-  <div class="cartao"><h2>Ausências por motivo</h2>
+  ${foco === 'turn' ? '' : `<div class="cartao"><h2>Ausências por motivo</h2>
     <p class="dica">${esc(NOTA_AUS)} Período e filtros acima (menos o de contrato).</p>
     ${tabelaAusencias(ausencias(mesesEntre(f.de, f.ate), f))}
-  </div>`;
+  </div>`}`;
 
   ['indDe', 'indAte', 'indEmp', 'indFaz', 'indSexo', 'indContrato', 'indSetor', 'indFuncao'].forEach(id =>
-    $(id).addEventListener('change', () => { lerFiltros(); desenhar(); }));
+    $(id).addEventListener('change', () => { lerFiltros(); desenhar(foco); }));
   $('indRecarregar').addEventListener('click', () => abrirIndicadores(est.tela, true));
   $('indRelatorio').addEventListener('click', () => mostrar(relatorioPainel(), { barra: true }));
   $('indExcel').addEventListener('click', () => excelPainel().catch(e => alertaTela(e.message)));
@@ -699,9 +702,9 @@ function pintarTv() {
   tv.el.querySelector('#tvSair').addEventListener('click', fecharTv);
 }
 
-const DESENHO = { rhIndPainel: desenhar, rhIndCert: () => desenharCert(), rhIndMetas: desenharMetas, rhIndPessoa: () => desenharPessoa() };
+const DESENHO = { rhIndAbs: () => desenhar('abs'), rhIndTurn: () => desenhar('turn'), rhIndPainel: () => desenhar(), rhIndCert: () => desenharCert(), rhIndMetas: desenharMetas, rhIndPessoa: () => desenharPessoa() };
 const TELA_ID = { rhIndPainel: 'telaRhIndPainel', rhIndPessoa: 'telaRhIndPessoa', rhIndCert: 'telaRhIndCert', rhIndMetas: 'telaRhIndMetas',
-  ceIndPainel: 'telaCeIndPainel', ceIndPessoa: 'telaCeIndPessoa', ceIndRh: 'telaCeIndRh', ceIndMetas: 'telaCeIndMetas' };
+  ceIndAbs: 'telaCeIndAbs', ceIndTurn: 'telaCeIndTurn', ceIndPainel: 'telaCeIndPainel', ceIndPessoa: 'telaCeIndPessoa', ceIndRh: 'telaCeIndRh', ceIndMetas: 'telaCeIndMetas' };
 
 export async function abrirIndicadores(tela = 'rhIndPainel', forcar = false) {
   est.tela = tela;
