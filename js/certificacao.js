@@ -936,8 +936,10 @@ async function painelDoc() {
       ${app ? `<button class="btn principal" type="button" id="ceDvApp" title="${esc(app.nome)}">${svgIcone('seta-dir')} Abrir no app</button>`
         : modelo ? `<button class="btn principal" type="button" data-ir-modelo="${modelo.id}">${svgIcone('documento')} Ver o modelo (${esc(modelo.codigo)})</button>`
         : `<button class="btn principal" type="button" id="ceDvPdf" disabled>${svgIcone('documento')} Abrir PDF</button>`}
-      ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive">${svgIcone('predio')} Abrir local</a>`
-        : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">Abrir local</button>'}
+      ${d.caminho ? `<button class="btn" type="button" id="ceDvPc" title="Abre a pasta no Explorador de Arquivos deste computador">💻 No computador</button>`
+        : '<button class="btn" type="button" disabled title="Sem caminho da pasta — preencha em Editar">💻 No computador</button>'}
+      ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive pela internet">☁ Na nuvem</a>`
+        : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">☁ Na nuvem</button>'}
       ${d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
       <span class="cresce"></span>
       <button class="btn" type="button" id="ceDvEditar">${svgIcone('lapis')} Editar</button>
@@ -963,6 +965,17 @@ async function painelDoc() {
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
   el.querySelector('[data-ir-modelo]')?.addEventListener('click', () => abrirTipo('FORM', modelo.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
+  /* Abrir no computador (29/10/2026, pedido dele: "não consigo abrir local, estão indo para
+     chrome no OneDrive, coloque as duas opções local e nuvem"). O navegador não abre pasta do
+     Windows sozinho: o link lop-pasta: é atendido pelo atalho instalado uma vez em cada
+     computador (ferramentas/abrir-pasta, cópia no OneDrive em _ferramentas). O caminho também
+     vai para a área de transferência, caso o atalho não esteja instalado. */
+  $('ceDvPc')?.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(d.caminho); } catch { /* sem permissão: segue */ }
+    const a = document.createElement('a'); a.href = 'lop-pasta:' + encodeURIComponent(d.caminho); a.click();
+    $('ceDvMsg').innerHTML = 'Abrindo a pasta no Explorador… Se não abriu, o caminho já está copiado: no Explorador, clique na barra de endereço, cole (Ctrl+V) e Enter. '
+      + 'Para abrir direto, instale uma vez neste computador o <b>instalar.bat</b> de <i>Certificação - Lop Gestão Rápida › _ferramentas › Abrir pasta no computador</i>.';
+  });
   $('ceDvCopiar')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); $('ceDvMsg').textContent = 'Caminho copiado. No Explorador de Arquivos, clique na barra de endereço, cole (Ctrl+V) e Enter.'; }
     catch { $('ceDvMsg').textContent = d.caminho; prompt('Copie o caminho:', d.caminho); }
@@ -972,8 +985,7 @@ async function painelDoc() {
     listarArquivos('certificacao', 'documento', revDono(d.id)).catch(() => []),
   ]);
   if (g !== geracaoPainel) return;
-  const pdfs = arqs.filter(ehPdf);
-  const vig = pdfs.find(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo)) || pdfs[0] || arqs[0];
+  const vig = escolherVigente(d, arqs);
   const extras = arqs.filter(x => x !== vig);
   $('ceDvRevs').innerHTML = revs.length ? revs.slice().sort((a, b) => so(b.nome).localeCompare(so(a.nome))).map(x =>
       `<button type="button" class="ce-dv-rev" data-ver="${esc(x.chave)}">${svgIcone('historico')} <span>${esc(x.nome)}</span></button>`).join('')
@@ -1336,8 +1348,17 @@ function apresentarCadeia(d) {
    ------------------------------------------------------------------- */
 async function pdfVigente(d) {
   const arqs = await listarArquivos('certificacao', 'documento', d.id).catch(() => []);
+  return escolherVigente(d, arqs);
+}
+/* PDF vigente (29/10/2026, AN 97 abria o plano de 2024 em vez do PGRS de 2026): entre os PDFs
+   com o código do documento no nome (se houver algum), o de data mais nova no OneDrive
+   (arquivos.data_arquivo); sem data, o enviado por último. */
+function escolherVigente(d, arqs) {
   const pdfs = arqs.filter(ehPdf);
-  return pdfs.find(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo)) || pdfs[0] || arqs[0] || null;
+  const comCod = pdfs.filter(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo));
+  const base = comCod.length ? comCod : pdfs;
+  const quando = x => String(x.data_arquivo || '') + '|' + String(x.criado_em || '');
+  return base.slice().sort((a, b) => quando(b).localeCompare(quando(a)))[0] || arqs[0] || null;
 }
 let apr = null;
 function apresentar(id, listaPronta = null) {

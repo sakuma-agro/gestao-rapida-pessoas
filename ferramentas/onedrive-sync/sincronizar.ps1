@@ -104,6 +104,24 @@ try {
   }
   $feito | ConvertTo-Json -Depth 2 | Set-Content -Encoding UTF8 $Estado
   if ($env -or $pul -or $err) { Log "Fim: $env enviado(s), $pul já estavam no app, $err erro(s)." }
+
+  # Datas dos arquivos (29/10/2026): uma vez, manda a data de cada arquivo já enviado para o app
+  # saber qual PDF é o mais novo quando a pasta tem mais de um. Depois a data vai junto em cada envio.
+  $DatasOk = Join-Path $Aqui 'datas-enviadas.ok'
+  if (-not (Test-Path $DatasOk)) {
+    $lista = foreach ($topo in $Topos) {
+      $raiz = Join-Path $Base $topo
+      if (Test-Path $raiz) {
+        Get-ChildItem -LiteralPath $raiz -File -Recurse -ErrorAction SilentlyContinue |
+          Where-Object { $_.Extension -match '^\.(pdf|jpe?g|png)$' } |
+          ForEach-Object { @{ o = 'onedrive:' + $_.FullName.Substring($Base.Length + 1).Replace('\', '/'); d = $_.LastWriteTime.ToString('yyyy-MM-dd') } }
+      }
+    }
+    $corpo = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @($lista) -Depth 3 -Compress))
+    $r = Invoke-RestMethod -Method Post -Uri "$Url`?acao=datas" -Headers $H -ContentType 'application/json; charset=utf-8' -Body $corpo -TimeoutSec 300
+    Log "Datas dos arquivos: $($r.atualizados) atualizada(s) de $(@($lista).Count)."
+    Set-Content -Path $DatasOk -Value (Get-Date)
+  }
 } catch {
   if ("$_" -ne 'parar') { Log "FALHOU: $($_.Exception.Message)" }
   if ($feito) { $feito | ConvertTo-Json -Depth 2 | Set-Content -Encoding UTF8 $Estado }

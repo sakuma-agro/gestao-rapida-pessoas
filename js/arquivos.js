@@ -177,7 +177,7 @@ export async function listarArquivos(area, tipo, dono) {
   let lista = lerCacheLista()[k] || [];
   if (navigator.onLine && estado.cliente) {
     const { data, error } = await estado.cliente.from('arquivos')
-      .select('chave,nome,mime,tamanho,criado_em').eq('area', area).eq('tipo', tipo).eq('dono_id', String(dono))
+      .select('chave,nome,mime,tamanho,criado_em,data_arquivo').eq('area', area).eq('tipo', tipo).eq('dono_id', String(dono))
       .order('criado_em');
     if (!error) { lista = data || []; gravarCacheLista(k, lista); }
   }

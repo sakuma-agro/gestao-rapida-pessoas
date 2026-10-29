@@ -22,6 +22,7 @@
 // Ações (?acao=):
 //   mapa                     GET  → documentos (id, codigo, por_fazenda) e itens (id, documento_id, fazenda)
 //   enviar&destino=doc|item|evid&id=&caminho=&nome=&data=   POST corpo = arquivo
+//   datas                    POST [{o: origem, d: data}] → arquivos.data_arquivo
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -124,7 +125,7 @@ const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 const slug = (s: string) => semAcento(s).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "arquivo";
 
 /** Grava (ou atualiza) o arquivo no Drive e na tabela arquivos. */
-async function gravar(chave: string, tipo: string, dono: string, nome: string, mime: string, corpo: Uint8Array, origem: string) {
+async function gravar(chave: string, tipo: string, dono: string, nome: string, mime: string, corpo: Uint8Array, origem: string, dataArquivo: string | null = null) {
   const atual = await db(`arquivos?select=drive_id&chave=eq.${encodeURIComponent(chave)}`);
   let driveId: string = atual?.[0]?.drive_id ?? "";
   if (driveId) {
@@ -149,7 +150,7 @@ async function gravar(chave: string, tipo: string, dono: string, nome: string, m
   }
   await db("arquivos?on_conflict=chave", {
     method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({ chave, area: "certificacao", tipo, dono_id: dono, nome, mime, tamanho: corpo.length, drive_id: driveId, origem, enviado_por: "onedrive@sakumasrv" }),
+    body: JSON.stringify({ chave, area: "certificacao", tipo, dono_id: dono, nome, mime, tamanho: corpo.length, drive_id: driveId, origem, enviado_por: "onedrive@sakumasrv", ...(dataArquivo ? { data_arquivo: dataArquivo } : {}) }),
   });
 }
 
@@ -185,7 +186,8 @@ async function enviar(req: Request, u: URL) {
     // mesmo nome enviado à mão (sem origem): o arquivo do OneDrive passa a ser a fonte e atualiza o mesmo registro
     if (igual?.length && igual[0].origem && igual[0].origem !== origem) return json({ ok: true, pulado: "ja-existe-no-app" });
     const chave = igual?.length ? igual[0].chave : `certificacao/documento/${id}/od-${sufixo}-${slug(nome)}.${ext}`;
-    await gravar(chave, "documento", String(id), nome, mime, corpo, origem);
+    // data do arquivo no OneDrive (29/10/2026): com dois PDFs na pasta, o app abre o mais novo
+    await gravar(chave, "documento", String(id), nome, mime, corpo, origem, data);
     return json({ ok: true, chave });
   }
 
@@ -232,6 +234,13 @@ Deno.serve(async (req) => {
     const acao = u.searchParams.get("acao") || "";
     if (acao === "mapa" && req.method === "GET") return await mapa();
     if (acao === "enviar" && req.method === "POST") return await enviar(req, u);
+    // datas (29/10/2026): [{o: origem, d: aaaa-mm-dd}] → arquivos.data_arquivo (data do arquivo no OneDrive)
+    if (acao === "datas" && req.method === "POST") {
+      const l = await req.json();
+      if (!Array.isArray(l) || l.length > 5000) return json({ erro: "lista-invalida" }, 400);
+      const n = await db("rpc/arquivos_marcar_datas", { method: "POST", body: JSON.stringify({ l }) });
+      return json({ ok: true, atualizados: n });
+    }
     return json({ erro: "acao-invalida" }, 400);
   } catch (e) {
     if (e instanceof Falha) { console.error(e.codigo, e.message); return json({ erro: e.codigo }, 502); }
