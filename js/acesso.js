@@ -284,36 +284,31 @@ export const MODULOS = [
     /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
        aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
     { id: 'ceFornSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
-      ['foPainel',     'Painel'],
-      ['foAvaliacoes', 'Avaliações'],
-      ['foCadastro',   'Cadastro'],
+      ['foPainel',     'Registros'],
+      ['foCadastro',   'Cadastros'],
     ] },
     /* Reunião GRASP (27/10/2026): FORM 044 — ata da reunião mensal com o
        representante dos trabalhadores e lista de presença. js/cert-grasp.js; tabela cg_reunioes. */
     { id: 'ceGraspSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 044', nome: 'Reunião GRASP', telas: [
-      ['gpPainel',    'Painel'],
-      ['gpReunioes',  'Reuniões'],
+      ['gpPainel',    'Registros'],
     ] },
     /* Resíduos (27/10/2026): gestão de resíduos — FORM 053 (POP 004): saídas
        em kg, avaliação mensal do manejo e indicadores. js/cert-residuos.js; tabelas cr_*. */
     { id: 'ceResiduosSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 053', nome: 'Resíduos', telas: [
-      ['rePainel',    'Painel'],
-      ['reSaidas',    'Saídas'],
+      ['rePainel',    'Registros'],
       ['reAvaliacao', 'Avaliação'],
       ['reTipos',     'Tipos'],
     ] },
     /* Energia (26/10/2026): consumo de energias — o FORM 043 virou painel.
        js/cert-energia.js; tabelas ce_fontes / ce_consumos. */
     { id: 'ceEnergiaSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 043', nome: 'Energia', telas: [
-      ['enPainel',      'Painel'],
-      ['enLancamentos', 'Lançamentos'],
+      ['enPainel',      'Registros'],
       ['enFontes',      'Fontes'],
     ] },
     /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
        trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
     { id: 'ceFaunaSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
-      ['faPainel',    'Painel'],
-      ['faRegistros', 'Registros'],
+      ['faPainel',    'Registros'],
       ['faEspecies',  'Espécies'],
       ['faCameras',   'Câmeras'],
     ] },
@@ -722,8 +717,19 @@ export function mostrarInicio() {
   aoTrocar('inicio');
 }
 
+/* Telas que viraram parte de outra (etapa 2 da Certificação, 29/10/2026): o
+   histórico mora embaixo do painel, na aba Registros. Link antigo cai lá e
+   rola até o histórico. */
+const TELA_JUNTA = { foAvaliacoes: 'foPainel', faRegistros: 'faPainel', enLancamentos: 'enPainel', reSaidas: 'rePainel', gpReunioes: 'gpPainel' };
+export const TELAS_JUNTAS = Object.fromEntries(Object.entries(TELA_JUNTA).map(([h, p]) => [p, h]));
+
 export function abrirModulo(id, tela) {
   if (!id) return;
+  if (TELA_JUNTA[tela]) {
+    const hist = 'tela' + tela[0].toUpperCase() + tela.slice(1);
+    tela = TELA_JUNTA[tela];
+    setTimeout(() => document.getElementById(hist)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+  }
   moduloAberto = id;
   $('navModulos').querySelectorAll('.aba').forEach(b =>
     b.setAttribute('aria-selected', String(b.dataset.modulo === id)));

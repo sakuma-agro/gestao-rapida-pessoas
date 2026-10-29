@@ -385,7 +385,8 @@ async function exportar() {
    ENTRADA
    =================================================================== */
 export const TELAS_FORNECEDORES = ['foPainel', 'foAvaliacoes', 'foCadastro'];
-const DESENHO = { foPainel: desenharPainel, foAvaliacoes: desenharAval, foCadastro: desenharCadastro };
+/* Etapa 2 (29/10/2026, claude/cert-redesenho-lean.md): a aba Registros mostra o painel e, logo abaixo, o histórico. */
+const DESENHO = { foPainel: () => { desenharPainel(); desenharAval(); }, foAvaliacoes: desenharAval, foCadastro: desenharCadastro };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }

@@ -611,7 +611,8 @@ async function exportar(k) {
    ENTRADA
    =================================================================== */
 export const TELAS_RESIDUOS = ['rePainel', 'reSaidas', 'reAvaliacao', 'reTipos'];
-const DESENHO = { rePainel: desenharPainel, reSaidas: desenharSaidas, reAvaliacao: desenharAvaliacao, reTipos: desenharTipos };
+/* Etapa 2 (29/10/2026, claude/cert-redesenho-lean.md): a aba Registros mostra o painel e, logo abaixo, o histórico. */
+const DESENHO = { rePainel: () => { desenharPainel(); desenharSaidas(); }, reSaidas: desenharSaidas, reAvaliacao: desenharAvaliacao, reTipos: desenharTipos };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }

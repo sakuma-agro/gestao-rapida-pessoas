@@ -41,7 +41,7 @@ import * as jd from './jornada-dados.js';
 import * as nucleo from './nucleo.js';
 import * as iv from './rh-ind-vinculos.js';
 import * as folhaPonto from './jornada-folhaponto.js';
-import { pode, podeTela, acesso } from './acesso.js';
+import { pode, podeTela, acesso, TELAS_JUNTAS } from './acesso.js';
 import { ligarBackup } from './backup.js';
 import { campoAnexos, contarPendentes as pendentesAnexos, enviarPendentes as enviarAnexos,
   fotosDe, urlDoArquivo } from './arquivos.js';
@@ -294,6 +294,13 @@ function abrirAba(nome) {
   for (const t of TELAS_TAREFAS) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_TAREFAS.includes(nome)) abrirTarefas(nome);
   if (nome.startsWith('tk')) abrirTicket(nome);
+  // Certificação, etapa 2 (29/10/2026): o histórico aparece logo abaixo do painel, na mesma aba
+  for (const [painel, hist] of Object.entries(TELAS_JUNTAS)) {
+    const el = $('tela' + hist[0].toUpperCase() + hist.slice(1));
+    if (!el) continue;
+    el.classList.toggle('tela-junta', nome === painel);
+    if (nome === painel) el.hidden = false;
+  }
 }
 
 /* =============== login =============== */

@@ -425,7 +425,8 @@ async function exportar() {
    ENTRADA
    =================================================================== */
 export const TELAS_GRASP = ['gpPainel', 'gpReunioes'];
-const DESENHO = { gpPainel: desenharPainel, gpReunioes: desenharReunioes };
+/* Etapa 2 (29/10/2026, claude/cert-redesenho-lean.md): a aba Registros mostra o painel e, logo abaixo, o histórico. */
+const DESENHO = { gpPainel: () => { desenharPainel(); desenharReunioes(); }, gpReunioes: desenharReunioes };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }

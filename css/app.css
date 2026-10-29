@@ -2341,3 +2341,7 @@ body.ce-apr-aberto{overflow:hidden}
 }
 .ce-ent-voltar{display:inline-flex;align-items:center;gap:6px}
 .ce-ent-voltar svg{width:16px;height:16px}
+
+/* Certificação, etapa 2: histórico logo abaixo do painel, na aba Registros (29/10/2026) */
+.tela-junta{margin-top:16px;scroll-margin-top:130px}
+.tela-junta > .cartao:first-child > .barra:first-child .btn.principal{display:none}

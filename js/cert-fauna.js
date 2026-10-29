@@ -902,7 +902,8 @@ async function exportar(regs) {
    ENTRADA DO MÓDULO
    =================================================================== */
 export const TELAS_FAUNA = ['faPainel', 'faRegistros', 'faEspecies', 'faCameras'];
-const DESENHO = { faPainel: desenharPainel, faRegistros: desenharRegistros, faEspecies: desenharEspecies, faCameras: desenharCameras };
+/* Etapa 2 (29/10/2026, claude/cert-redesenho-lean.md): a aba Registros mostra o painel e, logo abaixo, o histórico. */
+const DESENHO = { faPainel: () => { desenharPainel(); desenharRegistros(); }, faRegistros: desenharRegistros, faEspecies: desenharEspecies, faCameras: desenharCameras };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
 let telaAtual = '';
 function redesenhar() { DESENHO[telaAtual]?.(); }
