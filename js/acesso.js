@@ -268,6 +268,7 @@ export const MODULOS = [
     { id: 'ceSinalSub', nome: 'Sinalética', telas: [
       ['siPlacas',        'Placas'],
       ['siPlacasEstoque', 'Placas do estoque'],
+      ['siEtiquetasL',    'Etiquetas da pasta L'],
     ] },
     /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
        trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */

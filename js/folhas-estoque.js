@@ -213,8 +213,70 @@
     doc.text(cfg.frase, tx, bot - 7);
   }
 
+  /* ---------------- etiqueta da pasta L (80 × 110 mm) ----------------
+     Pedido dele (29/10/2026): "as folhas de estoque ficaram dentro de uma pasta
+     L transparente na prancheta; quero pôr uma etiqueta na pasta L de entrada e
+     saída. Medida 80x110 mm" — e "publique em sinaléticas". 4 por folha A4 em
+     pé, com marcas de corte; imprimir em tamanho real (100%). */
+  const EW = 80, EH = 110;
+  const FRASES = { entrada: ['Chegou produto?', 'Anote aqui antes de guardar.'],
+                   saida: ['Vai retirar produto?', 'Anote aqui antes de levar.'] };
+  function etiquetaL(doc, img, x, y, tipo, mov) {
+    const cfg = MOV[mov], COR = cfg.cor, cx = x + EW / 2, m = 3;
+    // marcas de corte nos cantos (para fora)
+    doc.setDrawColor(CORTE); doc.setLineWidth(0.15);
+    [[x, y], [x + EW, y], [x, y + EH], [x + EW, y + EH]].forEach(([px, py]) =>
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dx, dy]) => doc.line(px + dx * 1.5, py + dy * 1.5, px + dx * 4, py + dy * 4)));
+    doc.setDrawColor(COR); doc.setLineWidth(1.6); doc.setFillColor('#FFFFFF');
+    doc.roundedRect(x + m, y + m, EW - 2 * m, EH - 2 * m, 3, 3, 'FD');
+    // faixa colorida com a palavra
+    const fh = 30;
+    doc.setFillColor(COR);
+    doc.roundedRect(x + m, y + m, EW - 2 * m, fh, 3, 3, 'F');
+    doc.rect(x + m, y + m + fh - 5, EW - 2 * m, 5, 'F');
+    let fs = 34;
+    doc.setFont('helvetica', 'bold');
+    while (fs > 14) { doc.setFontSize(fs); if (doc.getTextWidth(cfg.titulo) <= EW - 2 * m - 8) break; fs -= 1; }
+    doc.setTextColor('#FFFFFF');
+    doc.text(cfg.titulo, cx, y + m + fh / 2, { align: 'center', baseline: 'middle' });
+    // logo, tipo, FORM e frase
+    const lh = 11, lw = lh * img.sakuma.w / img.sakuma.h;
+    doc.addImage(img.sakuma.url, 'PNG', cx - lw / 2, y + m + fh + 3, lw, lh);
+    const ty = y + m + fh + lh + 12;
+    fs = 20;
+    while (fs > 9) { doc.setFontSize(fs); if (doc.getTextWidth(tipo.nome.toUpperCase()) <= EW - 2 * m - 6) break; fs -= 0.5; }
+    doc.setTextColor(CINZA);
+    doc.text(tipo.nome.toUpperCase(), cx, ty, { align: 'center' });
+    doc.setFontSize(11); doc.setTextColor(COR);
+    doc.text(tipo.form, cx, ty + 7, { align: 'center' });
+    doc.setFontSize(10.5); doc.setTextColor(CINZA);
+    doc.text(FRASES[mov][0], cx, ty + 15, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(FRASES[mov][1], cx, ty + 20, { align: 'center' });
+    // seta para baixo
+    const aTop = ty + 24, aBot = y + EH - m - 5, larg = 16, haste = larg * 0.42, cab = (aBot - aTop) * 0.5;
+    doc.setFillColor(COR);
+    doc.rect(cx - haste / 2, aTop, haste, aBot - cab - aTop + 0.2, 'F');
+    doc.triangle(cx - larg / 2, aBot - cab, cx + larg / 2, aBot - cab, cx, aBot, 'F');
+  }
+
   /* ---------------- PDF ---------------- */
   async function montar(o) {
+    if (o.etiquetas) {
+      await carregarJsPdf();
+      const img = { sakuma: await imagem('sakuma-logo.png') };
+      const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      const lista = [];
+      for (const t of o.tipos) for (let c = 0; c < (o.copias || 1); c++) for (const m of o.movs) lista.push([t, m]);
+      const gap = 6, x0 = (210 - 2 * EW - gap) / 2, y0 = (297 - 2 * EH - gap) / 2;
+      const pos = [[x0, y0], [x0 + EW + gap, y0], [x0, y0 + EH + gap], [x0 + EW + gap, y0 + EH + gap]];
+      lista.forEach(([t, m], i) => {
+        if (i && i % 4 === 0) doc.addPage('a4', 'portrait');
+        etiquetaL(doc, img, pos[i % 4][0], pos[i % 4][1], t, m);
+      });
+      doc.setProperties({ title: o.titulo, author: 'SAKUMA Agronegócios' });
+      return doc;
+    }
     await carregarJsPdf();
     const img = { sakuma: await imagem('sakuma-logo.png'), lop: await imagem('lop-assinatura-laser-claro.png') };
     const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
@@ -297,7 +359,7 @@
 
   /**
    * Desenha a tela dentro de `el`.
-   * opcoes = { tela: 'folhas' | 'placas', estoques: [nomes] (padrão: os 5) }
+   * opcoes = { tela: 'folhas' | 'placas' | 'etiquetas', estoques: [nomes] (padrão: os 5) }
    */
   function desenhar(el, opcoes) {
     if (!el) return;
@@ -305,33 +367,36 @@
     const op = opcoes || {};
     const est = (op.estoques && op.estoques.length) ? op.estoques : ESTOQUES;
     const placas = op.tela === 'placas';
+    const etiq = op.tela === 'etiquetas';
     const chk = (nome, valor, rot, extra, marcado = true) =>
       `<label class="fe-op"><input type="checkbox" name="${nome}" value="${esc(valor)}"${marcado ? ' checked' : ''}>${rot}${extra ? `<small>${esc(extra)}</small>` : ''}</label>`;
 
     el.innerHTML = `
 <div class="cartao">
-  <h2>${placas ? 'Placas das pranchetas' : 'Folhas de entrada e saída'}</h2>
-  <p class="dica">${placas
+  <h2>${etiq ? 'Etiquetas da pasta L' : placas ? 'Placas das pranchetas' : 'Folhas de entrada e saída'}</h2>
+  <p class="dica">${etiq
+    ? 'Etiqueta de 80 × 110 mm para a pasta L transparente onde ficam as folhas da prancheta: ENTRADA em azul e SAÍDA em vermelho, com o tipo e o FORM. Saem 4 por folha A4, com marcas de corte. Imprima em <strong>tamanho real (100%)</strong>, sem "ajustar à página".'
+    : placas
     ? 'Placa para pendurar em cima da prancheta: ENTRADA em azul e SAÍDA em vermelho, com a seta para a folha. Sai uma folha A4 por tipo, com as duas placas e a linha de corte. Plastifique para durar.'
     : 'As folhas da prancheta de cada estoque: ENTRADA em azul e SAÍDA em vermelho, uma por tipo, com o nome do estoque e o FORM da Certificação já impressos. A4 deitado, 15 linhas por folha, corpo em cinza e branco para gastar pouca tinta.'}</p>
   <div class="fe-grade">
-    ${placas ? '' : `<div class="fe-bloco" data-grupo="est"><h3>Estoque</h3>
+    ${placas || etiq ? '' : `<div class="fe-bloco" data-grupo="est"><h3>Estoque</h3>
       ${est.map(e => chk('est', e, esc(e), '', est.length === 1 || !op.estoqueUnico)).join('')}
       ${est.length > 1 ? '<button type="button" class="fe-todos" data-alternar="est">marcar / desmarcar todos</button>' : ''}</div>`}
     <div class="fe-bloco" data-grupo="tipo"><h3>Tipo de estoque</h3>
       ${TIPOS.map(t => chk('tipo', t.id, esc(t.nome), t.form)).join('')}
       <button type="button" class="fe-todos" data-alternar="tipo">marcar / desmarcar todos</button></div>
-    <div class="fe-bloco"><h3>${placas ? 'Opções' : 'Folhas'}</h3>
-      ${placas
+    <div class="fe-bloco"><h3>${placas ? 'Opções' : etiq ? 'Etiquetas' : 'Folhas'}</h3>
+      ${placas && !etiq
         ? `<label class="campo">Nome do estoque na placa (opcional)
              <select name="estPlaca"><option value="">Sem nome — serve em qualquer estoque</option>${est.map(e => `<option>${esc(e)}</option>`).join('')}</select></label>`
         : `${chk('mov', 'entrada', '<span class="fe-tag" style="background:#1F5FA8"></span> Entrada', 'azul')}
            ${chk('mov', 'saida', '<span class="fe-tag" style="background:#C62828"></span> Saída', 'vermelho')}`}
-      <label class="campo" style="margin-top:8px">Cópias de cada ${placas ? 'folha de placas' : 'folha'}
+      <label class="campo" style="margin-top:8px">Cópias de cada ${etiq ? 'etiqueta' : placas ? 'folha de placas' : 'folha'}
         <input class="fe-num" type="number" name="copias" min="1" max="20" value="1"></label>
     </div>
   </div>
-  ${placas ? '' : `<h3 class="fe-sub">O que vai em cada folha</h3><div class="fe-colunas" data-colunas></div>`}
+  ${placas || etiq ? '' : `<h3 class="fe-sub">O que vai em cada folha</h3><div class="fe-colunas" data-colunas></div>`}
   <p class="fe-resumo" data-resumo></p>
   <div class="barra fim">
     <button type="button" class="btn" data-acao="baixar">Baixar PDF</button>
@@ -343,6 +408,12 @@
     const ler = () => {
       const tipos = TIPOS.filter(t => marcados('tipo').includes(t.id));
       const copias = Math.max(1, Math.min(20, Number(el.querySelector('[name=copias]').value) || 1));
+      if (etiq) {
+        const movs = ['entrada', 'saida'].filter(m => marcados('mov').includes(m));
+        const n = tipos.length * movs.length * copias;
+        return { etiquetas: true, tipos, movs, copias, n, paginas: Math.ceil(n / 4),
+          titulo: 'Etiquetas da pasta L — entrada e saída (80 × 110 mm)', arquivo: 'Etiquetas_Pasta_L_80x110' };
+      }
       if (placas) {
         const estoquePlaca = el.querySelector('[name=estPlaca]').value;
         return { placas: true, tipos, copias, estoquePlaca, paginas: tipos.length * copias,
@@ -373,10 +444,11 @@
     };
     const resumo = () => {
       const o = ler();
-      if (!placas) desenharColunas(o.tipos);
-      el.querySelector('[data-resumo]').innerHTML = o.paginas
-        ? `Vai sair <strong>${o.paginas} folha${o.paginas > 1 ? 's' : ''} A4</strong> deitada${o.paginas > 1 ? 's' : ''}${placas ? ` (${o.paginas * 2} placas)` : ''}.`
-        : 'Marque pelo menos um item em cada bloco.';
+      if (!placas && !etiq) desenharColunas(o.tipos);
+      el.querySelector('[data-resumo]').innerHTML = !o.paginas ? 'Marque pelo menos um item em cada bloco.'
+        : etiq ? `Vão sair <strong>${o.n} etiqueta${o.n > 1 ? 's' : ''}</strong> de 80 × 110 mm em ${o.paginas} folha${o.paginas > 1 ? 's' : ''} A4.`
+        : `Vai sair <strong>${o.paginas} folha${o.paginas > 1 ? 's' : ''} A4</strong> deitada${o.paginas > 1 ? 's' : ''}${placas ? ` (${o.paginas * 2} placas)` : ''}.`
+        ;
       el.querySelectorAll('[data-acao]').forEach(b => { b.disabled = !o.paginas; });
     };
     el.addEventListener('change', resumo);
