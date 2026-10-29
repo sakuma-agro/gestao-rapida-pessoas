@@ -260,6 +260,12 @@ export const MODULOS = [
       ['ccCalibracoes', 'Calibrações'],
       ['ccRelatorios',  'Relatórios'],
     ] },
+    /* Sinalética (29/10/2026, pedido dele: "as placas crie em certificação, o
+       módulo sinalética, e já coloca essas"): placas para imprimir. Começa com
+       as placas das pranchetas de ENTRADA e SAÍDA do estoque (js/folhas-estoque.js). */
+    { id: 'ceSinalSub', nome: 'Sinalética', telas: [
+      ['siPlacasEstoque', 'Placas do estoque'],
+    ] },
     /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de
        trilha — o FORM 050 virou painel. js/cert-fauna.js; tabelas cf_*. */
     { id: 'ceFaunaSub', grupo: 'FORMS Digital', codigo: 'FORM 050', nome: 'Biodiversidade', telas: [
@@ -315,7 +321,6 @@ export const MODULOS = [
        (nem todos têm acesso à Certificação). js/folhas-estoque.js. */
     { id: 'ceFolhasEstSub', grupo: 'FORMS Digital', codigo: 'FORM 048 · 049 · 055–057', nome: 'Folhas de estoque', telas: [
       ['feFolhas', 'Folhas de entrada e saída'],
-      ['fePlacas', 'Placas das pranchetas'],
     ] },
     /* Melhoria contínua (26/10/2026): registro de melhorias, não conformidades,
        reclamações, sugestões e elogios — a planilha FORMAGR-42A sem as
@@ -745,7 +750,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta',
 };
 const iconeSub = (s, id) => ICONE_SUB[s.id] || ICONE_TELA[s.telas[0]?.[0]] || ICONE_MODULO[id] || 'lista';
 /* Submódulo aberto na faixa (null = nível dos submódulos) e última tela usada em cada um. */
