@@ -117,6 +117,7 @@ const ORIGENS = {
   'cert-req':   { nome: 'Certificação › Requisitos', area: 'cert' },
   'cert-aud':   { nome: 'Certificação › Auditorias e certificados', area: 'cert' },
   'cert-acoes': { nome: 'Certificação › Ações de melhoria', area: 'cert' },
+  'cert-docs':  { nome: 'Certificação › Documentos por fazenda (AN)', area: 'cert' },
   'proj':       { nome: 'Projetos (PMBOK)', area: 'proj' },
   'rh-sd':      { nome: 'RH › Salário digno (planos de ação)', area: 'rh' },
   'reuniao':    { nome: 'Reunião semanal › Atividades do escritório', area: 'esc' },
@@ -323,6 +324,47 @@ const FONTES = [
     .filter(a => naJanela(a.quando) && !resolvido(a.status))
     .map(a => ({ chave: `cert-acoes:${a.id}:${a.quando}`, origem: 'cert-acoes', data: a.quando,
       titulo: `Ação de melhoria: ${a.oque || ''}`, respTexto: a.quem }))],
+  /* Documentos por fazenda (AN), 29/10/2026: vencimento de cada item (validade
+     informada ou última data + periodicidade). AN 55 (devolução de embalagens):
+     próxima devolução programada e, se a devolução já foi feita, o prazo de 7 dias
+     para os documentos carimbados voltarem. Mesmo AN + mesma data = um card só. */
+  ['cert-docs', async () => {
+    const [its, docs, faz] = await Promise.all([
+      pegar(cli().from('cert_doc_itens').select('id,documento_id,fazenda_id,local,periodicidade,ultima_data,validade,aguardando_data').eq('ativo', true)),
+      pegar(cli().from('cert_documentos').select('id,codigo,nome,periodicidade')),
+      pegar(cli().from('jor_fazendas').select('id,nome')).catch(() => []),
+    ]);
+    const MESES = { 'Mensal': 1, 'Trimestral': 3, 'Semestral': 6, 'Anual': 12, 'A cada 2 anos': 24, 'A cada 3 anos': 36 };
+    const somaMeses = (s, m) => { const [a, mm, d] = s.split('-').map(Number); const ult = new Date(a, mm - 1 + m + 1, 0).getDate();
+      const x = new Date(a, mm - 1 + m, Math.min(d, ult)); return iso(x); };
+    const ondeDe = i => [faz.find(f => f.id === i.fazenda_id)?.nome, i.local].filter(Boolean).join(' · ') || 'Geral';
+    const grupos = new Map();
+    const junta = (d, tipo, data, titulo, onde) => {
+      if (!naJanela(data)) return;
+      const k = `${d.id}:${tipo}:${data}`;
+      if (!grupos.has(k)) grupos.set(k, { k, data, titulo, onde: [] });
+      grupos.get(k).onde.push(onde);
+    };
+    for (const i of its) {
+      const d = docs.find(x => x.id === i.documento_id);
+      if (!d) continue;
+      const cod = d.codigo ? d.codigo + ' — ' : '';
+      if (/devolu[cç][aã]o de embalage/i.test(d.nome || '')) {
+        if (i.validade) junta(d, 'dev', i.validade, `${cod}Devolução de embalagens programada`, ondeDe(i));
+        if (i.aguardando_data) junta(d, 'doc', addDias(i.aguardando_data, 7),
+          `${cod}Receber documentos carimbados da devolução de ${br(i.aguardando_data)}`, ondeDe(i));
+        continue;
+      }
+      const m = MESES[i.periodicidade || d.periodicidade];
+      const v = i.validade || (m && i.ultima_data ? somaMeses(i.ultima_data, m) : null);
+      if (v) junta(d, 'v', v, `${cod}${d.nome} vence`, ondeDe(i));
+    }
+    return [...grupos.values()].map(g => ({
+      chave: `cert-docs:${g.k}`, origem: 'cert-docs', data: g.data,
+      titulo: g.onde.length > 1 ? `${g.titulo} — ${g.onde.length} locais` : `${g.titulo} — ${g.onde[0]}`,
+      detalhes: g.onde.sort((a, b) => a.localeCompare(b, 'pt-BR')), detRot: ['local', 'locais'],
+    }));
+  }],
   ['proj', async () => {
     const [pjs, eap, oc] = await Promise.all([
       pegar(cli().from('pj_projetos').select('id,nome,codigo,fim_previsto,situacao,ativo')),
@@ -774,7 +816,7 @@ function abrirItem(chave) {
     <h3>${nova ? 'Nova tarefa' : esc(it.titulo)}</h3>
     ${it ? `<p class="cr-dlg-orig">${tagArea(it.area)} ${esc(it.origemNome)}${it.auto ? ' · automático' : ''} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
     ${it?.texto ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
-    ${it?.detalhes?.length ? `<div class="cr-dlg-det"><b>${it.detalhes.length} ${it.detalhes.length === 1 ? 'pessoa' : 'pessoas'}</b><ul>${it.detalhes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
+    ${it?.detalhes?.length ? `<div class="cr-dlg-det"><b>${it.detalhes.length} ${(it.detRot || ['pessoa', 'pessoas'])[it.detalhes.length === 1 ? 0 : 1]}</b><ul>${it.detalhes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
     ${editavel ? `<div class="grade">
       <label class="campo plena">Tarefa<input id="crTit" required maxlength="160" value="${esc(t?.titulo || '')}" placeholder="O que precisa ser feito"></label>
       <label class="campo plena">Detalhes<textarea id="crDesc" rows="2" placeholder="Opcional">${esc(t?.descricao || '')}</textarea></label>
