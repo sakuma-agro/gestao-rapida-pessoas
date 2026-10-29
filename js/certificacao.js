@@ -1354,13 +1354,15 @@ async function pdfVigente(d) {
   return escolherVigente(d, arqs);
 }
 /* PDF vigente (29/10/2026, AN 97 abria o plano de 2024 em vez do PGRS de 2026): entre os PDFs
-   com o código do documento no nome (se houver algum), o de data mais nova no OneDrive
-   (arquivos.data_arquivo); sem data, o enviado por último. */
+   com o código do documento no nome (se houver algum), o da pasta de ANO mais novo (ele cria
+   AN xx\2024, AN xx\2026…), depois o de data mais nova no OneDrive (arquivos.data_arquivo);
+   sem data, o enviado por último. */
+const anoDaPasta = x => { const m = String(x.origem || '').split('/').slice(0, -1).map(p => p.trim()).filter(p => /^(19|20)\d\d$/.test(p)); return m.length ? m[m.length - 1] : '0000'; };
 function escolherVigente(d, arqs) {
   const pdfs = arqs.filter(ehPdf);
   const comCod = pdfs.filter(x => chaveCodigo(x.nome) === chaveCodigo(d.codigo));
   const base = comCod.length ? comCod : pdfs;
-  const quando = x => String(x.data_arquivo || '') + '|' + String(x.criado_em || '');
+  const quando = x => anoDaPasta(x) + '|' + String(x.data_arquivo || '') + '|' + String(x.criado_em || '');
   return base.slice().sort((a, b) => quando(b).localeCompare(quando(a)))[0] || arqs[0] || null;
 }
 let apr = null;

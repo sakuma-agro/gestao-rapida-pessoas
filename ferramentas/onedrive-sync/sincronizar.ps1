@@ -1,13 +1,12 @@
 ﻿# LOP - Gestão Rápida — sincroniza a pasta da Certificação no OneDrive com o app.
 # Roda no sakumasrv a cada hora (tarefa agendada "LOP - Sincronizar OneDrive").
 #
-# Varre 1 - POP, 2 - FORM, 3 - AN e 4 - POLÍTICAS dentro de "Certificação - Lop Gestão Rápida"
+# Varre 1 - POP, 2 - FORM, 3 - AN, 4 - POLÍTICAS e 5 - RG (registros: todo arquivo vira registro do RG) dentro de "Certificação - Lop Gestão Rápida"
 # e manda para o app cada PDF/foto novo ou alterado (até 15 MB):
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
 #   - arquivo na subpasta EVIDÊNCIAS de um documento -> evidência do documento
-#   - arquivo em 5 - RG\RG xxx\... -> registro (evidência) do RG xxx
-# Não apaga nada no app nem no OneDrive. Pastas "bkp" e "HISTÓRICO" ficam de fora (versões antigas não vão para o app).
+# Não apaga nada no app nem no OneDrive. Pastas "bkp" ficam de fora.
 # Registro do que já subiu: estado.json; o que aconteceu: sincronizar.log (nesta pasta).
 
 $ErrorActionPreference = 'Stop'
@@ -29,6 +28,24 @@ function SemAcento($s) {
   -join ($n.ToCharArray() | Where-Object { [Globalization.CharUnicodeInfo]::GetUnicodeCategory($_) -ne 'NonSpacingMark' })
 }
 function Chave($s) { (SemAcento $s).ToUpperInvariant().Trim() }
+
+# Atalho "Abrir no computador" do LOP (29/10/2026, pedido do Guilherme: "faça você"): instala uma vez,
+# para este usuário, o link lop-pasta: que abre no Explorador a pasta pedida pelo app.
+try {
+  $AbrirDir = Join-Path $env:LOCALAPPDATA 'LOP'
+  $AbrirPs1 = Join-Path $AbrirDir 'abrir-pasta.ps1'
+  $AbrirOrig = Join-Path $Base '_ferramentas\Abrir pasta no computador\abrir-pasta.ps1'
+  if ((Test-Path -LiteralPath $AbrirOrig) -and -not (Test-Path 'HKCU:\Software\Classes\lop-pasta\shell\open\command')) {
+    New-Item -ItemType Directory -Force -Path $AbrirDir | Out-Null
+    Copy-Item -LiteralPath $AbrirOrig -Destination $AbrirPs1 -Force
+    $k = 'HKCU:\Software\Classes\lop-pasta'
+    New-Item -Force -Path "$k\shell\open\command" | Out-Null
+    Set-Item -Path $k -Value 'URL:LOP - abrir pasta'
+    New-ItemProperty -Force -Path $k -Name 'URL Protocol' -Value '' | Out-Null
+    Set-Item -Path "$k\shell\open\command" -Value ('powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $AbrirPs1 + '" "%1"')
+    Log 'Atalho "Abrir no computador" (lop-pasta:) instalado para este usuário.'
+  }
+} catch { Log "Atalho lop-pasta não instalado: $($_.Exception.Message)" }
 
 # uma execução por vez (se a anterior travou há mais de 3 h, segue)
 if (Test-Path $Trava) {
@@ -81,9 +98,12 @@ try {
           # subpasta EVIDÊNCIAS -> evidência do documento (linha do tempo)
           $destino = 'evid'
         } elseif ($doc.por_fazenda -and $resto.Contains('\')) {
-          $faz = Chave ($resto.Split('\')[0])
-          $k = "$($doc.id)|$faz"
-          if ($itens.ContainsKey($k)) { $destino = 'item'; $id = $itens[$k] }
+          # a pasta da fazenda pode estar logo abaixo do AN ou dentro da pasta do ano (AN xx\2026\FAZ. FACA\...) — 29/10/2026
+          $segs = $resto.Split('\'); $segs = $segs[0..($segs.Length - 2)]
+          foreach ($sg in $segs) {
+            $k = "$($doc.id)|$(Chave $sg)"
+            if ($itens.ContainsKey($k)) { $destino = 'item'; $id = $itens[$k]; break }
+          }
         }
         $mime = switch -regex ($a.Extension.ToLower()) { '\.pdf' { 'application/pdf' } '\.png' { 'image/png' } default { 'image/jpeg' } }
         $q = "acao=enviar&destino=$destino&id=$([uri]::EscapeDataString([string]$id))" +
@@ -105,10 +125,10 @@ try {
   $feito | ConvertTo-Json -Depth 2 | Set-Content -Encoding UTF8 $Estado
   if ($env -or $pul -or $err) { Log "Fim: $env enviado(s), $pul já estavam no app, $err erro(s)." }
 
-  # Datas dos arquivos (29/10/2026): uma vez, manda a data de cada arquivo já enviado para o app
-  # saber qual PDF é o mais novo quando a pasta tem mais de um. Depois a data vai junto em cada envio.
-  $DatasOk = Join-Path $Aqui 'datas-enviadas.ok'
-  if (-not (Test-Path $DatasOk)) {
+  # Lista dos arquivos (29/10/2026): a cada rodada manda caminho e data de todos os arquivos. O app grava a
+  # data (abre o PDF mais novo / da pasta de ano mais novo) e tira os PDFs que saíram da pasta (movidos para
+  # a pasta do ano, renomeados ou apagados). Só limpa se a lista vier completa (proteção no banco).
+  if ($true) {
     $lista = foreach ($topo in $Topos) {
       $raiz = Join-Path $Base $topo
       if (Test-Path $raiz) {
@@ -119,8 +139,7 @@ try {
     }
     $corpo = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject @($lista) -Depth 3 -Compress))
     $r = Invoke-RestMethod -Method Post -Uri "$Url`?acao=datas" -Headers $H -ContentType 'application/json; charset=utf-8' -Body $corpo -TimeoutSec 300
-    Log "Datas dos arquivos: $($r.atualizados) atualizada(s) de $(@($lista).Count)."
-    Set-Content -Path $DatasOk -Value (Get-Date)
+    if ($r.datas -or $r.removidos) { Log "Lista dos arquivos: $($r.datas) data(s) atualizada(s), $($r.removidos) arquivo(s) que saíram da pasta tirados do app ($($r.lista) na pasta)." }
   }
 } catch {
   if ("$_" -ne 'parar') { Log "FALHOU: $($_.Exception.Message)" }

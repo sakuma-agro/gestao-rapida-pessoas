@@ -22,7 +22,7 @@
 // Ações (?acao=):
 //   mapa                     GET  → documentos (id, codigo, por_fazenda) e itens (id, documento_id, fazenda)
 //   enviar&destino=doc|item|evid&id=&caminho=&nome=&data=   POST corpo = arquivo
-//   datas                    POST [{o: origem, d: data}] → arquivos.data_arquivo
+//   datas                    POST [{o: origem, d: data}] → arquivos.data_arquivo; tira os PDFs de documento que saíram da pasta
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -181,11 +181,12 @@ async function enviar(req: Request, u: URL) {
   if (destino === "doc") {
     const d = await db(`cert_documentos?select=id&id=eq.${encodeURIComponent(id)}`);
     if (!d?.length) return json({ erro: "documento-nao-encontrado" }, 404);
-    // já foi enviado à mão com o mesmo nome? não duplica
-    const igual = await db(`arquivos?select=chave,origem&area=eq.certificacao&tipo=eq.documento&dono_id=eq.${encodeURIComponent(id)}&nome=eq.${encodeURIComponent(nome)}`);
-    // mesmo nome enviado à mão (sem origem): o arquivo do OneDrive passa a ser a fonte e atualiza o mesmo registro
-    if (igual?.length && igual[0].origem && igual[0].origem !== origem) return json({ ok: true, pulado: "ja-existe-no-app" });
-    const chave = igual?.length ? igual[0].chave : `certificacao/documento/${id}/od-${sufixo}-${slug(nome)}.${ext}`;
+    // O mesmo arquivo (mesmo caminho) atualiza o registro dele. Mesmo nome em outra pasta (ex.: 2024/PGRS.pdf
+    // e 2026/PGRS.pdf, pastas de ano — 29/10/2026) é outro arquivo. Só o enviado à mão (sem origem) com o
+    // mesmo nome é assumido pelo arquivo do OneDrive.
+    const mesmo = await db(`arquivos?select=chave&area=eq.certificacao&tipo=eq.documento&origem=eq.${encodeURIComponent(origem)}`);
+    const igual = mesmo?.length ? [] : await db(`arquivos?select=chave&area=eq.certificacao&tipo=eq.documento&dono_id=eq.${encodeURIComponent(id)}&nome=eq.${encodeURIComponent(nome)}&origem=is.null`);
+    const chave = mesmo?.length ? mesmo[0].chave : igual?.length ? igual[0].chave : `certificacao/documento/${id}/od-${sufixo}-${slug(nome)}.${ext}`;
     // data do arquivo no OneDrive (29/10/2026): com dois PDFs na pasta, o app abre o mais novo
     await gravar(chave, "documento", String(id), nome, mime, corpo, origem, data);
     return json({ ok: true, chave });
@@ -239,7 +240,7 @@ Deno.serve(async (req) => {
       const l = await req.json();
       if (!Array.isArray(l) || l.length > 5000) return json({ erro: "lista-invalida" }, 400);
       const n = await db("rpc/arquivos_marcar_datas", { method: "POST", body: JSON.stringify({ l }) });
-      return json({ ok: true, atualizados: n });
+      return json({ ok: true, ...(n || {}) });
     }
     return json({ erro: "acao-invalida" }, 400);
   } catch (e) {
