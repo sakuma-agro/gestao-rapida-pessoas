@@ -426,6 +426,8 @@
 .ev-quadro td:first-child { text-align: left; font-weight: 700; }
 .ev-cx { display: inline-block; width: 3.6mm; height: 3.6mm; border: 0.3mm solid #1B232B; vertical-align: middle; }
 .ev-fora td { color: #A8AA9E; background: #F2F2EF; }
+.ev-anual { margin-top: 2mm; }
+.ev-anual th { font-size: 7.8pt; }
 .ev-legenda { margin-top: auto; padding-top: 1.5mm; font-size: 8.5pt; text-align: center; color: #51534A; }
 @media print {
   .ev-etq, .ev-quadro th, .ev-fora td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

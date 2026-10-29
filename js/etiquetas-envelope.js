@@ -8,7 +8,8 @@
 //
 // Logo da SAKUMA (img/sakuma-logo.png, como enviada) no canto do topo,
 // ao lado do nome (pedido de 29/10/2026).
-// Medidas: etiqueta 100 mm de largura (pedido dele) × 120 mm de altura.
+// Embaixo do quadro mensal, os itens do ano: Férias, 13º 1ª e 2ª parcela.
+// Medidas: etiqueta 100 mm de largura (pedido dele) × 132 mm de altura.
 // Folha A4 em pé com 2 etiquetas, uma embaixo da outra, centralizadas.
 // Os meses antes da admissão (no ano escolhido) saem em cinza, sem caixinha.
 // Seleção e departamento trocado ficam só neste navegador.
@@ -24,10 +25,12 @@ const dataBr = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || 
 
 export const TELAS_ENVELOPE = ['etqEnvelopes'];
 
-const ETQ = { w: 100, h: 120 };
-const PAGINA = { w: 210, h: 297, porFolha: 2, topo: 14, vao: 14 };
+const ETQ = { w: 100, h: 132 };
+const PAGINA = { w: 210, h: 297, porFolha: 2, topo: 12, vao: 8 };
 const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 const DOCS = ['Holerite', 'Folha de ponto', 'Recibo'];
+/* Itens do ano (pedido de 29/10/2026): uma caixinha cada, embaixo do quadro mensal. */
+const ANUAIS = ['Férias', '13º · 1ª parcela', '13º · 2ª parcela'];
 
 const CHAVE = 'gr-etiquetas-envelopes';
 const est = { ano: new Date().getFullYear(), situacao: 'ATIVO', fazenda: '', busca: '', marcados: [], depto: {} };
@@ -165,6 +168,10 @@ function etiquetaHtml(f) {
     <table class="ev-quadro">
       <thead><tr><th>Mês</th>${DOCS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
       <tbody>${meses}</tbody>
+    </table>
+    <table class="ev-quadro ev-anual">
+      <thead><tr><th>Ano</th>${ANUAIS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+      <tbody><tr><td>${ano}</td>${ANUAIS.map(() => '<td><span class="ev-cx"></span></td>').join('')}</tr></tbody>
     </table>
     <div class="ev-legenda"><b>x</b> = arquivado &nbsp;·&nbsp; <b>o</b> = não tem</div>
   </div>`;
