@@ -167,7 +167,7 @@ async function carregarCadeia(c) {
     (ccl.data || []).forEach(x => { (porDoc[x.documento_id] = porDoc[x.documento_id] || []).push(x.data); });
     S.docs.filter(d => prefixoDoc(d) === 'CL').forEach(d => {
       const k = chaveCodigo(d.codigo);
-      EVID_APP[k] = { nome: 'Check List Digital — preenchimentos no app', tela: 'clRegistros' };
+      EVID_APP[k] = { nome: 'CHECKS Digital — preenchimentos no app', tela: 'clRegistros' };
       S.viva[k] = contaMeses(porDoc[d.id] || []);
     });
   }

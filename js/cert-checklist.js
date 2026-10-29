@@ -122,7 +122,7 @@ function desenharLista() {
         <button class="btn" type="button" data-branco="${esc(d.id)}">Em branco</button></div></div>`;
   };
   tela.innerHTML = `<div class="cartao naoimprimir">
-    ${cabecalho('Check List Digital', 'Preencha no celular: marque C, NC ou NA em cada item, tire foto e grave. Item NC abre uma não conformidade no FORM 004. Cada preenchimento conta como registro do RG CL.')}
+    ${cabecalho('CHECKS Digital', 'Preencha no celular: marque C, NC ou NA em cada item, tire foto e grave. Item NC abre uma não conformidade no FORM 004. Cada preenchimento conta como registro do RG CL.')}
     ${comMod.length ? `<div class="cl-cards">${comMod.map(cartao).join('')}</div>` : '<div class="vazio" style="margin-top:12px">Nenhum check list digital ainda. Crie em <b>Modelos</b>.</div>'}
     ${semMod.length ? `<div class="qp-bloco"><h3>CL da Lista mestra ainda sem versão digital</h3>
       ${semMod.map(d => `<div class="barra entre" style="margin:4px 0"><span><b>${esc(d.codigo)}</b> ${esc(d.nome)}</span><button class="btn mini" type="button" data-criar="${esc(d.id)}">Criar versão digital</button></div>`).join('')}</div>` : ''}
@@ -396,7 +396,7 @@ async function exportar(l) {
   const linhas = [];
   l.forEach(r => (r.respostas || []).forEach(x => linhas.push([r.data, codDe(r.documento_id), ROT_FAZ[r.fazenda] || r.fazenda || '', r.avaliado || '', r.atividade || '', r.local || '', x.texto, x.st || '', x.obs || '', x.nc_id ? 'Sim' : '', r.responsavel || ''])));
   await baixarXlsx(`check-lists-${hoje()}.xlsx`, [
-    { nome: 'Check lists', titulo: 'Check List Digital — itens respondidos', subtitulo: `SAKUMA Agronegócios · emitido em ${br(hoje())}`,
+    { nome: 'Check lists', titulo: 'CHECKS Digital — itens respondidos', subtitulo: `SAKUMA Agronegócios · emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Data', larg: 12, tipo: 'data' }, { rot: 'CL', larg: 8 }, { rot: 'Fazenda', larg: 18 }, { rot: 'Avaliado', larg: 28 }, { rot: 'Atividade', larg: 20 },
         { rot: 'Local', larg: 18 }, { rot: 'Item', larg: 36 }, { rot: 'Resultado', larg: 10 }, { rot: 'Observação', larg: 34 }, { rot: 'NC aberta', larg: 10 }, { rot: 'Feito por', larg: 24 }],
       linhas },

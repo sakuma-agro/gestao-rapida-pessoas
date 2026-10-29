@@ -269,7 +269,7 @@ export const MODULOS = [
        criar Check list digitais, aonde tem como pôr foto e deixar registrado"):
        C/NC/NA por item com foto, NC abre não conformidade no FORM 004, cada um
        conta como RG CL nn. js/cert-checklist.js; tabelas ccl_modelos e ccl_registros. */
-    { id: 'ceClSub', nome: 'Check List Digital', telas: [
+    { id: 'ceClSub', nome: 'CHECKS Digital', telas: [
       ['clLista',     'Check lists'],
       ['clRegistros', 'Registros'],
       ['clModelos',   'Modelos'],
