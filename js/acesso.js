@@ -262,8 +262,11 @@ export const MODULOS = [
     ] },
     /* Sinalética (29/10/2026, pedido dele: "as placas crie em certificação, o
        módulo sinalética, e já coloca essas"): placas para imprimir. Começa com
-       as placas das pranchetas de ENTRADA e SAÍDA do estoque (js/folhas-estoque.js). */
+       as placas das pranchetas de ENTRADA e SAÍDA do estoque (js/folhas-estoque.js).
+       Placas (29/10/2026): as da pasta 18 - Placas, com miniatura para marcar e
+       imprimir — js/sinaletica.js, arquivos em sinaletica/. */
     { id: 'ceSinalSub', nome: 'Sinalética', telas: [
+      ['siPlacas',        'Placas'],
       ['siPlacasEstoque', 'Placas do estoque'],
     ] },
     /* Biodiversidade (26/10/2026): monitoramento de animais pelas câmeras de

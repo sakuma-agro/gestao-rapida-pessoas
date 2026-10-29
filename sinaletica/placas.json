@@ -1,0 +1,929 @@
+{
+ "atualizado": "2026-10-29",
+ "pasta": "1 - ADM - PRINCIPAL\\18 - Placas",
+ "categorias": {
+  "seg": "Atenção e segurança",
+  "epi": "EPI",
+  "hig": "Higiene",
+  "def": "Defensivos e calda",
+  "des": "Descarte e reciclagem",
+  "loc": "Identificação de locais",
+  "est": "Estacionamento de máquinas",
+  "map": "Mapas e emergência",
+  "com": "Comunicados e avisos"
+ },
+ "placas": [
+  {
+   "id": "atencao-acesso-restrito",
+   "titulo": "Atenção – Acesso restrito",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "atencao-nao-retirar-itens-do-kit-de-emergencia",
+   "titulo": "Atenção – Não retirar itens do kit de emergência",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "seguranca-kit-de-emergencia-acidente-ambiental",
+   "titulo": "Segurança – Kit de emergência (acidente ambiental)",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "seguranca-proibido-fumar-celular-e-fogo",
+   "titulo": "Segurança – Proibido fumar, celular e fogo",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "seguranca-tomar-banho-apos-a-aplicacao",
+   "titulo": "Segurança – Tomar banho após a aplicação",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "lembre-se-guarde-as-ferramentas",
+   "titulo": "Lembre-se – Guarde as ferramentas",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "atencao-ao-abastecer-anotar-maquina-e-diesel",
+   "titulo": "Atenção – Ao abastecer, anotar máquina e diesel",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-fechar-as-portas-antes-de-transportar",
+   "titulo": "Atenção – Fechar as portas antes de transportar",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-110v-4-etiquetas",
+   "titulo": "Atenção 110V (4 etiquetas)",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 339,
+   "alt": 190
+  },
+  {
+   "id": "aviso-aquecedor-de-marmita",
+   "titulo": "Aviso – Aquecedor de marmita",
+   "cat": "seg",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-epis-necessarios-para-pulverizacao",
+   "titulo": "Atenção – EPIs necessários para pulverização",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "atencao-lavagem-de-epi",
+   "titulo": "Atenção – Lavagem de EPI",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "atencao-secagem-de-epi",
+   "titulo": "Atenção – Secagem de EPI",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "atencao-deposito-de-roupa-suja-pos-aplicacao",
+   "titulo": "Atenção – Depósito de roupa suja pós aplicação",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "atencao-como-vestir-o-epi",
+   "titulo": "Atenção – Como vestir o EPI",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-como-retirar-o-epi",
+   "titulo": "Atenção – Como retirar o EPI",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "seguranca-uso-obrigatorio-de-epi",
+   "titulo": "Segurança – Uso obrigatório de EPI",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "aviso-visitantes-uso-obrigatorio-de-epi",
+   "titulo": "Aviso – Visitantes: uso obrigatório de EPI",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "aviso-descarte-de-epis",
+   "titulo": "Aviso – Descarte de EPIs",
+   "cat": "epi",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-manipulacao-de-alimentos",
+   "titulo": "Atenção – Manipulação de alimentos",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "obrigatorio-lavar-as-maos",
+   "titulo": "Obrigatório lavar as mãos",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "lavagem-das-maos-passo-a-passo",
+   "titulo": "Lavagem das mãos – passo a passo",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "alcool-gel-higienize-suas-maos",
+   "titulo": "Álcool gel – higienize suas mãos",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "alcool-gel-2-por-folha",
+   "titulo": "Álcool gel (2 por folha)",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "higiene-nao-urine-no-chao-jogue-o-papel",
+   "titulo": "Higiene – Não urine no chão, jogue o papel",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "higiene-papel-toalha",
+   "titulo": "Higiene – Papel toalha",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "higiene-proibido-jogar-papel-no-vaso",
+   "titulo": "Higiene – Proibido jogar papel no vaso",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "aviso-agua-nao-potavel",
+   "titulo": "Aviso – Água não potável",
+   "cat": "hig",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-proibida-a-reutilizacao-de-embalagens-de-defensivos",
+   "titulo": "Atenção – Proibida a reutilização de embalagens de defensivos",
+   "cat": "def",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "preparo-de-calda-passo-a-passo",
+   "titulo": "Preparo de calda – passo a passo",
+   "cat": "def",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "preparo-de-calda-sequencia",
+   "titulo": "Preparo de calda – sequência",
+   "cat": "def",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "separacao-das-embalagens-vazias-de-agrotoxicos",
+   "titulo": "Separação das embalagens vazias de agrotóxicos",
+   "cat": "def",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "ecoactive-detergente-acido-modo-de-preparo",
+   "titulo": "Ecoactive – detergente ácido (modo de preparo)",
+   "cat": "def",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "ecosolup-desengraxante-alcalino-modo-de-preparo",
+   "titulo": "Ecosolup – desengraxante alcalino (modo de preparo)",
+   "cat": "def",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "descarte-aqui-epi-contaminado",
+   "titulo": "Descarte aqui – EPI contaminado",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "descarte-aqui-estopas-e-filtros",
+   "titulo": "Descarte aqui – Estopas e filtros",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "descarte-aqui-lama-azul",
+   "titulo": "Descarte aqui – Lama (azul)",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "descarte-aqui-lama-preta",
+   "titulo": "Descarte aqui – Lama (preta)",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "descarte-aqui-tampas-e-lacres-lixeira",
+   "titulo": "Descarte aqui – Tampas e lacres (lixeira)",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "tampas-e-lacres-tem-destino-certo",
+   "titulo": "Tampas e lacres têm destino certo",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "pilhas-e-baterias-descarte-aqui",
+   "titulo": "Pilhas e baterias – descarte aqui",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 56,
+   "alt": 66
+  },
+  {
+   "id": "pilhas-e-baterias-bombona-7-5-8-75-cm",
+   "titulo": "Pilhas e baterias – bombona (7,5 × 8,75 cm)",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 157,
+   "alt": 223
+  },
+  {
+   "id": "atencao-descartar-o-lixo-na-bombona-apos-manutencao",
+   "titulo": "Atenção – Descartar o lixo na bombona após manutenção",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "reciclagem-metal",
+   "titulo": "Reciclagem – Metal",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "reciclagem-nao-reciclavel",
+   "titulo": "Reciclagem – Não reciclável",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "reciclagem-organico",
+   "titulo": "Reciclagem – Orgânico",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "reciclagem-papel",
+   "titulo": "Reciclagem – Papel",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "reciclagem-plastico",
+   "titulo": "Reciclagem – Plástico",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "reciclagem-vidro",
+   "titulo": "Reciclagem – Vidro",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "folheto-separe-o-lixo-certo",
+   "titulo": "Folheto – Separe o lixo certo",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "folheto-separe-o-lixo-certo-4-por-folha",
+   "titulo": "Folheto – Separe o lixo certo (4 por folha)",
+   "cat": "des",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "deposito-de-defensivos",
+   "titulo": "Depósito de defensivos",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "deposito-de-lubrificantes",
+   "titulo": "Depósito de lubrificantes",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "deposito-de-irrigacao",
+   "titulo": "Depósito de irrigação",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "atencao-ferro-velho",
+   "titulo": "Atenção – Ferro velho",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "identificacao-galao-de-gasolina-a5",
+   "titulo": "Identificação – Galão de gasolina (A5)",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 148,
+   "alt": 210
+  },
+  {
+   "id": "identificacao-gasolina-a5",
+   "titulo": "Identificação – Gasolina (A5)",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 148,
+   "alt": 210
+  },
+  {
+   "id": "c-1-colheita",
+   "titulo": "C.1 Colheita",
+   "cat": "loc",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "mapa-de-acesso-faz-faca-ao-pronto-socorro-10-folhas",
+   "titulo": "Mapa de acesso – Faz. Faca ao pronto-socorro (10 folhas)",
+   "cat": "map",
+   "folhas": 10,
+   "larg": 339,
+   "alt": 190
+  },
+  {
+   "id": "folheto-cones-sinalize-antes-de-comecar",
+   "titulo": "Folheto – Cones: sinalize antes de começar",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "folheto-cones-4-por-folha",
+   "titulo": "Folheto – Cones (4 por folha)",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "como-fazer-o-boletim-modelo-1",
+   "titulo": "Como fazer o boletim (modelo 1)",
+   "cat": "com",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "como-fazer-o-boletim-modelo-2",
+   "titulo": "Como fazer o boletim (modelo 2)",
+   "cat": "com",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "aviso-apague-a-luz-ao-sair-2-por-folha",
+   "titulo": "Aviso – Apague a luz ao sair (2 por folha)",
+   "cat": "com",
+   "folhas": 1,
+   "larg": 297,
+   "alt": 210
+  },
+  {
+   "id": "comunicado-dia-do-pagamento",
+   "titulo": "Comunicado – Dia do pagamento",
+   "cat": "com",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "comunicado-pagamento-de-salarios",
+   "titulo": "Comunicado – Pagamento de salários",
+   "cat": "com",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "comunicado-auditoria-globalg-a-p-mar-2026",
+   "titulo": "Comunicado – Auditoria GLOBALG.A.P. (mar/2026)",
+   "cat": "com",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-01",
+   "titulo": "Mapa de rota de fuga – 01",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-02",
+   "titulo": "Mapa de rota de fuga – 02",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-03",
+   "titulo": "Mapa de rota de fuga – 03",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-04",
+   "titulo": "Mapa de rota de fuga – 04",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-05",
+   "titulo": "Mapa de rota de fuga – 05",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-06",
+   "titulo": "Mapa de rota de fuga – 06",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-07",
+   "titulo": "Mapa de rota de fuga – 07",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-08",
+   "titulo": "Mapa de rota de fuga – 08",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-09",
+   "titulo": "Mapa de rota de fuga – 09",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-10",
+   "titulo": "Mapa de rota de fuga – 10",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-11",
+   "titulo": "Mapa de rota de fuga – 11",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-12",
+   "titulo": "Mapa de rota de fuga – 12",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "mapa-de-rota-de-fuga-13",
+   "titulo": "Mapa de rota de fuga – 13",
+   "cat": "map",
+   "folhas": 1,
+   "larg": 190,
+   "alt": 275
+  },
+  {
+   "id": "t-05-john-deere-6110j",
+   "titulo": "T.05 – John Deere 6110J",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "t-37-massey-f-5290",
+   "titulo": "T.37 – Massey F. 5290",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "t-38-john-deere-7230j",
+   "titulo": "T.38 – John Deere 7230J",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "t-39-john-deere-6190m",
+   "titulo": "T.39 – John Deere 6190M",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "a-15-lancer-pendular-1200-kg",
+   "titulo": "A.15 – Lancer Pendular 1200 Kg",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "a-16-destrib-de-calcario-fert-dcf-12000",
+   "titulo": "A.16 – Destrib. De Calcario Fert. Dcf-12000",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-42-garfo-silagem",
+   "titulo": "C.42 – Garfo Silagem",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-57-carreta-madeira-graneleira-4-rodas",
+   "titulo": "C.57 – Carreta Madeira Graneleira 4 Rodas",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-58-carreta-agricola-graneleira-4-rodas",
+   "titulo": "C.58 – Carreta Agricola Graneleira 4 Rodas",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-59-rocadeira-lf-140j",
+   "titulo": "C.59 – Roçadeira Lf-140J",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-60-ensiladeira-hidra-jp92",
+   "titulo": "C.60 – Ensiladeira Hidra. Jp92",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-61-rocadeira-tf-1800",
+   "titulo": "C.61 – Roçadeira Tf 1800",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-62-carreta-agricola-graneleira-inox",
+   "titulo": "C.62 – Carreta Agrícola Graneleira Inox",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-63-guincho-tatu-gatg-ro",
+   "titulo": "C.63 – Guincho Tatu Gatg-Ro",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "c-64-guincho-baldan-gt-2000",
+   "titulo": "C.64 – Guincho Baldan Gt-2000",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "p-13-pulverizador-condor-600",
+   "titulo": "P.13 – Pulverizador Condor 600",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "p-21-tanque-distrib-de-chorume-4000-lt",
+   "titulo": "P.21 – Tanque Distrib. De Chorume 4000 Lt",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "p-25-pulverizador-autopropelido-pla",
+   "titulo": "P.25 – Pulverizador Autopropelido Pla",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "p-26-tanque-de-agua-6500",
+   "titulo": "P.26 – Tanque De Agua - 6500",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-12-palntadeira-2113-ccs-john-deere",
+   "titulo": "S.12 – Palntadeira 2113 Ccs John Deere",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-38-lamina-niveladora-hidraulica",
+   "titulo": "S.38 – Lamina Niveladora Hidraulica",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-51-grade-niveladora-28-discos",
+   "titulo": "S.51 – Grade Niveladora 28 Discos",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-52-lamina-traseira",
+   "titulo": "S.52 – Lamina Traseira",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-53-plantadeira-jumil-jm2040",
+   "titulo": "S.53 – Plantadeira Jumil JM2040",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-54-furadeira-de-solo",
+   "titulo": "S.54 – Furadeira De Solo",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-57-grade-36-discos",
+   "titulo": "S.57 – Grade 36 Discos",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-58-plantadeira-john-deere-s2117-17-linhas",
+   "titulo": "S.58 – Plantadeira John Deere S2117 – 17 Linhas",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-59-arado-subsolador-9-hastes",
+   "titulo": "S.59 – Arado Subsolador 9 Hastes",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-60-grade-aradora-gtcr-20x3-2x9",
+   "titulo": "S.60 – Grade Aradora Gtcr 20X3 2X9",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-61-grade-niveladora-56x22",
+   "titulo": "S.61 – Grade Niveladora 56X22",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-62-grade-aradora-gtcr-16x3-2x9",
+   "titulo": "S.62 – Grade Aradora Gtcr 16X3 2X9",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-66-rolo-faca-katrina-f5-9000",
+   "titulo": "S.66 – Rolo Faca Katrina F5/9000",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "s-68-plantadeira-braquiaria",
+   "titulo": "S.68 – Plantadeira Braquiaria",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  },
+  {
+   "id": "v-07-caminhao-ford-f600",
+   "titulo": "V.07 – Caminhão Ford F600",
+   "cat": "est",
+   "folhas": 1,
+   "larg": 275,
+   "alt": 190
+  }
+ ]
+}

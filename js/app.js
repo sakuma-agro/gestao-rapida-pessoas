@@ -263,7 +263,9 @@ function abrirAba(nome) {
   if (TELAS_BANHO.includes(nome)) abrirBanho(nome);
   // Certificação › Folhas de estoque (29/10/2026) — js/folhas-estoque.js (o mesmo da área Estoque)
   // e Certificação › Sinalética › Placas do estoque (29/10/2026) — mesmo arquivo
-  for (const t of ['feFolhas', 'siPlacasEstoque']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  for (const t of ['feFolhas', 'siPlacasEstoque', 'siPlacas']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  // Sinalética › Placas (29/10/2026) — as placas da pasta 18 - Placas, js/sinaletica.js
+  if (nome === 'siPlacas' && window.Sinaletica) window.Sinaletica.desenhar($('telaSiPlacas'));
   if ((nome === 'feFolhas' || nome === 'siPlacasEstoque') && window.FolhasEstoque)
     window.FolhasEstoque.desenhar($('tela' + nome[0].toUpperCase() + nome.slice(1)), { tela: nome === 'feFolhas' ? 'folhas' : 'placas' });
   // Certificação › Fornecedores (26/10/2026) — js/cert-fornecedores.js
