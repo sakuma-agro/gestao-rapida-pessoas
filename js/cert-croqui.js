@@ -1,4 +1,4 @@
-// cert-croqui.js — Certificação › AN 21 Croqui da propriedade, no satélite (30/10/2026).
+// cert-croqui.js — Certificação › AN 22 Croqui da propriedade, no satélite (30/10/2026).
 //
 // Pedido do Guilherme: "vc consegue melhorar esse croqui? conseguimos colocar dentro do
 // app?" → "estilo satélite"; "nesse kmz das pastas tem de todas as fazendas"; "parte de
@@ -271,7 +271,7 @@ function montarOverlay() {
   ov.id = 'crqOverlay'; ov.className = 'crq';
   ov.innerHTML = `
     <header class="crq-topo">
-      <div class="crq-tit"><b>Croqui das propriedades</b><span>AN 21 · satélite</span></div>
+      <div class="crq-tit"><b>Croqui das propriedades</b><span>AN 22 · satélite</span></div>
       <nav class="crq-faz" id="crqFaz"></nav>
       <div class="crq-acoes">
         <label class="crq-chk"><input type="checkbox" id="crqRot" checked> Nomes</label>
@@ -456,7 +456,7 @@ function painel() {
         ${linhaCar('Matrículas', esc(rv.averbacao || ''))}
         ${linhaCar('Situação', esc(rv.situacao || ''))}
       </tbody></table>
-      ${rv.fonte_car ? `<p class="crq-nota">Fonte: ${esc(rv.fonte_car)}</p>` : ''}` : '<p class="crq-alerta">Sem recibo do CAR desta fazenda na pasta AN 07.</p>'}
+      ${rv.fonte_car ? `<p class="crq-nota">Fonte: ${esc(rv.fonte_car)}</p>` : ''}` : '<p class="crq-alerta">Sem recibo do CAR desta fazenda na pasta AN 08.</p>'}
       ${rv.obs ? `<p class="crq-nota">${esc(rv.obs)}</p>` : ''}
       ${ambientais.length ? `<table class="crq-tab" style="margin-top:8px"><thead><tr><th>Área ambiental (CAR)</th><th>Área</th></tr></thead><tbody>
         ${ambientais.map(f => `<tr data-ir="${f.i}"><td>${esc(f.grupo)} ${esc(f.rot && f.rot !== f.grupo ? f.rot : '')}</td><td>${ha(f.ha)}</td></tr>`).join('')}</tbody></table>` : ''}
@@ -584,9 +584,9 @@ function imprimir() {
 /* ---------- AN Digital (tela do menu Certificação › Registros) ---------- */
 export const TELAS_AN_DIGITAL = ['anDigital'];
 const CARTOES_AN = [
-  ['AN 21', 'Croqui da propriedade', 'Mapa de satélite de cada fazenda: talhões, pivôs, sequeiro, pastos e áreas, com legenda e quadro de áreas.', 'mapa'],
-  ['AN 07', 'CAR e reserva legal', 'Nº do CAR, área do imóvel, consolidada, vegetação, APP e reserva legal × mínimo de 20%.', 'folha'],
-  ['AN 59', 'Outorgas — captações de água', 'Pontos de captação no mapa com portaria/certidão, vazão e validade (vermelho = vencida).', 'gota'],
+  ['AN 22', 'Croqui da propriedade', 'Mapa de satélite de cada fazenda: talhões, pivôs, sequeiro, pastos e áreas, com legenda e quadro de áreas.', 'mapa'],
+  ['AN 08', 'CAR e reserva legal', 'Nº do CAR, área do imóvel, consolidada, vegetação, APP e reserva legal × mínimo de 20%.', 'folha'],
+  ['AN 62', 'Outorgas — captações de água', 'Pontos de captação no mapa com portaria/certidão, vazão e validade (vermelho = vencida).', 'gota'],
 ];
 export async function abrirAnDigital() {
   const el = $('telaAnDigital'); if (!el) return;

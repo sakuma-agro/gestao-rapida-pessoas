@@ -66,7 +66,7 @@ export const ITENS = [
   ['queima',       'Nenhuma queima ou enterro de resíduos'],
   ['organicos',    'Restos orgânicos encaminhados à compostagem ou reaproveitamento'],
   ['comprovantes', 'Comprovantes de destinação do mês arquivados'],
-  ['mapa',         'Mapa de resíduos (AN 52) atualizado e afixado'],
+  ['mapa',         'Mapa de resíduos (AN 55) atualizado e afixado'],
   ['equipe',       'Equipe orientada sobre a separação e o descarte'],
 ];
 
@@ -543,7 +543,7 @@ const fichaForm = extra => `<div class="rel-ficha"><div><span>Código</span><b>$
 function docForm(k) {
   const l = k.saidas.slice().sort((a, b) => a.data.localeCompare(b.data));
   return documento({ titulo: FORM.titulo, subtitulo: `${rotPeriodo(E.fp.periodo)}${E.fp.fazenda ? ' · ' + nomeFaz(E.fp.fazenda) : ''}`, canto: FORM.codigo, paisagem: true, corpo: `
-    ${fichaForm(`<div><span>Referência</span><b>POP 004 · AN 52 · AN 55</b></div>`)}
+    ${fichaForm(`<div><span>Referência</span><b>POP 004 · AN 55 · AN 58</b></div>`)}
     <p class="rel-secao">1. Registro de saída de resíduos</p>
     <table class="rel-tabela"><thead><tr><th>Data</th><th>Fazenda</th><th>Resíduo</th><th>Classe</th><th>kg / emb.</th><th>Destinação</th><th>Recebido por</th><th>Comprovante</th></tr></thead><tbody>
       ${l.length ? l.map(s => { const t = tipoPorId(s.tipo_id); return `<tr><td>${br(s.data)}</td><td>${esc(curtoFaz(s.fazenda_id))}</td><td>${esc(t?.nome || '')}</td><td>${esc(t?.classe || '')}</td>

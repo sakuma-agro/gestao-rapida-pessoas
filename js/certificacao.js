@@ -1063,7 +1063,7 @@ async function painelDoc() {
       ${linkOk(d.link) ? `<a class="btn" id="ceDvLocal" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abre a pasta do documento no OneDrive pela internet">☁ Na nuvem</a>`
         : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">☁ Na nuvem</button>'}
       ${pcLocal && d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
-      ${/^AN 0?(21|7)$/.test(so(d.codigo)) ? `<button class="btn principal" type="button" id="ceDvCroqui" title="Croqui das fazendas no satélite, com reserva legal e áreas">🛰 Croqui no satélite</button>` : ''}
+      ${/^AN (22|0?8)$/.test(so(d.codigo)) ? `<button class="btn principal" type="button" id="ceDvCroqui" title="Croqui das fazendas no satélite, com reserva legal e áreas">🛰 Croqui no satélite</button>` : ''}
       <span class="cresce"></span>
       <button class="btn" type="button" id="ceDvEditar">${svgIcone('lapis')} Editar</button>
     </div>
@@ -1086,7 +1086,7 @@ async function painelDoc() {
   if (d.por_fazenda) ligarFazendas(d);
   if (app) el.querySelectorAll('#ceDvApp, [data-dv-app]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', app.tela)));
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
-  // AN 21 (croqui) e AN 07 (CAR): croqui no satélite com reserva legal detalhada (30/10/2026)
+  // AN 22 (croqui) e AN 08 (CAR) — números da Coopadap desde 30/10/2026: croqui no satélite com reserva legal detalhada (30/10/2026)
   $('ceDvCroqui')?.addEventListener('click', () => abrirCroqui());
   el.querySelector('[data-ir-modelo]')?.addEventListener('click', () => abrirTipo('FORM', modelo.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));

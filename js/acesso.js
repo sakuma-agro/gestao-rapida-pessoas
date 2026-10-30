@@ -334,7 +334,7 @@ export const MODULOS = [
        C/NC/NA por item com foto, NC abre não conformidade no FORM 004, cada um
        conta como RG CL nn. js/cert-checklist.js; tabelas ccl_modelos e ccl_registros. */
     /* AN Digital (30/10/2026, pedido dele: "crie AN digital e coloque esse AN lá, para dentro do app abrir"):
-       anexos que abrem dentro do app — AN 21 croqui no satélite, AN 07 CAR e reserva legal, AN 59 captações
+       anexos que abrem dentro do app — AN 22 croqui no satélite, AN 08 CAR e reserva legal, AN 62 captações
        outorgadas. js/cert-croqui.js; tabela cert_croquis. */
     { id: 'ceAnSub', grupo: 'Registros', secao: 'AN Digital', codigo: 'AN', nome: 'AN Digital', telas: [
       ['anDigital', 'Croqui, CAR e outorgas'],
