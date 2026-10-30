@@ -12,7 +12,7 @@
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$Base   = 'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida'
+$Base   = 'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações'
 $Topos  = @('1 - POP', '2 - FORMULÁRIOS', '3 - ANEXOS', '4 - POLÍTICAS', '5 - REGISTROS', '6 - CL')
 $Url    = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/onedrive-sync'
 $Aqui   = $PSScriptRoot

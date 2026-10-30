@@ -1002,7 +1002,7 @@ function desenharTipoDocs() {
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">${esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)} · ${docsDoTipo(f.tipo).length} documento(s)</small></h2></div>
       <span class="barra" style="margin:0">
-        <label class="btn" title="Escolha a pasta do tipo (ex.: Certificação - Lop Gestão Rápida › 1 - POP). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
+        <label class="btn" title="Escolha a pasta do tipo (ex.: 6 - Certificações › 1 - POP). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
           <input type="file" id="ceDcPasta" hidden webkitdirectory multiple></label>
         <button class="btn principal" type="button" id="ceDcNovo">Novo ${esc(t.nome)}</button></span>
     </div>
@@ -1099,7 +1099,7 @@ async function painelDoc() {
     try { await navigator.clipboard.writeText(d.caminho); } catch { /* sem permissão: segue */ }
     const a = document.createElement('a'); a.href = 'lop-pasta:' + encodeURIComponent(d.caminho); a.click();
     $('ceDvMsg').innerHTML = 'Abrindo a pasta no Explorador… Se não abriu, o caminho já está copiado (cole na barra de endereço do Explorador). '
-      + 'Para abrir direto, rode uma vez o <b>instalar.bat</b> de <i>Certificação - Lop Gestão Rápida › _ferramentas › Abrir pasta no computador</i>.';
+      + 'Para abrir direto, rode uma vez o <b>instalar.bat</b> de <i>6 - Certificações › _ferramentas › Abrir pasta no computador</i>.';
   });
   $('ceDvCopiar')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); $('ceDvMsg').textContent = 'Caminho copiado. No Explorador de Arquivos, clique na barra de endereço, cole (Ctrl+V) e Enter.'; }
