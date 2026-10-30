@@ -1070,7 +1070,7 @@ async function painelDoc() {
     <div class="dc-sem ce-dv-caminho" id="ceDvMsg">${esc(d.caminho || '')}</div>
     ${app ? `<div class="ce-dv-app"><div><b>Este formulário é preenchido no app</b><span class="dc-sem">${esc(app.nome)}</span></div>
         <button class="btn principal" type="button" data-dv-app>${svgIcone('seta-dir')} Abrir ${esc(app.nome.split(' — ')[0])}</button></div>`
-      : prefixoDoc(d) === 'RG' ? `<div class="ce-dv-app"><div><b>Registro: ${esc(modelo ? modelo.codigo : 'FORM')} preenchido</b><span class="dc-sem">Os arquivos ficam em 5 - RG no OneDrive e entram sozinhos na linha do tempo abaixo.</span></div></div>`
+      : prefixoDoc(d) === 'RG' ? `<div class="ce-dv-app"><div><b>Registro: ${esc(modelo ? modelo.codigo : 'FORM')} preenchido</b><span class="dc-sem">Os arquivos ficam em 5 - REGISTROS no OneDrive e entram sozinhos na linha do tempo abaixo.</span></div></div>`
       : '<div class="ce-dv-pdf" id="ceDvVisor"><span class="dc-sem">Procurando o PDF…</span></div>'}
     <div class="ce-dv-info">
       <div><h4 class="ac-h4">Normas atendidas</h4>
@@ -1262,7 +1262,7 @@ function formEvidencia(d, e, itemId = null) {
    um item por fazenda — e, na análise de água, um item por ponto de coleta
    (poço, caixa d'água, bebedouro). cert_doc_itens guarda fazenda, local,
    periodicidade, validade, data da última evidência e o link da subpasta no
-   OneDrive (3 - AN/<AN>/<FAZENDA>). A evidência pode apontar para o item
+   OneDrive (3 - ANEXOS/<AN>/<FAZENDA>). A evidência pode apontar para o item
    (cert_evidencias.item_id). Na auditoria, filtra a fazenda certificada.
    ------------------------------------------------------------------- */
 const nomeFaz = id => S.faz.find(f => f.id === id)?.nome || (id ? 'Sem fazenda' : 'Geral');

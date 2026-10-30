@@ -8,7 +8,7 @@
 //  · item marcado NC abre uma não conformidade no FORM 004 (cmc_casos, via
 //    CHECK LIST), com prazo e responsável, e ela cai no Cronograma;
 //  · cada CL preenchido é registro do RG CL nn (Lista mestra; o papel escaneado
-//    vai para 5 - RG\RG CL nn).
+//    vai para 5 - REGISTROS\RG CL nn).
 //
 // Telas: Check lists (cartões + preencher), Registros (filtros, abrir, imprimir)
 // e Modelos (itens e legenda de cada CL). Tabelas ccl_modelos e ccl_registros

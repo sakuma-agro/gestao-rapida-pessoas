@@ -1,7 +1,7 @@
 ﻿# LOP - Gestão Rápida — sincroniza a pasta da Certificação no OneDrive com o app.
 # Roda no sakumasrv a cada hora (tarefa agendada "LOP - Sincronizar OneDrive").
 #
-# Varre 1 - POP, 2 - FORM, 3 - AN, 4 - POLÍTICAS e 5 - RG (registros: todo arquivo vira registro do RG) dentro de "Certificação - Lop Gestão Rápida"
+# Varre 1 - POP, 2 - FORMULÁRIOS, 3 - ANEXOS, 4 - POLÍTICAS e 5 - REGISTROS (nomes desde 30/10/2026) (registros: todo arquivo vira registro do RG) dentro de "Certificação - Lop Gestão Rápida"
 # e manda para o app cada PDF/foto novo ou alterado (até 15 MB):
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Base   = 'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida'
-$Topos  = @('1 - POP', '2 - FORM', '3 - AN', '4 - POLÍTICAS', '5 - RG', '6 - CL')
+$Topos  = @('1 - POP', '2 - FORMULÁRIOS', '3 - ANEXOS', '4 - POLÍTICAS', '5 - REGISTROS', '6 - CL')
 $Url    = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/onedrive-sync'
 $Aqui   = $PSScriptRoot
 $Token  = (Get-Content -Raw -Encoding UTF8 (Join-Path $Aqui 'token.txt')).Trim()
@@ -135,7 +135,7 @@ try {
         # dentro da subpasta de uma fazenda de um AN por fazenda?
         $destino = 'doc'; $id = $doc.id
         $resto = $a.FullName.Substring($pasta.FullName.Length + 1)
-        if ($topo -eq '5 - RG' -or $resto -match '^EVID[ÊE]NCIAS\\') {
+        if ($topo -eq '5 - REGISTROS' -or $resto -match '^EVID[ÊE]NCIAS\\') {
           # subpasta EVIDÊNCIAS -> evidência do documento (linha do tempo)
           $destino = 'evid'
         } elseif ($doc.por_fazenda -and $resto.Contains('\')) {
