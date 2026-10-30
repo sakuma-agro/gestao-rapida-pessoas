@@ -388,6 +388,20 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
     }
   }
 
+  /* Déficit de horas (atraso, saída antecipada) — 30/10/2026, pedido dele:
+     desconta das horas extras do mês (primeiro das de 50%). O que as extras
+     não cobrirem continua no déficit e vai ao DP. */
+  let deficitRestante = deficitAvulso;
+  const deficitCompensado = Math.min(deficitAvulso, extra50 + extra100);
+  if (deficitCompensado > 0) {
+    let resto = deficitCompensado;
+    const tira50 = Math.min(extra50, resto); extra50 -= tira50; resto -= tira50;
+    extra100 -= resto;
+    deficitRestante = deficitAvulso - deficitCompensado;
+    passos.push(`Déficit de horas: ${minParaHHMM(deficitCompensado)} descontado das horas extras`
+      + (deficitRestante ? `; ${minParaHHMM(deficitRestante)} sem extras para cobrir — vai ao DP.` : '.'));
+  }
+
   const diasAtestado = dias.filter(d => d.contaDias > 0 && d.minDeficit === 0).length;
 
   return {
@@ -397,7 +411,8 @@ export function apurarCompetencia({ dias, parametros = {}, minExtraAnterior = 0 
     minExtraAnterior,               // coluna própria (RN-18/RN-29)
     minIntervaloSuprimido: intervaloSuprimido,
     minNoturnas: noturnas,
-    minDeficitAvulso: deficitAvulso,
+    minDeficitAvulso: deficitRestante,
+    minDeficitCompensado: deficitCompensado,
     faltasAbsorvidas,
     faltasInformadas,
     faltasJDescontar,

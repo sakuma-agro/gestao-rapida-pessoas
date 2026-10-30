@@ -1370,6 +1370,8 @@ function desenharBoletins() {
   if (estadoTela.filtroFunc && !porFunc.has(estadoTela.filtroFunc)) estadoTela.filtroFunc = '';
 
   const soma = c => linhas.reduce((s, l) => s + (l.a?.[c] || 0), 0);
+  // Déficit que não é falta (dia com entrada) — o que desconta das extras (30/10/2026).
+  const somaDefAvulso = () => linhas.filter(l => l.b.hora_ini).reduce((s, l) => s + (l.a?.min_deficit || 0), 0);
   // Lançados (14/10/2026, pedido dele): uma coluna com o total de extras
   // (50% + 100%) e outra com a insalubridade do dia, no lugar de 50% e 100%.
   const nInsal = linhas.filter(l => l.b.insalubridade_dia).length;
@@ -1412,7 +1414,8 @@ function desenharBoletins() {
         </tr>`).join('')}
       </tbody><tfoot><tr class="jor-total">
         <td colspan="4">${estadoTela.filtroFunc ? `Total de ${esc(porFunc.get(estadoTela.filtroFunc)?.nome || '—')}` : 'Total da competência'}</td>
-        <td class="ce">${horas(soma('min_extra_50') + soma('min_extra_100'))}</td>
+        <td class="ce">${horas(soma('min_extra_50') + soma('min_extra_100'))}${somaDefAvulso()
+          ? `<br><span class="dc-sem" title="Horas extras menos o déficit de horas (atraso/saída antes). Faltas são decididas no Abatimento de horas.">líquido ${horas(Math.max(0, soma('min_extra_50') + soma('min_extra_100') - somaDefAvulso()))}</span>` : ''}</td>
         <td class="ce">${nInsal ? `${nInsal} dia(s)` : '—'}</td>
         <td class="ce">${horas(soma('min_deficit'))}</td>
         <td class="ce">${soma('min_intervalo_suprimido')}</td><td></td><td></td>
