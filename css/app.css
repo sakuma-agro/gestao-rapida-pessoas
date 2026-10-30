@@ -636,6 +636,7 @@ dialog h3{margin:0 0 14px;font-size:16px}
 @page{size:A4 portrait;margin:0}
 /* A folha marcada com `.deitada` sai em paisagem; o resto continua em pé. */
 @page paisagem{size:A4 landscape;margin:0}
+@page croqui{size:A3 landscape;margin:8mm}
 /* Folha de ponto da gráfica, 26 × 16,5 cm (28/09/2026); "folhapontor" = girada 90°. */
 @page folhaponto{size:260mm 165mm;margin:0}
 @page folhapontor{size:165mm 260mm;margin:0}
@@ -2388,3 +2389,78 @@ body.modo-auditor :is(main,dialog) :is([id*="Novo"],[id*="Nova"],[id*="Agendar"]
 .mc-card-pe{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .mc-card-bt{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
 .mc-col-vazia{margin:4px;font-size:12px}
+
+/* ---------- Certificação › AN 21 Croqui no satélite (30/10/2026) — js/cert-croqui.js ---------- */
+body.crq-aberto{overflow:hidden}
+.crq{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;background:#1B232B;color:#E9ECE4}
+.crq[hidden]{display:none}
+.crq-topo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px max(14px,env(safe-area-inset-left,0px)) 10px max(14px,env(safe-area-inset-left,0px));padding-top:max(10px,env(safe-area-inset-top,0px));background:#1B232B;border-bottom:3px solid #84BD00}
+.crq-tit{display:flex;flex-direction:column;line-height:1.15}
+.crq-tit b{font-size:16px}.crq-tit span{font-size:11px;opacity:.7}
+.crq-faz{display:flex;gap:4px;flex-wrap:wrap;flex:1 1 auto}
+.crq-faz button{all:unset;cursor:pointer;padding:6px 11px;border-radius:999px;font-size:13px;background:rgba(255,255,255,.08);color:#E9ECE4}
+.crq-faz button.on{background:#84BD00;color:#14200A;font-weight:bold}
+.crq-faz button:focus-visible{outline:2px solid #84BD00}
+.crq-acoes{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.crq-acoes .btn{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25)}
+.crq-chk{display:flex;gap:5px;align-items:center;font-size:13px;cursor:pointer}
+.crq-corpo{flex:1;display:flex;min-height:0}
+.crq-mapa{flex:1;min-width:0;background:#0d1114}
+.crq-painel{width:370px;max-width:42vw;overflow:auto;background:#F6F7F3;color:#2E302A;padding:14px 16px 30px;box-sizing:border-box}
+.crq-h{margin:0 0 10px;color:#744F28;font-size:18px}
+.crq-sub{margin:18px 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#51534A}
+.crq-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.crq-kpis div{background:#fff;border:1px solid #DCDFD3;border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.crq-kpis span{font-size:11px;color:#6B6D63}.crq-kpis b{font-size:16px;font-variant-numeric:tabular-nums}.crq-kpis small{font-size:10.5px;color:#6B6D63}
+.crq-leg{display:grid;gap:4px}
+.crq-leg label{display:grid;grid-template-columns:18px 18px 1fr auto;align-items:center;gap:6px;font-size:13px;cursor:pointer}
+.crq-leg label.off{opacity:.45}
+.crq-leg i{width:16px;height:12px;border:2px solid;border-radius:2px}
+.crq-leg b{font-variant-numeric:tabular-nums;font-size:12.5px}
+.crq-leg-lim{display:flex;gap:6px;align-items:center;font-size:13px;padding-left:24px}
+.crq-leg-lim i{width:18px;border-top:2px dashed #51534A}
+.crq-rl{margin-top:16px;border:1px solid #DCDFD3;border-left:5px solid #9AA08F;border-radius:8px;padding:2px 12px 12px;background:#fff}
+.crq-rl.ok{border-left-color:#1E8C3A}.crq-rl.falta{border-left-color:#C0392B}
+.crq-rl-sit{font-weight:bold;font-size:13.5px;margin:2px 0 8px}
+.crq-rl.ok .crq-rl-sit{color:#1E7A33}.crq-rl.falta .crq-rl-sit{color:#B03A2E}
+.crq-tab{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.crq-tab th{background:#84BD00;color:#fff;text-align:left;padding:5px 6px;font-size:11.5px}
+.crq-tab td{padding:4px 6px;border-bottom:1px solid #E6E8DE}
+.crq-tab td:nth-child(n+2),.crq-tab th:nth-child(n+2){text-align:right}
+.crq-tab tbody tr:nth-child(even) td{background:#F3F8E7}
+.crq-tab tr[data-ir]{cursor:pointer}.crq-tab tr[data-ir]:hover td{background:#E4F2C4}
+.crq-tab tr.sel td{background:#D6EBA4!important;font-weight:bold}
+.crq-tab tr.tot td{font-weight:bold;background:#E3E5DC!important}
+.crq-tab tr.sobra td{color:#1E7A33;font-weight:bold}.crq-tab tr.deficit td{color:#B03A2E;font-weight:bold}
+.crq-tal td:first-child{text-align:left}.crq-tal i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.crq-rl-dados{display:grid;gap:6px;margin-top:10px}
+.crq-rl-dados label{display:grid;gap:2px;font-size:11.5px;color:#6B6D63}
+.crq-rl-dados input{font:inherit;font-size:13px;padding:5px 7px;border:1px solid #DCDFD3;border-radius:5px;color:#2E302A}
+.crq-rl-dados b{font-size:13px;color:#2E302A}
+.crq-nota{font-size:11px;color:#6B6D63;margin:8px 0 0}
+.crq-msg{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#1B232B;color:#fff;padding:9px 14px;border-radius:8px;z-index:950;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.35);max-width:90vw}
+.crq-msg.erro{background:#8E2B21}
+.leaflet-tooltip.crq-rot{background:rgba(20,26,18,.62);border:0;box-shadow:none;color:#fff;font-weight:bold;font-size:12px;text-align:center;line-height:1.15;padding:2px 5px;border-radius:4px}
+.leaflet-tooltip.crq-rot small{font-weight:normal;font-size:10.5px;opacity:.9}
+.leaflet-tooltip.crq-rot-p{font-size:10px;padding:1px 4px}
+.leaflet-tooltip.crq-rot::before{display:none}
+.crq-z-medio .leaflet-tooltip.crq-rot-p{display:none}
+.crq-z-longe .leaflet-tooltip.crq-rot{display:none}
+.crq-fora{display:inline-block;font-size:10px;padding:0 5px;border-radius:8px;background:#FBE3D6;color:#8A4B1E;font-weight:bold}
+.crq-alerta{font-size:12px;color:#8A4B1E;background:#FDF1E8;border-radius:6px;padding:6px 8px;margin:8px 0 0}
+@media (max-width:760px){
+  .crq-corpo{flex-direction:column}
+  .crq-mapa{flex:0 0 58vh}
+  .crq-painel{width:auto;max-width:none;flex:1}
+}
+@media print{
+  body.crq-imprimindo > *:not(#crqOverlay){display:none!important}
+  body.crq-imprimindo .crq{page:croqui;position:static;inset:auto;height:auto;background:#fff;color:#2E302A}
+  body.crq-imprimindo .crq-topo{background:#fff;color:#744F28;border-bottom-color:#84BD00}
+  body.crq-imprimindo .crq-acoes,body.crq-imprimindo .crq-faz button:not(.on),body.crq-imprimindo .crq-rl-dados button{display:none!important}
+  body.crq-imprimindo .crq-faz button.on{background:none;color:#744F28;font-size:18px}
+  body.crq-imprimindo .crq-corpo{display:flex;flex-direction:row;height:250mm}
+  body.crq-imprimindo .crq-mapa{flex:1;height:250mm}
+  body.crq-imprimindo .crq-painel{width:115mm;max-width:none;overflow:visible;background:#fff;font-size:11px}
+  body.crq-imprimindo .leaflet-control-zoom{display:none}
+}
