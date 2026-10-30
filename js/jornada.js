@@ -735,11 +735,37 @@ function mostrarDiaJa() {
     Para corrigir o lançamento em aberto, use <b>Editar</b> em Lançados.` : ''}`;
 }
 
+/* Dois boletins no mesmo dia (30/10/2026, pedido dele — Paulo, 02/10: manhã
+   07–12 com déficit de 4h + tarde 13–16 em consulta médica): o déficit do dia
+   é o do dia inteiro. Se os lançamentos anteriores somados ao novo passam
+   dele, tira a sobra dos anteriores ainda em aberto. Fechado não muda. */
+async function acertarDeficitDoDia(fid, data, r) {
+  if (r?.deficitDia == null) return;
+  const outros = outrosDoDia(fid, data).filter(b => !situacaoBoletim(b).fechado);
+  if (!outros.length) return;
+  const apDe = b => jd.dados.apuracoes.find(a => a.boletim_id === b.id) || dia.apuracoes.find(a => a.boletim_id === b.id);
+  const jaOutros = outrosDoDia(fid, data).reduce((s, b) => s + (apDe(b)?.min_deficit || 0), 0);
+  let sobra = jaOutros + (r.minDeficit || 0) - r.deficitDia;
+  for (const b of outros) {
+    if (sobra <= 0) break;
+    const a = apDe(b);
+    if (!a?.min_deficit) continue;
+    const tira = Math.min(a.min_deficit, sobra);
+    sobra -= tira;
+    const { _base, ...semB } = a;
+    await jd.salvar('apuracoes', { ...semB, boletim_id: b.id, min_deficit: a.min_deficit - tira,
+      memoria: `${a.memoria || ''}\n\nAcerto do dia (${new Date().toLocaleDateString('pt-BR')}): outro boletim no mesmo dia — déficit reduzido em ${minParaHHMM(tira)} (déficit do dia inteiro: ${minParaHHMM(r.deficitDia)}).`,
+      calculado_em: new Date().toISOString() });
+  }
+}
+
 /** Apura o dia inteiro e, se já havia boletim com horário, devolve só a diferença. */
 function apurarComplemento(entrada) {
   const r = apurarDia(entrada);
   const outros = outrosDoDia(entrada._contexto.funcionarioId, entrada.data);
-  if (!outros.length || entrada.tipo?.apura === false) return r;
+  // deficitDia: o déficit do DIA INTEIRO (todos os boletins juntos) — serve
+  // para tirar dos lançamentos anteriores o que deixou de existir (30/10/2026).
+  if (!outros.length || entrada.tipo?.apura === false) return { ...r, deficitDia: r.minDeficit };
   const aps = outros.map(b => dia.apuracoes.find(a => a.boletim_id === b.id) || {});
   const ja = k => aps.reduce((s, a) => s + (a[k] || 0), 0);
   const menos = (v, k) => Math.max(0, v - ja(k));
@@ -755,9 +781,10 @@ function apurarComplemento(entrada) {
     minIntervaloSuprimido: menos(r.minIntervaloSuprimido, 'min_intervalo_suprimido'),
     avisos: [...r.avisos],
     complemento: { trabalhadoDia: r.minTrabalhados, extraDia, extraJa: ja('min_extra_50') + ja('min_extra_100') },
+    deficitDia: r.minDeficit,
   };
   if (r.minDeficit < ja('min_deficit'))
-    out.avisos.push(`O dia agora tem menos déficit do que o já lançado (${horas(ja('min_deficit'))}). O desconto já feito não volta sozinho — acerte com o escritório.`);
+    out.avisos.push(`O dia agora tem menos déficit do que o já lançado (${horas(ja('min_deficit'))}). O déficit dos lançamentos em aberto do dia é acertado ao gravar; lançamento já fechado não muda — acerte com o escritório.`);
   out.memoria = `COMPLEMENTO DO DIA — ${outros.length} lançamento(s) anterior(es) neste dia.\n`
     + `Dia inteiro: ${minParaHHMM(r.minTrabalhados)} trabalhadas, extras ${minParaHHMM(extraDia)}, déficit ${minParaHHMM(r.minDeficit)}.\n`
     + `Já lançado: extras ${minParaHHMM(ja('min_extra_50') + ja('min_extra_100'))}, déficit ${minParaHHMM(ja('min_deficit'))}.\n`
@@ -1208,6 +1235,7 @@ async function gravarBoletim(ev) {
   });
   await jd.registrar({ tabela: 'jor_boletins', registro_id: gravado.id, acao: original ? 'update' : 'insert',
     antes: original || null, depois: b, justificativa: original ? motivoAlt : null });
+  await acertarDeficitDoDia(funcionarioId, entrada.data, r);
   if (original) {
     estadoTela.editando = null;
     aviso(`Lançamento de ${dataBR(entrada.data)} alterado.`, true);
