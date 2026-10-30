@@ -25,6 +25,8 @@ const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', cur
 const num = v => Math.round((Number(v) || 0) * 100) / 100;
 const MESES_L = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const mesAnterior = ym => { const a = +ym.slice(0, 4), m = +ym.slice(5, 7);
+  return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`; };
 const rotMes = ym => `${MESES_L[+ym.slice(5, 7) - 1]} de ${ym.slice(0, 4)}`;
 const br = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '—';
 const usuario = () => estado.sessao?.user?.email || null;
@@ -106,10 +108,14 @@ const obsRel = l => [l.abat ? `Abatido ${brl(l.abat)}${l.motivo ? ' — ' + l.mo
 function relatorioHTML(ym, linhas, emissao) {
   const grupos = agrupar(linhas);
   const total = soma(linhas, 'pagar');
-  return `<article class="rel">
+  /* 30/10/2026: em paisagem e com o mês de referência no título — o ticket
+     pago no início do mês ym é o do mês anterior. */
+  const ref = mesAnterior(ym);
+  const nomeMes = m => MESES_L[+m.slice(5, 7) - 1].replace(/^./, c => c.toUpperCase());
+  return `<article class="rel rel-paisagem">
     <header class="rel-cabecalho">
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-titulo"><h1>Ticket início · ${esc(rotMes(ym))}</h1>
+      <div class="rel-titulo"><h1>Ticket referente a ${esc(nomeMes(ref))} (pagamento início de ${esc(nomeMes(ym))})</h1>
         <p>Pagamento do ticket precisa cair até o dia 10</p></div>
       <div class="rel-comp">${emissao ? `emitido em<strong>${br(emissao.emitido_em)}</strong>${emissao.versao > 1 ? 'versão ' + emissao.versao : ''}`
         : `posição em<strong>${br(agora())}</strong>`}</div>
