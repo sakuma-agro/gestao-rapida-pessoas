@@ -68,7 +68,7 @@ export function lerValor(v) {
 }
 
 /* ---------------- o olho (mesma senha do Plano de cargos) ---------------- */
-const SENHA_SALARIO = 'sk123';
+export const SENHA_SALARIO = 'sk123';
 const OCULTO = '<span class="rh-oculto">••••••</span>';
 let aberto = false;
 const V = v => aberto ? brl(v) : OCULTO;

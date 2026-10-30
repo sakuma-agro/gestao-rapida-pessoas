@@ -17,6 +17,7 @@
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
 import { podeTela } from './acesso.js';
+import { SENHA_SALARIO } from './rh-salarios.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -119,7 +120,7 @@ function relatorioHTML(ym, linhas, emissao) {
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-titulo"><h1>Ticket referente a ${esc(nomeMes(ref))} (pagamento início de ${esc(nomeMes(ym))})</h1>
         <p>Pagamento do ticket precisa cair até o dia 10</p></div>
-      <div class="rel-comp">${emissao ? `emitido em<strong>${br(emissao.emitido_em)}</strong>${emissao.versao > 1 ? 'versão ' + emissao.versao : ''}`
+      <div class="rel-comp">${emissao ? `${emissao.fechado ? 'fechado em' : 'emitido em'}<strong>${br(emissao.emitido_em)}</strong>${emissao.versao > 1 ? 'versão ' + emissao.versao : ''}`
         : `posição em<strong>${br(agora())}</strong>`}</div>
     </header>
     ${grupos.map(g => `
@@ -154,15 +155,56 @@ function mostrarDoc(html, aoImprimir) {
   alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-/** Guarda o relatório como foi impresso (o Histórico reabre igual). */
-async function registrarEmissao(ym, linhas) {
+/* Fechar para pagamento (30/10/2026, pedido dele): guarda o relatório como
+   foi pago e trava o mês — sem abater nem mudar observação. Para corrigir,
+   "Reabrir o mês" pede a mesma senha de mostrar os salários; ao fechar de
+   novo sai uma versão nova. Imprimir com o mês aberto é só prévia. */
+const fechadoDe = ym => !!emissaoDe(ym)?.fechado;
+
+async function fecharMes(ym) {
+  const linhas = linhasDoMes(ym);
   const ant = emissaoDe(ym);
   const reg = {
     competencia: ym, versao: ant ? (ant.versao || 1) + 1 : 1,
     total: soma(linhas, 'pagar'), linhas,
     emitido_por: usuario(), emitido_em: agora(),
+    fechado: true, fechado_por: usuario(), fechado_em: agora(),
   };
-  try { await jd.salvar('ticketEmissoes', reg); } catch (e) { avisar('Não consegui guardar a emissão: ' + e.message); }
+  try { await jd.salvar('ticketEmissoes', reg); return reg; }
+  catch (e) { avisar('Não consegui fechar o mês: ' + e.message); return null; }
+}
+
+async function reabrirMes(ym) {
+  const em = emissaoDe(ym);
+  if (!em) return;
+  try {
+    const { _base, ...resto } = em;
+    await jd.salvar('ticketEmissoes', { ...resto, fechado: false, fechado_por: usuario(), fechado_em: agora() });
+    avisar(`${rotMes(mesAnterior(ym))} reaberto para edição.`, true);
+  } catch (e) { avisar('Não consegui reabrir: ' + e.message); }
+  desenharMes();
+}
+
+function pedirSenhaReabrir(depois) {
+  let d = $('dlgTkSenha');
+  if (!d) { d = document.createElement('dialog'); d.id = 'dlgTkSenha'; document.body.appendChild(d); }
+  d.innerHTML = `<form method="dialog" onsubmit="return false">
+    <h3>Reabrir o mês</h3>
+    <p class="dica">O relatório já foi fechado para pagamento. Digite a senha para liberar a edição (a mesma de mostrar os valores).</p>
+    <div class="aviso erro" id="tkSenhaErro" hidden></div>
+    <label class="campo plena">Senha<input type="password" id="tkSenha" autocomplete="off"></label>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="tkSenhaOk">Reabrir</button></div></form>`;
+  d.querySelector('[data-fechar]').addEventListener('click', () => d.close());
+  const ok = () => {
+    if ($('tkSenha').value.trim() !== SENHA_SALARIO) {
+      $('tkSenhaErro').textContent = 'Senha incorreta.'; $('tkSenhaErro').hidden = false; $('tkSenha').focus(); return;
+    }
+    d.close(); depois();
+  };
+  $('tkSenhaOk').addEventListener('click', ok);
+  $('tkSenha').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } });
+  d.showModal(); $('tkSenha').focus();
 }
 
 function csvMes(ym, linhas) {
@@ -198,13 +240,15 @@ export async function abrirTicket(tela) {
 
 function desenharMes() {
   const ym = est.mes;
-  const todas = linhasDoMes(ym);
+  const em = emissaoDe(ym);
+  const fechado = !!em?.fechado;
+  // Fechado: a tela mostra o que foi pago, não o cadastro de hoje.
+  const todas = fechado ? (em.linhas || []) : linhasDoMes(ym);
   const b = est.busca.trim().toLowerCase();
   const linhas = todas.filter(l => !b || l.nome.toLowerCase().includes(b));
   const grupos = agrupar(linhas);
-  const em = emissaoDe(ym);
   const sem = semTicket();
-  const podeEditar = podeTela('tkMes');
+  const podeEditar = podeTela('tkMes') && !fechado;
 
   /* 30/10/2026: escolhe-se o mês de referência; o dado continua guardado pelo
      mês do pagamento (ym = referência + 1), então ajustes e Histórico antigos valem. */
@@ -213,11 +257,15 @@ function desenharMes() {
     `<label>mês de referência<input type="month" id="tkMesSel" class="tk-mes-sel" value="${ref}"></label>
      <div class="tk-mes-pago">pago em ${esc(rotMes(ym))}</div>`) + `
     <div class="jor-corpo">
-      ${em ? `<div class="jor-caixa" style="margin-bottom:10px">Relatório deste mês já emitido em <b>${br(em.emitido_em)}</b>${em.emitido_por ? ' por ' + esc(em.emitido_por) : ''}${em.versao > 1 ? ` (versão ${em.versao})` : ''}.
-        Se mudar algo, imprima de novo — sai como versão nova, e a anterior continua no Histórico.</div>` : ''}
+      ${fechado ? `<div class="jor-caixa tk-fechado"><span>🔒 <b>Fechado para pagamento</b> em ${br(em.emitido_em)}${em.emitido_por ? ' por ' + esc(em.emitido_por) : ''}${em.versao > 1 ? ` (versão ${em.versao})` : ''}.
+          Ninguém altera valores nem observações enquanto estiver fechado.</span>
+          ${podeTela('tkMes') ? '<button class="btn mini" type="button" id="tkReabrir">Reabrir o mês</button>' : ''}</div>`
+        : em ? `<div class="jor-caixa alerta" style="margin-bottom:10px">Mês <b>reaberto</b> para edição (estava fechado na versão ${em.versao || 1}).
+          Ao terminar, clique em <b>Fechar para pagamento</b> de novo — sai como versão nova.</div>` : ''}
       <div class="jor-barra">
         <input id="tkBusca" type="search" placeholder="Buscar funcionário" value="${esc(est.busca)}">
-        <button class="btn principal" type="button" id="tkRel">Relatório do mês</button>
+        ${!fechado && podeTela('tkMes') ? '<button class="btn principal" type="button" id="tkFechar">Fechar para pagamento</button>' : ''}
+        <button class="btn${fechado ? ' principal' : ''}" type="button" id="tkRel">${fechado ? 'Relatório do mês' : 'Prévia do relatório'}</button>
         <button class="btn" type="button" id="tkCsv">Excel (CSV)</button>
         <span class="dc-sem">A pagar: <b>${brl(soma(todas, 'pagar'))}</b> · ${todas.length} pessoa(s)${todas.some(l => l.abat) ? ` · abatido: <b>${brl(soma(todas, 'abat'))}</b>` : ''}</span>
       </div>
@@ -276,10 +324,19 @@ function desenharMes() {
     const el = $('tkBusca'); el.focus(); try { el.setSelectionRange(pos, pos); } catch {}
   });
   $('tkRel').addEventListener('click', () => {
-    const ls = linhasDoMes(ym);
-    mostrarDoc(relatorioHTML(ym, ls, null), () => registrarEmissao(ym, ls));
+    if (fechado) mostrarDoc(relatorioHTML(ym, em.linhas || [], em), null);
+    else mostrarDoc(relatorioHTML(ym, linhasDoMes(ym), null), null);
   });
-  $('tkCsv').addEventListener('click', () => csvMes(ym, linhasDoMes(ym)));
+  $('tkFechar')?.addEventListener('click', async () => {
+    if (!confirm(`Fechar ${rotMes(mesAnterior(ym))} para pagamento?\n\nO relatório fica guardado como está e o mês trava: para mudar depois, só reabrindo com senha.`)) return;
+    const reg = await fecharMes(ym);
+    if (!reg) return;
+    avisar(`${rotMes(mesAnterior(ym))} fechado para pagamento.`, true);
+    desenharMes();
+    mostrarDoc(relatorioHTML(ym, reg.linhas, reg), null);
+  });
+  $('tkReabrir')?.addEventListener('click', () => pedirSenhaReabrir(() => reabrirMes(ym)));
+  $('tkCsv').addEventListener('click', () => csvMes(ym, todas));
   /* Observação direto na linha (14/10/2026, pedido dele): grava só para este
      mês; igual à do cadastro não fica guardada no mês. */
   document.querySelectorAll('#telaTkMes [data-tk-obs]').forEach(inp => {
@@ -293,6 +350,7 @@ function desenharMes() {
 
 async function gravarObs(fid, texto) {
   const ym = est.mes;
+  if (fechadoDe(ym)) { avisar('Mês fechado para pagamento — reabra para editar.'); return; }
   const v = jd.vinculoDe(fid);
   const a = ajusteDe(fid, ym);
   const obs = String(texto || '').trim();
@@ -312,6 +370,7 @@ async function gravarObs(fid, texto) {
 
 function abrirAbater(fid) {
   const ym = est.mes;
+  if (fechadoDe(ym)) { avisar('Mês fechado para pagamento — reabra para editar.'); return; }
   const l = linhasDoMes(ym).find(x => x.fid === fid);
   if (!l) return;
   const a = ajusteDe(fid, ym);

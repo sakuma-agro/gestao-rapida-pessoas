@@ -729,3 +729,5 @@
 .rel .tk-grupo { font-size: 12px; font-weight: 400; color: #744F28; margin: 14px 0 5px; break-after: avoid; page-break-after: avoid; }
 .rel .tk-rel th:first-child { width: 40%; }
 .rel .tk-rel th.rel-num { width: 18%; }
+/* Ticket fechado para pagamento (30/10/2026). */
+.jor-caixa.tk-fechado { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }

@@ -332,3 +332,8 @@ alter table public.funcionarios add constraint funcionarios_origem_chk check (or
 alter table public.jor_boletins add column if not exists motivo_tipo text;
 alter table public.jor_boletins drop constraint if exists jor_boletins_motivo_tipo_chk;
 alter table public.jor_boletins add constraint jor_boletins_motivo_tipo_chk check (motivo_tipo is null or motivo_tipo in ('pessoal','doenca','funeral','casamento','maternidade_paternidade'));
+
+-- 30/10/2026 · Ticket: fechar para pagamento (trava o mês; reabrir pede senha)
+alter table public.jor_ticket_emissoes add column if not exists fechado boolean not null default false;
+alter table public.jor_ticket_emissoes add column if not exists fechado_por text;
+alter table public.jor_ticket_emissoes add column if not exists fechado_em timestamptz;
