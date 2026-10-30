@@ -131,7 +131,6 @@ const EVID_APP = {
   FORM20: { nome: 'Melhorias contínuas — banco e plano de melhorias', tela: 'mcMelhorias' },
   FORM42: { nome: 'Reclamações e sugestões', tela: 'mcFeedbacks' },
   FORM44: { nome: 'Reunião GRASP — atas realizadas', tela: 'gpPainel' },
-  FORM54: { nome: 'Banho e higiene pessoal — aplicações registradas', tela: 'bhRegistros' },
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
@@ -162,7 +161,6 @@ async function carregarCadeia(c) {
   if (!en.error) S.viva.FORM43 = contaMeses((en.data || []).map(x => x.competencia));
   if (rs && !rs.error) S.viva.FORM53 = contaMeses((rs.data || []).map(x => x.data).concat(ra && !ra.error ? (ra.data || []).map(x => x.competencia) : []));
   if (gp && !gp.error) S.viva.FORM44 = contaMeses((gp.data || []).map(x => x.data));
-  if (bh && !bh.error) S.viva.FORM54 = contaMeses((bh.data || []).map(x => x.data));
   // Check List Digital (29/10/2026): cada CL preenchido no app conta como registro do RG CL nn.
   if (ccl && !ccl.error) {
     const porDoc = {};

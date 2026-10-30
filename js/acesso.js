@@ -319,12 +319,10 @@ export const MODULOS = [
       ['bmRastreio',   'Rastreabilidade'],
       ['bmFechamento', 'Fechamento'],
     ] },
-    /* Banho e higiene pessoal (28/10/2026): FORM 054 — ficha mensal por trabalhador
-       da aplicação (início/fim, banho tomado, observações). js/cert-banho.js; tabela cb_banhos. */
-    { id: 'ceBanhoSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 054', nome: 'Banho e higiene pessoal', telas: [
-      ['bhRegistros', 'Registros'],
-      ['bhFicha',     'Ficha por funcionário'],
-    ] },
+    /* Banho e higiene pessoal (FORM 054) saiu do FORMS Digital em 30/10/2026, pedido dele: "esse form,
+       somente no papel, coloque nos form, não será digital". O FORM 054 é documento em papel na Lista
+       mestra (2 - FORM) e as fichas preenchidas vão para o RG 054. js/cert-banho.js e a tabela cb_banhos
+       (vazia) ficaram sem uso. */
     /* Folhas de estoque (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de
        cada estoque e as placas — as mesmas da área Estoque › Formulários
        (nem todos têm acesso à Certificação). js/folhas-estoque.js. */
