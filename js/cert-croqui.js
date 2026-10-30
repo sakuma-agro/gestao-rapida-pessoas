@@ -581,4 +581,44 @@ function imprimir() {
   }, 500);
 }
 
+/* ---------- AN Digital (tela do menu Certificação › Registros) ---------- */
+export const TELAS_AN_DIGITAL = ['anDigital'];
+const CARTOES_AN = [
+  ['AN 21', 'Croqui da propriedade', 'Mapa de satélite de cada fazenda: talhões, pivôs, sequeiro, pastos e áreas, com legenda e quadro de áreas.', 'mapa'],
+  ['AN 07', 'CAR e reserva legal', 'Nº do CAR, área do imóvel, consolidada, vegetação, APP e reserva legal × mínimo de 20%.', 'folha'],
+  ['AN 59', 'Outorgas — captações de água', 'Pontos de captação no mapa com portaria/certidão, vazão e validade (vermelho = vencida).', 'gota'],
+];
+export async function abrirAnDigital() {
+  const el = $('telaAnDigital'); if (!el) return;
+  el.innerHTML = `<div class="crq-an">
+    <div class="crq-an-cab"><div><h2>AN Digital</h2><p class="dica">Anexos que abrem dentro do app. Toque num cartão para abrir o croqui no satélite.</p></div>
+      <button class="btn principal" type="button" data-an-abrir>🛰 Abrir croqui no satélite</button></div>
+    <div class="crq-an-cards">${CARTOES_AN.map(([c, n, d]) => `<button type="button" class="crq-an-card" data-an-abrir>
+      <span class="crq-an-cod">${c}</span><b>${esc(n)}</b><span>${esc(d)}</span></button>`).join('')}</div>
+    <h3 class="crq-sub" style="margin-top:22px">Resumo por fazenda</h3>
+    <div id="crqAnResumo"><p class="dica">Carregando…</p></div></div>`;
+  el.querySelectorAll('[data-an-abrir]').forEach(b => b.addEventListener('click', () => abrirCroqui()));
+  try {
+    await carregar();
+    const n = v => { const x = Number(String(v ?? '').replace(',', '.')); return v != null && v !== '' && isFinite(x) ? x : null; };
+    const linhas = S.lista.map(cq => {
+      const rv = cq.reserva || {}; const T = totais(cq);
+      const area = n(rv.car_area_ha) ?? (T.total || null), rl = n(rv.rl_car_ha);
+      const p = rl != null && area ? rl / area * 100 : null;
+      const pts = cq.pontos || [], venc = pts.filter(x => x.venc && x.venc < hojeIso()).length;
+      return `<tr data-faz="${cq.fazenda_id}"><td><b>${esc(cq.fazenda)}</b></td><td>${ha(area)}${n(rv.car_area_ha) == null && area ? '<br><small class="dica">desenho</small>' : ''}</td>
+        <td class="${p == null ? '' : p >= RL_MIN - 0.005 ? 'crq-ok' : 'crq-venc'}">${rl != null ? ha(rl) + ' · ' + pct(p) : '—'}</td>
+        <td>${rv.car ? '✔' : '<span class="crq-venc">sem CAR</span>'}</td>
+        <td>${(cq.feicoes || []).length ? (cq.feicoes || []).length + ' áreas' : '<span class="dica">não importado</span>'}</td>
+        <td>${pts.length}${venc ? ` · <span class="crq-venc">${venc} vencida${venc > 1 ? 's' : ''}</span>` : ''}</td></tr>`;
+    }).join('');
+    $('crqAnResumo').innerHTML = S.lista.length ? `<div style="overflow-x:auto"><table class="crq-tab crq-an-tab"><thead><tr><th>Fazenda</th><th>Área</th><th>Reserva legal</th><th>CAR</th><th>Desenho</th><th>Captações</th></tr></thead><tbody>${linhas}</tbody></table></div>
+      <p class="crq-nota">Toque numa fazenda para abrir o croqui dela. Mínimo de reserva legal: ${RL_MIN}% (Lei 12.651/2012, art. 12, II).</p>`
+      : '<p class="dica">Nenhum dado ainda.</p>';
+    $('crqAnResumo').querySelectorAll('[data-faz]').forEach(tr => tr.addEventListener('click', () => abrirCroqui(tr.dataset.faz)));
+  } catch (e) {
+    $('crqAnResumo').innerHTML = `<p class="dica">${esc(e.message || e)}</p>`;
+  }
+}
+
 export function limparCroqui() { S = { lista: [], atual: null, mapa: S.mapa, camadas: S.camadas, rotulos: true, ocultos: new Set(), sel: null }; fechar(); }

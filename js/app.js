@@ -64,7 +64,7 @@ import { abrirResiduos, limparResiduos, TELAS_RESIDUOS } from './cert-residuos.j
 import { abrirGrasp, limparGrasp, TELAS_GRASP } from './cert-grasp.js';
 import { abrirBanho, limparBanho, TELAS_BANHO } from './cert-banho.js';
 import { abrirChecklist, limparChecklist, TELAS_CHECKLIST } from './cert-checklist.js';
-import { limparCroqui } from './cert-croqui.js';
+import { limparCroqui, abrirAnDigital, TELAS_AN_DIGITAL } from './cert-croqui.js';
 import { abrirFornecedores, limparFornecedores, TELAS_FORNECEDORES } from './cert-fornecedores.js';
 import { abrirMelhorias, limparMelhorias, TELAS_MELHORIAS } from './cert-melhorias.js';
 import { abrirBalanco, limparBalanco, TELAS_BALANCO } from './cert-balanco.js';
@@ -263,6 +263,9 @@ function abrirAba(nome) {
   // Certificação › Banho e higiene pessoal (28/10/2026) — js/cert-banho.js
   for (const t of TELAS_BANHO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_BANHO.includes(nome)) abrirBanho(nome);
+  // Certificação › AN Digital (30/10/2026) — js/cert-croqui.js
+  for (const t of TELAS_AN_DIGITAL) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_AN_DIGITAL.includes(nome)) abrirAnDigital(nome);
   // Certificação › Check List Digital (29/10/2026) — js/cert-checklist.js
   for (const t of TELAS_CHECKLIST) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_CHECKLIST.includes(nome)) abrirChecklist(nome);

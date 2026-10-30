@@ -333,6 +333,12 @@ export const MODULOS = [
        criar Check list digitais, aonde tem como pôr foto e deixar registrado"):
        C/NC/NA por item com foto, NC abre não conformidade no FORM 004, cada um
        conta como RG CL nn. js/cert-checklist.js; tabelas ccl_modelos e ccl_registros. */
+    /* AN Digital (30/10/2026, pedido dele: "crie AN digital e coloque esse AN lá, para dentro do app abrir"):
+       anexos que abrem dentro do app — AN 21 croqui no satélite, AN 07 CAR e reserva legal, AN 59 captações
+       outorgadas. js/cert-croqui.js; tabela cert_croquis. */
+    { id: 'ceAnSub', grupo: 'Registros', secao: 'AN Digital', codigo: 'AN', nome: 'AN Digital', telas: [
+      ['anDigital', 'Croqui, CAR e outorgas'],
+    ] },
     { id: 'ceClSub', grupo: 'Registros', secao: 'Check lists e caderno', codigo: 'CL', nome: 'CHECKS Digital', telas: [
       ['clLista',     'Check lists'],
       ['clRegistros', 'Registros'],
@@ -784,7 +790,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceIndAbsSub: 'relogio', ceIndTurnSub: 'pessoas', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceIndAbsSub: 'relogio', ceIndTurnSub: 'pessoas', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceClSub: 'check', ceAnSub: 'mapa',
 };
 /* Ícone das portas da Certificação (29/10/2026). */
 const ICONE_GRUPO = { 'Documentos': 'documento', 'Registros': 'lapis', 'Pendências': 'calendario', 'Indicadores': 'grafico' };
