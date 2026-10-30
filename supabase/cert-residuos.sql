@@ -114,19 +114,19 @@ on conflict do nothing;
 -- Lista mestra: FORM 053 (modelo) e RG 053 (registros), ligados FORM → RG.
 insert into public.cert_documentos(codigo, nome, categoria, periodicidade, situacao, revisao, data_revisao, caminho, observacao)
 select 'FORM 053', 'Gestão de resíduos', 'FORMULÁRIOS', 'Mensal', 'Em dia', '01', '2026-12-01',
-  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida\2 - FORM\FORM 053 - GESTÃO DE RESÍDUOS',
+  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\2 - FORMULÁRIOS\FORM 053 - GESTÃO DE RESÍDUOS',
   'Saída de resíduos e avaliação mensal do manejo (POP 004). Preenchido no app: Certificação › Forms › Resíduos.'
 where not exists (select 1 from public.cert_documentos where codigo = 'FORM 053');
 insert into public.cert_documentos(codigo, nome, categoria, periodicidade, situacao, caminho, observacao)
 select 'RG 053', 'Gestão de resíduos', 'REGISTROS', 'Mensal', 'Em dia',
-  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida\5 - RG\RG 053 - GESTÃO DE RESÍDUOS',
-  'Registros do FORM 053 preenchido (modelo em 2 - FORM).'
+  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\5 - REGISTROS\RG 053 - GESTÃO DE RESÍDUOS',
+  'Registros do FORM 053 preenchido (modelo em 2 - FORMULÁRIOS).'
 where not exists (select 1 from public.cert_documentos where codigo = 'RG 053');
 insert into public.cert_vinculos(de_id, para_id, origem)
 select f.id, r.id, 'FORM → RG' from public.cert_documentos f, public.cert_documentos r
 where f.codigo = 'FORM 053' and r.codigo = 'RG 053'
   and not exists (select 1 from public.cert_vinculos v where v.de_id = f.id and v.para_id = r.id);
-update public.cert_documentos set link = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida%2F2%20%2D%20FORM%2FFORM%20053%20%2D%20GEST%C3%83O%20DE%20RES%C3%8DDUOS'
+update public.cert_documentos set link = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F2%20%2D%20FORMUL%C3%81RIOS%2FFORM%20053%20%2D%20GEST%C3%83O%20DE%20RES%C3%8DDUOS'
 where codigo = 'FORM 053' and link is null;
-update public.cert_documentos set link = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida%2F5%20%2D%20RG%2FRG%20053%20%2D%20GEST%C3%83O%20DE%20RES%C3%8DDUOS'
+update public.cert_documentos set link = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F5%20%2D%20REGISTROS%2FRG%20053%20%2D%20GEST%C3%83O%20DE%20RES%C3%8DDUOS'
 where codigo = 'RG 053' and link is null;

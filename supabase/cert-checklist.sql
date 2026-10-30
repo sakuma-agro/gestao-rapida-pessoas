@@ -2,10 +2,10 @@
 -- Pedido do Guilherme: "igual Forms digital, agora vamos criar Check list digitais,
 -- aonde tem como pôr foto e deixar registrado". Decisões dele (29/10/2026):
 --  · a lista de CL é refeita do zero (os 18 CL antigos eram modelo de outra fazenda;
---    backup em 6 - CL\bkp\CL antigos - lista modelo.xlsx); o Check List Uso de EPI's vira CL 01;
+--    backup em 6 - CHECK LIST\bkp\CL antigos - lista modelo.xlsx); o Check List Uso de EPI's vira CL 01;
 --  · item marcado NC abre uma não conformidade no FORM 004 (cmc_casos, via CHECK LIST);
 --  · começa pelo CL 01 como modelo; os outros entram um por um.
--- O registro do CL preenchido é o RG CL 01 (pasta 5 - RG). Pode rodar de novo.
+-- O registro do CL preenchido é o RG CL 01 (pasta 5 - REGISTROS). Pode rodar de novo.
 
 -- Modelo de cada check list digital: itens e legenda. Um por documento CL da Lista mestra.
 create table if not exists public.ccl_modelos (
@@ -73,15 +73,15 @@ where d.categoria = 'CHECK LIST' and d.codigo ~ '^CL \d+$' and d.nome <> 'Check 
 insert into public.cert_documentos(codigo, nome, categoria, periodicidade, situacao, revisao, data_revisao, certificacoes, observacao, caminho, link)
 select 'CL 01', 'Check List Uso de EPI''s', 'CHECK LIST', 'Mensal', 'Em dia', '01', '2026-11-01', '{}',
   'Verificação do uso dos EPIs por funcionário e atividade (C / NC / NA). Check list digital: Certificação › Check List Digital — com foto por item; NC abre não conformidade no FORM 004.',
-  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida\6 - CL\CL 01 - USO DE EPIS',
-  'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida%2F6%20%2D%20CL%2FCL%2001%20%2D%20USO%20DE%20EPIS'
+  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\6 - CHECK LIST\CL 01 - USO DE EPIS',
+  'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F6%20%2D%20CHECK%20LIST%2FCL%2001%20%2D%20USO%20DE%20EPIS'
 where not exists (select 1 from public.cert_documentos where codigo = 'CL 01');
 
 insert into public.cert_documentos(codigo, nome, categoria, periodicidade, situacao, certificacoes, observacao, caminho, link)
 select 'RG CL 01', 'Check List Uso de EPI''s', 'REGISTROS', 'Mensal', 'Em dia', '{}',
-  'Registros do CL 01 preenchido (papel escaneado em 5 - RG e os preenchidos no app).',
-  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\Certificação - Lop Gestão Rápida\5 - RG\RG CL 01 - USO DE EPIS',
-  'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida%2F5%20%2D%20RG%2FRG%20CL%2001%20%2D%20USO%20DE%20EPIS'
+  'Registros do CL 01 preenchido (papel escaneado em 5 - REGISTROS e os preenchidos no app).',
+  'C:\NUVEM\OneDrive\1 - ADM - PRINCIPAL\6 - Certificações\5 - REGISTROS\RG CL 01 - USO DE EPIS',
+  'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F5%20%2D%20REGISTROS%2FRG%20CL%2001%20%2D%20USO%20DE%20EPIS'
 where not exists (select 1 from public.cert_documentos where codigo = 'RG CL 01');
 
 insert into public.cert_vinculos(de_id, para_id, origem)

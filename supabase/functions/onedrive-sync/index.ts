@@ -2,7 +2,7 @@
 //
 // Pedido do Guilherme: o app "ler o OneDrive direto". O sakumasrv já tem o
 // OneDrive sincronizado; um script agendado nele (ferramentas/onedrive-sync)
-// varre a pasta "Certificação - Lop Gestão Rápida" (1 - POP, 2 - FORMULÁRIOS, 3 - ANEXOS, 5 - REGISTROS)
+// varre a pasta "6 - Certificações" (1 - PROCEDIMENTOS, 2 - FORMULÁRIOS, 3 - ANEXOS, 5 - REGISTROS)
 // e manda para cá cada arquivo novo ou alterado. Esta função grava no Google
 // Drive do app (mesma pasta e mesma tabela public.arquivos da função
 // "arquivos") e liga o arquivo ao documento da lista mestra:

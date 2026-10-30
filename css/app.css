@@ -2490,3 +2490,10 @@ body.crq-aberto{overflow:hidden}
 .crq-an-tab td:first-child,.crq-an-tab th:first-child{text-align:left}
 .crq-tab td.crq-ok{color:#1E7A33;font-weight:bold}
 .crq-tab .crq-venc,.crq-an-tab .crq-venc{color:#C62828;font-weight:bold}
+/* Lista mestra: cor de cada tipo = cor do ícone da pasta no OneDrive (30/10/2026) */
+.ce-tipo[style*="--tc"]{border-top:4px solid var(--tc)}
+.ce-tipo[style*="--tc"]:hover{border-color:var(--tc);box-shadow:0 0 0 1px var(--tc)}
+.ce-tipo[style*="--tc"] .ce-tipo-ic{background:var(--tc);color:#fff}
+.ce-tipo-selo{display:inline-block;background:var(--tc);color:#fff;border-radius:8px;padding:1px 10px;font-size:.85em;vertical-align:1px}
+.ce-dv-item[style*="--tc"] b{color:color-mix(in srgb,var(--tc) 80%,#1B232B)}
+.ce-dv-item[style*="--tc"].on{box-shadow:inset 3px 0 0 var(--tc)}

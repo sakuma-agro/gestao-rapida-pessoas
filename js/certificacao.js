@@ -855,21 +855,26 @@ function docFiltrados() {
    (arquivo no Google Drive), "Abrir local" (pasta no OneDrive, campo link),
    "copiar caminho" (C:\NUVEM\OneDrive\…, campo caminho) e as revisões
    anteriores (arquivos do dono "<id>-rev"). A pasta espelho no computador é
-   6 - Certificações › Certificação - Lop Gestão Rápida: o que está lá é o
+   1 - ADM - PRINCIPAL › 6 - Certificações (desde 30/10/2026): o que está lá é o
    que já está no app. "Importar pasta" lê uma pasta dessas (uma subpasta
    por documento, com Revisões dentro) e sobe os PDFs para o Drive.
    ------------------------------------------------------------------- */
 const TIPOS_DOC = [
-  { id: 'POP', nome: 'POP', desc: 'Procedimentos operacionais', icone: 'documento', cat: 'P.O.Ps' },
-  { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO' },
-  { id: 'FORM', nome: 'FORM', desc: 'Formulários (modelos)', icone: 'boletim', cat: 'FORMULÁRIOS' },
-  { id: 'RG', nome: 'RG', desc: 'Registros — FORMs preenchidos', icone: 'historico', cat: 'REGISTROS' },   // 27/10/2026
-  { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST' },
-  { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO' },
-  { id: 'POL', nome: 'POL', desc: 'Políticas', icone: 'balanca', cat: 'POLÍTICAS' },   // 27/10/2026
+  { id: 'POP', nome: 'POP', desc: 'Procedimentos operacionais', icone: 'documento', cat: 'P.O.Ps', cor: '#84BD00', pasta: '1 - PROCEDIMENTOS' },
+  { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO', cor: '#2A8FA6' },
+  { id: 'FORM', nome: 'FORM', desc: 'Formulários (modelos)', icone: 'boletim', cat: 'FORMULÁRIOS', cor: '#2F80C9', pasta: '2 - FORMULÁRIOS' },
+  { id: 'RG', nome: 'RG', desc: 'Registros — FORMs preenchidos', icone: 'historico', cat: 'REGISTROS', cor: '#E8862A', pasta: '5 - REGISTROS' },   // 27/10/2026
+  { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST', cor: '#E5B800', pasta: '6 - CHECK LIST' },
+  { id: 'AN', nome: 'AN', desc: 'Anexos', icone: 'etiqueta', cat: 'ANEXO', cor: '#744F28', pasta: '3 - ANEXOS' },
+  { id: 'POL', nome: 'POL', desc: 'Políticas', icone: 'balanca', cat: 'POLÍTICAS', cor: '#51534A', pasta: '4 - POLÍTICAS' },   // 27/10/2026
 ];
-/* Pasta espelho "Certificação - Lop Gestão Rápida" no OneDrive (link que ele mandou, 26/10/2026). */
-const PASTA_CERT = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida&viewid=076de95f%2D2e95%2D4233%2Da472%2D0c15d08dc08e';
+/* Cores e pastas = as dos ícones das pastas no OneDrive (30/10/2026, pedido do Guilherme:
+   "vamos vincular até as cores no app"). Pasta raiz: 1 - ADM - PRINCIPAL › 6 - Certificações. */
+const URL_CERT = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es';
+const encOd = t => [...new TextEncoder().encode(t)].map(b => /[A-Za-z0-9._~]/.test(String.fromCharCode(b)) && b < 128 ? String.fromCharCode(b) : '%' + b.toString(16).toUpperCase().padStart(2, '0')).join('');
+const PASTA_CERT = URL_CERT;
+const pastaTipo = t => t?.pasta ? URL_CERT + '%2F' + encOd(t.pasta) : URL_CERT;
+const corTipo = id => (TIPOS_DOC.find(t => t.id === id) || {}).cor || '';
 const prefixoDoc = d => (so(d.codigo).toUpperCase().match(/^[A-Z]+/) || [''])[0];
 const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Outros', desc: 'Outros documentos', icone: 'documento', cat: '' };
 const docsDoTipo = (id, comInativos = false) => S.docs.filter(d => (comInativos || !foraDeUso(d)) && (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
@@ -935,7 +940,7 @@ function desenharTiposDocs() {
     const l = docsDoTipo(t.id);
     const n = s => l.filter(d => sitDoc(d) === s).length;
     const venc = l.filter(docAtrasado).length;
-    return `<button class="ce-tipo" type="button" data-tipo="${t.id}">
+    return `<button class="ce-tipo" type="button" data-tipo="${t.id}"${t.cor ? ` style="--tc:${t.cor}"` : ''}>
       <span class="ce-tipo-ic">${svgIcone(t.icone)}</span>
       <b>${esc(t.nome)}</b><span class="dc-sem">${esc(t.desc)} · ${l.length} doc.</span>
       <span class="ce-tipo-pe">${n('Em dia') ? tag(n('Em dia') + ' em dia', 'ativo') : ''}${n('Revisar') ? tag(n('Revisar') + ' revisar', 'alerta') : ''}${n('Pendente') ? tag(n('Pendente') + ' pendente', 'perigo') : ''}${venc ? tag(venc + ' revisão vencida', 'perigo') : ''}${l.length ? '' : '<span class="dc-sem">nenhum ainda</span>'}</span>
@@ -945,7 +950,7 @@ function desenharTiposDocs() {
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">Lista mestra</h2>
         <p class="dica" style="margin:2px 0 0">Escolha o tipo de documento. Cada um abre com o PDF vigente, a pasta no OneDrive e as revisões anteriores.</p></div>
-      <span class="barra" style="margin:0"><a class="btn ce-btn-link" href="${PASTA_CERT}" target="_blank" rel="noopener" title="Certificação - Lop Gestão Rápida: o que está nesta pasta é o que está no app">${svgIcone('predio')} Pasta no OneDrive</a>
+      <span class="barra" style="margin:0"><a class="btn ce-btn-link" href="${PASTA_CERT}" target="_blank" rel="noopener" title="1 - ADM - PRINCIPAL › 6 - Certificações: o que está nesta pasta é o que está no app">${svgIcone('predio')} Pasta no OneDrive</a>
       <button class="btn" type="button" id="ceDcTabela2">Ver tudo em tabela</button>
       <button class="btn principal" type="button" id="ceDcNovo">Novo documento</button></span>
     </div>
@@ -1000,8 +1005,9 @@ function desenharTipoDocs() {
   const t = tipoDoc(f.tipo);
   tela.innerHTML = `<div class="cartao naoimprimir">
     <div class="barra entre" style="margin:0">
-      <div><h2 style="margin:0">${esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)} · ${docsDoTipo(f.tipo).length} documento(s)</small></h2></div>
+      <div><h2 style="margin:0">${t.cor ? `<span class="ce-tipo-selo" style="--tc:${t.cor}">${esc(t.nome)}</span>` : esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)} · ${docsDoTipo(f.tipo).length} documento(s)</small></h2></div>
       <span class="barra" style="margin:0">
+        ${t.pasta ? `<a class="btn ce-btn-link" href="${pastaTipo(t)}" target="_blank" rel="noopener" title="6 - Certificações › ${esc(t.pasta)}">${svgIcone('predio')} ${esc(t.pasta)}</a>` : ''}
         <label class="btn" title="Escolha a pasta do tipo (ex.: 6 - Certificações › 1 - PROCEDIMENTOS). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
           <input type="file" id="ceDcPasta" hidden webkitdirectory multiple></label>
         <button class="btn principal" type="button" id="ceDcNovo">Novo ${esc(t.nome)}</button></span>
@@ -1020,7 +1026,7 @@ function desenharTipoDocs() {
   const itens = () => {
     const q = so($('ceDcQ2').value).toLowerCase();
     const l = docsDoTipo(f.tipo, !!f.verInativos).filter(d => !q || [d.codigo, d.nome, codTexto(codigosDoDoc(d))].some(x => so(x).toLowerCase().includes(q)));
-    $('ceDcItens').innerHTML = l.length ? l.map(d => `<button type="button" class="ce-dv-item${d.id === f.sel ? ' on' : ''}" data-sel="${d.id}">
+    $('ceDcItens').innerHTML = l.length ? l.map(d => `<button type="button" class="ce-dv-item${d.id === f.sel ? ' on' : ''}" data-sel="${d.id}"${t.cor ? ` style="--tc:${t.cor}"` : ''}>
         <span><b>${esc(so(d.codigo).replace(/^[A-Z]+\s*/, ''))}</b> ${esc(d.nome)}</span>${tag(sitDoc(d), COR_SIT[sitDoc(d)])}</button>`).join('')
       : `<p class="dica" style="padding:8px">${docsDoTipo(f.tipo).length ? 'Nada com essa busca.' : 'Nenhum documento deste tipo ainda.'}</p>`;
     const nFora = docsDoTipo(f.tipo, true).length - docsDoTipo(f.tipo).length;

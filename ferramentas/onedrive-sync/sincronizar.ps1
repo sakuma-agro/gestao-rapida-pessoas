@@ -1,7 +1,7 @@
 ﻿# LOP - Gestão Rápida — sincroniza a pasta da Certificação no OneDrive com o app.
 # Roda no sakumasrv a cada hora (tarefa agendada "LOP - Sincronizar OneDrive").
 #
-# Varre 1 - PROCEDIMENTOS, 2 - FORMULÁRIOS, 3 - ANEXOS, 4 - POLÍTICAS e 5 - REGISTROS (nomes desde 30/10/2026) (registros: todo arquivo vira registro do RG) dentro de "Certificação - Lop Gestão Rápida"
+# Varre 1 - PROCEDIMENTOS, 2 - FORMULÁRIOS, 3 - ANEXOS, 4 - POLÍTICAS, 5 - REGISTROS e 6 - CHECK LIST (nomes desde 30/10/2026) (registros: todo arquivo vira registro do RG) dentro de "6 - Certificações"
 # e manda para o app cada PDF/foto novo ou alterado (até 15 MB):
 #   - arquivo da pasta do documento  -> vira o PDF/anexo daquele documento no app
 #   - arquivo na subpasta de uma fazenda de um AN por fazenda -> evidência daquela fazenda
