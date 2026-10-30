@@ -197,8 +197,7 @@ export async function carregar(competencia = competenciaAtual()) {
   const FER = ['afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas'];
   const [a, m] = competencia.split('-').map(Number);
   const [apur] = await Promise.all([
-    ids.length ? c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids)
-               : Promise.resolve({ data: [], error: null }),
+    apurPorLotes(c, ids),
     // Tipos de hora extra especial (25/09/2026): se falhar, só o seletor fica vazio.
     lerTabela('tiposHe'),
     // Empréstimos: pequenos, vêm inteiros — o saldo depende de todo o histórico.
@@ -268,6 +267,20 @@ export async function carregarApoioFerias() {
     && (porFunc.get(b.funcionario_id) || []).some(g => b.data_fato >= g.data_ini && b.data_fato <= g.data_fim));
   recortar();
   salvarCache();
+}
+
+/* Apurações em lotes (30/10/2026): com centenas de boletins, a lista de ids
+   num só .in() passava de 26 mil letras na URL e o servidor devolvia
+   "Bad Request" — o DP abria sem nenhuma apuração (extras zeradas em
+   Lançados). Agora vai de 150 em 150, juntas. */
+async function apurPorLotes(c, ids, colunas = '*') {
+  if (!ids.length) return { data: [], error: null };
+  const lotes = [];
+  for (let i = 0; i < ids.length; i += 150) lotes.push(ids.slice(i, i + 150));
+  const rs = await Promise.all(lotes.map(l => c.from(TABELAS.apuracoes).select(colunas).in('boletim_id', l)));
+  const erro = rs.find(r => r.error)?.error;
+  if (erro) return { data: null, error: erro };
+  return { data: rs.flatMap(r => r.data || []), error: null };
 }
 
 /* Lê a consulta inteira em páginas de 1.000 — o teto de uma resposta. */
@@ -522,7 +535,7 @@ export async function carregarAnterior(competencia, forcar = false) {
     const r = await c.from(TABELAS.boletins).select('*').eq('competencia', ant).neq('situacao', 'cancelado');
     if (r.error) throw r.error;
     const ids = r.data.map(b => b.id);
-    const ap = ids.length ? await c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids) : { data: [] };
+    const ap = await apurPorLotes(c, ids);
     if (ap.error) throw ap.error;
     dados.bolAnterior = r.data;
     dados.apurAnterior = ap.data;
@@ -676,7 +689,7 @@ export async function boletinsDoDia(fid, data) {
     boletins = [...mapa.values()].filter(vivo);
     const ids = boletins.map(b => b.id);
     if (ids.length) {
-      const a = await c.from(TABELAS.apuracoes).select('*').in('boletim_id', ids);
+      const a = await apurPorLotes(c, ids);
       if (a.error) throw a.error;
       const am = new Map((a.data || []).map(x => [x.boletim_id, x]));
       apuracoes.forEach(x => am.set(x.boletim_id, x));
