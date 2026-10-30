@@ -2447,6 +2447,17 @@ body.crq-aberto{overflow:hidden}
 .crq-z-medio .leaflet-tooltip.crq-rot-p{display:none}
 .crq-z-longe .leaflet-tooltip.crq-rot{display:none}
 .crq-fora{display:inline-block;font-size:10px;padding:0 5px;border-radius:8px;background:#FBE3D6;color:#8A4B1E;font-weight:bold}
+.leaflet-tooltip.crq-rot-agua{background:rgba(0,70,160,.8);font-size:11px}
+.crq-ponto-ico{display:inline-block;width:11px;height:11px;border-radius:50%;background:#0077FF;border:2px solid #fff;box-shadow:0 0 0 1px #0077FF;margin-right:5px;vertical-align:-1px}
+.crq-leg label .crq-ponto-ico{margin:0 2px}
+.crq-leg i.crq-ponto-ico,.crq-tal i.crq-ponto-ico{width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-sizing:content-box}
+.crq-ponto-ico.venc{background:#E53935;box-shadow:0 0 0 1px #E53935}
+.crq-tab td.crq-venc{color:#C62828;font-weight:bold}
+.crq-tal small{color:#6B6D63;font-weight:normal}
+.crq-car{margin-top:16px}
+.crq-car-tab td:first-child{text-align:left;color:#6B6D63}.crq-car-tab td:last-child{text-align:right}
+.crq-mono{font-family:Consolas,monospace;font-size:11px;overflow-wrap:anywhere}
+.crq-edit{margin-top:10px}.crq-edit summary{cursor:pointer;font-size:12.5px;color:#4E7A00}
 .crq-alerta{font-size:12px;color:#8A4B1E;background:#FDF1E8;border-radius:6px;padding:6px 8px;margin:8px 0 0}
 @media (max-width:760px){
   .crq-corpo{flex-direction:column}
