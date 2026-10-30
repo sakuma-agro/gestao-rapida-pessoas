@@ -24,3 +24,6 @@ drop policy if exists cert_croquis_leem on public.cert_croquis;
 drop policy if exists cert_croquis_gravam on public.cert_croquis;
 create policy cert_croquis_leem on public.cert_croquis for select to authenticated using (public.app_pode('cert') or public.app_pode('sst'));
 create policy cert_croquis_gravam on public.cert_croquis for all to authenticated using (public.app_pode('cert')) with check (public.app_pode('cert'));
+-- 30/10/2026 (2): pontos de captação (outorgas do AN 59) e origem do limite (KML ou CAR).
+alter table public.cert_croquis add column if not exists pontos jsonb not null default '[]'::jsonb,   -- [{nome,tipo,curso,outorga,vazao,finalidade,validade,venc,lat,lon}]
+  add column if not exists limite_fonte text;                                                          -- 'CAR' quando veio do shapefile do SICAR
