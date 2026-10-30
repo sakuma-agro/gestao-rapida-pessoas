@@ -1002,7 +1002,7 @@ function desenharTipoDocs() {
     <div class="barra entre" style="margin:0">
       <div><h2 style="margin:0">${esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)} · ${docsDoTipo(f.tipo).length} documento(s)</small></h2></div>
       <span class="barra" style="margin:0">
-        <label class="btn" title="Escolha a pasta do tipo (ex.: 6 - Certificações › 1 - POP). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
+        <label class="btn" title="Escolha a pasta do tipo (ex.: 6 - Certificações › 1 - PROCEDIMENTOS). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
           <input type="file" id="ceDcPasta" hidden webkitdirectory multiple></label>
         <button class="btn principal" type="button" id="ceDcNovo">Novo ${esc(t.nome)}</button></span>
     </div>
