@@ -34,7 +34,7 @@ function Chave($s) { (SemAcento $s).ToUpperInvariant().Trim() }
 try {
   $AbrirDir = Join-Path $env:LOCALAPPDATA 'LOP'
   $AbrirPs1 = Join-Path $AbrirDir 'abrir-pasta.ps1'
-  $AbrirOrig = Join-Path $Base '_ferramentas\Abrir pasta no computador\abrir-pasta.ps1'
+  $AbrirOrig = Join-Path $Base '7 - CONFIGURAÇÕES\Ferramentas\Abrir pasta no computador\abrir-pasta.ps1'
   if ((Test-Path -LiteralPath $AbrirOrig) -and -not (Test-Path 'HKCU:\Software\Classes\lop-pasta\shell\open\command')) {
     New-Item -ItemType Directory -Force -Path $AbrirDir | Out-Null
     Copy-Item -LiteralPath $AbrirOrig -Destination $AbrirPs1 -Force

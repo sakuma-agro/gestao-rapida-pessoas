@@ -1093,13 +1093,13 @@ async function painelDoc() {
   /* Abrir no computador (29/10/2026, pedido dele: "não consigo abrir local, estão indo para
      chrome no OneDrive, coloque as duas opções local e nuvem"). O navegador não abre pasta do
      Windows sozinho: o link lop-pasta: é atendido pelo atalho instalado uma vez em cada
-     computador (ferramentas/abrir-pasta, cópia no OneDrive em _ferramentas). O caminho também
+     computador (ferramentas/abrir-pasta, cópia no OneDrive em 7 - CONFIGURAÇÕES › Ferramentas). O caminho também
      vai para a área de transferência, caso o atalho não esteja instalado. */
   $('ceDvPc')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); } catch { /* sem permissão: segue */ }
     const a = document.createElement('a'); a.href = 'lop-pasta:' + encodeURIComponent(d.caminho); a.click();
     $('ceDvMsg').innerHTML = 'Abrindo a pasta no Explorador… Se não abriu, o caminho já está copiado (cole na barra de endereço do Explorador). '
-      + 'Para abrir direto, rode uma vez o <b>instalar.bat</b> de <i>6 - Certificações › _ferramentas › Abrir pasta no computador</i>.';
+      + 'Para abrir direto, rode uma vez o <b>instalar.bat</b> de <i>6 - Certificações › 7 - CONFIGURAÇÕES › Ferramentas › Abrir pasta no computador</i>.';
   });
   $('ceDvCopiar')?.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(d.caminho); $('ceDvMsg').textContent = 'Caminho copiado. No Explorador de Arquivos, clique na barra de endereço, cole (Ctrl+V) e Enter.'; }
