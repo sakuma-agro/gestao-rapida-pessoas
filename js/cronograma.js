@@ -485,7 +485,7 @@ const FONTES = [
     const g = new Map();
     for (const d of await pegar(cli().from('cert_documentos').select('id,codigo,nome,periodicidade,situacao,data_revisao,responsavel'))) {
       const m = MESES_P[d.periodicidade];
-      if (!m || !d.data_revisao || d.situacao === 'Obsoleto') continue;
+      if (!m || !d.data_revisao || d.situacao === 'Obsoleto' || d.situacao === 'Inativo') continue;
       const p = addMeses(d.data_revisao, m);
       if (!naJanela(p)) continue;
       if (!g.has(p)) g.set(p, []);

@@ -61,8 +61,12 @@ export const PRIORIDADES = ['Crítica', 'Maior', 'Menor'];
 export const STATUS = ['Conforme', 'Em andamento', 'Pendente', 'Não conforme', 'Não se aplica'];
 const COR_STATUS = { 'Conforme': 'ativo', 'Em andamento': 'neutra', 'Pendente': 'alerta', 'Não conforme': 'perigo', 'Não se aplica': 'inativo' };
 const COR_PRIOR = { 'Crítica': 'perigo', 'Maior': 'alerta', 'Menor': 'neutra' };
-const SITUACOES_DOC = ['Em dia', 'Revisar', 'Pendente', 'Obsoleto'];
-const COR_SIT = { 'Em dia': 'ativo', 'Revisar': 'alerta', 'Pendente': 'perigo', 'Obsoleto': 'inativo' };
+const SITUACOES_DOC = ['Em dia', 'Revisar', 'Pendente', 'Inativo', 'Obsoleto'];
+/* Inativo (30/10/2026, pedido dele: "atualiza os AN com os que estão ativos nas pastas"): documento
+   guardado em "Inativos por enquanto" no OneDrive — sai da lista mestra e das pendências, mas não é
+   apagado e pode voltar. Obsoleto = pasta _OBSOLETOS. */
+const foraDeUso = d => d.situacao === 'Obsoleto' || d.situacao === 'Inativo';
+const COR_SIT = { 'Em dia': 'ativo', 'Revisar': 'alerta', 'Pendente': 'perigo', 'Inativo': 'inativo', 'Obsoleto': 'inativo' };
 const CATEGORIAS = ['ANEXO', 'CHECK LIST', 'INST. TRABALHO', 'P.O.Ps', 'POLÍTICAS', 'REGISTROS'];
 const PERIODOS = ['Diário', 'Semanal', 'Mensal', 'Trimestral', 'Semestral', 'Anual', 'A cada 2 anos', 'A cada 3 anos', 'Por evento'];
 /* Quantos meses até a próxima vez (o que é diário ou semanal não vai ao calendário: é rotina). */
@@ -343,11 +347,11 @@ function proximaDoc(d) {
   if (!m || !d.data_revisao) return null;
   return somaMeses(d.data_revisao, m);
 }
-const docAtrasado = d => { const p = proximaDoc(d); return !!p && p < hoje(); };
+const docAtrasado = d => { if (foraDeUso(d)) return false; const p = proximaDoc(d); return !!p && p < hoje(); };
 /** Situação mostrada: no AN por fazenda vem das fazendas (Pendente se alguma está sem evidência ou vencida);
     nos demais, a situação escolhida no cadastro. */
 function sitDoc(d) {
-  if (!d.por_fazenda || d.situacao === 'Obsoleto') return d.situacao;
+  if (!d.por_fazenda || foraDeUso(d)) return d.situacao;
   const its = itensDe(d);
   if (!its.length) return d.situacao;
   return its.some(i => estadoItem(i, d).c === 'perigo') ? 'Pendente' : 'Em dia';
@@ -396,7 +400,7 @@ function itensEntre(de, ate, { cert = '', auto = true } = {}) {
   }
   for (const d of S.docs) {
     const p = proximaDoc(d);
-    if (!p || p < de || p > ate || d.situacao === 'Obsoleto') continue;
+    if (!p || p < de || p > ate || foraDeUso(d)) continue;
     if (cert && (d.certificacoes || []).length && !d.certificacoes.includes(cert)) continue;
     r.push({ data: p, tipo: 'Revisão de documento', cor: 'cinza', titulo: `${d.codigo} · ${d.nome}`, auto: 'doc', ref: d.id, certs: d.certificacoes || [], resp: d.responsavel });
   }
@@ -460,7 +464,7 @@ function dadosPendencias() {
   const hj = hoje();
   const prox = itensEntre(hj, somaDias(hj, 60)).filter(i => !i.feito);
   const atrasados = [
-    ...S.docs.filter(d => d.situacao !== 'Obsoleto' && docAtrasado(d)).map(d => ({ data: proximaDoc(d), titulo: `${d.codigo} · ${d.nome}`, tipo: 'Revisão de documento', resp: d.responsavel })),
+    ...S.docs.filter(d => !foraDeUso(d) && docAtrasado(d)).map(d => ({ data: proximaDoc(d), titulo: `${d.codigo} · ${d.nome}`, tipo: 'Revisão de documento', resp: d.responsavel })),
     ...S.reqs.filter(r => r.prazo && r.prazo < hj && emUso(r) && !['Conforme', 'Não se aplica'].includes(r.status)).map(r => ({ data: r.prazo, titulo: r.titulo, tipo: 'Prazo de requisito', resp: r.responsavel })),
     ...eventosVencidos(),
   ].sort((a, b) => a.data.localeCompare(b.data));
@@ -766,7 +770,7 @@ function formRequisito(id) {
       <button class="btn mini" type="button" id="cerDocMais">Ligar</button>
     </div>
     <p class="dica" id="cerDocAviso" hidden></p>
-    ${datalist('ceListaDocs', S.docs.filter(d => d.situacao !== 'Obsoleto').map(rotDoc))}
+    ${datalist('ceListaDocs', S.docs.filter(d => !foraDeUso(d)).map(rotDoc))}
     ${datalist('ceListaTemas', temas())}${datalist('ceListaResp', responsaveis())}${datalist('ceListaPer', PERIODOS)}
     ${r?.atualizado_por ? `<p class="dica">Última alteração: ${br(r.atualizado_em)} · ${esc(r.atualizado_por)}</p>` : ''}
     <div class="barra fim">
@@ -868,7 +872,7 @@ const TIPOS_DOC = [
 const PASTA_CERT = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2FCertifica%C3%A7%C3%A3o%20%2D%20Lop%20Gest%C3%A3o%20R%C3%A1pida&viewid=076de95f%2D2e95%2D4233%2Da472%2D0c15d08dc08e';
 const prefixoDoc = d => (so(d.codigo).toUpperCase().match(/^[A-Z]+/) || [''])[0];
 const tipoDoc = id => TIPOS_DOC.find(t => t.id === id) || { id, nome: id || 'Outros', desc: 'Outros documentos', icone: 'documento', cat: '' };
-const docsDoTipo = id => S.docs.filter(d => (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
+const docsDoTipo = (id, comInativos = false) => S.docs.filter(d => (comInativos || !foraDeUso(d)) && (TIPOS_DOC.some(t => t.id === prefixoDoc(d)) ? prefixoDoc(d) : 'OUTROS') === id)
   .sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 /* código comparável: "POP 1", "POP 001" e "POPAGR-01" viram POP1 */
 const EMAIL_PC_LOCAL = 'escritoriosakuma@hotmail.com';   // login do Guilherme
@@ -1015,10 +1019,13 @@ function desenharTipoDocs() {
   $('ceDcPasta').addEventListener('change', e => importarPasta([...e.target.files]).finally(() => { e.target.value = ''; }));
   const itens = () => {
     const q = so($('ceDcQ2').value).toLowerCase();
-    const l = docsDoTipo(f.tipo).filter(d => !q || [d.codigo, d.nome, codTexto(codigosDoDoc(d))].some(x => so(x).toLowerCase().includes(q)));
+    const l = docsDoTipo(f.tipo, !!f.verInativos).filter(d => !q || [d.codigo, d.nome, codTexto(codigosDoDoc(d))].some(x => so(x).toLowerCase().includes(q)));
     $('ceDcItens').innerHTML = l.length ? l.map(d => `<button type="button" class="ce-dv-item${d.id === f.sel ? ' on' : ''}" data-sel="${d.id}">
         <span><b>${esc(so(d.codigo).replace(/^[A-Z]+\s*/, ''))}</b> ${esc(d.nome)}</span>${tag(sitDoc(d), COR_SIT[sitDoc(d)])}</button>`).join('')
       : `<p class="dica" style="padding:8px">${docsDoTipo(f.tipo).length ? 'Nada com essa busca.' : 'Nenhum documento deste tipo ainda.'}</p>`;
+    const nFora = docsDoTipo(f.tipo, true).length - docsDoTipo(f.tipo).length;
+    if (nFora) $('ceDcItens').insertAdjacentHTML('beforeend', `<button type="button" class="ce-link dc-sem" id="ceDcInat" style="padding:8px">${f.verInativos ? 'Esconder' : 'Mostrar'} inativos e obsoletos (${nFora})</button>`);
+    $('ceDcInat')?.addEventListener('click', () => { f.verInativos = !f.verInativos; itens(); });
     $('ceDcItens').querySelectorAll('[data-sel]').forEach(b => b.addEventListener('click', () => {
       f.sel = Number(b.dataset.sel); itens(); painelDoc();
       if (matchMedia('(max-width:760px)').matches) $('ceDcPainel').scrollIntoView({ behavior: 'smooth' });
@@ -2164,7 +2171,7 @@ function docListaDocs(lista) {
         ${ds.map(d => `<tr><td>${codigoLink(d, 'rel-link')}</td><td>${esc(d.nome)}</td><td>${esc(d.revisao || '')}</td><td>${d.data_revisao ? br(d.data_revisao) : ''}</td>
           <td>${esc(d.periodicidade || '')}</td><td>${esc(d.responsavel || '')}</td>
           <td class="rel-miudo">${esc(codTexto(codigosDoDoc(d)))}</td>
-          <td class="${sitDoc(d) === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : sitDoc(d) === 'Obsoleto' ? '' : 'rel-pend'}">${esc(sitDoc(d))}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
+          <td class="${sitDoc(d) === 'Em dia' && !docAtrasado(d) ? 'rel-ok' : foraDeUso(d) ? '' : 'rel-pend'}">${esc(sitDoc(d))}${docAtrasado(d) ? ' · revisão vencida' : ''}</td></tr>`).join('')}`).join('')
         || '<tr><td colspan="8" class="rel-vazio">Nenhum documento.</td></tr>'}
       </tbody></table>` });
 }

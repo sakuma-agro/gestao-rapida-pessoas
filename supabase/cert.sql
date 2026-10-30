@@ -50,7 +50,7 @@ create table if not exists public.cert_documentos (
   categoria text not null,             -- ANEXO, INST. TRABALHO, REGISTROS, P.O.Ps, CHECK LIST
   responsavel text,
   periodicidade text,                  -- Diário, Semanal, Mensal, Trimestral, Semestral, Anual
-  situacao text not null default 'Em dia' check (situacao in ('Em dia','Revisar','Pendente','Obsoleto')),
+  situacao text not null default 'Em dia' check (situacao in ('Em dia','Revisar','Pendente','Inativo','Obsoleto')),
   revisao text,
   data_revisao date,
   certificacoes text[] not null default '{}',
