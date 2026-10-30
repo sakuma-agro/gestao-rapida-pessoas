@@ -306,7 +306,7 @@ const rotDoc = d => `${d.codigo} · ${d.nome}`;
 const linkOk = u => /^https?:\/\//i.test(so(u));
 const codigoLink = (d, cls = '') => (linkOk(d.link)
   ? `<a class="ce-cod-link ${cls}" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abrir no OneDrive: ${esc(d.nome)}">${esc(d.codigo)}<span aria-hidden="true">↗</span></a>`
-  : `<b>${esc(d.codigo)}</b>`) + (S.docComArq?.has?.(String(d.id)) ? '<span class="ce-anx" title="Tem arquivo no Google Drive">📎</span>' : '');
+  : `<b>${esc(d.codigo)}</b>`) + (S.docComArq?.has?.(String(d.id)) ? '<span class="ce-anx" title="Tem arquivo anexado (fica na pasta do OneDrive)">📎</span>' : '');
 /** Códigos das normas que o documento atende, pelos requisitos ligados a ele
  *  (só das certificações ligadas, sem repetir, na ordem das certificações). */
 function codigosDoDoc(d) {
@@ -1008,7 +1008,7 @@ function desenharTipoDocs() {
       <div><h2 style="margin:0">${t.cor ? `<span class="ce-tipo-selo" style="--tc:${t.cor}">${esc(t.nome)}</span>` : esc(t.nome)} <small class="dc-sem" style="font-size:14px;font-weight:400">· ${esc(t.desc)} · ${docsDoTipo(f.tipo).length} documento(s)</small></h2></div>
       <span class="barra" style="margin:0">
         ${t.pasta ? `<a class="btn ce-btn-link" href="${pastaTipo(t)}" target="_blank" rel="noopener" title="6 - Certificações › ${esc(t.pasta)}">${svgIcone('predio')} ${esc(t.pasta)}</a>` : ''}
-        <label class="btn" title="Escolha a pasta do tipo (ex.: 6 - Certificações › 1 - PROCEDIMENTOS). Cada subpasta é um documento; os PDFs sobem para o Drive.">Importar pasta
+        <label class="btn" title="Escolha a pasta do tipo (ex.: 6 - Certificações › 1 - PROCEDIMENTOS). Cada subpasta é um documento; os PDFs entram no app e ficam na pasta do OneDrive.">Importar pasta
           <input type="file" id="ceDcPasta" hidden webkitdirectory multiple></label>
         <button class="btn principal" type="button" id="ceDcNovo">Novo ${esc(t.nome)}</button></span>
     </div>
@@ -1209,7 +1209,7 @@ function ligarCadeia(d) {
   el.querySelectorAll('[data-arq-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.arqVer)));
   el.querySelectorAll('[data-ev-ver]').forEach(b => b.addEventListener('click', async () => {
     const l = await listarArquivos('certificacao', 'evidencia', b.dataset.evVer).catch(() => []);
-    if (l[0]) abrirArquivo(l[0].chave); else alert('Arquivo ainda não está no Drive.');
+    if (l[0]) abrirArquivo(l[0].chave); else alert('Arquivo ainda não está no app.');
   }));
   $('ceCadApr')?.addEventListener('click', () => apresentarCadeia(d));
 }
@@ -1567,7 +1567,7 @@ async function mostrarEnvio() {
   const el = $('ceDcEnvio'); if (!el) return;
   const n = await contarPendentes().catch(() => 0);
   el.hidden = !n;
-  el.textContent = n ? `Enviando para o Google Drive: faltam ${n} arquivo(s). Pode continuar usando o app.` : '';
+  el.textContent = n ? `Enviando: faltam ${n} arquivo(s). Pode continuar usando o app. O computador do escritório grava cada um na pasta do OneDrive em até 5 minutos.` : '';
   if (!pararAviso) pararAviso = aoMudarArquivos(() => { mostrarEnvio(); if (S.fd.modo === 'tipo') painelDoc(); });
 }
 
@@ -1615,7 +1615,7 @@ async function importarPasta(arquivos) {
   enviarPendentes();
   mostrarEnvio();
   dialogo(`<h3>Importar pasta</h3>
-    <p><b>${grupos.size}</b> documento(s) encontrados · <b>${novos}</b> arquivo(s) indo para o Google Drive${jaTinha ? ` · ${jaTinha} já estavam no app` : ''}.</p>
+    <p><b>${grupos.size}</b> documento(s) encontrados · <b>${novos}</b> arquivo(s) indo para o app e para a pasta do OneDrive${jaTinha ? ` · ${jaTinha} já estavam no app` : ''}.</p>
     ${ignorados ? `<p class="dica">${ignorados} arquivo(s) Word/outros ficaram de fora: o editável continua no OneDrive (botão “Abrir local”).</p>` : ''}
     ${semCadastro.size ? `<p class="dica">Sem cadastro na Lista mestra (não importados): ${esc([...semCadastro].join(', '))}. Cadastre e importe de novo.</p>` : ''}
     ${erros.length ? `<div class="aviso erro">${erros.map(esc).join('<br>')}</div>` : ''}

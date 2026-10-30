@@ -33,6 +33,14 @@
 //   enviar&chave=&nome=       POST corpo = arquivo → grava no Drive e registra
 //   ver&chave=                GET  → o arquivo
 //   apagar&chave=             POST → lixeira do Drive (recuperável 30 dias) e tira o registro
+//
+// Certificação: o OneDrive é o lugar oficial (30/10/2026, pedido do Guilherme — "deixe o Drive
+// somente para os outros apps, vamos usar na certificação o OneDrive", opção 1). Todo arquivo
+// certificacao/… enviado aqui continua indo para o Drive, mas só para abrir na tela; a linha ganha
+// od_destino = a pasta do documento no OneDrive (caminho dentro de "6 - Certificações") e o
+// computador do escritório (sakumasrv, entregar.ps1 a cada 5 min) grava lá e marca a origem.
+// Apagar no app um arquivo que o app mandou: o computador tira da pasta (vai para
+// 7 - CONFIGURAÇÕES › Para apagar). O que veio do OneDrive pelo sincronizador não é tocado na pasta.
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -151,6 +159,62 @@ type Db = ReturnType<typeof banco>;
 const pode = (db: Db, area: string, tipo: string, escrever: boolean) =>
   db("rpc/arquivo_pode", { method: "POST", body: JSON.stringify({ p_area: area, p_tipo: tipo, p_escrever: escrever }) });
 
+/* ─────────── Certificação: pasta do OneDrive para onde o arquivo vai ─────────── */
+const SERV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+async function sdb(caminho: string, init: RequestInit = {}) {
+  const r = await fetch(`${URL_BASE}/rest/v1/${caminho}`, { ...init, headers: { apikey: SERV, Authorization: `Bearer ${SERV}`, "Content-Type": "application/json", ...(init.headers || {}) } });
+  const t = await r.text();
+  if (!r.ok) throw new Error(`banco ${r.status}: ${t}`);
+  return t ? JSON.parse(t) : null;
+}
+const BASE_PC = "C:\\NUVEM\\OneDrive\\1 - ADM - PRINCIPAL\\6 - Certificações\\";
+const ODLINK = /[?&]id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F([^&]*)/i;
+const relDoLink = (l: string | null | undefined) => { const m = String(l || "").match(ODLINK); try { return m ? decodeURIComponent(m[1]) : ""; } catch { return ""; } };
+function relDoCaminhoPc(c: string | null | undefined) {
+  const x = String(c || "");
+  return x.toLowerCase().startsWith(BASE_PC.toLowerCase()) ? x.slice(BASE_PC.length).replace(/\\/g, "/").replace(/\/+$/, "") : "";
+}
+async function pastaDoc(id: string | number): Promise<{ rel: string; codigo: string }> {
+  const d = (await sdb(`cert_documentos?select=codigo,caminho,link&id=eq.${encodeURIComponent(String(id))}`))?.[0];
+  return d ? { rel: relDoCaminhoPc(d.caminho) || relDoLink(d.link), codigo: d.codigo } : { rel: "", codigo: "" };
+}
+async function pastaPorCodigo(codigo: string, reserva: string) {
+  const d = (await sdb(`cert_documentos?select=id&codigo=eq.${encodeURIComponent(codigo)}`))?.[0];
+  return (d && (await pastaDoc(d.id)).rel) || reserva;
+}
+const ANO = () => String(new Date().getFullYear());
+const SEM_LUGAR = (tipo: string, dono: string) => `7 - CONFIGURAÇÕES/Anexos do app/${tipo}/${dono}`;
+async function pastaOneDrive(tipo: string, dono: string): Promise<string> {
+  if (tipo === "documento") {
+    const [id, rev] = dono.split("-");
+    const p = (await pastaDoc(id)).rel;
+    return p ? (rev === "rev" ? p + "/Revisões" : p) : SEM_LUGAR(tipo, dono);
+  }
+  if (tipo === "evidencia") {
+    const ev = /^\d+$/.test(dono) ? (await sdb(`cert_evidencias?select=documento_id,item_id,data&id=eq.${dono}`))?.[0] : null;
+    if (!ev) return SEM_LUGAR(tipo, dono);
+    const doc = await pastaDoc(ev.documento_id);
+    if (!doc.rel) return SEM_LUGAR(tipo, dono);
+    const ano = String(ev.data || "").slice(0, 4) || ANO();
+    if (ev.item_id) {
+      const it = (await sdb(`cert_doc_itens?select=local,link,jor_fazendas(nome)&id=eq.${ev.item_id}`))?.[0];
+      const ri = relDoLink(it?.link);
+      if (ri && ri.startsWith(doc.rel + "/")) return ri + "/" + ano;
+      const local = String(it?.jor_fazendas?.nome || it?.local || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[\\/:*?"<>|]+/g, " ").trim();
+      return doc.rel + "/" + (local || "GERAL") + "/" + ano;
+    }
+    return doc.codigo.startsWith("RG ") ? doc.rel + "/" + ano : doc.rel + "/EVIDÊNCIAS/" + ano;
+  }
+  const porTipo: Record<string, [string, string]> = {
+    caderno: ["AN 09", "3 - ANEXOS/AN 09 - CADERNO DE CAMPO (RELATÓRIO DAS ATIVIDADES DO CAMPO)"],
+    fauna: ["RG 050", "5 - REGISTROS/RG 050 - MONITORAMENTO DE ANIMAIS"],
+    energia: ["RG 043", "5 - REGISTROS/RG 043 - TABELA CONSUMO DE ENERGIAS"],
+    residuo: ["RG 053", "5 - REGISTROS/RG 053 - GESTÃO DE RESÍDUOS"],
+  };
+  const x = porTipo[tipo];
+  return x ? (await pastaPorCodigo(x[0], x[1])) + "/" + ANO() : SEM_LUGAR(tipo, dono);
+}
+
 /* ─────────── ações ─────────── */
 async function status() {
   try {
@@ -187,7 +251,7 @@ async function enviar(req: Request, db: Db, chave: string, area: string, tipo: s
   if (corpo.length > MAX_BYTES) return json({ erro: "grande-demais" }, 413);
   const nomeFinal = nomeLimpo(nome, chave);
 
-  const atual = await db(`arquivos?select=drive_id&chave=eq.${encodeURIComponent(chave)}`);
+  const atual = await db(`arquivos?select=drive_id,origem&chave=eq.${encodeURIComponent(chave)}`);
   let driveId: string = atual?.[0]?.drive_id ?? "";
   if (driveId) {
     const r = await google(`https://www.googleapis.com/upload/drive/v3/files/${driveId}?uploadType=media&fields=id`, {
@@ -219,7 +283,14 @@ async function enviar(req: Request, db: Db, chave: string, area: string, tipo: s
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify({ chave, area, tipo, dono_id: dono, nome: nomeFinal, mime, tamanho: corpo.length, drive_id: driveId }),
   });
-  return json({ chave, nome: nomeFinal, tamanho: corpo.length, mime });
+  // Certificação: o computador do escritório grava no OneDrive (mesmo lugar, se for troca do arquivo)
+  let destino: string | null = null;
+  if (area === "certificacao") {
+    const ori = String(atual?.[0]?.origem || "");
+    destino = ori.startsWith("onedrive:") ? ori.slice(9) : (await pastaOneDrive(tipo, dono)) + "/" + nomeFinal;
+    await sdb(`arquivos?chave=eq.${encodeURIComponent(chave)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ od_destino: destino }) });
+  }
+  return json({ chave, nome: nomeFinal, tamanho: corpo.length, mime, ...(destino ? { onedrive: destino } : {}) });
 }
 
 async function ver(db: Db, chave: string) {
@@ -243,6 +314,9 @@ async function apagar(db: Db, chave: string) {
     method: "DELETE", headers: { Prefer: "return=representation" },
   });
   if (!m?.length) return json({ erro: "nao-encontrado-ou-sem-acesso" }, 404);
+  // arquivo da Certificação que o app mandou para o OneDrive: o computador tira da pasta
+  if (m[0].area === "certificacao" && String(m[0].origem || "").startsWith("onedrive:") && !String(m[0].enviado_por || "").startsWith("onedrive@"))
+    await sdb("onedrive_lixo", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ rel: m[0].origem.slice(9) }) }).catch(() => null);
   await google(`https://www.googleapis.com/drive/v3/files/${m[0].drive_id}`, {
     method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed: true }),
   }).catch(() => null);

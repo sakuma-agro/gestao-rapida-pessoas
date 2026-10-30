@@ -24,6 +24,11 @@
 //   enviar&destino=doc|item|evid&id=&caminho=&nome=&data=   POST corpo = arquivo
 //   datas                    POST [{o: origem, d: data}] → arquivos.data_arquivo; tira os PDFs de documento que saíram da pasta
 //   mover                    POST [{de, para}] → troca o caminho de arquivos/evidências movidos
+//   pendentes                GET  → arquivos anexados no app que o computador ainda precisa gravar no OneDrive
+//                                   (arquivos.od_destino) e os que precisa tirar da pasta (onedrive_lixo)  — 30/10/2026
+//   baixar&chave=            GET  → o arquivo (cópia do Drive) para o computador gravar
+//   entregue                 POST {chave, rel} → gravado no OneDrive: origem = onedrive:<rel>, od_destino = null
+//   lixo_feito               POST {id}
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -122,7 +127,7 @@ function nomeLimpo(nome: string, ext: string) {
   if (!n.toLowerCase().endsWith("." + ext)) n += "." + ext;
   return n;
 }
-const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const slug = (s: string) => semAcento(s).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "arquivo";
 
 /** Grava (ou atualiza) o arquivo no Drive e na tabela arquivos. */
@@ -178,6 +183,12 @@ async function enviar(req: Request, u: URL) {
   const nome = nomeLimpo(nomeOrig, ext);
   const origem = "onedrive:" + caminho.replace(/\\/g, "/");
   const sufixo = (await sha256(origem)).slice(0, 10);
+  // já está no app (anexado pelo app e gravado no OneDrive pelo computador, ou rodada anterior): não duplica
+  const ja = await db(`arquivos?select=chave&origem=eq.${encodeURIComponent(origem)}`);
+  if (ja?.length) {
+    await db(`arquivos?origem=eq.${encodeURIComponent(origem)}`, { method: "PATCH", body: JSON.stringify({ data_arquivo: data, atualizado_em: new Date().toISOString() }) });
+    return json({ ok: true, chave: ja[0].chave, ja: true });
+  }
 
   if (destino === "doc") {
     const d = await db(`cert_documentos?select=id&id=eq.${encodeURIComponent(id)}`);
@@ -249,6 +260,33 @@ Deno.serve(async (req) => {
       if (!Array.isArray(l) || l.length > 10000) return json({ erro: "lista-invalida" }, 400);
       const n = await db("rpc/arquivos_mover", { method: "POST", body: JSON.stringify({ l }) });
       return json({ ok: true, ...(n || {}) });
+    }
+    // entrega no OneDrive (30/10/2026): o computador grava o que foi anexado no app
+    if (acao === "pendentes" && req.method === "GET") {
+      const arqs = await db("arquivos?select=chave,od_destino,nome,tamanho,criado_em&od_destino=not.is.null&area=eq.certificacao&order=criado_em&limit=200");
+      const lixo = await db("onedrive_lixo?select=id,rel&feito_em=is.null&order=id&limit=200");
+      return json({ arquivos: arqs || [], lixo: lixo || [] });
+    }
+    if (acao === "baixar" && req.method === "GET") {
+      const chave = u.searchParams.get("chave") || "";
+      const m = (await db(`arquivos?select=drive_id,mime&chave=eq.${encodeURIComponent(chave)}`))?.[0];
+      if (!m?.drive_id) return json({ erro: "nao-encontrado" }, 404);
+      const r = await google(`https://www.googleapis.com/drive/v3/files/${m.drive_id}?alt=media`);
+      if (!r.ok) return json({ erro: "drive-ler", status: r.status }, 502);
+      return new Response(r.body, { status: 200, headers: { "Content-Type": m.mime || "application/octet-stream" } });
+    }
+    if (acao === "entregue" && req.method === "POST") {
+      const b = await req.json();
+      const chave = String(b?.chave || ""), rel = String(b?.rel || "").replace(/\\/g, "/");
+      if (!chave || !rel) return json({ erro: "dados" }, 400);
+      await db(`arquivos?chave=eq.${encodeURIComponent(chave)}`, { method: "PATCH",
+        body: JSON.stringify({ origem: "onedrive:" + rel, od_destino: null, data_arquivo: new Date().toISOString().slice(0, 10), atualizado_em: new Date().toISOString() }) });
+      return json({ ok: true });
+    }
+    if (acao === "lixo_feito" && req.method === "POST") {
+      const b = await req.json();
+      await db(`onedrive_lixo?id=eq.${Number(b?.id) || 0}`, { method: "PATCH", body: JSON.stringify({ feito_em: new Date().toISOString() }) });
+      return json({ ok: true });
     }
     return json({ erro: "acao-invalida" }, 400);
   } catch (e) {

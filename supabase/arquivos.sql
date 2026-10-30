@@ -61,3 +61,18 @@ create table if not exists public.drive_autorizacao_estado (
 alter table public.drive_autorizacao enable row level security;
 alter table public.drive_autorizacao_estado enable row level security;
 revoke all on public.drive_autorizacao, public.drive_autorizacao_estado from anon, authenticated;
+
+-- Certificação com o OneDrive como lugar oficial (30/10/2026, migração "certificacao_entrega_onedrive").
+-- O anexo do app continua no Drive só para abrir na tela; od_destino = caminho dentro de "6 - Certificações"
+-- onde o computador do escritório (ferramentas/onedrive-sync/entregar.ps1, a cada 5 min) grava o arquivo.
+alter table public.arquivos alter column drive_id drop not null;
+alter table public.arquivos add column if not exists od_destino text;
+create index if not exists arquivos_od_pendente on public.arquivos (criado_em) where od_destino is not null;
+create table if not exists public.onedrive_lixo (
+  id bigint generated always as identity primary key,
+  rel text not null,
+  criado_em timestamptz not null default now(),
+  feito_em timestamptz
+);
+alter table public.onedrive_lixo enable row level security;
+revoke all on public.onedrive_lixo from anon, authenticated;

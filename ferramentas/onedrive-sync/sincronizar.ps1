@@ -47,6 +47,17 @@ try {
   }
 } catch { Log "Atalho lop-pasta não instalado: $($_.Exception.Message)" }
 
+# Entrega no OneDrive (30/10/2026, pedido do Guilherme: Certificação com o OneDrive como lugar oficial):
+# cria uma vez a tarefa que roda o entregar.ps1 a cada 5 minutos, sem abrir janela (entregar.vbs).
+try {
+  $TnEnt = 'LOP - Entregar anexos no OneDrive'
+  $Vbs = Join-Path $Aqui 'entregar.vbs'
+  if ((Test-Path -LiteralPath $Vbs) -and -not (Get-ScheduledTask -TaskName $TnEnt -ErrorAction SilentlyContinue)) {
+    schtasks /Create /TN $TnEnt /SC MINUTE /MO 5 /TR ('wscript.exe ' + $Vbs) /F | Out-Null
+    Log "Tarefa '$TnEnt' criada: grava no OneDrive, a cada 5 minutos, o que for anexado no app."
+  }
+} catch { Log "Tarefa de entrega no OneDrive não criada: $($_.Exception.Message)" }
+
 # uma execução por vez (se a anterior travou há mais de 3 h, segue)
 if (Test-Path $Trava) {
   if ((Get-Item $Trava).LastWriteTime -gt (Get-Date).AddHours(-3)) { exit 0 }
