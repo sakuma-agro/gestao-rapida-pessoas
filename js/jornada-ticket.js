@@ -27,6 +27,8 @@ const MESES_L = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const mesAnterior = ym => { const a = +ym.slice(0, 4), m = +ym.slice(5, 7);
   return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`; };
+const proximoMes = ym => { const a = +ym.slice(0, 4), m = +ym.slice(5, 7);
+  return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}`; };
 const rotMes = ym => `${MESES_L[+ym.slice(5, 7) - 1]} de ${ym.slice(0, 4)}`;
 const br = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '—';
 const usuario = () => estado.sessao?.user?.email || null;
@@ -203,8 +205,12 @@ function desenharMes() {
   const sem = semTicket();
   const podeEditar = podeTela('tkMes');
 
-  $('telaTkMes').innerHTML = cabecalho('Ticket alimentação', 'Mês do pagamento · o ticket precisa cair até o dia 10',
-    `<label>mês do pagamento<input type="month" id="tkMesSel" class="tk-mes-sel" value="${ym}"></label>`) + `
+  /* 30/10/2026: escolhe-se o mês de referência; o dado continua guardado pelo
+     mês do pagamento (ym = referência + 1), então ajustes e Histórico antigos valem. */
+  const ref = mesAnterior(ym);
+  $('telaTkMes').innerHTML = cabecalho('Ticket alimentação', 'Mês de referência · o ticket precisa cair até o dia 10 do mês seguinte',
+    `<label>mês de referência<input type="month" id="tkMesSel" class="tk-mes-sel" value="${ref}"></label>
+     <div class="tk-mes-pago">pago em ${esc(rotMes(ym))}</div>`) + `
     <div class="jor-corpo">
       ${em ? `<div class="jor-caixa" style="margin-bottom:10px">Relatório deste mês já emitido em <b>${br(em.emitido_em)}</b>${em.emitido_por ? ' por ' + esc(em.emitido_por) : ''}${em.versao > 1 ? ` (versão ${em.versao})` : ''}.
         Se mudar algo, imprima de novo — sai como versão nova, e a anterior continua no Histórico.</div>` : ''}
@@ -260,7 +266,7 @@ function desenharMes() {
 
   $('tkMesSel').addEventListener('change', ev => {
     if (!/^\d{4}-\d{2}$/.test(ev.target.value)) return;
-    est.mes = ev.target.value; desenharMes();
+    est.mes = proximoMes(ev.target.value); desenharMes();
   });
   $('tkBusca').addEventListener('input', ev => {
     est.busca = ev.target.value;

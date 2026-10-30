@@ -722,3 +722,6 @@
 .jl-motivo { grid-template-columns: minmax(200px, 280px) minmax(0, 1fr); }
 .jl-motivo[hidden] { display: none !important; }
 @media (max-width: 640px) { .jl-motivo { grid-template-columns: 1fr; } }
+
+/* Legenda do mês de pagamento abaixo do seletor de referência (30/10/2026). */
+.tk-mes-pago { text-align: right; font: 12px Arial, Helvetica, sans-serif; color: #51534A; margin-top: 2px; }
