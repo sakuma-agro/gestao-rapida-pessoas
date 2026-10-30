@@ -3,9 +3,9 @@
 // Pedido do Guilherme: o app "ler o OneDrive direto". O sakumasrv já tem o
 // OneDrive sincronizado; um script agendado nele (ferramentas/onedrive-sync)
 // varre a pasta "6 - Certificações" (1 - PROCEDIMENTOS, 2 - FORMULÁRIOS, 3 - ANEXOS, 5 - REGISTROS)
-// e manda para cá cada arquivo novo ou alterado. Esta função grava no Google
-// Drive do app (mesma pasta e mesma tabela public.arquivos da função
-// "arquivos") e liga o arquivo ao documento da lista mestra:
+// e manda para cá cada arquivo novo ou alterado. Esta função registra o arquivo
+// na tabela public.arquivos (desde 30/10/2026 sem cópia no Google Drive: o app lê
+// direto do OneDrive pela origem) e liga o arquivo ao documento da lista mestra:
 //   - arquivo da pasta do documento → certificacao/documento/<id>/od-….pdf
 //     (vira o PDF do documento no app; se já existe um arquivo com o mesmo
 //     nome, enviado à mão, não duplica)
@@ -27,13 +27,7 @@
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const G_ID = Deno.env.get("GOOGLE_CLIENT_ID") ?? "";
-const G_SEGREDO = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
-const G_RENOVA = Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "";
-const RAIZ_NOME = "LOP - Gestão Rápida – arquivos";
-const MAX_BYTES = 15 * 1024 * 1024;
 const TIPOS_OK = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
-const NOME_TIPO: Record<string, string> = { documento: "Documentos", evidencia: "Evidências" };
 
 const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json" } });
 class Falha extends Error { constructor(public codigo: string, msg?: string) { super(msg ?? codigo); } }
@@ -62,60 +56,6 @@ async function tokenValido(t: string) {
   return true;
 }
 
-/* ─────────── Google (igual à função "arquivos") ─────────── */
-let renova = "", renovaAte = 0;
-async function refreshToken() {
-  if (renova && Date.now() < renovaAte) return renova;
-  let t = "";
-  try { t = (await db("drive_autorizacao?select=refresh_token&id=eq.1"))?.[0]?.refresh_token ?? ""; } catch { /* segredo */ }
-  renova = t || G_RENOVA; renovaAte = Date.now() + 5 * 60000;
-  return renova;
-}
-let token = "", tokenAte = 0;
-async function tokenGoogle() {
-  if (token && Date.now() < tokenAte) return token;
-  const rt = await refreshToken();
-  if (!G_ID || !G_SEGREDO || !rt) throw new Falha("drive-nao-configurado");
-  const r = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: G_ID, client_secret: G_SEGREDO, refresh_token: rt, grant_type: "refresh_token" }),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) { renovaAte = 0; throw new Falha(d.error === "invalid_grant" ? "drive-autorizacao-expirou" : "drive-token", JSON.stringify(d)); }
-  token = d.access_token; tokenAte = Date.now() + (Number(d.expires_in || 3600) - 300) * 1000;
-  return token;
-}
-async function google(url: string, init: RequestInit = {}) {
-  const r = await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${await tokenGoogle()}` } });
-  if (r.status === 401) token = "";
-  return r;
-}
-const pastas = new Map<string, string>();
-async function pasta(nome: string, mae: string | null) {
-  const k = (mae || "raiz") + "/" + nome;
-  if (pastas.has(k)) return pastas.get(k)!;
-  const q = `name='${nome.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false` + (mae ? ` and '${mae}' in parents` : "");
-  const r = await google(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&orderBy=createdTime&spaces=drive`);
-  const d = await r.json();
-  if (!r.ok) throw new Falha("drive-pasta", JSON.stringify(d));
-  let id = d.files?.[0]?.id;
-  if (!id) {
-    const c = await google("https://www.googleapis.com/drive/v3/files?fields=id", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nome, mimeType: "application/vnd.google-apps.folder", ...(mae ? { parents: [mae] } : {}) }),
-    });
-    const n = await c.json();
-    if (!c.ok) throw new Falha("drive-pasta", JSON.stringify(n));
-    id = n.id;
-  }
-  pastas.set(k, id);
-  return id;
-}
-async function pastaDe(tipo: string) {
-  const raiz = await pasta(RAIZ_NOME, null);
-  return await pasta(NOME_TIPO[tipo], await pasta("Certificação", raiz));
-}
-
 function nomeLimpo(nome: string, ext: string) {
   let n = (nome || "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150);
   if (!n) n = "arquivo";
@@ -125,33 +65,12 @@ function nomeLimpo(nome: string, ext: string) {
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 const slug = (s: string) => semAcento(s).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "arquivo";
 
-/** Grava (ou atualiza) o arquivo no Drive e na tabela arquivos. */
-async function gravar(chave: string, tipo: string, dono: string, nome: string, mime: string, corpo: Uint8Array, origem: string, dataArquivo: string | null = null) {
-  const atual = await db(`arquivos?select=drive_id&chave=eq.${encodeURIComponent(chave)}`);
-  let driveId: string = atual?.[0]?.drive_id ?? "";
-  if (driveId) {
-    const r = await google(`https://www.googleapis.com/upload/drive/v3/files/${driveId}?uploadType=media&fields=id`, { method: "PATCH", headers: { "Content-Type": mime }, body: corpo });
-    if (r.status === 404) driveId = "";
-    else if (!r.ok) throw new Falha("drive-gravar", await r.text());
-  }
-  if (!driveId) {
-    const limite = "fronteira" + crypto.randomUUID();
-    const meta = JSON.stringify({ name: nome, parents: [await pastaDe(tipo)], description: `LOP - Gestão Rápida — ${chave} (OneDrive)`, ...(new TextEncoder().encode(chave).length <= 110 ? { appProperties: { chave } } : {}) });
-    const enc = new TextEncoder();
-    const ini = enc.encode(`--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${limite}\r\nContent-Type: ${mime}\r\n\r\n`);
-    const fim = enc.encode(`\r\n--${limite}--`);
-    const body = new Uint8Array(ini.length + corpo.length + fim.length);
-    body.set(ini, 0); body.set(corpo, ini.length); body.set(fim, ini.length + corpo.length);
-    const r = await google("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id", {
-      method: "POST", headers: { "Content-Type": `multipart/related; boundary=${limite}` }, body,
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Falha("drive-gravar", JSON.stringify(d));
-    driveId = d.id;
-  }
+/** Registra (ou atualiza) o arquivo na tabela arquivos. Desde 30/10/2026 não há cópia no Google Drive:
+ *  o app lê o arquivo direto do OneDrive pela origem (função "arquivos", ../_shared/onedrive.ts). */
+async function gravar(chave: string, tipo: string, dono: string, nome: string, mime: string, tamanho: number, origem: string, dataArquivo: string | null = null) {
   await db("arquivos?on_conflict=chave", {
     method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({ chave, area: "certificacao", tipo, dono_id: dono, nome, mime, tamanho: corpo.length, drive_id: driveId, origem, enviado_por: "onedrive@sakumasrv", ...(dataArquivo ? { data_arquivo: dataArquivo } : {}) }),
+    body: JSON.stringify({ chave, area: "certificacao", tipo, dono_id: dono, nome, mime, tamanho, drive_id: null, origem, enviado_por: "onedrive@sakumasrv", ...(dataArquivo ? { data_arquivo: dataArquivo } : {}) }),
   });
 }
 
@@ -171,13 +90,19 @@ async function enviar(req: Request, u: URL) {
   const mime = (req.headers.get("content-type") || "").split(";")[0].trim();
   if (!TIPOS_OK.test(mime)) return json({ erro: "tipo-invalido" }, 415);
   if (!caminho) return json({ erro: "sem-caminho" }, 400);
+  // 30/10/2026: o conteúdo não é mais guardado (fica no OneDrive). O script pode mandar só &tamanho=.
   const corpo = new Uint8Array(await req.arrayBuffer());
-  if (!corpo.length) return json({ erro: "vazio" }, 400);
-  if (corpo.length > MAX_BYTES) return json({ erro: "grande-demais" }, 413);
+  const tamanho = corpo.length || Number(u.searchParams.get("tamanho") || 0);
   const ext = mime === "application/pdf" ? "pdf" : mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
   const nome = nomeLimpo(nomeOrig, ext);
   const origem = "onedrive:" + caminho.replace(/\\/g, "/");
   const sufixo = (await sha256(origem)).slice(0, 10);
+  // já registrado (enviado pelo app direto no OneDrive, ou rodada anterior): só atualiza data e tamanho
+  const ja = await db(`arquivos?select=chave&origem=eq.${encodeURIComponent(origem)}`);
+  if (ja?.length) {
+    await db(`arquivos?origem=eq.${encodeURIComponent(origem)}`, { method: "PATCH", body: JSON.stringify({ data_arquivo: data, ...(tamanho ? { tamanho } : {}), atualizado_em: new Date().toISOString() }) });
+    return json({ ok: true, chave: ja[0].chave, ja: true });
+  }
 
   if (destino === "doc") {
     const d = await db(`cert_documentos?select=id&id=eq.${encodeURIComponent(id)}`);
@@ -189,7 +114,7 @@ async function enviar(req: Request, u: URL) {
     const igual = mesmo?.length ? [] : await db(`arquivos?select=chave&area=eq.certificacao&tipo=eq.documento&dono_id=eq.${encodeURIComponent(id)}&nome=eq.${encodeURIComponent(nome)}&origem=is.null`);
     const chave = mesmo?.length ? mesmo[0].chave : igual?.length ? igual[0].chave : `certificacao/documento/${id}/od-${sufixo}-${slug(nome)}.${ext}`;
     // data do arquivo no OneDrive (29/10/2026): com dois PDFs na pasta, o app abre o mais novo
-    await gravar(chave, "documento", String(id), nome, mime, corpo, origem, data);
+    await gravar(chave, "documento", String(id), nome, mime, tamanho, origem, data);
     return json({ ok: true, chave });
   }
 
@@ -204,7 +129,7 @@ async function enviar(req: Request, u: URL) {
     const evId = ev?.[0]?.id;
     if (!evId) throw new Error("evidência não gravada");
     const chave = `certificacao/evidencia/${evId}/od-${sufixo}-${slug(nome)}.${ext}`;
-    await gravar(chave, "evidencia", String(evId), nome, mime, corpo, origem);
+    await gravar(chave, "evidencia", String(evId), nome, mime, tamanho, origem);
     if (!item.ultima_data || data > item.ultima_data)
       await db(`cert_doc_itens?id=eq.${item.id}`, { method: "PATCH", body: JSON.stringify({ ultima_data: data, atualizado_em: new Date().toISOString() }) });
     return json({ ok: true, chave, evidencia: evId });
@@ -223,7 +148,7 @@ async function enviar(req: Request, u: URL) {
     const evId = ev?.[0]?.id;
     if (!evId) throw new Error("evidência não gravada");
     const chave = `certificacao/evidencia/${evId}/od-${sufixo}-${slug(nome)}.${ext}`;
-    await gravar(chave, "evidencia", String(evId), nome, mime, corpo, origem);
+    await gravar(chave, "evidencia", String(evId), nome, mime, tamanho, origem);
     return json({ ok: true, chave, evidencia: evId });
   }
   return json({ erro: "destino-invalido" }, 400);

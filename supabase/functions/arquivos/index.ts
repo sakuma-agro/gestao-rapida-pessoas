@@ -33,6 +33,13 @@
 //   enviar&chave=&nome=       POST corpo = arquivo → grava no Drive e registra
 //   ver&chave=                GET  → o arquivo
 //   apagar&chave=             POST → lixeira do Drive (recuperável 30 dias) e tira o registro
+//
+// Certificação no OneDrive (30/10/2026, pedido do Guilherme: "deixe o Drive somente para os
+// outros apps, vamos usar na certificação o OneDrive"): toda chave certificacao/… é gravada na
+// pasta do documento no OneDrive do escritório (Microsoft Graph, ../_shared/onedrive.ts) e
+// registrada com origem = "onedrive:<caminho dentro de 6 - Certificações>" e drive_id vazio.
+// O sincronizador do sakumasrv reconhece pela origem e não duplica. "ver" de qualquer arquivo
+// com origem onedrive: lê do OneDrive (o que ainda tiver cópia antiga no Drive é o reserva).
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -61,6 +68,8 @@ const CORS = {
 };
 const json = (o: unknown, s = 200) =>
   new Response(JSON.stringify(o), { status: s, headers: { ...CORS, "Content-Type": "application/json" } });
+
+import { FalhaOneDrive, gravarArquivo, lerArquivo, apagarArquivo, relDoCaminhoPc, contaOneDrive } from "../_shared/onedrive.ts";
 
 class FalhaDrive extends Error { constructor(public codigo: string, msg?: string) { super(msg ?? codigo); } }
 
@@ -151,6 +160,85 @@ type Db = ReturnType<typeof banco>;
 const pode = (db: Db, area: string, tipo: string, escrever: boolean) =>
   db("rpc/arquivo_pode", { method: "POST", body: JSON.stringify({ p_area: area, p_tipo: tipo, p_escrever: escrever }) });
 
+/* ─────────── Certificação → OneDrive ─────────── */
+const SERV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+async function sdb(caminho: string) {
+  const r = await fetch(`${URL_BASE}/rest/v1/${caminho}`, { headers: { apikey: SERV, Authorization: `Bearer ${SERV}` } });
+  if (!r.ok) throw new Error(`banco ${r.status}: ${await r.text()}`);
+  return await r.json();
+}
+const ODLINK = /[?&]id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F([^&]*)/i;
+const relDoLink = (l: string | null | undefined) => { const m = String(l || "").match(ODLINK); try { return m ? decodeURIComponent(m[1]) : ""; } catch { return ""; } };
+async function pastaDoc(id: string | number): Promise<{ rel: string; codigo: string }> {
+  const d = (await sdb(`cert_documentos?select=codigo,caminho,link&id=eq.${encodeURIComponent(String(id))}`))?.[0];
+  if (!d) return { rel: "", codigo: "" };
+  return { rel: relDoCaminhoPc(d.caminho) || relDoLink(d.link), codigo: d.codigo };
+}
+async function pastaPorCodigo(codigo: string, reserva: string): Promise<string> {
+  const d = (await sdb(`cert_documentos?select=id&codigo=eq.${encodeURIComponent(codigo)}`))?.[0];
+  return (d && (await pastaDoc(d.id)).rel) || reserva;
+}
+const ANO = () => String(new Date().getFullYear());
+const SEM_LUGAR = (tipo: string, dono: string) => `7 - CONFIGURAÇÕES/Anexos do app/${tipo}/${dono}`;
+/** Pasta no OneDrive (relativa a 6 - Certificações) para um arquivo da Certificação enviado pelo app. */
+async function pastaOneDrive(tipo: string, dono: string): Promise<string> {
+  if (tipo === "documento") {
+    const [id, rev] = dono.split("-");
+    const p = (await pastaDoc(id)).rel;
+    return p ? (rev === "rev" ? p + "/Revisões" : p) : SEM_LUGAR(tipo, dono);
+  }
+  if (tipo === "evidencia") {
+    const ev = /^\d+$/.test(dono) ? (await sdb(`cert_evidencias?select=documento_id,item_id,data&id=eq.${dono}`))?.[0] : null;
+    if (!ev) return SEM_LUGAR(tipo, dono);
+    const doc = await pastaDoc(ev.documento_id);
+    if (!doc.rel) return SEM_LUGAR(tipo, dono);
+    const ano = String(ev.data || "").slice(0, 4) || ANO();
+    if (ev.item_id) {
+      const it = (await sdb(`cert_doc_itens?select=local,link,jor_fazendas(nome)&id=eq.${ev.item_id}`))?.[0];
+      const ri = relDoLink(it?.link);
+      if (ri && ri !== doc.rel && ri.startsWith(doc.rel + "/")) return ri + "/" + ano;
+      const nomeLocal = String(it?.jor_fazendas?.nome || it?.local || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[\\/:*?"<>|]+/g, " ").trim();
+      return doc.rel + "/" + (nomeLocal || "GERAL") + "/" + ano;
+    }
+    return doc.codigo.startsWith("RG ") ? doc.rel + "/" + ano : doc.rel + "/EVIDÊNCIAS/" + ano;
+  }
+  const porTipo: Record<string, [string, string]> = {
+    caderno: ["AN 09", "3 - ANEXOS/AN 09 - CADERNO DE CAMPO (RELATÓRIO DAS ATIVIDADES DO CAMPO)"],
+    fauna: ["RG 050", "5 - REGISTROS/RG 050 - MONITORAMENTO DE ANIMAIS"],
+    energia: ["RG 043", "5 - REGISTROS/RG 043 - TABELA CONSUMO DE ENERGIAS"],
+    residuo: ["RG 053", "5 - REGISTROS/RG 053 - GESTÃO DE RESÍDUOS"],
+  };
+  const x = porTipo[tipo];
+  return x ? (await pastaPorCodigo(x[0], x[1])) + "/" + ANO() : SEM_LUGAR(tipo, dono);
+}
+
+async function enviarOneDrive(req: Request, db: Db, chave: string, area: string, tipo: string, dono: string, nome: string) {
+  const mime = (req.headers.get("content-type") || "").split(";")[0].trim();
+  if (!TIPOS_OK.test(mime)) return json({ erro: "tipo-invalido" }, 415);
+  if ((mime === "application/pdf") !== chave.toLowerCase().endsWith(".pdf")) return json({ erro: "tipo-invalido" }, 415);
+  if ((await pode(db, area, tipo, true)) !== true) return json({ erro: "sem-acesso" }, 403);
+  const corpo = new Uint8Array(await req.arrayBuffer());
+  if (!corpo.length) return json({ erro: "vazio" }, 400);
+  if (corpo.length > MAX_BYTES) return json({ erro: "grande-demais" }, 413);
+  const nomeFinal = nomeLimpo(nome, chave);
+  const atual = (await db(`arquivos?select=origem&chave=eq.${encodeURIComponent(chave)}`))?.[0];
+  let g;
+  if (atual?.origem?.startsWith("onedrive:")) {
+    // mesma chave: troca o conteúdo no mesmo lugar
+    const rel = atual.origem.slice(9);
+    const i = rel.lastIndexOf("/");
+    g = await gravarArquivo(rel.slice(0, i), rel.slice(i + 1), corpo, true);
+  } else {
+    g = await gravarArquivo(await pastaOneDrive(tipo, dono), nomeFinal, corpo, false);
+  }
+  await db("arquivos?on_conflict=chave", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ chave, area, tipo, dono_id: dono, nome: g.nome, mime, tamanho: corpo.length, drive_id: null, origem: "onedrive:" + g.rel, data_arquivo: new Date().toISOString().slice(0, 10) }),
+  });
+  return json({ chave, nome: g.nome, tamanho: corpo.length, mime, onedrive: g.rel });
+}
+
 /* ─────────── ações ─────────── */
 async function status() {
   try {
@@ -163,7 +251,9 @@ async function status() {
       const q = a.storageQuota || {};
       if (q.limit) livre_gb = Math.round((Number(q.limit) - Number(q.usage || 0)) / 1e8) / 10;
     }
-    return json({ drive: true, conta, livre_gb });
+    let onedrive: unknown = null;
+    try { onedrive = { ok: true, ...(await contaOneDrive()) }; } catch (e) { onedrive = { ok: false, erro: e instanceof FalhaOneDrive ? e.codigo : "onedrive-erro" }; }
+    return json({ drive: true, conta, livre_gb, onedrive });
   } catch (e) {
     return json({ drive: false, erro: e instanceof FalhaDrive ? e.codigo : "drive-erro" });
   }
@@ -224,10 +314,20 @@ async function enviar(req: Request, db: Db, chave: string, area: string, tipo: s
 
 async function ver(db: Db, chave: string) {
   // a linha só aparece para quem pode ver (RLS)
-  const m = await db(`arquivos?select=drive_id,mime,nome&chave=eq.${encodeURIComponent(chave)}`);
+  const m = await db(`arquivos?select=drive_id,mime,nome,origem&chave=eq.${encodeURIComponent(chave)}`);
   if (!m?.length) return json({ erro: "nao-encontrado" }, 404);
-  const r = await google(`https://www.googleapis.com/drive/v3/files/${m[0].drive_id}?alt=media`);
-  if (!r.ok) return json({ erro: "drive-ler", status: r.status }, r.status === 404 ? 410 : 502);
+  let r: Response | null = null;
+  if (String(m[0].origem || "").startsWith("onedrive:")) {
+    // Certificação: lê do OneDrive; se falhar e ainda houver a cópia antiga no Drive, usa ela
+    try { r = await lerArquivo(m[0].origem.slice(9)); } catch (e) { if (!m[0].drive_id) throw e; r = null; }
+    if (r && !r.ok && !m[0].drive_id) return json({ erro: "onedrive-ler", status: r.status }, r.status === 404 ? 410 : 502);
+    if (r && !r.ok) r = null;
+  }
+  if (!r) {
+    if (!m[0].drive_id) return json({ erro: "nao-encontrado" }, 404);
+    r = await google(`https://www.googleapis.com/drive/v3/files/${m[0].drive_id}?alt=media`);
+    if (!r.ok) return json({ erro: "drive-ler", status: r.status }, r.status === 404 ? 410 : 502);
+  }
   return new Response(r.body, {
     status: 200,
     headers: {
@@ -243,7 +343,11 @@ async function apagar(db: Db, chave: string) {
     method: "DELETE", headers: { Prefer: "return=representation" },
   });
   if (!m?.length) return json({ erro: "nao-encontrado-ou-sem-acesso" }, 404);
-  await google(`https://www.googleapis.com/drive/v3/files/${m[0].drive_id}`, {
+  // arquivo da Certificação enviado pelo app: vai para a lixeira do OneDrive. O que veio do OneDrive
+  // pelo sincronizador (enviado_por onedrive@…) não é apagado da pasta: só sai do app.
+  if (String(m[0].origem || "").startsWith("onedrive:") && !String(m[0].enviado_por || "").startsWith("onedrive@"))
+    await apagarArquivo(m[0].origem.slice(9)).catch(() => false);
+  if (m[0].drive_id) await google(`https://www.googleapis.com/drive/v3/files/${m[0].drive_id}`, {
     method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed: true }),
   }).catch(() => null);
   return json({ apagado: chave });
@@ -262,10 +366,15 @@ Deno.serve(async (req) => {
     const [area, tipo, dono] = chave.split("/");
     const db = banco(jwt);
     if (acao === "ver" && req.method === "GET") return await ver(db, chave);
-    if (acao === "enviar" && req.method === "POST") return await enviar(req, db, chave, area, tipo, dono, u.searchParams.get("nome") || "");
+    if (acao === "enviar" && req.method === "POST")
+      return await (area === "certificacao" ? enviarOneDrive : enviar)(req, db, chave, area, tipo, dono, u.searchParams.get("nome") || "");
     if (acao === "apagar" && req.method === "POST") return await apagar(db, chave);
     return json({ erro: "acao-invalida" }, 400);
   } catch (e) {
+    if (e instanceof FalhaOneDrive) {
+      console.error(e.codigo, e.message);
+      return json({ erro: e.codigo }, e.codigo === "onedrive-nao-configurado" || e.codigo === "onedrive-autorizacao-expirou" ? 503 : 502);
+    }
     if (e instanceof FalhaDrive) {
       console.error(e.codigo, e.message);
       return json({ erro: e.codigo }, e.codigo === "drive-nao-configurado" || e.codigo === "drive-autorizacao-expirou" ? 503 : 502);
