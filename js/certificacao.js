@@ -80,7 +80,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 
 /* ---------------- estado ---------------- */
 const S = {
-  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [], docArq: [],
+  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [], docArq: [], docComArq: new Set(),
   fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
   fd: { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
@@ -192,7 +192,7 @@ function dataEvArq(x) {
   return da || cr;
 }
 const evArqDe = d => TIPOS_EV_ARQ.has(prefixoDoc(d))
-  ? (S.docArq || []).filter(x => x.dono_id === String(d.id)).map(x => ({ id: 'arq:' + x.chave, documento_id: d.id, data: dataEvArq(x), _arq: x.chave,
+  ? (Array.isArray(S.docArq) ? S.docArq : []).filter(x => x.dono_id === String(d.id)).map(x => ({ id: 'arq:' + x.chave, documento_id: d.id, data: dataEvArq(x), _arq: x.chave,
       descricao: String(x.origem || '').split('/').slice(2).join(' / ') || x.nome, item_id: null }))
   : [];
 const evidDe = d => [...S.evid.filter(e => e.documento_id === d.id), ...evArqDe(d)].sort((a, b) => b.data.localeCompare(a.data));
@@ -275,7 +275,9 @@ async function carregar() {
   await carregarCadeia(c);
   S.carregado = true;
   salvarCaixa();
-  S.docArq = await donosComArquivo('certificacao', 'documento').catch(() => new Set());
+  /* 30/10/2026: antes gravava em S.docArq e apagava a lista de arquivos das pastas (evidências dos AN/IT/POL) —
+     o painel do AN quebrava ("filter is not a function"). Agora são dois nomes. */
+  S.docComArq = await donosComArquivo('certificacao', 'documento').catch(() => new Set());
 }
 
 /* ===================================================================
@@ -300,7 +302,7 @@ const rotDoc = d => `${d.codigo} · ${d.nome}`;
 const linkOk = u => /^https?:\/\//i.test(so(u));
 const codigoLink = (d, cls = '') => (linkOk(d.link)
   ? `<a class="ce-cod-link ${cls}" href="${esc(d.link)}" target="_blank" rel="noopener" title="Abrir no OneDrive: ${esc(d.nome)}">${esc(d.codigo)}<span aria-hidden="true">↗</span></a>`
-  : `<b>${esc(d.codigo)}</b>`) + (S.docArq?.has(String(d.id)) ? '<span class="ce-anx" title="Tem arquivo no Google Drive">📎</span>' : '');
+  : `<b>${esc(d.codigo)}</b>`) + (S.docComArq?.has?.(String(d.id)) ? '<span class="ce-anx" title="Tem arquivo no Google Drive">📎</span>' : '');
 /** Códigos das normas que o documento atende, pelos requisitos ligados a ele
  *  (só das certificações ligadas, sem repetir, na ordem das certificações). */
 function codigosDoDoc(d) {
@@ -1587,7 +1589,7 @@ async function importarPasta(arquivos) {
     const temRev = new Set((await listarArquivos('certificacao', 'documento', revDono(d.id)).catch(() => [])).map(x => so(x.nome)));
     for (const a of raiz) {
       if (tem.has(a.name)) { jaTinha++; continue; }
-      try { await enfileirarArquivo('certificacao', 'documento', d.id, a, a.name); novos++; S.docArq?.add(String(d.id)); }
+      try { await enfileirarArquivo('certificacao', 'documento', d.id, a, a.name); novos++; S.docComArq?.add?.(String(d.id)); }
       catch (e) { erros.push(`${a.name}: ${e.message}`); }
     }
     for (const a of revs) {
@@ -1744,7 +1746,7 @@ async function gravarDocumento(d) {
     return erroDlg(`Já existe um documento com o código ${linha.codigo}.`);
   const anexos = anexosDoc;
   const gravado = await salvar('cert_documentos', d, linha, S.docs, 'cedGravar');
-  if (gravado && anexos?.mudou) { S.docArq?.add(String(gravado.id)); redesenhar(); }
+  if (gravado && anexos?.mudou) { S.docComArq?.add?.(String(gravado.id)); redesenhar(); }
   if (gravado && anexos) anexos.salvar(gravado.id).catch(e => alert('O documento foi gravado, mas o arquivo não: ' + e.message));
   S.docs.sort((a, b) => a.categoria.localeCompare(b.categoria) || a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }));
 }
@@ -2314,7 +2316,7 @@ export async function abrirCertificacao(tela) {
 }
 
 export function limparCertificacao() {
-  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = [];
+  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = []; S.docComArq = new Set();
   nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' });
