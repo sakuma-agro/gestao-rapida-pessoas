@@ -123,11 +123,12 @@ function relatorioHTML(ym, linhas, emissao) {
         : `posição em<strong>${br(agora())}</strong>`}</div>
     </header>
     ${grupos.map(g => `
+    <h2 class="rel-secao tk-grupo"><b>${esc(g.fazenda)}</b> · ${esc(g.empregador)}</h2>
     <table class="rel-tabela tk-rel">
-      <thead><tr><th>Nome</th><th>Empregador</th><th>Fazenda</th><th class="rel-num">Valor ticket alimentação</th><th>Observação</th></tr></thead>
-      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.nome)}</td><td>${esc(g.empregador)}</td><td>${esc(g.fazenda)}</td>
+      <thead><tr><th>Nome</th><th class="rel-num">Valor ticket alimentação</th><th>Observação</th></tr></thead>
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.nome)}</td>
         <td class="rel-num">${brl(l.pagar)}</td><td>${esc(obsRel(l))}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="3">Subtotal · ${esc(g.empregador)} · ${esc(g.fazenda)}</td><td class="rel-num">${brl(soma(g.linhas, 'pagar'))}</td><td>${g.linhas.length} pessoa(s)</td></tr></tfoot>
+      <tfoot><tr><td>Subtotal · ${esc(g.fazenda)}</td><td class="rel-num">${brl(soma(g.linhas, 'pagar'))}</td><td>${g.linhas.length} pessoa(s)</td></tr></tfoot>
     </table>`).join('') || '<div class="rel-resumo">Ninguém com ticket neste mês.</div>'}
     <div class="rel-resumo tk-total"><b>Total a pagar: ${brl(total)}</b> · ${linhas.length} pessoa(s)${
       linhas.some(l => l.abat) ? ` · abatido no mês: ${brl(soma(linhas, 'abat'))}` : ''}</div>
