@@ -41,6 +41,8 @@
 // computador do escritório (sakumasrv, entregar.ps1 a cada 5 min) grava lá e marca a origem.
 // Apagar no app um arquivo que o app mandou: o computador tira da pasta (vai para
 // 7 - CONFIGURAÇÕES › Para apagar). O que veio do OneDrive pelo sincronizador não é tocado na pasta.
+// Desde 01/11/2026 só POP e FORM ficam com a cópia no Drive para abrir no app; nos outros a cópia é
+// apagada assim que o computador grava no OneDrive, e "ver" responde 409 so-onedrive com o caminho.
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const ANON = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -190,8 +192,13 @@ async function pastaOneDrive(tipo: string, dono: string): Promise<string> {
     const p = (await pastaDoc(id)).rel;
     return p ? (rev === "rev" ? p + "/Revisões" : p) : SEM_LUGAR(tipo, dono);
   }
+  // evidências que não são de cert_evidencias: abertura das caixas de reclamação (cx-…) e NF-e do balanço de massa (nfe-…)
+  if (tipo === "evidencia" && dono.startsWith("cx-"))
+    return (await pastaPorCodigo("RG 042", "5 - REGISTROS/RG 042 - RECLAMAÇÃO E SUGESTÃO")) + "/Aberturas caixas de reclamação/" + ANO();
+  if (tipo === "evidencia" && dono.startsWith("nfe-"))
+    return (await pastaPorCodigo("RG 013", "5 - REGISTROS/RG 013 - PLANILHA DE BALANÇO DE MASSAS")) + "/NF-e/" + ANO();
   if (tipo === "evidencia") {
-    const ev = /^\d+$/.test(dono) ? (await sdb(`cert_evidencias?select=documento_id,item_id,data&id=eq.${dono}`))?.[0] : null;
+    const ev = /^[\w-]{1,60}$/.test(dono) ? (await sdb(`cert_evidencias?select=documento_id,item_id,data&id=eq.${encodeURIComponent(dono)}`).catch(() => null))?.[0] : null;
     if (!ev) return SEM_LUGAR(tipo, dono);
     const doc = await pastaDoc(ev.documento_id);
     if (!doc.rel) return SEM_LUGAR(tipo, dono);
@@ -295,8 +302,14 @@ async function enviar(req: Request, db: Db, chave: string, area: string, tipo: s
 
 async function ver(db: Db, chave: string) {
   // a linha só aparece para quem pode ver (RLS)
-  const m = await db(`arquivos?select=drive_id,mime,nome&chave=eq.${encodeURIComponent(chave)}`);
+  const m = await db(`arquivos?select=drive_id,mime,nome,origem,od_destino&chave=eq.${encodeURIComponent(chave)}`);
   if (!m?.length) return json({ erro: "nao-encontrado" }, 404);
+  // 01/11/2026 (pedido do Guilherme): na Certificação só POP e FORM abrem como PDF no app; o resto fica só
+  // no OneDrive e o app oferece "no computador" ou "na nuvem" (rel = caminho dentro de 6 - Certificações).
+  if (!m[0].drive_id) {
+    const rel = String(m[0].origem || "").startsWith("onedrive:") ? m[0].origem.slice(9) : String(m[0].od_destino || "");
+    return json({ erro: "so-onedrive", rel }, 409);
+  }
   const r = await google(`https://www.googleapis.com/drive/v3/files/${m[0].drive_id}?alt=media`);
   if (!r.ok) return json({ erro: "drive-ler", status: r.status }, r.status === 404 ? 410 : 502);
   return new Response(r.body, {

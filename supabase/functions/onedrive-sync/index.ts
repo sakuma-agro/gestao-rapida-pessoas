@@ -15,6 +15,8 @@
 //   - arquivo dentro da subpasta EVIDÊNCIAS de qualquer documento → uma
 //     evidência do documento (sem fazenda), na linha do tempo dele.
 // Nada é apagado aqui: tirar um arquivo do OneDrive não tira do app.
+// Desde 01/11/2026 só POP e FORM ganham cópia no Drive (abrem como PDF no app); o resto é só
+// registrado (drive_id vazio) e o app abre a pasta no computador ou na nuvem.
 //
 // Autenticação: cabeçalho x-sync-token, conferido pelo sha-256 na tabela
 // public.sync_tokens (sem login de pessoa). Roda com service_role.
@@ -29,6 +31,7 @@
 //   baixar&chave=            GET  → o arquivo (cópia do Drive) para o computador gravar
 //   entregue                 POST {chave, rel} → gravado no OneDrive: origem = onedrive:<rel>, od_destino = null
 //   lixo_feito               POST {id}
+//   limpar_drive&n=          POST → tira do Drive as cópias que não são de POP/FORM (01/11/2026: só POP e FORM abrem no app)
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICO = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -40,7 +43,7 @@ const MAX_BYTES = 15 * 1024 * 1024;
 const TIPOS_OK = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 const NOME_TIPO: Record<string, string> = { documento: "Documentos", evidencia: "Evidências" };
 
-const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json" } });
+const json = (o: unknown, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "Content-Type": "application/json; charset=utf-8" } });
 class Falha extends Error { constructor(public codigo: string, msg?: string) { super(msg ?? codigo); } }
 
 /* ─────────── banco (service_role) ─────────── */
@@ -130,10 +133,26 @@ function nomeLimpo(nome: string, ext: string) {
 const semAcento = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const slug = (s: string) => semAcento(s).replace(/\.[^.]+$/, "").toLowerCase().replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "arquivo";
 
-/** Grava (ou atualiza) o arquivo no Drive e na tabela arquivos. */
+/** Só POP e FORM abrem como PDF no app (01/11/2026); o resto fica só no OneDrive, sem cópia no Drive. */
+const abreNoApp = async (tipo: string, dono: string) =>
+  (await db("rpc/arquivo_cert_abre_no_app", { method: "POST", body: JSON.stringify({ p_tipo: tipo, p_dono: dono }) })) === true;
+async function lixeiraDrive(id: string) {
+  if (id) await google(`https://www.googleapis.com/drive/v3/files/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ trashed: true }) }).catch(() => null);
+}
+
+/** Grava (ou atualiza) o arquivo no Drive (só POP/FORM) e na tabela arquivos. */
 async function gravar(chave: string, tipo: string, dono: string, nome: string, mime: string, corpo: Uint8Array, origem: string, dataArquivo: string | null = null) {
   const atual = await db(`arquivos?select=drive_id&chave=eq.${encodeURIComponent(chave)}`);
   let driveId: string = atual?.[0]?.drive_id ?? "";
+  if (!(await abreNoApp(tipo, dono))) {
+    // só no OneDrive: registra sem cópia (e tira a cópia antiga, se havia)
+    await lixeiraDrive(driveId);
+    await db("arquivos?on_conflict=chave", {
+      method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ chave, area: "certificacao", tipo, dono_id: dono, nome, mime, tamanho: corpo.length, drive_id: null, origem, enviado_por: "onedrive@sakumasrv", ...(dataArquivo ? { data_arquivo: dataArquivo } : {}) }),
+    });
+    return;
+  }
   if (driveId) {
     const r = await google(`https://www.googleapis.com/upload/drive/v3/files/${driveId}?uploadType=media&fields=id`, { method: "PATCH", headers: { "Content-Type": mime }, body: corpo });
     if (r.status === 404) driveId = "";
@@ -279,9 +298,24 @@ Deno.serve(async (req) => {
       const b = await req.json();
       const chave = String(b?.chave || ""), rel = String(b?.rel || "").replace(/\\/g, "/");
       if (!chave || !rel) return json({ erro: "dados" }, 400);
+      const ar = (await db(`arquivos?select=tipo,dono_id,drive_id&chave=eq.${encodeURIComponent(chave)}`))?.[0];
+      const fica = ar ? await abreNoApp(ar.tipo, ar.dono_id) : true;
+      if (ar && !fica) await lixeiraDrive(ar.drive_id);
       await db(`arquivos?chave=eq.${encodeURIComponent(chave)}`, { method: "PATCH",
-        body: JSON.stringify({ origem: "onedrive:" + rel, od_destino: null, data_arquivo: new Date().toISOString().slice(0, 10), atualizado_em: new Date().toISOString() }) });
+        body: JSON.stringify({ origem: "onedrive:" + rel, od_destino: null, data_arquivo: new Date().toISOString().slice(0, 10), atualizado_em: new Date().toISOString(), ...(fica ? {} : { drive_id: null }) }) });
       return json({ ok: true });
+    }
+    // limpar_drive (01/11/2026): tira do Drive as cópias da Certificação que não são de POP/FORM (já estão no OneDrive)
+    if (acao === "limpar_drive" && req.method === "POST") {
+      const n = Math.min(Number(u.searchParams.get("n") || 100), 300);
+      const l = await db("rpc/arquivos_cert_copias_sobrando", { method: "POST", body: JSON.stringify({ p_limite: n }) });
+      let feitos = 0;
+      for (const x of l || []) {
+        await lixeiraDrive(x.drive_id);
+        await db(`arquivos?chave=eq.${encodeURIComponent(x.chave)}`, { method: "PATCH", body: JSON.stringify({ drive_id: null }) });
+        feitos++;
+      }
+      return json({ ok: true, feitos });
     }
     if (acao === "lixo_feito" && req.method === "POST") {
       const b = await req.json();

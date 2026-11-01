@@ -26,7 +26,7 @@ import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { abrirModulo, registrarFaixaTela, subsLiberados, abrirGrupo, grupoAberto, aoMudarGrupo } from './acesso.js';
-import { campoAnexos, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquivo, enfileirarArquivo, enviarPendentes, contarPendentes, aoMudarArquivos } from './arquivos.js';
+import { campoAnexos, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquivo, enfileirarArquivo, enviarPendentes, contarPendentes, aoMudarArquivos, abrirNoOneDrive } from './arquivos.js';
 import { svgIcone } from './icones.js';
 import { itensCaderno } from './cert-caderno.js';
 import { abrirCroqui } from './cert-croqui.js';
@@ -1141,12 +1141,20 @@ async function painelDoc() {
       visor.innerHTML = `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH&navpanes=0"></iframe>${anexos}`;
     } catch (e) {
       if (g !== geracaoPainel) return;
-      visor.innerHTML = `<span class="dc-sem">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</span>${anexos}`;
+      visor.innerHTML = (e.onedrive !== undefined ? htmlSoOneDrive(vig.nome, e.onedrive)
+        : `<span class="dc-sem">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</span>`) + anexos;
+      ligarSoOneDrive(visor);
     }
   }
   visor.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.ver)));
 }
 
+
+/* Só POP e FORM abrem como PDF no app (01/11/2026, pedido do Guilherme: "o restante só manda para o
+   local ou em nuvem"). Os outros arquivos ficam só no OneDrive: o app oferece abrir no computador ou na nuvem. */
+const htmlSoOneDrive = (nome, rel) => `<span class="dc-sem">${esc(nome || 'Arquivo')} fica só na pasta do OneDrive (no app abrem só POP e FORM).</span>
+  <button class="btn" type="button" data-od-abrir="${esc(rel)}">🖥 No computador / ☁ Na nuvem</button>`;
+const ligarSoOneDrive = el => el.querySelectorAll('[data-od-abrir]').forEach(b => b.addEventListener('click', () => abrirNoOneDrive(b.dataset.odAbrir)));
 
 /* ---- Cadeia no painel do documento ---- */
 function htmlCadeia(d) {
@@ -1557,7 +1565,11 @@ async function mostrarApr(i) {
     box.innerHTML = /^image\//.test(v.mime || '') ? `<img class="ce-apr-img" alt="${esc(d.nome)}" src="${u}">`
       : `<iframe title="${esc(d.codigo)}" src="${u}#view=FitH&navpanes=0"></iframe>`;
   } catch (e) {
-    if (apr && g === apr.g) box.innerHTML = `<p class="ce-apr-msg">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</p>`;
+    if (apr && g === apr.g) {
+      box.innerHTML = e.onedrive !== undefined ? `<p class="ce-apr-msg">${htmlSoOneDrive(d.nome, e.onedrive)}</p>`
+        : `<p class="ce-apr-msg">${esc(navigator.onLine ? e.message : 'Sem internet: o PDF abre quando a conexão voltar.')}</p>`;
+      ligarSoOneDrive(box);
+    }
   }
 }
 

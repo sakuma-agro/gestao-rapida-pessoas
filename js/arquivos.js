@@ -148,6 +148,7 @@ export async function urlDoArquivo(chave) {
     const r = await chamar('ver', chave);
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
+      if (d.erro === 'so-onedrive') { const e = new Error('Este arquivo fica só no OneDrive.'); e.onedrive = d.rel || ''; throw e; }
       throw new Error(r.status === 410 ? 'O arquivo não está mais no Drive.' : ERROS[d.erro] || 'Não consegui abrir o arquivo.');
     }
     blob = await r.blob();
@@ -163,8 +164,50 @@ export async function abrirArquivo(chave) {
     if (janela) janela.location.href = u; else location.href = u;
   } catch (e) {
     janela?.close();
+    if (e.onedrive !== undefined) { abrirNoOneDrive(e.onedrive); return; }
     alert(navigator.onLine ? e.message : 'Sem internet: o arquivo abre quando a conexão voltar.');
   }
+}
+
+/* ---------------- Certificação: arquivo só no OneDrive (01/11/2026) ----------------
+   Pedido do Guilherme: "deixar somente os POP e os FORM para abrir como PDF no aplicativo e o
+   restante só manda para o local ou em nuvem". rel = caminho do arquivo dentro de 6 - Certificações. */
+const OD_PC = 'C:\\NUVEM\\OneDrive\\1 - ADM - PRINCIPAL\\6 - Certificações';
+const OD_WEB = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es';
+const encOd = t => [...new TextEncoder().encode(t)].map(b => b < 128 && /[A-Za-z0-9._~]/.test(String.fromCharCode(b)) ? String.fromCharCode(b) : '%' + b.toString(16).toUpperCase().padStart(2, '0')).join('');
+/** Pasta do arquivo: { pc: caminho no computador, web: link do OneDrive na internet, nome }. */
+export function pastaNoOneDrive(rel) {
+  const partes = String(rel || '').split('/').filter(Boolean);
+  const nome = partes.length ? partes[partes.length - 1] : '';
+  const dir = partes.slice(0, -1);
+  return { nome, pc: [OD_PC, ...dir].join('\\'), web: dir.length ? OD_WEB + '%2F' + encOd(dir.join('/')) : OD_WEB };
+}
+/** Abre a pasta no Explorador (atalho lop-pasta: instalado no computador); o caminho também vai copiado. */
+export async function abrirPastaNoPc(caminho) {
+  try { await navigator.clipboard.writeText(caminho); } catch { /* sem permissão: segue */ }
+  const a = document.createElement('a'); a.href = 'lop-pasta:' + encodeURIComponent(caminho); a.click();
+}
+export function abrirNoOneDrive(rel) {
+  const p = pastaNoOneDrive(rel);
+  let dlg = document.getElementById('dlgOneDrive');
+  if (!dlg) { dlg = document.createElement('dialog'); dlg.id = 'dlgOneDrive'; document.body.appendChild(dlg); }
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  dlg.innerHTML = `<form method="dialog" style="max-width:440px">
+    <h3>Abrir arquivo</h3>
+    <p style="margin:0 0 6px"><b>${esc(p.nome || 'Arquivo')}</b></p>
+    <p class="dica" style="margin:0 0 14px">Na Certificação, só os POP e os FORM abrem dentro do app. Este arquivo fica na pasta do OneDrive:</p>
+    <div class="barra" style="margin:0;gap:8px;flex-wrap:wrap">
+      <button class="btn principal" type="button" data-od="pc">🖥 No computador</button>
+      <a class="btn" href="${esc(p.web)}" target="_blank" rel="noopener">☁ Na nuvem</a>
+      <button class="btn" value="x">Fechar</button>
+    </div>
+    <p class="dica" data-od-msg style="margin:10px 0 0;word-break:break-all"></p>
+  </form>`;
+  dlg.querySelector('[data-od="pc"]').addEventListener('click', async () => {
+    await abrirPastaNoPc(p.pc);
+    dlg.querySelector('[data-od-msg]').textContent = 'Abrindo a pasta no Explorador… Se não abriu, o caminho já está copiado: ' + p.pc;
+  });
+  dlg.showModal();
 }
 
 /* ---------------- lista de arquivos de um registro ---------------- */
