@@ -490,7 +490,7 @@
 }
 .hol-id { grid-template-columns: 2fr 1.4fr 1fr; background: #F4F8EA; }
 .hol-bases { grid-template-columns: repeat(4, 1fr); }
-.hol-pag { grid-template-columns: .7fr 1.3fr .7fr 1.1fr 1.6fr 1fr 1fr; }
+.hol-pag { grid-template-columns: .7fr 1.3fr .7fr 1.1fr 1.8fr; }
 .hol-id span, .hol-bases span, .hol-pag span, .hol-obs > span {
   display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .3px; color: #8A8D86;
 }
@@ -502,7 +502,9 @@
 .hol-resumo b { color: #744F28; }
 .hol-tab { width: 100%; }
 .hol-tab td:nth-child(2) { width: 22%; }
-.hol-tab td:nth-child(3), .hol-tab td:nth-child(4) { width: 19%; }
+.hol-tab td:nth-child(3) { width: 24%; }
+.rel-tabela.hol-tab .hol-bruto td { background: #E7EBDE; font-weight: 700; color: #744F28; font-size: 12px; }
+.hol-tab .rel-num .hol-in { margin-left: auto; display: block; }
 .hol-tab small { color: #8A8D86; }
 .hol-tab tr.hol-info td { color: #8A8D86; }
 .hol-tab .hol-liq td { background: #E9F3CF; color: #744F28; font-weight: 700; font-size: 12px; }
@@ -542,7 +544,8 @@
   .rel.hol { break-after: page; page-break-after: always; font-size: 10.5px; }
   .rel.hol:last-child { break-after: auto; page-break-after: auto; }
   .hol + .hol { margin-top: 0; }
-  .hol-id, .hol-resumo, .hol-tab .hol-liq td, .hol-notas { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hol-id, .rel-tabela.hol-tab .hol-bruto td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .hol-notas { display: none; }
 }
 .hol-tab .rel-c { text-align: center; }
+.rel-tabela.hol-tab thead th.rel-num { text-align: right; } .rel-tabela.hol-tab thead th.rel-c { text-align: center; }

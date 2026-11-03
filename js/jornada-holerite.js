@@ -125,7 +125,7 @@ function automatico(l, competencia) {
 
 /* ---------------- dados da tela ---------------- */
 
-const est = { competencia: null, destinoId: null, pessoa: '', avisar: () => {}, itens: [] };
+const est = { todas: false, competencia: null, destinoId: null, pessoa: '', avisar: () => {}, itens: [] };
 const ymDe = c => c.slice(0, 7);
 const chaveDe = (fid, c) => `${fid}|${ymDe(c)}`;
 const ajustesDe = (fid, c) => ((jd.dados.holerites || []).find(r => r.chave === chaveDe(fid, c))?.ajustes) || {};
@@ -186,6 +186,15 @@ async function salvarAjustes(item, ajustes) {
 
 /* ---------------- desenho ---------------- */
 
+/* 03/11/2026 (2ª versão, pedido dele): mais simples e sem o líquido — igual à
+   planilha: Descrição · Quantidade · Valor, total BRUTO e, abaixo dele, faltas,
+   adiantamento e horas por fora. Linha zerada não aparece (na tela, o botão
+   "Mostrar linhas zeradas" abre todas para editar). */
+const ORDEM_V = ['sal', 'dsr', 'feriado', 'ferias', 'he50', 'he100', 'reflexo', 'grat', 'fj', 'atest',
+  'obito', 'licmat', 'insal', 'peric', 'indevido'];
+const ORDEM_D = ['faltas', 'adiant', 'porfora'];
+const SEMPRE = new Set(['sal', 'dsr', 'feriado']);
+const linhaDe = k => LINHAS.find(l => l.k === k);
 const temLinha = (res, l) => (l.un && res.q[l.k]) || res.v[l.k];
 
 function holerite(it, editavel) {
@@ -200,102 +209,73 @@ function holerite(it, editavel) {
   const inNum = (c, v, fmt = moeda) => editavel
     ? `<input class="hol-in${alt(c)}" data-hol-f="${c}" data-hol-p="${it.fid}" value="${fmt(v)}" inputmode="decimal"${titAuto(c)}>`
     : (v ? fmt(v) : '');
-  const inTxt = (c, v, cls = '') => editavel
-    ? `<input class="hol-in hol-txt${alt(c)} ${cls}" data-hol-f="${c}" data-hol-p="${it.fid}" value="${esc(v)}"${titAuto(c)}>`
-    : esc(v || '—');
+  const inTxt = c => editavel
+    ? `<input class="hol-in hol-txt${alt(c)}" data-hol-f="${c}" data-hol-p="${it.fid}" value="${esc(r.texto[c])}"${titAuto(c)}>`
+    : esc(r.texto[c] || '—');
 
-  const linha = l => {
-    if (!editavel && !temLinha(r, l) && l.k !== 'sal') return '';
-    const ref = l.un && (editavel || r.q[l.k]) ? `${inNum(l.k + '.q', r.q[l.k], qtd)} <small>${l.un === 'h' ? 'h' : 'd'}</small>` : '';
-    const val = inNum(l.k + '.v', r.v[l.k]);
-    return `<tr${l.k === 'ferias' && !r.v.ferias ? ' class="hol-info"' : ''}>
-      <td>${esc(l.nome)}${l.k === 'ferias' && !r.v.ferias ? ' <span class="rel-mini">(recibo de férias)</span>' : ''}</td>
-      <td class="rel-c">${ref}</td>
-      <td class="rel-num">${l.tipo === 'v' ? val : ''}</td>
-      <td class="rel-num">${l.tipo === 'd' ? val : ''}</td>
-    </tr>`;
+  const mostra = l => SEMPRE.has(l.k) || temLinha(r, l) || (editavel && est.todas);
+  const linha = k => {
+    const l = linhaDe(k);
+    if (!mostra(l)) return '';
+    const ref = l.un && (editavel || r.q[l.k]) ? `${inNum(l.k + '.q', r.q[l.k], qtd)} <small>${l.un === 'h' ? 'h' : 'dias'}</small>` : '';
+    const nome = l.k === 'faltas' ? 'Faltas (descontar)' : l.k === 'ferias' && !r.v.ferias ? 'Férias <span class="rel-mini">(recibo de férias)</span>' : esc(l.nome);
+    return `<tr><td>${nome}</td><td class="rel-c">${ref}</td><td class="rel-num">${inNum(l.k + '.v', r.v[l.k])}</td></tr>`;
   };
+  const abaixo = ORDEM_D.map(linha).join('');
 
   const notas = [];
   if (it.auto.semSalario) notas.push('Sem salário cadastrado em RH › Salários — digite o salário base.');
-  if (it.auto.info.inss) notas.push(`${it.auto.info.inss} dia(s) afastado pelo INSS (a partir do 16º dia) — não pagos neste holerite.`);
-  if (it.auto.info.outro) notas.push(`${it.auto.info.outro} dia(s) de afastamento (outro motivo) — não pagos neste holerite.`);
+  if (it.auto.info.inss) notas.push(`${it.auto.info.inss} dia(s) afastado pelo INSS (a partir do 16º dia) — não pagos.`);
+  if (it.auto.info.outro) notas.push(`${it.auto.info.outro} dia(s) de afastamento (outro motivo) — não pagos.`);
   if (it.auto.info.compensadas) notas.push(`${it.auto.info.compensadas} falta(s) compensada(s) com horas — não descontadas.`);
   if (it.l.registroNoMes) notas.push(`Registrado em ${dataBR(it.admissao)} — mês proporcional.`);
-
-  const diasTrab = Math.max(0, (r.q.sal || 0) - (r.q.faltas || 0));
-  const fora = LINHAS.find(l => l.k === 'porfora');
+  const banco = ['banco', 'conta_tipo', 'agencia', 'conta', 'pix'].some(c => r.texto[c]);
 
   return `
   <article class="rel hol" data-hol="${it.fid}">
     <header class="rel-cabecalho">
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-titulo">
-        <h1>DEMONSTRATIVO DE PAGAMENTO</h1>
-        <p>Holerite · referente a ${esc(rotuloComp(est.competencia))}</p>
+        <h1>HOLERITE</h1>
+        <p>Referente a ${esc(rotuloComp(est.competencia))}</p>
       </div>
-      <div class="rel-comp"><span>competência</span><strong>${esc(MESES[+est.competencia.slice(5, 7) - 1].slice(0, 3))}/${est.competencia.slice(0, 4)}</strong><span>${esc(est.destino?.nome || '')}</span></div>
+      <div class="rel-comp"><strong>${esc(MESES[+est.competencia.slice(5, 7) - 1].slice(0, 3))}/${est.competencia.slice(0, 4)}</strong><span>${esc(est.destino?.nome || '')}</span></div>
     </header>
 
     <div class="hol-id">
       <div><span>Funcionário</span><b>${esc(it.nome)}</b></div>
       <div><span>Cargo</span><b>${esc(it.cargo || '—')}</b></div>
-      <div><span>Empregador</span><b>${esc(it.empregador || '—')}</b></div>
+      <div><span>Salário base</span><b>${inNum('base', r.base)}</b></div>
       <div><span>Fazenda</span><b>${esc(it.fazenda || '—')}</b></div>
       <div><span>Admissão</span><b>${esc(dataBR(it.admissao) || '—')}</b></div>
-      <div><span>CPF</span><b>${inTxt('cpf', r.texto.cpf)}</b></div>
-    </div>
-
-    <div class="hol-bases">
-      <div><span>Salário base</span><b>${inNum('base', r.base)}</b></div>
-      <div><span>Sal. p/ cálc. H.E.</span><b>${inNum('salHE', r.salHE)}</b></div>
-      <div><span>Diária</span><b>${moeda(r.diaria)}</b></div>
-      <div><span>Hora extra 50%</span><b>${moeda(r.hora50)}</b></div>
-    </div>
-
-    <div class="hol-resumo">
-      <span>Dias trabalhados <b>${qtd(diasTrab)}</b></span>
-      <span>Férias <b>${qtd(r.q.ferias)}</b></span>
-      <span>Atestados <b>${qtd(r.q.atest)}</b></span>
-      <span>Faltas justificadas <b>${qtd(r.q.fj)}</b></span>
-      <span>Faltas não justificadas <b>${qtd(r.q.faltas)}</b></span>
-      <span>Horas extras <b>${qtd(r.q.he50 + r.q.he100)} h</b></span>
+      <div><span>CPF</span><b>${inTxt('cpf')}</b></div>
     </div>
 
     <table class="rel-tabela hol-tab">
-      <thead><tr><th>Descrição</th><th class="rel-c">Referência</th><th class="rel-num">Vencimentos</th><th class="rel-num">Descontos</th></tr></thead>
-      <tbody>${LINHAS.filter(l => l.tipo !== 'f').map(linha).join('')}</tbody>
-      <tfoot>
-        <tr><td colspan="2">Totais (bruto)</td><td class="rel-num">${moeda(r.bruto)}</td><td class="rel-num">${moeda(r.descontos)}</td></tr>
-        <tr class="hol-liq"><td colspan="3">Líquido a receber</td><td class="rel-num">R$ ${moeda(r.liquido)}</td></tr>
-      </tfoot>
+      <thead><tr><th>Descrição</th><th class="rel-c">Quantidade</th><th class="rel-num">Valor</th></tr></thead>
+      <tbody>${ORDEM_V.map(linha).join('')}</tbody>
+      <tbody class="hol-bruto"><tr><td colspan="2">Bruto</td><td class="rel-num">${moeda(r.bruto)}</td></tr></tbody>
+      ${abaixo ? `<tbody>${abaixo}</tbody>` : ''}
     </table>
 
-    ${editavel || r.v.porfora ? `<table class="rel-tabela hol-tab hol-fora">
-      <tbody><tr><td>${esc(fora.nome)}</td><td class="rel-c">${inNum('porfora.q', r.q.porfora, qtd)} <small>h</small></td>
-        <td class="rel-num" colspan="2">${inNum('porfora.v', r.v.porfora)}</td></tr></tbody>
-    </table>` : ''}
-
-    <div class="hol-pag">
-      <div><span>Banco</span><b>${inTxt('banco', r.texto.banco)}</b></div>
-      <div><span>Tipo</span><b>${inTxt('conta_tipo', r.texto.conta_tipo)}</b></div>
-      <div><span>Agência</span><b>${inTxt('agencia', r.texto.agencia)}</b></div>
-      <div><span>Conta</span><b>${inTxt('conta', r.texto.conta)}</b></div>
-      <div class="hol-pix"><span>PIX</span><b>${inTxt('pix', r.texto.pix)}</b></div>
-      <div><span>Pagamento 1</span><b>${inNum('pag1', r.pag1)}</b></div>
-      <div><span>Pagamento 2</span><b>${inNum('pag2', r.pag2)}</b></div>
-    </div>
+    ${editavel || banco ? `<div class="hol-pag">
+      <div><span>Banco</span><b>${inTxt('banco')}</b></div>
+      <div><span>Tipo</span><b>${inTxt('conta_tipo')}</b></div>
+      <div><span>Agência</span><b>${inTxt('agencia')}</b></div>
+      <div><span>Conta</span><b>${inTxt('conta')}</b></div>
+      <div><span>PIX</span><b>${inTxt('pix')}</b></div>
+    </div>` : ''}
 
     ${editavel || r.texto.obs ? `<div class="hol-obs"><span>Observação</span>${editavel
       ? `<input class="hol-in hol-txt${alt('obs')}" data-hol-f="obs" data-hol-p="${it.fid}" value="${esc(r.texto.obs)}" placeholder="opcional">`
       : `<p>${esc(r.texto.obs)}</p>`}</div>` : ''}
 
-    ${notas.length ? `<ul class="hol-notas">${notas.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+    ${editavel && notas.length ? `<ul class="hol-notas">${notas.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
 
     ${editavel ? `<div class="hol-acoes"><button class="btn mini" type="button" data-hol-reset="${it.fid}"
         ${Object.keys(it.ajustes).length ? '' : 'disabled'}>Voltar tudo ao automático</button></div>` : `
     <div class="hol-assina">
-      <p>Declaro ter recebido a importância líquida discriminada neste demonstrativo.</p>
+      <p>Declaro ter recebido os valores discriminados neste holerite.</p>
       <div><span></span><small>Data</small></div>
       <div><span></span><small>Assinatura do funcionário</small></div>
     </div>`}
@@ -318,13 +298,14 @@ function desenhar() {
         <option value="">Todos (${est.itens.length})</option>
         ${est.itens.map(it => `<option value="${it.fid}"${it.fid === est.pessoa ? ' selected' : ''}>${esc(it.nome)}</option>`).join('')}
       </select></label>
-      <span class="hol-tot">Bruto ${moeda(total('bruto'))} · Líquido ${moeda(total('liquido'))} · Por fora ${moeda(total('porFora'))}</span>
+      <span class="hol-tot">Bruto ${moeda(total('bruto'))} · Por fora ${moeda(total('porFora'))}</span>
+      <button class="btn mini" type="button" data-hol-todas>${est.todas ? 'Esconder linhas zeradas' : 'Mostrar linhas zeradas'}</button>
       <button class="btn principal" type="button" data-hol-imprimir>Imprimir / salvar em PDF</button>
       <button class="btn mini" type="button" data-hol-fechar>Fechar</button>
     </div>
     <p class="hol-dica">Valores puxados do app. Para mudar, clique no número e digite — a alteração fica gravada só para
       ${esc(rotuloComp(est.competencia))}. Campo em <b class="hol-alt-ex">marrom</b> foi alterado à mão (passe o mouse para ver o automático);
-      apague o número para voltar ao automático. Na impressão saem só as linhas com valor.</p>
+      apague o número para voltar ao automático. Linhas zeradas ficam escondidas (e não saem na impressão).</p>
     <div class="hol-editor">${lista.map(it => holerite(it, true)).join('') || '<p class="rel-vazio">Nenhum funcionário neste destino.</p>'}</div>
     <div class="hol-papel"></div>`;
   ligar(alvo);
@@ -338,7 +319,7 @@ function redesenharCartao(it) {
   ligar(document.querySelector(`#jorImpressao .hol-editor [data-hol="${it.fid}"]`));
   const tot = document.querySelector('#jorImpressao .hol-tot');
   const total = k => est.itens.reduce((s, x) => s + (x.res[k] || 0), 0);
-  if (tot) tot.textContent = `Bruto ${moeda(total('bruto'))} · Líquido ${moeda(total('liquido'))} · Por fora ${moeda(total('porFora'))}`;
+  if (tot) tot.textContent = `Bruto ${moeda(total('bruto'))} · Por fora ${moeda(total('porFora'))}`;
 }
 
 function ligar(raiz) {
@@ -364,6 +345,7 @@ function ligar(raiz) {
     await salvarAjustes(it, {});
     redesenharCartao(it);
   }));
+  raiz.querySelector('[data-hol-todas]')?.addEventListener('click', () => { est.todas = !est.todas; desenhar(); });
   raiz.querySelector('[data-hol-pessoa]')?.addEventListener('change', e => { est.pessoa = e.target.value; desenhar(); });
   raiz.querySelector('[data-hol-fechar]')?.addEventListener('click', () => {
     const alvo = document.getElementById('jorImpressao'); alvo.hidden = true; alvo.innerHTML = '';
