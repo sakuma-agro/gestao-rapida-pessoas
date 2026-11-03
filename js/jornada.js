@@ -1908,6 +1908,7 @@ async function desenharFechamento() {
           <button class="btn mini" data-imprimirdp="${d.id}">Imprimir</button>
           <button class="btn" data-verantes="${d.id}" title="Dias trabalhados antes da data do registro (admissão) — uso interno">Horas extras antes do registro</button>
           <button class="btn" data-vermesant="${d.id}" title="Boletins de mês anterior lançados depois do fechamento e pagos neste mês">Horas do mês anterior</button>
+          <button class="btn" data-verfnd="${d.id}" title="Todos os funcionários, com as faltas e faltas justificadas que não foram abatidas das horas">Faltas não descontadas</button>
         </div>
       </section>`;
   }));
@@ -1989,6 +1990,9 @@ async function desenharFechamento() {
   }));
   document.querySelectorAll('[data-vermesant]').forEach(b => b.addEventListener('click', () => {
     rel.mostrar(rel.relatorioMesAnterior(estadoTela.competencia, b.dataset.vermesant), { barra: true });
+  }));
+  document.querySelectorAll('[data-verfnd]').forEach(b => b.addEventListener('click', () => {
+    rel.mostrar(rel.relatorioFaltasNaoDescontadas(estadoTela.competencia, b.dataset.verfnd), { barra: true });
   }));
   document.querySelectorAll('[data-imprimirdp]').forEach(b => b.addEventListener('click', () => {
     rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.imprimirdp), { barra: true });
