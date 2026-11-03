@@ -2458,6 +2458,8 @@ body.crq-aberto{overflow:hidden}
 .crq-marco-ponto{font-size:14px}
 .crq-marco-beb{font-size:9px;background:#E0F7FF;box-shadow:0 0 0 1.5px #0077FF}
 .crq-marco-leg{font-style:normal;background:none!important;border:0!important;width:auto!important;height:auto!important;font-size:13px}
+.leaflet-tooltip.crq-rot-c{background:rgba(27,35,43,.8);font-size:10.5px;padding:1px 5px}
+.crq-z-medio .leaflet-tooltip.crq-rot-c{display:none}
 .crq-mapa.crq-marcando,.crq-mapa.crq-marcando .leaflet-interactive{cursor:crosshair!important}
 .crq-ponto-ico.venc{background:#E53935;box-shadow:0 0 0 1px #E53935}
 .crq-tab td.crq-venc{color:#C62828;font-weight:bold}

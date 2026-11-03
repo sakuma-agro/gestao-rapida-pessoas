@@ -28,6 +28,8 @@ const quem = () => estado.sessao?.user?.email || null;
 
 /** Mínimo de reserva legal fora da Amazônia Legal (Lei 12.651/2012, art. 12, II). */
 const RL_MIN = 20;
+const m2 = n => n == null || isNaN(n) ? '—' : Math.round(n * 10000).toLocaleString('pt-BR') + ' m²';
+const areaTxt = f => f.grupo === 'Construção' ? m2(f.ha) : ha(f.ha);
 
 /** Usos (cor de preenchimento, cor da linha, nome na legenda). Cores pensadas para o satélite. */
 const GRUPOS = [
@@ -43,6 +45,7 @@ const GRUPOS = [
   ['APP', '#00897B', '#4DD0C4'],
   ['Servidão', '#8E24AA', '#E1BEE7'],
   ['Captação de água', '#00C2E0', '#7FF3FF'],
+  ['Construção', '#FFE9A8', '#FFC400'],
   ['Outros', '#B0B0B0', '#FFFFFF'],
 ];
 const COR = Object.fromEntries(GRUPOS.map(g => [g[0], { fill: g[1], line: g[2] }]));
@@ -52,7 +55,7 @@ let S = { lista: [], atual: null, mapa: null, camadas: {}, rotulos: true, oculto
 /** Pontos marcados (sede, galpão…): ícone e tamanho no mapa. 03/11/2026 — "falta marcar … sede". */
 const TIPO_MARCO = {
   Sede: { ico: '🏠', cls: 'sede', tam: 30 },
-  'Galpão': { ico: '🏚', cls: 'galpao', tam: 26 },
+  'Galpão': { ico: '🏭', cls: 'galpao', tam: 26 },
   'Combustível': { ico: '⛽', cls: 'galpao', tam: 26 },
   'Refeitório': { ico: '🍽', cls: 'galpao', tam: 26 },
   Defensivos: { ico: '🧪', cls: 'galpao', tam: 26 },
@@ -296,6 +299,8 @@ function montarOverlay() {
       <nav class="crq-faz" id="crqFaz"></nav>
       <div class="crq-acoes">
         <label class="crq-chk"><input type="checkbox" id="crqRot" checked> Nomes</label>
+        <button class="btn" type="button" id="crqSede" hidden title="Aproxima na sede e lista as construções">🏠 Mapa da sede</button>
+        <button class="btn" type="button" id="crqContornar" hidden title="Clique nos cantos da construção e depois em Concluir">✏ Contornar</button>
         <button class="btn" type="button" id="crqMarcar" hidden title="Clique no mapa para marcar sede, galpão, piscinão…">📍 Marcar ponto</button>
         <button class="btn" type="button" id="crqApresentar">⛶ Apresentar</button>
         <button class="btn" type="button" id="crqImprimir">Imprimir</button>
@@ -316,9 +321,11 @@ function montarOverlay() {
   });
   document.addEventListener('fullscreenchange', () => setTimeout(() => S.mapa?.invalidateSize(), 200));
   $('crqImprimir').addEventListener('click', imprimir);
-  $('crqMarcar').addEventListener('click', () => modoMarcar(!S.marcando));
+  $('crqMarcar').addEventListener('click', () => { modoContornar(false); modoMarcar(!S.marcando); });
+  $('crqContornar').addEventListener('click', () => { if (S.desenho) concluirContorno(); else { modoMarcar(false); modoContornar(true); } });
+  $('crqSede').addEventListener('click', () => { S.modoSede = !S.modoSede; $('crqSede').classList.toggle('principal', S.modoSede); painel(); if (S.modoSede) irParaSede(); else desenhar(true); });
   $('crqImp').addEventListener('change', importar);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.marcando) { modoMarcar(false); msg(''); return; } if (e.key === 'Escape' && !document.fullscreenElement && $('crqOverlay') && !$('crqOverlay').hidden) fechar(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && (S.marcando || S.desenho)) { modoMarcar(false); modoContornar(false); msg(''); return; } if (e.key === 'Escape' && !document.fullscreenElement && $('crqOverlay') && !$('crqOverlay').hidden) fechar(); });
   return ov;
 }
 
@@ -332,17 +339,19 @@ export async function abrirCroqui(fazendaId) {
   const ov = montarOverlay(); ov.hidden = false; document.body.classList.add('crq-aberto');
   $('crqImpLbl').hidden = !pode('cert');
   $('crqMarcar').hidden = !pode('cert');
+  $('crqContornar').hidden = !pode('cert');
+  $('crqSede').hidden = false;
   $('crqPainel').innerHTML = '<p class="dica">Carregando…</p>';
   try {
     const [L] = await Promise.all([carregarLeaflet(), carregar()]);
     if (!S.mapa) {
-      S.mapa = L.map('crqMapa', { zoomControl: true, attributionControl: true, preferCanvas: false });
+      S.mapa = L.map('crqMapa', { maxZoom: 21, zoomControl: true, attributionControl: true, preferCanvas: false });
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19, maxNativeZoom: 18, attribution: 'Imagem © Esri, Maxar, Earthstar Geographics', crossOrigin: true,
+        maxZoom: 21, maxNativeZoom: 18, attribution: 'Imagem © Esri, Maxar, Earthstar Geographics', crossOrigin: true,
       }).addTo(S.mapa);
       L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(S.mapa);
       S.mapa.on('zoomend', zoomRotulos);
-      S.mapa.on('click', e => { if (S.marcando) marcarAqui(e.latlng); });
+      S.mapa.on('click', e => { if (S.marcando) marcarAqui(e.latlng); else if (S.desenho) pontoContorno(e.latlng); });
     }
     if (!S.lista.length) {
       $('crqFaz').innerHTML = '';
@@ -361,7 +370,7 @@ export async function abrirCroqui(fazendaId) {
 }
 
 function fechar() {
-  modoMarcar(false);
+  modoMarcar(false); modoContornar(false);
   if (document.fullscreenElement) document.exitFullscreen?.();
   const ov = $('crqOverlay'); if (ov) ov.hidden = true;
   document.body.classList.remove('crq-aberto');
@@ -370,7 +379,7 @@ function fechar() {
 function abas() {
   $('crqFaz').innerHTML = S.lista.map(c => `<button type="button" class="${c === S.atual ? 'on' : ''}" data-faz="${c.fazenda_id}">${esc(c.fazenda)}</button>`).join('');
   $('crqFaz').querySelectorAll('[data-faz]').forEach(b => b.addEventListener('click', () => {
-    S.atual = S.lista.find(c => c.fazenda_id === b.dataset.faz); S.sel = null; modoMarcar(false); abas(); desenhar(true); painel();
+    S.atual = S.lista.find(c => c.fazenda_id === b.dataset.faz); S.sel = null; S.modoSede = false; $('crqSede').classList.remove('principal'); modoMarcar(false); modoContornar(false); abas(); desenhar(true); painel();
   }));
 }
 
@@ -383,21 +392,30 @@ function desenhar(enquadrar) {
     const lim = L.polygon(aneis(cq).map(a => a.map(([x, y]) => [y, x])), { color: '#FFFFFF', weight: 2.5, dashArray: '8 6', fill: false, interactive: false }).addTo(S.mapa);
     S.camadas.limite = lim; todas.push(lim);
   }
-  const ordem = ['Vegetação nativa', 'Pivô', 'Pasto', 'Sequeiro', 'Reserva', 'Reserva legal (CAR)', 'APP', 'Servidão', 'Café', 'Abacate Margarida', 'Abacate Hass', 'Captação de água', 'Outros'];
+  const ordem = ['Vegetação nativa', 'Pivô', 'Pasto', 'Sequeiro', 'Reserva', 'Reserva legal (CAR)', 'APP', 'Servidão', 'Café', 'Abacate Margarida', 'Abacate Hass', 'Captação de água', 'Construção', 'Outros'];
   const feics = (cq.feicoes || []).map((f, i) => ({ ...f, i })).sort((a, b) => ordem.indexOf(a.grupo) - ordem.indexOf(b.grupo));
   for (const f of feics) {
     if (S.ocultos.has(f.grupo)) continue;
     const cor = COR[f.grupo] || COR.Outros;
     const sel = S.sel === f.i;
     const pol = L.polygon([f.c, ...(f.h || [])].map(a => a.map(([x, y]) => [y, x])), {
-      color: sel ? '#FFFFFF' : cor.line, weight: sel ? 4 : 2, fillColor: cor.fill, fillOpacity: f.grupo === 'Pivô' ? 0.28 : f.grupo === 'Vegetação nativa' ? 0.25 : 0.45, dashArray: f.fonte === 'CAR' ? '5 4' : null,
+      color: sel ? '#FFFFFF' : cor.line, weight: sel ? 4 : f.grupo === 'Construção' ? 2.5 : 2, fillColor: cor.fill, fillOpacity: f.grupo === 'Pivô' ? 0.28 : f.grupo === 'Vegetação nativa' ? 0.25 : 0.45, dashArray: f.fonte === 'CAR' ? '5 4' : null,
     }).addTo(S.mapa);
-    pol.bindPopup(`<b>${esc(f.rot || f.nome)}</b><br>${esc(f.grupo)}${f.fonte === 'CAR' ? ' · do CAR' : ''}<br>${ha(f.ha)}${f.nome && f.nome !== f.rot ? `<br><span style="color:#777">${esc(f.nome)}</span>` : ''}`);
+    const ehConst = f.grupo === 'Construção';
+    pol.bindPopup(`<b>${esc(f.rot || f.nome)}</b><br>${esc(f.grupo)}${f.fonte === 'CAR' ? ' · do CAR' : ''}<br>${areaTxt(f)}${f.nome && f.nome !== f.rot ? `<br><span style="color:#777">${esc(f.nome)}</span>` : ''}${ehConst && pode('cert') ? `<br><button type="button" class="btn mini" data-c-ren style="margin-top:6px">Renomear</button> <button type="button" class="btn mini" data-c-del style="margin-top:6px">Apagar contorno</button>` : ''}`);
+    if (ehConst) pol.on('popupopen', ev => {
+      const el = ev.popup.getElement();
+      el?.querySelector('[data-c-ren]')?.addEventListener('click', () => renomearConstrucao(f.i));
+      el?.querySelector('[data-c-del]')?.addEventListener('click', () => apagarConstrucao(f.i));
+    });
     pol.on('click', e => {
       if (S.marcando) { S.mapa.closePopup(); marcarAqui(e.latlng); return; }   // marcar ponto em cima de talhão/pivô
+      if (S.desenho) { S.mapa.closePopup(); pontoContorno(e.latlng); return; }
       S.sel = f.i; marcarLinha();
     });
-    if (S.rotulos) pol.bindTooltip(`${esc(f.rot || '')}<br><small>${ha(f.ha)}</small>`, { permanent: true, direction: 'center', className: 'crq-rot crq-rot-' + (f.ha < 2 && !/piscin/i.test(f.rot || '') ? 'p' : 'g') });
+    // construção que já tem ponto com o mesmo nome: o nome fica no ponto (não repete)
+    const temMarco = ehConst && (cq.marcos || []).some(m => so(m.nome) === so(f.nome));
+    if (S.rotulos && !temMarco) pol.bindTooltip(ehConst ? esc(f.rot || '') : `${esc(f.rot || '')}<br><small>${ha(f.ha)}</small>`, { permanent: true, direction: 'center', className: 'crq-rot crq-rot-' + (ehConst ? 'c' : f.ha < 2 && !/piscin/i.test(f.rot || '') ? 'p' : 'g') });
     S.camadas['f' + f.i] = pol; todas.push(pol);
   }
   if (!S.ocultos.has('__pontos')) (cq.pontos || []).forEach((p, k) => {
@@ -424,6 +442,7 @@ function desenhar(enquadrar) {
 }
 
 function painel() {
+  if (S.modoSede) return painelSede();
   const cq = S.atual; const T = totais(cq); const rv = cq.reserva || {};
   const num = k => { const v = Number(String(rv[k] ?? '').replace(',', '.')); return isFinite(v) && rv[k] !== '' && rv[k] != null ? v : null; };
   const areaCar = num('car_area_ha');
@@ -439,7 +458,7 @@ function painel() {
   const atende = rlConta != null && rlConta >= minHa - 0.005;
   const nFora = partes.filter(p => p.fora);
   const usados = GRUPOS.filter(g => T.t[g[0]]);
-  const talhoes = todas.filter(f => !['Reserva', 'Reserva legal (CAR)', 'Vegetação nativa', 'APP', 'Servidão'].includes(f.grupo))
+  const talhoes = todas.filter(f => !['Reserva', 'Reserva legal (CAR)', 'Vegetação nativa', 'APP', 'Servidão', 'Construção'].includes(f.grupo))
     .sort((a, b) => GRUPOS.findIndex(g => g[0] === a.grupo) - GRUPOS.findIndex(g => g[0] === b.grupo) || so(a.rot).localeCompare(so(b.rot), 'pt-BR', { numeric: true }));
   const ambientais = todas.filter(f => ['Vegetação nativa', 'APP', 'Servidão'].includes(f.grupo));
   const edita = pode('cert');
@@ -457,7 +476,7 @@ function painel() {
     <h4 class="crq-sub">Legenda</h4>
     <div class="crq-leg">${usados.map(g => `<label class="${S.ocultos.has(g[0]) ? 'off' : ''}">
         <input type="checkbox" data-grp="${esc(g[0])}" ${S.ocultos.has(g[0]) ? '' : 'checked'}>
-        <i style="background:${g[1]};border-color:${g[2]}"></i><span>${esc(g[0])}</span><b>${ha(T.t[g[0]])}</b></label>`).join('')}
+        <i style="background:${g[1]};border-color:${g[2]}"></i><span>${esc(g[0])}</span><b>${g[0] === 'Construção' ? m2(T.t[g[0]]) : ha(T.t[g[0]])}</b></label>`).join('')}
       ${cq.limite ? '<div class="crq-leg-lim"><i></i><span>Limite da fazenda</span></div>' : ''}
       ${(cq.marcos || []).length ? `<label><input type="checkbox" data-grp="__marcos" ${S.ocultos.has('__marcos') ? '' : 'checked'}><i class="crq-marco-leg">🏠</i><span>Sede e pontos marcados</span><b>${cq.marcos.length}</b></label>` : ''}
       ${(cq.pontos || []).length ? `<label><input type="checkbox" data-grp="__pontos" ${S.ocultos.has('__pontos') ? '' : 'checked'}><i class="crq-ponto-ico"></i><span>Captações outorgadas</span><b>${cq.pontos.length}</b></label>` : ''}</div>
@@ -508,6 +527,7 @@ function painel() {
     </section>
 
     ${(cq.marcos || []).filter(m => m.tipo !== 'Bebedouro').length || edita ? `<h4 class="crq-sub">Sede e pontos marcados</h4>
+      ${itensSede(cq).cons.length || itensSede(cq).mar.length ? '<button class="btn mini principal" type="button" id="crqVerSede" style="margin-bottom:6px">🏠 Ver mapa da sede</button>' : ''}
       ${(cq.marcos || []).filter(m => m.tipo !== 'Bebedouro').length ? `<table class="crq-tab crq-tal"><tbody>
       ${(cq.marcos || []).map((m, k) => m.tipo === 'Bebedouro' ? '' : `<tr data-marco="${k}"><td>${(TIPO_MARCO[m.tipo] || TIPO_MARCO.Ponto).ico} ${esc(m.nome)}</td><td class="crq-mono">${m.lat.toFixed(5)}, ${m.lon.toFixed(5)}</td></tr>`).join('')}
       </tbody></table>` : ''}
@@ -529,11 +549,12 @@ function painel() {
   }));
   $('crqPainel').querySelectorAll('[data-ir]').forEach(tr => tr.addEventListener('click', () => irPara(Number(tr.dataset.ir))));
   $('crqPainel').querySelectorAll('[data-ponto]').forEach(tr => tr.addEventListener('click', () => {
-    const m = S.camadas['p' + tr.dataset.ponto]; if (m) { S.mapa.setView(m.getLatLng(), 17); m.openPopup(); }
+    const m = S.camadas['p' + tr.dataset.ponto]; if (m) { S.mapa.setView(m.getLatLng(), 18); m.openPopup(); }
   }));
   $('crqPainel').querySelectorAll('[data-marco]').forEach(tr => tr.addEventListener('click', () => {
-    const m = S.camadas['m' + tr.dataset.marco]; if (m) { S.mapa.setView(m.getLatLng(), 17); m.openPopup(); }
+    const m = S.camadas['m' + tr.dataset.marco]; if (m) { S.mapa.setView(m.getLatLng(), 20); m.openPopup(); }
   }));
+  $('crqVerSede')?.addEventListener('click', () => $('crqSede').click());
   $('crqRvGravar')?.addEventListener('click', gravarReserva);
   marcarLinha();
 }
@@ -551,11 +572,96 @@ const foraDoLimite = (cq, f) => !!cq.limite && !aneis(cq).some(a => dentro(centr
 function irPara(i) {
   S.sel = i; desenhar(false);
   const l = S.camadas['f' + i];
-  if (l) { S.mapa.fitBounds(l.getBounds(), { padding: [60, 60], maxZoom: 17 }); l.openPopup(); }
+  if (l) { S.mapa.fitBounds(l.getBounds(), { padding: [60, 60], maxZoom: S.atual?.feicoes?.[i]?.grupo === 'Construção' ? 20 : 17 }); l.openPopup(); }
   marcarLinha();
 }
 function marcarLinha() {
   $('crqPainel')?.querySelectorAll('[data-ir]').forEach(tr => tr.classList.toggle('sel', Number(tr.dataset.ir) === S.sel));
+}
+
+/* ---------- mapa da sede ---------- */
+/** Construções + pontos marcados (sem bebedouros): é "a sede". */
+function itensSede(cq) {
+  const cons = (cq.feicoes || []).map((f, i) => ({ ...f, i })).filter(f => f.grupo === 'Construção');
+  const mar = (cq.marcos || []).map((m, k) => ({ ...m, k })).filter(m => m.tipo !== 'Bebedouro');
+  return { cons, mar };
+}
+function irParaSede() {
+  const L = window.L, cq = S.atual; if (!L || !cq) return;
+  desenhar(false);
+  const { cons, mar } = itensSede(cq);
+  const pts = [...cons.flatMap(f => f.c.map(([x, y]) => [y, x])), ...mar.map(m => [m.lat, m.lon])];
+  if (!pts.length) return msg('Esta fazenda ainda não tem sede marcada. Use 📍 Marcar ponto ou ✏ Contornar.', true);
+  S.mapa.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 20 });
+}
+function painelSede() {
+  const cq = S.atual; const { cons, mar } = itensSede(cq); const edita = pode('cert');
+  const semContorno = mar.filter(m => !cons.some(f => so(f.nome) === so(m.nome)));
+  const total = cons.reduce((s, f) => s + (f.ha || 0), 0);
+  $('crqPainel').innerHTML = `
+    <h3 class="crq-h">${esc(cq.fazenda)} · sede</h3>
+    <div class="crq-kpis">
+      <div><span>Construções contornadas</span><b>${cons.length}</b></div>
+      <div><span>Área construída</span><b>${m2(total)}</b></div>
+    </div>
+    <h4 class="crq-sub">Construções</h4>
+    ${cons.length ? `<table class="crq-tab crq-tal"><thead><tr><th>Construção</th><th>Área</th></tr></thead><tbody>
+      ${cons.sort((a, b) => so(a.rot).localeCompare(so(b.rot), 'pt-BR')).map(f => { const m = mar.find(x => so(x.nome) === so(f.nome)); return `<tr data-ir="${f.i}"><td>${m ? (TIPO_MARCO[m.tipo] || TIPO_MARCO.Ponto).ico + ' ' : '<i style="background:#FFE9A8;border:1px solid #FFC400"></i>'}${esc(f.rot || f.nome)}</td><td>${m2(f.ha)}</td></tr>`; }).join('')}
+    </tbody></table>` : '<p class="dica">Nenhuma construção contornada ainda.</p>'}
+    ${semContorno.length ? `<h4 class="crq-sub">Pontos sem contorno</h4><table class="crq-tab crq-tal"><tbody>
+      ${semContorno.map(m => `<tr data-marco="${m.k}"><td>${(TIPO_MARCO[m.tipo] || TIPO_MARCO.Ponto).ico} ${esc(m.nome)}</td><td class="dica">só o ponto</td></tr>`).join('')}
+    </tbody></table>` : ''}
+    ${edita ? `<p class="crq-nota">Para contornar: <b>✏ Contornar</b>, clique em cada canto do telhado e depois em <b>✔ Concluir</b>. Para corrigir, toque no contorno › Apagar contorno e faça de novo. O nome igual ao de um ponto junta os dois.</p>` : ''}
+    <p class="crq-nota">Contornos traçados sobre a imagem de satélite: medidas aproximadas.</p>`;
+  $('crqPainel').querySelectorAll('[data-ir]').forEach(tr => tr.addEventListener('click', () => irPara(Number(tr.dataset.ir))));
+  $('crqPainel').querySelectorAll('[data-marco]').forEach(tr => tr.addEventListener('click', () => {
+    const m = S.camadas['m' + tr.dataset.marco]; if (m) { S.mapa.setView(m.getLatLng(), 20); m.openPopup(); }
+  }));
+  marcarLinha();
+}
+
+/* ---------- contornar construção ---------- */
+function modoContornar(on) {
+  if (!on) { S.desenho?.linha?.remove(); S.desenho?.cantos?.remove(); S.desenho = null; }
+  else S.desenho = { pts: [], linha: window.L.polyline([], { color: '#FFC400', weight: 3, dashArray: '4 4', interactive: false }).addTo(S.mapa), cantos: window.L.layerGroup().addTo(S.mapa) };
+  const b = $('crqContornar'); if (b) { b.classList.toggle('principal', !!on); b.textContent = on ? '✔ Concluir' : '✏ Contornar'; }
+  $('crqMapa')?.classList.toggle('crq-marcando', !!on || S.marcando);
+  if (on) msg('Clique em cada canto da construção. Depois toque em ✔ Concluir (Esc cancela).');
+}
+function pontoContorno(ll) {
+  const d = S.desenho; if (!d) return;
+  d.pts.push([ll.lng, ll.lat]);
+  d.linha.setLatLngs([...d.pts, d.pts[0]].map(([x, y]) => [y, x]));
+  window.L.circleMarker(ll, { radius: 4, color: '#fff', weight: 1.5, fillColor: '#FFC400', fillOpacity: 1, interactive: false }).addTo(d.cantos);
+  $('crqContornar').textContent = `✔ Concluir (${d.pts.length})`;
+}
+async function concluirContorno() {
+  const d = S.desenho; const cq = S.atual;
+  if (!d || d.pts.length < 3) { msg('Clique em pelo menos 3 cantos.', true); return; }
+  const pts = d.pts.slice(); modoContornar(false);
+  const nome = so(prompt('Nome da construção (ex.: Barracão de máquinas, Casa 2, Refeitório):', ''));
+  if (!nome) return msg('Contorno descartado.');
+  const r7 = v => Math.round(v * 1e7) / 1e7;
+  const c = [...pts, pts[0]].map(([x, y]) => [r7(x), r7(y)]);
+  const feicoes = [...(cq.feicoes || []), { nome, rot: nome, grupo: 'Construção', fonte: 'app', ha: Math.round(areaHa(c) * 1e4) / 1e4, c }];
+  await gravarFeicoes(feicoes, `Contorno “${nome}” gravado (${m2(areaHa(c))}).`);
+}
+async function gravarFeicoes(feicoes, aviso) {
+  const cq = S.atual;
+  const { error } = await estado.cliente.from('cert_croquis').update({ feicoes, atualizado_por: quem() }).eq('fazenda_id', cq.fazenda_id);
+  if (error) return msg('Não gravou: ' + error.message, true);
+  cq.feicoes = feicoes; S.mapa.closePopup(); desenhar(false); painel(); msg(aviso);
+}
+async function renomearConstrucao(i) {
+  const cq = S.atual; const f = cq.feicoes[i]; if (!f) return;
+  const nome = so(prompt('Novo nome da construção:', f.nome || ''));
+  if (!nome || nome === f.nome) return;
+  await gravarFeicoes(cq.feicoes.map((x, k) => k === i ? { ...x, nome, rot: nome } : x), `Renomeado para “${nome}”.`);
+}
+async function apagarConstrucao(i) {
+  const cq = S.atual; const f = cq.feicoes[i]; if (!f) return;
+  if (!confirm(`Apagar o contorno “${f.rot || f.nome}”?`)) return;
+  await gravarFeicoes(cq.feicoes.filter((_, k) => k !== i), `Contorno “${f.rot || f.nome}” apagado.`);
 }
 
 /* ---------- marcar ponto (sede, galpão, piscinão…) ---------- */
@@ -610,7 +716,7 @@ async function importar(ev) {
     // mantém o que veio do CAR (limite em partes e camadas ambientais) se já tiver sido importado
     const linhas = novos.map(n => {
       const ant = S.lista.find(c => c.fazenda_id === n.fazenda_id);
-      const doCar = (ant?.feicoes || []).filter(f => f.fonte === 'CAR');
+      const doCar = (ant?.feicoes || []).filter(f => f.fonte === 'CAR' || f.fonte === 'app');   // CAR e contornos feitos no app ficam
       const limCar = ant?.limite_fonte === 'CAR';
       const marcosApp = (ant?.marcos || []).filter(m => m.fonte !== 'KML');   // marcados no app ficam
       return { fazenda_id: n.fazenda_id, fazenda: n.fazenda, feicoes: [...n.feicoes, ...doCar], marcos: [...n.marcos, ...marcosApp],
@@ -700,4 +806,4 @@ export async function abrirAnDigital() {
   }
 }
 
-export function limparCroqui() { S = { lista: [], atual: null, mapa: S.mapa, camadas: S.camadas, rotulos: true, ocultos: new Set(), sel: null }; fechar(); }
+export function limparCroqui() { fechar(); S = { lista: [], atual: null, mapa: S.mapa, camadas: S.camadas, rotulos: true, ocultos: new Set(), sel: null, marcando: false }; }
