@@ -2060,6 +2060,7 @@ function desenharRelatorios() {
       { k: 'mesant', nome: 'Horas do mês anterior', desc: 'Boletins de mês anterior lançados depois do fechamento e pagos nesta competência',
         html: () => rel.relatorioMesAnterior(comp(), dest()) },
       { k: 'fal', nome: 'Faltas', desc: 'Só as informadas ao DP, com as datas', html: () => rel.relatorioFaltas(comp(), dest()) },
+      { k: 'fnd', nome: 'Faltas não descontadas', desc: 'Todos os funcionários, com as faltas e faltas justificadas que não foram abatidas das horas', html: () => rel.relatorioFaltasNaoDescontadas(comp(), dest()) },
       { k: 'ate', nome: 'Atestados', desc: 'Períodos e dias, sem motivo', html: () => rel.relatorioAtestados(comp(), dest()) },
       { k: 'csv', nome: 'Baixar dados', desc: 'Planilha do mês para o escritório', csv: () => rel.baixar(rel.planilhaDP(comp(), dest())) },
     ],

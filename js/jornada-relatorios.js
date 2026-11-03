@@ -476,6 +476,51 @@ export function relatorioConferencia({ boletins, apuracoes, de, ate, funcionario
 }
 
 /* ------------------------------------------------------------------
+   REL-FND — Faltas não descontadas (03/11/2026, pedido dele). Todos os
+   funcionários do destino, mesmo sem falta, com as faltas que NÃO foram
+   abatidas das horas (extras ou guardadas): falta e falta justificada.
+   A abatida já foi descontada das horas e não entra.
+   ------------------------------------------------------------------ */
+
+export function relatorioFaltasNaoDescontadas(competencia, destinoId) {
+  const c = consolidar(competencia, destinoId);
+  const comp = jd.competenciaDoDestino(competencia, destinoId);
+  const partes = l => {
+    const t = (l.faltasTodas || []).filter(f => !f.absorvida);
+    return { nj: t.filter(f => !f.justificada), j: t.filter(f => f.justificada) };
+  };
+  const datasNJ = arr => arr.map(f => dataBR(f.data) + (f.atrasada ? ' <span class="rel-mini">(mês anterior)</span>' : '')).join(', ');
+  const datasJ = arr => arr.map(f => dataBR(f.data) + (f.desconta ? ' <span class="rel-mini">(descontar)</span>' : '')).join(', ');
+  let qNJ = 0, qJ = 0;
+  const corpo = porEmpregador(c).map(g => `
+      ${blocoEmp(g.rotulo)}
+      <table class="rel-tabela rel-tabela-dp rel-he">
+        <thead><tr>
+          <th>Funcionário</th><th class="rel-c">Faltas</th>
+          <th class="rel-c">Faltas justificadas</th><th class="rel-c">Total</th>
+        </tr></thead>
+        <tbody>${g.linhas.map(l => {
+          const p = partes(l);
+          qNJ += p.nj.length; qJ += p.j.length;
+          return `<tr>
+          <td>${esc(l.nome)}</td>
+          <td class="rel-c">${datasNJ(p.nj)}</td>
+          <td class="rel-c">${datasJ(p.j)}</td>
+          <td class="rel-c"><b>${p.nj.length + p.j.length || ''}</b></td>
+        </tr>`; }).join('')}</tbody>
+      </table>`).join('')
+    || `<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>`;
+
+  const resumo = `<div class="rel-resumo"><b>Resumo:</b> ${qNJ + qJ} falta(s) não descontada(s) das horas no mês — ${qNJ} falta(s) e ${qJ} falta(s) justificada(s).</div>
+    <p class="rel-nota">Todos os funcionários do destino aparecem, mesmo sem falta. A falta abatida das horas extras ou das horas guardadas já foi descontada e não entra.</p>`;
+
+  return documentoDP({
+    titulo: 'RELATÓRIO FALTAS NÃO DESCONTADAS', competencia, destino: c.destino,
+    versao: comp?.versao || 1, classe: 'rel-paisagem', corpo: corpo + resumo, assinaturas: assinaturasDP,
+  });
+}
+
+/* ------------------------------------------------------------------
    REL-QUAL — Qualidade dos boletins (28/09/2026), uso interno
    Nota que quem lança dá ao boletim de papel: Ruim (1), Bom (2), Ótimo (3).
    Individual: indicadores, mês a mês e os boletins Ruim. Todos: um por
@@ -829,6 +874,7 @@ export const RELATORIOS_ARQUIVADOS = [
   ['porMes',    'Horas extras por mês',            (c, d) => relatorioPorMes(c, d)],
   ['faltas',    'Relatório de Faltas',             (c, d) => relatorioFaltas(c, d)],
   ['faltasTot', 'Faltas Totais (uso interno)',     (c, d) => relatorioFaltas(c, d, { totais: true })],
+  ['faltasND',  'Faltas não descontadas',          (c, d) => relatorioFaltasNaoDescontadas(c, d)],
   ['atestados', 'Relatório de Atestados',          (c, d) => relatorioAtestados(c, d)],
   ['detalhado', 'Detalhado DP',                    (c, d) => relatorioDetalhado(c, d)],
 ];
