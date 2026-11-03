@@ -512,8 +512,8 @@ export function relatorioFaltasNaoDescontadas(competencia, destinoId) {
       </table>`).join('')
     || `<p class="rel-vazio">Nenhuma falta não descontada nesta competência.</p>`;
 
-  const resumo = `<div class="rel-resumo"><b>Resumo:</b> ${qNJ + qJ} falta(s) não descontada(s) das horas no mês — ${qNJ} falta(s) e ${qJ} falta(s) justificada(s).</div>
-    <p class="rel-nota">Só aparecem os funcionários com falta no mês. A falta abatida das horas extras ou das horas guardadas já foi descontada e não entra.</p>`;
+  // 03/11/2026: sem resumo e sem nota no rodapé, a pedido dele.
+  const resumo = '';
 
   return documentoDP({
     titulo: 'RELATÓRIO FALTAS NÃO DESCONTADAS', competencia, destino: c.destino,
