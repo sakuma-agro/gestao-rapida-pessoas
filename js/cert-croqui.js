@@ -56,10 +56,11 @@ const TIPO_MARCO = {
   'Combustível': { ico: '⛽', cls: 'galpao', tam: 26 },
   'Refeitório': { ico: '🍽', cls: 'galpao', tam: 26 },
   Defensivos: { ico: '🧪', cls: 'galpao', tam: 26 },
+  Lavador: { ico: '🚿', cls: 'galpao', tam: 26 },
   Bebedouro: { ico: '💧', cls: 'beb', tam: 16 },
   Ponto: { ico: '📍', cls: 'ponto', tam: 24 },
 };
-const tipoDoNome = n => { const u = semAcento(n); return /^SEDE/.test(u) ? 'Sede' : /DIESEL|COMBUST|LUBRIF|TANQUE/.test(u) ? 'Combustível' : /REFEITORIO|COZINHA/.test(u) ? 'Refeitório' : /DEFENSIV|AGROTOX|CALDA/.test(u) ? 'Defensivos' : /GALPAO|BARRACAO|ARMAZEM|OFICINA|DEPOSITO/.test(u) ? 'Galpão' : /BEBEDOURO/.test(u) ? 'Bebedouro' : 'Ponto'; };
+const tipoDoNome = n => { const u = semAcento(n); return /^SEDE/.test(u) ? 'Sede' : /DIESEL|COMBUST|LUBRIF|TANQUE/.test(u) ? 'Combustível' : /REFEITORIO|COZINHA/.test(u) ? 'Refeitório' : /DEFENSIV|AGROTOX|CALDA/.test(u) ? 'Defensivos' : /LAVADOR|LAVAGEM/.test(u) ? 'Lavador' : /GALPAO|BARRACAO|ARMAZEM|OFICINA|DEPOSITO/.test(u) ? 'Galpão' : /BEBEDOURO/.test(u) ? 'Bebedouro' : 'Ponto'; };
 
 /* ---------- Leaflet sob demanda ---------- */
 let leafletPronto = null;
