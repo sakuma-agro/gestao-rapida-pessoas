@@ -653,9 +653,9 @@ function folhaPosExperiencia(p, comPeric, ticket) {
 }
 
 /* ================= COMUNICADO DE ALTERAÇÃO SALARIAL =================
-   03/11/2026. Antes × depois, motivo, vigência, composição do salário e as
-   duas assinaturas: a da empresa (sem nome de pessoa — ele não quer o nome
-   dele nos documentos) e a ciência do funcionário. */
+   03/11/2026. Antes × depois, motivo, vigência, composição do salário e só a
+   assinatura da empresa (sem nome de pessoa). Ele pediu SEM a assinatura do
+   funcionário — não volte a pôr "Ciente" nem data da ciência. */
 export const MOTIVOS_ALTERACAO = {
   horizontal: 'Promoção horizontal — mudança de faixa',
   vertical: 'Promoção vertical — mudança de cargo',
@@ -704,16 +704,14 @@ function documentoAlteracao(p) {
       .filter(Boolean).map(l => `<div>${esc(l.trim())}</div>`).join('')}</div>` : ''}
     <p class="rel-nota">As demais condições do contrato de trabalho continuam como estão.</p>
     <p class="rel-nota">São Gotardo, ${porExtenso(hoje())}.</p>
-    <div class="rel-assinaturas">
-      <div class="rel-assina"><span></span><small>SAKUMA Agronegócios</small></div>
-      <div class="rel-assina"><span></span><small>Ciente: ${esc(p.nome || '')}</small></div>
-    </div>
-    <p class="rel-nota" style="text-align:right;margin-top:10px">Data da ciência: ____/____/________</p>`;
+    <div class="rel-assinaturas" style="justify-content:center">
+      <div class="rel-assina" style="flex:0 0 55%"><span></span><small>SAKUMA Agronegócios</small></div>
+    </div>`;
 
   return documento({
     titulo: 'COMUNICADO DE ALTERAÇÃO SALARIAL',
     subtitulo: 'Plano de Cargos e Salários · SAKUMA Agronegócios',
-    canto: esc(p.cargo_nome || ''),
+    canto: `a partir de ${dataBr(p.data_inicio)}`,
     corpo,
     assinatura: '',
   });
@@ -802,7 +800,7 @@ function desenharUltimas() {
       <span>
         <span class="nome">${esc(p.nome)}</span>
         <span class="tag ${p.tipo === 'contratacao' ? 'ativo' : 'alerta'}">${p.tipo === 'alteracao' ? 'alteração de salário' : p.tipo === 'promocao' ? 'promoção' : 'contratação'}</span><br>
-        <span class="sub">${esc(p.cargo_nome || '')} · faixa ${esc(p.faixa || '—')} · ${dinheiro(p.salario)} · ${dataBr(String(p.criado_em).slice(0, 10))}</span>
+        <span class="sub">${esc(p.cargo_nome || '')} · faixa ${esc(p.faixa || '—')} · ${dinheiro(p.salario)}${p.tipo === 'alteracao' && p.data_inicio ? ` · <b>a partir de ${dataBr(p.data_inicio)}</b>` : ''} · emitido em ${dataBr(String(p.criado_em).slice(0, 10))}</span>
       </span>
       <span class="acoes">
         <button class="btn mini" data-prop="${p.id}">Ver de novo</button>
