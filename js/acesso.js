@@ -143,6 +143,9 @@ export const MODULOS = [
       ['rhEnquadra', 'Enquadramento'],
       ['rhReajuste', 'Reajuste anual'],
       ['rhProposta', 'Gerar proposta'],
+      /* Alteração de salário (03/11/2026): mesmo formulário do Gerar proposta,
+         preso no tipo alteração — sai o Comunicado de alteração salarial. */
+      ['rhAlteracao', 'Alteração de salário'],
     ] },
     /* Organograma (29/09/2026): hierarquia por função — js/organograma.js. */
     { id: 'organograma', nome: 'Organograma', telas: [
@@ -553,6 +556,9 @@ export function podeTela(tela) {
   if (SO_DP_INTEIRO.has(tela) && dpRestrito()) return false;
   const m = moduloDe(tela);
   if (!m || !pode(m)) return false;
+  /* Quem já tinha o Gerar proposta liberado ganha a Alteração de salário,
+     que nasceu de dentro dele (03/11/2026). */
+  if (tela === 'rhAlteracao' && acesso.telas.includes(m + ':rhProposta')) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
 

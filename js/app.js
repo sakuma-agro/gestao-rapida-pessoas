@@ -112,7 +112,7 @@ function limparPrevias() {
 /* Telas que só funcionam com internet (rodada C): sem cópia local nem fila.
    Offline, a pessoa vê um aviso honesto em vez de uma tela vazia sem explicação. */
 const SO_ONLINE = new Set(['disc', 'config', 'exFuncoes', 'trFuncoes', 'sstAtv',
-  'rhCargos', 'rhProposta', 'rhQuadro', 'rhOrganograma',
+  'rhCargos', 'rhProposta', 'rhAlteracao', 'rhQuadro', 'rhOrganograma',
   ...TELAS_ACIDENTES, ...TELAS_CAMPANHAS, ...TELAS_BRIGADA, ...TELAS_INDICADORES, ...TELAS_SALARIOS, ...TELAS_ENQUADRA, ...TELAS_SALARIO_DIGNO]);
 function avisarSoOnline(nome) {
   $('avisoSoOnline').hidden = !(SO_ONLINE.has(nome) && !navigator.onLine);
@@ -197,7 +197,8 @@ function abrirAba(nome) {
   if (nome === 'epiCrono') abrirEpiCrono();
   if (nome === 'modelo') preencherModelo();
   $('telaRhCargos').hidden   = nome !== 'rhCargos';
-  $('telaRhProposta').hidden = nome !== 'rhProposta';
+  /* Gerar proposta e Alteração de salário dividem a mesma tela (03/11/2026). */
+  $('telaRhProposta').hidden = !['rhProposta', 'rhAlteracao'].includes(nome);
   $('telaRhOrganograma').hidden = nome !== 'rhOrganograma';
   if (nome === 'rhOrganograma') abrirOrganograma();
   for (const t of TELAS_INDICADORES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
@@ -218,7 +219,7 @@ function abrirAba(nome) {
   $('telaEtqEnvelopes').hidden = nome !== 'etqEnvelopes';
   if (nome === 'etqEnvelopes') abrirEnvelopes();
   if (nome === 'disc') abrirDisc();
-  if (['rhCargos', 'rhProposta', 'rhQuadro'].includes(nome)) abrirRh(nome);
+  if (['rhCargos', 'rhProposta', 'rhAlteracao', 'rhQuadro'].includes(nome)) abrirRh(nome);
   if (nome === 'config') desenharConfig();
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();

@@ -69,7 +69,7 @@ export const ICONE_TELA = {
   brPainel: 'painel', brMembros: 'pessoas', brMinimos: 'ajuste', sstNrs: 'livro',
   bhRegistros: 'lista', bhFicha: 'ficha', clLista: 'check', anDigital: 'mapa', clRegistros: 'lista', clModelos: 'ajuste', feFolhas: 'documento', siPlacas: 'alerta', siPlacasEstoque: 'etiqueta', siEtiquetasL: 'documento', siAdesivos: 'etiqueta',
   camPainel: 'painel', camLista: 'megafone', camCal: 'calendario', camTemas: 'ajuste',
-  disc: 'disc', rhCargos: 'cargo', sdQuadro: 'balanca', sdPlanos: 'check', sdConfig: 'config', rhProposta: 'documento', rhOrganograma: 'organograma',
+  disc: 'disc', rhCargos: 'cargo', sdQuadro: 'balanca', sdPlanos: 'check', sdConfig: 'config', rhProposta: 'documento', rhAlteracao: 'dinheiro', rhOrganograma: 'organograma',
   jorPainel: 'painel', jorLancar: 'relogio', jorBoletins: 'lista', jorExtras: 'grafico', jorAbatimento: 'ajuste',
   jorFechamento: 'calendario', jorHistorico: 'historico',
   bdDia: 'boletim', bdMes: 'calendario', bdPend: 'alerta',

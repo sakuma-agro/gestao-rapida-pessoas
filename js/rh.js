@@ -264,7 +264,7 @@ function baixarCsv(nome, linhas) {
 
 /* =============== abrir uma tela =============== */
 export async function abrirRh(tela) {
-  if (!['rhCargos', 'rhProposta', 'rhQuadro'].includes(tela)) return;
+  if (!['rhCargos', 'rhProposta', 'rhAlteracao', 'rhQuadro'].includes(tela)) return;
   /* O Quadro de pessoal mora em Cadastros (29/09/2026) e só usa o cadastro de
      funcionários: quem não tem o RH abre do mesmo jeito. Do RH ele só pega a
      assinatura do modelo, quando dá para ler. */
@@ -275,14 +275,14 @@ export async function abrirRh(tela) {
   }
   if (!R.carregado) {
     try { await carregarRh(); } catch (e) {
-      const alvo = tela === 'rhCargos' ? 'rhTabelaCargos' : (tela === 'rhProposta' ? 'rhUltimas' : 'rhQuadroResumo');
+      const alvo = tela === 'rhCargos' ? 'rhTabelaCargos' : (['rhProposta', 'rhAlteracao'].includes(tela) ? 'rhUltimas' : 'rhQuadroResumo');
       if ($(alvo)) $(alvo).innerHTML = `<div class="vazio">Não deu para abrir o RH: ${esc(e.message || e)}</div>`;
       return;
     }
   }
   /* Sair da tela fecha o olho: quem voltar ao plano de cargos digita de novo. */
   if (tela === 'rhCargos') { salarioVisivel = false; desenharCargos(); }
-  if (tela === 'rhProposta') abrirProposta();
+  if (tela === 'rhProposta' || tela === 'rhAlteracao') abrirProposta(tela === 'rhAlteracao' ? 'alteracao' : 'proposta');
   if (tela === 'rhQuadro') desenharQuadro();
 }
 
@@ -389,7 +389,46 @@ function documentoCargos() {
 /* ==================================================================
    2 · PROPOSTA
    ================================================================== */
-function abrirProposta() {
+/* Submódulos (03/11/2026): "Gerar proposta" (contratação e promoção) e
+   "Alteração de salário" usam a mesma tela. O modo prende o tipo, troca os
+   títulos e filtra a lista de emitidos. Trocar de submódulo com o formulário
+   no tipo do outro limpa o formulário — senão uma proposta viraria comunicado. */
+let modoTela = 'proposta';
+const naAlteracao = () => modoTela === 'alteracao';
+
+function aplicarModo() {
+  const alt = naAlteracao();
+  const opAlt = $('ppTipo').querySelector('option[value="alteracao"]');
+  if (opAlt) opAlt.hidden = !alt;
+  $('ppTipo').querySelectorAll('option:not([value="alteracao"])').forEach(o => { o.hidden = alt; });
+  if ($('campoTipo')) $('campoTipo').hidden = alt;
+  const txt = (id, t) => { if ($(id)) $(id).textContent = t; };
+  txt('ppTituloTela', alt ? 'Alteração de salário' : 'Gerar proposta');
+  txt('ppDicaTela', alt
+    ? 'Escolha o funcionário: o salário, o cargo e a faixa de hoje vêm de RH › Salários. Sai o Comunicado de alteração salarial.'
+    : 'Escolha o cargo e a faixa; o salário vem da tabela e pode ser mudado.');
+  txt('bNovaProposta', alt ? 'Nova alteração' : 'Nova proposta');
+  txt('bSalvarProposta', editandoProposta ? 'Salvar alterações' : (alt ? 'Salvar alteração' : 'Salvar proposta'));
+  txt('ppTituloLista', alt ? 'Alterações já emitidas' : 'Propostas já emitidas');
+}
+
+function abrirProposta(modo = 'proposta') {
+  const trocou = modo !== modoTela;
+  modoTela = modo;
+  const tipoCerto = naAlteracao() ? $('ppTipo').value === 'alteracao' : $('ppTipo').value !== 'alteracao';
+  if (trocou || !tipoCerto) {
+    if (editandoProposta) sairDaEdicao();
+    $('ppTipo').value = naAlteracao() ? 'alteracao' : 'contratacao';
+    if (!tipoCerto) {
+      $('ppPessoa').value = ''; $('ppNome').value = ''; $('ppCargo').value = '';
+      $('ppSalario').value = ''; $('ppCargoAtual').value = ''; $('ppSalarioAtual').value = '';
+      if ($('ppFaixaAtual')) $('ppFaixaAtual').value = '';
+      if ($('ppDicaAtual')) $('ppDicaAtual').textContent = '';
+      documentoAtual = '';
+      if ($('jorImpressao')) { $('jorImpressao').innerHTML = ''; $('jorImpressao').hidden = true; }
+    }
+  }
+  aplicarModo();
   const m = R.modelo || {};
   const sel = $('ppCargo');
   if (!sel.dataset.pronto) {
@@ -795,7 +834,8 @@ export function documentoProposta(p) {
 function desenharUltimas() {
   const alvo = $('rhUltimas');
   if (!alvo) return;
-  alvo.innerHTML = R.propostas.length ? R.propostas.map(p => `
+  const daqui = R.propostas.filter(p => naAlteracao() ? p.tipo === 'alteracao' : p.tipo !== 'alteracao');
+  alvo.innerHTML = daqui.length ? daqui.map(p => `
     <div class="item" style="grid-template-columns:1fr auto">
       <span>
         <span class="nome">${esc(p.nome)}</span>
@@ -808,7 +848,7 @@ function desenharUltimas() {
         <button class="btn mini" data-prop-del="${p.id}">Excluir</button>
       </span>
     </div>`).join('')
-    : '<div class="vazio">Nenhuma proposta emitida ainda.</div>';
+    : `<div class="vazio">${naAlteracao() ? 'Nenhuma alteração de salário emitida ainda.' : 'Nenhuma proposta emitida ainda.'}</div>`;
 
   alvo.querySelectorAll('[data-prop]').forEach(b => b.addEventListener('click', () => {
     const p = R.propostas.find(x => x.id === b.dataset.prop);
@@ -868,7 +908,7 @@ function carregarNaProposta(p) {
 
 function modoEdicao() {
   const editando = !!editandoProposta;
-  $('bSalvarProposta').textContent = editando ? 'Salvar alterações' : 'Salvar proposta';
+  $('bSalvarProposta').textContent = editando ? 'Salvar alterações' : (naAlteracao() ? 'Salvar alteração' : 'Salvar proposta');
   $('bCancelarEdProposta').hidden = !editando;
   /* A faixa de aviso é a correção do acidente de 17/09/2026: ele abriu uma
      proposta no Editar, digitou os dados de outra pessoa e o Salvar gravou por
@@ -907,7 +947,7 @@ function virarNovaProposta(avisar = () => {}) {
 function limparProposta(avisar = () => {}) {
   sairDaEdicao();
   const m = R.modelo || {};
-  $('ppTipo').value = 'contratacao';
+  $('ppTipo').value = naAlteracao() ? 'alteracao' : 'contratacao';
   trocarTipo();
   $('ppPessoa').value = '';
   $('ppNome').value = '';
@@ -942,8 +982,8 @@ function limparProposta(avisar = () => {}) {
      formulário vazio, é convite para imprimir a folha errada. */
   documentoAtual = '';
   if ($('jorImpressao')) { $('jorImpressao').innerHTML = ''; $('jorImpressao').hidden = true; }
-  avisar('Formulário limpo — esta será uma proposta nova.');
-  $('ppNome').focus();
+  avisar(naAlteracao() ? 'Formulário limpo — esta será uma alteração nova.' : 'Formulário limpo — esta será uma proposta nova.');
+  (naAlteracao() ? $('ppPessoa') : $('ppNome')).focus();
   $('ppTipo').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
