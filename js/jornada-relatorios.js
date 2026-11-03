@@ -24,7 +24,7 @@
 
 import { estado } from './store.js';
 import * as jd from './jornada-dados.js';
-import { consolidar, formatarHoras, mesCurto, obsAnterior } from './jornada-fechamento.js';
+import { consolidar, formatarHoras, mesCurto } from './jornada-fechamento.js';
 import { minParaHHMM } from './jornada-motor.js';
 import { valorParaFolha, secaoRelatorioDP } from './jornada-emprestimos.js';
 
@@ -190,8 +190,8 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
           const parcela = antes ? 0 : valorParaFolha(l.vinculo.funcionario_id, competencia);
           const per = periodo(l);
           return `<tr>
-          <td>${esc(l.nome)}${per ? `<br><span class="rel-mini rel-obs">${esc(per)}</span>` : ''}${l.atrasados.length ? `<br><span class="rel-mini rel-obs">${esc(obsAnterior(l, fmt))}</span>` : ''}</td>
-          ${antes ? `<td class="rel-c"><b>${l.diarias || ''}</b></td>` : ''}<td class="rel-c"><b>${h(l.minExtraPagar)}</b>${l.atrasados.some(x => x.extra) ? '<sup>*</sup>' : ''}</td>
+          <td>${esc(l.nome)}${per ? `<br><span class="rel-mini rel-obs">${esc(per)}</span>` : ''}</td>
+          ${antes ? `<td class="rel-c"><b>${l.diarias || ''}</b></td>` : ''}<td class="rel-c"><b>${h(l.minExtraPagar)}</b></td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
@@ -200,18 +200,10 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
         </tr>`; }).join('')}</tbody>
       </table>`;
 
-  // Notas da folha: só das pessoas daquela folha.
-  const nota = linhas => {
-    const atrasadas = linhas.flatMap(l => l.atrasados.filter(x => x.extra).map(x => ({ l, x })))
-      .sort((a, b) => a.l.nome.localeCompare(b.l.nome, 'pt-BR') || a.x.data.localeCompare(b.x.data));
-    /* "não acumula" e a nota † retirados a pedido dele (27/10/2026): quem
-       recebe periculosidade fica com a insalubridade em branco, sem aviso. */
-    return `${atrasadas.length ? `<div class="rel-resumo"><b>* Inclui horas do mês anterior</b>, lançadas depois do fechamento
-      daquele mês: ${atrasadas.map(({ l, x }) => `${esc(l.nome)} — ${dataBR(x.data)}, ${h(x.extra)}`).join(' · ')}.
-      Abertura por mês no Relatório Horas Extras por Mês.</div>` : ''}
-    ${''/* nota do intervalo não feito retirada a pedido dele (14/10/2026) — segue no Relatório detalhado */}
-`;   // a frase de explicação das colunas saiu a pedido dele (28/09/2026)
-  };
+  /* 03/11/2026: a nota "* Inclui horas do mês anterior" (e o * e a obs. na
+     linha) saiu deste relatório a pedido dele. As horas continuam somadas no
+     total; a abertura fica no relatório próprio relatorioMesAnterior. */
+  const nota = () => '';
 
   const notaAntes = antes ? `<p class="rel-nota">Só os dias trabalhados antes da data do registro (admissão). A partir do registro, as horas estão no Relatório Horas Extras. Diárias: dias com lançamento de segunda a sábado — domingo e feriado entram inteiros nas horas extras; falta e atestado não contam.</p>` : '';
 
@@ -229,6 +221,55 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
     corpo: p.grupos.map(tabela).join('') + nota(p.grupos.flatMap(g => g.linhas)) + notaAntes,
     assinaturas: assinaturasDP,
   })).join('');
+}
+
+/* ------------------------------------------------------------------
+   REL-ANT — Horas do mês anterior (03/11/2026). Só os boletins de
+   competência anterior lançados depois do fechamento daquele mês e pagos
+   nesta competência. Antes era a nota "* Inclui horas do mês anterior" no
+   Relatório Horas Extras; agora é um relatório à parte.
+   ------------------------------------------------------------------ */
+
+export function relatorioMesAnterior(competencia, destinoId) {
+  const c = consolidar(competencia, destinoId);
+  const fmt = c.destino?.formato_horas || 'decimal';
+  const comp = jd.competenciaDoDestino(competencia, destinoId);
+  const h = m => m ? formatarHoras(m, fmt) : '—';
+  const temHoras = l => l.atrasados.some(x => x.extra);
+  const grupos = porEmpregador(c, temHoras);
+  let total = 0;
+
+  const corpo = grupos.map(g => {
+    const linhas = g.linhas.flatMap(l => l.atrasados.filter(x => x.extra)
+      .sort((a, b) => a.data.localeCompare(b.data)).map((x, i, arr) => ({ l, x, primeira: i === 0, n: arr.length })));
+    const soma = linhas.reduce((s, r) => s + r.x.extra, 0);
+    total += soma;
+    return `
+      ${blocoEmp(g.rotulo)}
+      <table class="rel-tabela rel-tabela-dp">
+        <thead><tr>
+          <th>Funcionário</th><th class="rel-c">Data do boletim</th><th class="rel-c">Mês do fato</th>
+          <th class="rel-num">Horas extras</th><th class="rel-num">Total do funcionário</th>
+        </tr></thead>
+        <tbody>${linhas.map(({ l, x, primeira, n }) => `<tr>
+          ${primeira ? `<td rowspan="${n}">${esc(l.nome)}</td>` : ''}
+          <td class="rel-c">${dataBR(x.data)}</td>
+          <td class="rel-c">${esc(compCurta(x.origem))}</td>
+          <td class="rel-num">${h(x.extra)}</td>
+          ${primeira ? `<td class="rel-num" rowspan="${n}"><b>${h(l.atrasados.reduce((s, y) => s + y.extra, 0))}</b></td>` : ''}
+        </tr>`).join('')}</tbody>
+        <tfoot><tr><td colspan="4">Total</td><td class="rel-num">${h(soma)}</td></tr></tfoot>
+      </table>`;
+  }).join('');
+
+  return documentoDP({
+    titulo: 'RELATÓRIO HORAS DO MÊS ANTERIOR', competencia, destino: c.destino,
+    versao: comp?.versao || 1,
+    corpo: corpo
+      ? corpo + `<p class="rel-nota">Boletins de mês anterior lançados depois do fechamento daquele mês e pagos em ${esc(compCurta(competencia))}. Essas horas já estão somadas no Relatório Horas Extras${grupos.length > 1 ? ` — total geral: ${h(total)}` : ''}.</p>`
+      : `<p class="rel-vazio">Nenhuma hora de mês anterior paga nesta competência.</p>`,
+    assinaturas: null,
+  });
 }
 
 /* ------------------------------------------------------------------
@@ -777,6 +818,7 @@ export function baixar({ nome, conteudo }) {
 export const RELATORIOS_ARQUIVADOS = [
   ['dp',        'Relatório Horas Extras',          (c, d) => relatorioDP(c, d)],
   ['antesReg',  'Horas extras antes do registro (uso interno)', (c, d) => relatorioAntesRegistro(c, d)],
+  ['mesAnt',    'Horas do mês anterior',           (c, d) => relatorioMesAnterior(c, d)],
   ['porMes',    'Horas extras por mês',            (c, d) => relatorioPorMes(c, d)],
   ['faltas',    'Relatório de Faltas',             (c, d) => relatorioFaltas(c, d)],
   ['faltasTot', 'Faltas Totais (uso interno)',     (c, d) => relatorioFaltas(c, d, { totais: true })],
