@@ -180,28 +180,37 @@ async function gravar(chave: string, tipo: string, dono: string, nome: string, m
 }
 
 /** Data da evidência pelo nome do arquivo (03/11/2026, pedido do Guilherme: as declarações de setembro e
- *  outubro do AN 82 entraram como 03/11, o dia em que foram para a pasta). Nome com data (21.08.2026) → ela;
- *  nome com mês (setembro, outubro…) → último dia do mês, com o ano do nome, da pasta de ano ou da data do
- *  arquivo. Nunca depois da data do arquivo. Sem nada disso, fica a data do arquivo. */
+ *  outubro do AN 82 entraram como 03/11, o dia em que foram para a pasta). Na ordem: data completa no nome
+ *  (2026-08-10, 21.08.2026, 21-08-2026) → ela; dia-mês sem ano (31-03) → com o ano da pasta (2026) ou do
+ *  arquivo; nome do mês (setembro, outubro…) → último dia do mês. Nunca depois da data do arquivo. Sem nada
+ *  disso, fica a data do arquivo. */
 const MESES_NOME = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 function dataPeloNome(caminho: string, padrao: string) {
   const partes = caminho.split(/[\\/]/);
   const nome = semAcento(partes[partes.length - 1] || "").toLowerCase().replace(/\.[a-z0-9]+$/, "");
   const dois = (n: number) => String(n).padStart(2, "0");
+  const valida = (aa: number, mm: number, dd: number) => mm >= 1 && mm <= 12 && new Date(Date.UTC(aa, mm - 1, dd)).getUTCDate() === dd;
+  const limite = (d: string) => d > padrao ? padrao : d;
+  const anoPasta = partes.slice(0, -1).map(p => p.trim()).filter(p => /^(19|20)\d\d$/.test(p)).pop();
+  const anoNome = nome.match(/(?:^|\D)(20\d\d)(?:\D|$)/)?.[1];
+  const iso = nome.match(/(?:^|\D)(20\d\d)[.\-_](\d{2})[.\-_](\d{2})(?:\D|$)/);
+  if (iso && valida(+iso[1], +iso[2], +iso[3])) return limite(`${iso[1]}-${iso[2]}-${iso[3]}`);
   const dt = nome.match(/(?:^|\D)(\d{1,2})[.\/_-](\d{1,2})[.\/_-](20\d\d)(?:\D|$)/);
-  if (dt) {
-    const [dd, mm, aa] = [Number(dt[1]), Number(dt[2]), Number(dt[3])];
-    const t = new Date(Date.UTC(aa, mm - 1, dd));
-    if (mm >= 1 && mm <= 12 && t.getUTCDate() === dd) { const d = `${aa}-${dois(mm)}-${dois(dd)}`; return d > padrao ? padrao : d; }
+  if (dt && valida(+dt[3], +dt[2], +dt[1])) return limite(`${dt[3]}-${dois(+dt[2])}-${dois(+dt[1])}`);
+  const dm = nome.match(/(?:^|[^\d])(\d{1,2})[.\-_](\d{1,2})(?![.\-_]?\d)/);
+  if (dm) {
+    const aa = Number(anoNome || anoPasta || padrao.slice(0, 4));
+    if (valida(aa, +dm[2], +dm[1])) {
+      let d = `${aa}-${dois(+dm[2])}-${dois(+dm[1])}`;
+      if (!anoNome && !anoPasta && d > padrao) d = `${aa - 1}-${dois(+dm[2])}-${dois(+dm[1])}`;
+      return limite(d);
+    }
   }
   const i = MESES_NOME.findIndex(m => new RegExp(`(^|[^a-z])${m}([^a-z]|$)`).test(nome));
   if (i < 0) return padrao;
-  const anoNome = nome.match(/(?:^|\D)(20\d\d)(?:\D|$)/)?.[1];
-  const anoPasta = partes.slice(0, -1).map(p => p.trim()).filter(p => /^(19|20)\d\d$/.test(p)).pop();
   let ano = Number(anoNome || anoPasta || padrao.slice(0, 4));
   if (!anoNome && !anoPasta && i + 1 > Number(padrao.slice(5, 7))) ano--;
-  const d = `${ano}-${dois(i + 1)}-${dois(new Date(Date.UTC(ano, i + 1, 0)).getUTCDate())}`;
-  return d > padrao ? padrao : d;
+  return limite(`${ano}-${dois(i + 1)}-${dois(new Date(Date.UTC(ano, i + 1, 0)).getUTCDate())}`);
 }
 
 /* ─────────── ações ─────────── */
