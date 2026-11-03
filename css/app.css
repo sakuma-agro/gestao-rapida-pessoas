@@ -2537,3 +2537,4 @@ body.crq-aberto{overflow:hidden}
 .ce-ent-venc.ok{background:var(--verde-fundo);border-color:rgba(132,189,0,.45)}
 .ce-ent-venc.ok svg{color:var(--verde-esc)}
 .ce-ent-venc{margin-bottom:10px}
+.ce-vn-bloco.por-faz label:not(:first-child),.ce-vn-bloco.por-faz #cedVencTxt{display:none}

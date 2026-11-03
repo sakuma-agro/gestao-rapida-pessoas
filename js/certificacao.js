@@ -52,6 +52,19 @@ function somaMeses(s, m) {
   d.setUTCDate(Math.min(dia, ult));
   return isoD(d);
 }
+/** Dia fixo do vencimento (03/11/2026, pedido do Guilherme: "mensal, vence todo dia 01"): a primeira data
+ *  com aquele dia, a partir de `s` (dia 31 em mês curto = último dia do mês). */
+function comDia(s, dia) {
+  if (!s || !dia) return s;
+  const d = utc(s);
+  for (let i = 0; i < 2; i++) {
+    const ult = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    const alvo = isoD(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), Math.min(dia, ult))));
+    if (alvo >= s) return alvo;
+    d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + 1);
+  }
+  return s;
+}
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const MES3 = MESES.map(m => m.slice(0, 3));
 const SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -1304,7 +1317,7 @@ const PRAZO_NOTAS = 7;
 function vencItem(i, d) {
   if (i.validade) return i.validade;
   const m = MESES_PERIODO[i.periodicidade || d.periodicidade];
-  return m && i.ultima_data ? somaMeses(i.ultima_data, m) : null;
+  return m && i.ultima_data ? comDia(somaMeses(i.ultima_data, m), d.dia_vencimento) : null;
 }
 function estadoItem(i, d) {
   if (rotDatas(d).entrega) return estadoEntrega(i);
@@ -1725,16 +1738,17 @@ function formDocumento(id, preset = {}) {
       <label class="campo">Responsável ${selectResp('cedResp', v.responsavel)}</label>
       <label class="campo">Periodicidade <select id="cedPer">${opcoes(PERIODOS, v.periodicidade, '—')}</select></label>
     </div>
-    <div class="ce-vn-bloco" id="cedVenc"${d?.por_fazenda ? ' hidden' : ''}>
+    <div class="ce-vn-bloco${d?.por_fazenda ? ' por-faz' : ''}" id="cedVenc">
       <b>Vencimento</b>
       <div class="grade">
+        <label class="campo">Vence todo dia <small>(opcional, mensal em diante)</small> <input type="number" id="cedDia" min="1" max="31" value="${v.dia_vencimento ?? ''}" placeholder="ex.: 1"></label>
         <label class="campo">Última vez feito <input type="date" id="cedUlt" value="${esc(ult0 || '')}" max="${hoje()}"></label>
         <label class="campo">Próximo vencimento <input type="date" id="cedVence" value="${esc(venc0 || '')}"></label>
         <label class="campo">Avisar quantos dias antes <input type="number" id="cedAviso" min="0" max="365" value="${v.aviso_dias ?? ''}" placeholder=""></label>
       </div>
       <p class="dica" id="cedVencTxt" style="margin:0"></p>
     </div>
-    ${d?.por_fazenda ? '<p class="dica">Este AN vence por fazenda — as datas ficam em cada fazenda, na ficha do documento.</p>' : ''}
+    ${d?.por_fazenda ? '<p class="dica">Este AN vence por fazenda — a última evidência de cada fazenda conta; aqui fica só o dia fixo.</p>' : ''}
     <label class="campo">Link no OneDrive
       <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://onedrive.live.com/… ou https://1drv.ms/…">
       <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" hidden>Abrir ↗</a></span></label>
@@ -1778,7 +1792,9 @@ function formDocumento(id, preset = {}) {
         : !temPeriodo(per) ? 'Escolha a periodicidade para o documento ter vencimento.'
         : ve ? `Aparece em Vencimentos a partir de ${br(somaDias(ve, -av))} (${av} dia(s) antes).` : 'Informe a última vez feito ou o próximo vencimento.';
     };
-    const recalc = () => { const u = $('cedUlt').value, per = $('cedPer').value; if (u && temPeriodo(per)) $('cedVence').value = avancar(u, per); textoVenc(); };
+    const diaF = () => { const n = Number($('cedDia').value); return n >= 1 && n <= 31 ? Math.round(n) : null; };
+    const recalc = () => { const u = $('cedUlt').value, per = $('cedPer').value; if (u && temPeriodo(per)) $('cedVence').value = comDia(avancar(u, per), MESES_PERIODO[per] ? diaF() : null); textoVenc(); };
+    $('cedDia').addEventListener('input', recalc);
     $('cedUlt').addEventListener('change', recalc);
     $('cedPer').addEventListener('change', () => { prox(); recalc(); });
     $('cedVence').addEventListener('change', textoVenc);
@@ -1811,6 +1827,7 @@ async function gravarDocumento(d) {
     responsavel: g('cedResp'), situacao: $('cedSit').value, revisao: g('cedRev'), data_revisao: g('cedData'),
     certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), atualizado_em: new Date().toISOString(),
     vence_em: comVenc ? g('cedVence') : null,
+    dia_vencimento: (n => n >= 1 && n <= 31 ? Math.round(n) : null)(Number($('cedDia').value)),
     aviso_dias: $('cedAviso').value !== '' ? Math.max(0, Math.round(Number($('cedAviso').value))) : null,
   };
   if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https:// — copie pelo botão Compartilhar › Copiar link do OneDrive.');
@@ -2358,12 +2375,12 @@ function vencDoc(d) {
   if (d.por_fazenda && itensDe(d).length) return itensDe(d).map(i => vencItem(i, d)).filter(Boolean).sort()[0] || null;
   if (d.vence_em) return d.vence_em;
   const u = ultimoFeito(d);
-  return u && temPeriodo(d.periodicidade) ? avancar(u, d.periodicidade) : null;
+  return u && temPeriodo(d.periodicidade) ? comDia(avancar(u, d.periodicidade), MESES_PERIODO[d.periodicidade] ? d.dia_vencimento : null) : null;
 }
 /** Depois de "Feito" em `data`: feito antes do vencimento conta para ele; feito atrasado pula para o próximo dia certo. */
 function proximoDepoisDe(d, data, per = d.periodicidade, base = d.vence_em) {
   if (!temPeriodo(per)) return null;
-  if (!base) return avancar(data, per);
+  if (!base) return comDia(avancar(data, per), MESES_PERIODO[per] ? d.dia_vencimento : null);
   if (base > data) return avancar(base, per);
   let v = base, n = 0;
   while (v <= data && n++ < 4000) v = avancar(v, per);

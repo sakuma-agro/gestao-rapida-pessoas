@@ -23,3 +23,7 @@ drop policy if exists cct_leem on public.cert_contatos;
 drop policy if exists cct_escrevem on public.cert_contatos;
 create policy cct_leem on public.cert_contatos for select to authenticated using (public.app_pode('cert'));
 create policy cct_escrevem on public.cert_contatos for all to authenticated using (public.app_pode('cert')) with check (public.app_pode('cert'));
+
+-- Dia fixo do vencimento (03/11/2026, pedido do Guilherme: AN 82 "mensal, vence todo dia 01").
+-- Vale para o próximo vencimento calculado (inclusive nos AN por fazenda): a primeira data com esse dia.
+alter table public.cert_documentos add column if not exists dia_vencimento integer check (dia_vencimento between 1 and 31);

@@ -179,6 +179,31 @@ async function gravar(chave: string, tipo: string, dono: string, nome: string, m
   });
 }
 
+/** Data da evidência pelo nome do arquivo (03/11/2026, pedido do Guilherme: as declarações de setembro e
+ *  outubro do AN 82 entraram como 03/11, o dia em que foram para a pasta). Nome com data (21.08.2026) → ela;
+ *  nome com mês (setembro, outubro…) → último dia do mês, com o ano do nome, da pasta de ano ou da data do
+ *  arquivo. Nunca depois da data do arquivo. Sem nada disso, fica a data do arquivo. */
+const MESES_NOME = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+function dataPeloNome(caminho: string, padrao: string) {
+  const partes = caminho.split(/[\\/]/);
+  const nome = semAcento(partes[partes.length - 1] || "").toLowerCase().replace(/\.[a-z0-9]+$/, "");
+  const dois = (n: number) => String(n).padStart(2, "0");
+  const dt = nome.match(/(?:^|\D)(\d{1,2})[.\/_-](\d{1,2})[.\/_-](20\d\d)(?:\D|$)/);
+  if (dt) {
+    const [dd, mm, aa] = [Number(dt[1]), Number(dt[2]), Number(dt[3])];
+    const t = new Date(Date.UTC(aa, mm - 1, dd));
+    if (mm >= 1 && mm <= 12 && t.getUTCDate() === dd) { const d = `${aa}-${dois(mm)}-${dois(dd)}`; return d > padrao ? padrao : d; }
+  }
+  const i = MESES_NOME.findIndex(m => new RegExp(`(^|[^a-z])${m}([^a-z]|$)`).test(nome));
+  if (i < 0) return padrao;
+  const anoNome = nome.match(/(?:^|\D)(20\d\d)(?:\D|$)/)?.[1];
+  const anoPasta = partes.slice(0, -1).map(p => p.trim()).filter(p => /^(19|20)\d\d$/.test(p)).pop();
+  let ano = Number(anoNome || anoPasta || padrao.slice(0, 4));
+  if (!anoNome && !anoPasta && i + 1 > Number(padrao.slice(5, 7))) ano--;
+  const d = `${ano}-${dois(i + 1)}-${dois(new Date(Date.UTC(ano, i + 1, 0)).getUTCDate())}`;
+  return d > padrao ? padrao : d;
+}
+
 /* ─────────── ações ─────────── */
 async function mapa() {
   const docs = await db("cert_documentos?select=id,codigo,categoria,por_fazenda&order=codigo");
@@ -223,20 +248,21 @@ async function enviar(req: Request, u: URL) {
     return json({ ok: true, chave });
   }
 
+  const dataEv = dataPeloNome(caminho, data);   // 03/11/2026: evidência com o mês/data do nome do arquivo
   if (destino === "item") {
     const it = await db(`cert_doc_itens?select=id,documento_id,ultima_data&id=eq.${encodeURIComponent(id)}`);
     if (!it?.length) return json({ erro: "item-nao-encontrado" }, 404);
     const item = it[0];
     const ev = await db("cert_evidencias?on_conflict=origem", {
       method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify({ documento_id: item.documento_id, item_id: item.id, data, descricao: caminho.split(/[\\/]/).slice(1).join(" / ").slice(0, 300) || nome, origem, criado_por: "onedrive@sakumasrv" }),
+      body: JSON.stringify({ documento_id: item.documento_id, item_id: item.id, data: dataEv, descricao: caminho.split(/[\\/]/).slice(1).join(" / ").slice(0, 300) || nome, origem, criado_por: "onedrive@sakumasrv" }),
     });
     const evId = ev?.[0]?.id;
     if (!evId) throw new Error("evidência não gravada");
     const chave = `certificacao/evidencia/${evId}/od-${sufixo}-${slug(nome)}.${ext}`;
     await gravar(chave, "evidencia", String(evId), nome, mime, corpo, origem);
-    if (!item.ultima_data || data > item.ultima_data)
-      await db(`cert_doc_itens?id=eq.${item.id}`, { method: "PATCH", body: JSON.stringify({ ultima_data: data, atualizado_em: new Date().toISOString() }) });
+    if (!item.ultima_data || dataEv > item.ultima_data)
+      await db(`cert_doc_itens?id=eq.${item.id}`, { method: "PATCH", body: JSON.stringify({ ultima_data: dataEv, atualizado_em: new Date().toISOString() }) });
     return json({ ok: true, chave, evidencia: evId });
   }
   // arquivo na subpasta EVIDÊNCIAS de um documento (FORM, AN…) → evidência do documento (sem fazenda)
@@ -248,7 +274,7 @@ async function enviar(req: Request, u: URL) {
     const descricao = (i >= 0 ? partes.slice(i + 1) : partes.slice(1)).join(" / ").slice(0, 300) || nome;
     const ev = await db("cert_evidencias?on_conflict=origem", {
       method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify({ documento_id: Number(id), item_id: null, data, descricao, origem, criado_por: "onedrive@sakumasrv" }),
+      body: JSON.stringify({ documento_id: Number(id), item_id: null, data: dataEv, descricao, origem, criado_por: "onedrive@sakumasrv" }),
     });
     const evId = ev?.[0]?.id;
     if (!evId) throw new Error("evidência não gravada");
