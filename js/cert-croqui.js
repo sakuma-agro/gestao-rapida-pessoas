@@ -53,10 +53,12 @@ let S = { lista: [], atual: null, mapa: null, camadas: {}, rotulos: true, oculto
 const TIPO_MARCO = {
   Sede: { ico: '🏠', cls: 'sede', tam: 30 },
   'Galpão': { ico: '🏚', cls: 'galpao', tam: 26 },
+  'Combustível': { ico: '⛽', cls: 'galpao', tam: 26 },
+  'Refeitório': { ico: '🍽', cls: 'galpao', tam: 26 },
   Bebedouro: { ico: '💧', cls: 'beb', tam: 16 },
   Ponto: { ico: '📍', cls: 'ponto', tam: 24 },
 };
-const tipoDoNome = n => { const u = semAcento(n); return /^SEDE/.test(u) ? 'Sede' : /GALPAO|BARRACAO|ARMAZEM/.test(u) ? 'Galpão' : /BEBEDOURO/.test(u) ? 'Bebedouro' : 'Ponto'; };
+const tipoDoNome = n => { const u = semAcento(n); return /^SEDE/.test(u) ? 'Sede' : /DIESEL|COMBUST|LUBRIF|TANQUE/.test(u) ? 'Combustível' : /REFEITORIO|COZINHA/.test(u) ? 'Refeitório' : /GALPAO|BARRACAO|ARMAZEM/.test(u) ? 'Galpão' : /BEBEDOURO/.test(u) ? 'Bebedouro' : 'Ponto'; };
 
 /* ---------- Leaflet sob demanda ---------- */
 let leafletPronto = null;
