@@ -1240,10 +1240,10 @@ function ligarCadeia(d) {
 }
 function refazCadeia(d) { const el = $('ceDvCadeia'); if (!el) return; el.innerHTML = htmlCadeia(d); ligarCadeia(d); }
 
-function formEvidencia(d, e, itemId = null) {
+function formEvidencia(d, e, itemId = null, dataSug = null) {
   const rd = rotDatas(d);
   const itAtual = S.itens.find(i => i.id === (e?.item_id ?? itemId));
-  const v = e || { data: (rd.entrega && itAtual?.aguardando_data) || hoje(), descricao: '', link: '', item_id: itemId };
+  const v = e || { data: dataSug || (rd.entrega && itAtual?.aguardando_data) || hoje(), descricao: '', link: '', item_id: itemId };
   const itensDoc = itensDe(d);
   let anx = null;
   dialogo(`<h3>${rd.entrega ? (e ? 'Documentos' : 'Chegaram os documentos') : e ? 'Evidência' : 'Nova evidência'} — ${esc(d.codigo)}${rd.entrega && itAtual ? ' · ' + esc(rotItem(itAtual)) : ''}</h3>
@@ -2587,11 +2587,159 @@ function formContatos() {
 }
 
 /* ===================================================================
+   TELA · EVIDÊNCIAS (03/11/2026, pedido do Guilherme: "um painel lean e fácil para evidências" —
+   desenho aprovado no canvas "Painel de Vencimentos"). Uma linha por documento (AN por fazenda: uma
+   por fazenda) e um quadrinho por período do ano: verde tem evidência, vermelho faltou, tracejado em
+   aberto. Sem "atraso": evidência que entra depois deixa o período verde como qualquer outra.
+   Clicar na linha mostra as evidências ao lado; clicar num período vazio inclui a evidência dele.
+   =================================================================== */
+const MES_CURTO = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const fimMes = (a, m) => `${a}-${doisD(m)}-${doisD(new Date(Date.UTC(a, m, 0)).getUTCDate())}`;
+/** Períodos do ano conforme a periodicidade: 12 meses, 4 trimestres, 2 semestres ou o ano (ou o bloco de 2/3 anos). */
+function periodosDoAno(per, ano) {
+  if (!per || per === 'Por evento') return null;
+  const meses = ['Diário', 'Semanal', 'Mensal'].includes(per) ? 1 : per === 'Trimestral' ? 3 : per === 'Semestral' ? 6 : 12;
+  if (meses === 12) {
+    const passo = per === 'A cada 3 anos' ? 3 : per === 'A cada 2 anos' ? 2 : 1;
+    const a1 = passo === 1 ? ano : ano - ((ano - 2024) % passo + passo) % passo;
+    return [{ rot: passo === 1 ? String(ano) : `${a1}–${String(a1 + passo - 1).slice(2)}`, de: `${a1}-01-01`, ate: `${a1 + passo - 1}-12-31`, span: 12 }];
+  }
+  const out = [];
+  for (let m = 1; m <= 12; m += meses) out.push({ rot: meses === 1 ? MES_CURTO[m - 1] : meses === 3 ? `${(m + 2) / 3}º tri` : `${(m + 5) / 6}º sem`,
+    de: `${ano}-${doisD(m)}-01`, ate: fimMes(ano, m + meses - 1), span: meses });
+  return out;
+}
+function linhasEvid(ano) {
+  const hj = hoje(), out = [];
+  const montar = (d, item, per, evs, viva) => {
+    const ps = periodosDoAno(per, ano); if (!ps) return;
+    const cel = ps.map(p => {
+      const n = evs.filter(e => e.data >= p.de && e.data <= p.ate).length
+        + (viva ? Object.entries(viva.meses).filter(([k]) => `${k}-01` >= p.de && `${k}-01` <= p.ate).reduce((s, [, q]) => s + q, 0) : 0);
+      const est = n ? 'ok' : p.de > hj ? 'futuro' : p.ate >= hj ? 'aberto' : 'falta';
+      return { ...p, n, est };
+    });
+    const fech = cel.filter(c => c.est === 'ok' || c.est === 'falta');
+    const pct = fech.length ? Math.round(100 * fech.filter(c => c.est === 'ok').length / fech.length) : null;
+    out.push({ chave: d.id + (item ? ':' + item.id : ''), d, item, per, cel, pct, evs, tipo: prefixoDoc(d) });
+  };
+  S.docs.filter(d => !foraDeUso(d) && TIPOS_VENC.includes(prefixoDoc(d))).sort(porCodigo).forEach(d => {
+    const its = d.por_fazenda ? itensDe(d) : [];
+    if (its.length) its.forEach(i => montar(d, i, i.periodicidade || d.periodicidade, evidDe(d).filter(e => e.item_id === i.id), null));
+    else montar(d, null, d.periodicidade, evidDe(d), vivaDe(d));
+  });
+  return out;
+}
+function desenharEvidencias() {
+  const tela = $('telaCeEvidencias');
+  const f = (S.fe ||= { tipo: '', falta: false, faz: '', q: '', ano: Number(hoje().slice(0, 4)), sel: '' });
+  const todas = linhasEvid(f.ano);
+  const q = so(f.q).toLowerCase();
+  const lista = todas.filter(l => (!f.tipo || l.tipo === f.tipo)
+    && (!f.faz || (l.item && l.item.fazenda_id === f.faz))
+    && (!f.falta || l.cel.some(c => c.est === 'falta'))
+    && (!q || [l.d.codigo, l.d.nome, l.item ? rotItem(l.item) : ''].some(x => so(x).toLowerCase().includes(q))));
+  const fech = lista.flatMap(l => l.cel).filter(c => c.est === 'ok' || c.est === 'falta');
+  const pctG = fech.length ? Math.round(100 * fech.filter(c => c.est === 'ok').length / fech.length) : 0;
+  const nFalta = fech.filter(c => c.est === 'falta').length;
+  const nAberto = lista.filter(l => l.cel.some(c => c.est === 'aberto')).length;
+  const sel = lista.find(l => l.chave === f.sel) || null;
+  const anos = [...new Set([Number(hoje().slice(0, 4)), ...S.evid.map(e => Number(String(e.data).slice(0, 4)))].filter(a => a >= 2020))].sort((a, b) => b - a);
+  const fazs = [...new Map(S.itens.filter(i => i.fazenda_id).map(i => [i.fazenda_id, nomeFaz(i.fazenda_id)])).entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  const chip = (id, rot) => `<button type="button" class="ce-vn-chip${f.tipo === id ? ' sel' : ''}" data-etipo="${id}">${esc(rot)}</button>`;
+  const quad = (l, c, i) => `<button type="button" class="ce-ev-q ce-ev-${c.est}" style="grid-column:span ${c.span}" data-eq="${esc(l.chave)}|${i}"
+      title="${esc(c.rot)}: ${c.n ? c.n + ' evidência(s)' : c.est === 'falta' ? 'sem evidência — clique para incluir' : c.est === 'aberto' ? 'em aberto' : 'ainda não chegou'}">${c.span > 1 ? esc(c.rot) : ''}</button>`;
+  const corPct = p => p == null ? '' : p >= 80 ? 'ok' : p >= 50 ? 'meio' : 'ruim';
+  tela.innerHTML = `<div class="ce-pend-topo naoimprimir">
+      <div><h2 style="margin:0">Evidências</h2>
+        <p class="dica" style="margin:2px 0 0">O que já está comprovado, período a período. Clique na linha para ver; num período vazio para incluir.</p></div>
+    </div>
+    <div class="cartao">
+      <div class="ce-vn-filtros">
+        <div class="ce-vn-chips">${chip('', 'Todos')}${chip('AN', 'AN')}${chip('RG', 'RG')}${chip('CL', 'CL')}
+          <button type="button" class="ce-vn-chip falta${f.falta ? ' sel' : ''}" id="ceEvFalta">Só o que falta</button></div>
+        <div class="ce-ev-filtros2">
+          ${fazs.length ? `<label class="campo">Fazenda <select id="ceEvFaz"><option value="">Todas</option>${fazs.map(([id, n]) => `<option value="${esc(id)}"${id === f.faz ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
+          <label class="campo">Ano <select id="ceEvAno">${anos.map(a => `<option${a === f.ano ? ' selected' : ''}>${a}</option>`).join('')}</select></label>
+          <label class="campo">Buscar <input type="search" id="ceEvQ" value="${esc(f.q)}" placeholder="AN, RG…"></label>
+        </div>
+      </div>
+      <div class="ce-ev-nums">
+        <div class="ok"><b>${pctG}%</b><span>dos períodos de ${f.ano} já comprovados</span></div>
+        <div class="ruim"><b>${nFalta}</b><span>períodos sem evidência</span></div>
+        <div><b>${nAberto}</b><span>documentos em aberto no período atual</span></div>
+      </div>
+      <div class="ce-ev-corpo">
+        <div class="ce-ev-grade">
+          <div class="ce-ev-lin ce-ev-cab"><div>Documento</div>${MES_CURTO.map(m => `<div class="ce">${m}</div>`).join('')}<div class="ce">Feito</div></div>
+          ${lista.map(l => `<div class="ce-ev-lin${sel === l ? ' sel' : ''}" data-elin="${esc(l.chave)}">
+            <button type="button" class="ce-ev-doc" data-esel="${esc(l.chave)}"><span><b>${esc(l.d.codigo)}</b> · ${esc(l.d.nome)}</span>
+              <small>${l.item ? esc(rotItem(l.item)) + ' · ' : ''}${esc(l.per || '')}</small></button>
+            ${l.cel.map((c, i) => quad(l, c, i)).join('')}
+            <div class="ce ce-ev-pct ${corPct(l.pct)}">${l.pct == null ? '—' : l.pct + '%'}</div></div>`).join('') || '<div class="vazio">Nada com esses filtros.</div>'}
+          <div class="ce-ev-leg"><span><i class="ce-ev-q ce-ev-ok"></i>tem evidência</span><span><i class="ce-ev-q ce-ev-falta"></i>faltou</span><span><i class="ce-ev-q ce-ev-aberto"></i>em aberto</span></div>
+        </div>
+        <aside class="ce-ev-lado" id="ceEvLado">${sel ? ladoEvid(sel) : '<p class="dica" style="margin:0">Clique num documento para ver as evidências dele.</p>'}</aside>
+      </div>
+    </div>`;
+  tela.querySelectorAll('[data-etipo]').forEach(b => b.addEventListener('click', () => { f.tipo = b.dataset.etipo; desenharEvidencias(); }));
+  $('ceEvFalta').addEventListener('click', () => { f.falta = !f.falta; desenharEvidencias(); });
+  $('ceEvFaz')?.addEventListener('change', e => { f.faz = e.target.value; desenharEvidencias(); });
+  $('ceEvAno').addEventListener('change', e => { f.ano = Number(e.target.value); desenharEvidencias(); });
+  $('ceEvQ').addEventListener('change', e => { f.q = e.target.value; desenharEvidencias(); });
+  tela.querySelectorAll('[data-esel]').forEach(b => b.addEventListener('click', () => { f.sel = b.dataset.esel; desenharEvidencias(); $('ceEvLado')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }));
+  tela.querySelectorAll('[data-eq]').forEach(b => b.addEventListener('click', () => {
+    const [ch, i] = b.dataset.eq.split('|'); const l = lista.find(x => x.chave === ch); if (!l) return;
+    const c = l.cel[Number(i)];
+    if (c.est === 'falta' || c.est === 'aberto') formEvidencia(l.d, null, l.item?.id || null, c.ate > hoje() ? hoje() : c.ate);
+    else { f.sel = ch; desenharEvidencias(); }
+  }));
+  if (sel) ligarLadoEvid(sel);
+}
+function abrirEvid(e) {
+  if (linkOk(e.link)) return `<a class="ce-link" href="${esc(e.link)}" target="_blank" rel="noopener">Abrir ↗</a>`;
+  if (e._arq) return `<button class="ce-link" type="button" data-earq="${esc(e._arq)}">Abrir ↗</button>`;
+  if (/^onedrive:/.test(so(e.origem))) return `<button class="ce-link" type="button" data-eod="${esc(so(e.origem).slice(9))}">Abrir ↗</button>`;
+  if (S.evArq?.has(String(e.id))) return `<button class="ce-link" type="button" data-eev="${esc(e.id)}">Abrir ↗</button>`;
+  return '';
+}
+function ladoEvid(l) {
+  const venc = l.item ? vencItem(l.item, l.d) : vencDoc(l.d);
+  const blocos = l.cel.slice().reverse().filter(c => c.est !== 'futuro').map(c => {
+    const vistos = new Set();   // o mesmo arquivo duas vezes (movido de pasta) aparece uma vez só
+    const evs = l.evs.filter(e => e.data >= c.de && e.data <= c.ate)
+      .filter(e => { const k = e.data + '|' + so(e.descricao).split(' / ').pop(); if (vistos.has(k)) return false; vistos.add(k); return true; });
+    const vazio = !evs.length && !c.n;
+    return `<div class="ce-ev-per${vazio ? ' vazio' : ''}"><div><b>${esc(c.rot)}${c.span < 12 ? '/' + c.de.slice(2, 4) : ''}</b>
+      ${evs.map(e => `<div class="ce-ev-it"><span>${br(e.data)} · ${esc(so(e.descricao).split(' / ').pop() || 'evidência')}</span>${abrirEvid(e)}</div>`).join('')}
+      ${!evs.length && c.n ? '<div class="ce-ev-it"><span>lançado no app</span></div>' : ''}
+      ${vazio ? `<div class="ce-ev-it"><span>${c.est === 'aberto' ? 'em aberto' : 'sem evidência'}</span></div>` : ''}</div>
+      ${vazio ? `<button class="btn mini${c.est === 'falta' ? ' perigo' : ''}" type="button" data-einc="${esc(c.ate)}">Incluir</button>` : ''}</div>`;
+  }).join('');
+  const pasta = l.item ? `${esc(l.d.codigo)} › ${esc(nomeFaz(l.item.fazenda_id))}` : esc(l.d.codigo);
+  return `<div class="ce-ev-tit"><small>${esc(l.d.codigo)}${l.item ? ' · ' + esc(rotItem(l.item)).toUpperCase() : ''}</small>
+      <b>${esc(l.d.nome)}</b><span class="dc-sem">${esc(l.per || '')}${l.d.dia_vencimento ? ` · vence todo dia ${doisD(l.d.dia_vencimento)}` : ''}${venc ? ' · próximo ' + br(venc) : ''}</span></div>
+    ${blocos || '<p class="dica">Nenhum período neste ano.</p>'}
+    <button class="btn principal" type="button" data-einc="${hoje()}">+ Evidência</button>
+    <p class="ce-ev-dica"><b>Sem digitar nada:</b> coloque o PDF na pasta <b>${pasta}</b> do OneDrive com o mês no nome (ex.: “novembro”). Em até 1 hora ele aparece aqui, no mês certo.</p>`;
+}
+function ligarLadoEvid(l) {
+  const el = $('ceEvLado'); if (!el) return;
+  el.querySelectorAll('[data-einc]').forEach(b => b.addEventListener('click', () => formEvidencia(l.d, null, l.item?.id || null, b.dataset.einc > hoje() ? hoje() : b.dataset.einc)));
+  el.querySelectorAll('[data-earq]').forEach(b => b.addEventListener('click', () => abrirArquivo(b.dataset.earq)));
+  el.querySelectorAll('[data-eod]').forEach(b => b.addEventListener('click', () => abrirNoOneDrive(b.dataset.eod)));
+  el.querySelectorAll('[data-eev]').forEach(b => b.addEventListener('click', async () => {
+    const a = await listarArquivos('certificacao', 'evidencia', b.dataset.eev).catch(() => []);
+    if (a[0]) abrirArquivo(a[0].chave); else alert('Arquivo ainda não está no app.');
+  }));
+}
+
+/* ===================================================================
    ENTRADA
    =================================================================== */
-export const TELAS_CERT = ['cePainel', 'cePendencias', 'ceVencimentos', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
+export const TELAS_CERT = ['cePainel', 'cePendencias', 'ceVencimentos', 'ceEvidencias', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
 const DESENHO = {
-  cePainel: desenharPainel, cePendencias: desenharPendencias, ceVencimentos: desenharVencimentos, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
+  cePainel: desenharPainel, cePendencias: desenharPendencias, ceVencimentos: desenharVencimentos, ceEvidencias: desenharEvidencias, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
   ceCalendario: desenharCalendario, ceAnual: desenharAnual, ceCertificacoes: desenharCertificacoes,
 };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
@@ -2650,7 +2798,7 @@ export async function abrirCertificacao(tela) {
 }
 
 export function limparCertificacao() {
-  S.carregado = false; S.contatos = []; S.fv = { tipo: '', resp: '', est: '' }; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = []; S.docComArq = new Set();
+  S.carregado = false; S.contatos = []; S.fv = { tipo: '', resp: '', est: '' }; S.fe = null; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = []; S.docComArq = new Set();
   nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' });

@@ -254,6 +254,11 @@ export const MODULOS = [
     { id: 'ceDocSub', grupo: 'Documentos', nome: 'Lista mestra', telas: [
       ['ceDocumentos', 'Lista mestra'],
     ] },
+    /* Evidências (03/11/2026, pedido do Guilherme: painel lean e fácil): o ano período a período.
+       Quem tinha a Lista mestra ganha esta (podeTela). */
+    { id: 'ceEvidSub', grupo: 'Documentos', nome: 'Evidências', telas: [
+      ['ceEvidencias', 'Evidências'],
+    ] },
     { id: 'ceReqSub', grupo: 'Documentos', nome: 'Requisitos', telas: [
       ['ceRequisitos', 'Requisitos'],
     ] },
@@ -567,6 +572,7 @@ export function podeTela(tela) {
      que nasceu de dentro dele (03/11/2026). */
   if (tela === 'rhAlteracao' && acesso.telas.includes(m + ':rhProposta')) return true;
   /* Quem já tinha etiqueta de armário ou de envelope ganha a de pasta suspensa (03/11/2026). */
+  if (tela === 'ceEvidencias' && acesso.telas.includes(m + ':ceDocumentos')) return true;
   if (tela === 'ceVencimentos' && acesso.telas.includes(m + ':cePendencias')) return true;
   if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);

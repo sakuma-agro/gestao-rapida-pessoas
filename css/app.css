@@ -2538,3 +2538,44 @@ body.crq-aberto{overflow:hidden}
 .ce-ent-venc.ok svg{color:var(--verde-esc)}
 .ce-ent-venc{margin-bottom:10px}
 .ce-vn-bloco.por-faz label:not(:first-child),.ce-vn-bloco.por-faz #cedVencTxt{display:none}
+
+/* Certificação › Evidências (03/11/2026) */
+.ce-vn-chip.falta{border-color:#B3261E;color:#B3261E}
+.ce-vn-chip.falta.sel{background:#B3261E;color:#fff}
+.ce-ev-filtros2{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.ce-ev-filtros2 .campo{margin:0;min-width:130px}
+.ce-ev-nums{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}
+.ce-ev-nums>div{background:var(--papel);border:1px solid var(--linha);border-left:6px solid var(--linha);border-radius:12px;padding:10px 14px;display:flex;align-items:baseline;gap:10px}
+.ce-ev-nums b{font-size:28px}
+.ce-ev-nums span{font-size:13px}
+.ce-ev-nums .ok{border-left-color:var(--verde)} .ce-ev-nums .ok b{color:#4E7300}
+.ce-ev-nums .ruim{border-left-color:#B3261E} .ce-ev-nums .ruim b{color:#B3261E}
+.ce-ev-corpo{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+.ce-ev-grade{border:1px solid var(--linha);border-radius:12px;overflow-x:auto;background:var(--papel)}
+.ce-ev-lin{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(12,minmax(26px,1fr)) 52px;gap:4px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--linha);min-width:760px}
+.ce-ev-lin.sel{background:rgba(116,79,40,.08);box-shadow:inset 4px 0 0 var(--marrom)}
+.ce-ev-cab{background:var(--marrom);color:#fff;font-size:11px;font-weight:700;position:sticky;top:0}
+.ce-ev-doc{font:inherit;color:inherit;text-align:left;background:none;border:0;padding:4px 0;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-width:0}
+.ce-ev-doc span{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ce-ev-doc b{color:var(--marrom)}
+.ce-ev-doc small{font-size:11.5px;color:var(--suave)}
+.ce-ev-q{height:26px;border-radius:6px;font:700 11px Arial;cursor:pointer;padding:0 4px;white-space:nowrap;overflow:hidden;display:inline-block}
+.ce-ev-ok{background:var(--verde);border:0;color:#fff}
+.ce-ev-falta{background:#FCEDEB;border:1.5px solid #B3261E;color:#B3261E}
+.ce-ev-aberto{background:var(--papel);border:1.5px dashed #9A9C92;color:var(--suave)}
+.ce-ev-futuro{background:rgba(0,0,0,.03);border:1px solid var(--linha);color:var(--suave);cursor:default}
+.ce-ev-q:focus-visible{outline:2px solid var(--marrom);outline-offset:1px}
+.ce-ev-pct{font-weight:700;font-size:13px}
+.ce-ev-pct.ok{color:#4E7300} .ce-ev-pct.meio{color:#8a5f00} .ce-ev-pct.ruim{color:#B3261E}
+.ce-ev-leg{display:flex;flex-wrap:wrap;gap:16px;padding:10px 12px;font-size:12px;color:var(--suave)}
+.ce-ev-leg span{display:flex;gap:6px;align-items:center}
+.ce-ev-leg i{width:14px;height:14px;padding:0;cursor:default}
+.ce-ev-lado{border:1px solid var(--linha);border-radius:12px;padding:14px;background:var(--papel);display:flex;flex-direction:column;gap:10px;position:sticky;top:10px}
+.ce-ev-tit{display:flex;flex-direction:column;gap:2px}
+.ce-ev-tit small{font-size:11px;font-weight:700;color:var(--marrom)}
+.ce-ev-tit b{font-size:16px}
+.ce-ev-per{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--linha)}
+.ce-ev-per.vazio b,.ce-ev-per.vazio .ce-ev-it span{color:#B3261E}
+.ce-ev-it{display:flex;gap:8px;align-items:baseline;justify-content:space-between;font-size:12.5px;color:var(--suave)}
+.ce-ev-dica{margin:0;background:var(--fundo,#F4F5EF);border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.45}
+@media (max-width:900px){.ce-ev-corpo{grid-template-columns:1fr}.ce-ev-lado{position:static}.ce-ev-nums{grid-template-columns:1fr}}
