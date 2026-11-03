@@ -360,6 +360,11 @@ export const MODULOS = [
       ['ccRelatorios',  'Relatórios'],
     ] },
     /* Pendências (etapa 3, 29/10/2026): atrasados, o que vence e a situação das certificações. */
+    /* Vencimentos (03/11/2026, pedido do Guilherme): AN, RG e CL do que vence primeiro ao último,
+       "Feito" com a evidência e lembrete por WhatsApp. Quem tinha Pendências ganha esta (podeTela). */
+    { id: 'ceVencSub', grupo: 'Pendências', nome: 'Vencimentos', telas: [
+      ['ceVencimentos', 'Vencimentos'],
+    ] },
     { id: 'cePendSub', grupo: 'Pendências', nome: 'Pendências', telas: [
       ['cePendencias', 'Pendências'],
     ] },
@@ -562,6 +567,7 @@ export function podeTela(tela) {
      que nasceu de dentro dele (03/11/2026). */
   if (tela === 'rhAlteracao' && acesso.telas.includes(m + ':rhProposta')) return true;
   /* Quem já tinha etiqueta de armário ou de envelope ganha a de pasta suspensa (03/11/2026). */
+  if (tela === 'ceVencimentos' && acesso.telas.includes(m + ':cePendencias')) return true;
   if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }

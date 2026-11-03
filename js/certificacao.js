@@ -84,7 +84,7 @@ const SIGLA = { 'GlobalG.A.P.': 'IFA', 'GRASP': 'GRASP', 'Rainforest Alliance': 
 
 /* ---------------- estado ---------------- */
 const S = {
-  carregado: false, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [], docArq: [], docComArq: new Set(),
+  carregado: false, contatos: [], fv: { tipo: '', resp: '', est: '' }, certs: [], reqs: [], docs: [], evs: [], vinc: [], evid: [], viva: {}, itens: [], faz: [], docArq: [], docComArq: new Set(),
   fr: { q: '', cert: '', tema: '', prior: '', status: '', doc: '' },
   fd: { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' },
   cal: { ano: 0, mes: 0, cert: '', auto: true },
@@ -97,7 +97,7 @@ const S = {
    (cert_marcar_feito). Cadastrar/editar requisitos continua só com internet. */
 const CAIXA = 'cert.cache';
 const CAMADA = 'cert';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz, docArq: S.docArq });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz, docArq: S.docArq, contatos: S.contatos });
 const CAMADA_DEF = {
   tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, i) => i,
   cliente: () => estado.cliente,
@@ -250,7 +250,7 @@ async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
   if (c0 && !S.carregado) {
     S.certs = c0.certs || []; S.reqs = c0.reqs || []; S.docs = c0.docs || []; S.evs = c0.evs || [];
-    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || []; S.docArq = c0.docArq || [];
+    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || []; S.docArq = c0.docArq || []; S.contatos = c0.contatos || [];
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -277,6 +277,8 @@ async function carregar() {
   }
   S.certs = a.data || []; S.reqs = b.data || []; S.docs = d.data || []; S.evs = e.data || [];
   await carregarCadeia(c);
+  const ct = await c.from('cert_contatos').select('*');   // 03/11/2026 · WhatsApp dos responsáveis (Vencimentos)
+  if (!ct.error) S.contatos = ct.data || [];
   S.carregado = true;
   salvarCaixa();
   /* 30/10/2026: antes gravava em S.docArq e apagava a lista de arquivos das pastas (evidências dos AN/IT/POL) —
@@ -506,6 +508,7 @@ function desenharPainel() {
         ${listaPorta(porta)}`
       : `<div class="ce-ent-topo"><h2>O que você quer fazer?</h2>
           <div class="ce-ent-chips">${ativas().map(c => `<span>${esc(c.nome)}</span>`).join('')}</div></div>
+        ${(() => { const r = resumoVencimentos(); return `<button type="button" class="ce-ent-alerta ce-ent-venc${r.vencidos ? '' : ' ok'}" id="ceEntVenc">${svgIcone('calendario')}<span>Vencimentos: ${r.vencidos} ${r.vencidos === 1 ? 'vencido' : 'vencidos'} · ${r.logo} ${r.logo === 1 ? 'vence logo' : 'vencem logo'}</span><b>Abrir</b></button>`; })()}
         ${atrasados.length ? `<button type="button" class="ce-ent-alerta" id="ceEntAtr">${svgIcone('alerta')}<span>${atrasados.length} ${atrasados.length === 1 ? 'item atrasado' : 'itens atrasados'}</span><b>Ver</b></button>` : ''}
         <div class="ce-ent-portas">${PORTAS.map(p => {
           const subs = subsDaPorta(p.g);
@@ -527,6 +530,7 @@ function desenharPainel() {
   tela.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSubDaPorta(b.dataset.sub)));
   $('ceEntVoltar')?.addEventListener('click', () => abrirModulo('cert', 'cePainel'));
   $('ceEntAtr')?.addEventListener('click', () => abrirModulo('cert', 'cePendencias'));
+  $('ceEntVenc')?.addEventListener('click', () => abrirModulo('cert', 'ceVencimentos'));
   $('ceEntCal')?.addEventListener('click', () => abrirModulo('cert', 'cePendencias'));
   tela.querySelectorAll('[data-atr-tipo]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', 'cePendencias')));
 }
@@ -1696,38 +1700,63 @@ const caixasCert = (marcadas, prefixo) => `<div class="ce-caixas">${S.certs.filt
   `<label class="rs-check"><input type="checkbox" data-${prefixo}="${esc(c.id)}" ${(marcadas || []).includes(c.id) ? 'checked' : ''}> ${esc(c.nome)}</label>`).join('')}</div>`;
 const lerCaixas = prefixo => [...document.querySelectorAll(`#dlgCe [data-${prefixo}]`)].filter(x => x.checked).map(x => x.dataset[prefixo]);
 
+/* Cadastro enxuto (03/11/2026, pedido do Guilherme: "achei muito cheio o cadastro"). Na frente só
+   código, nome, responsável, periodicidade, vencimento e o link do OneDrive; o resto em "Mais detalhes".
+   AN, RG e CL não levam mais arquivo anexo — só o link (os demais continuam com o arquivo que abre no app).
+   Responsável escolhido dos funcionários ativos (um nome antigo continua na lista até ser trocado). */
+const funcsAtivos = () => [...new Set((estado.funcionarios || []).filter(f => f.situacao === 'ATIVO').map(f => so(f.nome)).filter(Boolean))];
+function selectResp(id, atual) {
+  const a = so(atual);
+  const lista = [...new Set([...funcsAtivos(), ...responsaveis(), a].filter(Boolean))].sort((x, y) => x.localeCompare(y, 'pt-BR'));
+  return `<select id="${id}"><option value="">— sem responsável —</option>${lista.map(n => `<option value="${esc(n)}"${n === a ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+}
 let anexosDoc = null;
 function formDocumento(id, preset = {}) {
   const d = id ? S.docs.find(x => x.id === id) : null;
-  const v = d || { categoria: S.fd.cat || 'ANEXO', situacao: 'Em dia', periodicidade: 'Anual', certificacoes: [], ...preset };
+  const v = d || { categoria: S.fd.cat || '', situacao: 'Em dia', periodicidade: 'Anual', certificacoes: [], ...preset };
   const val = k => esc(v[k] ?? '');
+  const ult0 = d ? ultimoFeito(d) : '';
+  const venc0 = d && !d.por_fazenda ? vencDoc(d) : '';
   dialogo(`<h3>${d ? esc(d.codigo) + ' · documento' : 'Novo documento'}</h3>
     <div class="aviso erro" id="ceErro" hidden></div>
     <div class="grade">
-      <label class="campo">Código <input type="text" id="cedCod" maxlength="20" value="${val('codigo')}" placeholder="Ex.: POP 08" required></label>
-      <label class="campo plena">Documento <input type="text" id="cedNome" maxlength="200" value="${val('nome')}" required></label>
-      <label class="campo">Categoria <input type="text" id="cedCat" list="ceListaCat" maxlength="40" value="${val('categoria')}"></label>
+      <label class="campo">Código <input type="text" id="cedCod" maxlength="20" value="${val('codigo')}" placeholder="Ex.: AN 10, RG 039" required></label>
+      <label class="campo plena">Documento <input type="text" id="cedNome" maxlength="200" value="${val('nome')}" placeholder="Ex.: Análise de água – poço da sede" required></label>
+      <label class="campo">Responsável ${selectResp('cedResp', v.responsavel)}</label>
       <label class="campo">Periodicidade <select id="cedPer">${opcoes(PERIODOS, v.periodicidade, '—')}</select></label>
-      <label class="campo">Responsável <input type="text" id="cedResp" list="ceListaResp" maxlength="80" value="${val('responsavel')}"></label>
-      <label class="campo">Situação <select id="cedSit">${opcoes(SITUACOES_DOC, v.situacao)}</select></label>
-      <label class="campo">Revisão nº <input type="text" id="cedRev" maxlength="10" value="${val('revisao')}"></label>
-      <label class="campo">Data da revisão <input type="date" id="cedData" value="${val('data_revisao')}"></label>
-      <label class="campo plena">Link no OneDrive <small>da pasta — é o que abre no botão “Abrir local”</small>
-        <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://onedrive.live.com/… ou https://1drv.ms/…">
-        <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" ${linkOk(v.link) ? `href="${esc(v.link)}"` : 'hidden'}>Abrir ↗</a></span></label>
-      <label class="campo plena">Caminho no computador <small>a pasta no OneDrive do escritório — o app copia para colar no Explorador</small>
-        <input type="text" id="cedCaminho" maxlength="500" value="${val('caminho')}" placeholder="C:\\NUVEM\\OneDrive\\…"></label>
-      <div class="plena" id="cedAnexos"></div>
-      <p class="dica plena" id="cedProx"></p>
-      <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
-      <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
     </div>
-    ${d && codigosDoDoc(d).length ? `<h4 class="ac-h4">Códigos nas normas</h4><div class="ce-refs" style="max-width:none">${codTags(codigosDoDoc(d))}</div>` : ''}
-    ${d ? `<h4 class="ac-h4">Requisitos que este documento comprova</h4>
-      ${reqsDoDoc(d).length ? `<ul class="ce-lista-req">${reqsDoDoc(d).map(r => `<li><button class="ce-link" type="button" data-lreq="${r.id}">${esc(r.titulo)}</button>
-        <span class="dc-sem">${esc(refTexto(r, null))}</span></li>`).join('')}</ul>`
-        : '<p class="dica">Nenhum ainda. A ligação se faz no requisito, em “Documentos que comprovam”.</p>'}` : ''}
-    ${datalist('ceListaCat', CATEGORIAS)}${datalist('ceListaResp', responsaveis())}
+    <div class="ce-vn-bloco" id="cedVenc"${d?.por_fazenda ? ' hidden' : ''}>
+      <b>Vencimento</b>
+      <div class="grade">
+        <label class="campo">Última vez feito <input type="date" id="cedUlt" value="${esc(ult0 || '')}" max="${hoje()}"></label>
+        <label class="campo">Próximo vencimento <input type="date" id="cedVence" value="${esc(venc0 || '')}"></label>
+        <label class="campo">Avisar quantos dias antes <input type="number" id="cedAviso" min="0" max="365" value="${v.aviso_dias ?? ''}" placeholder=""></label>
+      </div>
+      <p class="dica" id="cedVencTxt" style="margin:0"></p>
+    </div>
+    ${d?.por_fazenda ? '<p class="dica">Este AN vence por fazenda — as datas ficam em cada fazenda, na ficha do documento.</p>' : ''}
+    <label class="campo">Link no OneDrive
+      <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://onedrive.live.com/… ou https://1drv.ms/…">
+      <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" hidden>Abrir ↗</a></span></label>
+    ${DICA_LINK}
+    <div id="cedAnexos" style="margin-top:8px"></div>
+    <details class="ce-mais"><summary>Mais detalhes <small>(categoria, situação, revisão, certificações, observação)</small></summary>
+      <div class="grade">
+        <label class="campo">Categoria <input type="text" id="cedCat" list="ceListaCat" maxlength="40" value="${val('categoria')}" placeholder="pelo código"></label>
+        <label class="campo">Situação <select id="cedSit">${opcoes(SITUACOES_DOC, v.situacao)}</select></label>
+        <label class="campo">Revisão nº <input type="text" id="cedRev" maxlength="10" value="${val('revisao')}"></label>
+        <label class="campo">Data da revisão <input type="date" id="cedData" value="${val('data_revisao')}"></label>
+        <p class="dica plena" id="cedProx"></p>
+        <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
+        <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
+      </div>
+      ${d && codigosDoDoc(d).length ? `<h4 class="ac-h4">Códigos nas normas</h4><div class="ce-refs" style="max-width:none">${codTags(codigosDoDoc(d))}</div>` : ''}
+      ${d ? `<h4 class="ac-h4">Requisitos que este documento comprova</h4>
+        ${reqsDoDoc(d).length ? `<ul class="ce-lista-req">${reqsDoDoc(d).map(r => `<li><button class="ce-link" type="button" data-lreq="${r.id}">${esc(r.titulo)}</button>
+          <span class="dc-sem">${esc(refTexto(r, null))}</span></li>`).join('')}</ul>`
+          : '<p class="dica">Nenhum ainda. A ligação se faz no requisito, em “Documentos que comprovam”.</p>'}` : ''}
+    </details>
+    ${datalist('ceListaCat', CATEGORIAS)}
     <div class="barra fim">
       ${d ? '<button class="btn perigo" type="button" id="cedApagar">Apagar</button><span class="cresce"></span>' : ''}
       <button class="btn" type="button" data-fechar>Cancelar</button>
@@ -1735,18 +1764,33 @@ function formDocumento(id, preset = {}) {
     </div>`, () => {
     const prox = () => {
       const p = proximaDoc({ periodicidade: $('cedPer').value, data_revisao: $('cedData').value });
-      $('cedProx').textContent = p ? `Próxima revisão: ${br(p)} — vai para o calendário.`
-        : MESES_PERIODO[$('cedPer').value] ? 'Informe a data da revisão para o documento aparecer no calendário.' : '';
+      $('cedProx').textContent = p ? `Próxima revisão do documento: ${br(p)} — vai para o calendário.` : '';
     };
-    $('cedPer').addEventListener('change', prox); $('cedData').addEventListener('change', prox); prox();
-    $('cedLink').addEventListener('input', () => {
-      const u = so($('cedLink').value), a = $('cedLinkAbrir');
-      if (linkOk(u)) { a.href = u; a.hidden = false; } else { a.removeAttribute('href'); a.hidden = true; }
-    });
+    $('cedData').addEventListener('change', prox); prox();
+    // Vencimento: muda a última vez ou a periodicidade → recalcula o próximo (dá para corrigir à mão).
+    const textoVenc = () => {
+      const per = $('cedPer').value, ve = $('cedVence').value;
+      const sem = per === 'Por evento' || !temPeriodo(per);
+      $('cedVenc').classList.toggle('apagado', sem);
+      const av = $('cedAviso').value !== '' ? Number($('cedAviso').value) : (AVISO_PADRAO[per] ?? 7);
+      $('cedAviso').placeholder = String(AVISO_PADRAO[per] ?? 7);
+      $('cedVencTxt').textContent = per === 'Por evento' ? 'Por evento: sem data fixa — não entra nos vencidos.'
+        : !temPeriodo(per) ? 'Escolha a periodicidade para o documento ter vencimento.'
+        : ve ? `Aparece em Vencimentos a partir de ${br(somaDias(ve, -av))} (${av} dia(s) antes).` : 'Informe a última vez feito ou o próximo vencimento.';
+    };
+    const recalc = () => { const u = $('cedUlt').value, per = $('cedPer').value; if (u && temPeriodo(per)) $('cedVence').value = avancar(u, per); textoVenc(); };
+    $('cedUlt').addEventListener('change', recalc);
+    $('cedPer').addEventListener('change', () => { prox(); recalc(); });
+    $('cedVence').addEventListener('change', textoVenc);
+    $('cedAviso').addEventListener('input', textoVenc);
+    textoVenc();
+    ligarLink('cedLink', 'cedLinkAbrir');
     document.querySelectorAll('#dlgCe [data-lreq]').forEach(b => b.addEventListener('click', () => formRequisito(Number(b.dataset.lreq))));
-    // Arquivo do documento no Google Drive (15/10/2026) — o link do OneDrive continua valendo.
+    // Arquivo do documento no Google Drive (15/10/2026) — só para POP, FORM, IT, POL… (AN, RG e CL: só o link, 03/11/2026).
     anexosDoc = campoAnexos($('cedAnexos'), { area: 'certificacao', tipo: 'documento', rotulo: 'Arquivo do documento', dica: 'PDF vigente — abre dentro do app' });
     anexosDoc.abrir(d ? d.id : null);
+    const soLink = () => { const pre = (so($('cedCod').value).toUpperCase().match(/^[A-Z]+/) || [''])[0]; $('cedAnexos').hidden = !pre || TIPOS_VENC.includes(pre); };
+    $('cedCod').addEventListener('input', soLink); soLink();
     $('cedGravar').addEventListener('click', () => gravarDocumento(d));
     $('cedApagar')?.addEventListener('click', () => apagar('cert_documentos', d.id, `${d.codigo} · ${d.nome}`, () => { S.docs = S.docs.filter(x => x.id !== d.id); }));
   });
@@ -1760,10 +1804,14 @@ function verReqsDoDoc(id) {
 
 async function gravarDocumento(d) {
   const g = id => so($(id).value) || null;
+  const pre = (so($('cedCod').value).toUpperCase().match(/^[A-Z]+/) || [''])[0];
+  const per = g('cedPer'), comVenc = !d?.por_fazenda && temPeriodo(per);
   const linha = {
-    codigo: g('cedCod'), nome: g('cedNome'), categoria: (g('cedCat') || 'ANEXO').toUpperCase(), periodicidade: g('cedPer'),
+    codigo: g('cedCod'), nome: g('cedNome'), categoria: (g('cedCat') || tipoDoc(pre).cat || 'ANEXO').toUpperCase(), periodicidade: per,
     responsavel: g('cedResp'), situacao: $('cedSit').value, revisao: g('cedRev'), data_revisao: g('cedData'),
-    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), caminho: g('cedCaminho'), atualizado_em: new Date().toISOString(),
+    certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), atualizado_em: new Date().toISOString(),
+    vence_em: comVenc ? g('cedVence') : null,
+    aviso_dias: $('cedAviso').value !== '' ? Math.max(0, Math.round(Number($('cedAviso').value))) : null,
   };
   if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https:// — copie pelo botão Compartilhar › Copiar link do OneDrive.');
   if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
@@ -2278,11 +2326,255 @@ async function exportarAnual(ano, linhas) {
 }
 
 /* ===================================================================
+   TELA · VENCIMENTOS (03/11/2026, pedido do Guilherme: "painel lean sobre
+   vencimentos e lembretes" de AN, RG e CL — desenho aprovado no canvas
+   "Painel de Vencimentos"). Uma lista só, do que vence primeiro ao último.
+   "Feito" grava a evidência (link do OneDrive) e já agenda a próxima data,
+   mantendo o dia (todo dia 3 continua dia 3, mesmo feito com atraso).
+   Lembrete por WhatsApp por responsável (cert_contatos).
+   Banco: supabase/cert-vencimentos.sql (vence_em, aviso_dias, cert_contatos).
+   =================================================================== */
+const TIPOS_VENC = ['AN', 'RG', 'CL'];
+const DIAS_PERIODO = { 'Diário': 1, 'Semanal': 7 };
+const AVISO_PADRAO = { 'Diário': 0, 'Semanal': 2, 'Mensal': 7, 'Trimestral': 15, 'Semestral': 30, 'Anual': 30, 'A cada 2 anos': 60, 'A cada 3 anos': 60 };
+const URL_APP = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/';
+const SEM_RESP_V = '__sem__';
+const temPeriodo = p => !!(DIAS_PERIODO[p] || MESES_PERIODO[p]);
+const avancar = (s, p) => DIAS_PERIODO[p] ? somaDias(s, DIAS_PERIODO[p]) : MESES_PERIODO[p] ? somaMeses(s, MESES_PERIODO[p]) : null;
+const avisoDe = d => d.aviso_dias ?? AVISO_PADRAO[d.periodicidade] ?? 7;
+const nomeCurto = n => so(n).toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()).split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
+const soDigitos = s => so(s).replace(/\D/g, '');
+
+/** Última vez feito: a evidência mais recente (ou o mês com lançamento no app, nos RG "vivos"). */
+function ultimoFeito(d) {
+  const e = evidDe(d)[0]?.data || null;
+  const viva = vivaDe(d);
+  const k = viva ? Object.keys(viva.meses).sort().pop() : null;
+  const dv = k ? (k + '-28' > hoje() ? hoje() : k + '-28') : null;
+  return [e, dv].filter(Boolean).sort().pop() || null;
+}
+/** Próximo vencimento: o gravado; sem ele, última vez feito + periodicidade. AN por fazenda: o item que vence primeiro. */
+function vencDoc(d) {
+  if (d.por_fazenda && itensDe(d).length) return itensDe(d).map(i => vencItem(i, d)).filter(Boolean).sort()[0] || null;
+  if (d.vence_em) return d.vence_em;
+  const u = ultimoFeito(d);
+  return u && temPeriodo(d.periodicidade) ? avancar(u, d.periodicidade) : null;
+}
+/** Depois de "Feito" em `data`: feito antes do vencimento conta para ele; feito atrasado pula para o próximo dia certo. */
+function proximoDepoisDe(d, data, per = d.periodicidade, base = d.vence_em) {
+  if (!temPeriodo(per)) return null;
+  if (!base) return avancar(data, per);
+  if (base > data) return avancar(base, per);
+  let v = base, n = 0;
+  while (v <= data && n++ < 4000) v = avancar(v, per);
+  return v;
+}
+function linhasVenc() {
+  const hj = hoje();
+  return S.docs.filter(d => !foraDeUso(d) && TIPOS_VENC.includes(prefixoDoc(d))).map(d => {
+    const evento = d.periodicidade === 'Por evento' || (!temPeriodo(d.periodicidade) && !d.vence_em && !d.por_fazenda);
+    const v = evento ? null : vencDoc(d);
+    const dias = v ? entre(hj, v) : null;
+    const est = evento ? 'evento' : !v ? 'semdata' : dias < 0 ? 'vencido' : dias <= avisoDe(d) ? 'logo' : dias <= 30 ? 'mes' : 'ok';
+    return { d, v, dias, est, tipo: prefixoDoc(d), ult: ultimoFeito(d) };
+  });
+}
+const incompletoV = l => l.est === 'semdata' || !so(l.d.responsavel);
+const ORDEM_EST = { vencido: 0, logo: 1, mes: 2, ok: 3, semdata: 4, evento: 5 };
+function tagVenc(l) {
+  if (l.est === 'evento') return tag('Por evento', 'neutra');
+  if (l.est === 'semdata') return tag('Sem data', 'inativo');
+  if (l.est === 'vencido') return tag(`Vencido há ${-l.dias} d`, 'perigo');
+  if (l.est === 'logo') return tag(l.dias === 0 ? 'Vence hoje' : `Vence em ${l.dias} d`, 'alerta');
+  return tag(`Em ${l.dias} d`, 'ativo');
+}
+/** Resumo para a entrada da Certificação. */
+export function resumoVencimentos() {
+  const ls = linhasVenc();
+  return { vencidos: ls.filter(l => l.est === 'vencido').length, logo: ls.filter(l => l.est === 'logo').length };
+}
+
+function desenharVencimentos() {
+  const tela = $('telaCeVencimentos');
+  const f = (S.fv ||= { tipo: '', resp: '', est: '' });
+  const todas = linhasVenc();
+  const doTipo = todas.filter(l => !f.tipo || l.tipo === f.tipo);
+  const base = doTipo.filter(l => !f.resp || (f.resp === SEM_RESP_V ? !so(l.d.responsavel) : so(l.d.responsavel) === f.resp));
+  const n = k => base.filter(l => l.est === k).length;
+  const nInc = base.filter(incompletoV).length;
+  const filtroEst = l => !f.est ? l.est !== 'evento' : f.est === 'inc' ? incompletoV(l) : f.est === 'mes' ? ['mes', 'logo'].includes(l.est) : l.est === f.est;
+  const lista = base.filter(filtroEst).sort((a, b) => ORDEM_EST[a.est] - ORDEM_EST[b.est] || (a.dias ?? 0) - (b.dias ?? 0) || porCodigo(a.d, b.d));
+  const resps = [...new Set(todas.map(l => so(l.d.responsavel)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const chip = (id, rot) => `<button type="button" class="ce-vn-chip${f.tipo === id ? ' sel' : ''}" data-vtipo="${id}">${esc(rot)} · ${id ? todas.filter(l => l.tipo === id && l.est !== 'evento').length : todas.filter(l => l.est !== 'evento').length}</button>`;
+  const card = (cor, rot, qtd, dica, est) => `<button type="button" class="pv-card pv-${cor}${qtd ? '' : ' pv-zero'}${f.est === est ? ' ce-vn-on' : ''}" data-vest="${est}">
+    <span>${esc(rot)}</span><strong>${qtd}</strong><small>${esc(dica)}</small></button>`;
+  const rotEst = { vencido: 'Vencidos', logo: 'Vencem logo', mes: 'Próximos 30 dias', inc: 'Sem data ou sem responsável', evento: 'Por evento' }[f.est];
+  tela.innerHTML = `<div class="ce-pend-topo naoimprimir">
+      <div><h2 style="margin:0">Vencimentos</h2>
+        <p class="dica" style="margin:2px 0 0">AN, RG e CL, do que vence primeiro ao último. “Feito” guarda a evidência e já agenda a próxima.</p></div>
+      <div class="barra" style="margin:0">
+        <button class="btn" type="button" id="ceVnCont">Contatos</button>
+        <button class="btn principal" type="button" id="ceVnZap">Lembrete por WhatsApp</button>
+      </div>
+    </div>
+    <div class="cartao">
+      <div class="ce-vn-filtros">
+        <div class="ce-vn-chips">${chip('', 'Todos')}${chip('AN', 'AN')}${chip('RG', 'RG')}${chip('CL', 'CL')}</div>
+        <label class="campo ce-vn-resp">Responsável <select id="ceVnResp">
+          <option value="">Todos</option><option value="${SEM_RESP_V}"${f.resp === SEM_RESP_V ? ' selected' : ''}>Sem responsável</option>
+          ${resps.map(r => `<option value="${esc(r)}"${r === f.resp ? ' selected' : ''}>${esc(nomeCurto(r))}</option>`).join('')}</select></label>
+      </div>
+      <div class="pv-cards" style="margin-top:12px">
+        ${card('perigo', 'Vencidos', n('vencido'), 'precisam de ação', 'vencido')}
+        ${card('alerta', 'Vencem logo', n('logo'), 'dentro do aviso', 'logo')}
+        ${card('calma', 'Próximos 30 dias', n('logo') + n('mes'), 'até ' + br(somaDias(hoje(), 30)), 'mes')}
+        ${card('ok', 'Cadastro incompleto', nInc, 'sem data ou sem responsável', 'inc')}
+      </div>
+      ${f.est ? `<p class="dica" style="margin:12px 0 0">Mostrando: <b>${esc(rotEst)}</b> · <button type="button" class="ce-link" id="ceVnLimpa">ver todos</button></p>` : ''}
+      <div class="ac-rola" style="margin-top:12px"><table class="dc-planilha ce-vn-tab"><thead><tr>
+        <th>Código</th><th>Documento</th><th>Responsável</th><th class="ce">Vencimento</th><th class="ce">Situação</th><th></th></tr></thead><tbody>
+        ${lista.map(l => `<tr class="ce-vn-${l.est}">
+          <td><b>${codigoLink(l.d)}</b></td>
+          <td><b>${esc(l.d.nome)}</b><br><span class="dc-sem">${esc(l.d.periodicidade || 'sem periodicidade')}${l.ult ? ' · último ' + br(l.ult) : ' · sem registro'}${l.d.por_fazenda ? ' · por fazenda' : ''}</span></td>
+          <td>${so(l.d.responsavel) ? esc(nomeCurto(l.d.responsavel)) : '<span class="ce-vn-falta">Sem responsável</span>'}</td>
+          <td class="ce">${l.v ? br(l.v) : '—'}</td>
+          <td class="ce">${tagVenc(l)}</td>
+          <td class="ce ce-vn-acoes">${l.d.por_fazenda
+            ? `<button class="btn mini" type="button" data-vabrir="${l.d.id}">Fazendas</button>`
+            : `<button class="btn mini principal" type="button" data-vfeito="${l.d.id}">Feito</button>`}
+            <button class="btn mini" type="button" data-vedit="${l.d.id}" title="Editar o cadastro" aria-label="Editar ${esc(l.d.codigo)}">✎</button></td>
+        </tr>`).join('') || `<tr><td colspan="6"><div class="vazio">Nada aqui.</div></td></tr>`}
+      </tbody></table></div>
+      ${!f.est && n('evento') ? `<p class="dica" style="margin:10px 0 0">${n('evento')} documento(s) por evento, sem data fixa — <button type="button" class="ce-link" id="ceVnEvento">ver</button></p>` : ''}
+    </div>`;
+  tela.querySelectorAll('[data-vtipo]').forEach(b => b.addEventListener('click', () => { f.tipo = b.dataset.vtipo; desenharVencimentos(); }));
+  tela.querySelectorAll('[data-vest]').forEach(b => b.addEventListener('click', () => { f.est = f.est === b.dataset.vest ? '' : b.dataset.vest; desenharVencimentos(); }));
+  $('ceVnResp').addEventListener('change', e => { f.resp = e.target.value; desenharVencimentos(); });
+  $('ceVnLimpa')?.addEventListener('click', () => { f.est = ''; desenharVencimentos(); });
+  $('ceVnEvento')?.addEventListener('click', () => { f.est = 'evento'; desenharVencimentos(); });
+  $('ceVnZap').addEventListener('click', formLembrete);
+  $('ceVnCont').addEventListener('click', formContatos);
+  tela.querySelectorAll('[data-vfeito]').forEach(b => b.addEventListener('click', () => formFeito(S.docs.find(d => d.id === Number(b.dataset.vfeito)))));
+  tela.querySelectorAll('[data-vedit]').forEach(b => b.addEventListener('click', () => formDocumento(Number(b.dataset.vedit))));
+  tela.querySelectorAll('[data-vabrir]').forEach(b => b.addEventListener('click', () => { const d = S.docs.find(x => x.id === Number(b.dataset.vabrir)); if (d) abrirTipo(prefixoDoc(d), d.id); }));
+}
+
+const DICA_LINK = `<details class="ce-vn-dica"><summary>Como pegar o link</summary>
+  <ol><li>No computador, abra a pasta no OneDrive (Explorador de Arquivos ou onedrive.live.com).</li>
+  <li>Botão direito no arquivo ou na pasta › <b>Compartilhar</b> › <b>Copiar link</b>.</li>
+  <li>Clique no campo e cole (<b>Ctrl+V</b>). Depois use <b>Abrir ↗</b> para conferir.</li></ol></details>`;
+function ligarLink(inp, a) {
+  const f = () => { const u = so($(inp).value); if (linkOk(u)) { $(a).href = u; $(a).hidden = false; } else { $(a).removeAttribute('href'); $(a).hidden = true; } };
+  $(inp).addEventListener('input', f); f();
+}
+
+/** Fechar a tarefa: data (hoje), link da evidência e observação. Grava em cert_evidencias e avança o vencimento. */
+function formFeito(d) {
+  if (!d) return;
+  const v0 = vencDoc(d);
+  const hist = evidDe(d).slice(0, 5);
+  dialogo(`<h3>Feito — ${esc(d.codigo)}</h3>
+    <p class="dica">${esc(d.nome)}${d.periodicidade ? ' · ' + esc(d.periodicidade) : ''}${v0 ? ' · vencimento ' + br(v0) : ''}</p>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">
+      <label class="campo">Feito em <input type="date" id="vfData" value="${hoje()}" max="${hoje()}"></label>
+      <label class="campo">Observação <small>(opcional)</small> <input type="text" id="vfObs" maxlength="300" placeholder="Ex.: extintor do galpão 2 recarregado"></label>
+    </div>
+    <label class="campo">Link da evidência no OneDrive
+      <span class="ce-linha-link"><input type="url" id="vfLink" maxlength="2000" placeholder="https://… (Compartilhar › Copiar link)">
+      <a class="btn mini" id="vfAbrir" target="_blank" rel="noopener" hidden>Abrir ↗</a></span></label>
+    ${DICA_LINK}
+    <div class="ce-vn-prox" id="vfProx"></div>
+    ${hist.length ? `<h4 class="ac-h4">Últimas vezes</h4><div class="ac-rola"><table class="dc-planilha"><thead><tr><th>Feito em</th><th>Descrição</th><th></th></tr></thead><tbody>
+      ${hist.map(e => `<tr><td>${br(e.data)}</td><td>${esc(e.descricao || '')}</td><td class="ce">${linkOk(e.link) ? `<a href="${esc(e.link)}" target="_blank" rel="noopener">Abrir ↗</a>` : ''}</td></tr>`).join('')}
+    </tbody></table></div>` : ''}
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="vfOk">Salvar e agendar a próxima</button></div>`, () => {
+    ligarLink('vfLink', 'vfAbrir');
+    const prox = () => {
+      const data = $('vfData').value || hoje();
+      const nv = proximoDepoisDe(d, data);
+      $('vfProx').innerHTML = nv ? `Próximo vencimento: <b>${br(nv)}</b> · aparece em Vencimentos a partir de ${br(somaDias(nv, -avisoDe(d)))}.`
+        : 'Este documento não tem periodicidade com data — a evidência fica guardada, sem próximo vencimento.';
+    };
+    $('vfData').addEventListener('change', prox); prox();
+    $('vfOk').addEventListener('click', async () => {
+      const data = $('vfData').value, link = so($('vfLink').value), obs = so($('vfObs').value);
+      if (!data) return erroDlg('Informe a data em que foi feito.');
+      if (!linkOk(link)) return erroDlg('Cole o link da evidência no OneDrive (começa com https://).');
+      if (!navigator.onLine || !estado.cliente) return erroDlg('Sem internet agora — tente de novo quando tiver sinal.');
+      $('vfOk').disabled = true;
+      const c = estado.cliente;
+      const { data: ev, error } = await c.from('cert_evidencias').insert({ documento_id: d.id, data, link, descricao: obs || 'Feito', criado_por: quem(), origem: 'vencimentos' }).select().single();
+      if (error) { $('vfOk').disabled = false; return erroDlg('Não consegui gravar: ' + error.message); }
+      S.evid.unshift(ev);
+      const nv = proximoDepoisDe(d, data);
+      if (nv) {
+        const { data: dd, error: e2 } = await c.from('cert_documentos').update({ vence_em: nv, atualizado_em: new Date().toISOString() }).eq('id', d.id).select().single();
+        if (e2) alert('A evidência foi gravada, mas a próxima data não: ' + e2.message); else Object.assign(d, dd);
+      }
+      salvarCaixa(); fechar(); redesenhar();
+    });
+  });
+}
+
+/** Lembrete por WhatsApp: uma mensagem por responsável com o que está vencido ou vence logo. */
+function formLembrete() {
+  const ls = linhasVenc().filter(l => ['vencido', 'logo'].includes(l.est)).sort((a, b) => a.dias - b.dias);
+  const grupos = new Map();
+  ls.forEach(l => { const k = so(l.d.responsavel); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(l); });
+  const ordem = [...grupos.keys()].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || a.localeCompare(b, 'pt-BR'));
+  const zapDe = nome => soDigitos((S.contatos || []).find(c => so(c.nome) === so(nome))?.whatsapp);
+  const texto = (nome, its) => `Olá, ${nomeCurto(nome).split(' ')[0]}! Vencimentos da Certificação (${br(hoje())}):\n\n`
+    + its.map(l => `${l.est === 'vencido' ? '🔴' : '🟡'} ${l.d.codigo} ${l.d.nome} — ${l.est === 'vencido' ? 'venceu' : 'vence'} ${br(l.v)}`).join('\n')
+    + `\n\nQuando concluir, marque "Feito" em Certificação › Vencimentos e cole o link da evidência.\n${URL_APP}`;
+  dialogo(`<h3>Lembrete por WhatsApp</h3>
+    <p class="dica">Uma mensagem para cada responsável, só com o que é dele (vencidos e os que vencem logo). O WhatsApp abre com o texto pronto; é só enviar.</p>
+    ${ordem.length ? ordem.map(nome => {
+      const its = grupos.get(nome); const z = nome && zapDe(nome);
+      const nv = its.filter(l => l.est === 'vencido').length;
+      return `<div class="ce-vn-zap">
+        <div><b>${nome ? esc(nomeCurto(nome)) : 'Sem responsável'}</b><br><span class="dc-sem">${nv ? nv + ' vencido(s)' : ''}${nv && its.length - nv ? ' · ' : ''}${its.length - nv ? (its.length - nv) + ' vence(m) logo' : ''}${nome && !z ? ' · sem WhatsApp em Contatos' : ''}</span>
+          ${!nome ? `<br><span class="dc-sem">${its.slice(0, 4).map(l => esc(l.d.codigo)).join(', ')}${its.length > 4 ? '…' : ''} — defina o responsável no cadastro</span>` : ''}</div>
+        ${z ? `<a class="btn principal" target="_blank" rel="noopener" href="https://wa.me/${z}?text=${encodeURIComponent(texto(nome, its))}">Abrir no WhatsApp</a>` : ''}
+      </div>`; }).join('') : '<div class="vazio">Nada vencido nem vencendo logo. 👍</div>'}
+    <div class="barra fim"><button class="btn" type="button" id="vzCont">Contatos</button><button class="btn" type="button" data-fechar>Fechar</button></div>`, () => {
+    $('vzCont').addEventListener('click', formContatos);
+  });
+}
+
+/** WhatsApp de cada responsável (cert_contatos). */
+function formContatos() {
+  const nomes = [...new Set([...S.docs.map(d => so(d.responsavel)), ...(S.contatos || []).map(c => so(c.nome))].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const zap = nome => so((S.contatos || []).find(c => so(c.nome) === nome)?.whatsapp);
+  dialogo(`<h3>Contatos do WhatsApp</h3>
+    <p class="dica">Número com DDI e DDD, ex.: +55 34 99999-9999. Vale para os lembretes de vencimento.</p>
+    <div class="aviso erro" id="ceErro" hidden></div>
+    <div class="grade">${nomes.map((n, i) => `<label class="campo">${esc(nomeCurto(n))} <input type="tel" data-zap="${i}" value="${esc(zap(n))}" placeholder="+55 34 …"></label>`).join('') || '<p class="dica">Defina responsáveis nos documentos primeiro.</p>'}</div>
+    <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="vcOk">Gravar</button></div>`, () => {
+    $('vcOk').addEventListener('click', async () => {
+      const linhas = nomes.map((n, i) => ({ nome: n, whatsapp: soDigitos(document.querySelector(`#dlgCe [data-zap="${i}"]`).value) }));
+      const ruim = linhas.find(l => l.whatsapp && l.whatsapp.length < 12);
+      if (ruim) return erroDlg(`Confira o número de ${nomeCurto(ruim.nome)}: falta o DDI (55) ou o DDD.`);
+      $('vcOk').disabled = true;
+      const c = estado.cliente;
+      const com = linhas.filter(l => l.whatsapp), sem = linhas.filter(l => !l.whatsapp && zap(l.nome)).map(l => l.nome);
+      const r1 = com.length ? await c.from('cert_contatos').upsert(com.map(l => ({ ...l, atualizado_em: new Date().toISOString(), atualizado_por: quem() }))) : {};
+      const r2 = sem.length ? await c.from('cert_contatos').delete().in('nome', sem) : {};
+      const err = r1.error || r2.error;
+      if (err) { $('vcOk').disabled = false; return erroDlg('Não consegui gravar: ' + err.message); }
+      S.contatos = com;
+      salvarCaixa(); fechar(); redesenhar();
+    });
+  });
+}
+
+/* ===================================================================
    ENTRADA
    =================================================================== */
-export const TELAS_CERT = ['cePainel', 'cePendencias', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
+export const TELAS_CERT = ['cePainel', 'cePendencias', 'ceVencimentos', 'ceRequisitos', 'ceDocumentos', 'ceCalendario', 'ceAnual', 'ceCertificacoes'];
 const DESENHO = {
-  cePainel: desenharPainel, cePendencias: desenharPendencias, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
+  cePainel: desenharPainel, cePendencias: desenharPendencias, ceVencimentos: desenharVencimentos, ceRequisitos: desenharRequisitos, ceDocumentos: desenharDocumentos,
   ceCalendario: desenharCalendario, ceAnual: desenharAnual, ceCertificacoes: desenharCertificacoes,
 };
 const idTela = t => 'tela' + t[0].toUpperCase() + t.slice(1);
@@ -2341,7 +2633,7 @@ export async function abrirCertificacao(tela) {
 }
 
 export function limparCertificacao() {
-  S.carregado = false; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = []; S.docComArq = new Set();
+  S.carregado = false; S.contatos = []; S.fv = { tipo: '', resp: '', est: '' }; S.certs = []; S.reqs = []; S.docs = []; S.evs = []; S.vinc = []; S.evid = []; S.viva = {}; S.docArq = []; S.docComArq = new Set();
   nucleo.apagarCaixa(CAIXA);
   Object.assign(S.fr, { q: '', cert: '', tema: '', prior: '', status: '', doc: '' });
   Object.assign(S.fd, { q: '', cat: '', per: '', sit: '', resp: '', modo: '', tipo: '', sel: null, q2: '' });

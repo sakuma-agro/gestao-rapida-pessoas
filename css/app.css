@@ -2507,3 +2507,33 @@ body.crq-aberto{overflow:hidden}
 .ce-tipo-selo{display:inline-block;background:var(--tc);color:#fff;border-radius:8px;padding:1px 10px;font-size:.85em;vertical-align:1px}
 .ce-dv-item[style*="--tc"] b{color:color-mix(in srgb,var(--tc) 80%,#1B232B)}
 .ce-dv-item[style*="--tc"].on{box-shadow:inset 3px 0 0 var(--tc)}
+
+/* Certificação › Vencimentos (03/11/2026) */
+.ce-vn-filtros{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.ce-vn-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ce-vn-chip{font:inherit;font-weight:700;font-size:13px;min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);cursor:pointer}
+.ce-vn-chip.sel{background:var(--marrom);border-color:var(--marrom);color:#fff}
+.ce-vn-chip:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.ce-vn-resp{margin:0;min-width:200px}
+.pv-card.ce-vn-on{outline:2px solid var(--marrom);outline-offset:1px}
+.ce-vn-tab td{vertical-align:middle}
+.ce-vn-tab tr.ce-vn-vencido td{background:rgba(192,57,43,.07)}
+.ce-vn-tab tr.ce-vn-logo td{background:rgba(201,138,0,.08)}
+.ce-vn-falta{color:#a5342a;font-weight:700}
+.ce-vn-acoes{white-space:nowrap}
+.ce-vn-acoes .btn+.btn{margin-left:4px}
+.ce-vn-bloco{background:var(--verde-fundo);border:1px solid rgba(132,189,0,.4);border-radius:12px;padding:12px 14px;margin:6px 0 10px}
+.ce-vn-bloco>b{display:block;margin-bottom:6px;color:var(--marrom)}
+.ce-vn-bloco.apagado .grade{opacity:.5}
+.ce-vn-prox{margin:10px 0 4px;padding:10px 12px;border-radius:10px;background:var(--verde-fundo);font-size:14px}
+.ce-vn-dica{margin:4px 0 0;font-size:13px;color:var(--suave)}
+.ce-vn-dica summary{cursor:pointer;color:var(--marrom);font-weight:700}
+.ce-vn-dica ol{margin:6px 0 0;padding-left:20px;line-height:1.5}
+.ce-mais{margin:12px 0 4px;border-top:1px solid var(--linha);padding-top:10px}
+.ce-mais>summary{cursor:pointer;color:var(--marrom);font-weight:700;padding:6px 0}
+.ce-mais>summary small{font-weight:400;color:var(--suave)}
+.ce-vn-zap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--linha)}
+.ce-vn-zap:last-of-type{border-bottom:0}
+.ce-ent-venc.ok{background:var(--verde-fundo);border-color:rgba(132,189,0,.45)}
+.ce-ent-venc.ok svg{color:var(--verde-esc)}
+.ce-ent-venc{margin-bottom:10px}
