@@ -47,7 +47,16 @@ const GRUPOS = [
 ];
 const COR = Object.fromEntries(GRUPOS.map(g => [g[0], { fill: g[1], line: g[2] }]));
 
-let S = { lista: [], atual: null, mapa: null, camadas: {}, rotulos: true, ocultos: new Set(), sel: null };
+let S = { lista: [], atual: null, mapa: null, camadas: {}, rotulos: true, ocultos: new Set(), sel: null, marcando: false };
+
+/** Pontos marcados (sede, galpão…): ícone e tamanho no mapa. 03/11/2026 — "falta marcar … sede". */
+const TIPO_MARCO = {
+  Sede: { ico: '🏠', cls: 'sede', tam: 30 },
+  'Galpão': { ico: '🏚', cls: 'galpao', tam: 26 },
+  Bebedouro: { ico: '💧', cls: 'beb', tam: 16 },
+  Ponto: { ico: '📍', cls: 'ponto', tam: 24 },
+};
+const tipoDoNome = n => { const u = semAcento(n); return /^SEDE/.test(u) ? 'Sede' : /GALPAO|BARRACAO|ARMAZEM/.test(u) ? 'Galpão' : /BEBEDOURO/.test(u) ? 'Bebedouro' : 'Ponto'; };
 
 /* ---------- Leaflet sob demanda ---------- */
 let leafletPronto = null;
@@ -236,8 +245,15 @@ function kmlParaCroquis(xml, fazendas) {
       const r = (v) => Math.round(v * 1e6) / 1e6;
       feicoes.push({ nome, rot: nome ? rotuloDe(nome, grupo) : grupo, grupo, ha: Math.round(areaHa(p.c) * 100) / 100, c: p.c.map(([x, y]) => [r(x), r(y)]) });
     }
+    // pontos soltos do KML que viram marcos no mapa (sede, bebedouros)
+    const r6 = v => Math.round(v * 1e6) / 1e6;
+    const marcos = g.pts.map(p => {
+      const u = semAcento(p.nome);
+      const tipo = /^SEDE/.test(u) ? 'Sede' : /^BEBEDOURO/.test(u) ? 'Bebedouro' : null;
+      return tipo && { nome: tipo === 'Sede' ? 'Sede' : p.nome, tipo, lon: r6(p.c[0]), lat: r6(p.c[1]), fonte: 'KML' };
+    }).filter(Boolean);
     out.push({ fazenda_id: faz.id, fazenda: faz.nome, limite: limite ? limite.c : null,
-      area_total: limite ? Math.round(areaHa(limite.c) * 100) / 100 : null, feicoes });
+      area_total: limite ? Math.round(areaHa(limite.c) * 100) / 100 : null, feicoes, marcos });
   }
   return out;
 }
@@ -275,6 +291,7 @@ function montarOverlay() {
       <nav class="crq-faz" id="crqFaz"></nav>
       <div class="crq-acoes">
         <label class="crq-chk"><input type="checkbox" id="crqRot" checked> Nomes</label>
+        <button class="btn" type="button" id="crqMarcar" hidden title="Clique no mapa para marcar sede, galpão, piscinão…">📍 Marcar ponto</button>
         <button class="btn" type="button" id="crqApresentar">⛶ Apresentar</button>
         <button class="btn" type="button" id="crqImprimir">Imprimir</button>
         <label class="btn" id="crqImpLbl" hidden title="KML/KMZ do Google Earth (todas as fazendas) ou .zip do shapefile do CAR (fazenda aberta)">Importar<input type="file" id="crqImp" accept=".kml,.kmz,.zip" hidden></label>
@@ -294,8 +311,9 @@ function montarOverlay() {
   });
   document.addEventListener('fullscreenchange', () => setTimeout(() => S.mapa?.invalidateSize(), 200));
   $('crqImprimir').addEventListener('click', imprimir);
+  $('crqMarcar').addEventListener('click', () => modoMarcar(!S.marcando));
   $('crqImp').addEventListener('change', importar);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.fullscreenElement && $('crqOverlay') && !$('crqOverlay').hidden) fechar(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.marcando) { modoMarcar(false); msg(''); return; } if (e.key === 'Escape' && !document.fullscreenElement && $('crqOverlay') && !$('crqOverlay').hidden) fechar(); });
   return ov;
 }
 
@@ -308,6 +326,7 @@ function msg(t, erro) {
 export async function abrirCroqui(fazendaId) {
   const ov = montarOverlay(); ov.hidden = false; document.body.classList.add('crq-aberto');
   $('crqImpLbl').hidden = !pode('cert');
+  $('crqMarcar').hidden = !pode('cert');
   $('crqPainel').innerHTML = '<p class="dica">Carregando…</p>';
   try {
     const [L] = await Promise.all([carregarLeaflet(), carregar()]);
@@ -318,6 +337,7 @@ export async function abrirCroqui(fazendaId) {
       }).addTo(S.mapa);
       L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(S.mapa);
       S.mapa.on('zoomend', zoomRotulos);
+      S.mapa.on('click', e => { if (S.marcando) marcarAqui(e.latlng); });
     }
     if (!S.lista.length) {
       $('crqFaz').innerHTML = '';
@@ -336,6 +356,7 @@ export async function abrirCroqui(fazendaId) {
 }
 
 function fechar() {
+  modoMarcar(false);
   if (document.fullscreenElement) document.exitFullscreen?.();
   const ov = $('crqOverlay'); if (ov) ov.hidden = true;
   document.body.classList.remove('crq-aberto');
@@ -344,7 +365,7 @@ function fechar() {
 function abas() {
   $('crqFaz').innerHTML = S.lista.map(c => `<button type="button" class="${c === S.atual ? 'on' : ''}" data-faz="${c.fazenda_id}">${esc(c.fazenda)}</button>`).join('');
   $('crqFaz').querySelectorAll('[data-faz]').forEach(b => b.addEventListener('click', () => {
-    S.atual = S.lista.find(c => c.fazenda_id === b.dataset.faz); S.sel = null; abas(); desenhar(true); painel();
+    S.atual = S.lista.find(c => c.fazenda_id === b.dataset.faz); S.sel = null; modoMarcar(false); abas(); desenhar(true); painel();
   }));
 }
 
@@ -367,8 +388,11 @@ function desenhar(enquadrar) {
       color: sel ? '#FFFFFF' : cor.line, weight: sel ? 4 : 2, fillColor: cor.fill, fillOpacity: f.grupo === 'Pivô' ? 0.28 : f.grupo === 'Vegetação nativa' ? 0.25 : 0.45, dashArray: f.fonte === 'CAR' ? '5 4' : null,
     }).addTo(S.mapa);
     pol.bindPopup(`<b>${esc(f.rot || f.nome)}</b><br>${esc(f.grupo)}${f.fonte === 'CAR' ? ' · do CAR' : ''}<br>${ha(f.ha)}${f.nome && f.nome !== f.rot ? `<br><span style="color:#777">${esc(f.nome)}</span>` : ''}`);
-    pol.on('click', () => { S.sel = f.i; marcarLinha(); });
-    if (S.rotulos) pol.bindTooltip(`${esc(f.rot || '')}<br><small>${ha(f.ha)}</small>`, { permanent: true, direction: 'center', className: 'crq-rot crq-rot-' + (f.ha < 2 ? 'p' : 'g') });
+    pol.on('click', e => {
+      if (S.marcando) { S.mapa.closePopup(); marcarAqui(e.latlng); return; }   // marcar ponto em cima de talhão/pivô
+      S.sel = f.i; marcarLinha();
+    });
+    if (S.rotulos) pol.bindTooltip(`${esc(f.rot || '')}<br><small>${ha(f.ha)}</small>`, { permanent: true, direction: 'center', className: 'crq-rot crq-rot-' + (f.ha < 2 && !/piscin/i.test(f.rot || '') ? 'p' : 'g') });
     S.camadas['f' + f.i] = pol; todas.push(pol);
   }
   if (!S.ocultos.has('__pontos')) (cq.pontos || []).forEach((p, k) => {
@@ -379,6 +403,16 @@ function desenhar(enquadrar) {
     m.bindPopup(`<b>💧 ${esc(p.nome)}</b>${p.tipo ? '<br>' + esc(p.tipo) : ''}${p.outorga ? '<br>Outorga: ' + esc(p.outorga) : ''}${p.vazao ? '<br>Vazão: ' + esc(p.vazao) : ''}${p.finalidade ? '<br>Finalidade: ' + esc(p.finalidade) : ''}${p.validade ? '<br>Validade: ' + esc(p.validade) + (venc ? ' <b style="color:#C62828">(vencida)</b>' : '') : ''}${p.curso ? '<br>' + esc(p.curso) : ''}<br><span style="color:#777">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>`);
     if (S.rotulos) m.bindTooltip('💧 ' + esc(p.nome), { permanent: true, direction: 'right', offset: [8, 0], className: 'crq-rot crq-rot-agua' });
     S.camadas['p' + k] = m;
+  });
+  if (!S.ocultos.has('__marcos')) (cq.marcos || []).forEach((p, k) => {
+    if (!isFinite(p.lat) || !isFinite(p.lon)) return;
+    const t = TIPO_MARCO[p.tipo] || TIPO_MARCO.Ponto;
+    const m = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'crq-marco crq-marco-' + t.cls, html: t.ico, iconSize: [t.tam, t.tam], iconAnchor: [t.tam / 2, t.tam / 2] }) }).addTo(S.mapa);
+    todas.push(m);
+    m.bindPopup(`<b>${t.ico} ${esc(p.nome)}</b>${p.tipo && p.tipo !== p.nome ? '<br>' + esc(p.tipo) : ''}${p.obs ? '<br>' + esc(p.obs) : ''}<br><span style="color:#777">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span>${pode('cert') ? `<br><button type="button" class="btn mini" data-marco-del="${k}" style="margin-top:6px">Remover ponto</button>` : ''}`);
+    m.on('popupopen', ev => ev.popup.getElement()?.querySelector('[data-marco-del]')?.addEventListener('click', () => removerMarco(k)));
+    if (S.rotulos && p.tipo !== 'Bebedouro') m.bindTooltip(esc(p.nome), { permanent: true, direction: 'right', offset: [t.tam / 2, 0], className: 'crq-rot crq-rot-marco' });
+    S.camadas['m' + k] = m;
   });
   if (enquadrar && todas.length) S.mapa.fitBounds((S.camadas.limite || L.featureGroup(todas)).getBounds(), { padding: [20, 20], maxZoom: 16 });
   zoomRotulos();
@@ -420,6 +454,7 @@ function painel() {
         <input type="checkbox" data-grp="${esc(g[0])}" ${S.ocultos.has(g[0]) ? '' : 'checked'}>
         <i style="background:${g[1]};border-color:${g[2]}"></i><span>${esc(g[0])}</span><b>${ha(T.t[g[0]])}</b></label>`).join('')}
       ${cq.limite ? '<div class="crq-leg-lim"><i></i><span>Limite da fazenda</span></div>' : ''}
+      ${(cq.marcos || []).length ? `<label><input type="checkbox" data-grp="__marcos" ${S.ocultos.has('__marcos') ? '' : 'checked'}><i class="crq-marco-leg">🏠</i><span>Sede e pontos marcados</span><b>${cq.marcos.length}</b></label>` : ''}
       ${(cq.pontos || []).length ? `<label><input type="checkbox" data-grp="__pontos" ${S.ocultos.has('__pontos') ? '' : 'checked'}><i class="crq-ponto-ico"></i><span>Captações outorgadas</span><b>${cq.pontos.length}</b></label>` : ''}</div>
 
     <section class="crq-rl ${rlConta == null ? 'sem' : atende ? 'ok' : 'falta'}">
@@ -467,6 +502,12 @@ function painel() {
       <p class="crq-nota">Lei 12.651/2012, art. 12, II: fora da Amazônia Legal, a reserva legal é de no mínimo ${RL_MIN}% da área do imóvel. Áreas do mapa calculadas dos desenhos (aproximadas); valem as do CAR.</p>
     </section>
 
+    ${(cq.marcos || []).filter(m => m.tipo !== 'Bebedouro').length || edita ? `<h4 class="crq-sub">Sede e pontos marcados</h4>
+      ${(cq.marcos || []).filter(m => m.tipo !== 'Bebedouro').length ? `<table class="crq-tab crq-tal"><tbody>
+      ${(cq.marcos || []).map((m, k) => m.tipo === 'Bebedouro' ? '' : `<tr data-marco="${k}"><td>${(TIPO_MARCO[m.tipo] || TIPO_MARCO.Ponto).ico} ${esc(m.nome)}</td><td class="crq-mono">${m.lat.toFixed(5)}, ${m.lon.toFixed(5)}</td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${edita && !(cq.marcos || []).some(m => m.tipo === 'Sede') ? '<p class="crq-alerta">A sede desta fazenda ainda não está no mapa. Clique em <b>📍 Marcar ponto</b> e depois no lugar da sede.</p>' : ''}` : ''}
+
     ${(cq.pontos || []).length ? `<h4 class="crq-sub">Captações de água (outorgas)</h4>
       <table class="crq-tab crq-tal"><thead><tr><th>Ponto</th><th>Outorga</th><th>Validade</th></tr></thead><tbody>
       ${cq.pontos.map((p, k) => { const v = p.venc && p.venc < hojeIso(); return `<tr data-ponto="${k}"><td><i class="crq-ponto-ico${v ? ' venc' : ''}"></i>${esc(p.nome)}${p.vazao ? `<br><small>${esc(p.vazao)}${p.finalidade ? ' · ' + esc(p.finalidade) : ''}</small>` : ''}</td><td>${esc(p.outorga || '')}</td><td class="${v ? 'crq-venc' : ''}">${esc(p.validade || '')}${v ? '<br><small>vencida</small>' : ''}</td></tr>`; }).join('')}
@@ -484,6 +525,9 @@ function painel() {
   $('crqPainel').querySelectorAll('[data-ir]').forEach(tr => tr.addEventListener('click', () => irPara(Number(tr.dataset.ir))));
   $('crqPainel').querySelectorAll('[data-ponto]').forEach(tr => tr.addEventListener('click', () => {
     const m = S.camadas['p' + tr.dataset.ponto]; if (m) { S.mapa.setView(m.getLatLng(), 17); m.openPopup(); }
+  }));
+  $('crqPainel').querySelectorAll('[data-marco]').forEach(tr => tr.addEventListener('click', () => {
+    const m = S.camadas['m' + tr.dataset.marco]; if (m) { S.mapa.setView(m.getLatLng(), 17); m.openPopup(); }
   }));
   $('crqRvGravar')?.addEventListener('click', gravarReserva);
   marcarLinha();
@@ -507,6 +551,35 @@ function irPara(i) {
 }
 function marcarLinha() {
   $('crqPainel')?.querySelectorAll('[data-ir]').forEach(tr => tr.classList.toggle('sel', Number(tr.dataset.ir) === S.sel));
+}
+
+/* ---------- marcar ponto (sede, galpão, piscinão…) ---------- */
+function modoMarcar(on) {
+  S.marcando = !!on;
+  $('crqMarcar')?.classList.toggle('principal', S.marcando);
+  $('crqMapa')?.classList.toggle('crq-marcando', S.marcando);
+  if (S.marcando) msg('Clique no mapa onde fica o ponto (Esc ou o botão de novo cancela).');
+}
+async function gravarMarcos(marcos, aviso) {
+  const cq = S.atual;
+  const { error } = await estado.cliente.from('cert_croquis').update({ marcos, atualizado_por: quem() }).eq('fazenda_id', cq.fazenda_id);
+  if (error) return msg('Não gravou: ' + error.message, true);
+  cq.marcos = marcos; desenhar(false); painel(); msg(aviso);
+}
+async function marcarAqui(ll) {
+  modoMarcar(false);
+  const cq = S.atual; if (!cq) return;
+  const sugestao = (cq.marcos || []).some(m => m.tipo === 'Sede') ? '' : 'Sede';
+  const nome = so(prompt('Nome do ponto (ex.: Sede, Galpão, Piscinão, Casa do caseiro):', sugestao));
+  if (!nome) return;
+  const r6 = v => Math.round(v * 1e6) / 1e6;
+  await gravarMarcos([...(cq.marcos || []), { nome, tipo: tipoDoNome(nome), lat: r6(ll.lat), lon: r6(ll.lng), fonte: 'app', em: hojeIso() }], `Ponto “${nome}” marcado.`);
+}
+async function removerMarco(k) {
+  const cq = S.atual; const m = (cq.marcos || [])[k]; if (!m) return;
+  if (!confirm(`Remover o ponto “${m.nome}” do mapa?`)) return;
+  S.mapa.closePopup();
+  await gravarMarcos(cq.marcos.filter((_, i) => i !== k), `Ponto “${m.nome}” removido.`);
 }
 
 async function gravarReserva() {
@@ -534,7 +607,8 @@ async function importar(ev) {
       const ant = S.lista.find(c => c.fazenda_id === n.fazenda_id);
       const doCar = (ant?.feicoes || []).filter(f => f.fonte === 'CAR');
       const limCar = ant?.limite_fonte === 'CAR';
-      return { fazenda_id: n.fazenda_id, fazenda: n.fazenda, feicoes: [...n.feicoes, ...doCar],
+      const marcosApp = (ant?.marcos || []).filter(m => m.fonte !== 'KML');   // marcados no app ficam
+      return { fazenda_id: n.fazenda_id, fazenda: n.fazenda, feicoes: [...n.feicoes, ...doCar], marcos: [...n.marcos, ...marcosApp],
         ...(limCar ? {} : { limite: n.limite, area_total: n.area_total }), fonte: file.name, importado_em: agora, atualizado_por: quem() };
     });
     const { error } = await estado.cliente.from('cert_croquis').upsert(linhas, { onConflict: 'fazenda_id' });

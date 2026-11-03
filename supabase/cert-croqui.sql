@@ -27,3 +27,5 @@ create policy cert_croquis_gravam on public.cert_croquis for all to authenticate
 -- 30/10/2026 (2): pontos de captação (outorgas do AN 59) e origem do limite (KML ou CAR).
 alter table public.cert_croquis add column if not exists pontos jsonb not null default '[]'::jsonb,   -- [{nome,tipo,curso,outorga,vazao,finalidade,validade,venc,lat,lon}]
   add column if not exists limite_fonte text;                                                          -- 'CAR' quando veio do shapefile do SICAR
+-- 03/11/2026: sede e pontos marcados no mapa (do KML ou pelo botão Marcar ponto).
+alter table public.cert_croquis add column if not exists marcos jsonb not null default '[]'::jsonb;   -- [{nome,tipo,lat,lon,fonte:'KML'|'app'}]
