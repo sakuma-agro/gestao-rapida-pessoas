@@ -254,7 +254,7 @@
 .rel-tabela.rel-he { table-layout: auto; width: 100%; }
 .rel-tabela.rel-he th.rel-c, .rel-tabela.rel-he td.rel-c { text-align: center; }
 .rel-tabela.rel-he th.rel-justo { width: 1%; white-space: nowrap; }
-.rel-tabela.rel-he th:not(:first-child):not(.rel-justo) { width: 11%; }
+.rel-tabela.rel-he th:not(:first-child):not(.rel-justo) { width: 10%; }
 
 /* ---- Qualidade dos boletins (28/09/2026) ---- */
 .rel-qpessoa { font-size: 12px; color: #51534A; margin: 10px 0 8px; }

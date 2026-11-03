@@ -138,7 +138,8 @@ const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', cur
 /* ------------------------------------------------------------------
    REL-DP — Relatório Horas Extras (protótipo 12.7, decisão de 25/09/2026)
    Colunas: Funcionário · Horas extras · Insalubridade · Periculosidade 30%
-   · Faltas justif. · Faltas não justif. · Saldo devedor (parcela do mês).
+   · Faltas justif. · Faltas não justif. · Atestado (dias, desde 03/11/2026)
+   · Saldo devedor (parcela do mês).
    ------------------------------------------------------------------ */
 
 /* 27/10/2026: o Relatório Horas Extras mostra cada funcionário só a partir
@@ -183,7 +184,7 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
         <thead><tr>
           <th>Funcionário</th>${antes ? '<th class="rel-c" title="Dias com lançamento de segunda a sábado, fora feriado, falta e atestado">Diárias</th>' : ''}<th class="rel-c">Horas extras</th>
           <th class="rel-c rel-justo">Insalubridade</th><th class="rel-c rel-justo">Periculosidade 30%</th>
-          <th class="rel-c">Faltas justif.</th><th class="rel-c">Faltas não justif.</th>
+          <th class="rel-c">Faltas justif.</th><th class="rel-c">Faltas não justif.</th><th class="rel-c" title="Dias com boletim do tipo Atestado no período">Atestado (dias)</th>
           ${antes ? '' : '<th class="rel-c">Saldo devedor</th>'}
         </tr></thead>
         <tbody>${g.linhas.map(l => {
@@ -196,6 +197,7 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
           <td class="rel-c">${l.faltasInformadas || ''}</td>
+          <td class="rel-c">${l.diasAtestado || ''}</td>
           ${antes ? '' : `<td class="rel-c">${parcela > 0.004 ? brl(parcela) : ''}</td>`}
         </tr>`; }).join('')}</tbody>
       </table>`;

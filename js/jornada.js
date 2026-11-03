@@ -2053,7 +2053,7 @@ function desenharRelatorios() {
   // Cada relatório: nome, o que é, como gerar (html) e, se tiver, o Excel.
   const RELS = {
     esc: [
-      { k: 'dp', nome: 'Relatório Horas Extras', desc: 'Horas extras, insalubridade, periculosidade, faltas e saldo devedor — uma folha por CAEPF', principal: true,
+      { k: 'dp', nome: 'Relatório Horas Extras', desc: 'Horas extras, insalubridade, periculosidade, faltas, atestados e saldo devedor — uma folha por CAEPF', principal: true,
         html: () => rel.relatorioDP(comp(), dest()) },
       { k: 'antes', nome: 'Horas extras antes do registro', desc: 'Dias trabalhados antes da data do registro (admissão) — uso interno, mesmo formato',
         html: () => rel.relatorioAntesRegistro(comp(), dest()) },
