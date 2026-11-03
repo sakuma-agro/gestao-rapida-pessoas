@@ -333,7 +333,10 @@ export function relatorioFaltas(competencia, destinoId, { totais = false } = {})
   const comp = jd.competenciaDoDestino(competencia, destinoId);
 
   const nj = l => l.faltasNJ.filter(f => totais || !f.absorvida);
-  const temFalta = l => l.faltasJ.length + nj(l).length + l.atestadoDatas.length > 0;   // 14/10/2026: atestado entra também
+  /* 03/11/2026: no relatório do DP a falta justificada abatida (compensada
+     com extras ou horas guardadas) também sai — só fica no Faltas totais. */
+  const fj = l => totais ? l.faltasJ : l.faltasJ.filter(d => !l.faltasJComp.includes(d));
+  const temFalta = l => fj(l).length + nj(l).length + l.atestadoDatas.length > 0;   // 14/10/2026: atestado entra também
   const datas = l => nj(l).map(f => dataBR(f.data) + (f.absorvida ? ' <span class="rel-mini">(compensada)</span>'
     : f.atrasada ? ' <span class="rel-mini">(mês anterior)</span>' : ''));
 
@@ -349,13 +352,13 @@ export function relatorioFaltas(competencia, destinoId, { totais = false } = {})
         </tr></thead>
         <tbody>${g.linhas.map(l => {
           const n = nj(l);
-          qJ += l.faltasJ.length; qNJ += n.length; qComp += n.filter(f => f.absorvida).length; qAt += l.atestadoDatas.length;
+          qJ += fj(l).length; qNJ += n.length; qComp += n.filter(f => f.absorvida).length; qAt += l.atestadoDatas.length;
           return `<tr>
           <td>${esc(l.nome)}</td>
-          <td class="rel-c">${l.faltasJ.map(d => dataBR(d) + (l.faltasJDesc.includes(d) ? ' <span class="rel-mini">(descontar)</span>'
+          <td class="rel-c">${fj(l).map(d => dataBR(d) + (l.faltasJDesc.includes(d) ? ' <span class="rel-mini">(descontar)</span>'
             : totais && l.faltasJComp.includes(d) ? ' <span class="rel-mini">(compensada)</span>' : '')).join(', ') || '—'}</td>
           <td class="rel-c">${datas(l).join(', ') || '—'}</td>
-          <td class="rel-num"><b>${l.faltasJ.length + n.length || '—'}</b></td>
+          <td class="rel-num"><b>${fj(l).length + n.length || '—'}</b></td>
           <td class="rel-c">${periodos(l.atestadoDatas).map(p => p.ini === p.fim ? dataBR(p.ini) : `${dataBR(p.ini)} a ${dataBR(p.fim)}`).join('<br>') || '—'}</td>
           <td class="rel-num">${l.atestadoDatas.length ? `<b>${l.atestadoDatas.length}</b>` : '—'}</td>
         </tr>`; }).join('')}</tbody>
@@ -365,7 +368,7 @@ export function relatorioFaltas(competencia, destinoId, { totais = false } = {})
   const resumo = totais
     ? `<div class="rel-resumo"><b>Resumo:</b> ${qJ + qNJ} falta(s) no mês — ${qJ} justificada(s) e ${qNJ} não justificada(s).
        Das não justificadas, ${qComp} foram compensadas por horas extras e ${qNJ - qComp} foram informadas ao DP.${qAt ? ` Atestado: ${qAt} dia(s).` : ''}</div>`
-    : `<p class="rel-nota">Constam só as faltas informadas ao DP. A falta não justificada que as horas extras do mês cobriram não aparece aqui. Atestado não desconta: só informa os dias.</p>`;
+    : `<p class="rel-nota">Constam só as faltas informadas ao DP. A falta abatida das horas extras ou das horas guardadas não aparece aqui. Atestado não desconta: só informa os dias.</p>`;
 
   return documentoDP({
     titulo: totais ? 'RELATÓRIO FALTAS TOTAIS' : 'RELATÓRIO DE FALTAS',
