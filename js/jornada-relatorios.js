@@ -140,6 +140,8 @@ const brl = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', cur
    Colunas: Funcionário · Horas extras · Insalubridade · Periculosidade 30%
    · Faltas justif. · Faltas não justif. · Atestado (dias, desde 03/11/2026)
    · Saldo devedor (parcela do mês).
+   03/11/2026: falta abatida (compensada com horas extras ou com horas
+   guardadas) não sai no relatório do DP — nem justificada nem não justificada.
    ------------------------------------------------------------------ */
 
 /* 27/10/2026: o Relatório Horas Extras mostra cada funcionário só a partir
@@ -195,7 +197,7 @@ export function relatorioDP(competencia, destinoId, { antes = false } = {}) {
           ${antes ? `<td class="rel-c"><b>${l.diarias || ''}</b></td>` : ''}<td class="rel-c"><b>${h(l.minExtraPagar)}</b></td>
           <td class="rel-c">${l.insalubridadePagar ? 'PAGAR' : ''}</td>
           <td class="rel-c">${l.periculosidade ? 'PAGAR' : ''}</td>
-          <td class="rel-c">${l.faltasJ.length || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
+          <td class="rel-c">${Math.max(0, l.faltasJ.length - l.faltasJComp.length) || ''}${l.faltasJDesc.length ? `<br><span class="rel-mini">${l.faltasJDesc.length} a descontar</span>` : ''}</td>
           <td class="rel-c">${l.faltasInformadas || ''}</td>
           <td class="rel-c">${l.diasAtestado || ''}</td>
           ${antes ? '' : `<td class="rel-c">${parcela > 0.004 ? brl(parcela) : ''}</td>`}
