@@ -37,7 +37,9 @@ Set-Content -Path $Trava -Value $PID
 try {
   if (-not (Test-Path -LiteralPath $Base)) { exit 0 }
   $H = @{ 'x-sync-token' = $Token }
-  $p = Invoke-RestMethod -Method Get -Uri "$Url`?acao=pendentes" -Headers $H -TimeoutSec 120
+  # lê a resposta como UTF-8 (o PowerShell 5.1 trocaria Ç/Õ por Ã… e criaria pastas com nome errado)
+  $resp = Invoke-WebRequest -Method Get -Uri "$Url`?acao=pendentes" -Headers $H -UseBasicParsing -TimeoutSec 120
+  $p = [Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray()) | ConvertFrom-Json
   $n = 0; $nl = 0
   foreach ($a in @($p.arquivos)) {
     if (-not $a) { continue }

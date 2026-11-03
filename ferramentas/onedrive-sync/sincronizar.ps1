@@ -139,6 +139,8 @@ try {
         $rel = $a.FullName.Substring($Base.Length + 1)
         $assin = "$($a.Length)|$($a.LastWriteTimeUtc.Ticks)"
         if ($feito[$rel] -eq $assin) { continue }
+        # arquivo vazio (0 KB, PDF que não salvou direito): não tem o que mandar — 30/10/2026
+        if ($a.Length -eq 0) { continue }
         if ($a.Length -gt $MaxB) {
           if ($feito[$rel] -ne "grande|$assin") { Log "GRANDE DEMAIS (mais de 15 MB, fica só no OneDrive): $rel" }
           $feito[$rel] = "grande|$assin"; continue
@@ -162,7 +164,7 @@ try {
              "&caminho=$([uri]::EscapeDataString($rel))&nome=$([uri]::EscapeDataString($a.Name))" +
              "&data=$($a.LastWriteTime.ToString('yyyy-MM-dd'))"
         try {
-          $r = Invoke-RestMethod -Method Post -Uri "$Url`?$q" -Headers $H -ContentType $mime -Body ([IO.File]::ReadAllBytes($a.FullName)) -TimeoutSec 300
+          $r = Invoke-RestMethod -Method Post -Uri "$Url`?$q" -Headers $H -ContentType $mime -Body ([IO.File]::ReadAllBytes($(if ($a.FullName.Length -ge 248) { '\\?\' + $a.FullName } else { $a.FullName }))) -TimeoutSec 300
           if ($r.pulado) { $pul++ } else { $env++ }
           $feito[$rel] = $assin
         } catch {
