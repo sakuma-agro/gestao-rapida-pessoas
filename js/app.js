@@ -1869,7 +1869,7 @@ const NOME_COLECAO = { funcionarios: 'funcionário', epis: 'EPI', fichas: 'ficha
   boletins: 'boletim', apuracoes: 'apuração', ocorrencias: 'ocorrência', vinculos: 'cadastro nível 2', emprestimos: 'empréstimo',
   abatimentos: 'abatimento', salarios: 'salário', afastamentos: 'afastamento', feriasInicial: 'férias (inicial)', feriasGozos: 'férias',
   feriasPerdas: 'perda de férias', bolEntregas: 'entrega de boletim', docEntregas: 'entrega de documento', banco: 'horas guardadas',
-  ticketMes: 'ticket do mês', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria',
+  ticketMes: 'ticket do mês', holerites: 'holerite (ajuste)', ticketEmissoes: 'emissão de ticket', competencias: 'competência', auditoria: 'auditoria',
   sst_exames: 'exame', sst_tipos_exame: 'tipo de exame', sst_treinamentos: 'treinamento', sst_tipos_treinamento: 'tipo de treinamento', sst_aso_itens: 'marcação do ASO',
   cert_eventos: 'evento da certificação (feito)',
   cc_plantios: 'plantio', cc_insumos: 'insumo', cc_analises: 'análise', cc_calibracoes: 'calibração', cc_registros: 'lançamento de campo', cc_config: 'responsável técnico' };

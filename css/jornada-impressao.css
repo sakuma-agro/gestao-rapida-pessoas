@@ -471,3 +471,78 @@
 .cl-fotos figcaption { font-size: 8px; padding: 2px; }
 .cl-folha .rel-rodape { margin-top: 4mm; }
 @media print { .rel.cl-folha { width: 210mm; box-sizing: border-box; max-width: none; border: 0; } }
+
+/* ---- Holerites do DP 2 (03/11/2026) ----
+   Um demonstrativo por funcionário, no formato da planilha do DP 2. Na tela
+   os números são campos editáveis; no papel sai a versão limpa (.hol-papel),
+   uma folha A4 por pessoa, só com as linhas que têm valor. */
+.hol-barra { align-items: center; flex-wrap: wrap; max-width: 210mm; }
+.hol-barra label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #51534A; margin-right: auto; }
+.hol-barra select { max-width: 260px; }
+.hol-tot { font-size: 12px; color: #744F28; font-weight: 700; }
+.hol-dica { max-width: 210mm; margin: 0 auto 10px; font-size: 12px; color: #51534A; line-height: 1.5; }
+.hol-alt-ex { color: #744F28; }
+.hol + .hol { margin-top: 14px; }
+.hol-papel { display: none; }
+
+.hol-id, .hol-bases, .hol-pag {
+  display: grid; gap: 4px 14px; border: 1px solid #D6D8CF; padding: 7px 10px; margin-bottom: 8px;
+}
+.hol-id { grid-template-columns: 2fr 1.4fr 1fr; background: #F4F8EA; }
+.hol-bases { grid-template-columns: repeat(4, 1fr); }
+.hol-pag { grid-template-columns: .7fr 1.3fr .7fr 1.1fr 1.6fr 1fr 1fr; }
+.hol-id span, .hol-bases span, .hol-pag span, .hol-obs > span {
+  display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .3px; color: #8A8D86;
+}
+.hol-id b, .hol-bases b, .hol-pag b { font-size: 11px; color: #51534A; overflow-wrap: anywhere; }
+.hol-resumo {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 8px; padding: 5px 10px;
+  border-left: 4px solid #84BD00; background: #FAFBF6; font-size: 10.5px; color: #51534A;
+}
+.hol-resumo b { color: #744F28; }
+.hol-tab { width: 100%; }
+.hol-tab td:nth-child(2) { width: 22%; }
+.hol-tab td:nth-child(3), .hol-tab td:nth-child(4) { width: 19%; }
+.hol-tab small { color: #8A8D86; }
+.hol-tab tr.hol-info td { color: #8A8D86; }
+.hol-tab .hol-liq td { background: #E9F3CF; color: #744F28; font-weight: 700; font-size: 12px; }
+.hol-fora { margin-top: -4px; }
+.hol-fora td:first-child { color: #744F28; font-weight: 700; }
+.hol-obs { border: 1px solid #D6D8CF; padding: 6px 10px; margin-bottom: 8px; }
+.hol-obs p { margin: 2px 0 0; }
+.hol-notas { margin: 0 0 8px; padding: 6px 10px 6px 26px; background: #FAF6EF; border-left: 4px solid #744F28; font-size: 10px; color: #744F28; }
+.hol-acoes { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+.hol-assina { display: grid; grid-template-columns: 1fr 2fr; gap: 0 30px; margin-top: 18px; }
+.hol-assina p { grid-column: 1 / -1; margin: 0 0 26px; font-size: 10px; }
+.hol-assina div { text-align: center; }
+.hol-assina span { display: block; border-top: 1px solid #51534A; }
+.hol-assina small { font-size: 9.5px; color: #8A8D86; }
+
+/* Campos editáveis: parecem texto até receber o clique. */
+.hol-in {
+  width: 100%; max-width: 110px; box-sizing: border-box; font: inherit; color: #51534A; text-align: right;
+  border: 1px solid #D6D8CF; border-radius: 4px; padding: 2px 5px; background: #fff;
+}
+.hol-tab td.rel-c .hol-in { max-width: 64px; text-align: center; }
+.hol-in.hol-txt { text-align: left; max-width: none; }
+.hol-in:focus { outline: 2px solid #84BD00; border-color: #84BD00; }
+.hol-in.hol-alt { border-color: #744F28; background: #FAF6EF; color: #744F28; font-weight: 700; }
+.hol-obs .hol-in { margin-top: 2px; }
+
+@media (max-width: 700px) {
+  .hol-id { grid-template-columns: 1fr 1fr; }
+  .hol-bases { grid-template-columns: 1fr 1fr; }
+  .hol-pag { grid-template-columns: 1fr 1fr; }
+  .rel.hol { padding: 12px 10px; }
+}
+
+@media print {
+  .hol-barra, .hol-dica, .hol-editor { display: none !important; }
+  .hol-papel { display: block; }
+  .rel.hol { break-after: page; page-break-after: always; font-size: 10.5px; }
+  .rel.hol:last-child { break-after: auto; page-break-after: auto; }
+  .hol + .hol { margin-top: 0; }
+  .hol-id, .hol-resumo, .hol-tab .hol-liq td, .hol-notas { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .hol-notas { display: none; }
+}
+.hol-tab .rel-c { text-align: center; }

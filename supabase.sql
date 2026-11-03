@@ -337,3 +337,22 @@ alter table public.jor_boletins add constraint jor_boletins_motivo_tipo_chk chec
 alter table public.jor_ticket_emissoes add column if not exists fechado boolean not null default false;
 alter table public.jor_ticket_emissoes add column if not exists fechado_por text;
 alter table public.jor_ticket_emissoes add column if not exists fechado_em timestamptz;
+
+-- Holerite do DP 2 (03/11/2026): ajustes feitos à mão no holerite de UM mês.
+-- chave = funcionario_id|AAAA-MM; ajustes = { "sal.q": 24, "base": 2070, "obs": "..." }.
+-- Mesmo acesso da tela Salário base (o holerite mostra salário).
+create table if not exists public.jor_holerites (
+  chave text primary key,
+  funcionario_id uuid not null,
+  competencia text not null,
+  destino_id uuid,
+  ajustes jsonb not null default '{}'::jsonb,
+  atualizado_por text,
+  atualizado_em timestamptz not null default now()
+);
+create index if not exists jor_holerites_comp on public.jor_holerites (competencia);
+alter table public.jor_holerites enable row level security;
+create policy holerite_tela on public.jor_holerites for all
+  using (app_pode_tela('empSalarios','jornada') or app_pode('rh'))
+  with check (app_pode_tela('empSalarios','jornada') or app_pode('rh'));
+create trigger lop_atualizado before update on public.jor_holerites for each row execute function marcar_atualizacao();

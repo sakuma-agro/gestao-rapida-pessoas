@@ -17,6 +17,7 @@ import * as bol from './jornada-boletins.js';
 import * as tf from './dp-tarefas.js';
 import * as docm from './jornada-documentos.js';
 import * as tk from './jornada-ticket.js';
+import * as hol from './jornada-holerite.js';
 import { podeTela } from './acesso.js';
 
 const $ = id => document.getElementById(id);
@@ -1910,6 +1911,7 @@ async function desenharFechamento() {
           <button class="btn" data-vermesant="${d.id}" title="Boletins de mês anterior lançados depois do fechamento e pagos neste mês">Horas do mês anterior</button>
           <button class="btn" data-verfnd="${d.id}" title="Funcionários com falta ou falta justificada que não foi abatida das horas">Faltas não descontadas</button>
           <button class="btn" data-verate="${d.id}" title="Funcionários com atestado no mês, com o período e os dias">Atestados</button>
+          ${hol.ehDp2(d) && podeTela('empSalarios') ? `<button class="btn" data-verhol="${d.id}" title="Um holerite por funcionário, no formato da planilha do DP 2 — os valores puxados podem ser alterados">Holerites</button>` : ''}
         </div>
       </section>`;
   }));
@@ -1997,6 +1999,9 @@ async function desenharFechamento() {
   }));
   document.querySelectorAll('[data-verate]').forEach(b => b.addEventListener('click', () => {
     rel.mostrar(rel.relatorioAtestados(estadoTela.competencia, b.dataset.verate), { barra: true });
+  }));
+  document.querySelectorAll('[data-verhol]').forEach(b => b.addEventListener('click', () => {
+    hol.abrirHolerites(estadoTela.competencia, b.dataset.verhol, aviso);
   }));
   document.querySelectorAll('[data-imprimirdp]').forEach(b => b.addEventListener('click', () => {
     rel.mostrar(rel.relatorioDP(estadoTela.competencia, b.dataset.imprimirdp), { barra: true });

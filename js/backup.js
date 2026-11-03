@@ -90,6 +90,7 @@ const GRUPOS = [
   ['DP · Entregas', 'public', ['jor_bol_entregas', 'jor_doc_entregas']],
   ['DP · Folha de ponto', 'public', ['jor_folha_ponto_config', 'jor_folha_ponto_impressos']],
   ['DP · Ticket', 'public', ['jor_ticket_mes', 'jor_ticket_emissoes']],
+  ['DP · Holerites (DP 2)', 'public', ['jor_holerites']],
   ['DP · Empréstimo e Férias', 'public', ['jor_emprestimos', 'jor_emprestimo_abatimentos', 'jor_salarios',
     'jor_afastamentos', 'jor_ferias_inicial', 'jor_ferias_gozos', 'jor_ferias_perdas']],
   ['Certificação', 'public', ['cert_certificacoes', 'cert_requisitos', 'cert_documentos', 'cert_doc_itens', 'cert_vinculos', 'cert_evidencias', 'cert_eventos', 'cr_tipos', 'cr_saidas', 'cr_avaliacoes']],

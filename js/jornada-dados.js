@@ -73,6 +73,9 @@ export const TABELAS = {
      pessoa. Chave da tarefa = funcionario_id|evento|data|modelo. */
   tarefaModelos:  'jor_tarefa_modelos',
   tarefas:        'jor_tarefas',
+  /* Holerite do DP 2 (03/11/2026): o que foi alterado à mão no holerite de
+     UM mês. Chave = funcionario_id|AAAA-MM; ajustes = { campo: valor }. */
+  holerites:      'jor_holerites',
 };
 
 /* Leituras de apoio que não são tabela própria: as faltas de todo o histórico
@@ -82,7 +85,7 @@ const APOIO = ['faltas', 'bolFerias', 'bolJornada'];
 
 /* A chave primária de cada coleção. jor_vinculos e jor_apuracoes não usam
    "id" — o vínculo é do funcionário, a apuração é do boletim. */
-const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave', ticketMes: 'chave', ticketEmissoes: 'competencia', tarefas: 'chave' };
+const CHAVE = { vinculos: 'funcionario_id', apuracoes: 'boletim_id', feriasInicial: 'funcionario_id', bolEntregas: 'chave', docEntregas: 'chave', banco: 'chave', ticketMes: 'chave', holerites: 'chave', ticketEmissoes: 'competencia', tarefas: 'chave' };
 const chaveDe = c => CHAVE[c] || 'id';
 
 export const dados = Object.fromEntries([...Object.keys(TABELAS), ...APOIO].map(k => [k, []]));
@@ -117,7 +120,7 @@ async function carregarCache() {
    ficam inteiros: a aba Cadastros continua mostrando todo mundo. */
 const POR_PESSOA = ['boletins', 'ocorrencias', 'emprestimos', 'abatimentos', 'salarios',
   'afastamentos', 'feriasInicial', 'feriasGozos', 'feriasPerdas', 'bolEntregas',
-  'docEntregas', 'banco', 'ticketMes', 'tarefas', 'faltas', 'bolFerias', 'bolJornada'];
+  'docEntregas', 'banco', 'ticketMes', 'holerites', 'tarefas', 'faltas', 'bolFerias', 'bolJornada'];
 
 /** Destino de DP da pessoa, pelo vínculo → unidade. */
 export const destinoIdDoFuncionario = fid => unidadeDe(vinculoDe(fid))?.destino_id || null;
@@ -216,7 +219,7 @@ export async function carregar(competencia = competenciaAtual()) {
         : (bh.data || []).map(r => ({ ...(r.valor || {}), chave: r.chave, _base: r.atualizado_em ?? null }));
     }),
     // Ticket e vínculos dos indicadores: pequenos, vêm inteiros.
-    ...['ticketMes', 'ticketEmissoes', 'indVinculos', 'tiposDeslig'].map(k => lerTabela(k)),
+    ...['ticketMes', 'ticketEmissoes', 'indVinculos', 'tiposDeslig', 'holerites'].map(k => lerTabela(k)),
     // Admissão e demissão: pequenas, vêm inteiras (painel do DP).
     carregarTarefas().catch(() => {}),
   ]);
