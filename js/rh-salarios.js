@@ -876,3 +876,58 @@ export const api = {
 
 /* Para testes. */
 export const _sal = { S, PJ, abrirFicha, formAlteracao };
+
+/* ===================================================================
+   PONTE COM O "GERAR PROPOSTA" › ALTERAÇÃO DE SALÁRIO (03/11/2026)
+   Pedido dele: a alteração de salário nasce no Gerar proposta, sai como
+   "Comunicado de alteração salarial" com ciência do funcionário e grava a
+   vigência nova aqui, no mesmo histórico (jor_salarios) do Alterar salário.
+   A regra de gravação é a mesma do formAlteracao: total do plano dividido em
+   base + adicionais, insalubridade acompanha, cadastro só muda se a data já
+   valer. Não duplique essa regra no rh.js — chame daqui.
+   =================================================================== */
+export { MOTIVOS };
+
+/** O que vale hoje para a pessoa: salário total, cargo, faixa e a próxima faixa sugerida. */
+export async function vigenteParaProposta(fid) {
+  await api.garantir();
+  const f = pessoa(fid);
+  if (!f) return null;
+  const x = situacao(f);
+  return {
+    total: x.sal, peric: x.peric, grat: x.grat, desde: x.s?.desde || null,
+    cargo: x.cargo, faixa: x.faixa,
+    proxima: x.prox && !x.prox.topo ? { cargo: x.prox.cargo, letra: x.prox.letra, vertical: !!x.prox.vertical } : null,
+  };
+}
+
+/** Grava a vigência nova. Devolve o registro gravado (com id). */
+export async function registrarAlteracao({ fid, total, comPeric, cargoId, faixa, motivo, desde, obs, atualizarCad = true }) {
+  await api.garantir();
+  const f = pessoa(fid);
+  if (!f) throw new Error('Funcionário não encontrado.');
+  if (!total) throw new Error('Informe o novo salário.');
+  if (!desde) throw new Error('Informe a data de vigência.');
+  if (salariosDe(fid).find(s => s.desde === desde))
+    throw new Error(`Já existe um salário de ${f.nome} começando em ${br(desde)}. Corrija por RH › Salários.`);
+  const x = situacao(f);
+  const cargo = cargoPorId(cargoId);
+  const comGrat = x.grat > 0 || ehGerencia(cargo);
+  const d = dividir(total, !!comPeric, comGrat);
+  const insal = x.insal;
+  const reg = {
+    funcionario_id: fid, valor: d.base, periculosidade: d.peric, gratificacao: d.grat,
+    faixa_obs: obsFaixa(cargo, faixa, r2(total)),
+    insalubridade: insal?.valor || 0, insalubridade_tipo: insal?.tipo || null,
+    desde, rh_cargo_id: cargoId || null, faixa: faixa || null, motivo: motivo || 'ajuste',
+    justificativa: obs || 'Comunicado de alteração salarial (Gerar proposta)',
+    criado_por: estado.sessao?.user?.email || null, criado_em: new Date().toISOString(),
+  };
+  const g = await jd.salvar('salarios', reg);
+  await jd.registrar({ tabela: 'jor_salarios', registro_id: g.id, acao: 'insert', antes: null, depois: g, justificativa: reg.justificativa });
+  if (atualizarCad && desde <= hoje()) await atualizarCadastro(f, cargoId, faixa, {
+    periculosidade: d.peric > 0,
+    insalubridade: insal?.tipo === 'fixa' ? 'permanente' : insal?.tipo === 'variavel' ? 'eventual' : 'nao',
+  });
+  return g;
+}

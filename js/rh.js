@@ -427,7 +427,7 @@ function montarBeneficios() {
 /* A segunda fase (depois do contrato de experiência) é opcional: enquanto a
    caixa estiver desmarcada, os campos ficam escondidos e nada sai no papel. */
 function trocarPos() {
-  $('campoPos').hidden = !$('ppPos').checked;
+  $('campoPos').hidden = ehAlteracao() || !$('ppPos').checked;
 }
 
 function escolherCargoPos() {
@@ -442,21 +442,78 @@ function aplicarFaixaPos() {
   if (c && c[campo] != null) $('ppPosSalario').value = emCampo(c[campo]);
 }
 
+/* Três tipos: contratação (candidato), promoção (proposta para quem já é da
+   casa) e, desde 03/11/2026, alteração de salário — que não é proposta: sai
+   como "Comunicado de alteração salarial", com ciência do funcionário, e grava
+   a vigência nova no histórico de RH › Salários. Por isso ela esconde o que é
+   de proposta (jornada, local, experiência, benefícios, segunda folha). */
+const ehAlteracao = () => $('ppTipo').value === 'alteracao';
+const daCasa = () => $('ppTipo').value !== 'contratacao';
+
 function trocarTipo() {
-  const promocao = $('ppTipo').value === 'promocao';
-  $('campoPessoa').hidden = !promocao;
-  $('campoNome').hidden = promocao;
-  $('campoAtual').hidden = !promocao;
+  const casa = daCasa(), alt = ehAlteracao();
+  $('campoPessoa').hidden = !casa;
+  $('campoNome').hidden = casa;
+  $('campoAtual').hidden = !casa;
+  document.querySelectorAll('#telaRhProposta .so-proposta').forEach(e => { e.hidden = alt; });
+  document.querySelectorAll('#telaRhProposta .so-alteracao').forEach(e => { e.hidden = !alt; });
+  if ($('campoPos')) $('campoPos').hidden = alt || !$('ppPos').checked;
+  const rot = (id, t) => { if ($(id)) $(id).textContent = t; };
+  rot('ppRotCargo', alt ? 'Cargo a partir da vigência' : 'Cargo');
+  rot('ppRotFaixa', alt ? 'Faixa nova' : 'Faixa');
+  rot('ppRotSalario', alt ? 'Novo salário (R$)' : 'Salário proposto (R$)');
+  rot('ppRotInicio', alt ? 'Vigência a partir de' : 'Início / vigência');
+}
+
+/* O motivo se sugere sozinho (mudou o cargo = vertical, só a faixa =
+   horizontal) até ele escolher à mão. */
+function sugerirMotivo() {
+  const sel = $('ppMotivo');
+  if (!sel || !ehAlteracao() || sel.dataset.mexido) return;
+  const hoje_ = so($('ppCargoAtual').value).toLowerCase();
+  const novo = so(cargoPorId($('ppCargo').value)?.nome).toLowerCase();
+  sel.value = novo && hoje_ && novo !== hoje_ ? 'vertical' : 'horizontal';
 }
 
 /** Ao escolher a pessoa, traz o cargo de hoje e o salário que a tabela mostra. */
-function escolherPessoa() {
-  const f = estado.funcionarios.find(x => x.id === $('ppPessoa').value);
+async function escolherPessoa() {
+  const fid = $('ppPessoa').value;
+  const f = estado.funcionarios.find(x => x.id === fid);
   if (!f) return;
   $('ppCargoAtual').value = f.cargo || '';
-  // o salário de hoje é da pessoa, não do cargo — quem digita é ele
+  $('ppFaixaAtual').value = '';
+  $('ppDicaAtual').textContent = '';
   const c = cargoPorNome(f.cargo);
   if (c && !$('ppCargo').value) { $('ppCargo').value = c.id; escolherCargo(); }
+  /* O salário de hoje vem do histórico de RH › Salários (jor_salarios) — antes
+     ficava em branco e ele digitava. Sem permissão ou sem registro, segue em
+     branco para digitar, como era. */
+  let v = null;
+  try { v = await (await import('./rh-salarios.js')).vigenteParaProposta(fid); }
+  catch (e) { console.warn('salário de hoje', e); }
+  if ($('ppPessoa').value !== fid) return;          /* trocou de pessoa no meio */
+  if (!v || v.total == null) {
+    $('ppSalarioAtual').value = '';
+    $('ppDicaAtual').textContent = 'Sem salário no histórico de RH › Salários — digite o de hoje.';
+    return;
+  }
+  $('ppSalarioAtual').value = emCampo(v.total);
+  if (v.cargo) $('ppCargoAtual').value = v.cargo.nome;
+  $('ppFaixaAtual').value = v.faixa || '';
+  $('ppDicaAtual').textContent = `Do histórico de salários: vale desde ${dataBr(v.desde)}`
+    + `${v.peric > 0 ? ' · com periculosidade' : ''}${v.grat > 0 ? ' · com gratificação de função' : ''}.`;
+  $('ppPeric').checked = v.peric > 0;
+  if (ehAlteracao()) {
+    /* Sugere o próximo passo da tabela; ele muda se quiser. */
+    const alvo = v.proxima?.cargo || v.cargo;
+    if (alvo) {
+      $('ppCargo').value = alvo.id;
+      escolherCargo();
+      const campo = (FAIXAS.find(([, r]) => r === (v.proxima?.letra || v.faixa)) || [])[0];
+      if (campo) { $('ppFaixa').value = campo; aplicarFaixa(); }
+    }
+    sugerirMotivo();
+  }
 }
 
 /** Cargo + faixa mandam o salário; ele pode mudar em cima. */
@@ -464,6 +521,7 @@ function escolherCargo() {
   const c = cargoPorId($('ppCargo').value);
   $('ppNivel').textContent = c?.nivel ? `Nível ${c.nivel}` : '';
   aplicarFaixa();
+  sugerirMotivo();
 }
 
 function aplicarFaixa() {
@@ -477,11 +535,12 @@ function aplicarFaixa() {
 }
 
 function dadosDaProposta() {
-  const promocao = $('ppTipo').value === 'promocao';
+  const promocao = daCasa();               /* promoção e alteração: gente da casa */
+  const alt = ehAlteracao();
   const c = cargoPorId($('ppCargo').value);
   const pessoa = estado.funcionarios.find(x => x.id === $('ppPessoa').value);
-  return {
-    tipo: promocao ? 'promocao' : 'contratacao',
+  const p = {
+    tipo: $('ppTipo').value,
     funcionario_id: promocao ? (pessoa?.id || null) : null,
     nome: promocao ? so(pessoa?.nome) : so($('ppNome').value),
     cargo_id: c?.id || null,
@@ -509,8 +568,19 @@ function dadosDaProposta() {
     pos_faixa: $('ppPos').checked
       ? ((FAIXAS.find(([k]) => k === $('ppPosFaixa').value) || [])[1] || '') : '',
     pos_salario: $('ppPos').checked ? numeroOuNulo($('ppPosSalario').value) : null,
+    faixa_atual: promocao ? so($('ppFaixaAtual').value) : '',
+    motivo: alt ? $('ppMotivo').value : null,
   };
+  if (alt) Object.assign(p, {
+    morador: false, jornada: '', local_trabalho: '', experiencia: '', beneficios: '',
+    pos_experiencia: false, pos_cargo_id: null, pos_cargo_nome: '', pos_nivel: '', pos_faixa: '', pos_salario: null,
+  });
+  return p;
 }
+
+/* Nome do PDF que o Chrome sugere. */
+const nomeDoArquivo = p => p.tipo === 'alteracao'
+  ? `Alteração salarial - ${p.nome || ''}` : `Proposta salarial - ${p.nome || ''}`;
 
 /* O ticket alimentação não passa pelo holerite. Por isso a tabela fecha em
    dois totais: o "Total mensal holerite", que é o que a folha paga, e o
@@ -582,7 +652,75 @@ function folhaPosExperiencia(p, comPeric, ticket) {
   });
 }
 
+/* ================= COMUNICADO DE ALTERAÇÃO SALARIAL =================
+   03/11/2026. Antes × depois, motivo, vigência, composição do salário e as
+   duas assinaturas: a da empresa (sem nome de pessoa — ele não quer o nome
+   dele nos documentos) e a ciência do funcionário. */
+export const MOTIVOS_ALTERACAO = {
+  horizontal: 'Promoção horizontal — mudança de faixa',
+  vertical: 'Promoção vertical — mudança de cargo',
+  reajuste: 'Reajuste / dissídio',
+  ajuste: 'Ajuste salarial',
+};
+
+function documentoAlteracao(p) {
+  const motivo = MOTIVOS_ALTERACAO[p.motivo] || 'Ajuste salarial';
+  const comPeric = !!p.periculosidade && p.salario != null;
+  const ticket = valorOuNulo(p.ticket_alimentacao);
+  const antes = valorOuNulo(p.salario_atual);
+  const dif = antes != null && p.salario != null ? p.salario - antes : null;
+  const pct = dif != null && antes ? dif * 100 / antes : null;
+  const pctTxt = pct == null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(1).replace('.', ',')}%`;
+  const mudouCargo = so(p.cargo_atual) && so(p.cargo_nome)
+    && so(p.cargo_atual).toLowerCase() !== so(p.cargo_nome).toLowerCase();
+
+  const corpo = `
+    <p>Comunicamos a <b>${esc(p.nome || '—')}</b> que, a partir de <b>${dataBr(p.data_inicio)}</b>,
+       sua remuneração mensal passa a ser a indicada abaixo, por motivo de
+       <b>${esc(motivo.toLowerCase())}</b>.</p>
+    <div class="rel-ficha">
+      <div><span>Nome</span><b>${esc(p.nome || '—')}</b></div>
+      <div><span>Cargo</span><b>${esc(p.cargo_nome || '—')}</b></div>
+      <div><span>Nível</span><b>${esc(p.nivel || '—')}</b></div>
+      <div><span>Faixa salarial</span><b>${esc(p.faixa || '—')}</b></div>
+      <div><span>Novo salário mensal</span><b>${dinheiro(p.salario)}${comPeric ? ' <small style="font-weight:400">(com periculosidade)</small>' : ''}</b></div>
+      <div><span>Vigência a partir de</span><b>${dataBr(p.data_inicio)}</b></div>
+      <div><span>Motivo</span><b>${esc(motivo)}</b></div>
+    </div>
+    <table class="rel-tabela">
+      <thead><tr><th></th><th>Até agora</th><th>A partir de ${dataBr(p.data_inicio)}</th><th>Diferença</th></tr></thead>
+      <tbody>
+        <tr><td>Cargo</td><td>${esc(p.cargo_atual || '—')}</td><td>${esc(p.cargo_nome || '—')}</td>
+            <td>${mudouCargo ? 'mudou de cargo' : 'mesmo cargo'}</td></tr>
+        <tr><td>Faixa</td><td>${esc(p.faixa_atual || '—')}</td><td>${esc(p.faixa || '—')}</td><td>${so(p.faixa_atual) && so(p.faixa) && so(p.faixa_atual) !== so(p.faixa) ? 'mudou de faixa' : '—'}</td></tr>
+        <tr><td>Salário mensal (holerite)</td><td class="rel-num">${dinheiro(antes)}</td>
+            <td class="rel-num">${dinheiro(p.salario)}</td>
+            <td class="rel-num">${dif == null ? '—' : `${dif >= 0 ? '+' : '−'} ${dinheiro(Math.abs(dif))}`}</td></tr>
+      </tbody>
+      <tfoot><tr><td colspan="3">Aumento</td><td class="rel-num">${pctTxt}</td></tr></tfoot>
+    </table>
+    ${composicaoDoSalario(p.salario, comPeric, ticket)}
+    ${so(p.observacao) ? `<div class="rel-resumo">${so(p.observacao).split('\n')
+      .filter(Boolean).map(l => `<div>${esc(l.trim())}</div>`).join('')}</div>` : ''}
+    <p class="rel-nota">As demais condições do contrato de trabalho continuam como estão.</p>
+    <p class="rel-nota">São Gotardo, ${porExtenso(hoje())}.</p>
+    <div class="rel-assinaturas">
+      <div class="rel-assina"><span></span><small>SAKUMA Agronegócios</small></div>
+      <div class="rel-assina"><span></span><small>Ciente: ${esc(p.nome || '')}</small></div>
+    </div>
+    <p class="rel-nota" style="text-align:right;margin-top:10px">Data da ciência: ____/____/________</p>`;
+
+  return documento({
+    titulo: 'COMUNICADO DE ALTERAÇÃO SALARIAL',
+    subtitulo: 'Plano de Cargos e Salários · SAKUMA Agronegócios',
+    canto: esc(p.cargo_nome || ''),
+    corpo,
+    assinatura: '',
+  });
+}
+
 export function documentoProposta(p) {
+  if (p.tipo === 'alteracao') return documentoAlteracao(p);
   const m = R.modelo || {};
   const promocao = p.tipo === 'promocao';
   const dif = (promocao && p.salario != null && p.salario_atual)
@@ -663,7 +801,7 @@ function desenharUltimas() {
     <div class="item" style="grid-template-columns:1fr auto">
       <span>
         <span class="nome">${esc(p.nome)}</span>
-        <span class="tag ${p.tipo === 'promocao' ? 'alerta' : 'ativo'}">${p.tipo === 'promocao' ? 'promoção' : 'contratação'}</span><br>
+        <span class="tag ${p.tipo === 'contratacao' ? 'ativo' : 'alerta'}">${p.tipo === 'alteracao' ? 'alteração de salário' : p.tipo === 'promocao' ? 'promoção' : 'contratação'}</span><br>
         <span class="sub">${esc(p.cargo_nome || '')} · faixa ${esc(p.faixa || '—')} · ${dinheiro(p.salario)} · ${dataBr(String(p.criado_em).slice(0, 10))}</span>
       </span>
       <span class="acoes">
@@ -676,7 +814,7 @@ function desenharUltimas() {
 
   alvo.querySelectorAll('[data-prop]').forEach(b => b.addEventListener('click', () => {
     const p = R.propostas.find(x => x.id === b.dataset.prop);
-    if (p) verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
+    if (p) verPrevia(documentoProposta(p), nomeDoArquivo(p));
   }));
   alvo.querySelectorAll('[data-prop-ed]').forEach(b => b.addEventListener('click', () => {
     const p = R.propostas.find(x => x.id === b.dataset.propEd);
@@ -695,9 +833,13 @@ function desenharUltimas() {
 function carregarNaProposta(p) {
   editandoProposta = p.id;
   propostaOriginal = { ...p };
-  $('ppTipo').value = p.tipo === 'promocao' ? 'promocao' : 'contratacao';
-  trocarTipo();
+  $('ppTipo').value = ['promocao', 'alteracao'].includes(p.tipo) ? p.tipo : 'contratacao';
   $('ppPessoa').value = p.funcionario_id || '';
+  trocarTipo();
+  $('ppMotivo').value = p.motivo || 'horizontal';
+  $('ppMotivo').dataset.mexido = '1';
+  $('ppFaixaAtual').value = p.faixa_atual || '';
+  $('ppDicaAtual').textContent = '';
   $('ppNome').value = p.nome || '';
   $('ppCargo').value = p.cargo_id || '';
   escolherCargo();
@@ -722,7 +864,7 @@ function carregarNaProposta(p) {
   $('ppPosFaixa').value = (FAIXAS.find(([, r]) => r === p.pos_faixa) || ['faixa_media'])[0];
   $('ppPosSalario').value = p.pos_salario != null ? emCampo(p.pos_salario) : '';
   modoEdicao();
-  verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
+  verPrevia(documentoProposta(p), nomeDoArquivo(p));
   $('ppNome').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -780,6 +922,11 @@ function limparProposta(avisar = () => {}) {
   $('ppMorador').checked = false;
   $('ppCargoAtual').value = '';
   $('ppSalarioAtual').value = '';
+  $('ppFaixaAtual').value = '';
+  $('ppDicaAtual').textContent = '';
+  $('ppMotivo').value = 'horizontal';
+  delete $('ppMotivo').dataset.mexido;
+  $('ppRegistrar').checked = true;
   $('ppInicio').value = hoje();
   $('ppJornada').value = m.jornada || '';
   $('ppLocal').value = m.local_trabalho || '';
@@ -1282,11 +1429,16 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
   });
 
   /* --- proposta --- */
-  $('ppTipo').addEventListener('change', trocarTipo);
+  $('ppTipo').addEventListener('change', () => {
+    trocarTipo();
+    /* Já tinha escolhido a pessoa num tipo e trocou para outro: traz o de hoje. */
+    if (daCasa() && $('ppPessoa').value && !$('ppSalarioAtual').value) escolherPessoa();
+  });
   $('ppMorador').addEventListener('change', montarBeneficios);
   $('ppPessoa').addEventListener('change', escolherPessoa);
   $('ppCargo').addEventListener('change', escolherCargo);
-  $('ppFaixa').addEventListener('change', aplicarFaixa);
+  $('ppFaixa').addEventListener('change', () => { aplicarFaixa(); sugerirMotivo(); });
+  $('ppMotivo').addEventListener('change', () => { $('ppMotivo').dataset.mexido = '1'; });
   $('ppPos').addEventListener('change', trocarPos);
   $('bCancelarEdProposta').addEventListener('click', sairDaEdicao);
   $('bCancelarEdProposta2').addEventListener('click', sairDaEdicao);
@@ -1303,7 +1455,7 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
     const p = dadosDaProposta();
     if (!p.nome) return avisar('Falta o nome da pessoa.');
     if (!p.cargo_id) return avisar('Escolha o cargo.');
-    verPrevia(documentoProposta(p), `Proposta salarial - ${p.nome || ''}`);
+    verPrevia(documentoProposta(p), nomeDoArquivo(p));
   });
 
   $('bSalvarProposta').addEventListener('click', async ev => {
@@ -1325,9 +1477,27 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
       sairDaEdicao();
     }
 
+    const alt = p.tipo === 'alteracao';
+    if (alt && (!p.funcionario_id || p.salario == null || !p.data_inicio))
+      return avisar('Na alteração de salário, escolha o funcionário e preencha o novo salário e a vigência.');
+    const gravarHistorico = alt && !editandoProposta && $('ppRegistrar').checked;
+
     const botao = ev.currentTarget;
     botao.disabled = true;
+    let gravouHistorico = false;
     try {
+      /* Primeiro o histórico: se a data já tiver vigência, para aqui e nada
+         é gravado pela metade. */
+      if (gravarHistorico) {
+        const sal = await import('./rh-salarios.js');
+        const g = await sal.registrarAlteracao({
+          fid: p.funcionario_id, total: p.salario, comPeric: p.periculosidade,
+          cargoId: p.cargo_id, faixa: p.faixa || null, motivo: p.motivo,
+          desde: p.data_inicio, obs: p.observacao ? `Comunicado: ${p.observacao}`.slice(0, 200) : '',
+        });
+        p.salario_registro_id = g.id;
+        gravouHistorico = true;
+      }
       const corpo = { ...p, emitida_por: estado.sessao?.user?.email || null };
       const { data, error } = editandoProposta
         ? await estado.cliente.from('rh_propostas').update(corpo).eq('id', editandoProposta).select().single()
@@ -1341,10 +1511,18 @@ export function ligarRh(avisar = () => {}, redesenharFuncionarios = () => {}) {
         R.propostas.unshift(data);
       }
       desenharUltimas();
-      verPrevia(documentoProposta(data), `Proposta salarial - ${data.nome || ''}`);
-      avisar('Proposta salva. A prévia está aí embaixo, pronta para imprimir.');
+      verPrevia(documentoProposta(data), nomeDoArquivo(data));
+      avisar(alt
+        ? (gravarHistorico ? 'Comunicado salvo e a nova vigência gravada em RH › Salários. A prévia está aí embaixo.'
+          : 'Comunicado salvo (o histórico de salários não foi mexido). A prévia está aí embaixo.')
+        : 'Proposta salva. A prévia está aí embaixo, pronta para imprimir.');
     } catch (e) {
-      avisar(`Não deu para salvar: ${e.message || e}`);
+      /* O histórico já entrou e só o comunicado falhou: desmarca a caixa para
+         o próximo Salvar não gravar a mesma vigência duas vezes. */
+      if (gravouHistorico) $('ppRegistrar').checked = false;
+      avisar(gravouHistorico
+        ? `A vigência nova já foi gravada em RH › Salários, mas o comunicado não salvou: ${e.message || e}. Tente Salvar de novo.`
+        : `Não deu para salvar: ${e.message || e}`);
     } finally { botao.disabled = false; }
   });
 

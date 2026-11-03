@@ -1584,6 +1584,15 @@ addEventListener('beforeinstallprompt', function (ev) {
             <select id="ppTipo">
               <option value="contratacao">Contratação</option>
               <option value="promocao">Promoção ou aumento</option>
+              <option value="alteracao">Alteração de salário</option>
+            </select>
+          </label>
+          <label class="campo so-alteracao" hidden>Motivo
+            <select id="ppMotivo">
+              <option value="horizontal">Promoção horizontal (faixa)</option>
+              <option value="vertical">Promoção vertical (cargo)</option>
+              <option value="reajuste">Reajuste / dissídio</option>
+              <option value="ajuste">Ajuste salarial</option>
             </select>
           </label>
           <label class="campo" id="campoNome">Nome do candidato
@@ -1592,34 +1601,36 @@ addEventListener('beforeinstallprompt', function (ev) {
           <label class="campo" id="campoPessoa" hidden>Funcionário
             <select id="ppPessoa"></select>
           </label>
-          <label class="campo">Cargo
+          <label class="campo"><span id="ppRotCargo">Cargo</span>
             <select id="ppCargo"></select>
             <small class="dc-sem" id="ppNivel"></small>
           </label>
-          <label class="campo">Faixa
+          <label class="campo"><span id="ppRotFaixa">Faixa</span>
             <select id="ppFaixa"></select>
           </label>
-          <label class="campo">Salário proposto (R$)
+          <label class="campo"><span id="ppRotSalario">Salário proposto (R$)</span>
             <input type="text" id="ppSalario" inputmode="decimal">
           </label>
           <label class="campo">Ticket alimentação (R$)
             <input type="text" id="ppTicket" inputmode="decimal" placeholder="em branco = não entra">
             <small class="dc-sem">Sai fora do holerite: entra depois do total e soma no "Total de tudo".</small>
           </label>
-          <label class="campo">Início / vigência
+          <label class="campo"><span id="ppRotInicio">Início / vigência</span>
             <input type="date" id="ppInicio">
           </label>
           <div class="campo plena" id="campoAtual" hidden>
             <div class="grade">
               <label class="campo">Cargo de hoje <input type="text" id="ppCargoAtual"></label>
               <label class="campo">Salário de hoje (R$) <input type="text" id="ppSalarioAtual" inputmode="decimal"></label>
+              <label class="campo">Faixa de hoje <input type="text" id="ppFaixaAtual" maxlength="20"></label>
             </div>
+            <small class="dc-sem" id="ppDicaAtual"></small>
           </div>
           <p class="dica plena" id="ppDicaFaixa" style="margin:0"></p>
-          <label class="campo">Jornada <input type="text" id="ppJornada"></label>
-          <label class="campo">Local de trabalho <input type="text" id="ppLocal"></label>
-          <label class="campo plena">Período de experiência <input type="text" id="ppExperiencia"></label>
-          <label class="campo plena" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:13px">
+          <label class="campo so-proposta">Jornada <input type="text" id="ppJornada"></label>
+          <label class="campo so-proposta">Local de trabalho <input type="text" id="ppLocal"></label>
+          <label class="campo plena so-proposta">Período de experiência <input type="text" id="ppExperiencia"></label>
+          <label class="campo plena so-proposta" style="text-transform:none;letter-spacing:0;font-weight:400;font-size:13px">
             <span><input type="checkbox" id="ppMorador" style="width:auto;margin-right:6px">
             Mora na fazenda — acrescenta moradia, internet e a folga de compras</span>
           </label>
@@ -1627,11 +1638,11 @@ addEventListener('beforeinstallprompt', function (ev) {
             <span><input type="checkbox" id="ppPeric" style="width:auto;margin-right:6px">
             Salário com periculosidade de 30% embutida — a proposta abre a conta (base + adicional = total)</span>
           </label>
-          <label class="campo plena">Benefícios (um por linha)
+          <label class="campo plena so-proposta">Benefícios (um por linha)
             <textarea id="ppBeneficios" rows="5"></textarea>
             <small class="dc-sem">Marcar ou desmarcar "mora na fazenda" remonta esta lista pelo padrão.</small>
           </label>
-          <label class="campo plena">
+          <label class="campo plena so-proposta">
             <span><input type="checkbox" id="ppPos" style="width:auto;margin-right:6px">
             Prevê mudança depois do contrato de experiência — sai numa segunda folha</span>
           </label>
@@ -1649,6 +1660,11 @@ addEventListener('beforeinstallprompt', function (ev) {
               </label>
             </div>
           </div>
+          <label class="campo plena so-alteracao" hidden>
+            <span><input type="checkbox" id="ppRegistrar" checked style="width:auto;margin-right:6px">
+            Gravar a nova vigência no histórico de salários (RH › Salários) e atualizar o cadastro</span>
+            <small class="dc-sem">Vale só ao salvar pela primeira vez. Data futura fica como "programado" e o cadastro muda quando chegar o dia.</small>
+          </label>
           <label class="campo plena">Observação (sai numa caixa na proposta)
             <textarea id="ppObs" rows="2"></textarea>
             <small class="dc-sem"><label style="cursor:pointer">
