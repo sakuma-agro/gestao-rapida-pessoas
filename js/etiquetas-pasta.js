@@ -9,6 +9,11 @@
 // 13,5 mm em cima e embaixo, fora da área que a impressora não alcança.
 // O nome pode ser trocado na tela (para abreviar nome comprido). Seleção e
 // nomes trocados ficam só neste navegador.
+//
+// Ajuste de 03/11/2026, depois da primeira impressão: nome menor (até 10 pt,
+// no máximo 2 linhas) e com o número na frente, "127 – NOME", como na
+// etiqueta de armário. O número vem do nº de cadastro (ficha) e pode ser
+// trocado na tela.
 
 import { estado } from './store.js';
 import { mostrar, imprimir } from './jornada-relatorios.js';
@@ -27,7 +32,7 @@ const ESQ = (PAGINA.w - PAGINA.colunas * ETQ.w) / 2;
 const TOPO = (PAGINA.h - PAGINA.linhas * ETQ.h) / 2;
 
 const CHAVE = 'gr-etiquetas-pastas';
-const est = { situacao: 'ATIVO', fazenda: '', busca: '', marcados: [], nome: {}, inicio: 1 };
+const est = { situacao: 'ATIVO', fazenda: '', busca: '', marcados: [], nome: {}, num: {}, inicio: 1 };
 (function ler() {
   try { Object.assign(est, JSON.parse(localStorage.getItem(CHAVE)) || {}); } catch { /* sem armazenamento */ }
   est.busca = '';
@@ -43,6 +48,7 @@ const pessoas = () => estado.funcionarios
     (!est.fazenda || limpo(f.fazenda) === est.fazenda))
   .filter(f => !est.busca || [f.nome, f.cadastro].some(v => String(v || '').toLowerCase().includes(est.busca.toLowerCase())))
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+const numDe = f => (String(f.id) in est.num) ? est.num[f.id] : limpo(f.cadastro);
 const nomeDe = f => (String(f.id) in est.nome) ? est.nome[f.id] : limpo(f.nome);
 const fazendas = () => [...new Set(estado.funcionarios.map(f => limpo(f.fazenda)).filter(Boolean))]
   .sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -94,9 +100,10 @@ function desenhar() {
       </div>
 
       <div class="et-lista">
-        <div class="et-linha ep-linha et-cab"><span></span><span>Funcionário</span><span>Nome na etiqueta</span></div>
+        <div class="et-linha ep-linha et-cab"><span></span><span>Nº</span><span>Funcionário</span><span>Nome na etiqueta</span></div>
         ${lista.map(f => `<div class="et-linha ep-linha">
           <input type="checkbox" data-ep-f="${esc(f.id)}"${marc.has(String(f.id)) ? ' checked' : ''}>
+          <input class="et-num" type="text" data-ep-num="${esc(f.id)}" value="${esc(numDe(f))}" maxlength="8" placeholder="—">
           <span>${esc(f.nome)}${f.cadastro ? ` <span class="dc-sem">· ficha ${esc(f.cadastro)}</span>` : ''}</span>
           <input class="et-nome" type="text" data-ep-nome="${esc(f.id)}" value="${esc(nomeDe(f))}" maxlength="60"></div>`).join('') ||
           '<p class="dc-sem" style="padding:8px">Ninguém neste filtro.</p>'}
@@ -130,6 +137,12 @@ function desenhar() {
     else est.nome[i.dataset.epNome] = i.value;
     gravar(); fechar();
   }));
+  alvo.querySelectorAll('[data-ep-num]').forEach(i => i.addEventListener('input', () => {
+    const f = estado.funcionarios.find(x => String(x.id) === i.dataset.epNum);
+    if (f && limpo(i.value) === limpo(f.cadastro)) delete est.num[i.dataset.epNum];
+    else est.num[i.dataset.epNum] = i.value;
+    gravar(); fechar();
+  }));
   $('epVer').addEventListener('click', () => gerar(false));
   $('epImp').addEventListener('click', () => gerar(true));
 }
@@ -137,7 +150,7 @@ function desenhar() {
 /* ---------------- a etiqueta ---------------- */
 const etiquetaHtml = f => `<div class="ep-etq" style="width:${ETQ.w}mm;height:${ETQ.h}mm">
     <div class="ep-faixa"></div>
-    <div class="ep-nome"><span>${esc(limpo(nomeDe(f)) || f.nome)}</span></div>
+    <div class="ep-nome"><span>${limpo(numDe(f)) ? `<b>${esc(limpo(numDe(f)))}</b> – ` : ''}${esc(limpo(nomeDe(f)) || f.nome)}</span></div>
     <div class="ep-filete"></div>
   </div>`;
 
@@ -157,17 +170,19 @@ function gerar(paraImprimir) {
   if (paraImprimir) setTimeout(imprimirSemTitulo, 400);
 }
 
-/* Nome grande: começa em 15pt, quebra em até duas linhas e diminui a letra
-   até caber, com folga porque a impressora desenha a letra um pouco maior
-   que a tela (mesmo cuidado da etiqueta de envelope). */
+/* Nome: começa em 10 pt e diminui a letra até caber em no máximo duas
+   linhas (pedido de 03/11/2026 — em 15 pt saía em três linhas e enchia o
+   visor). Folga porque a impressora desenha a letra um pouco maior. */
 function caberNome() {
   document.querySelectorAll('#jorImpressao .ep-nome').forEach(box => {
     const s = box.firstElementChild;
-    let pt = 15;
-    s.style.fontSize = pt + 'pt';
-    const cabe = () => s.scrollWidth <= s.clientWidth &&
-      s.getBoundingClientRect().height <= box.clientHeight * 0.88;
-    while (!cabe() && pt > 7) { pt -= 0.5; s.style.fontSize = pt + 'pt'; }
+    let pt = 10;
+    const cabe = () => {
+      s.style.fontSize = pt + 'pt';
+      const linha = parseFloat(getComputedStyle(s).lineHeight) || pt * 1.5;
+      return s.scrollWidth <= s.clientWidth && s.getBoundingClientRect().height <= linha * 2 + 1;
+    };
+    while (!cabe() && pt > 6.5) pt -= 0.5;
   });
 }
 
