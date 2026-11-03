@@ -492,7 +492,8 @@ export function relatorioFaltasNaoDescontadas(competencia, destinoId) {
   const datasNJ = arr => arr.map(f => dataBR(f.data) + (f.atrasada ? ' <span class="rel-mini">(mês anterior)</span>' : '')).join(', ');
   const datasJ = arr => arr.map(f => dataBR(f.data) + (f.desconta ? ' <span class="rel-mini">(descontar)</span>' : '')).join(', ');
   let qNJ = 0, qJ = 0;
-  const corpo = porEmpregador(c).map(g => `
+  // 03/11/2026: só quem tem falta não abatida no mês.
+  const corpo = porEmpregador(c, l => { const p = partes(l); return p.nj.length + p.j.length > 0; }).map(g => `
       ${blocoEmp(g.rotulo)}
       <table class="rel-tabela rel-tabela-dp rel-he">
         <thead><tr>
@@ -509,10 +510,10 @@ export function relatorioFaltasNaoDescontadas(competencia, destinoId) {
           <td class="rel-c"><b>${p.nj.length + p.j.length || ''}</b></td>
         </tr>`; }).join('')}</tbody>
       </table>`).join('')
-    || `<p class="rel-vazio">Nenhum funcionário com vínculo neste destino.</p>`;
+    || `<p class="rel-vazio">Nenhuma falta não descontada nesta competência.</p>`;
 
   const resumo = `<div class="rel-resumo"><b>Resumo:</b> ${qNJ + qJ} falta(s) não descontada(s) das horas no mês — ${qNJ} falta(s) e ${qJ} falta(s) justificada(s).</div>
-    <p class="rel-nota">Todos os funcionários do destino aparecem, mesmo sem falta. A falta abatida das horas extras ou das horas guardadas já foi descontada e não entra.</p>`;
+    <p class="rel-nota">Só aparecem os funcionários com falta no mês. A falta abatida das horas extras ou das horas guardadas já foi descontada e não entra.</p>`;
 
   return documentoDP({
     titulo: 'RELATÓRIO FALTAS NÃO DESCONTADAS', competencia, destino: c.destino,
