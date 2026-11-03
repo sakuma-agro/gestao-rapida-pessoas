@@ -406,6 +406,17 @@
 
 /* ---- Etiquetas de envelope (29/10/2026, js/etiquetas-envelope.js) ----
    100 × 120 mm, 2 por A4. Quadro mês a mês: holerite, folha de ponto, recibo. */
+/* Pastas suspensas (03/11/2026) — 50 × 30 mm, modelo A: faixa verde, nome, filete marrom */
+.ep-linha { grid-template-columns: 26px minmax(0, 1.2fr) minmax(0, 1fr); }
+.ep-pos { position: absolute; }
+.ep-etq { box-sizing: border-box; display: flex; flex-direction: column; background: #fff;
+  outline: 0.2mm dashed #B4B2A9; outline-offset: -0.1mm; font-family: Arial, Helvetica, sans-serif; }
+.ep-faixa { flex: none; height: 2mm; background: #84BD00; }
+.ep-filete { flex: none; height: 0.8mm; background: #744F28; }
+.ep-nome { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 2.5mm; overflow: hidden; }
+.ep-nome > span { display: block; width: 100%; text-align: center; font-weight: 700; line-height: 1.12; color: #51534A;
+  text-transform: uppercase; overflow-wrap: break-word; }
+@media print { .ep-etq, .ep-faixa, .ep-filete { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 .ev-linha { grid-template-columns: 26px minmax(0, 1.3fr) minmax(0, 1fr) 90px; }
 .ev-pos { position: absolute; }
 .ev-etq { box-sizing: border-box; display: flex; flex-direction: column; padding: 4mm 5mm 3mm;

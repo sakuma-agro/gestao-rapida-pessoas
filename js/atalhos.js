@@ -42,6 +42,7 @@ const PROPRIOS = {
   cadFerias:     ['sol', 'Férias do mês'],
   etqArmarios:   ['armario', 'Etiquetas de armário'],
   etqEnvelopes:  ['envelope', 'Etiquetas de envelope'],
+  etqPastas:     ['pasta', 'Etiquetas de pasta suspensa'],
   jorPainel:     ['painel', 'Painel DP'],
   jorLancar:     ['relogio', 'Lançar jornada'],
   jorBoletins:   ['relogio', 'Jornadas lançadas'],

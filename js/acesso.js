@@ -65,6 +65,8 @@ export const MODULOS = [
     { id: 'etiquetas', nome: 'Etiquetas', telas: [
       ['etqArmarios', 'Armários'],
       ['etqEnvelopes', 'Envelopes'],
+      /* Pastas suspensas (03/11/2026): js/etiquetas-pasta.js, 50 × 30 mm. */
+      ['etqPastas', 'Pastas suspensas'],
     ] },
     /* "Estrutura" (29/09/2026): Funções e setores e Empregador e fazenda viraram
        um submódulo só, a pedido dele. As chaves das telas não mudaram. */
@@ -559,6 +561,8 @@ export function podeTela(tela) {
   /* Quem já tinha o Gerar proposta liberado ganha a Alteração de salário,
      que nasceu de dentro dele (03/11/2026). */
   if (tela === 'rhAlteracao' && acesso.telas.includes(m + ':rhProposta')) return true;
+  /* Quem já tinha etiqueta de armário ou de envelope ganha a de pasta suspensa (03/11/2026). */
+  if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
 
