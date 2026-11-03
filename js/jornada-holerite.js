@@ -110,8 +110,8 @@ function automatico(l, competencia) {
     q: {
       ...q,
       faltas: naoAbatidas.length,
-      he50: r2(((l.minExtra50 || 0) + (l.minExtraAnterior || 0)) / 60),
-      he100: r2((l.minExtra100 || 0) / 60),
+      // Todas as horas extras a 50%, como a planilha do DP 2 (03/11/2026).
+      he50: r2(((l.minExtra50 || 0) + (l.minExtra100 || 0) + (l.minExtraAnterior || 0)) / 60),
       porfora: 0,
     },
     v: { adiant: valorParaFolha(fid, competencia) || 0 },
@@ -190,7 +190,7 @@ async function salvarAjustes(item, ajustes) {
    planilha: Descrição · Quantidade · Valor, total BRUTO e, abaixo dele, faltas,
    adiantamento e horas por fora. Linha zerada não aparece (na tela, o botão
    "Mostrar linhas zeradas" abre todas para editar). */
-const ORDEM_V = ['sal', 'dsr', 'feriado', 'ferias', 'he50', 'he100', 'reflexo', 'grat', 'fj', 'atest',
+const ORDEM_V = ['sal', 'dsr', 'feriado', 'ferias', 'he50', 'reflexo', 'grat', 'fj', 'atest',
   'obito', 'licmat', 'insal', 'peric', 'indevido'];
 const ORDEM_D = ['faltas', 'adiant', 'porfora'];
 const SEMPRE = new Set(['sal', 'dsr', 'feriado']);

@@ -3,7 +3,8 @@
 // Segue a planilha "Controle folha de pagamento Quebra Cocão - DP2":
 //   diária = salário base / 30
 //   sal. p/ cálc. H.E. = base + gratificação + insalubridade + periculosidade
-//   hora extra = sal. p/ cálc. H.E. / 220 × 1,5   (100%: × 2)
+//   hora extra = sal. p/ cálc. H.E. / 220 × 1,5 — todas a 50%, como a planilha
+//   (03/11/2026: domingo e feriado também entram aqui, pedido dele)
 //   reflexo H.E. = valor das H.E. / dias de salário normal × (D.S.R. + feriados)
 //   salário normal, D.S.R., feriado, falta justificada, atestado e licenças
 //   = dias × diária; o mês fecha sempre em 30 dias (mês comercial)
@@ -25,7 +26,6 @@ export const LINHAS = [
   { k: 'ferias',   nome: 'Férias',                       tipo: 'v', un: 'dias' },
   { k: 'indevido', nome: 'Pagamento indevido',           tipo: 'v', un: '' },
   { k: 'he50',     nome: 'Horas extras 50%',             tipo: 'v', un: 'h' },
-  { k: 'he100',    nome: 'Horas extras 100%',            tipo: 'v', un: 'h' },
   { k: 'reflexo',  nome: 'Reflexo H.E. (D.S.R.)',        tipo: 'v', un: '' },
   { k: 'grat',     nome: 'Grat. de função',              tipo: 'v', un: '' },
   { k: 'fj',       nome: 'Falta justificada',            tipo: 'v', un: 'dias' },
@@ -83,8 +83,7 @@ export function calcular(auto, ajustes = {}) {
   val('ferias', 0);
   val('indevido', 0);
   val('he50', q.he50 * hora * 1.5);
-  val('he100', q.he100 * hora * 2);
-  val('reflexo', q.sal > 0 ? (v.he50 + v.he100) / q.sal * (q.dsr + q.feriado) : 0);
+  val('reflexo', q.sal > 0 ? v.he50 / q.sal * (q.dsr + q.feriado) : 0);
   val('fj', q.fj * diaria);
   val('atest', q.atest * diaria);
   val('obito', q.obito * diaria);
@@ -107,7 +106,7 @@ export function calcular(auto, ajustes = {}) {
   const alterado = new Set(Object.keys(aj).filter(c => temAjuste(aj, c)));
 
   return {
-    base, diaria: r2(diaria), salHE, hora50: r2(hora * 1.5), hora100: r2(hora * 2),
+    base, diaria: r2(diaria), salHE, hora50: r2(hora * 1.5),
     q, v, bruto, descontos, liquido, porFora, totalPagar: r2(liquido + porFora),
     pag1, pag2, texto, alterado, fator,
   };
