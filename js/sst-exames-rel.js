@@ -11,7 +11,7 @@
 import { LOGO, PE_LOP } from './seed.js';
 import { retratoExames } from './sst.js';
 import { montarMulti } from './multisel.js';
-import { exigidosDe, funcoes } from './aso.js';
+import { exigidosPessoa, funcoes } from './aso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -311,9 +311,10 @@ function listaClinica() {
     // incluído à mão entra sempre; o resto, pelo vencimento do ASO
     .filter(x => x.extra || (x.aso && (x.aso.nunca ? nunca : situacao(x.aso, prazo).precisa)))
     .map(({ p, aso, extra }) => {
-      // mudança de função: a clínica faz os exames da função NOVA
+      // mudança de função: a clínica faz os exames da função NOVA, mais os das
+      // atividades da pessoa (ex.: secador de café → audiometria)
       const nova = extra && extra.tipo === 'Mudança de função' && extra.funcao;
-      const exames = nova ? exigidosDe(nova).map(t => t.nome) : p.linhas.filter(l => l.exame !== 'ASO').map(l => l.exame);
+      const exames = nova ? exigidosPessoa({ ...p.f, cargo: nova }).map(t => t.nome) : p.linhas.filter(l => l.exame !== 'ASO').map(l => l.exame);
       return {
         f: p.f, aso: aso || { nunca: true }, extra,
         tipo: extra ? extra.tipo : 'Periódico',
