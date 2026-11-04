@@ -6,3 +6,6 @@
 create table if not exists public.cert_evidencias_bkp_datas(id uuid, data_antiga date, data_nova date, em timestamptz default now());
 alter table public.cert_evidencias_bkp_datas enable row level security;
 -- Para desfazer: update cert_evidencias e set data = b.data_antiga from cert_evidencias_bkp_datas b where b.id = e.id;
+-- 03/11/2026 (2ª versão): também escâner (06122024_131843_…), câmera (2025-1127-161840), ano-mês (2026-10)
+-- e mês abreviado com ano (ABR-2025, Dez2024, ago-26) — mais 201 evidências acertadas.
+-- arquivos_mover (padronizar.ps1 → movidos.json) passou a acertar a data e a descrição pelo caminho novo.

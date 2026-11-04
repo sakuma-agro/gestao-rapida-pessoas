@@ -197,6 +197,12 @@ function dataPeloNome(caminho: string, padrao: string) {
   if (iso && valida(+iso[1], +iso[2], +iso[3])) return limite(`${iso[1]}-${iso[2]}-${iso[3]}`);
   const dt = nome.match(/(?:^|\D)(\d{1,2})[.\/_-](\d{1,2})[.\/_-](20\d\d)(?:\D|$)/);
   if (dt && valida(+dt[3], +dt[2], +dt[1])) return limite(`${dt[3]}-${dois(+dt[2])}-${dois(+dt[1])}`);
+  const esc = nome.match(/^(\d{2})(\d{2})(20\d\d)_\d{6}/);   // escâner: 06122024_131843_SAKUMA…
+  if (esc && valida(+esc[3], +esc[2], +esc[1])) return limite(`${esc[3]}-${esc[2]}-${esc[1]}`);
+  const cam = nome.match(/(?:^|\D)(20\d\d)-(\d{2})(\d{2})-\d{6}/);   // câmera: 2025-1127-161840
+  if (cam && valida(+cam[1], +cam[2], +cam[3])) return limite(`${cam[1]}-${cam[2]}-${cam[3]}`);
+  const am = nome.match(/(?:^|\D)(20\d\d)[.\-_](\d{2})(?:\D|$)/);   // ano-mês: 2026-10 (padrão novo)
+  if (am && +am[2] >= 1 && +am[2] <= 12) return limite(`${am[1]}-${am[2]}-${dois(new Date(Date.UTC(+am[1], +am[2], 0)).getUTCDate())}`);
   const dm = nome.match(/(?:^|[^\d])(\d{1,2})[.\-_](\d{1,2})(?![.\-_]?\d)/);
   if (dm) {
     const aa = Number(anoNome || anoPasta || padrao.slice(0, 4));
@@ -207,7 +213,13 @@ function dataPeloNome(caminho: string, padrao: string) {
     }
   }
   const i = MESES_NOME.findIndex(m => new RegExp(`(^|[^a-z])${m}([^a-z]|$)`).test(nome));
-  if (i < 0) return padrao;
+  if (i < 0) {   // mês abreviado com ano: ABR-2025, Dez2024, ago-26
+    for (let j = 0; j < 12; j++) {
+      const ab = nome.match(new RegExp(`(?:^|[^a-z])${MESES_NOME[j].slice(0, 3)}[^a-z0-9]{0,3}((?:20)?\\d\\d)(?!\\d)`));
+      if (ab) { const aa = ab[1].length === 2 ? 2000 + +ab[1] : +ab[1]; return limite(`${aa}-${dois(j + 1)}-${dois(new Date(Date.UTC(aa, j + 1, 0)).getUTCDate())}`); }
+    }
+    return padrao;
+  }
   let ano = Number(anoNome || anoPasta || padrao.slice(0, 4));
   if (!anoNome && !anoPasta && i + 1 > Number(padrao.slice(5, 7))) ano--;
   return limite(`${ano}-${dois(i + 1)}-${dois(new Date(Date.UTC(ano, i + 1, 0)).getUTCDate())}`);
