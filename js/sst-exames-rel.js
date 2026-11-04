@@ -10,6 +10,7 @@
 // imprimir) e CSV.
 import { LOGO, PE_LOP } from './seed.js';
 import { retratoExames } from './sst.js';
+import { montarMulti } from './multisel.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -21,6 +22,10 @@ const dataBr = iso => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
 };
+
+/* Fazendas marcadas no filtro: null = todas. */
+const fazendasEscolhidas = () => { const v = $('erFazenda').valores || []; return v.length ? new Set(v) : null; };
+const textoFazendas = () => ($('erFazenda').rotulos || []).join(', ');
 
 let BASE = [];           // [{ f, linhas, semLista }]
 let atual = [];          // o recorte que está na tela
@@ -55,17 +60,23 @@ function preencherFiltros() {
       lista.map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
     sel.value = lista.some(([k]) => k === antes) ? antes : '';
   };
-  opc($('erFazenda'), BASE.map(p => p.f.fazenda), 'Todas');
+  // Fazenda aceita mais de uma (04/11/2026, pedido dele): caixas de marcar.
+  const fz = new Map();
+  BASE.forEach(p => { const v = so(p.f.fazenda); if (v && !fz.has(chave(v))) fz.set(chave(v), v); });
+  montarMulti($('erFazenda'), {
+    opcoes: [...fz.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR')),
+    marcados: $('erFazenda').valores || [], todas: 'Todas as fazendas', plural: 'fazendas',
+  });
   opc($('erFuncao'), BASE.map(p => p.f.cargo), 'Todas');
 }
 
 function recortar() {
-  const faz = $('erFazenda').value, fun = $('erFuncao').value;
+  const faz = fazendasEscolhidas(), fun = $('erFuncao').value;
   const q = chave($('erBusca').value);
   const prazo = Number($('erPrazo').value) || 60;
   const soPend = $('erMostrar').value === 'pendentes';
   return BASE
-    .filter(p => (!faz || chave(p.f.fazenda) === faz) && (!fun || chave(p.f.cargo) === fun)
+    .filter(p => (!faz || faz.has(chave(p.f.fazenda))) && (!fun || chave(p.f.cargo) === fun)
       && (!q || chave(p.f.nome).includes(q)))
     .map(p => {
       const linhas = p.linhas.map(l => ({ ...l, s: situacao(l, prazo) }))
@@ -80,7 +91,7 @@ function recortar() {
 function textoRecorte() {
   const nome = id => { const s = $(id); return s.value ? s.options[s.selectedIndex].text : ''; };
   const partes = [];
-  if (nome('erFazenda')) partes.push(nome('erFazenda'));
+  if (textoFazendas()) partes.push(textoFazendas());
   if (nome('erFuncao')) partes.push(nome('erFuncao'));
   partes.push($('erMostrar').value === 'pendentes'
     ? `a fazer (vencidos, nunca feitos e vencendo em até ${$('erPrazo').value} dias)` : 'todos os exames');
@@ -240,12 +251,12 @@ const ehAudio = nome => chave(nome).includes('AUDIOMETRIA');
 let ultimaClinica = '';
 
 function listaClinica() {
-  const faz = $('erFazenda').value, fun = $('erFuncao').value;
+  const faz = fazendasEscolhidas(), fun = $('erFuncao').value;
   const q = chave($('erBusca').value);
   const prazo = Number($('erPrazo').value) || 60;
   const nunca = $('clNunca').checked;
   return BASE
-    .filter(p => (!faz || chave(p.f.fazenda) === faz) && (!fun || chave(p.f.cargo) === fun)
+    .filter(p => (!faz || faz.has(chave(p.f.fazenda))) && (!fun || chave(p.f.cargo) === fun)
       && (!q || chave(p.f.nome).includes(q)))
     .map(p => ({ p, aso: p.linhas.find(l => l.exame === 'ASO') }))
     .filter(x => x.aso && (x.aso.nunca ? nunca : situacao(x.aso, prazo).precisa))
@@ -289,7 +300,7 @@ function porEmpregador(lista) {
 }
 function recorteClinica() {
   const nome = id => { const s = $(id); return s.value ? s.options[s.selectedIndex].text : ''; };
-  return [nome('erFazenda'), nome('erFuncao'), `ASO vencido ou vencendo em até ${$('erPrazo').value} dias`]
+  return [textoFazendas(), nome('erFuncao'), `ASO vencido ou vencendo em até ${$('erPrazo').value} dias`]
     .filter(Boolean).join(' · ');
 }
 function folhasClinica(titulo, emp, cab, cols, linhas, pesoDe, n) {
