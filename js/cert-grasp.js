@@ -95,6 +95,7 @@ const nomeFaz = id => E.faz.find(x => x.id === id)?.nome || '';
 const realizadas = () => E.reun.filter(r => r.situacao === 'Realizada');
 const funcionarios = () => (estado.funcionarios || []).filter(f => f.situacao === 'ATIVO')
   .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+const fazendasFunc = fs => [...new Set(fs.map(f => so(f.fazenda)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 const anos = () => [...new Set(E.reun.map(r => r.data.slice(0, 4)))].sort().reverse();
 const encAbertos = () => E.reun.flatMap(r => (r.encaminhamentos || []).filter(e => e.situacao !== 'Concluído').map(e => ({ ...e, r })));
 
@@ -246,11 +247,13 @@ function formReuniao(r, pre = {}) {
       <label class="campo">Conduzida pela empresa por <input type="text" id="gfCond" value="${esc(v.conduzida_por || '')}"></label>
     </div>
     <datalist id="gfFuncs">${fs.map(f => `<option value="${esc(f.nome)}">`).join('')}</datalist>
-    <details ${v.situacao === 'Agendada' && !marcados.size ? '' : 'open'} style="margin-top:10px"><summary><b>Participantes</b> <span class="dica" id="gfConta"></span></summary>
+    <details open style="margin-top:10px"><summary><b>Participantes · lista de presença</b> <span class="dica" id="gfConta"></span></summary>
+      <p class="dica" style="margin:4px 0">Marque quem vai assinar: cada um sai na lista com a função do cadastro.</p>
       <div class="barra" style="margin:6px 0"><input type="search" id="gfBusca" placeholder="Buscar funcionário" style="flex:1">
-        <button class="btn mini" type="button" id="gfTodos">Marcar todos os ativos</button><button class="btn mini" type="button" id="gfNenhum">Limpar</button></div>
+        <select id="gfFFaz">${opcoes(fazendasFunc(fs), '', 'Todas as fazendas')}</select>
+        <button class="btn mini" type="button" id="gfTodos">Marcar os visíveis</button><button class="btn mini" type="button" id="gfNenhum">Limpar</button></div>
       <div id="gfLista" style="max-height:220px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:6px 8px">
-        ${fs.length ? fs.map(f => `<label class="item" data-nome="${esc(String(f.nome).toLowerCase())}" style="display:flex;gap:8px;align-items:center;padding:2px 0">
+        ${fs.length ? fs.map(f => `<label class="item" data-nome="${esc(String(f.nome).toLowerCase())}" data-faz="${esc(so(f.fazenda))}" style="display:flex;gap:8px;align-items:center;padding:2px 0">
           <input type="checkbox" data-pid="${esc(f.id)}" ${marcados.has(String(f.id)) ? 'checked' : ''}> <span>${esc(f.nome)} <small class="dica">${esc(f.cargo || '')}</small></span></label>`).join('')
           : '<p class="dica">O cadastro de funcionários não está neste aparelho. Use "Outros participantes".</p>'}
       </div>
@@ -266,14 +269,15 @@ function formReuniao(r, pre = {}) {
     <div class="np-passo">2 · Evidência (opcional)</div>
     <div id="gfAnx" style="margin-top:8px"></div>
     <div class="barra entre">
-      <div>${r ? '<button class="btn perigo" type="button" id="gfApagar">Apagar</button> ' : ''}<button class="btn" type="button" id="gfImp">Imprimir ata e lista</button></div>
+      <div>${r ? '<button class="btn perigo" type="button" id="gfApagar">Apagar</button> ' : ''}<button class="btn" type="button" id="gfImpLista">Imprimir lista de presença</button> <button class="btn" type="button" id="gfImp">Imprimir ata e lista</button></div>
       <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="gfOk">Gravar</button></div>
     </div>`, d => {
     const conta = () => { $('gfConta').textContent = `· ${d.querySelectorAll('#gfLista input:checked').length} marcado(s)`; };
     d.querySelectorAll('#gfLista input').forEach(x => x.addEventListener('change', conta)); conta();
-    $('gfBusca').addEventListener('input', e => { const q = e.target.value.trim().toLowerCase();
-      d.querySelectorAll('#gfLista [data-nome]').forEach(x => { x.style.display = !q || x.dataset.nome.includes(q) ? '' : 'none'; }); });
-    $('gfTodos').addEventListener('click', () => { d.querySelectorAll('#gfLista input').forEach(x => { x.checked = true; }); conta(); });
+    const filtrar = () => { const q = $('gfBusca').value.trim().toLowerCase(), fz = $('gfFFaz').value;
+      d.querySelectorAll('#gfLista [data-nome]').forEach(x => { x.style.display = (!q || x.dataset.nome.includes(q)) && (!fz || x.dataset.faz === fz) ? '' : 'none'; }); };
+    $('gfBusca').addEventListener('input', filtrar); $('gfFFaz').addEventListener('change', filtrar);
+    $('gfTodos').addEventListener('click', () => { d.querySelectorAll('#gfLista [data-nome]').forEach(x => { if (x.style.display !== 'none') x.querySelector('input').checked = true; }); conta(); });
     $('gfNenhum').addEventListener('click', () => { d.querySelectorAll('#gfLista input').forEach(x => { x.checked = false; }); conta(); });
     const lerEncs = () => [...$('gfEncs').querySelectorAll('tr')].map(tr => Object.fromEntries([...tr.querySelectorAll('[data-k]')].map(x => [x.dataset.k, so(x.value)])));
     const desenharEncs = () => { $('gfEncs').innerHTML = encs.length ? encs.map(linhaEnc).join('') : '<tr><td colspan="5" class="dica">Nenhum encaminhamento.</td></tr>';
@@ -296,6 +300,7 @@ function formReuniao(r, pre = {}) {
         observacao: so($('gfObs').value) || null };
     };
     $('gfImp').addEventListener('click', () => { fechar(); mostrar(docAta({ ...v, ...ler(), id: r?.id }), { barra: true }); });
+    $('gfImpLista').addEventListener('click', () => { fechar(); mostrar(docLista({ ...v, ...ler(), id: r?.id }), { barra: true }); });
     $('gfApagar')?.addEventListener('click', () => confirmarApagar(r));
     $('gfOk').addEventListener('click', async () => {
       const l = ler();
@@ -366,9 +371,6 @@ const caixa = (txt, alt = 3) => txt ? `<div style="border:1px solid #C9CCC3;bord
 /** Ata + lista de presença. Sem reunião (r = null) ou Agendada: campos em branco para preencher à mão. */
 function docAta(r) {
   const branco = !r || r.situacao !== 'Realizada';
-  const pres = r ? [...(r.participantes || []).map(p => [p.nome, p.funcao]), ...linhas(r.outros).map(n => [n, ''])] : [];
-  const total = Math.max(pres.length + (branco ? 4 : 0), 15);
-  const vazias = Array.from({ length: total - pres.length }, () => ['', '']);
   const enc = (r?.encaminhamentos || []);
   return documento({ titulo: FORM.titulo, subtitulo: 'Reunião com o representante dos trabalhadores · GLOBALG.A.P. GRASP', canto: FORM.codigo, corpo: `
     ${fichaForm()}
@@ -389,13 +391,25 @@ function docAta(r) {
         : Array.from({ length: 3 }, () => '<tr><td style="height:20px"></td><td></td><td></td><td></td></tr>').join('')}
     </tbody></table>
     ${r?.observacao && !branco ? `<p class="rel-secao">Observação</p>${caixa(r.observacao)}` : ''}
-    <div class="rel-assinaturas"><div class="rel-assina"><span></span><small>${esc(r?.representante || 'Representante dos trabalhadores')}<br>Representante dos trabalhadores</small></div>
-      <div class="rel-assina"><span></span><small>${esc(r?.conduzida_por || 'Responsável pela empresa')}<br>Pela empresa</small></div></div>
+    <div class="rel-assinaturas"><div class="rel-assina"><span></span><small>${r?.representante ? esc(r.representante) + '<br>' : ''}Representante dos trabalhadores</small></div>
+      <div class="rel-assina"><span></span><small>${r?.conduzida_por ? esc(r.conduzida_por) + '<br>' : ''}Pela empresa</small></div></div>
     <p class="rel-secao" style="page-break-before:always">5. Lista de presença</p>
-    <p class="rel-nota" style="margin:0 0 6px">Reunião GRASP de ${r?.data ? br(r.data) : '____/____/______'} · assinatura de próprio punho de cada participante.</p>
+    ${tabelaPresenca(r)}` });
+}
+/** Lista de presença: um funcionário marcado por linha, com a função do cadastro; sobra em branco para quem não estava marcado. */
+function tabelaPresenca(r) {
+  const branco = !r || r.situacao !== 'Realizada';
+  const pres = r ? [...(r.participantes || []).map(p => [p.nome, p.funcao]), ...linhas(r.outros).map(n => [n, ''])] : [];
+  const total = Math.max(pres.length + (branco ? 4 : 0), 15);
+  const vazias = Array.from({ length: total - pres.length }, () => ['', '']);
+  return `<p class="rel-nota" style="margin:0 0 6px">Reunião GRASP de ${r?.data ? br(r.data) : '____/____/______'}${r?.horario ? ' · ' + esc(r.horario) : ''}${r?.local ? ' · ' + esc(r.local) : ''} · assinatura de próprio punho de cada participante.</p>
     <table class="rel-tabela"><thead><tr><th style="width:5%">Nº</th><th style="width:42%">Nome</th><th style="width:23%">Função</th><th>Assinatura</th></tr></thead><tbody>
       ${[...pres, ...vazias].map(([n, f], i) => `<tr><td>${i + 1}</td><td style="height:24px">${esc(n)}</td><td>${esc(f)}</td><td></td></tr>`).join('')}
-    </tbody></table>` });
+    </tbody></table>`;
+}
+function docLista(r) {
+  return documento({ titulo: 'Lista de presença · Reunião mensal GRASP', subtitulo: 'Reunião com o representante dos trabalhadores · GLOBALG.A.P. GRASP', canto: FORM.codigo,
+    corpo: `${fichaForm()}<div style="margin-top:8px">${tabelaPresenca(r)}</div>` });
 }
 function docPainel(ms, encs) {
   return documento({ titulo: 'Reunião mensal GRASP — situação', subtitulo: `${rotMes(ms[0].m)} a ${rotMes(ms[ms.length - 1].m)}`, canto: FORM.codigo, corpo: `
