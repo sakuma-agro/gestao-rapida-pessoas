@@ -12,8 +12,11 @@
 // ativos, com a função (cargo) do cadastro; sobram linhas em branco para quem
 // aparecer sem estar marcado.
 
-import { estado } from './store.js';
+import { estado, modeloAtual } from './store.js';
 import { mostrar } from './jornada-relatorios.js';
+// Ficha de EPI (04/11/2026): a mesma ficha de SST › EPI's › Fichas, com as medidas
+// da planilha (182 mm) e os textos do "Modelo da ficha". Aqui só imprime.
+import { montarFicha, linhaVazia, MESES as MESES_FICHA } from './ficha.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -32,8 +35,11 @@ const FORMS = {
   // 04/11/2026: fichas de papel por funcionário (uma folha para cada marcado).
   f007: { codigo: 'FORM 007', titulo: "Higienização dos EPI's", data: '01/11/2026', nrev: '02', aprovador: 'Produtor – Fabio Massao Sakuma' },
   f054: { codigo: 'FORM 054', titulo: 'Controle de banho e higiene pessoal', data: '01/11/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
+  f045: { codigo: 'FORM 045', titulo: 'Ata de treinamento do representante dos trabalhadores – GRASP', data: '01/12/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
+  f046: { codigo: 'FORM 046', titulo: 'Declaração de direitos e deveres do representante dos trabalhadores', data: '01/12/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
 };
 const POR_FUNC = new Set(['f007', 'f054']);
+const DO_REPRESENTANTE = new Set(['f045', 'f046']);
 const TEMA_024 = 'Saúde, segurança e bem-estar dos trabalhadores';
 const EMPRESA_044 = 'FABIO MASSAO SAKUMA E OUTROS';
 const ENDERECO_044 = 'Fazenda Faca, S/N – Zona Rural – Campos Altos/MG';
@@ -184,17 +190,115 @@ function doc054(p, v, folha) {
   { classe: folha ? 'folha2' : '', compacto: true });
 }
 
+/* ---------------- representante dos trabalhadores (GRASP) ----------------
+   Textos do Word do OneDrive (FORM 045 e FORM 046). `v` = { data, horario, local,
+   representante, cargoRep, responsavel, cargoResp }. */
+const topicos = itens => `<ul style="margin:2px 0 6px 18px;padding:0;font-size:10.5px">${itens.map(i => `<li style="margin:0 0 1px">${esc(i)}</li>`).join('')}</ul>`;
+const par = t => `<p style="margin:3px 0;font-size:10.5px">${esc(t)}</p>`;
+const sub = t => `<p style="margin:6px 0 2px;font-size:10.5px;color:#744F28"><b>${esc(t)}</b></p>`;
+const cabEmpresa = () => ficha([linha('Empresa', EMPRESA_044), linha('Endereço', ENDERECO_044)]);
+
+function doc045(v) {
+  return documento(FORMS.f045, `
+    ${cabEmpresa()}
+    ${secao('1. Identificação')}
+    ${ficha([linha('Data do treinamento', br(v.data) || '____/____/______'), linha('Horário', v.horario), linha('Local', v.local),
+      linha('Representante dos trabalhadores', v.representante), linha('Função', v.cargoRep),
+      linha('Responsável pelo treinamento', v.responsavel), linha('Cargo do responsável', v.cargoResp)])}
+    ${secao('2. Objetivo do treinamento')}
+    ${par('Capacitar formalmente o representante dos trabalhadores quanto:')}
+    ${topicos(['Aos seus direitos e deveres no âmbito do GRASP;', 'Ao uso correto do processo de reclamação previsto na propriedade;',
+      'À atuação em nome de outros trabalhadores, conforme requisito GRASP 03.03;', 'À obrigação de confidencialidade;',
+      'À necessidade de autorização expressa do trabalhador quando a reclamação for apresentada em seu nome;',
+      'Ao procedimento específico para casos de solicitação de anonimato;', 'À garantia de não retaliação no exercício da função representativa.'])}
+    ${secao('3. Conteúdo abordado')}
+    ${par('Durante o treinamento foram apresentados e discutidos os seguintes temas:')}
+    ${sub('3.1 Papel e atribuições do representante dos trabalhadores')}
+    ${topicos(['Representação dos interesses dos trabalhadores perante a gestão;', 'Participação em reuniões mensais relacionadas ao GRASP;', 'Comunicação organizada de demandas coletivas.'])}
+    ${sub('3.2 Processo de reclamação')}
+    ${par('Foi explicado detalhadamente que o processo permite reclamações:')}
+    ${topicos(['Presencialmente (diretamente à gestão);', 'De forma anônima;', 'Por meio do representante dos trabalhadores.'])}
+    ${par('Foi instruído que:')}
+    ${topicos(['O trabalhador deve autorizar formalmente o representante antes da apresentação de reclamação em seu nome;',
+      'O documento de autorização deve ser arquivado, quando aplicável;', 'A confidencialidade deve ser mantida em todos os casos;',
+      'Quando solicitado anonimato, a identidade do reclamante não será divulgada e o processo seguirá normalmente, sem prejuízo da análise.'])}
+    ${sub('3.3 Alternativas à representação')}
+    ${par('Foi esclarecido que trabalhadores podem optar por:')}
+    ${topicos(['Registrar reclamação diretamente à gestão;', 'Solicitar apoio de outro trabalhador;', 'Utilizar canal independente previsto no procedimento interno.'])}
+    ${sub('3.4 Garantia de não retaliação')}
+    ${par('Foi reforçado que o representante não poderá sofrer qualquer forma de retaliação, penalidade ou prejuízo em razão do exercício de sua função.')}
+    ${secao('4. Declaração do representante')}
+    ${par('Declaro que:')}
+    ${topicos(['Recebi instrução formal e suficiente sobre o uso do processo de reclamação em nome de trabalhadores;',
+      'Fui orientado quanto à necessidade de autorização expressa;', 'Estou ciente da obrigação de confidencialidade;',
+      'Compreendo o procedimento aplicável quando houver solicitação de anonimato;', 'Comprometo-me a atuar de forma ética, imparcial e independente.'])}
+    ${assinaturas([[v.representante, 'Representante dos trabalhadores'], [v.responsavel, 'Responsável pelo treinamento']])}`,
+  'Capacitação formal do representante eleito · GLOBALG.A.P. GRASP');
+}
+
+function doc046(v) {
+  return documento(FORMS.f046, `
+    ${cabEmpresa()}
+    ${ficha([linha('Representante dos trabalhadores', v.representante), linha('Função', v.cargoRep), linha('Data', br(v.data) || '____/____/______')])}
+    ${secao('1. Finalidade')}
+    ${par('Esta declaração estabelece os direitos, responsabilidades e deveres do representante dos trabalhadores eleito pelos colaboradores da propriedade, bem como registra que o representante foi formalmente instruído quanto ao uso do processo de reclamação previsto no GRASP.')}
+    ${secao('2. Instrução formal sobre o processo de reclamação')}
+    ${par('Fica formalmente registrado que o representante dos trabalhadores recebeu orientação da gestão sobre:')}
+    ${sub('2.1 Utilização do processo de reclamação em nome de outro trabalhador, incluindo:')}
+    ${topicos(['Recebimento da demanda;', 'Registro da reclamação no canal adequado;', 'Acompanhamento dos prazos de resposta;', 'Comunicação do resultado ao trabalhador interessado.'])}
+    ${sub('2.2 Autorização expressa')}
+    ${par('Foi esclarecido que o trabalhador deve autorizar formalmente o representante antes que este apresente reclamação em seu nome.')}
+    ${sub('2.3 Arquivamento da autorização')}
+    ${par('Quando aplicável, o documento de autorização do trabalhador deverá ser formalizado e arquivado como evidência do consentimento.')}
+    ${sub('2.4 Confidencialidade')}
+    ${par('O representante foi instruído quanto à obrigação de manter absoluta confidencialidade sobre todas as informações recebidas no âmbito das reclamações.')}
+    ${sub('2.5 Procedimento em caso de solicitação de anonimato')}
+    ${par('Quando o trabalhador solicitar anonimato:')}
+    ${topicos(['A identidade do reclamante não será divulgada;', 'O processo seguirá regularmente;', 'A solicitação de anonimato não influenciará a análise ou o resultado da reclamação.'])}
+    ${sub('2.6 Alternativas à representação')}
+    ${par('Foi esclarecido que trabalhadores que optarem por não utilizar a representação poderão:')}
+    ${topicos(['Registrar reclamação diretamente junto à gestão;', 'Solicitar apoio de outro trabalhador;', 'Utilizar canal independente previsto no procedimento interno.'])}
+    ${secao('3. Direitos do representante dos trabalhadores')}
+    ${par('O representante eleito possui o direito de:')}
+    ${topicos(['Representar os interesses dos trabalhadores perante a gestão;', 'Ter acesso às áreas necessárias ao desempenho de suas funções, inclusive áreas de campo;',
+      'Reunir-se com trabalhadores em horário apropriado, sem prejuízo das atividades produtivas;', 'Participar das reuniões periódicas relacionadas ao GRASP;',
+      'Ser informado sobre o andamento e o desfecho das reclamações, respeitados os critérios de confidencialidade;',
+      'Exercer suas funções sem sofrer qualquer forma de retaliação, discriminação ou prejuízo.'])}
+    ${secao('4. Deveres do representante dos trabalhadores')}
+    ${par('O representante compromete-se a:')}
+    ${par('4.1 Atuar de forma imparcial, ética e independente.')}
+    ${par('4.2 Manter confidencialidade absoluta sobre informações recebidas.')}
+    ${par('4.3 Solicitar autorização formal do trabalhador antes de apresentar reclamação em seu nome.')}
+    ${par('4.4 Informar aos trabalhadores que o processo de reclamação pode ser utilizado:')}
+    ${topicos(['Presencialmente;', 'De forma anônima;', 'Por meio do representante.'])}
+    ${par('4.5 Esclarecer aos trabalhadores:')}
+    ${topicos(['Onde registrar reclamações;', 'Qual o prazo estimado de resposta;', 'A garantia de não retaliação.'])}
+    ${par('4.6 Assegurar que trabalhadores próprios e subcontratados compreendam os canais disponíveis.')}
+    ${par('4.7 Participar das reuniões mensais relacionadas ao GRASP.')}
+    ${par('4.8 Comunicar à gestão demandas coletivas de forma organizada e fundamentada.')}
+    ${secao('5. Garantia de não retaliação')}
+    ${par('A empresa assegura que o representante não sofrerá qualquer penalidade, prejuízo ou discriminação em razão do exercício de sua função representativa, conforme os princípios da Política de Direitos Humanos da propriedade e da norma GRASP.')}
+    ${secao('6. Abrangência')}
+    ${par('Esta declaração aplica-se a:')}
+    ${topicos(['Trabalhadores próprios;', 'Trabalhadores subcontratados enquanto atuarem na propriedade.'])}
+    ${assinaturas([[v.representante, 'Representante dos trabalhadores'], [v.responsavel, 'Representante da gestão']])}`,
+  'Representante eleito pelos trabalhadores · GLOBALG.A.P. GRASP');
+}
+
 /* ===================================================================
    TELA
    =================================================================== */
 /* 04/11/2026: a GRASP imprime só a ata (mensal); a presença sai na Lista de presença (FORM 018). */
 const IMPRESSOS = [
+  { tipo: 'fichaEpi', codigo: 'Ficha de EPI', freq: 'Mensal · por funcionário', nome: 'Ficha de EPI', desc: 'A ficha de entrega de EPI de SST › EPI\'s › Fichas, com o modelo do app. Uma ficha para cada funcionário marcado; o que já foi preenchido no mês vem junto.' },
   { tipo: 'f018', codigo: 'FORM 018', freq: 'Por evento', nome: 'Lista de presença', desc: 'Treinamentos, palestras e reuniões (também a reunião GRASP): temas, horário, ministrante e quem assina.' },
   { tipo: 'f024', codigo: 'FORM 024', freq: 'Anual', nome: 'Reunião com a gerência', desc: 'Reunião da gerência com os funcionários, com a lista de participantes.' },
   { tipo: 'f044', codigo: 'FORM 044', freq: 'Mensal', nome: 'Ata da reunião GRASP', desc: 'Ata da reunião mensal com o representante dos trabalhadores. A presença vai na Lista de presença (FORM 018).' },
   // 04/11/2026: fichas de papel por funcionário — uma folha para cada marcado.
   { tipo: 'f007', codigo: 'FORM 007', freq: 'Anual · por funcionário', nome: "Higienização dos EPI's", desc: 'Ficha do ano de cada aplicador: marca 1 ou 2 no dia de cada lavagem. Sai uma folha (A4 deitada) por funcionário marcado.' },
   { tipo: 'f054', codigo: 'FORM 054', freq: 'Mensal · por funcionário', nome: 'Banho e higiene pessoal', desc: 'Ficha do mês de cada trabalhador da aplicação: início/fim, banho tomado e assinatura. Uma folha por funcionário marcado.' },
+  { tipo: 'f045', codigo: 'FORM 045', freq: 'Anual · representante', nome: 'Treinamento do representante', desc: 'Ata do treinamento do representante dos trabalhadores (GRASP), com a declaração e as duas assinaturas.' },
+  { tipo: 'f046', codigo: 'FORM 046', freq: 'Anual · representante', nome: 'Direitos e deveres do representante', desc: 'Declaração dos direitos e deveres do representante eleito, para ele e a gestão assinarem.' },
 ];
 function desenhar() {
   const tela = $('telaCeImpressoes'); if (!tela) return;
@@ -218,11 +322,13 @@ function dialogo(html, ligar) {
 const fechar = () => $('dlgCi')?.open && $('dlgCi').close();
 
 function formImpresso(tipo) {
+  if (tipo === 'fichaEpi') return formFichaEpi();
   const f = FORMS[tipo], ant = lembrado()[tipo] || {};
   const fs = funcionarios();
   const ehGrasp = tipo === 'f044';
   if (ehGrasp) return formAta(f, ant);
   if (POR_FUNC.has(tipo)) return formPorFunc(tipo, f, ant);
+  if (DO_REPRESENTANTE.has(tipo)) return formRepresentante(tipo, f, ant);
   const rotLocal = tipo === 'f018' ? 'Propriedade' : tipo === 'f024' ? 'Fazenda / sítio' : 'Local';
   const rotResp = tipo === 'f018' ? 'Responsável' : tipo === 'f024' ? 'Responsável pela gerência' : 'Representante da gestão';
   dialogo(`<h3>${esc(f.titulo)} <small class="dica">${f.codigo}</small></h3>
@@ -321,6 +427,74 @@ function formPorFunc(tipo, f, ant) {
   });
 }
 
+/** FORM 045 / FORM 046: escolhe o representante (função vem do cadastro) e quem assina pela gestão. */
+function formRepresentante(tipo, f, ant) {
+  const fs = funcionarios();
+  const e045 = tipo === 'f045';
+  // o representante e o responsável valem para os dois documentos (e para a ata GRASP)
+  const comum = { ...(lembrado().f044 || {}), ...(lembrado().representante || {}) };
+  const cargoDe = nome => so(fs.find(x => so(x.nome).toLowerCase() === so(nome).toLowerCase())?.cargo);
+  dialogo(`<h3>${esc(f.titulo)} <small class="dica">${f.codigo}</small></h3>
+    <p class="dica" style="margin:0 0 8px">Escolha o representante dos trabalhadores no cadastro (a função vem junto). O que ficar vazio sai em branco para escrever à mão.</p>
+    <div class="grade">
+      <label class="campo">Representante dos trabalhadores <input type="text" id="ciRep" value="${esc(comum.representante || '')}" list="ciFuncs" placeholder="Nome do representante eleito"></label>
+      <label class="campo">Função do representante <span class="dc-sem">(vem do cadastro)</span><input type="text" id="ciCargoRep" value="${esc(cargoDe(comum.representante))}"></label>
+      <label class="campo">Data <span class="dc-sem">(opcional)</span><input type="date" id="ciData"></label>
+      ${e045 ? `<label class="campo">Horário <input type="text" id="ciHora" value="${esc(ant.horario || '')}" placeholder="08:00 às 09:00"></label>
+        <label class="campo">Local <input type="text" id="ciLocal" value="${esc(ant.local || '')}" placeholder="Escritório, refeitório…"></label>` : ''}
+      <label class="campo">${e045 ? 'Responsável pelo treinamento' : 'Representante da gestão'} <span class="dc-sem">(opcional)</span><input type="text" id="ciResp" value="${esc(comum.responsavel || '')}" list="ciFuncs"></label>
+      ${e045 ? `<label class="campo">Cargo do responsável <input type="text" id="ciCargoResp" value="${esc(comum.cargoGestao || '')}"></label>` : ''}
+    </div>
+    <datalist id="ciFuncs">${fs.map(x => `<option value="${esc(x.nome)}">`).join('')}</datalist>
+    <div class="barra entre"><button class="btn" type="button" data-fechar>Cancelar</button>
+      <div class="barra fim" style="margin:0"><button class="btn principal" type="button" id="ciImpRep">Imprimir</button></div></div>`, () => {
+    $('ciRep').addEventListener('change', () => { const c = cargoDe($('ciRep').value); if (c) $('ciCargoRep').value = c; });
+    $('ciImpRep').addEventListener('click', () => {
+      const v = { data: $('ciData').value, horario: so($('ciHora')?.value), local: so($('ciLocal')?.value),
+        representante: so($('ciRep').value), cargoRep: so($('ciCargoRep').value),
+        responsavel: so($('ciResp').value), cargoResp: so($('ciCargoResp')?.value) };
+      lembrar('representante', { representante: v.representante, responsavel: v.responsavel, ...(e045 ? { cargoGestao: v.cargoResp } : {}) });
+      if (e045) lembrar('f045', { horario: v.horario, local: v.local });
+      fechar(); mostrar(e045 ? doc045(v) : doc046(v), { barra: true });
+    });
+  });
+}
+
+/** Ficha de EPI: mês/ano e linhas como em SST › Fichas; cada marcado sai na ficha do app. */
+function formFichaEpi() {
+  const fs = funcionarios(), m = modeloAtual(), d0 = new Date();
+  const ant = lembrado().fichaEpi || {};
+  const linhasPadrao = Math.max(1, Math.min(40, parseInt(ant.linhas) || m.linhas_padrao || 20));
+  dialogo(`<h3>Ficha de EPI <small class="dica">mensal · por funcionário</small></h3>
+    <p class="dica" style="margin:0 0 8px">Sai a mesma ficha de SST › EPI's › Fichas, uma para cada funcionário marcado. O que já foi preenchido e salvo naquele mês vem junto; o resto sai em branco. Para lançar e salvar as entregas, use SST › EPI's › Fichas.</p>
+    <div class="grade">
+      <label class="campo">Mês <select id="ciFeMes">${MESES_FICHA.map((n, i) => `<option value="${i}" ${i === d0.getMonth() ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+      <label class="campo">Ano <input type="number" id="ciFeAno" min="2020" max="2100" value="${d0.getFullYear()}"></label>
+      <label class="campo">Linhas da tabela <input type="number" id="ciFeLinhas" min="1" max="40" value="${linhasPadrao}"></label>
+    </div>
+    ${htmlSeletor(fs, 'Funcionários')}
+    <label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" id="ciBranco"> Incluir também uma ficha em branco</label>
+    <div class="barra entre"><button class="btn" type="button" data-fechar>Cancelar</button>
+      <div class="barra fim" style="margin:0"><button class="btn principal" type="button" id="ciImpFe">Imprimir</button></div></div>`, d => {
+    const marcados = ligarSeletor(d, fs);
+    $('ciImpFe').addEventListener('click', () => {
+      const mes = +$('ciFeMes').value, ano = +$('ciFeAno').value || d0.getFullYear();
+      const n = Math.max(1, Math.min(40, parseInt($('ciFeLinhas').value) || 20));
+      lembrar('fichaEpi', { linhas: n });
+      const linhasDe = func => {
+        const salva = func.id && (estado.fichas || []).find(x => x.funcionario_id === func.id && x.mes === mes && x.ano === ano);
+        const ls = Array.isArray(salva?.linhas) ? salva.linhas.map(l => ({ ...linhaVazia(), ...l })) : [];
+        while (ls.length < n) ls.push(linhaVazia());
+        return ls.slice(0, n);
+      };
+      const pessoas = [...marcados()];
+      if ($('ciBranco').checked || !pessoas.length) pessoas.push({ id: '', nome: '', cargo: '', setor: '' });
+      const html = pessoas.map(func => montarFicha(func, m, { mes, ano, linhas: linhasDe(func), chave: `ci|${func.id}|${mes}|${ano}` })).join('');
+      fechar(); mostrar(`<div class="previa" style="margin-top:0">${html}</div>`, { barra: true });
+    });
+  });
+}
+
 /** Ata GRASP (mensal): só o cabeçalho da reunião; os presentes assinam a Lista de presença (FORM 018). */
 function formAta(f, ant) {
   dialogo(`<h3>${esc(f.titulo)} <small class="dica">${f.codigo} · mensal</small></h3>
@@ -352,4 +526,4 @@ function formAta(f, ant) {
 export const TELAS_IMPRESSOES = ['ceImpressoes'];
 export function abrirImpressoes(tela) { if (tela === 'ceImpressoes') desenhar(); }
 export function limparImpressoes() { fechar(); const t = $('telaCeImpressoes'); if (t) t.innerHTML = ''; }
-export const _ci = { doc018, doc024, doc044, doc007, doc054 };
+export const _ci = { doc018, doc024, doc044, doc007, doc054, doc045, doc046 };
