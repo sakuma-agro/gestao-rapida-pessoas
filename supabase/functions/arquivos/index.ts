@@ -206,9 +206,13 @@ async function pastaOneDrive(tipo: string, dono: string): Promise<string> {
     if (ev.item_id) {
       const it = (await sdb(`cert_doc_itens?select=local,link,jor_fazendas(nome)&id=eq.${ev.item_id}`))?.[0];
       const ri = relDoLink(it?.link);
-      if (ri && ri.startsWith(doc.rel + "/")) return ri + "/" + ano;
+      // padrão de 04/11/2026 (pedido do Guilherme): documento › ano › fazenda — a pasta da fazenda fica dentro do ano
+      if (ri && ri.startsWith(doc.rel + "/")) {
+        const resto = ri.slice(doc.rel.length + 1).split("/").filter(p => !/^(19|20)\d\d$/.test(p)).join("/");
+        return doc.rel + "/" + ano + (resto ? "/" + resto : "");
+      }
       const local = String(it?.jor_fazendas?.nome || it?.local || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[\\/:*?"<>|]+/g, " ").trim();
-      return doc.rel + "/" + (local || "GERAL") + "/" + ano;
+      return doc.rel + "/" + ano + "/" + (local || "GERAL");
     }
     return doc.codigo.startsWith("RG ") ? doc.rel + "/" + ano : doc.rel + "/EVIDÊNCIAS/" + ano;
   }

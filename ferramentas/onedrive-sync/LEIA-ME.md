@@ -26,3 +26,9 @@ Tarefa agendada do Windows "LOP - Sincronizar OneDrive", a cada hora.
 Lotes: `alta` (21 documentos com periodicidade), `inverter` (5 que só trocam fazenda › ano), `media` (27).
 Um documento só: `-Docs "AN 82"`. Não rodar enquanto a sincronização estiver rodando (o script confere).
 **Nunca mover à mão** arquivos já sincronizados: o app os vê como novos e a evidência duplica.
+
+### 04/11/2026 — versão em Python (a usada de fato)
+`padronizar_previa.py <lote>` gera `padronizar-previa-<lote>.csv` e `previa-<lote>.json` (mesmas regras do .ps1, com a
+correção de que pastas com data + descrição/número — `CONTROLE-09-04-2024-14051`, `14-06-2021 - Ferro velho` — ficam).
+`padronizar_aplicar.py` move o que está no json e grava `movidos.json` para a sincronização. Lote **alta** aplicado em
+04/11/2026: 636 arquivos movidos, 239 pastas vazias tiradas.
