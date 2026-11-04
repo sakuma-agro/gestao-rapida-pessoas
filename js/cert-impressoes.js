@@ -112,6 +112,13 @@ const ficha = itens => `<div class="rel-ficha" style="margin-top:6px">${itens.jo
 const caixa = (txt, alt = 3) => txt
   ? `<div style="border:1px solid #C9CCC3;border-radius:4px;padding:6px 8px;font-size:11px">${linhas(txt).map(l => `<p style="margin:0 0 3px">${esc(l)}</p>`).join('')}</div>`
   : `<div style="border:1px solid #C9CCC3;border-radius:4px;height:${alt * 22}px;background:repeating-linear-gradient(transparent 0 21px,#E2E4DE 21px 22px)"></div>`;
+/** Temas (04/11/2026, pedido dele): o que foi digitado + linhas pautadas livres
+    para acrescentar à mão. Cada linha tem 22 px, digitada ou em branco. */
+const caixaTemas = (txt, livres = 4) => {
+  const ls = [...linhas(txt), ...Array(livres).fill('')];
+  return `<div style="border:1px solid #C9CCC3;border-radius:4px;padding:0 8px;font-size:11px">${ls.map((l, i) =>
+    `<div style="height:22px;line-height:22px;${i < ls.length - 1 ? 'border-bottom:1px solid #E2E4DE;' : ''}overflow:hidden">${l ? esc(l) : '&nbsp;'}</div>`).join('')}</div>`;
+};
 const secao = (t, quebra) => `<p class="rel-secao"${quebra ? ' style="page-break-before:always"' : ''}>${esc(t)}</p>`;
 const assinaturas = pares => `<div class="rel-assinaturas">${pares.map(([nome, papel]) =>
   `<div class="rel-assina"><span></span><small>${nome ? esc(nome) + '<br>' : ''}${esc(papel)}</small></div>`).join('')}</div>`;
@@ -129,7 +136,7 @@ function doc018(v) {
   const temas = linhas(v.temas);
   return documento(FORMS.f018, `
     ${ficha([linha('Data', br(v.data) || '____/____/______'), linha('Propriedade', v.local), linha('Responsável (nome / assinatura)', v.responsavel, true)])}
-    ${secao('I. Temas')}${caixa(temas.join('\n'), 3)}
+    ${secao('I. Temas')}${caixaTemas(temas.join('\n'))}
     ${secao('II. Horário')}${caixa(v.horario, 1)}
     ${secao('III. Ministrante')}${assinaturas([[v.ministrante, 'Ministrante']])}
     ${secao('IV. Participantes')}${tabelaPresenca(v.pres, { min: 20 })}`, 'Treinamentos, palestras e reuniões');
@@ -138,7 +145,7 @@ function doc018(v) {
 function doc024(v) {
   return documento(FORMS.f024, `
     ${ficha([linha('Data', br(v.data) || '____/____/______'), linha('Fazenda / sítio', v.local), linha('Responsável pela gerência', v.responsavel, true)])}
-    ${secao('1) Temas')}${caixa(so(v.temas) || TEMA_024, 3)}
+    ${secao('1) Temas')}${caixaTemas(so(v.temas) || TEMA_024)}
     ${secao('2) Horário')}${caixa(v.horario, 1)}
     ${secao('3) Ministrante')}${assinaturas([[v.ministrante, 'Ministrante'], [v.responsavel, 'Responsável pela gerência']])}
     ${secao('4) Assuntos abordados pelos funcionários (reclamações, sugestões ou relatos)')}${caixa('', 7)}
