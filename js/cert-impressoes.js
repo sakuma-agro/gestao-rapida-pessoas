@@ -92,15 +92,41 @@ function tabelaPresenca(pres, { funcao = true, min = 15 } = {}) {
   </tbody></table>`;
 }
 
-/* FORM 018 — Lista de presença (treinamentos, palestras, qualquer evento) */
+/* FORM 018 — Lista de presença (treinamentos, palestras, qualquer evento)
+   04/11/2026: a pedido dele, o corpo segue o ORIGINAL do Word (2 - FORMULÁRIOS ›
+   FORM 018): "Data: __/__/__  Nome/Assinatura: ____", "Propriedade: ____",
+   I. TEMAS / II. HORÁRIO (espaço em branco), III. MINISTRANTE (Nome / Assinatura)
+   e IV. PARTICIPANTES com NOME | FUNÇÃO | ASSINATURA em três colunas iguais,
+   cabeçalho azul-claro #B8CCE3 e linhas altas (≈1,2 cm). Só o cabeçalho é o do app. */
+const f18 = 'font-family:Arial,Helvetica,sans-serif;color:#51534A';
+const traco = (val, larg) => `<span style="display:inline-block;min-width:${larg};border-bottom:1px solid #51534A;padding:0 4px">${val ? esc(val) : '&nbsp;'}</span>`;
+const titulo18 = (num, t) => `<p style="${f18};margin:16px 0 6px 6mm;font-size:12px;font-weight:bold"><span style="display:inline-block;width:12mm">${num}.</span>${t}</p>`;
 function doc018(v) {
   const temas = linhas(v.temas);
+  const dataTxt = v.data ? br(v.data) : '';
+  const pres = v.pres;
+  const total = Math.max(pres.length + 4, 20);
+  const todas = [...pres, ...Array.from({ length: total - pres.length }, () => ['', ''])];
+  const texto18 = (t, alt) => `<div style="${f18};min-height:${alt};margin:0 0 0 24mm;font-size:11px">${t.map(l => `<p style="margin:0 0 2px">${esc(l)}</p>`).join('')}</div>`;
   return documento(FORMS.f018, `
-    ${ficha([linha('Data', br(v.data) || '____/____/______'), linha('Propriedade', v.local), linha('Responsável (nome / assinatura)', v.responsavel, true)])}
-    ${secao('I. Temas')}${caixa(temas.join('\n'), 3)}
-    ${secao('II. Horário')}${caixa(v.horario, 1)}
-    ${secao('III. Ministrante')}${assinaturas([[v.ministrante, 'Ministrante']])}
-    ${secao('IV. Participantes')}${tabelaPresenca(v.pres, { min: 20 })}`, 'Treinamentos, palestras e reuniões');
+    <div style="${f18};font-size:11px;margin:8px 0 0">
+      <p style="margin:0 0 10px 6mm">Data: ${dataTxt ? traco(dataTxt, '30mm') : `${traco('', '10mm')}/${traco('', '10mm')}/${traco('', '14mm')}`}
+        &nbsp;&nbsp; Nome/Assinatura: ${traco(v.responsavel, '95mm')}</p>
+      <p style="margin:0 0 6px 6mm">Propriedade: ${traco(v.local, '143mm')}</p>
+    </div>
+    ${titulo18('I', 'TEMAS')}${texto18(temas, '22mm')}
+    ${titulo18('II', 'HORÁRIO')}${texto18(v.horario ? [v.horario] : [], '14mm')}
+    ${titulo18('III', 'MINISTRANTE')}
+    <p style="${f18};margin:14px 0 6px 7mm;font-size:11px;font-weight:bold">Nome: ${traco(v.ministrante, '70mm')} &nbsp;&nbsp; Assinatura: ${traco('', '68mm')}</p>
+    ${titulo18('IV', 'PARTICIPANTES')}
+    <table style="${f18};width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;margin-top:4px">
+      <thead style="display:table-header-group"><tr>${['NOME', 'FUNÇÃO', 'ASSINATURA'].map(h =>
+        `<th style="border:1px solid #51534A;background:#B8CCE3;-webkit-print-color-adjust:exact;print-color-adjust:exact;height:10mm;text-align:center;font-weight:bold">${h}</th>`).join('')}</tr></thead>
+      <tbody>${todas.map(([n, fu]) => `<tr style="page-break-inside:avoid">
+        <td style="border:1px solid #51534A;height:12mm;text-align:center;vertical-align:middle;padding:0 4px">${esc(n)}</td>
+        <td style="border:1px solid #51534A;text-align:center;vertical-align:middle;padding:0 4px">${esc(fu)}</td>
+        <td style="border:1px solid #51534A"></td></tr>`).join('')}</tbody></table>`,
+  'Treinamentos, palestras e reuniões', { compacto: true });
 }
 /* FORM 024 — Reunião com a gerência e funcionários */
 function doc024(v) {
