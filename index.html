@@ -1023,6 +1023,22 @@ addEventListener('beforeinstallprompt', function (ev) {
         <div id="erTabela" style="margin-top:12px"></div>
       </div>
 
+      <!-- Pedido para a clínica (04/11/2026): as três listas do ASO periódico -->
+      <div class="cartao naoimprimir">
+        <h2 style="margin:0">Pedido para a clínica · ASO periódico</h2>
+        <p class="dica" style="margin:2px 0 0">
+          Quem tem o ASO vencido ou vencendo no prazo escolhido acima (e na fazenda/função filtradas). Cada lista sai com nome, função e CPF.
+        </p>
+        <div class="barra" style="margin:12px 0 0;flex-wrap:wrap;gap:8px">
+          <button class="btn principal" id="bClAso">ASO periódico</button>
+          <button class="btn" id="bClAudio">Audiometria</button>
+          <button class="btn" id="bClOutros">Outros exames</button>
+          <label class="dc-sem" style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="clNunca"> incluir quem não tem ASO lançado</label>
+        </div>
+        <div class="barra" id="clResumo" style="margin:10px 0 0"></div>
+      </div>
+
       <div class="previa-lista" id="erSaida"></div>
 
       <div class="rodape-fixo naoimprimir">

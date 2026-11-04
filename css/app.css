@@ -2581,3 +2581,9 @@ body.crq-aberto{overflow:hidden}
 @media (max-width:900px){.ce-ev-corpo{grid-template-columns:1fr}.ce-ev-lado{position:static}.ce-ev-nums{grid-template-columns:1fr}}
 .ce-vn-pasta{margin:4px 0 10px;padding:10px 12px;border-radius:10px;background:var(--verde-fundo);font-size:13.5px;line-height:1.5}
 .ce-vn-pasta .btn{margin-right:6px}
+
+/* SST › Exames › Pedido para a clínica (04/11/2026) */
+.cl-tab td{font-size:9pt;padding:1.9mm 1.8mm;line-height:1.25}
+.cl-tab td.cl-quebra{white-space:normal;overflow:visible;text-overflow:clip}
+.cl-tab th{font-size:8.5pt;padding-left:1.8mm;padding-right:1.8mm}
+.cl-tab tr.cl-total td{background:#e8f2cf;font-weight:bold;color:#744F28}

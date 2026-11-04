@@ -42,6 +42,7 @@ export async function abrirRelExames() {
   catch (e) { caixa.innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`; return; }
   preencherFiltros();
   desenhar();
+  resumoClinica();
 }
 
 function preencherFiltros() {
@@ -212,6 +213,7 @@ export function ligarRelExames() {
     $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   $('bErCsv').addEventListener('click', baixarCsv);
+  ligarClinica();
   $('bImprimirEr').addEventListener('click', () => {
     // prévia antes de imprimir: sem documento na tela, mostra primeiro
     if (!so($('erSaida').innerHTML)) {
@@ -224,3 +226,143 @@ export function ligarRelExames() {
 }
 
 export const limparRelExames = () => { BASE = []; atual = []; };
+
+/* =============== pedido para a clínica (04/11/2026) ===============
+   Pedido dele: no dia de marcar o periódico, passar três listas para a
+   clínica — quem faz o ASO periódico, quem faz audiometria e os outros
+   exames de cada um. Quem entra: funcionário ativo com o ASO vencido ou
+   vencendo no prazo do filtro "Vencendo em até" (e na fazenda/função
+   filtradas). Quem nunca teve ASO lançado só entra com a caixinha marcada —
+   na maioria das vezes é lançamento que falta, não exame que falta.
+   Audiometria e outros exames saem do que a função e as atividades exigem
+   (Exames por função), feitos ou não: no periódico a clínica refaz tudo. */
+const ehAudio = nome => chave(nome).includes('AUDIOMETRIA');
+let ultimaClinica = '';
+
+function listaClinica() {
+  const faz = $('erFazenda').value, fun = $('erFuncao').value;
+  const q = chave($('erBusca').value);
+  const prazo = Number($('erPrazo').value) || 60;
+  const nunca = $('clNunca').checked;
+  return BASE
+    .filter(p => (!faz || chave(p.f.fazenda) === faz) && (!fun || chave(p.f.cargo) === fun)
+      && (!q || chave(p.f.nome).includes(q)))
+    .map(p => ({ p, aso: p.linhas.find(l => l.exame === 'ASO') }))
+    .filter(x => x.aso && (x.aso.nunca ? nunca : situacao(x.aso, prazo).precisa))
+    .map(({ p, aso }) => ({
+      f: p.f, aso,
+      outros: p.linhas.filter(l => l.exame !== 'ASO' && !ehAudio(l.exame)).map(l => l.exame),
+      audio: p.linhas.some(l => ehAudio(l.exame)),
+    }))
+    .sort((a, b) => String(a.aso.vence || '').localeCompare(String(b.aso.vence || ''))
+      || a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
+}
+
+function resumoClinica() {
+  if (!$('clResumo')) return;
+  if (!BASE.length) { $('clResumo').innerHTML = ''; return; }
+  const l = listaClinica();
+  const prazo = Number($('erPrazo').value) || 60;
+  const vencidos = l.filter(x => !x.aso.nunca && x.aso.sit && x.aso.sit.dias < 0).length;
+  const sem = BASE.filter(p => p.linhas.find(x => x.exame === 'ASO')?.nunca).length;
+  $('clResumo').innerHTML = `
+    <span class="contagem"><b>${l.length}</b> no ASO periódico</span>
+    <span class="contagem"><b>${vencidos}</b> já vencido(s)</span>
+    <span class="contagem"><b>${l.filter(x => x.audio).length}</b> com audiometria</span>
+    <span class="dc-sem">vencendo em até ${prazo} dias${sem && !$('clNunca').checked ? ` · ${sem} ativo(s) sem ASO lançado ficaram de fora` : ''}</span>`;
+}
+
+/* Folhas: paginação por peso, como no documento acima. A linha cuja coluna
+   de exames quebra em várias conta mais. */
+function folhasClinica(titulo, cab, cols, linhas, pesoDe, rodapeExtra = '') {
+  const UN = 26;
+  const paginas = []; let pag = [], soma = 0;
+  linhas.forEach(l => {
+    const w = pesoDe(l);
+    if (pag.length && soma + w > UN) { paginas.push(pag); pag = []; soma = 0; }
+    soma += w; pag.push(l);
+  });
+  if (pag.length || !paginas.length) paginas.push(pag);
+  const prazo = $('erPrazo').value;
+  const nome = id => { const s = $(id); return s.value ? s.options[s.selectedIndex].text : ''; };
+  const rec = [nome('erFazenda'), nome('erFuncao'), `ASO vencido ou vencendo em até ${prazo} dias`]
+    .filter(Boolean).join(' · ');
+  const n = linhas.filter(l => !l.total).length;
+  return paginas.map((fatia, i) => `<div class="an-folha">
+      <div class="an-topo">
+        <img src="${LOGO}" alt="">
+        <div class="an-tit"><h1>${esc(titulo)}</h1><p>${esc(rec)} · ${dataBr(hoje())}</p></div>
+      </div>
+      ${fatia.length ? `<table class="an-tab sst-folha-tab cl-tab">
+        <colgroup>${cols.map(c => `<col${c ? ` style="width:${c}"` : ''}>`).join('')}</colgroup>
+        <thead><tr>${cab.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+        <tbody>${fatia.map(l => l.html).join('')}</tbody>
+      </table>` : '<p class="pn-nada">Ninguém nesse recorte.</p>'}
+      ${i === paginas.length - 1 ? rodapeExtra : ''}
+      <div class="an-pe"><span>${n} funcionário(s) · página ${i + 1} de ${paginas.length}</span><span>SAKUMA Agronegócios</span></div>
+      ${PE_LOP}
+    </div>`).join('');
+}
+
+function docClinica(qual) {
+  const l = listaClinica();
+  const venceTxt = a => a.nunca ? 'Sem ASO' : dataBr(a.vence);
+  const cls = a => a.nunca || (a.sit && a.sit.dias < 0) ? ' class="ce sst-vencido"' : ' class="ce"';
+  if (qual === 'aso') {
+    return folhasClinica('ASO PERIÓDICO', ['#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'VENCE'],
+      ['9mm', null, '36mm', '30mm', '32mm', '21mm'],
+      l.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
+        <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
+        <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td${cls(x.aso)}>${venceTxt(x.aso)}</td></tr>` })),
+      () => 1);
+  }
+  if (qual === 'audio') {
+    const a = l.filter(x => x.audio);
+    return folhasClinica('AUDIOMETRIA', ['#', 'NOME', 'FUNÇÃO', 'CPF'], ['9mm', null, '45mm', '34mm'],
+      a.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
+        <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td></tr>` })),
+      () => 1);
+  }
+  // outros exames
+  const cont = new Map();
+  l.forEach(x => x.outros.forEach(e => cont.set(e, (cont.get(e) || 0) + 1)));
+  const total = [...cont.values()].reduce((a, b) => a + b, 0);
+  const quadro = cont.size ? `<table class="an-tab sst-folha-tab cl-tab" style="width:110mm">
+      <colgroup><col><col style="width:28mm"></colgroup>
+      <thead><tr><th>TOTAL POR EXAME</th><th>QTDE</th></tr></thead>
+      <tbody>${[...cont.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+        .map(([e, q]) => `<tr><td>${esc(e)}</td><td class="ce">${q}</td></tr>`).join('')}
+        <tr class="cl-total"><td>Total</td><td class="ce">${total}</td></tr></tbody></table>` : '';
+  const folhas = folhasClinica('OUTROS EXAMES', ['#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
+    ['9mm', '44mm', '30mm', '28mm', null],
+    l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr><td class="ce">${i + 1}</td>
+      <td class="an-nome cl-quebra">${esc(x.f.nome)}</td><td class="cl-quebra">${esc(x.f.cargo || '—')}</td>
+      <td class="ce">${esc(x.f.cpf || '—')}</td>
+      <td class="cl-quebra">${x.outros.length ? esc(x.outros.join(', ')) : '<span class="dc-sem">Nenhum cadastrado para a função</span>'}</td></tr>` })),
+    x => Math.max(1, Math.ceil(x.ex.length / 55)));
+  // o quadro de totais vai numa folha própria só se houver o que contar
+  return folhas + (quadro ? `<div class="an-folha">
+      <div class="an-topo"><img src="${LOGO}" alt=""><div class="an-tit"><h1>OUTROS EXAMES · TOTAIS</h1>
+        <p>${l.length} funcionário(s) · ${dataBr(hoje())}</p></div></div>
+      ${quadro}
+      <div class="an-pe"><span>Para a clínica conferir as quantidades</span><span>SAKUMA Agronegócios</span></div>
+      ${PE_LOP}
+    </div>` : '');
+}
+
+function mostrarClinica(qual) {
+  if (!BASE.length) return;
+  ultimaClinica = qual;
+  $('erSaida').innerHTML = docClinica(qual);
+  $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+export function ligarClinica() {
+  if (!$('bClAso')) return;
+  $('bClAso').addEventListener('click', () => mostrarClinica('aso'));
+  $('bClAudio').addEventListener('click', () => mostrarClinica('audio'));
+  $('bClOutros').addEventListener('click', () => mostrarClinica('outros'));
+  $('clNunca').addEventListener('change', () => { resumoClinica(); if (ultimaClinica) mostrarClinica(ultimaClinica); });
+  ['erFazenda', 'erFuncao', 'erPrazo'].forEach(id => $(id).addEventListener('change', resumoClinica));
+  $('erBusca').addEventListener('input', resumoClinica);
+}
