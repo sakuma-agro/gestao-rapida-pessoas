@@ -13,6 +13,7 @@
 // aparecer sem estar marcado.
 
 import { estado, modeloAtual } from './store.js';
+import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 // Ficha de EPI (04/11/2026): a mesma ficha de SST › EPI's › Fichas, com as medidas
 // da planilha (182 mm) e os textos do "Modelo da ficha". Aqui só imprime.
@@ -39,6 +40,33 @@ const FORMS = {
   f046: { codigo: 'FORM 046', titulo: 'Declaração de direitos e deveres do representante dos trabalhadores', data: '01/12/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
 };
 const POR_FUNC = new Set(['f007', 'f054']);
+
+/* Revisão e data (04/11/2026, pergunta dele "a data de revisão, aonde eu altero?"):
+   os valores acima são só o padrão. Ao abrir a tela, vêm da Lista mestra
+   (cert_documentos.revisao / data_revisao do FORM de mesmo código) — é lá que
+   se altera: Certificação › Lista mestra › FORM › Editar. Cópia no aparelho
+   para funcionar sem internet. A Ficha de EPI usa o "Modelo da ficha" do SST. */
+const CAIXA_REV = 'cert-impressoes-revisoes';
+function aplicarRevisoes(docs) {
+  for (const f of Object.values(FORMS)) {
+    const d = (docs || []).find(x => String(x.codigo || '').replace(/\s+/g, ' ').trim().toUpperCase() === f.codigo);
+    if (!d) continue;
+    if (d.revisao) f.nrev = String(d.revisao).padStart(2, '0');
+    if (d.data_revisao) f.data = br(d.data_revisao);
+  }
+  document.querySelectorAll('#telaCeImpressoes [data-rev]').forEach(b => {
+    const f = FORMS[b.dataset.rev]; if (f) b.textContent = `${f.nrev} de ${f.data}`; });
+}
+async function carregarRevisoes() {
+  try { aplicarRevisoes(await nucleo.lerCaixa(CAIXA_REV, [])); } catch { /* sem cópia */ }
+  const c = estado.cliente;
+  if (!c || !estado.sessao || !navigator.onLine) return;
+  try {
+    const { data, error } = await c.from('cert_documentos').select('codigo, revisao, data_revisao').ilike('codigo', 'FORM%');
+    if (error || !data) return;
+    aplicarRevisoes(data); nucleo.gravarCaixa(CAIXA_REV, data);
+  } catch { /* fica o padrão */ }
+}
 const DO_REPRESENTANTE = new Set(['f045', 'f046']);
 const TEMA_024 = 'Saúde, segurança e bem-estar dos trabalhadores';
 const EMPRESA_044 = 'FABIO MASSAO SAKUMA E OUTROS';
@@ -66,7 +94,11 @@ function documento(f, corpo, subtitulo = '', { classe = '', compacto = false } =
     ? `<p class="rel-nota" style="margin:-8px 0 6px">${f.codigo} · Revisão ${f.nrev} · Data ${f.data} · Elaboração/revisão: ${ELAB} · Aprovação: ${esc(f.aprovador)}</p>`
     : `<div class="rel-ficha"><div><span>Código</span><b>${f.codigo}</b></div><div><span>Data</span><b>${f.data}</b></div><div><span>Revisão</span><b>${f.nrev}</b></div>
       <div><span>Elaboração / revisão</span><b>${ELAB}</b></div><div><span>Aprovação</span><b>${esc(f.aprovador)}</b></div></div>`;
-  return `<article class="rel${classe ? ' ' + classe : ''}">
+  // ci-pag (04/11/2026, pedido dele): numeração "Página X de Y" no pé de cada
+  // folha, como no original. Só nos documentos de várias páginas (não nas
+  // fichas por funcionário, que saem várias juntas de 1 página cada).
+  const pag = compacto ? '' : ' ci-pag';
+  return `<article class="rel${classe ? ' ' + classe : ''}${pag}">
     <header class="rel-cabecalho"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-titulo"><h1>${esc(f.titulo)}</h1><p>${esc(subtitulo)}</p></div>
       <div class="rel-comp"><span>código</span><strong>${f.codigo}</strong><span>rev. ${f.nrev}</span></div></header>
@@ -92,41 +124,15 @@ function tabelaPresenca(pres, { funcao = true, min = 15 } = {}) {
   </tbody></table>`;
 }
 
-/* FORM 018 — Lista de presença (treinamentos, palestras, qualquer evento)
-   04/11/2026: a pedido dele, o corpo segue o ORIGINAL do Word (2 - FORMULÁRIOS ›
-   FORM 018): "Data: __/__/__  Nome/Assinatura: ____", "Propriedade: ____",
-   I. TEMAS / II. HORÁRIO (espaço em branco), III. MINISTRANTE (Nome / Assinatura)
-   e IV. PARTICIPANTES com NOME | FUNÇÃO | ASSINATURA em três colunas iguais,
-   cabeçalho azul-claro #B8CCE3 e linhas altas (≈1,2 cm). Só o cabeçalho é o do app. */
-const f18 = 'font-family:Arial,Helvetica,sans-serif;color:#51534A';
-const traco = (val, larg) => `<span style="display:inline-block;min-width:${larg};border-bottom:1px solid #51534A;padding:0 4px">${val ? esc(val) : '&nbsp;'}</span>`;
-const titulo18 = (num, t) => `<p style="${f18};margin:16px 0 6px 6mm;font-size:12px;font-weight:bold"><span style="display:inline-block;width:12mm">${num}.</span>${t}</p>`;
+/* FORM 018 — Lista de presença (treinamentos, palestras, qualquer evento) */
 function doc018(v) {
   const temas = linhas(v.temas);
-  const dataTxt = v.data ? br(v.data) : '';
-  const pres = v.pres;
-  const total = Math.max(pres.length + 4, 20);
-  const todas = [...pres, ...Array.from({ length: total - pres.length }, () => ['', ''])];
-  const texto18 = (t, alt) => `<div style="${f18};min-height:${alt};margin:0 0 0 24mm;font-size:11px">${t.map(l => `<p style="margin:0 0 2px">${esc(l)}</p>`).join('')}</div>`;
   return documento(FORMS.f018, `
-    <div style="${f18};font-size:11px;margin:8px 0 0">
-      <p style="margin:0 0 10px 6mm">Data: ${dataTxt ? traco(dataTxt, '30mm') : `${traco('', '10mm')}/${traco('', '10mm')}/${traco('', '14mm')}`}
-        &nbsp;&nbsp; Nome/Assinatura: ${traco(v.responsavel, '95mm')}</p>
-      <p style="margin:0 0 6px 6mm">Propriedade: ${traco(v.local, '143mm')}</p>
-    </div>
-    ${titulo18('I', 'TEMAS')}${texto18(temas, '22mm')}
-    ${titulo18('II', 'HORÁRIO')}${texto18(v.horario ? [v.horario] : [], '14mm')}
-    ${titulo18('III', 'MINISTRANTE')}
-    <p style="${f18};margin:14px 0 6px 7mm;font-size:11px;font-weight:bold">Nome: ${traco(v.ministrante, '70mm')} &nbsp;&nbsp; Assinatura: ${traco('', '68mm')}</p>
-    ${titulo18('IV', 'PARTICIPANTES')}
-    <table style="${f18};width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;margin-top:4px">
-      <thead style="display:table-header-group"><tr>${['NOME', 'FUNÇÃO', 'ASSINATURA'].map(h =>
-        `<th style="border:1px solid #51534A;background:#B8CCE3;-webkit-print-color-adjust:exact;print-color-adjust:exact;height:10mm;text-align:center;font-weight:bold">${h}</th>`).join('')}</tr></thead>
-      <tbody>${todas.map(([n, fu]) => `<tr style="page-break-inside:avoid">
-        <td style="border:1px solid #51534A;height:12mm;text-align:center;vertical-align:middle;padding:0 4px">${esc(n)}</td>
-        <td style="border:1px solid #51534A;text-align:center;vertical-align:middle;padding:0 4px">${esc(fu)}</td>
-        <td style="border:1px solid #51534A"></td></tr>`).join('')}</tbody></table>`,
-  'Treinamentos, palestras e reuniões', { compacto: true });
+    ${ficha([linha('Data', br(v.data) || '____/____/______'), linha('Propriedade', v.local), linha('Responsável (nome / assinatura)', v.responsavel, true)])}
+    ${secao('I. Temas')}${caixa(temas.join('\n'), 3)}
+    ${secao('II. Horário')}${caixa(v.horario, 1)}
+    ${secao('III. Ministrante')}${assinaturas([[v.ministrante, 'Ministrante']])}
+    ${secao('IV. Participantes')}${tabelaPresenca(v.pres, { min: 20 })}`, 'Treinamentos, palestras e reuniões');
 }
 /* FORM 024 — Reunião com a gerência e funcionários */
 function doc024(v) {
@@ -330,9 +336,9 @@ function desenhar() {
   const tela = $('telaCeImpressoes'); if (!tela) return;
   tela.innerHTML = `<div class="cartao naoimprimir">
     <h2 style="margin:0">Impressões</h2>
-    <p class="dica" style="margin:2px 0 12px">Escolha o impresso, preencha o que quiser do cabeçalho (o que ficar vazio sai em branco para escrever à mão) e marque os funcionários: cada um sai na lista com a função do cadastro. Nada fica gravado — é só para imprimir.</p>
+    <p class="dica" style="margin:2px 0 12px">A revisão e a data de cada FORM vêm da Lista mestra (Editar no documento). Escolha o impresso, preencha o que quiser do cabeçalho (o que ficar vazio sai em branco para escrever à mão) e marque os funcionários: cada um sai na lista com a função do cadastro. Nada fica gravado — é só para imprimir.</p>
     <div class="ce-ent-lista">${IMPRESSOS.map(i => `<button type="button" class="pv-card pv-calma" data-imp="${i.tipo}" style="text-align:left">
-      <span>${esc(i.codigo)} · ${esc(i.freq)}</span><strong style="font-size:17px">${esc(i.nome)}</strong><small>${esc(i.desc)}</small></button>`).join('')}</div>
+      <span>${esc(i.codigo)} · ${esc(i.freq)}${FORMS[i.tipo] ? ` · rev. <b data-rev="${i.tipo}">${FORMS[i.tipo].nrev} de ${FORMS[i.tipo].data}</b>` : ''}</span><strong style="font-size:17px">${esc(i.nome)}</strong><small>${esc(i.desc)}</small></button>`).join('')}</div>
   </div>`;
   tela.querySelectorAll('[data-imp]').forEach(b => b.addEventListener('click', () => formImpresso(b.dataset.imp)));
 }
@@ -550,6 +556,6 @@ function formAta(f, ant) {
    ENTRADA
    =================================================================== */
 export const TELAS_IMPRESSOES = ['ceImpressoes'];
-export function abrirImpressoes(tela) { if (tela === 'ceImpressoes') desenhar(); }
+export function abrirImpressoes(tela) { if (tela === 'ceImpressoes') { desenhar(); carregarRevisoes(); } }
 export function limparImpressoes() { fechar(); const t = $('telaCeImpressoes'); if (t) t.innerHTML = ''; }
 export const _ci = { doc018, doc024, doc044, doc007, doc054, doc045, doc046 };

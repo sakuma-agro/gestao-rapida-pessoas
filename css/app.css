@@ -639,6 +639,11 @@ dialog h3{margin:0 0 14px;font-size:16px}
 /* A folha marcada com `.deitada` sai em paisagem; o resto continua em pé. */
 @page paisagem{size:A4 landscape;margin:0}
 @page croqui{size:A3 landscape;margin:8mm}
+/* Certificação › Impressões (04/11/2026): página com o número "Página X de Y"
+   no pé, como os FORMs originais. Só vale para .rel.ci-pag (o resto do app
+   continua na @page de margem zero). */
+@page certpag{size:A4 portrait;margin:6mm 0 10mm;
+  @bottom-right{content:"Página " counter(page) " de " counter(pages);font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#51534A;margin-right:10mm;vertical-align:middle}}
 /* Folha de ponto da gráfica, 26 × 16,5 cm (28/09/2026); "folhapontor" = girada 90°. */
 @page folhaponto{size:260mm 165mm;margin:0}
 @page folhapontor{size:165mm 260mm;margin:0}
@@ -672,6 +677,7 @@ dialog h3{margin:0 0 14px;font-size:16px}
      "Padrão"/"Mínimo") deixava a folha maior que a página e a marca da LOP caía
      sozinha numa folha em branco. 185 mm cabe mesmo com ~12 mm de margem. */
   .an-folha.deitada{height:auto;min-height:185mm}
+  .rel.ci-pag{page:certpag}
   #dfSaida{transform:none !important}
   .dk-folha{box-shadow:none;margin:0;padding:10mm 12mm;
     page-break-after:always;break-after:page}
