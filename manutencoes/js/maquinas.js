@@ -118,7 +118,7 @@ TELAS.maquinas = el => {
   };
   ['mq-busca', 'mq-local', 'mq-tipo'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
   const bn = $('#mq-nova'); if (bn) bn.onclick = () => formMaquina();
-  $('#mq-imprimir').onclick = () => imprimirListaMaquinas(listaMaqAtual);
+  $('#mq-imprimir').onclick = () => escolherLetraImpressao(listaMaqAtual);
   const bi = $('#mq-importar'); if (bi) bi.onclick = telaImportarRealtec;
   const bt = $('#mq-itens'); if (bt) bt.onclick = telaItensManutencao;
   ligarSeletorGrupo('mq-grupo');
@@ -133,13 +133,41 @@ TELAS.maquinas = el => {
    em ordem de número. Sai o que está na tela (respeita busca, local, grupo e
    tipo). A4 em pé, pé só com a LOP. 1ª versão agrupava pela letra do nome —
    quase tudo caía no "T" de Trator; ele achou que não ficou legal. */
-function imprimirListaMaquinas(lista) {
+/* Letra do número da máquina (T.01 → T); número sem letra vai para "#". */
+function letraMaq(e) {
+  const l = String(e.codigo || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').charAt(0).toUpperCase();
+  return /[A-Z]/.test(l) ? l : '#';
+}
+
+/* 04/11/2026 (2º pedido: "quero um relatório que saia por letra"): antes de
+   imprimir, escolhe a letra — sai só ela — ou todas, cada letra numa folha. */
+function escolherLetraImpressao(lista) {
+  if (!lista.length) return aviso('Nenhuma máquina para imprimir com esses filtros.', true);
+  const conta = {};
+  lista.forEach(e => { const l = letraMaq(e); conta[l] = (conta[l] || 0) + 1; });
+  const letras = Object.keys(conta).sort((a, b) => (a === '#') - (b === '#') || a.localeCompare(b));
+  abrirModal('Imprimir lista de máquinas', `
+    <p class="sub">Escolha a letra do número da máquina.</p>
+    <div class="acoes" style="flex-wrap:wrap">
+      ${letras.map(l => `<button type="button" class="btn-fantasma" data-letra="${esc(l)}" style="min-width:90px"><b style="font-size:17px">${esc(l)}</b> <small>${conta[l]}</small></button>`).join('')}
+    </div>
+    <div class="acoes">
+      <button type="button" class="btn" data-letra="">Todas — uma folha por letra</button>
+      <button type="button" class="btn neutro" id="lt-fechar">Fechar</button>
+    </div>`, corpo => {
+    corpo.querySelectorAll('[data-letra]').forEach(b => b.onclick = () => {
+      const l = b.dataset.letra;
+      fecharModal();
+      imprimirListaMaquinas(l ? lista.filter(e => letraMaq(e) === l) : lista, l);
+    });
+    corpo.querySelector('#lt-fechar').onclick = fecharModal;
+  });
+}
+
+function imprimirListaMaquinas(lista, soLetra) {
   if (!lista.length) return aviso('Nenhuma máquina para imprimir com esses filtros.', true);
   const nome = e => String(e.descricao || '').trim();
-  const letraDe = e => {
-    const l = String(e.codigo || '').trim().normalize('NFD').replace(/[̀-ͯ]/g, '').charAt(0).toUpperCase();
-    return /[A-Z]/.test(l) ? l : '#';
-  };
+  const letraDe = letraMaq;
   const ordenada = [...lista].sort((a, b) => (letraDe(a) === '#') - (letraDe(b) === '#') || letraDe(a).localeCompare(letraDe(b))
     || String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR', { numeric: true, sensitivity: 'base' }));
   const grupos = [];
@@ -180,31 +208,32 @@ function imprimirListaMaquinas(lista) {
       col.c1{width:26mm}
       thead{display:table-header-group}
       th{background:#51534A;color:#fff;text-align:left;padding:6px 9px;font-size:11px;border:1px solid #51534A}
-      td{padding:5px 9px;border:1px solid #d7dccb;overflow-wrap:anywhere}
-      tbody.g{break-inside:avoid;page-break-inside:avoid}
+      td{padding:4px 9px;border:1px solid #d7dccb;overflow-wrap:anywhere}
       tr.letra td{background:#84BD00;color:#fff;font-weight:bold;font-size:12.5px;padding:5px 9px;border-color:#84BD00}
       tr.letra .l{display:inline-block;min-width:22px;font-size:15px}
       tr.letra td{line-height:18px}
       tr.letra .n{float:right;font-weight:normal;font-size:11px;line-height:18px}
       tr.it:nth-child(odd) td{background:#f2f7e6}
       td.cod{font-weight:bold;color:#744F28}
-      tr.esp td{border:0;height:8px;padding:0;background:#fff}
+      .folha+.folha{break-before:page;page-break-before:always}
       .tot{margin-top:10px;font-size:12px;text-align:right}
       .pe{margin-top:16px;display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:9px;letter-spacing:.06em;color:#7a7c72}
       .pe img{height:22px}
     </style></head><body>
-    <div class="cab"><img src="${new URL('../img/sakuma-marca-vertical.png', location.href)}" alt="SAKUMA">
-      <div class="t"><h1>Relatório de máquinas</h1><p>${esc(filtros)} · ${qtd(lista.length)} · emitido em ${formatarData(hoje())}</p></div></div>
-    <table><colgroup><col class="c1"><col></colgroup><thead><tr><th>Número</th><th>Nome</th></tr></thead>
-    ${grupos.map((g, i) => {
+    ${grupos.map(g => {
       const t = tipoDaLetra(g.itens);
-      return `<tbody class="${g.itens.length <= 25 ? 'g' : ''}">${i ? '<tr class="esp"><td colspan="2"></td></tr>' : ''}
-        <tr class="letra"><td colspan="2"><span class="l">${g.l}</span>${t ? esc(t) : ''}<span class="n">${qtd(g.itens.length)}</span></td></tr>` +
-        g.itens.map(e => `<tr class="it"><td class="cod">${esc(e.codigo || '')}</td><td>${esc(nome(e))}</td></tr>`).join('') + '</tbody>';
+      return `<section class="folha">
+      <div class="cab"><img src="${new URL('../img/sakuma-marca-vertical.png', location.href)}" alt="SAKUMA">
+        <div class="t"><h1>Relatório de máquinas · Letra ${g.l}${t ? ' — ' + esc(t) : ''}</h1>
+        <p>${esc(filtros)} · ${qtd(g.itens.length)} · emitido em ${formatarData(hoje())}</p></div></div>
+      <table><colgroup><col class="c1"><col></colgroup><thead><tr><th>Número</th><th>Nome</th></tr></thead><tbody>
+        <tr class="letra"><td colspan="2"><span class="l">${g.l}</span>${t ? esc(t) : ''}<span class="n">${qtd(g.itens.length)}</span></td></tr>
+        ${g.itens.map(e => `<tr class="it"><td class="cod">${esc(e.codigo || '')}</td><td>${esc(nome(e))}</td></tr>`).join('')}
+      </tbody></table>
+      <p class="tot">Total da letra ${g.l}: <b>${qtd(g.itens.length)}</b>${grupos.length > 1 ? ` · geral: ${qtd(lista.length)}` : ''}</p>
+      <div class="pe"><img src="${new URL('../img/lop-marca.png', location.href)}" alt=""><span>DESENVOLVIDO POR LOP · INTELIGÊNCIA PARA O AGRONEGÓCIO</span></div>
+      </section>`;
     }).join('')}
-    </table>
-    <p class="tot">Total: <b>${qtd(lista.length)}</b></p>
-    <div class="pe"><img src="${new URL('../img/lop-marca.png', location.href)}" alt=""><span>DESENVOLVIDO POR LOP · INTELIGÊNCIA PARA O AGRONEGÓCIO</span></div>
     <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>
     </body></html>`);
   w.document.close();
