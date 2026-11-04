@@ -2305,6 +2305,10 @@ addEventListener('beforeinstallprompt', function (ev) {
       <label class="campo plena">Motivo
         <textarea id="jorMotivoTexto" rows="3" required minlength="5"></textarea>
       </label>
+      <label class="campo plena">Senha (a mesma de mostrar os valores)
+        <input type="password" id="jorReabrirSenha" autocomplete="off" required>
+      </label>
+      <div class="aviso erro plena" id="jorReabrirErro" hidden></div>
     </div>
     <div class="barra entre">
       <span></span>

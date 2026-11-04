@@ -19,6 +19,7 @@ import * as docm from './jornada-documentos.js';
 import * as tk from './jornada-ticket.js';
 import * as hol from './jornada-holerite.js';
 import { podeTela } from './acesso.js';
+import { SENHA_SALARIO } from './rh-salarios.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -1982,6 +1983,8 @@ async function desenharFechamento() {
   document.querySelectorAll('[data-reabrir]').forEach(b => b.addEventListener('click', () => {
     estadoTela.reabrindo = b.dataset.reabrir;
     $('jorMotivoTexto').value = '';
+    $('jorReabrirSenha').value = '';
+    $('jorReabrirErro').hidden = true;
     $('dlgJorReabrir').showModal();
   }));
 
@@ -2289,6 +2292,11 @@ export function ligarJornada(navegar) {
   $('formJorReabrir')?.addEventListener('submit', async ev => {
     ev.preventDefault();
     const motivo = $('jorMotivoTexto').value.trim();
+    /* 04/11/2026: reabrir a competência enviada pede senha (a mesma do ticket e dos salários). */
+    if ($('jorReabrirSenha').value.trim() !== SENHA_SALARIO) {
+      $('jorReabrirErro').textContent = 'Senha incorreta.'; $('jorReabrirErro').hidden = false;
+      $('jorReabrirSenha').focus(); return;
+    }
     try {
       await fech.reabrir(estadoTela.competencia, estadoTela.reabrindo, motivo);
       await emp.estornarAbatimentos(estadoTela.competencia, estadoTela.reabrindo, 'Reabertura: ' + motivo);
