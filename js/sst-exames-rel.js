@@ -11,6 +11,7 @@
 import { LOGO, PE_LOP } from './seed.js';
 import { retratoExames } from './sst.js';
 import { montarMulti } from './multisel.js';
+import { exigidosDe, funcoes } from './aso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -47,6 +48,7 @@ export async function abrirRelExames() {
   catch (e) { caixa.innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`; return; }
   preencherFiltros();
   desenhar();
+  preencherExtras();
   resumoClinica();
 }
 
@@ -247,6 +249,53 @@ export const limparRelExames = () => { BASE = []; atual = []; };
    na maioria das vezes é lançamento que falta, não exame que falta.
    Audiometria e outros exames saem do que a função e as atividades exigem
    (Exames por função), feitos ou não: no periódico a clínica refaz tudo. */
+/* Incluídos à mão (04/11/2026, pedido dele): quem vai à clínica por outro
+   motivo — admissional, mudança de função, retorno. Não mexe no cadastro:
+   vale só para o pedido. Fica guardado no aparelho até ser tirado. */
+const TIPOS_EXTRA = ['Admissional', 'Mudança de função', 'Retorno ao trabalho', 'Periódico'];
+const CHAVE_EXTRAS = 'gr-clinica-extras';
+const EXTRAS = new Map();
+try { (JSON.parse(localStorage.getItem(CHAVE_EXTRAS) || '[]') || []).forEach(x => x && x.id && EXTRAS.set(x.id, x)); } catch (e) { /* sem guarda local */ }
+const guardarExtras = () => {
+  try { localStorage.setItem(CHAVE_EXTRAS, JSON.stringify([...EXTRAS.values()])); } catch (e) { /* sem guarda local */ }
+};
+
+function preencherExtras() {
+  if (!$('clFunc')) return;
+  const antes = $('clFunc').value;
+  $('clFunc').innerHTML = '<option value="">Escolha…</option>' + BASE.map(p =>
+    `<option value="${esc(p.f.id)}">${esc(p.f.nome)}</option>`).join('');
+  if (BASE.some(p => p.f.id === antes)) $('clFunc').value = antes;
+  const antesNova = $('clNova').value;
+  let lista = [];
+  try { lista = funcoes(); } catch (e) { lista = []; }
+  $('clNova').innerHTML = '<option value="">Escolha…</option>' + lista.map(f => `<option>${esc(f)}</option>`).join('');
+  if (lista.includes(antesNova)) $('clNova').value = antesNova;
+  trocarTipoExtra();
+  desenharExtras();
+}
+function trocarTipoExtra() {
+  // .campo tem display próprio, que passa por cima do atributo hidden
+  $('clNovaCampo').style.display = $('clTipo').value === 'Mudança de função' ? '' : 'none';
+}
+function desenharExtras() {
+  const nomeDe = id => BASE.find(p => p.f.id === id)?.f.nome;
+  const itens = [...EXTRAS.values()].filter(x => nomeDe(x.id));
+  $('clExtras').innerHTML = itens.length
+    ? itens.map(x => `<span class="contagem">${esc(nomeDe(x.id))} · <b>${esc(x.tipo)}</b>${x.funcao ? ` → ${esc(x.funcao)}` : ''}
+        <button type="button" class="btn mini" data-cl-tira="${esc(x.id)}" title="Tirar do pedido">×</button></span>`).join('')
+    : '';
+}
+function incluirExtra() {
+  const id = $('clFunc').value, tipo = $('clTipo').value, funcao = $('clNova').value;
+  $('clAvisoExtra').textContent = '';
+  if (!id) { $('clAvisoExtra').textContent = 'Escolha o funcionário.'; return; }
+  if (tipo === 'Mudança de função' && !funcao) { $('clAvisoExtra').textContent = 'Escolha a nova função.'; return; }
+  EXTRAS.set(id, { id, tipo, funcao: tipo === 'Mudança de função' ? funcao : '' });
+  guardarExtras(); desenharExtras(); resumoClinica();
+  if (ultimaClinica) mostrarClinica(ultimaClinica);
+}
+
 const ehAudio = nome => chave(nome).includes('AUDIOMETRIA');
 let ultimaClinica = '';
 
@@ -258,13 +307,21 @@ function listaClinica() {
   return BASE
     .filter(p => (!faz || faz.has(chave(p.f.fazenda))) && (!fun || chave(p.f.cargo) === fun)
       && (!q || chave(p.f.nome).includes(q)))
-    .map(p => ({ p, aso: p.linhas.find(l => l.exame === 'ASO') }))
-    .filter(x => x.aso && (x.aso.nunca ? nunca : situacao(x.aso, prazo).precisa))
-    .map(({ p, aso }) => ({
-      f: p.f, aso,
-      outros: p.linhas.filter(l => l.exame !== 'ASO' && !ehAudio(l.exame)).map(l => l.exame),
-      audio: p.linhas.some(l => ehAudio(l.exame)),
-    }))
+    .map(p => ({ p, aso: p.linhas.find(l => l.exame === 'ASO'), extra: EXTRAS.get(p.f.id) }))
+    // incluído à mão entra sempre; o resto, pelo vencimento do ASO
+    .filter(x => x.extra || (x.aso && (x.aso.nunca ? nunca : situacao(x.aso, prazo).precisa)))
+    .map(({ p, aso, extra }) => {
+      // mudança de função: a clínica faz os exames da função NOVA
+      const nova = extra && extra.tipo === 'Mudança de função' && extra.funcao;
+      const exames = nova ? exigidosDe(nova).map(t => t.nome) : p.linhas.filter(l => l.exame !== 'ASO').map(l => l.exame);
+      return {
+        f: p.f, aso: aso || { nunca: true }, extra,
+        tipo: extra ? extra.tipo : 'Periódico',
+        funcao: nova ? `${nova} (era ${so(p.f.cargo) || 'sem função'})` : so(p.f.cargo) || '—',
+        outros: exames.filter(e => !ehAudio(e)),
+        audio: exames.some(ehAudio),
+      };
+    })
     .sort((a, b) => String(a.aso.vence || '').localeCompare(String(b.aso.vence || ''))
       || a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
 }
@@ -275,9 +332,10 @@ function resumoClinica() {
   const l = listaClinica();
   const prazo = Number($('erPrazo').value) || 60;
   const vencidos = l.filter(x => !x.aso.nunca && x.aso.sit && x.aso.sit.dias < 0).length;
-  const sem = BASE.filter(p => p.linhas.find(x => x.exame === 'ASO')?.nunca).length;
+  const sem = BASE.filter(p => !EXTRAS.has(p.f.id) && p.linhas.find(x => x.exame === 'ASO')?.nunca).length;
   $('clResumo').innerHTML = `
-    <span class="contagem"><b>${l.length}</b> no ASO periódico</span>
+    <span class="contagem"><b>${l.filter(x => !x.extra).length}</b> no ASO periódico</span>
+    ${l.some(x => x.extra) ? `<span class="contagem"><b>${l.filter(x => x.extra).length}</b> incluído(s) à mão</span>` : ''}
     <span class="contagem"><b>${vencidos}</b> já vencido(s)</span>
     <span class="contagem"><b>${l.filter(x => x.audio).length}</b> com audiometria</span>
     ${porEmpregador(l).map(([e, g]) => `<span class="contagem"><b>${g.length}</b> ${esc(e)}</span>`).join('')}
@@ -337,18 +395,20 @@ function docClinica(qual) {
     '—', ['#'], [null], [], () => 1, 0);
   return grupos.map(([emp, l]) => {
     if (qual === 'aso') {
-      return folhasClinica('ASO PERIÓDICO', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'VENCE'],
-        ['12mm', '10mm', null, '55mm', '34mm', '58mm', '26mm'],
+      return folhasClinica(base.some(x => x.extra) ? 'ASO' : 'ASO PERIÓDICO', emp,
+        ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'TIPO DE ASO', 'VENCE'],
+        ['12mm', '10mm', null, '52mm', '32mm', '44mm', '34mm', '24mm'],
         l.map((x, i) => ({ html: `<tr>${CAIXA}<td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
-          <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
-          <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td${cls(x.aso)}>${venceTxt(x.aso)}</td></tr>` })),
+          <td class="cl-quebra">${esc(x.funcao)}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
+          <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td class="cl-quebra${x.extra ? ' an-nome' : ''}">${esc(x.tipo)}</td>
+          <td${x.extra && x.aso.nunca ? ' class="ce"' : cls(x.aso)}>${x.extra && x.aso.nunca ? '—' : venceTxt(x.aso)}</td></tr>` })),
         () => 1, l.length);
     }
     if (qual === 'audio') {
       return folhasClinica('AUDIOMETRIA', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA'],
         ['12mm', '10mm', null, '60mm', '36mm', '62mm'],
         l.map((x, i) => ({ html: `<tr>${CAIXA}<td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
-          <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
+          <td class="cl-quebra">${esc(x.funcao)}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
           <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td></tr>` })),
         () => 1, l.length);
     }
@@ -356,7 +416,7 @@ function docClinica(qual) {
     const folhas = folhasClinica('OUTROS EXAMES', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
       ['12mm', '10mm', '62mm', '42mm', '32mm', null],
       l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr>${CAIXA}<td class="ce">${i + 1}</td>
-        <td class="an-nome cl-quebra">${esc(x.f.nome)}</td><td class="cl-quebra">${esc(x.f.cargo || '—')}</td>
+        <td class="an-nome cl-quebra">${esc(x.f.nome)}</td><td class="cl-quebra">${esc(x.funcao)}</td>
         <td class="ce">${esc(x.f.cpf || '—')}</td>
         <td class="cl-quebra">${x.outros.length ? esc(x.outros.join(', ')) : '<span class="dc-sem">Nenhum cadastrado para a função</span>'}</td></tr>` })),
       x => Math.max(1, Math.ceil(x.ex.length / 95)), l.length);
@@ -379,4 +439,11 @@ export function ligarClinica() {
   $('clNunca').addEventListener('change', () => { resumoClinica(); if (ultimaClinica) mostrarClinica(ultimaClinica); });
   ['erFazenda', 'erFuncao', 'erPrazo'].forEach(id => $(id).addEventListener('change', resumoClinica));
   $('erBusca').addEventListener('input', resumoClinica);
+  $('clTipo').addEventListener('change', trocarTipoExtra);
+  $('bClIncluir').addEventListener('click', incluirExtra);
+  $('clExtras').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-cl-tira]'); if (!b) return;
+    EXTRAS.delete(b.dataset.clTira); guardarExtras(); desenharExtras(); resumoClinica();
+    if (ultimaClinica) mostrarClinica(ultimaClinica);
+  });
 }

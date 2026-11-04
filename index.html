@@ -1037,6 +1037,22 @@ addEventListener('beforeinstallprompt', function (ev) {
             <input type="checkbox" id="clNunca"> incluir quem não tem ASO lançado</label>
         </div>
         <div class="barra" id="clResumo" style="margin:10px 0 0"></div>
+        <h3 style="margin:16px 0 0">Incluir no pedido</h3>
+        <p class="dica" style="margin:2px 0 0">Para quem vai à clínica por outro motivo (admissional, mudança de função, retorno). Não muda o cadastro — vale só para o pedido.</p>
+        <div class="grade" style="margin-top:8px">
+          <label class="campo">Funcionário <select id="clFunc"></select></label>
+          <label class="campo">Tipo de ASO
+            <select id="clTipo">
+              <option>Admissional</option>
+              <option>Mudança de função</option>
+              <option>Retorno ao trabalho</option>
+              <option>Periódico</option>
+            </select></label>
+          <label class="campo" id="clNovaCampo" hidden>Nova função <select id="clNova"></select></label>
+          <div class="campo"><span>&nbsp;</span><button type="button" class="btn" id="bClIncluir">Incluir no pedido</button></div>
+        </div>
+        <div class="dc-sem" id="clAvisoExtra" style="color:#a5342a"></div>
+        <div class="barra" id="clExtras" style="margin:8px 0 0;flex-wrap:wrap;gap:6px"></div>
       </div>
 
       <div class="previa-lista" id="erSaida"></div>
