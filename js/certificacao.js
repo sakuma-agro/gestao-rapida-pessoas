@@ -2358,6 +2358,11 @@ const URL_APP = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/';
 const SEM_RESP_V = '__sem__';
 const temPeriodo = p => !!(DIAS_PERIODO[p] || MESES_PERIODO[p]);
 const avancar = (s, p) => DIAS_PERIODO[p] ? somaDias(s, DIAS_PERIODO[p]) : MESES_PERIODO[p] ? somaMeses(s, MESES_PERIODO[p]) : null;
+const recuar = (s, p) => DIAS_PERIODO[p] ? somaDias(s, -DIAS_PERIODO[p]) : MESES_PERIODO[p] ? somaMeses(s, -MESES_PERIODO[p]) : s;
+/** Pasta do documento (ou da fazenda) na nuvem: o link do cadastro — o de compartilhamento abre para o responsável. */
+const linkPasta = (d, item = null) => linkOk(item?.link) ? item.link : linkOk(d.link) ? d.link : '';
+const btnPasta = (d, item = null, cls = 'btn mini') => linkPasta(d, item)
+  ? `<a class="${cls}" href="${esc(linkPasta(d, item))}" target="_blank" rel="noopener" title="Abrir a pasta no OneDrive">Pasta ☁</a>` : '';
 const avisoDe = d => d.aviso_dias ?? AVISO_PADRAO[d.periodicidade] ?? 7;
 const nomeCurto = n => so(n).toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase()).split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
 const soDigitos = s => so(s).replace(/\D/g, '');
@@ -2373,8 +2378,20 @@ function ultimoFeito(d) {
 /** Próximo vencimento: o gravado; sem ele, última vez feito + periodicidade. AN por fazenda: o item que vence primeiro. */
 function vencDoc(d) {
   if (d.por_fazenda && itensDe(d).length) return itensDe(d).map(i => vencItem(i, d)).filter(Boolean).sort()[0] || null;
-  if (d.vence_em) return d.vence_em;
   const u = ultimoFeito(d);
+  if (d.vence_em) {
+    /* 03/11/2026: o responsável coloca o arquivo na pasta do OneDrive e a sincronização cria a evidência — sem
+       apertar "Feito". Evidência dentro do ciclo atual (depois do vencimento anterior) empurra para o próximo. */
+    // só conta evidência que chegou DEPOIS do último ajuste do vencimento ("Feito" já avançou a data sozinho)
+    const novas = S.evid.filter(e => e.documento_id === d.id && so(e.criado_em) > so(d.atualizado_em)).map(e => e.data).sort();
+    const un = novas[novas.length - 1];
+    let v = d.vence_em, n = 0;
+    if (un && temPeriodo(d.periodicidade) && un > recuar(v, d.periodicidade)) {   // mesma regra do "Feito"
+      if (v > un) v = avancar(v, d.periodicidade);
+      else while (v <= un && n++ < 400) v = avancar(v, d.periodicidade);
+    }
+    return v;
+  }
   return u && temPeriodo(d.periodicidade) ? comDia(avancar(u, d.periodicidade), MESES_PERIODO[d.periodicidade] ? d.dia_vencimento : null) : null;
 }
 /** Depois de "Feito" em `data`: feito antes do vencimento conta para ele; feito atrasado pula para o próximo dia certo. */
@@ -2459,6 +2476,7 @@ function desenharVencimentos() {
           <td class="ce ce-vn-acoes">${l.d.por_fazenda
             ? `<button class="btn mini" type="button" data-vabrir="${l.d.id}">Fazendas</button>`
             : `<button class="btn mini principal" type="button" data-vfeito="${l.d.id}">Feito</button>`}
+            ${btnPasta(l.d)}
             <button class="btn mini" type="button" data-vedit="${l.d.id}" title="Editar o cadastro" aria-label="Editar ${esc(l.d.codigo)}">✎</button></td>
         </tr>`).join('') || `<tr><td colspan="6"><div class="vazio">Nada aqui.</div></td></tr>`}
       </tbody></table></div>
@@ -2497,7 +2515,8 @@ function formFeito(d) {
       <label class="campo">Feito em <input type="date" id="vfData" value="${hoje()}" max="${hoje()}"></label>
       <label class="campo">Observação <small>(opcional)</small> <input type="text" id="vfObs" maxlength="300" placeholder="Ex.: extintor do galpão 2 recarregado"></label>
     </div>
-    <label class="campo">Link da evidência no OneDrive
+    <p class="ce-vn-pasta">${linkPasta(d) ? `${btnPasta(d, null, 'btn')} ` : ''}<b>Mais fácil:</b> coloque o arquivo na pasta do ano no OneDrive, com a data no começo do nome (ex.: <i>${hoje().slice(0, 7)} - ${esc(so(d.nome).slice(0, 30))}.pdf</i>). Em até 1 hora ele entra aqui sozinho e o vencimento anda — não precisa apertar Feito.</p>
+    <label class="campo">Ou registre aqui — link da evidência no OneDrive
       <span class="ce-linha-link"><input type="url" id="vfLink" maxlength="2000" placeholder="https://… (Compartilhar › Copiar link)">
       <a class="btn mini" id="vfAbrir" target="_blank" rel="noopener" hidden>Abrir ↗</a></span></label>
     ${DICA_LINK}
@@ -2720,7 +2739,7 @@ function ladoEvid(l) {
   return `<div class="ce-ev-tit"><small>${esc(l.d.codigo)}${l.item ? ' · ' + esc(rotItem(l.item)).toUpperCase() : ''}</small>
       <b>${esc(l.d.nome)}</b><span class="dc-sem">${esc(l.per || '')}${l.d.dia_vencimento ? ` · vence todo dia ${doisD(l.d.dia_vencimento)}` : ''}${venc ? ' · próximo ' + br(venc) : ''}</span></div>
     ${blocos || '<p class="dica">Nenhum período neste ano.</p>'}
-    <button class="btn principal" type="button" data-einc="${hoje()}">+ Evidência</button>
+    <div class="barra" style="margin:0;gap:8px">${btnPasta(l.d, l.item, 'btn')}<button class="btn principal" type="button" data-einc="${hoje()}">+ Evidência</button></div>
     <p class="ce-ev-dica"><b>Sem digitar nada:</b> coloque o PDF na pasta <b>${pasta}</b> do OneDrive com o mês no nome (ex.: “novembro”). Em até 1 hora ele aparece aqui, no mês certo.</p>`;
 }
 function ligarLadoEvid(l) {
