@@ -373,7 +373,7 @@ function recorteClinica() {
     .filter(Boolean).join(' · ');
 }
 function folhasClinica(titulo, emp, cab, cols, linhas, pesoDe, n) {
-  const UN = 17;
+  const UN = 12; // cabe nos 185 mm da folha deitada mesmo com margem da impressora (04/11/2026)
   const paginas = []; let pag = [], soma = 0;
   linhas.forEach(l => {
     const w = pesoDe(l);

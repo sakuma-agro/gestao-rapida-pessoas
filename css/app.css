@@ -667,6 +667,11 @@ dialog h3{margin:0 0 14px;font-size:16px}
     page-break-after:always;break-after:page;
     page-break-inside:avoid;break-inside:avoid}
   .an-folha:last-child{page-break-after:auto;break-after:auto}
+  /* Folha deitada na impressão (04/11/2026): altura pelo conteúdo, com mínimo
+     de 185 mm. Com 209,8 mm fixos, qualquer margem da impressora (Margens
+     "Padrão"/"Mínimo") deixava a folha maior que a página e a marca da LOP caía
+     sozinha numa folha em branco. 185 mm cabe mesmo com ~12 mm de margem. */
+  .an-folha.deitada{height:auto;min-height:185mm}
   #dfSaida{transform:none !important}
   .dk-folha{box-shadow:none;margin:0;padding:10mm 12mm;
     page-break-after:always;break-after:page}
