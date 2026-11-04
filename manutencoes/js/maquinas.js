@@ -53,6 +53,7 @@ function piorSituacao(idMaquina) {
 /* ---------------------------------------------------------------- lista */
 
 let filtroMaq = { busca: '', local: '', tipo: '' };
+let listaMaqAtual = [];
 
 TELAS.maquinas = el => {
   el.innerHTML = `
@@ -63,6 +64,7 @@ TELAS.maquinas = el => {
       'Informe a <b>próxima troca</b> — pronto, ela aparece nas Preventivas quando vencer']) : ''}
     <div class="acoes">
       ${ehAdmin() ? '<button type="button" class="btn" id="mq-nova">Cadastrar máquina</button>' : ''}
+      <button type="button" class="btn-fantasma" id="mq-imprimir">Imprimir lista</button>
       ${'' /* 14/10/2026: importação Realtec foi só a carga inicial; horímetro agora é lançado no app. Para voltar: botão #mq-importar (ver git). */}
       ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-itens">Lista de serviços</button>' : ''}
       ${ehAdminTotal() ? '<button type="button" class="btn-fantasma" id="mq-tipos">Tipos de máquina e grupos</button>' : ''}
@@ -87,6 +89,7 @@ TELAS.maquinas = el => {
       (!filtroMaq.tipo || e.tipo_equipamento_id === filtroMaq.tipo) &&
       (!b || (e.codigo + ' ' + e.descricao + ' ' + (e.patrimonio || '')).toLowerCase().includes(b))
     ).sort(porCodigo);
+    listaMaqAtual = lista;
 
     $('#mq-lista').innerHTML = lista.length === 0
       ? '<div class="vazio"><p>Nenhuma máquina com esses filtros.</p></div>'
@@ -115,12 +118,73 @@ TELAS.maquinas = el => {
   };
   ['mq-busca', 'mq-local', 'mq-tipo'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
   const bn = $('#mq-nova'); if (bn) bn.onclick = () => formMaquina();
+  $('#mq-imprimir').onclick = () => imprimirListaMaquinas(listaMaqAtual);
   const bi = $('#mq-importar'); if (bi) bi.onclick = telaImportarRealtec;
   const bt = $('#mq-itens'); if (bt) bt.onclick = telaItensManutencao;
   ligarSeletorGrupo('mq-grupo');
   const bg = $('#mq-tipos'); if (bg) bg.onclick = telaTiposMaquina;
   desenhar();
 };
+
+/* ---------------------------------------------------------------- impressão
+
+   04/11/2026 (pedido dele): relatório das máquinas para imprimir — número e
+   nome, em ordem alfabética do nome, separado por letra. Sai o que está na
+   tela (respeita busca, local, grupo e tipo). A4 em pé, pé só com a LOP. */
+function imprimirListaMaquinas(lista) {
+  if (!lista.length) return aviso('Nenhuma máquina para imprimir com esses filtros.', true);
+  const nome = e => String(e.descricao || '').trim();
+  const letraDe = e => (nome(e).normalize('NFD').replace(/[\u0300-\u036f]/g, '').charAt(0).toUpperCase() || '#');
+  const ordenada = [...lista].sort((a, b) => nome(a).localeCompare(nome(b), 'pt-BR', { sensitivity: 'base', numeric: true }) || porCodigo(a, b));
+  const grupos = [];
+  ordenada.forEach(e => {
+    const l = /[A-Z]/.test(letraDe(e)) ? letraDe(e) : '#';
+    if (!grupos.length || grupos[grupos.length - 1].l !== l) grupos.push({ l, itens: [] });
+    grupos[grupos.length - 1].itens.push(e);
+  });
+  const filtros = [
+    filtroMaq.local ? q.nome('locais', filtroMaq.local) : 'Todos os locais',
+    grupoAtual ? nomeGrupo(grupoAtual) : '',
+    filtroMaq.tipo ? q.nome('tipos_equipamento', filtroMaq.tipo) : '',
+    filtroMaq.busca ? 'busca: ' + filtroMaq.busca : '',
+  ].filter(Boolean).join(' · ');
+  const w = window.open('', '_blank');
+  if (!w) return aviso('O navegador bloqueou a janela de impressão.', true);
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+    <title>Relatório de máquinas — ${esc(filtros)}</title>
+    <style>
+      @page{size:A4 portrait;margin:12mm}
+      *{box-sizing:border-box}
+      body{font-family:Arial,Helvetica,sans-serif;color:#51534A;margin:0;font-size:11.5px}
+      .cab{display:flex;align-items:center;gap:14px;border-bottom:2px solid #c9dd94;padding-bottom:8px;margin-bottom:10px}
+      .cab img{height:42px}
+      h1{font-size:17px;margin:0;color:#744F28}
+      .cab p{margin:2px 0 0;font-size:11px}
+      table{width:100%;border-collapse:collapse}
+      thead{display:table-header-group}
+      tbody{break-inside:avoid;page-break-inside:avoid}
+      th{background:#eef3e0;text-align:left;padding:5px 8px;border:1px solid #d7dccb;font-size:10.5px}
+      td{padding:5px 8px;border:1px solid #d7dccb}
+      td.cod{width:110px;white-space:nowrap;font-weight:bold}
+      tr.letra td{background:#84BD00;color:#fff;font-weight:bold;font-size:13px;padding:3px 8px;letter-spacing:.05em}
+      tr.it:nth-child(odd) td{background:#f7f9f1}
+      .n{color:#8a8c82;font-weight:normal;font-size:10px;margin-left:6px}
+      .tot{margin-top:8px;font-size:11px;text-align:right}
+      .pe{margin-top:14px;display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:9px;letter-spacing:.06em}
+      .pe img{height:22px}
+    </style></head><body>
+    <div class="cab"><img src="${new URL('../img/sakuma-marca-vertical.png', location.href)}" alt="SAKUMA">
+      <div><h1>Relatório de máquinas</h1><p>${esc(filtros)} · ${lista.length} ${lista.length === 1 ? 'máquina' : 'máquinas'} · emitido em ${formatarData(hoje())}</p></div></div>
+    <table><thead><tr><th>Número</th><th>Nome</th></tr></thead>
+    ${grupos.map(g => `<tbody><tr class="letra"><td colspan="2">${g.l}<span class="n">${g.itens.length}</span></td></tr>` +
+      g.itens.map(e => `<tr class="it"><td class="cod">${esc(e.codigo || '')}</td><td>${esc(nome(e))}</td></tr>`).join('') + '</tbody>').join('')}
+    </table>
+    <p class="tot">Total: <b>${lista.length}</b> ${lista.length === 1 ? 'máquina' : 'máquinas'}</p>
+    <div class="pe"><img src="${new URL('../img/lop-marca.png', location.href)}" alt=""><span>DESENVOLVIDO POR LOP · INTELIGÊNCIA PARA O AGRONEGÓCIO</span></div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>
+    </body></html>`);
+  w.document.close();
+}
 
 /* ---------------------------------------------------------------- ficha */
 
