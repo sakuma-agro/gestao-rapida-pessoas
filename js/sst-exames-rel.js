@@ -341,10 +341,7 @@ function docClinica(qual) {
           <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td></tr>` })),
         () => 1, l.length);
     }
-    // outros exames: lista + quadro de totais do empregador na última folha dele
-    const cont = new Map();
-    l.forEach(x => x.outros.forEach(e => cont.set(e, (cont.get(e) || 0) + 1)));
-    const total = [...cont.values()].reduce((a, b) => a + b, 0);
+    // outros exames: só a lista (a folha de totais saiu a pedido dele, 04/11/2026)
     const folhas = folhasClinica('OUTROS EXAMES', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
       ['12mm', '10mm', '62mm', '42mm', '32mm', null],
       l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr>${CAIXA}<td class="ce">${i + 1}</td>
@@ -352,19 +349,7 @@ function docClinica(qual) {
         <td class="ce">${esc(x.f.cpf || '—')}</td>
         <td class="cl-quebra">${x.outros.length ? esc(x.outros.join(', ')) : '<span class="dc-sem">Nenhum cadastrado para a função</span>'}</td></tr>` })),
       x => Math.max(1, Math.ceil(x.ex.length / 95)), l.length);
-    if (!cont.size) return folhas;
-    const itens = [...cont.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
-    return folhas + `<div class="an-folha deitada">
-      <div class="an-topo"><img src="${LOGO}" alt=""><div class="an-tit"><h1>OUTROS EXAMES · TOTAIS</h1>
-        <p><b>Empregador: ${esc(emp)}</b> · ${l.length} funcionário(s) · ${dataBr(hoje())}</p></div></div>
-      <table class="an-tab sst-folha-tab cl-tab" style="width:130mm">
-        <colgroup><col><col style="width:30mm"></colgroup>
-        <thead><tr><th>EXAME</th><th>QTDE</th></tr></thead>
-        <tbody>${itens.map(([e, q]) => `<tr><td>${esc(e)}</td><td class="ce">${q}</td></tr>`).join('')}
-          <tr class="cl-total"><td>Total</td><td class="ce">${total}</td></tr></tbody></table>
-      <div class="an-pe"><span>${esc(emp)} · para a clínica conferir as quantidades</span><span>SAKUMA Agronegócios</span></div>
-      ${PE_LOP}
-    </div>`;
+    return folhas;
   }).join('');
 }
 
