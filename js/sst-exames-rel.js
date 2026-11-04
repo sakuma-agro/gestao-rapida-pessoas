@@ -351,6 +351,15 @@ const SEM_EMP = 'Sem empregador cadastrado';
    responsáveis irem chamando um por um e riscando quem já foi. */
 const CAIXA = '<td class="ce cl-marca"><span class="cl-caixa"></span></td>';
 const empDe = f => so(f.empregador) || SEM_EMP;
+/* Folha por empregador E fazenda (04/11/2026): "MASSATO SAKUMA – LOTE 35 PADAP". */
+const grupoDe = f => `${empDe(f)} – ${so(f.fazenda) || 'Sem fazenda'}`;
+function porGrupo(lista) {
+  const m = new Map();
+  lista.forEach(x => { const g = grupoDe(x.f); if (!m.has(g)) m.set(g, { emp: empDe(x.f), faz: so(x.f.fazenda), itens: [] }); m.get(g).itens.push(x); });
+  return [...m.entries()].sort((a, b) => (a[1].emp === SEM_EMP) - (b[1].emp === SEM_EMP)
+    || a[1].emp.localeCompare(b[1].emp, 'pt-BR') || a[1].faz.localeCompare(b[1].faz, 'pt-BR'))
+    .map(([g, v]) => [g, v.itens]);
+}
 function porEmpregador(lista) {
   const m = new Map();
   lista.forEach(x => { const e = empDe(x.f); if (!m.has(e)) m.set(e, []); m.get(e).push(x); });
@@ -374,7 +383,7 @@ function folhasClinica(titulo, emp, cab, cols, linhas, pesoDe, n) {
       <div class="an-topo">
         <img src="${LOGO}" alt="">
         <div class="an-tit"><h1>${esc(titulo)}</h1>
-          <p><b>Empregador: ${esc(emp)}</b> · ${esc(recorteClinica())} · ${dataBr(hoje())}</p></div>
+          <p><b>${esc(emp)}</b> · ${esc(recorteClinica())} · ${dataBr(hoje())}</p></div>
       </div>
       ${fatia.length ? `<table class="an-tab sst-folha-tab cl-tab">
         <colgroup>${cols.map(c => `<col${c ? ` style="width:${c}"` : ''}>`).join('')}</colgroup>
@@ -390,26 +399,25 @@ function docClinica(qual) {
   const venceTxt = a => a.nunca ? 'Sem ASO' : dataBr(a.vence);
   const cls = a => a.nunca || (a.sit && a.sit.dias < 0) ? ' class="ce sst-vencido"' : ' class="ce"';
   const base = qual === 'audio' ? listaClinica().filter(x => x.audio) : listaClinica();
-  const grupos = porEmpregador(base);
+  const grupos = porGrupo(base);
   if (!grupos.length) return folhasClinica(qual === 'aso' ? 'ASO PERIÓDICO' : qual === 'audio' ? 'AUDIOMETRIA' : 'OUTROS EXAMES',
     '—', ['#'], [null], [], () => 1, 0);
   return grupos.map(([emp, l]) => {
     if (qual === 'aso') {
       return folhasClinica(base.some(x => x.extra) ? 'ASO' : 'ASO PERIÓDICO', emp,
-        ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'TIPO DE ASO', 'VENCE'],
-        ['12mm', '10mm', null, '52mm', '32mm', '44mm', '34mm', '24mm'],
+        ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'TIPO DE ASO', 'VENCE'],
+        ['12mm', '10mm', null, '64mm', '34mm', '38mm', '26mm'],
         l.map((x, i) => ({ html: `<tr>${CAIXA}<td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
           <td class="cl-quebra">${esc(x.funcao)}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
-          <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td class="cl-quebra${x.extra ? ' an-nome' : ''}">${esc(x.tipo)}</td>
+          <td class="cl-quebra${x.extra ? ' an-nome' : ''}">${esc(x.tipo)}</td>
           <td${x.extra && x.aso.nunca ? ' class="ce"' : cls(x.aso)}>${x.extra && x.aso.nunca ? '—' : venceTxt(x.aso)}</td></tr>` })),
         () => 1, l.length);
     }
     if (qual === 'audio') {
-      return folhasClinica('AUDIOMETRIA', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA'],
-        ['12mm', '10mm', null, '60mm', '36mm', '62mm'],
+      return folhasClinica('AUDIOMETRIA', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF'],
+        ['12mm', '10mm', null, '80mm', '40mm'],
         l.map((x, i) => ({ html: `<tr>${CAIXA}<td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
-          <td class="cl-quebra">${esc(x.funcao)}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
-          <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td></tr>` })),
+          <td class="cl-quebra">${esc(x.funcao)}</td><td class="ce">${esc(x.f.cpf || '—')}</td></tr>` })),
         () => 1, l.length);
     }
     // outros exames: só a lista (a folha de totais saiu a pedido dele, 04/11/2026)
