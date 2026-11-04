@@ -269,13 +269,28 @@ function resumoClinica() {
     <span class="contagem"><b>${l.length}</b> no ASO periódico</span>
     <span class="contagem"><b>${vencidos}</b> já vencido(s)</span>
     <span class="contagem"><b>${l.filter(x => x.audio).length}</b> com audiometria</span>
+    ${porEmpregador(l).map(([e, g]) => `<span class="contagem"><b>${g.length}</b> ${esc(e)}</span>`).join('')}
     <span class="dc-sem">vencendo em até ${prazo} dias${sem && !$('clNunca').checked ? ` · ${sem} ativo(s) sem ASO lançado ficaram de fora` : ''}</span>`;
 }
 
-/* Folhas: paginação por peso, como no documento acima. A linha cuja coluna
-   de exames quebra em várias conta mais. */
-function folhasClinica(titulo, cab, cols, linhas, pesoDe, rodapeExtra = '') {
-  const UN = 26;
+/* Folhas (04/11/2026, pedido dele): A4 em paisagem e uma seção por
+   empregador — cada empregador começa folha nova e a numeração recomeça,
+   para cada lista ir para a clínica no nome de quem paga. Paginação por
+   peso: a linha cuja coluna de exames quebra em várias conta mais. */
+const SEM_EMP = 'Sem empregador cadastrado';
+const empDe = f => so(f.empregador) || SEM_EMP;
+function porEmpregador(lista) {
+  const m = new Map();
+  lista.forEach(x => { const e = empDe(x.f); if (!m.has(e)) m.set(e, []); m.get(e).push(x); });
+  return [...m.entries()].sort((a, b) => (a[0] === SEM_EMP) - (b[0] === SEM_EMP) || a[0].localeCompare(b[0], 'pt-BR'));
+}
+function recorteClinica() {
+  const nome = id => { const s = $(id); return s.value ? s.options[s.selectedIndex].text : ''; };
+  return [nome('erFazenda'), nome('erFuncao'), `ASO vencido ou vencendo em até ${$('erPrazo').value} dias`]
+    .filter(Boolean).join(' · ');
+}
+function folhasClinica(titulo, emp, cab, cols, linhas, pesoDe, n) {
+  const UN = 17;
   const paginas = []; let pag = [], soma = 0;
   linhas.forEach(l => {
     const w = pesoDe(l);
@@ -283,71 +298,71 @@ function folhasClinica(titulo, cab, cols, linhas, pesoDe, rodapeExtra = '') {
     soma += w; pag.push(l);
   });
   if (pag.length || !paginas.length) paginas.push(pag);
-  const prazo = $('erPrazo').value;
-  const nome = id => { const s = $(id); return s.value ? s.options[s.selectedIndex].text : ''; };
-  const rec = [nome('erFazenda'), nome('erFuncao'), `ASO vencido ou vencendo em até ${prazo} dias`]
-    .filter(Boolean).join(' · ');
-  const n = linhas.filter(l => !l.total).length;
-  return paginas.map((fatia, i) => `<div class="an-folha">
+  return paginas.map((fatia, i) => `<div class="an-folha deitada">
       <div class="an-topo">
         <img src="${LOGO}" alt="">
-        <div class="an-tit"><h1>${esc(titulo)}</h1><p>${esc(rec)} · ${dataBr(hoje())}</p></div>
+        <div class="an-tit"><h1>${esc(titulo)}</h1>
+          <p><b>Empregador: ${esc(emp)}</b> · ${esc(recorteClinica())} · ${dataBr(hoje())}</p></div>
       </div>
       ${fatia.length ? `<table class="an-tab sst-folha-tab cl-tab">
         <colgroup>${cols.map(c => `<col${c ? ` style="width:${c}"` : ''}>`).join('')}</colgroup>
         <thead><tr>${cab.map(c => `<th>${c}</th>`).join('')}</tr></thead>
         <tbody>${fatia.map(l => l.html).join('')}</tbody>
       </table>` : '<p class="pn-nada">Ninguém nesse recorte.</p>'}
-      ${i === paginas.length - 1 ? rodapeExtra : ''}
-      <div class="an-pe"><span>${n} funcionário(s) · página ${i + 1} de ${paginas.length}</span><span>SAKUMA Agronegócios</span></div>
+      <div class="an-pe"><span>${esc(emp)} · ${n} funcionário(s) · página ${i + 1} de ${paginas.length}</span><span>SAKUMA Agronegócios</span></div>
       ${PE_LOP}
     </div>`).join('');
 }
 
 function docClinica(qual) {
-  const l = listaClinica();
   const venceTxt = a => a.nunca ? 'Sem ASO' : dataBr(a.vence);
   const cls = a => a.nunca || (a.sit && a.sit.dias < 0) ? ' class="ce sst-vencido"' : ' class="ce"';
-  if (qual === 'aso') {
-    return folhasClinica('ASO PERIÓDICO', ['#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'VENCE'],
-      ['9mm', null, '36mm', '30mm', '32mm', '21mm'],
-      l.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
-        <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
-        <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td${cls(x.aso)}>${venceTxt(x.aso)}</td></tr>` })),
-      () => 1);
-  }
-  if (qual === 'audio') {
-    const a = l.filter(x => x.audio);
-    return folhasClinica('AUDIOMETRIA', ['#', 'NOME', 'FUNÇÃO', 'CPF'], ['9mm', null, '45mm', '34mm'],
-      a.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
-        <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td></tr>` })),
-      () => 1);
-  }
-  // outros exames
-  const cont = new Map();
-  l.forEach(x => x.outros.forEach(e => cont.set(e, (cont.get(e) || 0) + 1)));
-  const total = [...cont.values()].reduce((a, b) => a + b, 0);
-  const quadro = cont.size ? `<table class="an-tab sst-folha-tab cl-tab" style="width:110mm">
-      <colgroup><col><col style="width:28mm"></colgroup>
-      <thead><tr><th>TOTAL POR EXAME</th><th>QTDE</th></tr></thead>
-      <tbody>${[...cont.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
-        .map(([e, q]) => `<tr><td>${esc(e)}</td><td class="ce">${q}</td></tr>`).join('')}
-        <tr class="cl-total"><td>Total</td><td class="ce">${total}</td></tr></tbody></table>` : '';
-  const folhas = folhasClinica('OUTROS EXAMES', ['#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
-    ['9mm', '44mm', '30mm', '28mm', null],
-    l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr><td class="ce">${i + 1}</td>
-      <td class="an-nome cl-quebra">${esc(x.f.nome)}</td><td class="cl-quebra">${esc(x.f.cargo || '—')}</td>
-      <td class="ce">${esc(x.f.cpf || '—')}</td>
-      <td class="cl-quebra">${x.outros.length ? esc(x.outros.join(', ')) : '<span class="dc-sem">Nenhum cadastrado para a função</span>'}</td></tr>` })),
-    x => Math.max(1, Math.ceil(x.ex.length / 55)));
-  // o quadro de totais vai numa folha própria só se houver o que contar
-  return folhas + (quadro ? `<div class="an-folha">
+  const base = qual === 'audio' ? listaClinica().filter(x => x.audio) : listaClinica();
+  const grupos = porEmpregador(base);
+  if (!grupos.length) return folhasClinica(qual === 'aso' ? 'ASO PERIÓDICO' : qual === 'audio' ? 'AUDIOMETRIA' : 'OUTROS EXAMES',
+    '—', ['#'], [null], [], () => 1, 0);
+  return grupos.map(([emp, l]) => {
+    if (qual === 'aso') {
+      return folhasClinica('ASO PERIÓDICO', emp, ['#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'VENCE'],
+        ['10mm', null, '55mm', '34mm', '58mm', '26mm'],
+        l.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
+          <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
+          <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td${cls(x.aso)}>${venceTxt(x.aso)}</td></tr>` })),
+        () => 1, l.length);
+    }
+    if (qual === 'audio') {
+      return folhasClinica('AUDIOMETRIA', emp, ['#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA'],
+        ['10mm', null, '60mm', '36mm', '62mm'],
+        l.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
+          <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
+          <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td></tr>` })),
+        () => 1, l.length);
+    }
+    // outros exames: lista + quadro de totais do empregador na última folha dele
+    const cont = new Map();
+    l.forEach(x => x.outros.forEach(e => cont.set(e, (cont.get(e) || 0) + 1)));
+    const total = [...cont.values()].reduce((a, b) => a + b, 0);
+    const folhas = folhasClinica('OUTROS EXAMES', emp, ['#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
+      ['10mm', '62mm', '42mm', '32mm', null],
+      l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr><td class="ce">${i + 1}</td>
+        <td class="an-nome cl-quebra">${esc(x.f.nome)}</td><td class="cl-quebra">${esc(x.f.cargo || '—')}</td>
+        <td class="ce">${esc(x.f.cpf || '—')}</td>
+        <td class="cl-quebra">${x.outros.length ? esc(x.outros.join(', ')) : '<span class="dc-sem">Nenhum cadastrado para a função</span>'}</td></tr>` })),
+      x => Math.max(1, Math.ceil(x.ex.length / 95)), l.length);
+    if (!cont.size) return folhas;
+    const itens = [...cont.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
+    return folhas + `<div class="an-folha deitada">
       <div class="an-topo"><img src="${LOGO}" alt=""><div class="an-tit"><h1>OUTROS EXAMES · TOTAIS</h1>
-        <p>${l.length} funcionário(s) · ${dataBr(hoje())}</p></div></div>
-      ${quadro}
-      <div class="an-pe"><span>Para a clínica conferir as quantidades</span><span>SAKUMA Agronegócios</span></div>
+        <p><b>Empregador: ${esc(emp)}</b> · ${l.length} funcionário(s) · ${dataBr(hoje())}</p></div></div>
+      <table class="an-tab sst-folha-tab cl-tab" style="width:130mm">
+        <colgroup><col><col style="width:30mm"></colgroup>
+        <thead><tr><th>EXAME</th><th>QTDE</th></tr></thead>
+        <tbody>${itens.map(([e, q]) => `<tr><td>${esc(e)}</td><td class="ce">${q}</td></tr>`).join('')}
+          <tr class="cl-total"><td>Total</td><td class="ce">${total}</td></tr></tbody></table>
+      <div class="an-pe"><span>${esc(emp)} · para a clínica conferir as quantidades</span><span>SAKUMA Agronegócios</span></div>
       ${PE_LOP}
-    </div>` : '');
+    </div>`;
+  }).join('');
 }
 
 function mostrarClinica(qual) {
