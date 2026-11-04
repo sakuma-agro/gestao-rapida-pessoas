@@ -63,6 +63,7 @@ import { abrirFauna, limparFauna, TELAS_FAUNA } from './cert-fauna.js';
 import { abrirEnergia, limparEnergia, TELAS_ENERGIA } from './cert-energia.js';
 import { abrirResiduos, limparResiduos, TELAS_RESIDUOS } from './cert-residuos.js';
 import { abrirGrasp, limparGrasp, TELAS_GRASP } from './cert-grasp.js';
+import { abrirImpressoes, limparImpressoes, TELAS_IMPRESSOES } from './cert-impressoes.js';
 import { abrirBanho, limparBanho, TELAS_BANHO } from './cert-banho.js';
 import { abrirChecklist, limparChecklist, TELAS_CHECKLIST } from './cert-checklist.js';
 import { limparCroqui, abrirAnDigital, TELAS_AN_DIGITAL } from './cert-croqui.js';
@@ -264,6 +265,9 @@ function abrirAba(nome) {
   // Certificação › Reunião GRASP (27/10/2026) — js/cert-grasp.js
   for (const t of TELAS_GRASP) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_GRASP.includes(nome)) abrirGrasp(nome);
+  // Certificação › Impressões (04/11/2026) — js/cert-impressoes.js
+  for (const t of TELAS_IMPRESSOES) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  if (TELAS_IMPRESSOES.includes(nome)) abrirImpressoes(nome);
   // Certificação › Banho e higiene pessoal (28/10/2026) — js/cert-banho.js
   for (const t of TELAS_BANHO) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
   if (TELAS_BANHO.includes(nome)) abrirBanho(nome);
@@ -363,7 +367,7 @@ $('bCancelarNovaSenha').addEventListener('click', () => {
 $('btnSair').addEventListener('click', async () => {
   await db.sair();
   marcados.clear(); rascunhos.clear(); limparAtalhos();
-  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparNrs(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparBanho(); limparChecklist(); limparCroqui(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
+  limparAreas(); limparDisc(); limparAcesso(); limparJornada(); limparSst(); limparAcidentes(); limparCampanhas(); limparBrigada(); limparNrs(); limparEpiCrono(); limparCertificacao(); limparCaderno(); limparFauna(); limparEnergia(); limparResiduos(); limparGrasp(); limparImpressoes(); limparBanho(); limparChecklist(); limparCroqui(); limparFornecedores(); limparMelhorias(); limparBalanco(); limparRh(); limparOrganograma(); limparIndicadores(); limparSalarios(); limparEnquadra(); limparSalarioDigno(); limparReuniao(); limparTarefas();
   mostrar('login');
 });
 
