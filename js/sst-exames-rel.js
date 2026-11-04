@@ -367,7 +367,8 @@ function porEmpregador(lista) {
 }
 function recorteClinica() {
   const nome = id => { const s = $(id); return s.value ? s.options[s.selectedIndex].text : ''; };
-  return [textoFazendas(), nome('erFuncao'), `ASO vencido ou vencendo em até ${$('erPrazo').value} dias`]
+  // a fazenda já vai no título da folha (EMPREGADOR – FAZENDA): não repetir o filtro
+  return [nome('erFuncao'), `ASO vencido ou vencendo em até ${$('erPrazo').value} dias`]
     .filter(Boolean).join(' · ');
 }
 function folhasClinica(titulo, emp, cab, cols, linhas, pesoDe, n) {
