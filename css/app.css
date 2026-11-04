@@ -420,7 +420,9 @@ dialog h3{margin:0 0 14px;font-size:16px}
 /* A4 deitado, para a folha que tem coluna demais (o quadro de exames por
    função). O `page:` nomeado é o que faz o Chrome virar só esta folha; o resto
    do documento continua em pé. */
-.an-folha.deitada{width:296.8mm;height:210mm;page:paisagem}
+/* 209,8 e não 210: com a altura exata do papel, o arredondamento da impressão
+   empurrava a marca da LOP para uma folha em branco (04/11/2026, Outros exames). */
+.an-folha.deitada{width:296.8mm;height:209.8mm;page:paisagem}
 .an-topo{display:flex;align-items:center;gap:8mm;border-bottom:1.2mm solid #84BD00;padding-bottom:5mm}
 .an-topo img{height:24mm;width:auto;display:block}
 .an-tit h1{margin:0;font-size:17pt;font-weight:bold;color:#744F28;letter-spacing:.4pt}
