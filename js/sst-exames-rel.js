@@ -278,6 +278,9 @@ function resumoClinica() {
    para cada lista ir para a clínica no nome de quem paga. Paginação por
    peso: a linha cuja coluna de exames quebra em várias conta mais. */
 const SEM_EMP = 'Sem empregador cadastrado';
+/* Caixinha para marcar à caneta (04/11/2026): a folha vai para os
+   responsáveis irem chamando um por um e riscando quem já foi. */
+const CAIXA = '<td class="ce cl-marca"><span class="cl-caixa"></span></td>';
 const empDe = f => so(f.empregador) || SEM_EMP;
 function porEmpregador(lista) {
   const m = new Map();
@@ -323,17 +326,17 @@ function docClinica(qual) {
     '—', ['#'], [null], [], () => 1, 0);
   return grupos.map(([emp, l]) => {
     if (qual === 'aso') {
-      return folhasClinica('ASO PERIÓDICO', emp, ['#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'VENCE'],
-        ['10mm', null, '55mm', '34mm', '58mm', '26mm'],
-        l.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
+      return folhasClinica('ASO PERIÓDICO', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA', 'VENCE'],
+        ['12mm', '10mm', null, '55mm', '34mm', '58mm', '26mm'],
+        l.map((x, i) => ({ html: `<tr>${CAIXA}<td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
           <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
           <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td><td${cls(x.aso)}>${venceTxt(x.aso)}</td></tr>` })),
         () => 1, l.length);
     }
     if (qual === 'audio') {
-      return folhasClinica('AUDIOMETRIA', emp, ['#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA'],
-        ['10mm', null, '60mm', '36mm', '62mm'],
-        l.map((x, i) => ({ html: `<tr><td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
+      return folhasClinica('AUDIOMETRIA', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'FAZENDA'],
+        ['12mm', '10mm', null, '60mm', '36mm', '62mm'],
+        l.map((x, i) => ({ html: `<tr>${CAIXA}<td class="ce">${i + 1}</td><td class="an-nome cl-quebra">${esc(x.f.nome)}</td>
           <td class="cl-quebra">${esc(x.f.cargo || '—')}</td><td class="ce">${esc(x.f.cpf || '—')}</td>
           <td class="cl-quebra">${esc(x.f.fazenda || '—')}</td></tr>` })),
         () => 1, l.length);
@@ -342,9 +345,9 @@ function docClinica(qual) {
     const cont = new Map();
     l.forEach(x => x.outros.forEach(e => cont.set(e, (cont.get(e) || 0) + 1)));
     const total = [...cont.values()].reduce((a, b) => a + b, 0);
-    const folhas = folhasClinica('OUTROS EXAMES', emp, ['#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
-      ['10mm', '62mm', '42mm', '32mm', null],
-      l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr><td class="ce">${i + 1}</td>
+    const folhas = folhasClinica('OUTROS EXAMES', emp, ['✓', '#', 'NOME', 'FUNÇÃO', 'CPF', 'EXAMES'],
+      ['12mm', '10mm', '62mm', '42mm', '32mm', null],
+      l.map((x, i) => ({ ex: x.outros.join(', '), html: `<tr>${CAIXA}<td class="ce">${i + 1}</td>
         <td class="an-nome cl-quebra">${esc(x.f.nome)}</td><td class="cl-quebra">${esc(x.f.cargo || '—')}</td>
         <td class="ce">${esc(x.f.cpf || '—')}</td>
         <td class="cl-quebra">${x.outros.length ? esc(x.outros.join(', ')) : '<span class="dc-sem">Nenhum cadastrado para a função</span>'}</td></tr>` })),

@@ -2587,3 +2587,5 @@ body.crq-aberto{overflow:hidden}
 .cl-tab td.cl-quebra{white-space:normal;overflow:visible;text-overflow:clip}
 .cl-tab th{font-size:8.5pt;padding-left:1.8mm;padding-right:1.8mm}
 .cl-tab tr.cl-total td{background:#e8f2cf;font-weight:bold;color:#744F28}
+.cl-tab .cl-caixa{display:inline-block;width:5mm;height:5mm;border:.4mm solid #51534A;border-radius:.8mm;background:#fff;vertical-align:middle}
+.cl-tab td.cl-marca{padding-top:1.4mm;padding-bottom:1.4mm}
