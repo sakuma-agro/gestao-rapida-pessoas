@@ -14,6 +14,7 @@
 
 import { estado, modeloAtual } from './store.js';
 import * as nucleo from './nucleo.js';
+import { _ce } from './certificacao.js';
 import { mostrar } from './jornada-relatorios.js';
 // Ficha de EPI (04/11/2026): a mesma ficha de SST › EPI's › Fichas, com as medidas
 // da planilha (182 mm) e os textos do "Modelo da ficha". Aqui só imprime.
@@ -57,14 +58,20 @@ function aplicarRevisoes(docs) {
   document.querySelectorAll('#telaCeImpressoes [data-rev]').forEach(b => {
     const f = FORMS[b.dataset.rev]; if (f) b.textContent = `${f.nrev} de ${f.data}`; });
 }
+let revDoBanco = false;
 async function carregarRevisoes() {
-  try { aplicarRevisoes(await nucleo.lerCaixa(CAIXA_REV, [])); } catch { /* sem cópia */ }
+  // 04/11/2026: ele mudou a data do FORM 018 na Lista mestra e a impressão não
+  // mudou. Agora: a cópia do aparelho só vale enquanto o banco não respondeu, a
+  // Lista mestra já aberta no app (S.docs) entra por cima e a busca se repete a
+  // cada impresso aberto, não só ao entrar na tela.
+  if (!revDoBanco) { try { aplicarRevisoes(await nucleo.lerCaixa(CAIXA_REV, [])); } catch { /* sem cópia */ } }
+  aplicarRevisoes(_ce?.S?.docs);
   const c = estado.cliente;
   if (!c || !estado.sessao || !navigator.onLine) return;
   try {
     const { data, error } = await c.from('cert_documentos').select('codigo, revisao, data_revisao').ilike('codigo', 'FORM%');
     if (error || !data) return;
-    aplicarRevisoes(data); nucleo.gravarCaixa(CAIXA_REV, data);
+    revDoBanco = true; aplicarRevisoes(data); nucleo.gravarCaixa(CAIXA_REV, data);
   } catch { /* fica o padrão */ }
 }
 const DO_REPRESENTANTE = new Set(['f045', 'f046']);
@@ -361,6 +368,7 @@ function dialogo(html, ligar) {
 const fechar = () => $('dlgCi')?.open && $('dlgCi').close();
 
 function formImpresso(tipo) {
+  aplicarRevisoes(_ce?.S?.docs); carregarRevisoes();
   if (tipo === 'fichaEpi') return formFichaEpi();
   const f = FORMS[tipo], ant = lembrado()[tipo] || {};
   const fs = funcionarios();
