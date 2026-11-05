@@ -6,6 +6,7 @@
 #    nome, grava como "nome (2).pdf" — nunca sobrescreve);
 #  - avisa o app (origem = onedrive:<caminho>), e o sincronizador não manda de novo;
 #  - arquivo que o app mandou e depois foi apagado no app vai para 7 - CONFIGURAÇÕES\Para apagar.
+#  - cria as pastas pedidas pelo app (05/11/2026: fornecedor novo no FORM 023 ganha a pasta dele em AN 20).
 # O que acontece fica em sincronizar.log, nesta pasta.
 
 $ErrorActionPreference = 'Stop'
@@ -45,7 +46,7 @@ try {
     if (-not $a) { continue }
     try {
       $rel = ([string]$a.od_destino).Trim('/') -replace '/', '\'
-      if ($rel -match '\.\.') { throw "caminho inválido: $rel" }
+      if (($rel -split '\\') -contains '..') { throw "caminho inválido: $rel" }
       $dest = Join-Path $Base $rel
       New-Item -ItemType Directory -Force -Path (Split-Path $dest -Parent) | Out-Null
       $tmp = Join-Path $env:TEMP ("lop-entrega-" + [guid]::NewGuid().ToString() + ".tmp")
@@ -72,6 +73,18 @@ try {
       $nl++
     } catch { Log "Entrega no OneDrive: ERRO ao tirar $($l.rel) : $($_.Exception.Message)" }
   }
+  $np = 0
+  foreach ($pa in @($p.pastas)) {
+    if (-not $pa) { continue }
+    try {
+      $rel = ([string]$pa.rel).Trim('/') -replace '/', '\'
+      if (-not $rel -or (($rel -split '\\') -contains '..')) { throw "caminho inválido: $rel" }   # "MANUTENÇÃO..." no nome do AN 20 é válido
+      $dest = Join-Path $Base $rel
+      if (-not (Test-Path -LiteralPath $dest)) { New-Item -ItemType Directory -Force -Path $dest | Out-Null; $np++ }
+      Postar 'pasta_feita' @{ id = $pa.id }
+    } catch { Log "Entrega no OneDrive: ERRO ao criar a pasta $($pa.rel) : $($_.Exception.Message)" }
+  }
+  if ($np) { Log "Entrega no OneDrive: $np pasta(s) criada(s) a pedido do app (fornecedores no AN 20)." }
   if ($n -or $nl) { Log "Entrega no OneDrive: $n arquivo(s) anexado(s) no app gravado(s) na pasta; $nl tirado(s) para 7 - CONFIGURAÇÕES\Para apagar." }
 } catch {
   Log "Entrega no OneDrive: erro $($_.Exception.Message)"

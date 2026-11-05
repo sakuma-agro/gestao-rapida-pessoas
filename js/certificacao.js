@@ -1087,6 +1087,7 @@ async function painelDoc() {
         : '<button class="btn" type="button" disabled title="Sem link do OneDrive — preencha em Editar">☁ Na nuvem</button>'}
       ${pcLocal && d.caminho ? `<button class="btn" type="button" id="ceDvCopiar" title="Copiar o caminho da pasta no computador">⧉</button>` : ''}
       ${/^AN (22|0?8)$/.test(so(d.codigo)) ? `<button class="btn principal" type="button" id="ceDvCroqui" title="Croqui das fazendas no satélite, com reserva legal e áreas">🛰 Croqui no satélite</button>` : ''}
+      ${/^AN 0?20$/.test(so(d.codigo)) ? `<button class="btn principal" type="button" id="ceDvForn" title="AN 20 ligado ao FORM 023 (05/11/2026): cada fornecedor tem a sua pasta aqui e o CL 07">${svgIcone('seta-dir')} Fornecedores · FORM 023 / CL 07</button>` : ''}
       <span class="cresce"></span>
       <button class="btn" type="button" id="ceDvEditar">${svgIcone('lapis')} Editar</button>
     </div>
@@ -1126,6 +1127,7 @@ async function painelDoc() {
   });
   // AN 22 (croqui) e AN 08 (CAR) — números da Coopadap desde 30/10/2026: croqui no satélite com reserva legal detalhada (30/10/2026)
   $('ceDvCroqui')?.addEventListener('click', () => abrirCroqui());
+  $('ceDvForn')?.addEventListener('click', () => abrirModulo('cert', 'foCadastro'));
   el.querySelector('[data-ir-modelo]')?.addEventListener('click', () => abrirTipo('FORM', modelo.id));
   $('ceDvReqs')?.addEventListener('click', () => verReqsDoDoc(d.id));
   /* Abrir no computador (29/10/2026, pedido dele: "não consigo abrir local, estão indo para

@@ -32,3 +32,10 @@ Um documento só: `-Docs "AN 82"`. Não rodar enquanto a sincronização estiver
 correção de que pastas com data + descrição/número — `CONTROLE-09-04-2024-14051`, `14-06-2021 - Ferro velho` — ficam).
 `padronizar_aplicar.py` move o que está no json e grava `movidos.json` para a sincronização. Lote **alta** aplicado em
 04/11/2026: 636 arquivos movidos, 239 pastas vazias tiradas.
+
+## Pastas dos fornecedores (05/11/2026)
+
+O `entregar.ps1` também cria as pastas que o app pede (`public.onedrive_pastas`, campo `pastas` da ação
+`pendentes`). Cada fornecedor cadastrado no FORM 023 ganha a sua pasta em
+`3 - ANEXOS\AN 20 - CONTRATOS DE TERCEIROS (COLHEITA, MANUTENÇÃO...)\<NOME>` em até 5 minutos.
+A cópia no sakumasrv foi atualizada em 05/11/2026 (a anterior ficou como `entregar.ps1.antes-pastas-fornecedores`).

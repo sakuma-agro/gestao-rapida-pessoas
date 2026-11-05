@@ -31,6 +31,8 @@
 //   baixar&chave=            GET  → o arquivo (cópia do Drive) para o computador gravar
 //   entregue                 POST {chave, rel} → gravado no OneDrive: origem = onedrive:<rel>, od_destino = null
 //   lixo_feito               POST {id}
+//   (pendentes também traz "pastas": pastas a criar no OneDrive — fornecedor novo no FORM 023 ganha a sua em AN 20, 05/11/2026)
+//   pasta_feita              POST {id}
 //   limpar_drive&n=          POST → tira do Drive as cópias que não são de POP/FORM (01/11/2026: só POP e FORM abrem no app)
 
 const URL_BASE = Deno.env.get("SUPABASE_URL") ?? "";
@@ -331,7 +333,8 @@ Deno.serve(async (req) => {
     if (acao === "pendentes" && req.method === "GET") {
       const arqs = await db("arquivos?select=chave,od_destino,nome,tamanho,criado_em&od_destino=not.is.null&area=eq.certificacao&order=criado_em&limit=200");
       const lixo = await db("onedrive_lixo?select=id,rel&feito_em=is.null&order=id&limit=200");
-      return json({ arquivos: arqs || [], lixo: lixo || [] });
+      const pastas = await db("onedrive_pastas?select=id,rel&feito_em=is.null&order=id&limit=200").catch(() => []);
+      return json({ arquivos: arqs || [], lixo: lixo || [], pastas: pastas || [] });
     }
     if (acao === "baixar" && req.method === "GET") {
       const chave = u.searchParams.get("chave") || "";
@@ -367,6 +370,11 @@ Deno.serve(async (req) => {
     if (acao === "lixo_feito" && req.method === "POST") {
       const b = await req.json();
       await db(`onedrive_lixo?id=eq.${Number(b?.id) || 0}`, { method: "PATCH", body: JSON.stringify({ feito_em: new Date().toISOString() }) });
+      return json({ ok: true });
+    }
+    if (acao === "pasta_feita" && req.method === "POST") {
+      const b = await req.json();
+      await db(`onedrive_pastas?id=eq.${Number(b?.id) || 0}`, { method: "PATCH", body: JSON.stringify({ feito_em: new Date().toISOString() }) });
       return json({ ok: true });
     }
     return json({ erro: "acao-invalida" }, 400);

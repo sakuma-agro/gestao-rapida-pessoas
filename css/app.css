@@ -2378,6 +2378,17 @@ body.ce-apr-aberto{overflow:hidden}
 .cfo-sn label:has(input[value="1"]:checked){background:var(--verde);border-color:var(--verde);color:#1B232B}
 .cfo-sn label:has(input[value="0"]:checked){background:var(--erro);border-color:var(--erro);color:#fff}
 .cfo-sn label:focus-within{outline:2px solid var(--verde);outline-offset:2px}
+/* CL 07 (05/11/2026): SIM / NÃO / N.A. — a cor diz se está conforme, não a palavra */
+.cfo-sn3 label{min-width:56px;padding:0 8px}
+.cfo-sn3 label:has(input[value="S"]:checked){background:var(--verde);border-color:var(--verde);color:#1B232B}
+.cfo-sn3 label:has(input[value="N"]:checked){background:var(--marrom);border-color:var(--marrom);color:#fff}
+.cfo-sn3.neg label:has(input[value="N"]:checked){background:var(--verde);border-color:var(--verde);color:#1B232B}
+.cfo-sn3.neg label:has(input[value="S"]:checked){background:var(--marrom);border-color:var(--marrom);color:#fff}
+.cfo-sn3 label:has(input[value="NA"]:checked){background:var(--linha);border-color:var(--cinza,#51534A);color:var(--cinza,#51534A)}
+.cfo-arqs{margin:6px 0 8px;padding-left:18px;max-height:220px;overflow:auto}
+.cfo-arqs li{margin:2px 0}
+.rel-tabela td.ce{text-align:center;font-weight:700}
+.rel-tabela tr.rel-total td{background:#E3EDC8 !important}
 
 /* Certificação › Pendências (etapa 3, 29/10/2026) */
 .ce-pend-topo{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
