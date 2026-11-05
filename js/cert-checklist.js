@@ -1,4 +1,4 @@
-// cert-checklist.js — Certificação › Check List Digital (29/10/2026).
+// cert-checklist.js — Certificação › Check List Digital (29/10/2026; campos extras por modelo 05/11/2026 — CL 03 Colheita Abacate).
 //
 // Pedido do Guilherme: "igual Forms digital, agora vamos criar Check list
 // digitais, aonde tem como pôr foto e deixar registrado". Decisões dele:
@@ -79,6 +79,16 @@ const codDe = id => docDe(id)?.codigo || 'CL';
 const tituloDe = id => modDe(id)?.titulo || docDe(id)?.nome || 'Check list';
 const legDe = id => ({ ...LEG_PADRAO, ...(modDe(id)?.legenda || {}) });
 const conta = r => { const o = { C: 0, NC: 0, NA: 0, vazio: 0 }; (r.respostas || []).forEach(x => { o[ST.includes(x.st) ? x.st : 'vazio']++; }); return o; };
+/* Configuração por modelo (ccl_modelos.config, 05/11/2026 — CL 03 Colheita Abacate):
+   rotulos dos campos fixos (ex.: local → Lote), padroes já preenchidos no novo
+   preenchimento e extras do cabeçalho [{id, rot, tipo: text|date|number, lugar: cab|plano}]
+   gravados em ccl_registros.extras. */
+const cfgDe = id => modDe(id)?.config || {};
+const ROT_CAMPO = { local: 'Local', atividade: 'Atividade', cultura: 'Cultura', variedade: 'Variedade', avaliado: 'Funcionário / equipe avaliada', responsavel: 'Feito por' };
+const rotDe = (id, campo) => cfgDe(id).rotulos?.[campo] || ROT_CAMPO[campo];
+const extrasDe = id => (cfgDe(id).extras || []).filter(x => x && x.id);
+const valExtra = (r, x) => { const v = r?.extras?.[x.id]; return x.tipo === 'date' ? br(v) : so(v); };
+const resumoExtras = (r) => extrasDe(r.documento_id).filter(x => so(r.extras?.[x.id])).map(x => `${x.rot}: ${valExtra(r, x)}`).join(' · ');
 const regsDo = id => E.reg.filter(r => String(r.documento_id) === String(id));
 const funcs = () => (estado.funcionarios || []).filter(f => f.situacao === 'ATIVO').sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
 
@@ -155,7 +165,7 @@ function desenharRegistros() {
     </div>
     <div class="qp-bloco">${l.length ? `<div class="ac-rola"><table class="dc-planilha"><thead><tr><th class="ce">Data</th><th>Check list</th><th>Fazenda</th><th>Avaliado</th><th>Atividade / local</th><th class="ce">Resultado</th><th>Feito por</th><th></th></tr></thead><tbody>
       ${l.map(r => `<tr><td class="ce">${br(r.data)}</td><td><b>${esc(codDe(r.documento_id))}</b> <small>${esc(tituloDe(r.documento_id))}</small></td>
-        <td>${esc(ROT_FAZ[r.fazenda] || r.fazenda || '')}</td><td>${esc(r.avaliado || '')}</td><td><small>${esc([r.atividade, r.local].filter(Boolean).join(' · '))}</small></td>
+        <td>${esc(ROT_FAZ[r.fazenda] || r.fazenda || '')}</td><td>${esc(r.avaliado || '')}</td><td><small>${esc([r.atividade, r.local, resumoExtras(r)].filter(Boolean).join(' · '))}</small></td>
         <td class="ce">${resumoTags(r)}</td><td><small>${esc(r.responsavel || '')}</small></td>
         <td class="ce"><button class="btn mini" type="button" data-ab="${esc(r.id)}">Abrir</button> <button class="btn mini" type="button" data-imp="${esc(r.id)}">Imprimir</button></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="vazio">Nenhum check list preenchido neste filtro.</div>'}</div>
@@ -186,7 +196,10 @@ function formRegistro(r, docId) {
   const itens = (mod.itens || []).map(it => ({ ...it, ...(resp.get(it.id) || {}), id: it.id, texto: it.texto }));
   // itens que saíram do modelo mas foram respondidos continuam no registro
   (r?.respostas || []).forEach(x => { if (!itens.some(i => i.id === x.id)) itens.push({ ...x }); });
-  const v = r || { data: hoje(), fazenda: '', local: '', atividade: '', cultura: '', variedade: '', avaliado: '', responsavel: estado.sessao?.user?.user_metadata?.nome || '', plano_acao: '', observacao: '' };
+  const v = r || { data: hoje(), fazenda: '', local: '', atividade: '', cultura: '', variedade: '', avaliado: '', responsavel: estado.sessao?.user?.user_metadata?.nome || '', plano_acao: '', observacao: '', ...(cfgDe(docId).padroes || {}) };
+  const ext = extrasDe(docId), vx = r?.extras || {};
+  const campoExtra = x => `<label class="campo">${esc(x.rot)} <input type="${x.tipo === 'date' ? 'date' : 'text'}" ${x.tipo === 'number' ? 'inputmode="numeric"' : ''} data-extra="${esc(x.id)}" value="${esc(vx[x.id] || '')}"></label>`;
+  const rot = c => esc(rotDe(docId, c));
   const fs = funcs();
   const linha = it => `<div class="cl-it" data-it="${esc(it.id)}">
     <div class="cl-it-topo"><span class="cl-it-txt">${esc(it.texto)}</span>
@@ -206,18 +219,20 @@ function formRegistro(r, docId) {
     <div class="grade">
       <label class="campo">Fazenda <select id="clFaz">${opcoes(FAZENDAS.map(x => [x, ROT_FAZ[x]]), v.fazenda, 'Escolha')}</select></label>
       <label class="campo">Data <input type="date" id="clData" value="${esc(v.data)}" max="${hoje()}"></label>
-      <label class="campo">Local <input type="text" id="clLocal" value="${esc(v.local || '')}"></label>
-      <label class="campo">Atividade <input type="text" id="clAtv" value="${esc(v.atividade || '')}"></label>
-      <label class="campo">Cultura <input type="text" id="clCult" value="${esc(v.cultura || '')}"></label>
-      <label class="campo">Variedade <input type="text" id="clVar" value="${esc(v.variedade || '')}"></label>
-      <label class="campo">Funcionário / equipe avaliada <input type="text" id="clAval" list="clFuncs" value="${esc(v.avaliado || '')}"></label>
-      <label class="campo">Feito por <input type="text" id="clResp" list="clFuncs" value="${esc(v.responsavel || '')}"></label>
+      ${ext.filter(x => x.lugar !== 'plano').map(campoExtra).join('')}
+      <label class="campo">${rot('local')} <input type="text" id="clLocal" value="${esc(v.local || '')}"></label>
+      <label class="campo">${rot('atividade')} <input type="text" id="clAtv" value="${esc(v.atividade || '')}"></label>
+      <label class="campo">${rot('cultura')} <input type="text" id="clCult" value="${esc(v.cultura || '')}"></label>
+      <label class="campo">${rot('variedade')} <input type="text" id="clVar" value="${esc(v.variedade || '')}"></label>
+      <label class="campo">${rot('avaliado')} <input type="text" id="clAval" list="clFuncs" value="${esc(v.avaliado || '')}"></label>
+      <label class="campo">${rot('responsavel')} <input type="text" id="clResp" list="clFuncs" value="${esc(v.responsavel || '')}"></label>
     </div>
     <datalist id="clFuncs">${fs.map(f => `<option value="${esc(f.nome)}">`).join('')}</datalist>
     <div class="barra entre" style="margin:12px 0 4px"><b>Itens</b>
       <div class="barra" style="margin:0"><button class="btn mini" type="button" id="clTodosC">Vazios = C</button><button class="btn mini" type="button" id="clTodosNA">Vazios = NA</button></div></div>
     <div class="cl-itens">${itens.map(linha).join('')}</div>
     <p class="dica cl-leg"><b>C</b> = ${esc(leg.C)} · <b>NC</b> = ${esc(leg.NC)} · <b>NA</b> = ${esc(leg.NA)}</p>
+    ${ext.some(x => x.lugar === 'plano') ? `<div class="grade">${ext.filter(x => x.lugar === 'plano').map(campoExtra).join('')}</div>` : ''}
     <label class="campo">Plano de ação de não conformidades <textarea id="clPlano" rows="3">${esc(v.plano_acao || '')}</textarea></label>
     <label class="campo">Observação geral <input type="text" id="clObs" value="${esc(v.observacao || '')}"></label>
     <div class="qp-bloco"><div id="clFotosGerais"></div></div>
@@ -268,6 +283,7 @@ function formRegistro(r, docId) {
       const l = { data: $('clData').value, fazenda: $('clFaz').value || null, local: so($('clLocal').value) || null, atividade: so($('clAtv').value) || null,
         cultura: so($('clCult').value) || null, variedade: so($('clVar').value) || null, avaliado: so($('clAval').value) || null,
         responsavel: so($('clResp').value) || null, plano_acao: so($('clPlano').value) || null, observacao: so($('clObs').value) || null };
+      if (ext.length || r?.extras) { l.extras = { ...(r?.extras || {}) }; d.querySelectorAll('[data-extra]').forEach(i => { const val = so(i.value); if (val) l.extras[i.dataset.extra] = val; else delete l.extras[i.dataset.extra]; }); }
       const fAval = fs.find(f => f.nome === l.avaliado); l.avaliado_id = fAval ? fAval.id : null;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(l.data)) return erroDlg('Informe a data do check list.');
       if (l.data > hoje()) return erroDlg('O check list se lança no dia em que foi feito — não no futuro.');
@@ -282,7 +298,7 @@ function formRegistro(r, docId) {
         const titulo = `${codDe(docId)} · ${x.texto}${l.avaliado ? ' — ' + l.avaliado : ''}`;
         const { data: caso, error } = await cl.from('cmc_casos').insert({
           natureza: 'NC', tipo: 'NÃO CONFORMIDADE', titulo: titulo.length > 120 ? titulo.slice(0, 117) + '…' : titulo,
-          descricao: `Check list ${codDe(docId)} (${tituloDe(docId)}) de ${br(l.data)}: item "${x.texto}" não conforme.${x.obs ? ' Observação: ' + x.obs : ''}${l.atividade ? ' Atividade: ' + l.atividade + '.' : ''}${l.plano_acao ? ' Plano de ação: ' + l.plano_acao : ''}`,
+          descricao: `Check list ${codDe(docId)} (${tituloDe(docId)}) de ${br(l.data)}: item "${x.texto}" não conforme.${x.obs ? ' Observação: ' + x.obs : ''}${l.atividade ? ' Atividade: ' + l.atividade + '.' : ''}${l.extras && ext.length ? ' ' + resumoExtras({ documento_id: docId, extras: l.extras }) + '.' : ''}${l.plano_acao ? ' Plano de ação: ' + l.plano_acao : ''}`,
           via: 'CHECK LIST', local: l.local, fazenda: l.fazenda, solicitante: l.responsavel, responsavel: x.resp_nc, prioridade: 'MÉDIA',
           data_abertura: l.data, etapa: 'ABERTA', previsao: x.prazo, origem_externa: `cl:${rid}:${x.id}`,
         }).select('id').single();
@@ -339,7 +355,7 @@ function formModelo(docId) {
       const itens = textos.map(t => ant.find(i => i.texto === t) || { id: 'i' + doisD(++n), texto: t });
       const linha = { documento_id: Number(docId), titulo: so($('cmTit').value) || d?.nome || 'Check list', itens,
         legenda: { C: so($('cmC').value) || LEG_PADRAO.C, NC: so($('cmNC').value) || LEG_PADRAO.NC, NA: so($('cmNA').value) || LEG_PADRAO.NA },
-        campos: m?.campos || ['fazenda', 'data', 'local', 'atividade', 'cultura', 'variedade', 'avaliado', 'responsavel'] };
+        campos: m?.campos || ['fazenda', 'data', 'local', 'atividade', 'cultura', 'variedade', 'avaliado', 'responsavel'], config: m?.config || {} };
       if (precisaRede()) return;
       $('cmOk').disabled = true;
       const { data, error } = await estado.cliente.from('ccl_modelos').upsert({ ...linha, atualizado_por: quem() }).select().single();
@@ -369,22 +385,28 @@ async function imprimir(r, docId) {
   }
   const x = s => s ? '<b>X</b>' : '';
   const faz = FAZENDAS.map(f => `<span class="cl-fz">(${r?.fazenda === f ? 'X' : '&nbsp;&nbsp;'}) ${esc(ROT_FAZ[f])}</span>`).join('');
-  const linhasVazias = Math.max(0, 22 - itens.length);
+  const linhasVazias = Math.max(0, (cfgDe(docId).linhas_papel || 22) - itens.length);
+  const rt = c => esc(rotDe(docId, c).toUpperCase());
+  const ext = extrasDe(docId), cab = ext.filter(e => e.lugar !== 'plano'), pla = ext.filter(e => e.lugar === 'plano');
+  const celX = e => `<div><b>${esc(e.rot.toUpperCase())}:</b> ${esc(valExtra(r, e))}</div>`;
+  const pares = l => { let h = ''; for (let i = 0; i < l.length; i += 2) h += `<div class="cl-dupla">${celX(l[i])}${l[i + 1] ? celX(l[i + 1]) : '<div></div>'}</div>`; return h; };
   const html = `<article class="rel cl-folha">
     <header class="cl-cab"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <h1>Check List<br>${esc(mod.titulo)}</h1>
       <div class="cl-id"><div>Identificação: <b>${esc(d?.codigo || '')}</b></div><div>Revisão: ${esc(d?.revisao || '00')}</div><div>Página: 1</div>
         <div>Elaborado por: ${ASSIN.elaborador}</div><div>Aprovado por: ${ASSIN.aprovador}</div><div>Data: ${esc(br(d?.data_revisao) || '')}</div></div></header>
     <div class="cl-linha"><b>FAZENDA:</b> ${faz}</div>
-    <div class="cl-dupla"><div><b>DATA:</b> ${esc(br(r?.data))}</div><div><b>LOCAL:</b> ${esc(r?.local || '')}</div></div>
-    <div class="cl-linha"><b>ATIVIDADE:</b> ${esc(r?.atividade || '')}</div>
-    <div class="cl-dupla"><div><b>CULTURA:</b> ${esc(r?.cultura || '')}</div><div><b>RESPONSÁVEL:</b> ${esc(r?.avaliado || '')}</div></div>
+    <div class="cl-dupla"><div><b>DATA:</b> ${esc(br(r?.data))}</div><div><b>${rt('local')}:</b> ${esc(r?.local || '')}</div></div>
+    ${pares(cab)}
+    <div class="cl-linha"><b>${rt('atividade')}:</b> ${esc(r?.atividade || (r ? '' : cfgDe(docId).padroes?.atividade || ''))}</div>
+    <div class="cl-dupla"><div><b>CULTURA:</b> ${esc(r?.cultura || (r ? '' : cfgDe(docId).padroes?.cultura || ''))}</div><div><b>${esc((cfgDe(docId).rotulos?.avaliado || 'Responsável').toUpperCase())}:</b> ${esc(r?.avaliado || '')}</div></div>
     <div class="cl-dupla"><div><b>VARIEDADE:</b> ${esc(r?.variedade || '')}</div><div><b>ASSINATURA:</b> ${esc(r?.responsavel || '')}</div></div>
     <table class="cl-imp"><colgroup><col class="c-it"><col class="c-st"><col class="c-st"><col class="c-st"><col class="c-obs"></colgroup>
       <thead><tr><th>${esc(mod.titulo.toUpperCase())}</th><th>C</th><th>NC</th><th>NA</th><th>OBS</th></tr></thead>
       <tbody>${itens.map(i => `<tr><td class="cl-t">${esc(i.texto)}</td><td>${x(i.st === 'C')}</td><td class="cl-nc">${x(i.st === 'NC')}</td><td>${x(i.st === 'NA')}</td>
         <td class="cl-o">${esc(i.obs || '')}${i.st === 'NC' && i.nc_id ? ' <small>(NC aberta no FORM 004)</small>' : ''}</td></tr>`).join('')}
         ${Array.from({ length: r ? 0 : linhasVazias }, () => '<tr><td class="cl-t"></td><td></td><td></td><td></td><td></td></tr>').join('')}</tbody></table>
+    ${pares(pla)}
     <div class="cl-plano"><b>Plano de ação de não conformidades:</b> ${esc(r?.plano_acao || '')}${r?.observacao ? `<br><b>Observação:</b> ${esc(r.observacao)}` : ''}</div>
     <p class="cl-legenda"><b>C</b> = ${esc(leg.C)}<br><b>NC</b> = ${esc(leg.NC)}<br><b>NA</b> = ${esc(leg.NA)}</p>
     ${fotos.length ? `<div class="cl-fotos">${fotos.map(f => `<figure><img src="${esc(f.url)}" alt=""><figcaption>${esc(f.rot)}${f.st ? ' · ' + esc(f.st) : ''}</figcaption></figure>`).join('')}</div>` : ''}
@@ -394,11 +416,11 @@ async function imprimir(r, docId) {
 
 async function exportar(l) {
   const linhas = [];
-  l.forEach(r => (r.respostas || []).forEach(x => linhas.push([r.data, codDe(r.documento_id), ROT_FAZ[r.fazenda] || r.fazenda || '', r.avaliado || '', r.atividade || '', r.local || '', x.texto, x.st || '', x.obs || '', x.nc_id ? 'Sim' : '', r.responsavel || ''])));
+  l.forEach(r => (r.respostas || []).forEach(x => linhas.push([r.data, codDe(r.documento_id), ROT_FAZ[r.fazenda] || r.fazenda || '', r.avaliado || '', r.atividade || '', r.local || '', resumoExtras(r), x.texto, x.st || '', x.obs || '', x.nc_id ? 'Sim' : '', r.responsavel || ''])));
   await baixarXlsx(`check-lists-${hoje()}.xlsx`, [
     { nome: 'Check lists', titulo: 'CHECKS Digital — itens respondidos', subtitulo: `SAKUMA Agronegócios · emitido em ${br(hoje())}`,
       colunas: [{ rot: 'Data', larg: 12, tipo: 'data' }, { rot: 'CL', larg: 8 }, { rot: 'Fazenda', larg: 18 }, { rot: 'Avaliado', larg: 28 }, { rot: 'Atividade', larg: 20 },
-        { rot: 'Local', larg: 18 }, { rot: 'Item', larg: 36 }, { rot: 'Resultado', larg: 10 }, { rot: 'Observação', larg: 34 }, { rot: 'NC aberta', larg: 10 }, { rot: 'Feito por', larg: 24 }],
+        { rot: 'Local', larg: 18 }, { rot: 'Dados do cabeçalho', larg: 30 }, { rot: 'Item', larg: 36 }, { rot: 'Resultado', larg: 10 }, { rot: 'Observação', larg: 34 }, { rot: 'NC aberta', larg: 10 }, { rot: 'Feito por', larg: 24 }],
       linhas },
   ]);
 }
@@ -425,4 +447,4 @@ export function limparChecklist() {
   Object.assign(E.fl, { doc: '', mes: '', faz: '' });
   nucleo.apagarCaixa(CAIXA); telaAtual = ''; fechar();
 }
-export const _cl = { E, imprimir };
+export const _cl = { E, imprimir, formRegistro };
