@@ -92,6 +92,31 @@ const resumoExtras = (r) => extrasDe(r.documento_id).filter(x => so(r.extras?.[x
 const regsDo = id => E.reg.filter(r => String(r.documento_id) === String(id));
 const funcs = () => (estado.funcionarios || []).filter(f => f.situacao === 'ATIVO').sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
 
+/* ---------------- assinatura (05/11/2026, CL 03) ----------------
+   Modelo com config.assinatura = true pede a assinatura de quem preencheu,
+   desenhada com o dedo na tela. Vai como PNG (data URL) em ccl_registros.assinatura. */
+function padAssinatura(caixa, atual) {
+  caixa.innerHTML = `<div class="cl-ass-pad"><canvas></canvas><span class="cl-ass-dica">Assine aqui com o dedo</span></div>
+    <div class="barra" style="margin:4px 0 0"><button type="button" class="btn mini" data-limpar>Limpar assinatura</button></div>`;
+  const cv = caixa.querySelector('canvas'), dica = caixa.querySelector('.cl-ass-dica');
+  let tem = false, mudou = false, ctx;
+  const preparar = () => {
+    const r = cv.getBoundingClientRect(), e = window.devicePixelRatio || 1;
+    cv.width = Math.max(1, Math.round(r.width * e)); cv.height = Math.max(1, Math.round(r.height * e));
+    ctx = cv.getContext('2d'); ctx.scale(e, e); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1F3A93';
+    if (atual && !mudou) { const im = new Image(); im.onload = () => { ctx.drawImage(im, 0, 0, r.width, r.height); }; im.src = atual; tem = true; dica.hidden = true; }
+  };
+  requestAnimationFrame(preparar);
+  let ult = null;
+  const pt = ev => { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
+  cv.addEventListener('pointerdown', ev => { if (!ctx) preparar(); cv.setPointerCapture(ev.pointerId); ult = pt(ev); ctx.beginPath(); ctx.arc(ult[0], ult[1], 1, 0, 7); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); tem = mudou = true; dica.hidden = true; ev.preventDefault(); });
+  cv.addEventListener('pointermove', ev => { if (!ult) return; const p = pt(ev); ctx.beginPath(); ctx.moveTo(ult[0], ult[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); ult = p; ev.preventDefault(); });
+  const fim = () => { ult = null; };
+  cv.addEventListener('pointerup', fim); cv.addEventListener('pointercancel', fim); cv.addEventListener('pointerleave', fim);
+  caixa.querySelector('[data-limpar]').addEventListener('click', () => { ctx?.clearRect(0, 0, cv.width, cv.height); tem = false; mudou = true; atual = null; dica.hidden = false; });
+  return { get vazia() { return !tem; }, get mudou() { return mudou; }, png: () => (tem ? (mudou ? cv.toDataURL('image/png') : atual) : null) };
+}
+
 /* ---------------- peças ---------------- */
 const tag = (txt, cor) => `<span class="tag ${cor}">${esc(txt)}</span>`;
 const opcoes = (lista, val, vazio) => (vazio != null ? `<option value="">${esc(vazio)}</option>` : '')
@@ -235,6 +260,8 @@ function formRegistro(r, docId) {
     ${ext.some(x => x.lugar === 'plano') ? `<div class="grade">${ext.filter(x => x.lugar === 'plano').map(campoExtra).join('')}</div>` : ''}
     <label class="campo">Plano de ação de não conformidades <textarea id="clPlano" rows="3">${esc(v.plano_acao || '')}</textarea></label>
     <label class="campo">Observação geral <input type="text" id="clObs" value="${esc(v.observacao || '')}"></label>
+    ${cfgDe(docId).assinatura ? `<div class="qp-bloco cl-ass"><b>Assinatura — ${rot('responsavel')}</b>
+      <p class="dica" style="margin:2px 0 6px">Quem preencheu assina abaixo. Sem a assinatura o check list não grava.</p><div id="clAssPad"></div></div>` : ''}
     <div class="qp-bloco"><div id="clFotosGerais"></div></div>
     <div class="barra entre"><div>${r ? '<button class="btn perigo" type="button" id="clApagar">Apagar</button> <button class="btn" type="button" id="clImpDlg">Imprimir</button>' : ''}</div>
       <div class="barra fim" style="margin:0"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="clOk">Gravar</button></div></div>`, d => {
@@ -261,6 +288,7 @@ function formRegistro(r, docId) {
     if (r) fotosDe('certificacao', 'evidencia', itens.map(it => donoItem(rid, it.id))).then(m => {
       d.querySelectorAll('.cl-it').forEach(box => { if (m.has(donoItem(rid, box.dataset.it))) { abrirFoto(box, box.dataset.it); box.querySelector('[data-foto]').textContent = '📷 Foto ✓'; } });
     }).catch(() => {});
+    const ass = cfgDe(docId).assinatura ? padAssinatura($('clAssPad'), r?.assinatura || null) : null;
     const gerais = campoAnexos($('clFotosGerais'), { area: 'certificacao', tipo: 'evidencia', rotulo: 'Fotos gerais / check list em papel', dica: 'fotos do local, da equipe ou do papel assinado' });
     gerais.abrir(r ? donoGeral(rid) : null);
     const vazios = st => d.querySelectorAll('.cl-it').forEach(box => { if (!box.querySelector('[data-st].on')) box.querySelector(`[data-st="${st}"]`).classList.add('on'); });
@@ -289,6 +317,11 @@ function formRegistro(r, docId) {
       if (l.data > hoje()) return erroDlg('O check list se lança no dia em que foi feito — não no futuro.');
       if (!l.fazenda) return erroDlg('Escolha a fazenda.');
       if (!respostas.some(x => x.st)) return erroDlg('Marque pelo menos um item (C, NC ou NA).');
+      if (ass) {
+        if (!l.responsavel) return erroDlg(`Informe o ${esc(rotDe(docId, 'responsavel').toLowerCase())}.`);
+        if (ass.vazia) return erroDlg('Peça a assinatura de quem preencheu antes de gravar.');
+        if (!r || ass.mudou || l.responsavel !== r.responsavel) { l.assinatura = ass.png(); l.assinado_em = new Date().toISOString(); }
+      }
       if (precisaRede()) return;
       $('clOk').disabled = true;
       const t = estado.cliente.from('ccl_registros');
@@ -345,6 +378,9 @@ function formModelo(docId) {
       <label class="campo">Legenda NC <input type="text" id="cmNC" value="${esc(leg.NC)}"></label>
       <label class="campo">Legenda NA <input type="text" id="cmNA" value="${esc(leg.NA)}"></label>
     </div>
+    <div class="grade">
+      <label class="rs-check"><input type="checkbox" id="cmAss" ${m?.config?.assinatura ? 'checked' : ''}> Pedir assinatura de quem preencheu</label>
+    </div>
     <p class="dica">Os registros já gravados guardam os itens como estavam: mudar o modelo não altera o que já foi preenchido.</p>
     <div class="barra fim"><button class="btn" type="button" data-fechar>Cancelar</button><button class="btn principal" type="button" id="cmOk">Salvar</button></div>`, () => {
     $('cmOk').addEventListener('click', async () => {
@@ -355,7 +391,7 @@ function formModelo(docId) {
       const itens = textos.map(t => ant.find(i => i.texto === t) || { id: 'i' + doisD(++n), texto: t });
       const linha = { documento_id: Number(docId), titulo: so($('cmTit').value) || d?.nome || 'Check list', itens,
         legenda: { C: so($('cmC').value) || LEG_PADRAO.C, NC: so($('cmNC').value) || LEG_PADRAO.NC, NA: so($('cmNA').value) || LEG_PADRAO.NA },
-        campos: m?.campos || ['fazenda', 'data', 'local', 'atividade', 'cultura', 'variedade', 'avaliado', 'responsavel'], config: m?.config || {} };
+        campos: m?.campos || ['fazenda', 'data', 'local', 'atividade', 'cultura', 'variedade', 'avaliado', 'responsavel'], config: { ...(m?.config || {}), assinatura: $('cmAss').checked } };
       if (precisaRede()) return;
       $('cmOk').disabled = true;
       const { data, error } = await estado.cliente.from('ccl_modelos').upsert({ ...linha, atualizado_por: quem() }).select().single();
@@ -400,7 +436,7 @@ async function imprimir(r, docId) {
     ${pares(cab)}
     <div class="cl-linha"><b>${rt('atividade')}:</b> ${esc(r?.atividade || (r ? '' : cfgDe(docId).padroes?.atividade || ''))}</div>
     <div class="cl-dupla"><div><b>CULTURA:</b> ${esc(r?.cultura || (r ? '' : cfgDe(docId).padroes?.cultura || ''))}</div><div><b>${esc((cfgDe(docId).rotulos?.avaliado || 'Responsável').toUpperCase())}:</b> ${esc(r?.avaliado || '')}</div></div>
-    <div class="cl-dupla"><div><b>VARIEDADE:</b> ${esc(r?.variedade || '')}</div><div><b>ASSINATURA:</b> ${esc(r?.responsavel || '')}</div></div>
+    <div class="cl-dupla"><div><b>VARIEDADE:</b> ${esc(r?.variedade || '')}</div><div><b>${rt('responsavel')}:</b> ${esc(r?.responsavel || '')}</div></div>
     <table class="cl-imp"><colgroup><col class="c-it"><col class="c-st"><col class="c-st"><col class="c-st"><col class="c-obs"></colgroup>
       <thead><tr><th>${esc(mod.titulo.toUpperCase())}</th><th>C</th><th>NC</th><th>NA</th><th>OBS</th></tr></thead>
       <tbody>${itens.map(i => `<tr><td class="cl-t">${esc(i.texto)}</td><td>${x(i.st === 'C')}</td><td class="cl-nc">${x(i.st === 'NC')}</td><td>${x(i.st === 'NA')}</td>
@@ -408,6 +444,8 @@ async function imprimir(r, docId) {
         ${Array.from({ length: r ? 0 : linhasVazias }, () => '<tr><td class="cl-t"></td><td></td><td></td><td></td><td></td></tr>').join('')}</tbody></table>
     ${pares(pla)}
     <div class="cl-plano"><b>Plano de ação de não conformidades:</b> ${esc(r?.plano_acao || '')}${r?.observacao ? `<br><b>Observação:</b> ${esc(r.observacao)}` : ''}</div>
+    ${cfgDe(docId).assinatura ? `<div class="cl-ass-imp"><div class="cl-ass-img">${r?.assinatura ? `<img src="${esc(r.assinatura)}" alt="">` : ''}</div>
+      <div class="cl-ass-rot">${esc(r?.responsavel || '')}<br><b>${esc(rotDe(docId, 'responsavel'))}</b>${r?.assinado_em ? ' · assinado em ' + esc(br(r.assinado_em.slice(0, 10))) : ''}</div></div>` : ''}
     <p class="cl-legenda"><b>C</b> = ${esc(leg.C)}<br><b>NC</b> = ${esc(leg.NC)}<br><b>NA</b> = ${esc(leg.NA)}</p>
     ${fotos.length ? `<div class="cl-fotos">${fotos.map(f => `<figure><img src="${esc(f.url)}" alt=""><figcaption>${esc(f.rot)}${f.st ? ' · ' + esc(f.st) : ''}</figcaption></figure>`).join('')}</div>` : ''}
     <footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer></article>`;

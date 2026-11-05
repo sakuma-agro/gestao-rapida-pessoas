@@ -549,3 +549,8 @@
 }
 .hol-tab .rel-c { text-align: center; }
 .rel-tabela.hol-tab thead th.rel-num { text-align: right; } .rel-tabela.hol-tab thead th.rel-c { text-align: center; }
+/* Check list › assinatura de quem preencheu (05/11/2026) */
+.cl-ass-imp { width: 75mm; margin: 6mm 0 0 auto; text-align: center; break-inside: avoid; }
+.cl-ass-img { height: 20mm; border-bottom: 1px solid #51534A; display: flex; align-items: flex-end; justify-content: center; }
+.cl-ass-img img { max-height: 19mm; max-width: 100%; }
+.cl-ass-rot { font-size: 9.5px; color: #51534A; margin-top: 1mm; line-height: 1.35; } .cl-ass-rot b { color: #744F28; }

@@ -2605,3 +2605,7 @@ body.crq-aberto{overflow:hidden}
 .cl-tab tr.cl-total td{background:#e8f2cf;font-weight:bold;color:#744F28}
 .cl-tab .cl-caixa{display:inline-block;width:5mm;height:5mm;border:.4mm solid #51534A;border-radius:.8mm;background:#fff;vertical-align:middle}
 .cl-tab td.cl-marca{padding-top:1.4mm;padding-bottom:1.4mm}
+/* Check list › assinatura na tela (05/11/2026) */
+.cl-ass-pad{position:relative;border:1px dashed var(--linha);border-radius:10px;background:#fff;height:160px;touch-action:none}
+.cl-ass-pad canvas{width:100%;height:100%;display:block;border-radius:10px;touch-action:none}
+.cl-ass-dica{position:absolute;inset:auto 0 10px;text-align:center;color:#9a9b94;font-size:13px;pointer-events:none}
