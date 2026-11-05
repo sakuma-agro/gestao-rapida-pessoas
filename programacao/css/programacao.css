@@ -445,3 +445,24 @@ body.modo-quadro .pc-rolagem{max-height:calc(100vh - 180px)}
 .pc-lado-lista .info{flex:1 1 auto;min-width:0}
 .pc-lado-lista li{flex-wrap:nowrap}
 .modal .pc-seg{display:flex;flex-wrap:wrap}.modal .pc-seg button{flex:1 1 auto;padding:0 8px}
+
+/* ---------- programação por plantio (quadro horizontal) ---------- */
+.pc-quadro .pc-pl-cab{cursor:pointer;border-left:5px solid var(--cor);vertical-align:top}
+.pc-quadro .pc-pl-cab:hover{background:#E6F0D2}
+.pc-pl-nome{display:block;font-size:1.25em;font-weight:bold;color:var(--marrom);line-height:1.15}
+.pc-pl-nome i{font-weight:normal;font-size:.8em;color:var(--cinza-claro)}
+.pc-pl-cult{display:inline-flex;align-items:center;gap:5px;font-weight:normal}
+.pc-pl-cult i{width:.9em;height:.9em;border-radius:3px;border:1px solid rgba(81,83,74,.25)}
+.pc-pl-local{display:block;font-weight:bold;color:var(--cinza);margin:2px 0 4px}
+.pc-pl-conta{display:block;font-weight:normal;font-size:.85em;color:var(--cinza-claro);margin-top:2px}
+.pc-pl-conta b{color:var(--urgente)}
+.pc-barra{display:block;height:6px;background:var(--branco);border:1px solid var(--verde-linha);border-radius:4px;overflow:hidden}
+.pc-barra i{display:block;height:100%;background:var(--ok)}
+.pc-pl-tab td{font-size:14px;padding:8px 10px}
+.pc-pl-tab tbody tr{cursor:pointer;background:var(--verde-claro)}
+.pc-pl-tab tbody tr:nth-child(even){background:var(--branco)}
+.pc-pl-tab tbody tr.st-ok td:first-child{color:var(--ok)}
+.pc-pl-tab tbody tr.st-atr{background:var(--atr-fundo)}
+.pc-pl-tab tbody tr.st-canc td{color:var(--cinza-claro);text-decoration:line-through}
+.pc-pl-tab small{color:var(--cinza-claro)}
+.pc-nw{white-space:nowrap}

@@ -50,7 +50,7 @@ export const AREAS = [
      do LOP para usar os cadastros de funcionários (Pessoas) e de máquinas e
      implementos (Máquinas e Patrimônio). Mora em programacao/, numa moldura. */
   { id: 'programacao', nome: 'Programação Campo', icone: 'icons/area-programacao.v3.svg',
-    desc: 'Painel anual · Atividades · Reunião semanal · Relatório diário' },
+    desc: 'Painel anual · Por plantio · Atividades · Reunião semanal · Relatório diário' },
   /* Estoque (15/10/2026, pedido dele): o app avulso Gestão Rápida (Estoque
      Inteligente) veio para dentro do LOP. Balanço, não movimento: contagem,
      acerto entre as fazendas e cadastros. Mora em estoque/, numa moldura. */

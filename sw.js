@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v573';
+const VERSAO = 'gr-v574';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -49,7 +49,7 @@ const ARQUIVOS = [
   './vendor/jspdf.umd.min.js', './vendor/jspdf.plugin.autotable.min.js', './vendor/html2canvas.min.js',
   './programacao/', './programacao/index.html', './programacao/css/app.css', './programacao/css/programacao.css',
   './programacao/js/config.js', './programacao/js/base.js', './programacao/js/comum.js', './programacao/js/acesso.js',
-  './programacao/js/painel.js', './programacao/js/atividades.js', './programacao/js/reuniao.js', './programacao/js/relatorio.js',
+  './programacao/js/painel.js', './programacao/js/plantio.js', './programacao/js/atividades.js', './programacao/js/reuniao.js', './programacao/js/relatorio.js',
   './programacao/js/cadastros.js', './programacao/js/ficha.js', './programacao/js/diario.js',
   './programacao/img/sakuma-logo.png', './programacao/img/lop-marca.png',
   './programacao/img/whatsapp.png',
