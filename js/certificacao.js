@@ -1100,8 +1100,11 @@ async function painelDoc() {
         ${refs.length ? `<div class="ce-refs" style="max-width:none">${codTags(refs)}</div>
           <button class="ce-link dc-sem" type="button" id="ceDvReqs">${reqsDoDoc(d).length} requisito(s)</button>`
           : '<p class="dica">Nenhum requisito ligado ainda. A ligação se faz no requisito, em “Documentos que comprovam”.</p>'}
-        ${d.observacao ? `<h4 class="ac-h4">Observação</h4><p class="dica">${esc(d.observacao)}</p>` : ''}</div>
+      </div>
       <div><h4 class="ac-h4">Revisões anteriores</h4><div id="ceDvRevs"><span class="dc-sem">…</span></div></div>
+      <div class="ce-dv-obs"><h4 class="ac-h4">Observação</h4>
+        <textarea id="ceDvObs" rows="3" maxlength="1000" placeholder="Anote aqui o que for importante deste documento…">${esc(d.observacao || '')}</textarea>
+        <div class="ce-dv-obs-acao"><span class="dc-sem" id="ceDvObsMsg"></span><button class="btn mini principal" type="button" id="ceDvObsGravar" hidden>Gravar observação</button></div></div>
     </div>
     ${d.por_fazenda ? `<div class="ce-faz" id="ceDvFaz">${htmlFazendas(d)}</div>` : ''}
     <div class="ce-cadeia" id="ceDvCadeia">${htmlCadeia(d)}</div>`;
@@ -1109,6 +1112,18 @@ async function painelDoc() {
   if (d.por_fazenda) ligarFazendas(d);
   if (app) el.querySelectorAll('#ceDvApp, [data-dv-app]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', app.tela)));
   $('ceDvEditar').addEventListener('click', () => formDocumento(d.id));
+  /* Observação editável direto no painel (05/11/2026, pedido dele: um campo de obs em cada documento). */
+  const obsEl = $('ceDvObs'), obsBt = $('ceDvObsGravar'), obsMsg = $('ceDvObsMsg');
+  obsEl.addEventListener('input', () => { obsBt.hidden = so(obsEl.value) === so(d.observacao); obsMsg.textContent = ''; });
+  obsBt.addEventListener('click', async () => {
+    if (!navigator.onLine || !estado.cliente) return erroDlg('Sem internet agora — tente de novo quando tiver sinal.');
+    obsBt.disabled = true;
+    const { data: dd, error } = await estado.cliente.from('cert_documentos')
+      .update({ observacao: so(obsEl.value) || null, atualizado_em: new Date().toISOString() }).eq('id', d.id).select().single();
+    obsBt.disabled = false;
+    if (error) return erroDlg('Não consegui gravar a observação: ' + error.message);
+    Object.assign(d, dd); obsBt.hidden = true; obsMsg.textContent = 'Observação gravada.';
+  });
   // AN 22 (croqui) e AN 08 (CAR) — números da Coopadap desde 30/10/2026: croqui no satélite com reserva legal detalhada (30/10/2026)
   $('ceDvCroqui')?.addEventListener('click', () => abrirCroqui());
   el.querySelector('[data-ir-modelo]')?.addEventListener('click', () => abrirTipo('FORM', modelo.id));
@@ -1753,8 +1768,9 @@ function formDocumento(id, preset = {}) {
       <span class="ce-linha-link"><input type="url" id="cedLink" maxlength="2000" value="${val('link')}" placeholder="https://onedrive.live.com/… ou https://1drv.ms/…">
       <a class="btn mini" id="cedLinkAbrir" target="_blank" rel="noopener" hidden>Abrir ↗</a></span></label>
     ${DICA_LINK}
+    <label class="campo" style="margin-top:8px">Observação <textarea id="cedObs" rows="2" maxlength="1000" placeholder="Anote aqui o que for importante deste documento…">${val('observacao')}</textarea></label>
     <div id="cedAnexos" style="margin-top:8px"></div>
-    <details class="ce-mais"><summary>Mais detalhes <small>(categoria, situação, revisão, certificações, observação)</small></summary>
+    <details class="ce-mais"><summary>Mais detalhes <small>(categoria, situação, revisão, certificações)</small></summary>
       <div class="grade">
         <label class="campo">Categoria <input type="text" id="cedCat" list="ceListaCat" maxlength="40" value="${val('categoria')}" placeholder="pelo código"></label>
         <label class="campo">Situação <select id="cedSit">${opcoes(SITUACOES_DOC, v.situacao)}</select></label>
@@ -1762,7 +1778,6 @@ function formDocumento(id, preset = {}) {
         <label class="campo">Data da revisão <input type="date" id="cedData" value="${val('data_revisao')}"></label>
         <p class="dica plena" id="cedProx"></p>
         <div class="campo plena"><span>Certificações que pedem <small>vazio = todas</small></span>${caixasCert(v.certificacoes, 'dcert')}</div>
-        <label class="campo plena">Observação <textarea id="cedObs" rows="2" maxlength="1000">${val('observacao')}</textarea></label>
       </div>
       ${d && codigosDoDoc(d).length ? `<h4 class="ac-h4">Códigos nas normas</h4><div class="ce-refs" style="max-width:none">${codTags(codigosDoDoc(d))}</div>` : ''}
       ${d ? `<h4 class="ac-h4">Requisitos que este documento comprova</h4>
