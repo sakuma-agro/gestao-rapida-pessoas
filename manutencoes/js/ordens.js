@@ -197,7 +197,8 @@ TELAS.ordens = el => {
       <button type="button" data-aba="abertas">Abertas</button>
       <button type="button" data-aba="feitas">Feitas</button>
     </div>
-    <div class="acoes"><button type="button" class="btn" id="os-corretiva">Nova OS corretiva</button></div>
+    <div class="acoes"><button type="button" class="btn" id="os-corretiva">Nova OS corretiva</button>
+      <button type="button" class="btn neutro" id="os-branco">Imprimir OS em branco</button></div>
     <div class="filtros">
       <input type="search" id="os-busca" placeholder="Buscar máquina ou nº da OS" value="${esc(filtroOS.busca)}">
       <select id="os-tipo"><option value="">Preventivas e corretivas</option>
@@ -210,6 +211,7 @@ TELAS.ordens = el => {
   el.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { filtroOS.aba = b.dataset.aba; TELAS.ordens(el); });
   $('#os-tipo').value = filtroOS.tipo; $('#os-local').value = filtroOS.local;
   $('#os-corretiva').onclick = () => formCorretiva();
+  $('#os-branco').onclick = () => imprimirOSBranco();
 
   const desenhar = () => {
     Object.assign(filtroOS, { busca: $('#os-busca').value, tipo: $('#os-tipo').value, local: $('#os-local').value });
@@ -532,6 +534,88 @@ function imprimirVariasOS(lista) {
     corpo.querySelector('#ov-imp').onclick = imp;
     corpo.querySelector('#ov-fechar').onclick = fecharModal;
     setTimeout(imp, 300);
+  });
+}
+
+/* OS em branco (05/11/2026, pedido dele): a folha de papel "Ordem de serviço
+   manutenções" para preencher à mão na oficina. Não grava nada no banco —
+   só escolhe a máquina (marca a fazenda e preenche patrimônio e
+   identificação) ou sai sem máquina, toda em branco. */
+function folhaOSBranco(e) {
+  e = e || null;
+  const linhas = n => '<div class="os-linhas">' + '<span></span>'.repeat(n) + '</div>';
+  const quadro = (txt, on) => `<span><i class="os-quad${on ? ' on' : ''}">${on ? '✓' : ''}</i>${esc(txt)}</span>`;
+  const dataBr = '<span class="osb-data">DATA: ___/___/_____</span>';
+  const fazendas = q.ordenado('locais').filter(l => l.ativo !== false || (e && l.id === e.local_id));
+  const lt = e && e.unidade_controle === 'KM' ? 'Km' : (e && e.unidade_controle === 'CALENDARIO' ? 'Horímetro/Km' : (e ? 'Horímetro' : 'Horímetro/Km'));
+  const cx = (rot, v, cls = '') => `<div class="os-cx ${cls}"><span>${rot}</span><b>${v ? esc(v) : '<span class="os-preencher"></span>'}</b></div>`;
+  return `
+    <div class="os-folha osb">
+      <header class="os-cab">
+        <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios" class="os-logo">
+        <div class="os-titulo"><h2>Ordem de serviço</h2><span class="osb-sub">Manutenções</span></div>
+        <div class="os-numero"><span>Nº</span><b>&nbsp;</b></div>
+      </header>
+
+      <section class="os-bloco">
+        <div class="osb-linha"><b>Fazenda</b><div class="os-checks">${fazendas.map(l => quadro(l.nome, e && e.local_id === l.id)).join('')}</div></div>
+        <div class="osb-linha"><b>Tipo</b><div class="os-checks">${['Preventiva', 'Preditiva', 'Corretiva', 'Corretiva não planejada'].map(t => quadro(t)).join('')}</div></div>
+      </section>
+
+      <section class="os-bloco">
+        <div class="os-grade os-g4">
+          ${cx('Patrimônio', e && e.patrimonio)}
+          ${cx('Identificação', e ? e.codigo + (e.descricao ? ' — ' + e.descricao : '') : '', 'larga')}
+          ${cx(lt, '')}
+        </div>
+      </section>
+
+      <section class="os-bloco">
+        <h3 class="osb-h">Diagnóstico (motivo) ${dataBr}</h3>
+        ${linhas(3)}
+      </section>
+
+      <section class="os-bloco">
+        <h3 class="osb-h">Solução (aplicada) ${dataBr}</h3>
+        ${linhas(5)}
+        <div class="os-grade osb-g2">${cx('Mão de obra', '')}${cx('Valor (R$)', '')}</div>
+      </section>
+
+      <section class="os-bloco">
+        <h3>Peças trocadas</h3>
+        <table class="os-tab os-pecas osb-pecas"><thead><tr><th class="osb-qtd">Qtd.</th><th>Peça</th><th class="osb-val">Valor (R$)</th></tr></thead>
+          <tbody>${'<tr><td></td><td></td><td></td></tr>'.repeat(6)}</tbody></table>
+        <div class="os-grade osb-g2" style="margin-top:6px">${cx('Fornecedor', '')}${cx('Valor (R$)', '')}</div>
+      </section>
+
+      <section class="os-assinaturas os-ass2">
+        <div><span></span>Solicitante</div>
+        <div><span></span>Responsável</div>
+      </section>
+
+      <footer class="os-pe">
+        <img src="../img/lop-marca.png" alt="LOP">
+        <span>Inteligência para o agronegócio</span>
+      </footer>
+    </div>`;
+}
+
+function imprimirOSBranco(idMaquina) {
+  const maquinas = q.ativos('equipamentos').filter(e => noGrupoId(e.id)).slice().sort(porCodigo);
+  abrirModal('Imprimir OS em branco', `
+    ${campoLista('Máquina', 'equipamento_id', maquinas.map(e => ({ id: e.id, nome: e.codigo + ' — ' + e.descricao })), idMaquina, 'Sem máquina (folha toda em branco)')}
+    <div id="os-impresso"></div>
+    <div class="acoes"><button type="button" class="btn btn-pdf" id="ob-imp">Imprimir</button>
+      <button type="button" class="btn neutro" id="ob-fechar">Fechar</button></div>`, corpo => {
+    const sel = corpo.querySelector('#f-equipamento_id');
+    const desenhar = () => { corpo.querySelector('#os-impresso').innerHTML = folhaOSBranco(sel.value ? q.por_id('equipamentos', sel.value) : null); };
+    sel.onchange = desenhar; desenhar();
+    corpo.querySelector('#ob-fechar').onclick = fecharModal;
+    corpo.querySelector('#ob-imp').onclick = () => {
+      document.body.classList.add('imprimindo-os');
+      window.print();
+      setTimeout(() => document.body.classList.remove('imprimindo-os'), 500);
+    };
   });
 }
 

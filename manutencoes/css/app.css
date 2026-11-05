@@ -467,7 +467,7 @@ tr.cel.marcada td{background:#F1F7EA}
   body.imprimindo-os .topo,body.imprimindo-os .conteudo{display:none !important}
   body.imprimindo-os .modal{position:static;background:none;display:block}
   body.imprimindo-os .modal .caixa{max-width:none;max-height:none;border-radius:0;background:#fff}
-  body.imprimindo-os .modal header{display:none !important}
+  body.imprimindo-os .modal > .caixa > header{display:none !important}
   .os-servico{break-inside:avoid;page-break-inside:avoid}
   body.imprimindo-os .os-rodape{position:fixed;bottom:0;left:0;right:0;background:#fff}
   body.imprimindo-os #os-impresso{padding-bottom:26mm}
@@ -1591,3 +1591,22 @@ tr.ir-volta td{color:var(--cinza-claro)}
 .ah-tab td,.ah-tab th{padding:8px 14px}
 .ah-tab tr.ah-y td{background:#FFF8E6}.ah-tab tr.ah-y td:last-child{color:#A87508;font-weight:bold}
 .ah-tab tr.ah-r td{background:#FDF0EE}.ah-tab tr.ah-r td:last-child{color:var(--urgente);font-weight:bold}
+
+/* ---------- OS em branco (05/11/2026): a folha de papel para preencher à mão ---------- */
+.osb-sub{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--cinza-claro);margin-top:2px}
+.osb .os-numero{min-height:52px}
+.osb-linha{display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid #E3E5DE}
+.osb-linha > b{flex:none;width:62px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza-claro);padding-top:6px}
+.osb-linha .os-checks{gap:6px 18px;padding:2px 0}
+.osb .os-checks .os-quad{width:15px;height:15px;font-size:11px}
+.osb-h{display:flex;justify-content:space-between;align-items:center}
+.osb-data{font-size:10px;font-weight:normal;letter-spacing:.04em;color:var(--cinza-claro)}
+.osb .os-linhas{margin-bottom:6px}
+.osb-g2{grid-template-columns:2fr 1fr}
+.osb-pecas td{height:26px}
+.osb-qtd{width:60px}.osb-val{width:120px}
+@media print{ .osb .os-quad.on{-webkit-print-color-adjust:exact;print-color-adjust:exact} }
+/* cabeçalho da folha da OS dentro da janela: não herda a faixa da janela (05/11/2026) */
+body .modal .os-folha header.os-cab{position:static;background:none;color:inherit;display:grid;
+  padding:0 0 10px;border-bottom:2px solid #CFE3A0}
+body .modal .os-folha header.os-cab h2{font-size:20px;color:var(--cinza)}
