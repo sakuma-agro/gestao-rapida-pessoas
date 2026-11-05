@@ -162,7 +162,10 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
      (esgotar, manômetro, vazamento, limpeza, ferrugem) entram juntos em
      qualquer OS preventiva da mesma máquina — vencida a troca de óleo do
      compressor, o operador faz tudo numa ida só e o mês do vaso conta feito. */
-  for (const pj of q.ativos('planos_manutencao').filter(x => x.equipamento_id === e.id && x.id !== p.id)) {
+  /* 05/11/2026 ("toda vez que trocar óleo precisa fazer o check list também"):
+     no vaso de pressão o check list entra sempre, mesmo com o plano desativado. */
+  const vasoOS = window.ehVaso ? ehVaso(e) : false;
+  for (const pj of (vasoOS ? q.todos('planos_manutencao') : q.ativos('planos_manutencao')).filter(x => x.equipamento_id === e.id && x.id !== p.id)) {
     const tj = q.por_id('tipos_manutencao', pj.tipo_manutencao_id);
     if (!tj || !tj.acompanha || tj.ativo === false || osAbertaDoPlano(pj)) continue;
     const cj = calcular(pj);
