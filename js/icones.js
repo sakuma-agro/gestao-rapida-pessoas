@@ -90,7 +90,7 @@ export const ICONE_TELA = {
   faPainel: 'painel', faRegistros: 'boletim', faEspecies: 'lista', faCameras: 'ajuste',
   enPainel: 'painel', enLancamentos: 'boletim', enFontes: 'ajuste',
   rePainel: 'painel', reSaidas: 'boletim', reAvaliacao: 'check', reTipos: 'ajuste',
-  foPainel: 'painel', foAvaliacoes: 'boletim', foCadastro: 'lista', mcPainel: 'painel', mcNcs: 'alerta', mcMelhorias: 'grafico', mcFeedbacks: 'reuniao', mcCaixas: 'armario',
+  foPainel: 'painel', foCl07: 'lista', foAvaliacoes: 'boletim', foCadastro: 'lista', mcPainel: 'painel', mcNcs: 'alerta', mcMelhorias: 'grafico', mcFeedbacks: 'reuniao', mcCaixas: 'armario',
   bmPainel: 'painel', bmRastreio: 'boletim', bmLotes: 'documento', bmFechamento: 'grafico',
 };
 export const ICONE_MODULO = { pessoas: 'pessoa', sst: 'escudo', rh: 'cargo', jornada: 'relogio', cert: 'check', reuniao: 'reuniao' };

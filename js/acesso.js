@@ -301,7 +301,8 @@ export const MODULOS = [
     /* Fornecedores (26/10/2026): avaliação de fornecedores — o FORM 023 virou
        aba (POP 021). js/cert-fornecedores.js; tabela cfo_avaliacoes. */
     { id: 'ceFornSub', grupo: 'Registros', secao: 'FORMS Digital', codigo: 'FORM 023', nome: 'Fornecedores', telas: [
-      ['foPainel',     'Registros'],
+      ['foPainel',     'Painel'],
+      ['foCl07',       'CL 07'],
       ['foCadastro',   'Cadastros'],
     ] },
     /* Reunião GRASP (27/10/2026): FORM 044 — ata da reunião mensal com o
@@ -583,6 +584,7 @@ export function podeTela(tela) {
   /* Impressões (04/11/2026): quem tinha a Lista mestra ou a Reunião GRASP ganha. */
   if (tela === 'ceImpressoes' && ['ceDocumentos', 'gpPainel'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   if (tela === 'ceVencimentos' && acesso.telas.includes(m + ':cePendencias')) return true;
+  if (tela === 'foCl07' && acesso.telas.includes(m + ':foPainel')) return true;   /* 05/11/2026: quem vê o painel de fornecedores vê o CL 07 */
   if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }

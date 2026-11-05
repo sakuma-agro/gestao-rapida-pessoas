@@ -2647,3 +2647,58 @@ body.crq-aberto{overflow:hidden}
 .rc-legenda{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--suave);margin:10px 2px 0}
 .rc-legenda i{display:inline-block;width:14px;height:8px;border-radius:2px;margin-right:4px;vertical-align:middle}
 @media (max-width:560px){.rc-cards{grid-template-columns:1fr}}
+
+/* Certificação › Fornecedores (05/11/2026 — js/cert-fornecedores.js): painel em cartões, CL 07 igual à planilha
+   (itens × fornecedores, abas embaixo) e editor de categorias. */
+.fo2-chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.fo2-chips button{flex:none;border:1px solid var(--linha);background:var(--papel);border-radius:20px;padding:6px 12px;font:inherit;font-size:13px;color:inherit;cursor:pointer}
+.fo2-chips button.on{background:#51534A;border-color:#51534A;color:#fff}
+.fo2-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px;margin-top:12px}
+.fo2-card{display:flex;flex-direction:column;gap:7px;border:1px solid var(--linha);border-left:5px solid var(--verde);border-radius:12px;padding:12px 14px;background:var(--papel)}
+.fo2-card.n1{border-left-color:#E8B100}.fo2-card.n2{border-left-color:var(--marrom)}
+.fo2-ct{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.fo2-ct b{font-size:15.5px;line-height:1.25}.fo2-ct .tag{white-space:nowrap}
+.fo2-barra{height:8px;background:var(--linha);border-radius:5px;overflow:hidden}.fo2-barra i{display:block;height:100%;background:var(--verde)}
+.fo2-lin{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--suave);flex-wrap:wrap}
+.fo2-ent{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--suave);flex-wrap:wrap}
+.fo2-ent i{width:17px;height:17px;border-radius:4px;background:var(--verde);color:#fff;font-style:normal;font-size:11px;text-align:center;line-height:17px}
+.fo2-ent i.n{background:var(--marrom)}.fo2-ent i.v{background:var(--linha)}
+.fo2-bt{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}.fo2-bt .btn{min-height:36px;padding:0 12px;font-size:13px}
+.fo2-link{background:none;border:0;padding:0;font:inherit;font-size:12.5px;color:#3F6000;font-weight:700;cursor:pointer;text-align:inherit}
+.fo2-cartao{padding-bottom:6px}
+.fo2-folha{margin-top:12px}
+.fo2-tab{min-width:100%}
+.fo2-tab th{background:var(--verde);color:#1B232B;vertical-align:top}
+.fo2-tab th.fo2-col{min-width:170px;text-align:center;font-weight:400;font-size:12px}.fo2-tab th.fo2-col b{font-size:13.5px}
+.fo2-tab th .fo2-link{color:#1B232B;font-weight:400;text-decoration:underline}
+.fo2-tab td.fo2-req,.fo2-tab th.fo2-req{min-width:260px;max-width:420px;text-align:left}
+.fo2-tab tbody tr:nth-child(even) td.fo2-req{background:var(--verde-fundo)}
+.fo2-tab td.fo2-nc{background:rgba(116,79,40,.16)}
+.fo2-tab tr.fo2-antigo td.fo2-req{color:var(--suave)}
+.fo2-tab tr.fo2-tot td{background:var(--linha);font-weight:700}
+.fo2-tab tr.fo2-tot2 td{background:var(--fundo);font-size:12.5px}
+.fo2-sn{display:inline-flex;border:1px solid var(--linha);border-radius:8px;overflow:hidden;background:var(--papel)}
+.fo2-sn button{border:0;background:none;padding:5px 8px;font:inherit;font-size:11.5px;color:var(--suave);cursor:pointer}
+.fo2-sn button+button{border-left:1px solid var(--linha)}
+.fo2-sn .on-S{background:var(--verde);color:#1B232B;font-weight:700}.fo2-sn .on-N{background:var(--marrom);color:#fff;font-weight:700}.fo2-sn .on-NA{background:#B9BBB0;color:#fff;font-weight:700}
+.fo2-sn.grande{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%;border:0;gap:6px;background:none}
+.fo2-sn.grande button{border:1px solid var(--linha);border-radius:9px;padding:11px 0;font-size:14px;font-weight:700}
+.fo2-abas{position:sticky;bottom:0;z-index:3;display:flex;gap:2px;overflow-x:auto;background:var(--fundo);padding:0 8px;border-top:1px solid var(--linha);margin:0 -2px}
+.fo2-abas button{flex:none;border:0;background:var(--linha);padding:9px 12px;font:inherit;font-size:13px;color:var(--texto);border-radius:0 0 8px 8px;cursor:pointer;white-space:nowrap}
+.fo2-abas button.on{background:var(--papel);font-weight:700;box-shadow:inset 0 -3px 0 var(--verde)}
+.fo2-abas em{font-style:normal;background:var(--marrom);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;margin-left:5px}
+.fo2-prog{height:8px;background:var(--linha);border-radius:5px;overflow:hidden}.fo2-prog i{display:block;height:100%;background:var(--verde)}
+.fo2-q{background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:12px;margin-top:9px}.fo2-q p{margin:0 0 9px;font-size:14.5px}
+.fo2-q.fo2-nc{border-color:var(--marrom)}
+.fo2-fim{position:sticky;bottom:44px;background:var(--papel);padding:10px 0;display:flex;gap:8px}.fo2-fim .btn{flex:1}
+.fo2-cats{display:grid;grid-template-columns:240px 1fr;gap:14px;margin-top:12px}
+.fo2-catlista{display:flex;flex-direction:column;border:1px solid var(--linha);border-radius:10px;overflow:hidden;align-self:start}
+.fo2-catlista button[data-cat]{display:flex;justify-content:space-between;gap:8px;border:0;border-bottom:1px solid var(--linha);background:var(--papel);padding:8px 10px;font:inherit;font-size:13px;text-align:left;color:inherit;cursor:pointer}
+.fo2-catlista button.on{background:var(--verde-fundo);box-shadow:inset 4px 0 0 var(--verde);font-weight:700}
+.fo2-catlista button.fo2-inat{opacity:.55}.fo2-catlista small{color:var(--suave);font-weight:400}
+.fo2-itens{margin-bottom:14px}.fo2-itens ol{margin:6px 0;padding-left:22px;font-size:13.5px}
+.fo2-itens li{padding:5px 0;border-bottom:1px solid var(--linha)}.fo2-itens li>span:first-child{display:inline}
+.fo2-itens li{display:list-item}.fo2-ed{float:right;display:inline-flex;gap:2px}
+.fo2-ed button{border:1px solid var(--linha);background:var(--papel);border-radius:6px;width:28px;height:26px;font-size:12px;cursor:pointer;color:inherit}
+.fo2-ed button:disabled{opacity:.35;cursor:default}
+.fo2-fixo{color:var(--suave)}.fo2-fixo small{margin-left:8px;background:var(--linha);border-radius:5px;padding:1px 6px;font-size:10.5px}
+@media (max-width:760px){.fo2-cats{grid-template-columns:1fr}.fo2-cards{grid-template-columns:1fr}}
