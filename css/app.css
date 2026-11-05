@@ -2605,3 +2605,15 @@ body.crq-aberto{overflow:hidden}
 .cl-tab tr.cl-total td{background:#e8f2cf;font-weight:bold;color:#744F28}
 .cl-tab .cl-caixa{display:inline-block;width:5mm;height:5mm;border:.4mm solid #51534A;border-radius:.8mm;background:#fff;vertical-align:middle}
 .cl-tab td.cl-marca{padding-top:1.4mm;padding-bottom:1.4mm}
+
+/* Certificação › Desmatamento (05/11/2026) — js/cert-desmatamento.js */
+.ds-graf{width:100%;height:auto;max-height:260px;display:block}
+.ds-graf-rel{max-height:190px}
+.ds-leg{margin:4px 0 0}
+.ds-traco{display:inline-block;width:18px;border-top:2px dashed #51534A;vertical-align:middle;margin:0 4px 0 10px}
+.ds-anos tr[data-ano]{cursor:pointer}
+.ds-anos tr[data-ano]:hover td{background:var(--verde-fundo)}
+.ds-l-alerta td{background:#FFF0B3}
+.ds-l-vazia td{color:#8A8D86}
+.ds-perda{color:#C0392B}
+.ds-conc{font-size:11.5px;color:#51534A;margin:4px 0}

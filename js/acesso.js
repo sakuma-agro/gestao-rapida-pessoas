@@ -356,6 +356,13 @@ export const MODULOS = [
     { id: 'ceAnSub', grupo: 'Registros', secao: 'AN Digital', codigo: 'AN', nome: 'AN Digital', telas: [
       ['anDigital', 'Croqui, CAR e outorgas'],
     ] },
+    /* Desmatamento (05/11/2026, pedido dele: "crie um submodulo sobre desmatamento, 2014 em diante,
+       referente a fazenda faca, mostrando por ano"): FV-GFS 22.03.01 — vegetação nativa por ano
+       (MapBiomas) e alertas PRODES com verificação de campo. js/cert-desmatamento.js; tabelas cd_*. */
+    { id: 'ceDesmSub', grupo: 'Registros', secao: 'AN Digital', codigo: 'GFS 22.03.01', nome: 'Desmatamento', telas: [
+      ['dsPainel',  'Por ano'],
+      ['dsAlertas', 'Alertas PRODES'],
+    ] },
     { id: 'ceClSub', grupo: 'Registros', secao: 'Check lists e caderno', codigo: 'CL', nome: 'CHECKS Digital', telas: [
       ['clLista',     'Check lists'],
       ['clRegistros', 'Registros'],
@@ -583,6 +590,8 @@ export function podeTela(tela) {
   /* Impressões (04/11/2026): quem tinha a Lista mestra ou a Reunião GRASP ganha. */
   if (tela === 'ceImpressoes' && ['ceDocumentos', 'gpPainel'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   if (tela === 'ceVencimentos' && acesso.telas.includes(m + ':cePendencias')) return true;
+  /* Desmatamento (05/11/2026): quem tinha o AN Digital (CAR e reserva legal) ganha. */
+  if ((tela === 'dsPainel' || tela === 'dsAlertas') && acesso.telas.includes(m + ':anDigital')) return true;
   if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
@@ -821,7 +830,7 @@ const ICONE_SUB = {
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
   vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
-  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceIndAbsSub: 'relogio', ceIndTurnSub: 'pessoas', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceImpSub: 'ficha', ceClSub: 'check', ceAnSub: 'mapa',
+  cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceIndAbsSub: 'relogio', ceIndTurnSub: 'pessoas', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceImpSub: 'ficha', ceClSub: 'check', ceAnSub: 'mapa', ceDesmSub: 'folha',
 };
 /* Ícone das portas da Certificação (29/10/2026). */
 const ICONE_GRUPO = { 'Documentos': 'documento', 'Registros': 'lapis', 'Pendências': 'calendario', 'Indicadores': 'grafico' };
