@@ -22,6 +22,7 @@ import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { campoAnexos, fotosDe, urlDoArquivo, listarArquivos } from './arquivos.js';
 import { abrirModulo } from './acesso.js';
+import { cartaoRegistro, cobrir, situacaoCob } from './cert-cartoes.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -119,23 +120,22 @@ function desenharLista() {
   const am = hoje().slice(0, 7);
   const comMod = E.docs.filter(d => modDe(d.id));
   const semMod = E.docs.filter(d => !modDe(d.id));
+  /* 05/11/2026: o mesmo cartão da porta Registros (js/cert-cartoes.js) — situação do período, números e faixa. */
   const cartao = d => {
     const l = regsDo(d.id), ult = l[0], mes = l.filter(r => r.data.startsWith(am));
     const ncs = mes.reduce((s, r) => s + conta(r).NC, 0);
-    return `<div class="cl-card">
-      <div class="cl-card-topo"><span class="cl-cod">${esc(d.codigo)}</span><b>${esc(tituloDe(d.id))}</b></div>
-      <div class="cl-card-num"><div><strong>${mes.length}</strong><span>neste mês</span></div><div><strong>${l.length}</strong><span>no total</span></div>
-        <div class="${ncs ? 'cl-ruim' : ''}"><strong>${ncs}</strong><span>NC no mês</span></div></div>
-      <p class="dica" style="margin:6px 0 10px">${ult ? `Último: ${br(ult.data)}${ult.fazenda ? ' · ' + esc(ROT_FAZ[ult.fazenda] || ult.fazenda) : ''}${ult.avaliado ? ' · ' + esc(ult.avaliado) : ''}` : 'Nenhum preenchido ainda.'} · ${esc(d.periodicidade || '')}</p>
-      <div class="barra" style="margin:0"><button class="btn principal" type="button" data-preencher="${esc(d.id)}">Preencher</button>
-        <button class="btn" type="button" data-regs="${esc(d.id)}">Registros</button>
-        <button class="btn" type="button" data-branco="${esc(d.id)}">Em branco</button></div></div>`;
+    const cob = cobrir(d.periodicidade, l.map(r => r.data));
+    return cartaoRegistro({ cod: d.codigo, nome: tituloDe(d.id), sit: situacaoCob(cob, d.periodicidade),
+      nums: [{ n: mes.length, rot: 'neste mês' }, { n: l.length, rot: 'no total' }, { n: ncs, rot: 'NC no mês', ruim: ncs > 0 }], cob,
+      linha: `${ult ? `Último: ${br(ult.data)}${ult.fazenda ? ' · ' + esc(ROT_FAZ[ult.fazenda] || ult.fazenda) : ''}${ult.avaliado ? ' · ' + esc(ult.avaliado) : ''}` : 'Nenhum preenchido ainda'}${d.periodicidade ? ' · ' + esc(d.periodicidade) : ''}`,
+      botoes: [{ rot: 'Preencher', attr: `data-preencher="${esc(d.id)}"`, principal: true }, { rot: 'Registros', attr: `data-regs="${esc(d.id)}"` }, { rot: 'Em branco', attr: `data-branco="${esc(d.id)}"` }] });
   };
+  const cartaoSem = d => cartaoRegistro({ cod: d.codigo, nome: d.nome.replace(/^Check List\s*/i, ''), sit: { rot: 'Sem versão digital', cor: 'neutra' },
+    linha: 'Ainda só no papel. Crie a versão digital para preencher no celular.', botoes: [{ rot: 'Criar versão digital', attr: `data-criar="${esc(d.id)}"`, principal: true }] });
   tela.innerHTML = `<div class="cartao naoimprimir">
     ${cabecalho('CHECKS Digital', 'Preencha no celular: marque C, NC ou NA em cada item, tire foto e grave. Item NC abre uma não conformidade no FORM 004. Cada preenchimento conta como registro do RG CL.')}
-    ${comMod.length ? `<div class="cl-cards">${comMod.map(cartao).join('')}</div>` : '<div class="vazio" style="margin-top:12px">Nenhum check list digital ainda. Crie em <b>Modelos</b>.</div>'}
-    ${semMod.length ? `<div class="qp-bloco"><h3>CL da Lista mestra ainda sem versão digital</h3>
-      ${semMod.map(d => `<div class="barra entre" style="margin:4px 0"><span><b>${esc(d.codigo)}</b> ${esc(d.nome)}</span><button class="btn mini" type="button" data-criar="${esc(d.id)}">Criar versão digital</button></div>`).join('')}</div>` : ''}
+    <div class="rc-cards" style="margin-top:14px">${[...comMod.map(cartao), ...semMod.map(cartaoSem)].join('') || '<div class="vazio">Nenhum check list na Lista mestra.</div>'}</div>
+    <div class="rc-legenda"><span><i style="background:var(--verde)"></i>com registro</span><span><i style="border:1.5px dashed var(--suave)"></i>período atual em aberto</span><span><i style="background:var(--marrom);opacity:.75"></i>passou sem registro</span></div>
   </div>`;
   tela.querySelectorAll('[data-preencher]').forEach(b => b.addEventListener('click', () => formRegistro(null, b.dataset.preencher)));
   tela.querySelectorAll('[data-regs]').forEach(b => b.addEventListener('click', () => { E.fl.doc = b.dataset.regs; abrirModulo('cert', 'clRegistros'); }));
@@ -448,3 +448,10 @@ export function limparChecklist() {
   nucleo.apagarCaixa(CAIXA); telaAtual = ''; fechar();
 }
 export const _cl = { E, imprimir, formRegistro };
+/** Atalho da porta Registros (05/11/2026): preencher um CL direto ou ver os registros dele. */
+export async function preencherChecklist(id, modo) {
+  if (modo === 'registros') { E.fl.doc = String(id); abrirModulo('cert', 'clRegistros'); return; }
+  abrirModulo('cert', 'clLista');
+  if (!E.carregado) { try { await carregar(); } catch (e) { alert('Não consegui abrir os check lists: ' + (e.message || e)); return; } }
+  if (modDe(id)) formRegistro(null, String(id));
+}

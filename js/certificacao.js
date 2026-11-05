@@ -30,6 +30,8 @@ import { campoAnexos, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquiv
 import { svgIcone } from './icones.js';
 import { itensCaderno } from './cert-caderno.js';
 import { abrirCroqui } from './cert-croqui.js';
+import { cartaoRegistro, situacaoCob, rotMesCurto } from './cert-cartoes.js';
+import { preencherChecklist } from './cert-checklist.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -110,7 +112,7 @@ const S = {
    (cert_marcar_feito). Cadastrar/editar requisitos continua só com internet. */
 const CAIXA = 'cert.cache';
 const CAMADA = 'cert';
-const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz, docArq: S.docArq, contatos: S.contatos });
+const salvarCaixa = () => nucleo.gravarCaixa(CAIXA, { certs: S.certs, reqs: S.reqs, docs: S.docs, evs: S.evs, vinc: S.vinc, evid: S.evid, viva: S.viva, itens: S.itens, faz: S.faz, docArq: S.docArq, contatos: S.contatos, clMods: S.clMods, clRegs: S.clRegs });
 const CAMADA_DEF = {
   tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, i) => i,
   cliente: () => estado.cliente,
@@ -152,7 +154,7 @@ const EVID_APP = {
 };
 const contaMeses = datas => datas.reduce((m, d) => { const k = String(d || '').slice(0, 7); if (k) m[k] = (m[k] || 0) + 1; return m; }, {});
 async function carregarCadeia(c) {
-  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, bh, ccl, darq] = await Promise.all([
+  const [v, ev, fa, en, bm, fo, mc, cxa, it, fz, rs, ra, gp, bh, ccl, darq, cmod] = await Promise.all([
     c.from('cert_vinculos').select('*'),
     c.from('cert_evidencias').select('*').order('data', { ascending: false }),
     c.from('cf_registros').select('data'),
@@ -167,9 +169,13 @@ async function carregarCadeia(c) {
     c.from('cr_avaliacoes').select('competencia'),
     c.from('cg_reunioes').select('data').eq('situacao', 'Realizada'),
     c.from('cb_banhos').select('data'),
-    c.from('ccl_registros').select('data, documento_id'),
+    c.from('ccl_registros').select('data, documento_id, respostas'),
     c.from('arquivos').select('dono_id, chave, nome, origem, data_arquivo, criado_em').eq('area', 'certificacao').eq('tipo', 'documento').not('origem', 'is', null),
+    c.from('ccl_modelos').select('documento_id'),
   ]);
+  /* cartões da porta Registros (05/11/2026): CL com versão digital e NC de cada preenchimento */
+  if (cmod && !cmod.error) S.clMods = (cmod.data || []).map(x => String(x.documento_id));
+  if (ccl && !ccl.error) S.clRegs = (ccl.data || []).map(x => ({ data: x.data, documento_id: String(x.documento_id), nc: (x.respostas || []).filter(r => r.st === 'NC').length }));
   if (it && !it.error) S.itens = it.data || [];
   if (darq && !darq.error) S.docArq = darq.data || [];
   if (fz && !fz.error) S.faz = fz.data || [];
@@ -263,7 +269,7 @@ async function carregar() {
   const c0 = await nucleo.lerCaixa(CAIXA, null);
   if (c0 && !S.carregado) {
     S.certs = c0.certs || []; S.reqs = c0.reqs || []; S.docs = c0.docs || []; S.evs = c0.evs || [];
-    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || []; S.docArq = c0.docArq || []; S.contatos = c0.contatos || [];
+    S.vinc = c0.vinc || []; S.evid = c0.evid || []; S.viva = c0.viva || {}; S.itens = c0.itens || []; S.faz = c0.faz || []; S.docArq = c0.docArq || []; S.contatos = c0.contatos || []; S.clMods = c0.clMods || []; S.clRegs = c0.clRegs || [];
     S.carregado = true;
   }
   await nucleo.contarFila(CAMADA);
@@ -474,6 +480,56 @@ function abrirSubDaPorta(id) {
   if (s) abrirModulo('cert', s.telas[0][0]);
 }
 
+/* Porta Registros em cartões (05/11/2026, pedido do Guilherme: "vamos melhorar esse painel dos forms digital
+   e por igual esse dos checks"): cada FORM e cada CL com a situação do período, os números e a faixa dos
+   últimos períodos (a mesma conta da Lista mestra: lançamentos no app + arquivos do RG no OneDrive). */
+function dadosRegistro(chave) {
+  const docF = S.docs.find(d => chaveCodigo(d.codigo) === chave && !foraDeUso(d));
+  const alvo = docF ? (rgDe(docF) || docF) : null;
+  const cob = alvo ? cobertura(alvo) : null, per = alvo?.periodicidade || '';
+  const meses = S.viva[chave] || null, am = hoje().slice(0, 7);
+  const tot = meses ? Object.values(meses).reduce((a, b) => a + b, 0) : null;
+  const ult = meses ? Object.keys(meses).filter(k => meses[k]).sort().pop() : null;
+  const ult12 = cob && ['Diário', 'Semanal', 'Mensal'].includes(per) ? cob.filter(c => c.n).length : null;
+  return { docF, alvo, cob, per, meses, tot, ult, am, ult12 };
+}
+function cartoesRegistros(subs) {
+  const secoes = [...new Set(subs.map(s => s.secao || ''))];
+  const legenda = `<div class="rc-legenda"><span><i style="background:var(--verde)"></i>com registro</span><span><i style="border:1.5px dashed var(--suave)"></i>período atual em aberto</span><span><i style="background:var(--marrom);opacity:.75"></i>passou sem registro</span></div>`;
+  const cartaoForm = s => {
+    const k = chaveCodigo(s.codigo), r = dadosRegistro(k);
+    const extras = s.telas.slice(1, 3).map(([t, rot]) => ({ rot, attr: `data-sub-tela="${t}"` }));
+    return cartaoRegistro({ cod: s.codigo, nome: s.nome, sit: situacaoCob(r.cob, r.per),
+      nums: [{ n: r.meses ? (r.meses[r.am] || 0) : null, rot: 'neste mês' }, { n: r.tot, rot: 'no total' },
+        r.ult12 != null ? { n: `${r.ult12}/12`, rot: 'em 12 meses', ruim: situacaoCob(r.cob, r.per).cor === 'perigo' } : { n: r.cob ? `${r.cob.filter(c => c.n).length}/${r.cob.length}` : null, rot: 'períodos', ruim: situacaoCob(r.cob, r.per).cor === 'perigo' }],
+      cob: r.cob, linha: `${r.ult ? 'Último registro: ' + esc(rotMesCurto(r.ult)) : 'Nenhum registro no app ainda'}${r.per ? ' · ' + esc(r.per) : ''}`,
+      botoes: [{ rot: 'Abrir', attr: `data-sub="${s.id}"`, principal: true }, ...extras] });
+  };
+  const cartaoCl = d => {
+    const k = chaveCodigo(d.codigo), r = dadosRegistro(k), am = hoje().slice(0, 7);
+    const regs = (S.clRegs || []).filter(x => x.documento_id === String(d.id));
+    const ncMes = regs.filter(x => String(x.data).startsWith(am)).reduce((a, x) => a + x.nc, 0);
+    const digital = (S.clMods || []).includes(String(d.id));
+    return cartaoRegistro({ cod: d.codigo, nome: d.nome.replace(/^Check List\s*/i, ''), sit: digital ? situacaoCob(r.cob, r.per) : { rot: 'Sem versão digital', cor: 'neutra' },
+      nums: [{ n: regs.filter(x => String(x.data).startsWith(am)).length, rot: 'neste mês' }, { n: regs.length, rot: 'no total' }, { n: ncMes, rot: 'NC no mês', ruim: ncMes > 0 }],
+      cob: digital ? r.cob : null, linha: `${regs.length ? 'Último: ' + br(regs.map(x => x.data).sort().pop()) : 'Nenhum preenchido ainda'}${r.per ? ' · ' + esc(r.per) : ''}`,
+      botoes: digital ? [{ rot: 'Preencher', attr: `data-cl-preencher="${d.id}"`, principal: true }, { rot: 'Registros', attr: `data-cl-regs="${d.id}"` }]
+        : [{ rot: 'Criar versão digital', attr: 'data-sub-tela="clLista"' }] });
+  };
+  const cartaoSimples = s => cartaoRegistro({ cod: s.codigo, nome: s.nome, linha: s.telas.map(t => esc(t[1])).join(' · '),
+    botoes: [{ rot: 'Abrir', attr: `data-sub="${s.id}"`, principal: true }, ...s.telas.slice(1, 3).map(([t, rot]) => ({ rot, attr: `data-sub-tela="${t}"` }))] });
+  return secoes.map(sec => {
+    const l = subs.filter(s => (s.secao || '') === sec);
+    let cards;
+    if (sec === 'FORMS Digital') cards = l.map(cartaoForm);
+    else cards = l.flatMap(s => s.id === 'ceClSub'
+      ? S.docs.filter(d => prefixoDoc(d) === 'CL' && !foraDeUso(d)).sort(porCodigo).map(cartaoCl)
+      : [cartaoSimples(s)]);
+    return `<div class="rc-secao"><h3>${esc(sec || 'Outros')}</h3>${sec === 'FORMS Digital' ? `<small>${l.length} formulários</small>` : ''}</div>
+      <div class="rc-cards">${cards.join('')}</div>`;
+  }).join('') + legenda;
+}
+
 /* Atrasados, próximos 60 dias e números da certificação — usados na entrada e em Pendências. */
 function dadosPendencias() {
   const hj = hoje();
@@ -502,6 +558,7 @@ function desenharPainel() {
   ultimaPorta = porta;
   const listaPorta = g => {
     const subs = subsDaPorta(g);
+    if (g === 'Registros') return cartoesRegistros(subs);
     const secoes = [...new Set(subs.map(s => s.secao || ''))];
     return secoes.map(sec => `${sec ? `<div class="ce-ent-secao">${esc(sec)}</div>` : ''}
       <div class="ce-ent-lista">${subs.filter(s => (s.secao || '') === sec).map(s => `
@@ -541,6 +598,9 @@ function desenharPainel() {
 `;
   tela.querySelectorAll('[data-porta]').forEach(b => b.addEventListener('click', () => b.dataset.porta === 'Pendências' ? abrirModulo('cert', 'cePendencias') : abrirGrupo('cert', b.dataset.porta)));
   tela.querySelectorAll('[data-sub]').forEach(b => b.addEventListener('click', () => abrirSubDaPorta(b.dataset.sub)));
+  tela.querySelectorAll('[data-sub-tela]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', b.dataset.subTela)));
+  tela.querySelectorAll('[data-cl-preencher]').forEach(b => b.addEventListener('click', () => preencherChecklist(b.dataset.clPreencher)));
+  tela.querySelectorAll('[data-cl-regs]').forEach(b => b.addEventListener('click', () => preencherChecklist(b.dataset.clRegs, 'registros')));
   $('ceEntVoltar')?.addEventListener('click', () => abrirModulo('cert', 'cePainel'));
   $('ceEntAtr')?.addEventListener('click', () => abrirModulo('cert', 'cePendencias'));
   $('ceEntVenc')?.addEventListener('click', () => abrirModulo('cert', 'ceVencimentos'));
