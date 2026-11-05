@@ -36,6 +36,9 @@ function tipoComo(idTipo) {
 }
 /* Precisa da foto do adesivo? Só quando a OS tem troca de verdade — itens do
    vaso feitos pelo operador e serviços de empresa contratada não têm adesivo. */
+/* OS externa (05/11/2026, pedido dele): serviço de empresa contratada fica
+   numa OS separada da troca de óleo, que é interna. */
+const osExterna = o => { const it = itensDaOS(o.id); return it.length > 0 && it.every(i => tipoDe(i).terceirizado); };
 const pedeAdesivo = itens => itens.some(it => { const t = tipoDe(it); return !t.acompanha && !t.terceirizado; });
 
 function numeroOS(o) { return o.numero ? 'nº ' + o.numero : '(aguardando envio)'; }
@@ -135,7 +138,10 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
      podem estar juntos"): quem abre escolhe os serviços. opcoes.nova cria
      uma OS só com eles; opcoes.osAlvo põe o item nessa OS. Sem nenhuma das
      duas, entra na OS preventiva aberta mais antiga da máquina. */
-  let os = opcoes.osAlvo || (opcoes.nova ? null : q.todos('ordens_servico').filter(o => o.equipamento_id === e.id && o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status))
+  const externo = !!(q.por_id('tipos_manutencao', p.tipo_manutencao_id) || {}).terceirizado;
+  // Marcou serviço externo e interno juntos: cada um vai para a sua OS.
+  const alvo = opcoes.osAlvo && (!itensDaOS(opcoes.osAlvo.id).length || osExterna(opcoes.osAlvo) === externo) ? opcoes.osAlvo : null;
+  let os = alvo || (opcoes.nova && !opcoes.osAlvo ? null : q.todos('ordens_servico').filter(o => o.equipamento_id === e.id && o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status) && osExterna(o) === externo)
     .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')) || (a.numero || 0) - (b.numero || 0))[0]);
   const juntou = !!os;
   // Item que já está numa OS aberta (ex.: puxado junto com o óleo) não entra de novo.
@@ -165,7 +171,7 @@ async function abrirOSPreventiva(idPlano, opcoes = {}) {
   /* 05/11/2026 ("toda vez que trocar óleo precisa fazer o check list também"):
      no vaso de pressão o check list entra sempre, mesmo com o plano desativado. */
   const vasoOS = window.ehVaso ? ehVaso(e) : false;
-  for (const pj of (vasoOS ? q.todos('planos_manutencao') : q.ativos('planos_manutencao')).filter(x => x.equipamento_id === e.id && x.id !== p.id)) {
+  if (!externo) for (const pj of (vasoOS ? q.todos('planos_manutencao') : q.ativos('planos_manutencao')).filter(x => x.equipamento_id === e.id && x.id !== p.id)) {
     const tj = q.por_id('tipos_manutencao', pj.tipo_manutencao_id);
     if (!tj || !tj.acompanha || tj.ativo === false || osAbertaDoPlano(pj)) continue;
     const cj = calcular(pj);
@@ -403,7 +409,7 @@ function folhaOS(os) {
   /* Conferência da máquina (28/10/2026, pedido dele): adesivo de troca e
      vazamentos, com espaço para detalhar. Não vai na OS do vaso de pressão. */
   const quad = t => `<span><i class="os-quad"></i>${t}</span>`;
-  const blocoConferencia = !trocas.length || ehVasoOS ? '' : `
+  const blocoConferencia = !trocas.length || ehVasoOS || osExterna(os) ? '' : `
     <section class="os-bloco">
       <h3>Conferência da máquina</h3>
       <div class="os-conf">
@@ -461,7 +467,7 @@ function folhaOS(os) {
         <img src="../img/sakuma-logo.png" alt="SAKUMA Agronegócios" class="os-logo">
         <div class="os-titulo">
           <h2>Ordem de serviço</h2>
-          <span class="os-tipo ${corretiva ? 'corr' : 'prev'}">${corretiva ? 'Corretiva' : 'Preventiva'}</span>
+          <span class="os-tipo ${corretiva ? 'corr' : 'prev'}">${corretiva ? 'Corretiva' : (osExterna(os) ? 'Preventiva · Externa' : 'Preventiva · Interna')}</span>
         </div>
         <div class="os-numero"><span>Nº</span><b>${esc(os.numero || '—')}</b><small>aberta em ${formatarData(os.data_emissao)}</small></div>
       </header>
