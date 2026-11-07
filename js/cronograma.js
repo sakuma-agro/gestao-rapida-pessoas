@@ -29,6 +29,13 @@
 // os responsáveis da área/unidade (cron_config 'responsaveis_area'; padrão
 // RESP_AREA_PADRAO, definido pelo Guilherme em 28/10/2026).
 //
+// 07/11/2026 — reunião matinal de 15 minutos (pedido dele): três abas —
+// Calendário (tudo que tem data), Foco do dia (o que a equipe escolheu fazer:
+// A fazer → Em andamento → Concluído hoje) e Reunião (uma pessoa por vez, com
+// cronômetro; dali se envia tarefa para o Foco do dia). A data de envio fica
+// em foco_em; a tarefa fica no foco até concluir e, passado o dia, ganha a
+// etiqueta "Não feito". Bloqueado (com "depende de") tira do foco.
+//
 // Offline (regra do app): tudo fica em cache; gravação sem rede entra numa
 // fila e sobe sozinha quando a rede voltar.
 
@@ -808,6 +815,7 @@ function todosItens() {
 function bloqDe(r) {
   return {
     inicioEm: r?.inicio_em || null,
+    focoEm: r?.foco_em || null,
     bloq: r?.situacao === 'bloqueado'
       ? { motivo: r.bloq_motivo || '', quem: r.bloq_quem || null, cobrar: r.bloq_cobrar || null, desde: r.bloq_desde || null }
       : null,
@@ -821,11 +829,11 @@ const diasParado = it => it.bloq?.desde ? Math.max(0, -diasAte(it.bloq.desde)) :
 /* ---------------- tela ---------------- */
 const vis = ler('gr.cronograma.vis', null) || {};
 const est = {
-  visao: vis.visao || 'calendario',     // calendario | kanban (Quadro) | reuniao
+  visao: vis.visao === 'kanban' ? 'foco' : (vis.visao || 'calendario'),  // calendario | foco | reuniao
   colMob: 'afazer',                     // aba do quadro no celular
   colunas: vis.colunas || 'situacao',   // situacao | pessoa
   filtro: vis.filtro || 'todos',        // todos | minhas
-  pessoa: '', area: '',
+  pessoa: '', area: '', origem: '',
   periodo: vis.periodo || 30,
   mes: hoje().slice(0, 7), dia: hoje(),
 };
@@ -848,11 +856,26 @@ function filtrados() {
     if (est.pessoa === '-' && it.resps.length) return false;
     if (est.pessoa && est.pessoa !== '-' && !it.resps.includes(est.pessoa)) return false;
     if (est.area && it.area !== est.area) return false;
+    if (est.origem === 'app' && !it.auto) return false;
+    if (est.origem === 'avulsa' && it.auto) return false;
     return true;
   });
 }
 
 const tagArea = a => `<span class="cr-tag" style="background:${areaDe(a).cor}">${esc(areaDe(a).nome)}</span>`;
+/* Origem (07/11/2026, aprovado por ele): "Do app" = nasce e some sozinha
+   conforme a área de origem (etiqueta cheia na cor da área, com a origem);
+   "Avulsa" = lançada à mão, inclusive as importadas do Trello (etiqueta só
+   contornada, com quem criou). */
+function quemCriou(t) {
+  const c = limpo(t?.criado_por);
+  if (!c || /importa/i.test(c)) return '';
+  const m = c.match(/pedido d[oa]\s+([^)]+)/i);
+  return limpo(m ? m[1] : c).split(/\s+/)[0];
+}
+const tagOrigem = it => it.auto
+  ? `<span class="cr-tag" style="background:${areaDe(it.area).cor}" title="Vem sozinha de ${esc(it.origemNome)}">Do app · ${esc((ORIGENS[it.origem]?.nome || areaDe(it.area).nome))}</span>`
+  : `<span class="cr-tag avulsa" title="Tarefa lançada à mão">Avulsa${quemCriou(it.tarefa) ? ' · ' + esc(quemCriou(it.tarefa)) : ''}</span>`;
 const avatar = (id, grande) => {
   const p = pessoa(id);
   return `<span class="cr-av${grande ? ' g' : ''}${p ? '' : ' cr-ninguem'}" title="${esc(p ? p.nome : 'Sem responsável')}">${esc(iniciais(p))}</span>`;
@@ -893,7 +916,7 @@ function desenhar() {
     ${dados.semTabelas ? '<div class="aviso erro">O banco ainda não tem as tabelas do Cronograma. As tarefas lançadas à mão e a mudança de situação só funcionam depois disso — os vencimentos das áreas já aparecem.</div>' : ''}
     <div class="cr-seg" role="tablist">
       <button type="button" role="tab" data-visao="calendario" aria-selected="${est.visao === 'calendario'}">Calendário</button>
-      <button type="button" role="tab" data-visao="kanban" aria-selected="${est.visao === 'kanban'}">Quadro</button>
+      <button type="button" role="tab" data-visao="foco" aria-selected="${est.visao === 'foco'}">Foco do dia</button>
       <button type="button" role="tab" data-visao="reuniao" aria-selected="${est.visao === 'reuniao'}">Reunião</button>
     </div>
     ${est.visao === 'reuniao' ? `<div id="crCorpo">${reuniao()}</div>` : `
@@ -909,17 +932,19 @@ function desenhar() {
         <option value="">Todas as áreas</option>
         ${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${est.area === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}
       </select>
-      ${est.visao === 'kanban' ? `
+      <select id="crOrigem" aria-label="Origem">
+        <option value="">Origem: todas</option>
+        <option value="app" ${est.origem === 'app' ? 'selected' : ''}>Do app</option>
+        <option value="avulsa" ${est.origem === 'avulsa' ? 'selected' : ''}>Avulsas</option>
+      </select>
+      ${est.visao === 'foco' ? `
         <span class="cr-sep">Colunas por:</span>
         <button type="button" class="cr-chip" data-colunas="situacao" aria-pressed="${est.colunas === 'situacao'}">Situação</button>
-        <button type="button" class="cr-chip" data-colunas="pessoa" aria-pressed="${est.colunas === 'pessoa'}">Pessoa</button>
-        <select id="crPeriodo" aria-label="Período">
-          ${[7, 30, 90].map(n => `<option value="${n}" ${+est.periodo === n ? 'selected' : ''}>Até ${n} dias</option>`).join('')}
-        </select>` : ''}
+        <button type="button" class="cr-chip" data-colunas="pessoa" aria-pressed="${est.colunas === 'pessoa'}">Pessoa</button>` : ''}
     </div>
-    <div id="crCorpo">${est.visao === 'kanban' ? kanban() : calendario()}</div>
+    <div id="crCorpo">${est.visao === 'foco' ? foco() : calendario()}</div>
     <div class="cr-legenda">${est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
-      <span class="cr-auto-leg">⟳ automático = vem sozinho de outra área</span></div>`}
+      <span class="cr-auto-leg"><span class="cr-tag" style="background:#51534A">Do app</span> vem sozinha de outra área · <span class="cr-tag avulsa">Avulsa</span> lançada à mão</span></div>`}
   </div>`;
   ligarTela();
   if (est.visao === 'reuniao') ligarReuniao();
@@ -1014,19 +1039,29 @@ function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
-    <span class="cr-item-txt"><b>${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${esc(it.origemNome)}${it.auto ? ' · automático' : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
-    <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span></span>
+    <span class="cr-item-txt"><b>${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
+    <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span>
+      ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? (it.focoEm ? '<span class="cr-nofoco">🎯 no foco</span>'
+        : `<span class="cr-ac foco" role="button" tabindex="0" data-acao="foco" data-alvo="${esc(it.chave)}">Foco do dia →</span>`) : ''}</span>
   </button>`;
 }
 
 /* Ações rápidas do card (07/11/2026): no celular não dá para arrastar, então
    cada card leva o próximo passo — Iniciar, Concluir, Bloquear, Liberar. */
 function acoes(it) {
-  const b = (a, t) => `<span class="cr-ac" role="button" tabindex="0" data-acao="${a}" data-alvo="${esc(it.chave)}">${t}</span>`;
-  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('bloquear', 'Bloquear');
-  if (it.sit === 'fazendo') return b('feito', 'Concluir') + b('bloquear', 'Bloquear');
+  const b = (a, t, cls = '') => `<span class="cr-ac${cls}" role="button" tabindex="0" data-acao="${a}" data-alvo="${esc(it.chave)}">${t}</span>`;
   if (it.sit === 'bloqueado') return b('liberar', 'Liberar');
-  return b('afazer', 'Reabrir');
+  if (!it.focoEm) return it.sit === 'feito' ? b('afazer', 'Reabrir') : b('foco', 'Foco do dia →', ' foco') + b('bloquear', 'Bloquear');
+  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('bloquear', 'Bloquear') + b('tirar', 'Tirar do foco');
+  if (it.sit === 'fazendo') return b('feito', 'Concluir') + b('bloquear', 'Bloquear');
+  return b('fazendo', 'Reabrir');
+}
+/* No foco desde um dia anterior e não concluída = "não feito" (07/11/2026). */
+const naoFeito = it => !!it.focoEm && it.sit !== 'feito' && it.focoEm < hoje();
+function seloNaoFeito(it) {
+  if (!naoFeito(it)) return '';
+  const n = -diasAte(it.focoEm);
+  return `<span class="cr-sit naofeito">Não feito · no foco desde ${brCurto(it.focoEm)}${n > 1 ? ` (${n} dias)` : ''}</span>`;
 }
 function seloSit(it) {
   if (atrasado(it)) { const n = -diasAte(it.data); return `<span class="cr-sit atraso">Atrasada ${n} ${n === 1 ? 'dia' : 'dias'}</span>`; }
@@ -1038,10 +1073,12 @@ function linhaBloq(it) {
   return `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir na reunião')}${q ? ` · com ${esc(q)}` : ''}${n != null ? ` · parado há ${n} ${n === 1 ? 'dia' : 'dias'}` : ''}${it.bloq.cobrar ? ` · cobrar ${brCurto(it.bloq.cobrar)}` : ''}</small>`;
 }
 function card(it, { semResp = false, comSit = false, comAcoes = true } = {}) {
-  const r = it.sit === 'fazendo' && it.inicioEm ? { txt: 'desde ' + brCurto(it.inicioEm), cls: '' } : rotuloData(it);
+  const r = it.sit === 'fazendo' && it.inicioEm ? { txt: 'iniciada ' + brCurto(it.inicioEm) + (atrasado(it) ? ' · venceu ' + brCurto(it.data) : ''), cls: atrasado(it) ? 'atraso' : '' }
+    : atrasado(it) ? { txt: 'venceu ' + brCurto(it.data), cls: 'atraso' } : rotuloData(it);
   return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
-    <span class="cr-card-top">${tagArea(it.area)}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : (seloSit(it) || (it.auto ? '<span class="cr-auto">⟳ automático</span>' : ''))}</span>
+    <span class="cr-card-top">${tagOrigem(it)}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
     <b>${esc(it.titulo)}</b>
+    ${seloNaoFeito(it)}
     ${linhaBloq(it)}
     <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span><span class="cr-card-dir">${botaoIr(it)}${semResp ? '' : avatares(it)}</span></span>
     ${comAcoes ? `<span class="cr-acs">${acoes(it)}</span>` : ''}
@@ -1051,42 +1088,43 @@ function card(it, { semResp = false, comSit = false, comAcoes = true } = {}) {
 /* Ordem dentro da coluna: atrasadas primeiro (mais antiga em cima), depois pela data. */
 const ordemQuadro = (a, b) => (atrasado(b) - atrasado(a)) || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
 
-function kanban() {
-  const limite = addDias(hoje(), +est.periodo);
-  const corte = addDias(hoje(), -7);
-  // Concluído: últimos 7 dias. Bloqueado e Em andamento: todos (independem da data).
-  const itens = filtrados().filter(it => it.sit === 'feito' ? (it.feitaEm || it.data) >= corte
-    : (it.sit === 'afazer' ? it.data <= limite : true)).sort(ordemQuadro);
+/* Foco do dia (07/11/2026): o que a equipe escolheu fazer, enviado na reunião
+   (ou pelo calendário). Fica aqui até concluir; o que entrou num dia anterior
+   e não terminou ganha a etiqueta "Não feito". Concluído mostra o de hoje.
+   Bloquear tira do foco (volta ao calendário com cadeado). Sem limite de
+   tarefas por pessoa (decisão dele). */
+const ordemFoco = (a, b) => (naoFeito(b) - naoFeito(a)) || (a.focoEm || '').localeCompare(b.focoEm || '') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
+function foco() {
+  const itens = filtrados().filter(it => it.focoEm && it.sit !== 'bloqueado' && (it.sit !== 'feito' || (it.feitaEm || hoje()) >= hoje())).sort(ordemFoco);
+  if (!itens.length) return `<div class="cr-foco-vazio"><b>Ninguém tem tarefa no foco agora.</b>
+    <p>Na reunião da manhã, cada pessoa escolhe o que vai fazer no dia e toca em "Foco do dia →". Fora da reunião, o botão também aparece nas tarefas do calendário.</p>
+    <button type="button" class="btn principal" data-visao="reuniao">Abrir a reunião</button></div>`;
   let cols;
   if (est.colunas === 'pessoa') {
     const ps = pessoasAtivas();
-    cols = [...ps.map(p => ({ id: p.id, nome: p.nome, cab: avatar(p.id, true), itens: itens.filter(i => i.resps.includes(p.id) && i.sit !== 'feito') })),
-      { id: '-', nome: 'Sem responsável', cab: avatar(null, true), itens: itens.filter(i => !i.resps.length && i.sit !== 'feito') }]
-      .filter(c => c.id !== '-' || c.itens.length);
+    cols = [...ps.map(p => ({ id: p.id, nome: p.nome, cab: avatar(p.id, true), itens: itens.filter(i => i.resps.includes(p.id)) })),
+      { id: '-', nome: 'Sem responsável', cab: avatar(null, true), itens: itens.filter(i => !i.resps.length) }]
+      .filter(c => c.itens.length);
     return `<div class="cr-quadro">${cols.map(c => {
-      const at = c.itens.filter(atrasado).length, bq = c.itens.filter(i => i.sit === 'bloqueado').length;
+      const ok = c.itens.filter(i => i.sit === 'feito').length, nf = c.itens.filter(naoFeito).length;
       return `<section class="cr-col" data-col="${c.id}">
-        <header class="cr-col-cab pessoa">${c.cab}<span class="cr-quem"><b>${esc(c.nome)}</b><small>${c.itens.length} ${c.itens.length === 1 ? 'item' : 'itens'}${at ? ` · ${at} atrasado${at > 1 ? 's' : ''}` : ''}${bq ? ` · ${bq} bloqueado${bq > 1 ? 's' : ''}` : ''}</small></span></header>
-        <div class="cr-col-corpo">${c.itens.map(i => card(i, { semResp: true, comSit: true })).join('') || '<p class="cr-vazio">Nada pendente.</p>'}</div>
+        <header class="cr-col-cab pessoa">${c.cab}<span class="cr-quem"><b>${esc(c.nome)}</b><small>${ok} de ${c.itens.length} concluídas${nf ? ` · ${nf} não feita${nf > 1 ? 's' : ''}` : ''}</small></span></header>
+        <div class="cr-col-corpo">${c.itens.map(i => card(i, { semResp: true, comSit: true })).join('')}</div>
       </section>`;
     }).join('')}</div>`;
   }
   cols = [
     { id: 'afazer', nome: 'A fazer', cor: '#51534A', itens: itens.filter(i => i.sit === 'afazer') },
     { id: 'fazendo', nome: 'Em andamento', cor: COR_SIT.fazendo, itens: itens.filter(i => i.sit === 'fazendo') },
-    { id: 'bloqueado', nome: 'Bloqueado', cor: COR_SIT.bloqueado, itens: itens.filter(i => i.sit === 'bloqueado') },
-    { id: 'feito', nome: 'Concluído', cor: COR_SIT.feito, itens: itens.filter(i => i.sit === 'feito').sort((a, b) => (b.feitaEm || b.data).localeCompare(a.feitaEm || a.data)) },
+    { id: 'feito', nome: 'Concluído hoje', cor: COR_SIT.feito, itens: itens.filter(i => i.sit === 'feito') },
   ];
-  const extra = c => {
-    if (c.id === 'afazer') { const n = c.itens.filter(atrasado).length; return n ? ` · <span class="cr-at">${n} atrasada${n > 1 ? 's' : ''}</span>` : ''; }
-    if (c.id === 'feito') return ' · últimos 7 dias';
-    return '';
-  };
+  const extra = c => { const n = c.itens.filter(naoFeito).length; return n ? ` · <span class="cr-at">${n} não feita${n > 1 ? 's' : ''}</span>` : ''; };
   // No celular as colunas viram abas (uma por vez); no computador ficam lado a lado.
+  if (!cols.some(c => c.id === est.colMob)) est.colMob = 'afazer';
   return `<div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmob="${c.id}" aria-selected="${est.colMob === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
     <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMob === c.id ? ' ativa' : ''}" data-col="${c.id}">
-      <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.id === 'bloqueado' ? '🔒 ' : ''}${c.nome}</b><span class="cr-cont">${c.itens.length}${extra(c)}</span></header>
-      <div class="cr-col-corpo">${c.itens.map(i => card(i)).join('') || `<p class="cr-vazio">${c.id === 'bloqueado' ? 'Nada travado.' : 'Nada aqui.'}</p>`}</div>
+      <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.nome}</b><span class="cr-cont">${c.itens.length}${extra(c)}</span></header>
+      <div class="cr-col-corpo">${c.itens.map(i => card(i)).join('') || '<p class="cr-vazio">Nada aqui.</p>'}</div>
     </section>`).join('')}</div>`;
 }
 
@@ -1121,14 +1159,14 @@ function blocosDe(id, itens) {
   const meu = it => it.resps.includes(id);
   return {
     feitos: itens.filter(it => meu(it) && it.sit === 'feito' && (it.feitaEm || it.data) >= desde),
-    andamento: itens.filter(it => meu(it) && it.sit === 'fazendo').sort(ordemQuadro),
-    hoje: itens.filter(it => meu(it) && it.sit === 'afazer' && it.data <= hoje()).sort(ordemQuadro),
+    foco: itens.filter(it => meu(it) && it.focoEm && (it.sit === 'afazer' || it.sit === 'fazendo')).sort(ordemFoco),
+    hoje: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && it.data <= hoje()).sort(ordemQuadro),
+    proximos: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && it.data > hoje() && it.data <= addDias(hoje(), 7)).sort(ordemQuadro),
     bloq: itens.filter(it => it.sit === 'bloqueado' && (meu(it) || it.bloq?.quem === id)).sort((a, b) => (a.bloq?.desde || '').localeCompare(b.bloq?.desde || '')),
-    proximos: itens.filter(it => meu(it) && it.sit === 'afazer' && it.data > hoje() && it.data <= addDias(hoje(), 7)).length,
   };
 }
 function pessoasReuniao(itens) {
-  const tem = id => { const b = blocosDe(id, itens); return b.feitos.length + b.andamento.length + b.hoje.length + b.bloq.length + b.proximos > 0; };
+  const tem = id => { const b = blocosDe(id, itens); return b.feitos.length + b.foco.length + b.hoje.length + b.proximos.length + b.bloq.length > 0; };
   const ps = pessoasAtivas().filter(p => tem(p.id));
   const pos = id => { const i = reu.ordem.indexOf(id); return i < 0 ? 999 : i; };
   return ps.sort((a, b) => pos(a.id) - pos(b.id) || (a.ordem ?? 999) - (b.ordem ?? 999));
@@ -1166,7 +1204,7 @@ function reuniao() {
     </aside>
     <div class="cr-reu-main">
       <div class="cr-reu-cab">${avatar(p.id, true)}
-        <div><b>${esc(p.nome)}</b><small>${abertas.length} abertas · ${abertas.filter(atrasado).length} atrasadas · ${b.bloq.length} bloqueadas${b.proximos ? ` · ${b.proximos} nos próximos 7 dias` : ''}</small></div>
+        <div><b>${esc(p.nome)}</b><small>${b.foco.length} no foco${b.foco.filter(naoFeito).length ? ` (${b.foco.filter(naoFeito).length} não feitas)` : ''} · ${abertas.filter(atrasado).length} atrasadas · ${b.bloq.length} bloqueadas</small></div>
         <span class="cr-reu-nav">
           ${idx ? '<button type="button" class="btn" id="crReuAnt" aria-label="Pessoa anterior">‹</button>' : ''}
           ${prox ? `<button type="button" class="btn principal" id="crReuProx">Próxima: ${esc(prox.nome)} →</button>` : '<span class="cr-reu-fim">Última pessoa</span>'}
@@ -1174,9 +1212,10 @@ function reuniao() {
       </div>
       <div class="cr-reu-grade">
         ${bloco('ok', '✓', dow === 1 ? 'Concluiu desde sexta' : 'Concluiu desde ontem', b.feitos, 'Nada concluído.')}
-        ${bloco('and', '▶', 'Em andamento', b.andamento, 'Nada em andamento.')}
-        ${bloco('hoje', '📅', 'Para hoje e atrasadas', b.hoje, 'Nada vencendo hoje.')}
-        ${bloco('bq', '🔒', 'Bloqueado — alguém pode destravar?', b.bloq, 'Nada travado.')}
+        ${bloco('and', '🎯', 'No foco — ainda não terminou', b.foco, 'Nada no foco ainda.')}
+        ${bloco('hoje', '📅', 'Vence hoje ou atrasado — puxar para o foco?', b.hoje, 'Nada vencendo hoje.')}
+        ${bloco('prox', '🗓', 'Próximos 7 dias', b.proximos, 'Nada nos próximos dias.')}
+        ${bloco('bq largo', '🔒', 'Bloqueado — alguém pode destravar?', b.bloq, 'Nada travado.')}
       </div>
     </div>
   </div>`;
@@ -1216,6 +1255,7 @@ function ligarTela() {
   r.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { est.filtro = b.dataset.filtro; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
   if ($('crPessoa')) $('crPessoa').onchange = e => { est.pessoa = e.target.value; desenhar(); };
+  if ($('crOrigem')) $('crOrigem').onchange = e => { est.origem = e.target.value; desenhar(); };
   if ($('crArea')) $('crArea').onchange = e => { est.area = e.target.value; desenhar(); };
   if ($('crPeriodo')) $('crPeriodo').onchange = e => { est.periodo = +e.target.value; guardarVis(); desenhar(); };
   $('crAtualizar').onclick = () => carregarCronograma();
@@ -1262,9 +1302,8 @@ function ligarTela() {
       const it = todosItens().find(x => x.chave === ev.dataTransfer.getData('text/plain'));
       if (!it) return;
       const c = col.dataset.col;
-      if (est.colunas === 'pessoa' && est.visao === 'kanban') await mudar(it, { resp: c === '-' ? null : c });
-      else if (c === 'bloqueado') { if (it.sit !== 'bloqueado') abrirBloquear(it); }
-      else await mudar(it, { sit: c });
+      if (est.colunas === 'pessoa' && est.visao === 'foco') await mudar(it, { resp: c === '-' ? null : c, foco: true });
+      else await mudar(it, { sit: c, foco: true });
     });
   });
 }
@@ -1273,7 +1312,9 @@ function acaoRapida(chave, acao) {
   const it = todosItens().find(x => x.chave === chave);
   if (!it) return;
   if (acao === 'bloquear') return abrirBloquear(it);
-  if (acao === 'liberar') return mudar(it, { sit: 'fazendo' });
+  if (acao === 'liberar') return mudar(it, { sit: 'afazer' });          // volta para o calendário
+  if (acao === 'foco') return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true });
+  if (acao === 'tirar') return mudar(it, { foco: false });
   return mudar(it, { sit: acao });
 }
 
@@ -1281,8 +1322,10 @@ function acaoRapida(chave, acao) {
    - Em andamento: guarda desde quando (inicio_em), se ainda não tinha;
    - Bloqueado: depende de / quem / cobrar / desde (vêm em bloq);
    - qualquer outra: limpa o bloqueio. */
-function camposSit(it, novaSit, bloq) {
+function camposSit(it, novaSit, bloq, foco) {
   const extra = {
+    // Foco do dia: entra com a data do dia; sai quando bloqueia ou quando tiram
+    foco_em: foco === true ? (it.focoEm || hoje()) : foco === false || novaSit === 'bloqueado' ? null : (it.focoEm || null),
     inicio_em: novaSit === 'fazendo' ? (it.inicioEm || hoje()) : (novaSit === 'afazer' ? null : it.inicioEm || null),
     bloq_motivo: null, bloq_quem: null, bloq_cobrar: null, bloq_desde: null,
   };
@@ -1293,10 +1336,10 @@ function camposSit(it, novaSit, bloq) {
   }
   return extra;
 }
-async function mudar(it, { sit, resp, bloq }) {
+async function mudar(it, { sit, resp, bloq, foco }) {
   const novaSit = sit ?? it.sit, novoResp = resp === undefined ? it.explicito : resp;
   const feita = novaSit === 'feito' ? (it.sit === 'feito' ? it.feitaEm || hoje() : hoje()) : null;
-  const extra = camposSit(it, novaSit, bloq);
+  const extra = camposSit(it, novaSit, bloq, foco);
   let r;
   if (!it.auto && !(it.tarefa.recorrencia && it.tarefa.recorrencia !== 'nenhuma')) {
     r = await gravar('cron_tarefas', 'id', { ...it.tarefa, situacao: novaSit, feita_em: feita, responsavel_id: novoResp, ...extra });
@@ -1369,7 +1412,7 @@ function abrirItem(chave) {
   const r = it ? rotuloData(it) : null;
   d.innerHTML = `<form method="dialog" id="crForm">
     <h3>${nova ? 'Nova tarefa' : esc(it.titulo)}</h3>
-    ${it ? `<p class="cr-dlg-orig">${tagArea(it.area)} ${esc(it.origemNome)}${it.auto ? ' · automático' : ''} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
+    ${it ? `<p class="cr-dlg-orig">${tagOrigem(it)} ${tagArea(it.area)} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
     ${it?.texto ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
     ${it?.detalhes?.length ? `<div class="cr-dlg-det"><b>${it.detalhes.length} ${(it.detRot || ['pessoa', 'pessoas'])[it.detalhes.length === 1 ? 0 : 1]}</b><ul>${it.detalhes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
     ${editavel ? `<div class="grade">
@@ -1402,12 +1445,14 @@ function abrirItem(chave) {
       ${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : (it && podeIr(it.ir) ? `<button type="button" class="btn" id="crIr">Ir para ${esc(ORIGENS[it.origem]?.nome || 'a origem')} ↗</button>` : '<span></span>')}
       <span class="barra">
         <button class="btn" value="cancelar">Fechar</button>
+        ${it && it.sit !== 'feito' && it.sit !== 'bloqueado' ? `<button type="button" class="btn" id="crFoco">${it.focoEm ? 'Tirar do foco' : 'Foco do dia →'}</button>` : ''}
         <button type="button" class="btn principal" id="crSalvar">${nova ? 'Lançar' : 'Salvar'}</button>
       </span>
     </div>
   </form>`;
   d.showModal();
   if ($('crIr')) $('crIr').onclick = () => irPara(it.ir);
+  if ($('crFoco')) $('crFoco').onclick = async () => { d.close(); await mudar(it, { foco: !it.focoEm }); };
   // trocar a área da tarefa mostra quem é o responsável da área
   if ($('crAreaT')) $('crAreaT').onchange = () => {
     const o = $('crRespSel').options[0], n = nomesDe(respsDaArea($('crAreaT').value, null));

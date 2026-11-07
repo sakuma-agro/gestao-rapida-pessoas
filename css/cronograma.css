@@ -191,7 +191,7 @@ html[data-tema="escuro"] .cr-bloq-txt,html[data-tema="escuro"] .cr-sit.bloqueado
 .cr-reu-fila{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
 .cr-reu-fila li{display:flex;align-items:center;gap:4px}
 .cr-reu-p{font:inherit;flex:1;display:flex;align-items:center;gap:8px;min-height:42px;padding:6px 8px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--texto);cursor:pointer;text-align:left}
-.cr-reu-p span{flex:1}
+.cr-reu-p > span:not(.cr-av){flex:1}
 .cr-reu-p em{font-style:normal;font-size:12px;color:var(--suave);font-variant-numeric:tabular-nums}
 .cr-reu-fila li.atual .cr-reu-p{background:var(--verde-fundo);border-color:var(--verde);font-weight:700}
 .cr-reu-fila li.foi .cr-reu-p{color:var(--suave)}
@@ -213,3 +213,31 @@ span.cr-reu-sobe{border:0;background:none}
 .cr-reu-bl.bq{border-color:rgba(186,117,23,.5);background:rgba(186,117,23,.05)}
 .cr-reu-bl.bq h4{color:#8A560F}
 html[data-tema="escuro"] .cr-reu-bl.bq h4{color:#EFB45A}
+
+/* Foco do dia (07/11/2026) */
+.cr-sit.naofeito{background:rgba(180,35,24,.12);color:var(--erro);align-self:flex-start}
+.cr-ac.foco{border-color:var(--verde);color:var(--verde-esc);background:var(--verde-fundo)}
+.cr-nofoco{font-size:11px;color:var(--verde-esc);font-weight:600;white-space:nowrap}
+.cr-item-dir .cr-ac{min-height:28px;font-size:11.5px}
+.cr-foco-vazio{background:var(--papel);border:1px dashed var(--linha);border-radius:12px;padding:20px;text-align:center}
+.cr-foco-vazio p{color:var(--suave);font-size:13px;max-width:460px;margin:8px auto 14px}
+@media (max-width:599px){.cr-abas{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.cr-reu-bl.prox h4{color:var(--suave)}
+@media (min-width:900px){.cr-reu-bl.largo{grid-column:1 / -1}}
+@media (max-width:899px){
+  .cr-reu-lado{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center}
+  .cr-reu-lado > small:first-child{grid-column:1 / -1}
+  .cr-reu-relogio{font-size:34px}
+  .cr-reu-barra,.cr-reu-lado > small,.cr-reu-fila{grid-column:1 / -1}
+  .cr-reu-ctl{grid-column:2;grid-row:2;margin:0}
+  .cr-reu-fila{flex-direction:row;flex-wrap:wrap;gap:6px}
+  .cr-reu-fila li{flex:0 0 auto}
+  .cr-reu-p{min-height:38px;padding:4px 10px 4px 4px;border-color:var(--linha)}
+  .cr-reu-sobe{display:none}
+}
+/* Origem: Do app (cheia) × Avulsa (contornada) — 07/11/2026 */
+.cr-tag.avulsa{background:transparent;color:var(--suave);border:1px solid var(--suave);padding:1px 6px}
+.cr-tag{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cr-item-txt small .cr-tag{font-size:10px;vertical-align:1px}
+.cr-auto-leg{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cr-dlg-orig .cr-tag{vertical-align:middle}
