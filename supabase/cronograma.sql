@@ -67,3 +67,26 @@ create policy cron_config_gravar on public.cron_config for all to authenticated
   using (public.app_admin()) with check (public.app_admin());
 
 create index if not exists cron_tarefas_data on public.cron_tarefas (data);
+
+-- 07/11/2026 — Cronograma geral: reunião matinal de 15 minutos (pedido do Guilherme).
+-- Situação Bloqueado (com "depende de"), Foco do dia (foco_em) e importação do Trello.
+alter table public.cron_tarefas drop constraint if exists cron_tarefas_situacao_check;
+alter table public.cron_tarefas add constraint cron_tarefas_situacao_check check (situacao in ('afazer','fazendo','bloqueado','feito'));
+alter table public.cron_estado drop constraint if exists cron_estado_situacao_check;
+alter table public.cron_estado add constraint cron_estado_situacao_check check (situacao in ('afazer','fazendo','bloqueado','feito'));
+alter table public.cron_tarefas
+  add column if not exists bloq_motivo text,
+  add column if not exists bloq_quem text references public.reu_pessoas(id),
+  add column if not exists bloq_cobrar date,
+  add column if not exists bloq_desde date,
+  add column if not exists inicio_em date,
+  add column if not exists foco_em date,
+  add column if not exists trello_id text;
+create unique index if not exists cron_tarefas_trello_id_uq on public.cron_tarefas(trello_id) where trello_id is not null;
+alter table public.cron_estado
+  add column if not exists bloq_motivo text,
+  add column if not exists bloq_quem text references public.reu_pessoas(id),
+  add column if not exists bloq_cobrar date,
+  add column if not exists bloq_desde date,
+  add column if not exists inicio_em date,
+  add column if not exists foco_em date;
