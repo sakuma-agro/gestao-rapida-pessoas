@@ -862,6 +862,8 @@ const IR_CK = {
   horimetros: { a: 'manutencoes', x: 'acao=horimetros' }, patrimonio: { a: 'manutencoes', x: 'acao=patrimonio' },
   vistorias: { a: 'vistorias', m: 'vsAnom', t: 'vsAnAberto' },
   qcSaida: { a: 'estoque', t: 'qcSaida' }, qcEntrada: { a: 'estoque', t: 'qcEntrada' }, ctNova: { a: 'estoque', t: 'ctNova' },
+  acPainel: { a: 'estoque', t: 'acPainel' }, acSaldo: { a: 'estoque', t: 'acSaldo' },
+  acTransf: { a: 'estoque', t: 'acTransferencias' }, acRelatorio: { a: 'estoque', t: 'acRelatorio' },
   rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' },
   colheita: { a: 'colheita', t: 'cpCargas' }, certDocs: { a: 'certificacao', t: 'ceDocumentos' },
   vencMaq: { a: 'manutencoes', x: 'acao=vencimentos' }, certAud: { a: 'certificacao', t: 'ceCertificacoes' },
