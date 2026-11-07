@@ -147,7 +147,16 @@ const ORIGENS = {
   'colh-pag':   { nome: 'Colheita › Pagamento de cargas', area: 'colh', ir: { a: 'colheita', t: 'cpCargas' } },
 };
 
-const SIT = { afazer: 'A fazer', fazendo: 'Fazendo', feito: 'Feito' };
+/* Situações (07/11/2026, pedido dele para a reunião matinal de 15 minutos):
+   A fazer → Em andamento → Concluído, mais Bloqueado quando a tarefa depende
+   de algo. Bloqueado guarda "depende de", quem precisa agir (alguém do
+   escritório ou ninguém = fora da equipe), quando cobrar de novo e desde
+   quando está parado — em cron_tarefas (tarefa simples) ou cron_estado
+   (automático e repetição), colunas bloq_*. Os valores no banco continuam
+   afazer / fazendo / bloqueado / feito. */
+const SIT = { afazer: 'A fazer', fazendo: 'Em andamento', bloqueado: 'Bloqueado', feito: 'Concluído' };
+const COR_SIT = { atraso: '#B42318', afazer: '#888780', fazendo: '#2F6FB0', bloqueado: '#BA7517', feito: '#5E8A00' };
+const sitCor = it => it.sit === 'afazer' && atrasado(it) ? 'atraso' : it.sit;
 
 /* ---------------- dados ---------------- */
 const dados = {
@@ -773,7 +782,7 @@ function todosItens() {
     const resps = explicito ? [explicito] : padrao[a.origem] ? [padrao[a.origem]] : respsDaArea(o.area, a.unid);
     let sit = e?.situacao || (a.feitoNaOrigem ? 'feito' : 'afazer');
     itens.push({ ...a, ir: a.ir || o.ir || null, area: o.area, origemNome: o.nome + (a.unid ? ' · ' + a.unid : ''), auto: true,
-      resp: resps[0] || null, resps, explicito, sit, feitaEm: e?.feita_em || null });
+      resp: resps[0] || null, resps, explicito, sit, feitaEm: e?.feita_em || null, ...bloqDe(e) });
   }
   for (const t of dados.tarefas) {
     if (t.ativo === false) continue;
@@ -789,17 +798,31 @@ function todosItens() {
         auto: false, resp: resps[0] || null, resps, explicito,
         sit: rep ? (e?.situacao || 'afazer') : (t.situacao || 'afazer'),
         feitaEm: rep ? e?.feita_em : t.feita_em,
+        ...bloqDe(rep ? e : t),
       });
     }
   }
   return itens;
 }
-const atrasado = it => it.sit !== 'feito' && it.data < hoje();
+/* Bloqueio e início vêm da linha que guarda a situação (tarefa ou estado). */
+function bloqDe(r) {
+  return {
+    inicioEm: r?.inicio_em || null,
+    bloq: r?.situacao === 'bloqueado'
+      ? { motivo: r.bloq_motivo || '', quem: r.bloq_quem || null, cobrar: r.bloq_cobrar || null, desde: r.bloq_desde || null }
+      : null,
+  };
+}
+/* Atrasado = passou da data sem andar. Bloqueado não conta: ali o aviso é
+   "parado há N dias", que diz mais na reunião. */
+const atrasado = it => (it.sit === 'afazer' || it.sit === 'fazendo') && it.data < hoje();
+const diasParado = it => it.bloq?.desde ? Math.max(0, -diasAte(it.bloq.desde)) : null;
 
 /* ---------------- tela ---------------- */
 const vis = ler('gr.cronograma.vis', null) || {};
 const est = {
-  visao: vis.visao || 'calendario',     // calendario | kanban
+  visao: vis.visao || 'calendario',     // calendario | kanban (Quadro) | reuniao
+  colMob: 'afazer',                     // aba do quadro no celular
   colunas: vis.colunas || 'situacao',   // situacao | pessoa
   filtro: vis.filtro || 'todos',        // todos | minhas
   pessoa: '', area: '',
@@ -870,8 +893,10 @@ function desenhar() {
     ${dados.semTabelas ? '<div class="aviso erro">O banco ainda não tem as tabelas do Cronograma. As tarefas lançadas à mão e a mudança de situação só funcionam depois disso — os vencimentos das áreas já aparecem.</div>' : ''}
     <div class="cr-seg" role="tablist">
       <button type="button" role="tab" data-visao="calendario" aria-selected="${est.visao === 'calendario'}">Calendário</button>
-      <button type="button" role="tab" data-visao="kanban" aria-selected="${est.visao === 'kanban'}">Kanban</button>
+      <button type="button" role="tab" data-visao="kanban" aria-selected="${est.visao === 'kanban'}">Quadro</button>
+      <button type="button" role="tab" data-visao="reuniao" aria-selected="${est.visao === 'reuniao'}">Reunião</button>
     </div>
+    ${est.visao === 'reuniao' ? `<div id="crCorpo">${reuniao()}</div>` : `
     <div class="cr-filtros">
       <button type="button" class="cr-chip" data-filtro="todos" aria-pressed="${est.filtro === 'todos'}">Todos</button>
       <button type="button" class="cr-chip" data-filtro="minhas" aria-pressed="${est.filtro === 'minhas'}" ${meu ? '' : 'disabled title="Seu nome não está entre as pessoas do escritório (Reunião semanal › Responsáveis)."'}>Só as minhas</button>
@@ -893,10 +918,11 @@ function desenhar() {
         </select>` : ''}
     </div>
     <div id="crCorpo">${est.visao === 'kanban' ? kanban() : calendario()}</div>
-    <div class="cr-legenda">${Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
-      <span class="cr-auto-leg">⟳ automático = vem sozinho de outra área</span></div>
+    <div class="cr-legenda">${est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
+      <span class="cr-auto-leg">⟳ automático = vem sozinho de outra área</span></div>`}
   </div>`;
   ligarTela();
+  if (est.visao === 'reuniao') ligarReuniao();
 }
 
 function calendario() {
@@ -907,17 +933,24 @@ function calendario() {
   const ult = new Date(a, m, 0);
   const fim = new Date(ult); fim.setDate(ult.getDate() + (6 - ult.getDay()));
   const porDia = new Map();
-  for (const it of itens) { if (!porDia.has(it.data)) porDia.set(it.data, []); porDia.get(it.data).push(it); }
+  const por = (d, it) => { if (!porDia.has(d)) porDia.set(d, []); porDia.get(d).push(it); };
+  for (const it of itens) {
+    por(it.data, it);
+    // bloqueada com data de cobrança: aparece também no dia de cobrar
+    if (it.sit === 'bloqueado' && it.bloq?.cobrar && it.bloq.cobrar !== it.data) por(it.bloq.cobrar, { ...it, cobrar: true });
+  }
   let cel = '';
   for (let d = new Date(ini); d <= fim; d.setDate(d.getDate() + 1)) {
     const s = iso(d), fora = d.getMonth() !== m - 1;
-    const l = porDia.get(s) || [];
+    const l = (porDia.get(s) || []).slice().sort(ordemItens);
     const temAtraso = l.some(atrasado);
-    const areas = [...new Set(l.filter(x => x.sit !== 'feito').map(x => x.area))].slice(0, 4);
+    // bolinhas = situação (07/11/2026): atrasado, a fazer, em andamento, bloqueado, concluído
+    const sits = ['atraso', 'afazer', 'fazendo', 'bloqueado', 'feito'].filter(k => l.some(x => sitCor(x) === k));
     const cls = ['cr-dia', fora ? 'fora' : '', s === hoje() ? 'hoje' : '', s === est.dia ? 'sel' : '', temAtraso ? 'atraso' : ''].filter(Boolean).join(' ');
     cel += `<button type="button" class="${cls}" data-dia="${s}" aria-label="${br(s)}: ${l.length} itens">
       <span class="n">${d.getDate()}</span>
-      <span class="pts">${areas.map(k => `<i style="background:${areaDe(k).cor}"></i>`).join('')}</span>
+      <span class="pts">${sits.map(k => `<i style="background:${COR_SIT[k]}"></i>`).join('')}</span>
+      <span class="cr-evs">${l.slice(0, 3).map(x => `<span class="cr-ev s-${sitCor(x)}">${x.cobrar ? 'Cobrar: ' : ''}${esc(x.titulo)}</span>`).join('')}${l.length > 3 ? `<span class="cr-ev-mais">+ ${l.length - 3}</span>` : ''}</span>
       ${l.length ? `<span class="q">${l.length}</span>` : ''}
     </button>`;
   }
@@ -944,6 +977,8 @@ function calendario() {
   </div>`;
 }
 const ordemItens = (a, b) => (a.sit === 'feito') - (b.sit === 'feito') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
+const legendaSit = () => [['atraso', 'Atrasado'], ['afazer', 'A fazer'], ['fazendo', 'Em andamento'], ['bloqueado', 'Bloqueado'], ['feito', 'Concluído']]
+  .map(([k, n]) => `<span><i style="background:${COR_SIT[k]}"></i>${n}</span>`).join('');
 
 /* ---------------- ir para a origem (29/10/2026, pedido dele) ----------------
    "Coloque um botão para ir para o local da atividade": o card e o detalhe
@@ -979,24 +1014,49 @@ function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
-    <span class="cr-item-txt"><b>${esc(it.titulo)}</b><small>${esc(it.origemNome)}${it.auto ? ' · automático' : ''}${it.sit === 'fazendo' ? ' · fazendo' : ''}</small></span>
+    <span class="cr-item-txt"><b>${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${esc(it.origemNome)}${it.auto ? ' · automático' : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
     <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span></span>
   </button>`;
 }
 
-function card(it, { semResp = false, comSit = false } = {}) {
-  const r = rotuloData(it);
-  return `<button type="button" class="cr-card" draggable="true" data-item="${esc(it.chave)}">
-    <span class="cr-card-top">${tagArea(it.area)}${comSit ? `<span class="cr-sit ${it.sit}${atrasado(it) ? ' atraso' : ''}">${atrasado(it) && it.sit === 'afazer' ? 'Atrasado' : SIT[it.sit]}</span>` : (it.auto ? '<span class="cr-auto">⟳ automático</span>' : '')}</span>
+/* Ações rápidas do card (07/11/2026): no celular não dá para arrastar, então
+   cada card leva o próximo passo — Iniciar, Concluir, Bloquear, Liberar. */
+function acoes(it) {
+  const b = (a, t) => `<span class="cr-ac" role="button" tabindex="0" data-acao="${a}" data-alvo="${esc(it.chave)}">${t}</span>`;
+  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('bloquear', 'Bloquear');
+  if (it.sit === 'fazendo') return b('feito', 'Concluir') + b('bloquear', 'Bloquear');
+  if (it.sit === 'bloqueado') return b('liberar', 'Liberar');
+  return b('afazer', 'Reabrir');
+}
+function seloSit(it) {
+  if (atrasado(it)) { const n = -diasAte(it.data); return `<span class="cr-sit atraso">Atrasada ${n} ${n === 1 ? 'dia' : 'dias'}</span>`; }
+  return '';
+}
+function linhaBloq(it) {
+  if (!it.bloq) return '';
+  const n = diasParado(it), q = it.bloq.quem ? pessoa(it.bloq.quem)?.nome : null;
+  return `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir na reunião')}${q ? ` · com ${esc(q)}` : ''}${n != null ? ` · parado há ${n} ${n === 1 ? 'dia' : 'dias'}` : ''}${it.bloq.cobrar ? ` · cobrar ${brCurto(it.bloq.cobrar)}` : ''}</small>`;
+}
+function card(it, { semResp = false, comSit = false, comAcoes = true } = {}) {
+  const r = it.sit === 'fazendo' && it.inicioEm ? { txt: 'desde ' + brCurto(it.inicioEm), cls: '' } : rotuloData(it);
+  return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
+    <span class="cr-card-top">${tagArea(it.area)}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : (seloSit(it) || (it.auto ? '<span class="cr-auto">⟳ automático</span>' : ''))}</span>
     <b>${esc(it.titulo)}</b>
+    ${linhaBloq(it)}
     <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span><span class="cr-card-dir">${botaoIr(it)}${semResp ? '' : avatares(it)}</span></span>
+    ${comAcoes ? `<span class="cr-acs">${acoes(it)}</span>` : ''}
   </button>`;
 }
 
+/* Ordem dentro da coluna: atrasadas primeiro (mais antiga em cima), depois pela data. */
+const ordemQuadro = (a, b) => (atrasado(b) - atrasado(a)) || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
+
 function kanban() {
   const limite = addDias(hoje(), +est.periodo);
-  const corte = addDias(hoje(), -30);
-  const itens = filtrados().filter(it => it.sit === 'feito' ? (it.feitaEm || it.data) >= corte : it.data <= limite).sort(ordemItens);
+  const corte = addDias(hoje(), -7);
+  // Concluído: últimos 7 dias. Bloqueado e Em andamento: todos (independem da data).
+  const itens = filtrados().filter(it => it.sit === 'feito' ? (it.feitaEm || it.data) >= corte
+    : (it.sit === 'afazer' ? it.data <= limite : true)).sort(ordemQuadro);
   let cols;
   if (est.colunas === 'pessoa') {
     const ps = pessoasAtivas();
@@ -1004,23 +1064,149 @@ function kanban() {
       { id: '-', nome: 'Sem responsável', cab: avatar(null, true), itens: itens.filter(i => !i.resps.length && i.sit !== 'feito') }]
       .filter(c => c.id !== '-' || c.itens.length);
     return `<div class="cr-quadro">${cols.map(c => {
-      const at = c.itens.filter(atrasado).length;
+      const at = c.itens.filter(atrasado).length, bq = c.itens.filter(i => i.sit === 'bloqueado').length;
       return `<section class="cr-col" data-col="${c.id}">
-        <header class="cr-col-cab pessoa">${c.cab}<span class="cr-quem"><b>${esc(c.nome)}</b><small>${c.itens.length} ${c.itens.length === 1 ? 'item' : 'itens'}${at ? ` · ${at} atrasado${at > 1 ? 's' : ''}` : ''}</small></span></header>
+        <header class="cr-col-cab pessoa">${c.cab}<span class="cr-quem"><b>${esc(c.nome)}</b><small>${c.itens.length} ${c.itens.length === 1 ? 'item' : 'itens'}${at ? ` · ${at} atrasado${at > 1 ? 's' : ''}` : ''}${bq ? ` · ${bq} bloqueado${bq > 1 ? 's' : ''}` : ''}</small></span></header>
         <div class="cr-col-corpo">${c.itens.map(i => card(i, { semResp: true, comSit: true })).join('') || '<p class="cr-vazio">Nada pendente.</p>'}</div>
       </section>`;
     }).join('')}</div>`;
   }
   cols = [
-    { id: 'atrasado', nome: 'Atrasado', cor: '#B42318', itens: itens.filter(i => i.sit === 'afazer' && atrasado(i)) },
-    { id: 'afazer', nome: 'A fazer', cor: '#51534A', itens: itens.filter(i => i.sit === 'afazer' && !atrasado(i)) },
-    { id: 'fazendo', nome: 'Fazendo', cor: '#2F6FB0', itens: itens.filter(i => i.sit === 'fazendo') },
-    { id: 'feito', nome: 'Feito (últimos 30 dias)', cor: '#5E8A00', itens: itens.filter(i => i.sit === 'feito') },
+    { id: 'afazer', nome: 'A fazer', cor: '#51534A', itens: itens.filter(i => i.sit === 'afazer') },
+    { id: 'fazendo', nome: 'Em andamento', cor: COR_SIT.fazendo, itens: itens.filter(i => i.sit === 'fazendo') },
+    { id: 'bloqueado', nome: 'Bloqueado', cor: COR_SIT.bloqueado, itens: itens.filter(i => i.sit === 'bloqueado') },
+    { id: 'feito', nome: 'Concluído', cor: COR_SIT.feito, itens: itens.filter(i => i.sit === 'feito').sort((a, b) => (b.feitaEm || b.data).localeCompare(a.feitaEm || a.data)) },
   ];
-  return `<div class="cr-quadro">${cols.map(c => `<section class="cr-col" data-col="${c.id}">
-      <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.nome}</b><span class="cr-cont">${c.itens.length}</span></header>
-      <div class="cr-col-corpo">${c.itens.map(i => card(i)).join('') || '<p class="cr-vazio">Nada aqui.</p>'}</div>
+  const extra = c => {
+    if (c.id === 'afazer') { const n = c.itens.filter(atrasado).length; return n ? ` · <span class="cr-at">${n} atrasada${n > 1 ? 's' : ''}</span>` : ''; }
+    if (c.id === 'feito') return ' · últimos 7 dias';
+    return '';
+  };
+  // No celular as colunas viram abas (uma por vez); no computador ficam lado a lado.
+  return `<div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmob="${c.id}" aria-selected="${est.colMob === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
+    <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMob === c.id ? ' ativa' : ''}" data-col="${c.id}">
+      <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.id === 'bloqueado' ? '🔒 ' : ''}${c.nome}</b><span class="cr-cont">${c.itens.length}${extra(c)}</span></header>
+      <div class="cr-col-corpo">${c.itens.map(i => card(i)).join('') || `<p class="cr-vazio">${c.id === 'bloqueado' ? 'Nada travado.' : 'Nada aqui.'}</p>`}</div>
     </section>`).join('')}</div>`;
+}
+
+/* ---------------- modo Reunião (07/11/2026, pedido dele) ----------------
+   Reunião matinal de 15 minutos: uma pessoa por vez, com o que concluiu desde
+   o último dia útil, o que está em andamento, o que vence hoje ou está
+   atrasado e o que está bloqueado (inclusive o que depende dela). O
+   cronômetro é só referência: não corta ninguém, fica vermelho quando passa.
+   A ordem das pessoas fica guardada neste aparelho. */
+const REU_SEG = 15 * 60;
+const reu = { ordem: ler('gr.cronograma.reuOrdem', []), atual: null, rodando: false, acum: 0, marca: 0, porPessoa: {}, timer: null };
+const agoraS = () => Date.now() / 1000;
+function trecho() { return reu.rodando ? agoraS() - reu.marca : 0; }
+const tempoTotal = () => reu.acum + trecho();
+const tempoDe = id => (reu.porPessoa[id] || 0) + (id === reu.atual ? trecho() : 0);
+function fecharTrecho() {
+  if (!reu.rodando) return;
+  const t = trecho();
+  reu.acum += t;
+  if (reu.atual) reu.porPessoa[reu.atual] = (reu.porPessoa[reu.atual] || 0) + t;
+  reu.marca = agoraS();
+}
+const mmss = s => { const n = Math.abs(Math.round(s)); return `${s < 0 ? '+' : ''}${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
+
+/* "Desde ontem": na segunda, desde a sexta. */
+function inicioOntem() {
+  const d = new Date(); const dow = d.getDay();
+  return addDias(hoje(), dow === 1 ? -3 : dow === 0 ? -2 : -1);
+}
+function blocosDe(id, itens) {
+  const desde = inicioOntem();
+  const meu = it => it.resps.includes(id);
+  return {
+    feitos: itens.filter(it => meu(it) && it.sit === 'feito' && (it.feitaEm || it.data) >= desde),
+    andamento: itens.filter(it => meu(it) && it.sit === 'fazendo').sort(ordemQuadro),
+    hoje: itens.filter(it => meu(it) && it.sit === 'afazer' && it.data <= hoje()).sort(ordemQuadro),
+    bloq: itens.filter(it => it.sit === 'bloqueado' && (meu(it) || it.bloq?.quem === id)).sort((a, b) => (a.bloq?.desde || '').localeCompare(b.bloq?.desde || '')),
+    proximos: itens.filter(it => meu(it) && it.sit === 'afazer' && it.data > hoje() && it.data <= addDias(hoje(), 7)).length,
+  };
+}
+function pessoasReuniao(itens) {
+  const tem = id => { const b = blocosDe(id, itens); return b.feitos.length + b.andamento.length + b.hoje.length + b.bloq.length + b.proximos > 0; };
+  const ps = pessoasAtivas().filter(p => tem(p.id));
+  const pos = id => { const i = reu.ordem.indexOf(id); return i < 0 ? 999 : i; };
+  return ps.sort((a, b) => pos(a.id) - pos(b.id) || (a.ordem ?? 999) - (b.ordem ?? 999));
+}
+
+function reuniao() {
+  const itens = todosItens();
+  const ps = pessoasReuniao(itens);
+  if (!ps.length) return '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>';
+  if (!reu.atual || !ps.some(p => p.id === reu.atual)) reu.atual = ps[0].id;
+  const idx = ps.findIndex(p => p.id === reu.atual), p = ps[idx], prox = ps[idx + 1];
+  const b = blocosDe(p.id, itens);
+  const porPessoa = REU_SEG / ps.length;
+  const resto = REU_SEG - tempoTotal();
+  const dow = new Date().getDay();
+  const bloco = (cls, ic, tit, l, vazio) => `<section class="cr-reu-bl ${cls}"><h4>${ic} ${tit} <span>${l.length}</span></h4>
+    ${l.map(i => card(i, { semResp: true })).join('') || `<p class="cr-vazio">${vazio}</p>`}</section>`;
+  const abertas = itens.filter(i => i.resps.includes(p.id) && i.sit !== 'feito');
+  return `<div class="cr-reu">
+    <aside class="cr-reu-lado">
+      <small>${reu.rodando || tempoTotal() ? 'Tempo restante' : 'Reunião de 15 minutos'}</small>
+      <div class="cr-reu-relogio${resto < 0 ? ' estourou' : ''}" id="crReuRel">${mmss(resto)}</div>
+      <div class="cr-reu-barra"><i id="crReuBar" style="width:${Math.min(100, tempoTotal() / REU_SEG * 100)}%"></i></div>
+      <small>cerca de ${mmss(porPessoa)} por pessoa</small>
+      <div class="cr-reu-ctl">
+        ${reu.rodando ? '<button type="button" class="btn" id="crReuPausa">Pausar</button>'
+          : `<button type="button" class="btn principal" id="crReuIni">${tempoTotal() ? 'Continuar' : 'Iniciar reunião'}</button>`}
+        ${tempoTotal() ? '<button type="button" class="btn" id="crReuFim">Encerrar</button>' : ''}
+      </div>
+      <small>Ordem</small>
+      <ol class="cr-reu-fila">${ps.map((x, k) => `<li class="${x.id === p.id ? 'atual' : ''}${k < idx ? ' foi' : ''}">
+        <button type="button" class="cr-reu-p" data-reup="${x.id}">${avatar(x.id)}<span>${esc(x.nome)}</span><em data-reut="${x.id}">${tempoDe(x.id) ? mmss(tempoDe(x.id)) : ''}</em></button>
+        ${k ? `<button type="button" class="cr-reu-sobe" data-reusobe="${x.id}" aria-label="Subir ${esc(x.nome)} na ordem">↑</button>` : '<span class="cr-reu-sobe"></span>'}
+      </li>`).join('')}</ol>
+    </aside>
+    <div class="cr-reu-main">
+      <div class="cr-reu-cab">${avatar(p.id, true)}
+        <div><b>${esc(p.nome)}</b><small>${abertas.length} abertas · ${abertas.filter(atrasado).length} atrasadas · ${b.bloq.length} bloqueadas${b.proximos ? ` · ${b.proximos} nos próximos 7 dias` : ''}</small></div>
+        <span class="cr-reu-nav">
+          ${idx ? '<button type="button" class="btn" id="crReuAnt" aria-label="Pessoa anterior">‹</button>' : ''}
+          ${prox ? `<button type="button" class="btn principal" id="crReuProx">Próxima: ${esc(prox.nome)} →</button>` : '<span class="cr-reu-fim">Última pessoa</span>'}
+        </span>
+      </div>
+      <div class="cr-reu-grade">
+        ${bloco('ok', '✓', dow === 1 ? 'Concluiu desde sexta' : 'Concluiu desde ontem', b.feitos, 'Nada concluído.')}
+        ${bloco('and', '▶', 'Em andamento', b.andamento, 'Nada em andamento.')}
+        ${bloco('hoje', '📅', 'Para hoje e atrasadas', b.hoje, 'Nada vencendo hoje.')}
+        ${bloco('bq', '🔒', 'Bloqueado — alguém pode destravar?', b.bloq, 'Nada travado.')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function tic() {
+  const rel = $('crReuRel');
+  if (!rel || est.visao !== 'reuniao') { clearInterval(reu.timer); reu.timer = null; return; }
+  const resto = REU_SEG - tempoTotal();
+  rel.textContent = mmss(resto); rel.classList.toggle('estourou', resto < 0);
+  const bar = $('crReuBar'); if (bar) bar.style.width = Math.min(100, tempoTotal() / REU_SEG * 100) + '%';
+  const t = alvo?.querySelector(`[data-reut="${reu.atual}"]`); if (t) t.textContent = mmss(tempoDe(reu.atual));
+}
+function ligarReuniao() {
+  const r = alvo;
+  const trocar = id => { fecharTrecho(); reu.atual = id; desenhar(); window.scrollTo?.({ top: r.offsetTop, behavior: 'smooth' }); };
+  if ($('crReuIni')) $('crReuIni').onclick = () => { reu.rodando = true; reu.marca = agoraS(); desenhar(); };
+  if ($('crReuPausa')) $('crReuPausa').onclick = () => { fecharTrecho(); reu.rodando = false; desenhar(); };
+  if ($('crReuFim')) $('crReuFim').onclick = () => {
+    if (!confirm('Encerrar a reunião e zerar o cronômetro?')) return;
+    Object.assign(reu, { rodando: false, acum: 0, marca: 0, porPessoa: {}, atual: null }); desenhar();
+  };
+  if ($('crReuProx')) $('crReuProx').onclick = () => { const ps = pessoasReuniao(todosItens()); const i = ps.findIndex(x => x.id === reu.atual); if (ps[i + 1]) trocar(ps[i + 1].id); };
+  if ($('crReuAnt')) $('crReuAnt').onclick = () => { const ps = pessoasReuniao(todosItens()); const i = ps.findIndex(x => x.id === reu.atual); if (i > 0) trocar(ps[i - 1].id); };
+  r.querySelectorAll('[data-reup]').forEach(b => b.onclick = () => trocar(b.dataset.reup));
+  r.querySelectorAll('[data-reusobe]').forEach(b => b.onclick = () => {
+    const ids = pessoasReuniao(todosItens()).map(x => x.id), i = ids.indexOf(b.dataset.reusobe);
+    if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; reu.ordem = ids; gravarLocal('gr.cronograma.reuOrdem', ids); desenhar(); }
+  });
+  if (!reu.timer) reu.timer = setInterval(tic, 1000);
 }
 
 /* ---------------- eventos ---------------- */
@@ -1029,8 +1215,8 @@ function ligarTela() {
   r.querySelectorAll('[data-visao]').forEach(b => b.onclick = () => { est.visao = b.dataset.visao; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { est.filtro = b.dataset.filtro; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
-  $('crPessoa').onchange = e => { est.pessoa = e.target.value; desenhar(); };
-  $('crArea').onchange = e => { est.area = e.target.value; desenhar(); };
+  if ($('crPessoa')) $('crPessoa').onchange = e => { est.pessoa = e.target.value; desenhar(); };
+  if ($('crArea')) $('crArea').onchange = e => { est.area = e.target.value; desenhar(); };
   if ($('crPeriodo')) $('crPeriodo').onchange = e => { est.periodo = +e.target.value; guardarVis(); desenhar(); };
   $('crAtualizar').onclick = () => carregarCronograma();
   $('crNova').onclick = () => abrirItem(null);
@@ -1047,10 +1233,17 @@ function ligarTela() {
     desenhar();
     if (matchMedia('(max-width: 899px)').matches) r.querySelector('.cr-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  r.querySelectorAll('[data-colmob]').forEach(b => b.onclick = () => { est.colMob = b.dataset.colmob; desenhar(); });
   r.querySelectorAll('[data-item]').forEach(b => b.onclick = ev => {
+    const ac = ev.target.closest('[data-acao]');
+    if (ac) { ev.preventDefault(); ev.stopPropagation(); acaoRapida(ac.dataset.alvo, ac.dataset.acao); return; }
     const ir = ev.target.closest('[data-ir]');
     if (ir) { ev.preventDefault(); ev.stopPropagation(); irPara(todosItens().find(x => x.chave === ir.dataset.ir)?.ir); return; }
     abrirItem(b.dataset.item);
+  });
+  r.querySelectorAll('[data-acao]').forEach(b => b.onkeydown = ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault(); ev.stopPropagation(); acaoRapida(b.dataset.alvo, b.dataset.acao);
   });
   r.querySelectorAll('[data-ir]').forEach(b => b.onkeydown = ev => {
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
@@ -1070,21 +1263,77 @@ function ligarTela() {
       if (!it) return;
       const c = col.dataset.col;
       if (est.colunas === 'pessoa' && est.visao === 'kanban') await mudar(it, { resp: c === '-' ? null : c });
-      else await mudar(it, { sit: c === 'atrasado' ? 'afazer' : c });
+      else if (c === 'bloqueado') { if (it.sit !== 'bloqueado') abrirBloquear(it); }
+      else await mudar(it, { sit: c });
     });
   });
 }
 
-async function mudar(it, { sit, resp }) {
+function acaoRapida(chave, acao) {
+  const it = todosItens().find(x => x.chave === chave);
+  if (!it) return;
+  if (acao === 'bloquear') return abrirBloquear(it);
+  if (acao === 'liberar') return mudar(it, { sit: 'fazendo' });
+  return mudar(it, { sit: acao });
+}
+
+/* Grava situação + campos que andam junto com ela:
+   - Em andamento: guarda desde quando (inicio_em), se ainda não tinha;
+   - Bloqueado: depende de / quem / cobrar / desde (vêm em bloq);
+   - qualquer outra: limpa o bloqueio. */
+function camposSit(it, novaSit, bloq) {
+  const extra = {
+    inicio_em: novaSit === 'fazendo' ? (it.inicioEm || hoje()) : (novaSit === 'afazer' ? null : it.inicioEm || null),
+    bloq_motivo: null, bloq_quem: null, bloq_cobrar: null, bloq_desde: null,
+  };
+  if (novaSit === 'bloqueado') {
+    const b = bloq || it.bloq || {};
+    Object.assign(extra, { bloq_motivo: b.motivo || null, bloq_quem: b.quem || null, bloq_cobrar: b.cobrar || null,
+      bloq_desde: it.sit === 'bloqueado' ? (it.bloq?.desde || hoje()) : hoje() });
+  }
+  return extra;
+}
+async function mudar(it, { sit, resp, bloq }) {
   const novaSit = sit ?? it.sit, novoResp = resp === undefined ? it.explicito : resp;
   const feita = novaSit === 'feito' ? (it.sit === 'feito' ? it.feitaEm || hoje() : hoje()) : null;
+  const extra = camposSit(it, novaSit, bloq);
   let r;
   if (!it.auto && !(it.tarefa.recorrencia && it.tarefa.recorrencia !== 'nenhuma')) {
-    r = await gravar('cron_tarefas', 'id', { ...it.tarefa, situacao: novaSit, feita_em: feita, responsavel_id: novoResp });
+    r = await gravar('cron_tarefas', 'id', { ...it.tarefa, situacao: novaSit, feita_em: feita, responsavel_id: novoResp, ...extra });
   } else {
-    r = await gravar('cron_estado', 'chave', { chave: it.chave, situacao: novaSit, feita_em: feita, responsavel_id: novoResp });
+    r = await gravar('cron_estado', 'chave', { chave: it.chave, situacao: novaSit, feita_em: feita, responsavel_id: novoResp, ...extra });
   }
   recado(r);
+}
+
+/* Janela "Bloquear tarefa" (07/11/2026). "Depende de" é obrigatório: é o que
+   se cobra na reunião. Quem precisa agir, sendo do escritório, faz a tarefa
+   aparecer também na vez dessa pessoa na reunião. "Cobrar de novo em" põe a
+   tarefa no calendário daquele dia. */
+function abrirBloquear(it) {
+  const d = dialogo();
+  const b = it.bloq || {};
+  d.innerHTML = `<form method="dialog" id="crBloqForm">
+    <h3>🔒 Bloquear tarefa</h3>
+    <p class="cr-dlg-orig">${esc(it.titulo)} · ${esc(nomesDe(it.resps) || 'sem responsável')}</p>
+    <div class="grade">
+      <label class="campo plena">Depende de<input id="crBqMot" required maxlength="200" value="${esc(b.motivo || '')}" placeholder="Oficina devolver as motos"></label>
+      <label class="campo">Quem precisa agir<select id="crBqQuem"><option value="">Fora da equipe</option>${pessoasAtivas().map(p => `<option value="${p.id}" ${b.quem === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select></label>
+      <label class="campo">Cobrar de novo em<input type="date" id="crBqCob" value="${esc(b.cobrar || addDias(hoje(), 3))}"></label>
+    </div>
+    <p class="cr-erro" id="crBqErro" hidden>Escreva do que a tarefa depende.</p>
+    <div class="barra entre"><span></span><span class="barra">
+      <button class="btn" value="cancelar">Cancelar</button>
+      <button type="button" class="btn principal" id="crBqOk">Bloquear</button></span></div>
+  </form>`;
+  d.showModal();
+  $('crBqMot').oninput = () => { $('crBqErro').hidden = true; };
+  $('crBqOk').onclick = async () => {
+    const motivo = limpo($('crBqMot').value);
+    if (!motivo) { $('crBqErro').hidden = false; $('crBqMot').focus(); return; }
+    d.close();
+    await mudar(it, { sit: 'bloqueado', bloq: { motivo, quem: $('crBqQuem').value || null, cobrar: $('crBqCob').value || null } });
+  };
 }
 
 function recado(r) {
@@ -1140,6 +1389,12 @@ function abrirItem(chave) {
       ${it ? `<div class="campo">Situação${rep ? ' (desta vez)' : ''}<div class="cr-sits">${Object.entries(SIT).map(([k, n]) =>
         `<label><input type="radio" name="crSit" value="${k}" ${it.sit === k ? 'checked' : ''}> ${n}</label>`).join('')}</div></div>` : ''}
     </div>
+    ${it ? `<div class="grade cr-bloq-campos" id="crBqCampos" ${it.sit === 'bloqueado' ? '' : 'hidden'}>
+      <label class="campo plena">Depende de<input id="crBqMot" maxlength="200" value="${esc(it.bloq?.motivo || '')}" placeholder="Oficina devolver as motos"></label>
+      <label class="campo">Quem precisa agir<select id="crBqQuem"><option value="">Fora da equipe</option>${pessoasAtivas().map(p => `<option value="${p.id}" ${it.bloq?.quem === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('')}</select></label>
+      <label class="campo">Cobrar de novo em<input type="date" id="crBqCob" value="${esc(it.bloq?.cobrar || addDias(hoje(), 3))}"></label>
+    </div>
+    <p class="cr-erro" id="crBqErro" hidden>Escreva do que a tarefa depende.</p>` : ''}
     ${rep && it ? `<p class="dica">Para mudar o responsável de todas as vezes, edite a tarefa e escolha em "Responsável padrão" abaixo.</p>
       <label class="campo">Responsável padrão (todas as vezes)<select id="crRespPadrao">${opcoesPessoas(t.responsavel_id, nomesDe(respsDaArea(t.area || 'esc', null)))}</select></label>` : ''}
     ${it?.auto ? '<p class="dica">Este item vem sozinho da área de origem e some quando ela for atualizada (exame renovado, OS concluída…). Aqui você marca o andamento e quem cuida.</p>' : ''}
@@ -1160,9 +1415,18 @@ function abrirItem(chave) {
   };
   const rep2 = $('crRep');
   if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; };
+  d.querySelectorAll('input[name=crSit]').forEach(x => x.onchange = () => {
+    if ($('crBqCampos')) $('crBqCampos').hidden = d.querySelector('input[name=crSit]:checked')?.value !== 'bloqueado';
+  });
   $('crSalvar').onclick = async () => {
     const resp = $('crRespSel').value || null;
     const sit = d.querySelector('input[name=crSit]:checked')?.value || 'afazer';
+    let bloq = null;
+    if (sit === 'bloqueado') {
+      bloq = { motivo: limpo($('crBqMot').value), quem: $('crBqQuem').value || null, cobrar: $('crBqCob').value || null };
+      if (!bloq.motivo) { $('crBqErro').hidden = false; $('crBqMot').focus(); return; }
+    }
+    const ext = it ? camposSit(it, sit, bloq) : {};
     let r = 'ok';
     if (editavel) {
       const titulo = limpo($('crTit').value), data = $('crData').value;
@@ -1178,18 +1442,18 @@ function abrirItem(chave) {
       };
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp;
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
-      if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; }
+      if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext); }
       r = await gravar('cron_tarefas', 'id', base);
       if (!nova && rep && it) {
         // ocorrência desta vez
         const e = estadoDe(it.chave);
-        if (sit !== it.sit || resp !== it.explicito || e)
+        if (sit !== it.sit || resp !== it.explicito || e || bloq)
           r = await gravar('cron_estado', 'chave', { chave: it.chave, situacao: sit, responsavel_id: resp,
-            feita_em: sit === 'feito' ? (it.feitaEm || hoje()) : null });
+            feita_em: sit === 'feito' ? (it.feitaEm || hoje()) : null, ...ext });
       }
     } else {
       r = await gravar('cron_estado', 'chave', { chave: it.chave, situacao: sit, responsavel_id: resp,
-        feita_em: sit === 'feito' ? (it.feitaEm || hoje()) : null });
+        feita_em: sit === 'feito' ? (it.feitaEm || hoje()) : null, ...ext });
     }
     d.close();
     recado(r);
