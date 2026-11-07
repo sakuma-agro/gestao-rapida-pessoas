@@ -767,16 +767,34 @@ async function gravar(tabela, chaveCol, item) {
 }
 
 /* ---------------- montar a lista de itens ---------------- */
+/* Rotina mensal que cai no sábado ou domingo passa para a segunda (07/11/2026:
+   "Semana 1" é dia 1, "Semana 2" dia 8…). */
+const diaUtil = s => { const w = dataDe(s).getDay(); return w === 6 ? addDias(s, 2) : w === 0 ? addDias(s, 1) : s; };
 function ocorrencias(t) {
   const ini = addDias(hoje(), -JANELA_ATRAS), fim = addDias(hoje(), JANELA_FRENTE);
   if (t.recorrencia === 'nenhuma' || !t.recorrencia) return [t.data];
   const out = [];
   let d = t.data;
   for (let k = 0; k < 400 && d <= fim && (!t.ate || d <= t.ate); k++) {
-    if (d >= ini) out.push(d);
+    if (d >= ini) out.push(t.recorrencia === 'mensal' ? diaUtil(d) : d);
     d = t.recorrencia === 'semanal' ? addDias(t.data, 7 * (k + 1)) : addMeses(t.data, k + 1);
   }
   return out;
+}
+/* Rotina que repete: das vezes que já passaram, só a mais recente continua
+   aparecendo (as anteriores somem quando chega a próxima), a não ser que
+   tenham sido concluídas ou estejam no foco/bloqueadas. Evita a pilha de
+   "segunda-feira atrasada" de semanas atrás. */
+function vezesVisiveis(t) {
+  const ds = ocorrencias(t);
+  if (t.recorrencia === 'nenhuma' || !t.recorrencia) return ds;
+  const passadas = ds.filter(d => d <= hoje());
+  const ultima = passadas[passadas.length - 1];
+  return ds.filter(d => {
+    if (d > hoje() || d === ultima) return true;
+    const e = estadoDe(`t:${t.id}:${d}`);
+    return !!e && (e.situacao === 'feito' || e.situacao === 'bloqueado' || !!e.foco_em);
+  });
 }
 
 function todosItens() {
@@ -794,18 +812,21 @@ function todosItens() {
   for (const t of dados.tarefas) {
     if (t.ativo === false) continue;
     const rep = t.recorrencia && t.recorrencia !== 'nenhuma';
-    for (const d of ocorrencias(t)) {
+    for (const d of vezesVisiveis(t)) {
       const chave = rep ? `t:${t.id}:${d}` : `t:${t.id}`;
       const e = rep ? estadoDe(chave) : null;
       const explicito = e?.responsavel_id || t.responsavel_id || null;
       const resps = explicito ? [explicito] : respsDaArea(t.area || 'esc', null);
       itens.push({
         chave, tarefa: t, data: d, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
+        ir: t.ir ? (IR_CK[t.ir] || null) : null,
         origemNome: rep ? (t.recorrencia === 'semanal' ? 'Tarefa · toda semana' : 'Tarefa · todo mês') : 'Tarefa',
         auto: false, resp: resps[0] || null, resps, explicito,
         sit: rep ? (e?.situacao || 'afazer') : (t.situacao || 'afazer'),
         feitaEm: rep ? e?.feita_em : t.feita_em,
         ...bloqDe(rep ? e : t),
+        checklist: Array.isArray(t.checklist) && t.checklist.length ? t.checklist : null,
+        checks: (rep ? e?.checks : t.checks) || [],
       });
     }
   }
@@ -824,6 +845,31 @@ function bloqDe(r) {
 /* Atrasado = passou da data sem andar. Bloqueado não conta: ali o aviso é
    "parado há N dias", que diz mais na reunião. */
 const atrasado = it => (it.sit === 'afazer' || it.sit === 'fazendo') && it.data < hoje();
+/* Checklist (07/11/2026, rotinas do Trello): modelo em cron_tarefas.checklist
+   [{g: grupo, i: [itens]}]; marcados em checks ["grupo|item"] — da tarefa ou,
+   na rotina que repete, da ocorrência (cron_estado). */
+const txtCk = x => typeof x === 'string' ? x : (x?.t || '');
+const chaveCk = (g, i) => `${g}|${txtCk(i)}`;
+const totalCk = it => (it.checklist || []).reduce((n, g) => n + (g.i || []).length, 0);
+const feitosCk = it => { const set = new Set(it.checks || []); return (it.checklist || []).reduce((n, g) => n + (g.i || []).filter(x => set.has(chaveCk(g.g, x))).length, 0); };
+/* Item do checklist ligado a uma tela do app (07/11/2026, pedido dele: "o que
+   tem no Trello é a mesma coisa do app") — {t: texto, ir: destino}. */
+const IR_CK = {
+  exVenc: { a: 'pessoas', t: 'exVenc' }, trVenc: { a: 'pessoas', t: 'trVenc' },
+  fichas: { a: 'pessoas', t: 'fichas' }, folhaPonto: { a: 'pessoas', t: 'folhaPonto' },
+  bdDia: { a: 'pessoas', t: 'bdDia' }, jorLancar: { a: 'pessoas', t: 'jorLancar' }, dmMes: { a: 'pessoas', t: 'dmMes' },
+  ordens: { a: 'manutencoes', x: 'acao=ordens' }, checklist: { a: 'manutencoes', x: 'acao=checklist' },
+  horimetros: { a: 'manutencoes', x: 'acao=horimetros' }, patrimonio: { a: 'manutencoes', x: 'acao=patrimonio' },
+  vistorias: { a: 'vistorias', m: 'vsAnom', t: 'vsAnAberto' },
+  qcSaida: { a: 'estoque', t: 'qcSaida' }, qcEntrada: { a: 'estoque', t: 'qcEntrada' }, ctNova: { a: 'estoque', t: 'ctNova' },
+  rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' },
+  colheita: { a: 'colheita', t: 'cpCargas' }, certDocs: { a: 'certificacao', t: 'ceDocumentos' },
+  vencMaq: { a: 'manutencoes', x: 'acao=vencimentos' }, certAud: { a: 'certificacao', t: 'ceCertificacoes' },
+  certAcoes: { a: 'certificacao', t: 'mcMelhorias' }, cadRel: { a: 'pessoas', t: 'cadRelatorios' },
+  campanhas: { a: 'pessoas', t: 'camLista' }, reuniao: { a: 'pessoas', t: 'reuSemana' },
+};
+const irCk = x => typeof x === 'object' && x?.ir ? (IR_CK[x.ir] || null) : null;
+const seloCk = it => it.checklist ? `<span class="cr-ck${feitosCk(it) === totalCk(it) ? ' ok' : ''}">☑ ${feitosCk(it)}/${totalCk(it)}</span>` : '';
 const diasParado = it => it.bloq?.desde ? Math.max(0, -diasAte(it.bloq.desde)) : null;
 
 /* ---------------- tela ---------------- */
@@ -1029,6 +1075,8 @@ function irPara(ir) {
   else {
     entrarNaArea(ir.a, undefined, ir.x);
     if (ir.a === 'colheita' && ir.t) quandoPronta('molduraCP', w => w.abrirTelaColheita?.(ir.t));
+    if (ir.a === 'estoque' && ir.t) quandoPronta('molduraEst', w => w.abrirTelaEstoque?.(ir.t));
+    if (ir.a === 'custobase' && ir.t) quandoPronta('molduraCB', w => w.abrirTelaCustoBase?.(ir.t));
   }
   window.scrollTo?.(0, 0);
 }
@@ -1039,7 +1087,7 @@ function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
-    <span class="cr-item-txt"><b>${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
+    <span class="cr-item-txt"><b>${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
     <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span>
       ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? (it.focoEm ? '<span class="cr-nofoco">🎯 no foco</span>'
         : `<span class="cr-ac foco" role="button" tabindex="0" data-acao="foco" data-alvo="${esc(it.chave)}">Foco do dia →</span>`) : ''}</span>
@@ -1078,9 +1126,10 @@ function card(it, { semResp = false, comSit = false, comAcoes = true } = {}) {
   return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
     <span class="cr-card-top">${tagOrigem(it)}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
     <b>${esc(it.titulo)}</b>
+    ${it.checklist ? `<span class="cr-ckbar"><i style="width:${Math.round(feitosCk(it) / totalCk(it) * 100)}%"></i></span>` : ''}
     ${seloNaoFeito(it)}
     ${linhaBloq(it)}
-    <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span><span class="cr-card-dir">${botaoIr(it)}${semResp ? '' : avatares(it)}</span></span>
+    <span class="cr-card-pe"><span class="cr-data ${r.cls}">${esc(r.txt)}</span>${seloCk(it)}<span class="cr-card-dir">${botaoIr(it)}${semResp ? '' : avatares(it)}</span></span>
     ${comAcoes ? `<span class="cr-acs">${acoes(it)}</span>` : ''}
   </button>`;
 }
@@ -1388,6 +1437,63 @@ function recado(r) {
   clearTimeout(recado.t); recado.t = setTimeout(() => { a.hidden = true; }, 6000);
 }
 
+/* ---------------- checklist da tarefa (07/11/2026) ----------------
+   Marcar um item grava na hora. Primeiro item marcado → Em andamento; todos
+   marcados → Concluído; desmarcar um item de tarefa concluída → Em andamento. */
+function ckParaTexto(ck) {
+  return (ck || []).map(g => `# ${g.g}\n` + (g.i || []).map(txtCk).join('\n')).join('\n');
+}
+function textoParaCk(txt, antigo) {
+  const links = new Map();
+  (antigo || []).forEach(g => (g.i || []).forEach(x => { if (typeof x === 'object' && x.ir) links.set(txtCk(x), x.ir); }));
+  const out = [];
+  for (const l of String(txt || '').split('\n').map(limpo).filter(Boolean)) {
+    if (l.startsWith('#')) { out.push({ g: limpo(l.slice(1)) || 'Itens', i: [] }); continue; }
+    if (!out.length) out.push({ g: 'Itens', i: [] });
+    out[out.length - 1].i.push(links.has(l) ? { t: l, ir: links.get(l) } : l);
+  }
+  return out.filter(g => g.i.length).length ? out.filter(g => g.i.length) : null;
+}
+function blocoCk(it) {
+  const set = new Set(it.checks || []);
+  return `<div class="cr-ckbox"><div class="cr-ckcab"><b>Checklist</b><span id="crCkCont">${feitosCk(it)} de ${totalCk(it)}</span></div>
+    ${it.checklist.map((g, gi) => `<fieldset class="cr-ckg"><legend>${esc(g.g)}</legend>
+      ${(g.i || []).map((x, xi) => { const ir = irCk(x); return `<div class="cr-cki">
+        <label><input type="checkbox" data-ck="${gi}:${xi}" ${set.has(chaveCk(g.g, x)) ? 'checked' : ''}><span>${esc(txtCk(x))}</span></label>
+        ${ir && podeIr(ir) ? `<button type="button" class="cr-ir" data-ckir="${gi}:${xi}">Abrir ↗</button>` : ''}</div>`; }).join('')}
+    </fieldset>`).join('')}</div>`;
+}
+function ligarCk(d, it) {
+  if (!it?.checklist) return;
+  d.querySelectorAll('[data-ckir]').forEach(b => b.onclick = () => {
+    const [gi, xi] = b.dataset.ckir.split(':').map(Number);
+    irPara(irCk(it.checklist[gi].i[xi]));
+  });
+  d.querySelectorAll('[data-ck]').forEach(c => c.onchange = async () => {
+    const marcados = [];
+    d.querySelectorAll('[data-ck]').forEach(x => {
+      if (!x.checked) return;
+      const [gi, xi] = x.dataset.ck.split(':').map(Number);
+      marcados.push(chaveCk(it.checklist[gi].g, it.checklist[gi].i[xi]));
+    });
+    it.checks = marcados;
+    $('crCkCont').textContent = `${marcados.length} de ${totalCk(it)}`;
+    const todos = marcados.length === totalCk(it);
+    let sit = it.sit;
+    if (todos) sit = 'feito';
+    else if (marcados.length && (it.sit === 'afazer' || it.sit === 'feito')) sit = 'fazendo';
+    const feita = sit === 'feito' ? (it.feitaEm || hoje()) : null;
+    const extra = { ...camposSit(it, sit), checks: marcados };
+    const rep = it.tarefa?.recorrencia && it.tarefa.recorrencia !== 'nenhuma';
+    const r = rep
+      ? await gravar('cron_estado', 'chave', { chave: it.chave, situacao: sit, feita_em: feita, responsavel_id: it.explicito, ...extra })
+      : await gravar('cron_tarefas', 'id', { ...it.tarefa, situacao: sit, feita_em: feita, ...extra });
+    it.sit = sit; it.feitaEm = feita;
+    if (todos) { d.close(); }
+    recado(r);
+  });
+}
+
 /* ---------------- diálogo do item / tarefa nova ---------------- */
 function dialogo() {
   let d = $('dlgCron');
@@ -1414,10 +1520,14 @@ function abrirItem(chave) {
     <h3>${nova ? 'Nova tarefa' : esc(it.titulo)}</h3>
     ${it ? `<p class="cr-dlg-orig">${tagOrigem(it)} ${tagArea(it.area)} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
     ${it?.texto ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
+    ${it?.checklist ? blocoCk(it) : ''}
     ${it?.detalhes?.length ? `<div class="cr-dlg-det"><b>${it.detalhes.length} ${(it.detRot || ['pessoa', 'pessoas'])[it.detalhes.length === 1 ? 0 : 1]}</b><ul>${it.detalhes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
-    ${editavel ? `<div class="grade">
+    ${editavel ? `${nova ? '' : '<details class="cr-editar"><summary>Editar tarefa (nome, data, repetição, checklist)</summary>'}<div class="grade">
       <label class="campo plena">Tarefa<input id="crTit" required maxlength="160" value="${esc(t?.titulo || '')}" placeholder="O que precisa ser feito"></label>
       <label class="campo plena">Detalhes<textarea id="crDesc" rows="2" placeholder="Opcional">${esc(t?.descricao || '')}</textarea></label>
+      <details class="campo plena cr-ckedit"${t?.checklist?.length ? '' : ''}><summary>Checklist (opcional)</summary>
+        <p class="dica">Um item por linha. Linha começando com # é o nome do grupo.</p>
+        <textarea id="crCkTxt" rows="6" placeholder="# Boletins&#10;Buscar boletins&#10;Marcar boletins">${esc(ckParaTexto(t?.checklist))}</textarea></details>
       <label class="campo">${rep ? 'Começa em' : 'Data'}<input type="date" id="crData" required value="${esc(t?.data || est.dia || hoje())}"></label>
       <label class="campo">Área<select id="crAreaT">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t?.area || 'esc') === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>
       <label class="campo">Repete<select id="crRep">
@@ -1426,7 +1536,7 @@ function abrirItem(chave) {
         <option value="mensal" ${t?.recorrencia === 'mensal' ? 'selected' : ''}>Todo mês</option>
       </select></label>
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
-    </div>` : ''}
+    </div>${nova ? '' : '</details>'}` : ''}
     <div class="grade">
       <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? (it.explicito || '') : '', nomesDe(respsDaArea(it ? it.area : (t?.area || 'esc'), it?.unid)))}</select></label>
       ${it ? `<div class="campo">Situação${rep ? ' (desta vez)' : ''}<div class="cr-sits">${Object.entries(SIT).map(([k, n]) =>
@@ -1442,7 +1552,7 @@ function abrirItem(chave) {
       <label class="campo">Responsável padrão (todas as vezes)<select id="crRespPadrao">${opcoesPessoas(t.responsavel_id, nomesDe(respsDaArea(t.area || 'esc', null)))}</select></label>` : ''}
     ${it?.auto ? '<p class="dica">Este item vem sozinho da área de origem e some quando ela for atualizada (exame renovado, OS concluída…). Aqui você marca o andamento e quem cuida.</p>' : ''}
     <div class="barra entre">
-      ${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : (it && podeIr(it.ir) ? `<button type="button" class="btn" id="crIr">Ir para ${esc(ORIGENS[it.origem]?.nome || 'a origem')} ↗</button>` : '<span></span>')}
+      <span class="barra">${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : ''}${it && podeIr(it.ir) ? `<button type="button" class="btn" id="crIr">${it.auto ? `Ir para ${esc(ORIGENS[it.origem]?.nome || 'a origem')}` : 'Abrir a tela no app'} ↗</button>` : ''}</span>
       <span class="barra">
         <button class="btn" value="cancelar">Fechar</button>
         ${it && it.sit !== 'feito' && it.sit !== 'bloqueado' ? `<button type="button" class="btn" id="crFoco">${it.focoEm ? 'Tirar do foco' : 'Foco do dia →'}</button>` : ''}
@@ -1452,6 +1562,7 @@ function abrirItem(chave) {
   </form>`;
   d.showModal();
   if ($('crIr')) $('crIr').onclick = () => irPara(it.ir);
+  ligarCk(d, it);
   if ($('crFoco')) $('crFoco').onclick = async () => { d.close(); await mudar(it, { foco: !it.focoEm }); };
   // trocar a área da tarefa mostra quem é o responsável da área
   if ($('crAreaT')) $('crAreaT').onchange = () => {
@@ -1487,6 +1598,7 @@ function abrirItem(chave) {
       };
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp;
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
+      base.checklist = textoParaCk($('crCkTxt').value, t?.checklist);
       if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext); }
       r = await gravar('cron_tarefas', 'id', base);
       if (!nova && rep && it) {

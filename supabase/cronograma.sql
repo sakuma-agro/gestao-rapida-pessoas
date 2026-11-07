@@ -90,3 +90,7 @@ alter table public.cron_estado
   add column if not exists bloq_desde date,
   add column if not exists inicio_em date,
   add column if not exists foco_em date;
+
+-- 07/11/2026 — rotinas do Trello com checklist e ligação com as telas do app.
+alter table public.cron_tarefas add column if not exists checklist jsonb, add column if not exists checks jsonb, add column if not exists ir text;
+alter table public.cron_estado add column if not exists checks jsonb;
