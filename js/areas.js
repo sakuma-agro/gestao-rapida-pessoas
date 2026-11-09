@@ -42,7 +42,7 @@ export const AREAS = [
      09/11/2026: primeiro cartão da tela inicial, antes de Pessoas (pedido dele). */
   /* 09/11/2026, pedido dele: a área ganhou nome próprio, "Rastro" (Gestão de
      tarefas e prazos). O id segue 'cronograma'. */
-  { id: 'cronograma', nome: 'Rastro', icone: 'icons/area-cronograma.v2.svg',
+  { id: 'cronograma', nome: 'Rastro', icone: 'icons/area-cronograma.v3.svg',
     desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
