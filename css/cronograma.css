@@ -326,3 +326,19 @@ html[data-tema="escuro"] .cr-anomalia{color:#EFB45A}
 .cr-reu-equipe li b{min-width:110px}
 .cr-reu-equipe li span{font-size:12.5px;color:var(--suave)}
 .cr-reu-equipe em{font-style:normal}
+
+/* Checklist estilo Trello e etiqueta de rotina (09/11/2026) */
+.cr-tag.rotina{background:transparent;color:#2F6FB0;border:1px solid #2F6FB0}
+.cr-ckocultar{font:inherit;font-size:12px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);border-radius:6px;padding:4px 10px;cursor:pointer}
+.cr-ckprog{display:flex;align-items:center;gap:10px;margin:2px 0 6px}
+.cr-ckprog span:first-child{font-size:12px;font-weight:700;color:var(--suave);min-width:34px}
+.cr-ckprog span:last-child{font-size:12px;color:var(--suave)}
+.cr-ckbar.g{flex:1;height:8px;border-radius:4px}
+.cr-ckbar.g.ok i{background:var(--verde-esc)}
+.cr-ckbar.g i{transition:width .25s}
+.cr-ckbox.oculta .cr-cki.on{display:none}
+.cr-ckdel{font:inherit;width:30px;height:30px;border:0;background:transparent;color:var(--suave);font-size:18px;border-radius:6px;cursor:pointer;flex:none;opacity:.55}
+.cr-ckdel:hover,.cr-ckdel:focus-visible{opacity:1;background:var(--linha);color:var(--erro);outline:none}
+.cr-ckadd{display:flex;gap:8px;margin-top:8px}
+.cr-ckadd input{flex:1;min-height:38px;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;background:var(--papel);color:var(--texto)}
+.cr-ckadd input:focus{outline:none;border-color:var(--verde)}

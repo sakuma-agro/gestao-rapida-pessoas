@@ -1092,7 +1092,9 @@ function quemCriou(t) {
 }
 const tagOrigem = it => it.auto
   ? `<span class="cr-tag" style="background:${areaDe(it.area).cor}" title="Vem sozinha de ${esc(it.origemNome)}">Do app · ${esc((ORIGENS[it.origem]?.nome || areaDe(it.area).nome))}</span>`
-  : `<span class="cr-tag avulsa" title="Tarefa lançada à mão">Avulsa${quemCriou(it.tarefa) ? ' · ' + esc(quemCriou(it.tarefa)) : ''}</span>`;
+  : /^rotina · /i.test(it.tarefa?.descricao || '')
+    ? `<span class="cr-tag rotina" title="Rotina que repete">${esc(it.tarefa.descricao.replace(/ do mês$/, ''))}</span>`
+    : `<span class="cr-tag avulsa" title="Tarefa lançada à mão">Avulsa${quemCriou(it.tarefa) ? ' · ' + esc(quemCriou(it.tarefa)) : ''}</span>`;
 const avatar = (id, grande) => {
   const p = pessoa(id);
   return `<span class="cr-av${grande ? ' g' : ''}${p ? '' : ' cr-ninguem'}" title="${esc(p ? p.nome : 'Sem responsável')}">${esc(iniciais(p))}</span>`;
@@ -1789,17 +1791,57 @@ function textoParaCk(txt, antigo) {
   }
   return out.filter(g => g.i.length).length ? out.filter(g => g.i.length) : null;
 }
+/* Checklist estilo Trello (09/11/2026, pedido dele): barra de progresso com
+   %, marcar direto, "Ocultar marcados", e nas tarefas avulsas "+ Adicionar um
+   item" e × para tirar um item — muda o modelo da tarefa (vale para as
+   próximas vezes também). */
+let ocultarMarcados = false;
 function blocoCk(it) {
   const set = new Set(it.checks || []);
-  return `<div class="cr-ckbox"><div class="cr-ckcab"><b>Checklist</b><span id="crCkCont">${feitosCk(it)} de ${totalCk(it)}</span></div>
-    ${it.checklist.map((g, gi) => `<fieldset class="cr-ckg"><legend>${esc(g.g)}</legend>
-      ${(g.i || []).map((x, xi) => { const ir = irCk(x); return `<div class="cr-cki">
-        <label><input type="checkbox" data-ck="${gi}:${xi}" ${set.has(chaveCk(g.g, x)) ? 'checked' : ''}><span>${esc(txtCk(x))}</span></label>
-        ${ir && podeIr(ir) ? `<button type="button" class="cr-ir" data-ckir="${gi}:${xi}">Abrir ↗</button>` : ''}</div>`; }).join('')}
+  const tot = totalCk(it), feitos = feitosCk(it), pct = tot ? Math.round(feitos / tot * 100) : 0;
+  const edita = !it.auto && it.tarefa;
+  const umGrupo = it.checklist.length === 1;
+  return `<div class="cr-ckbox${ocultarMarcados ? ' oculta' : ''}" id="crCkBox">
+    <div class="cr-ckcab"><b>☑ Checklist</b>
+      <button type="button" class="cr-ckocultar" id="crCkOcultar">${ocultarMarcados ? 'Mostrar marcados' : 'Ocultar marcados'}</button></div>
+    <div class="cr-ckprog"><span id="crCkPct">${pct}%</span><span class="cr-ckbar g${pct === 100 ? ' ok' : ''}"><i id="crCkBar" style="width:${pct}%"></i></span><span id="crCkCont">${feitos}/${tot}</span></div>
+    ${it.checklist.map((g, gi) => `<fieldset class="cr-ckg">${umGrupo && norm(g.g) === norm(it.titulo) ? '' : `<legend>${esc(g.g)}</legend>`}
+      ${(g.i || []).map((x, xi) => { const ir = irCk(x), on = set.has(chaveCk(g.g, x)); return `<div class="cr-cki${on ? ' on' : ''}">
+        <label><input type="checkbox" data-ck="${gi}:${xi}" ${on ? 'checked' : ''}><span>${esc(txtCk(x))}</span></label>
+        ${ir && podeIr(ir) ? `<button type="button" class="cr-ir" data-ckir="${gi}:${xi}">Abrir ↗</button>` : ''}
+        ${edita ? `<button type="button" class="cr-ckdel" data-ckdel="${gi}:${xi}" title="Tirar este item" aria-label="Tirar este item">×</button>` : ''}</div>`; }).join('')}
+      ${edita ? `<div class="cr-ckadd"><input type="text" maxlength="200" placeholder="+ Adicionar um item" data-ckadd="${gi}" aria-label="Adicionar item em ${esc(g.g)}"><button type="button" class="btn" data-ckaddbt="${gi}">Adicionar</button></div>` : ''}
     </fieldset>`).join('')}</div>`;
+}
+/* Muda o modelo do checklist (itens) de uma tarefa avulsa e redesenha o bloco. */
+async function mudarModeloCk(d, it, fn) {
+  const ck = JSON.parse(JSON.stringify(it.checklist));
+  fn(ck);
+  const limpoCk = ck.filter(g => (g.i || []).length);
+  it.checklist = limpoCk.length ? limpoCk : null;
+  const r = await gravar('cron_tarefas', 'id', { ...it.tarefa, checklist: it.checklist });
+  it.tarefa = { ...it.tarefa, checklist: it.checklist };
+  const box = d.querySelector('#crCkBox');
+  if (box && it.checklist) { box.outerHTML = blocoCk(it); ligarCk(d, it); }
+  else if (box) box.remove();
+  recado(r);
 }
 function ligarCk(d, it) {
   if (!it?.checklist) return;
+  const oc = d.querySelector('#crCkOcultar');
+  if (oc) oc.onclick = () => { ocultarMarcados = !ocultarMarcados; d.querySelector('#crCkBox').classList.toggle('oculta', ocultarMarcados); oc.textContent = ocultarMarcados ? 'Mostrar marcados' : 'Ocultar marcados'; };
+  d.querySelectorAll('[data-ckdel]').forEach(b => b.onclick = () => {
+    const [gi, xi] = b.dataset.ckdel.split(':').map(Number);
+    if (!confirm(`Tirar "${txtCk(it.checklist[gi].i[xi])}" do checklist? Vale para as próximas vezes também.`)) return;
+    mudarModeloCk(d, it, ck => ck[gi].i.splice(xi, 1));
+  });
+  const adicionar = gi => {
+    const inp = d.querySelector(`[data-ckadd="${gi}"]`), t = limpo(inp?.value);
+    if (!t) { inp?.focus(); return; }
+    mudarModeloCk(d, it, ck => ck[gi].i.push(t)).then(() => d.querySelector(`[data-ckadd="${gi}"]`)?.focus());
+  };
+  d.querySelectorAll('[data-ckaddbt]').forEach(b => b.onclick = () => adicionar(+b.dataset.ckaddbt));
+  d.querySelectorAll('[data-ckadd]').forEach(i => i.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); adicionar(+i.dataset.ckadd); } });
   d.querySelectorAll('[data-ckir]').forEach(b => b.onclick = () => {
     const [gi, xi] = b.dataset.ckir.split(':').map(Number);
     irPara(irCk(it.checklist[gi].i[xi]));
@@ -1812,7 +1854,12 @@ function ligarCk(d, it) {
       marcados.push(chaveCk(it.checklist[gi].g, it.checklist[gi].i[xi]));
     });
     it.checks = marcados;
-    $('crCkCont').textContent = `${marcados.length} de ${totalCk(it)}`;
+    c.closest('.cr-cki')?.classList.toggle('on', c.checked);
+    const pct = Math.round(marcados.length / totalCk(it) * 100);
+    $('crCkCont').textContent = `${marcados.length}/${totalCk(it)}`;
+    $('crCkPct').textContent = pct + '%';
+    $('crCkBar').style.width = pct + '%';
+    $('crCkBar').parentElement.classList.toggle('ok', pct === 100);
     const todos = marcados.length === totalCk(it);
     let sit = it.sit;
     if (todos) sit = 'feito';
@@ -1854,7 +1901,7 @@ function abrirItem(chave) {
   d.innerHTML = `<form method="dialog" id="crForm">
     <h3>${nova ? 'Nova tarefa' : `${numDe(it) ? `<span class="cr-num g">#${numDe(it)}</span> ` : ''}${esc(it.titulo)}`}</h3>
     ${it ? `<p class="cr-dlg-orig">${tagOrigem(it)} ${tagArea(it.area)} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
-    ${it?.texto ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
+    ${it?.texto && !/^rotina · /i.test(it.texto) ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
     ${it?.checklist ? blocoCk(it) : ''}
     ${it?.detalhes?.length ? `<div class="cr-dlg-det"><b>${it.detalhes.length} ${(it.detRot || ['pessoa', 'pessoas'])[it.detalhes.length === 1 ? 0 : 1]}</b><ul>${it.detalhes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
     ${editavel ? `${nova ? '' : '<details class="cr-editar"><summary>Editar tarefa (nome, data, repetição, checklist)</summary>'}<div class="grade">

@@ -119,3 +119,9 @@ begin
   return query select n.chave, n.numero from public.cron_numeros n where n.chave = any(p_chaves);
 end $$;
 grant execute on function public.cron_numerar(text[]) to authenticated;
+
+-- 09/11/2026 — rotinas do Trello separadas em um cartão por grupo do checklist
+-- (pedido dele: "igual ao Trello"). Os 23 cartões "Rotina · …" ficaram com
+-- ativo = false (não foram apagados); os novos têm descricao 'Rotina · <quando>'
+-- e checklist com um só grupo. Situação, foco e marcações de hoje foram levados
+-- para os cartões novos (cron_estado com a mesma data).
