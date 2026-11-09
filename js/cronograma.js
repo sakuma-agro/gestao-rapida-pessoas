@@ -1102,8 +1102,9 @@ function acoes(it) {
   const b = (a, t, cls = '') => `<span class="cr-ac${cls}" role="button" tabindex="0" data-acao="${a}" data-alvo="${esc(it.chave)}">${t}</span>`;
   if (it.sit === 'bloqueado') return b('liberar', 'Liberar');
   if (!it.focoEm) return it.sit === 'feito' ? b('afazer', 'Reabrir') : b('foco', 'Foco do dia →', ' foco') + b('bloquear', 'Bloquear');
-  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('bloquear', 'Bloquear') + b('tirar', 'Tirar do foco');
-  if (it.sit === 'fazendo') return b('feito', 'Concluir') + b('bloquear', 'Bloquear');
+  // Concluir direto do A fazer (09/11/2026): tarefa rápida não precisa passar por Em andamento
+  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear') + b('tirar', 'Tirar do foco');
+  if (it.sit === 'fazendo') return b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear');
   return b('fazendo', 'Reabrir');
 }
 /* No foco desde um dia anterior e não concluída = "não feito" (07/11/2026). */

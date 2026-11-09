@@ -216,6 +216,7 @@ html[data-tema="escuro"] .cr-reu-bl.bq h4{color:#EFB45A}
 
 /* Foco do dia (07/11/2026) */
 .cr-sit.naofeito{background:rgba(180,35,24,.12);color:var(--erro);align-self:flex-start}
+.cr-ac.ok{border-color:var(--verde);color:#fff;background:var(--verde)}
 .cr-ac.foco{border-color:var(--verde);color:var(--verde-esc);background:var(--verde-fundo)}
 .cr-nofoco{font-size:11px;color:var(--verde-esc);font-weight:600;white-space:nowrap}
 .cr-item-dir .cr-ac{min-height:28px;font-size:11.5px}
