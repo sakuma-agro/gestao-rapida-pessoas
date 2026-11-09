@@ -907,6 +907,8 @@ function todosItens() {
   }
   for (const t of dados.tarefas) {
     if (t.ativo === false) continue;
+    // privada de outra pessoa (sobra de cache num aparelho compartilhado): não mostra
+    if (t.privada && String(t.dono_email || '').toLowerCase() !== meuEmail()) continue;
     const rep = t.recorrencia && t.recorrencia !== 'nenhuma';
     for (const d of vezesVisiveis(t)) {
       const chave = rep ? `t:${t.id}:${d}` : `t:${t.id}`;
@@ -923,11 +925,17 @@ function todosItens() {
         ...bloqDe(rep ? e : t),
         checklist: Array.isArray(t.checklist) && t.checklist.length ? t.checklist : null,
         checks: (rep ? e?.checks : t.checks) || [],
+        privada: !!t.privada,
       });
     }
   }
   return itens;
 }
+/* Tarefa privada (09/11/2026, pedido dele): só quem criou vê — o banco nem
+   entrega a linha para os outros (RLS em cron_tarefas). Aqui é só o selo. */
+const SELO_PRIV = '<span class="cr-priv" title="Só você vê esta tarefa">\u{1F441} Só eu</span> ';
+const seloPriv = it => it?.privada ? SELO_PRIV : '';
+const meuEmail = () => String(acesso.email || '').trim().toLowerCase();
 /* Bloqueio e início vêm da linha que guarda a situação (tarefa ou estado). */
 function bloqDe(r) {
   return {
@@ -1270,7 +1278,7 @@ function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
-    <span class="cr-item-txt"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
+    <span class="cr-item-txt"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${seloPriv(it)}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
     <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span>
       ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? (it.focoEm ? '<span class="cr-nofoco">🎯 no foco</span>'
         : `<span class="cr-ac foco" role="button" tabindex="0" data-acao="foco" data-alvo="${esc(it.chave)}">Foco do dia →</span>`) : ''}</span>
@@ -1309,7 +1317,7 @@ function card(it, { semResp = false, comSit = false, comAcoes = true, mover = fa
     : atrasado(it) ? { txt: 'venceu ' + brCurto(it.data), cls: 'atraso' } : rotuloData(it);
   return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
     <span class="cr-card-top"><span class="cr-card-tags">${seloNum(it)}${tagOrigem(it)}</span>${mover ? `<span class="cr-mover"><span class="cr-mv" role="button" tabindex="0" data-acao="subir" data-alvo="${esc(it.chave)}" title="Subir">▲</span><span class="cr-mv" role="button" tabindex="0" data-acao="descer" data-alvo="${esc(it.chave)}" title="Descer">▼</span></span>` : ''}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
-    <b>${esc(it.titulo)}</b>
+    <b>${seloPriv(it)}${esc(it.titulo)}</b>
     ${it.checklist ? `<span class="cr-ckbar"><i style="width:${Math.round(feitosCk(it) / totalCk(it) * 100)}%"></i></span>` : ''}
     ${seloNaoFeito(it)}
     ${linhaBloq(it)}
@@ -1899,7 +1907,7 @@ function abrirItem(chave) {
   const rep = t && t.recorrencia && t.recorrencia !== 'nenhuma';
   const r = it ? rotuloData(it) : null;
   d.innerHTML = `<form method="dialog" id="crForm">
-    <h3>${nova ? 'Nova tarefa' : `${numDe(it) ? `<span class="cr-num g">#${numDe(it)}</span> ` : ''}${esc(it.titulo)}`}</h3>
+    <h3>${nova ? 'Nova tarefa' : `${numDe(it) ? `<span class="cr-num g">#${numDe(it)}</span> ` : ''}${seloPriv(it)}${esc(it.titulo)}`}</h3>
     ${it ? `<p class="cr-dlg-orig">${tagOrigem(it)} ${tagArea(it.area)} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
     ${it?.texto && !/^rotina · /i.test(it.texto) ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
     ${it?.checklist ? blocoCk(it) : ''}
@@ -1918,6 +1926,7 @@ function abrirItem(chave) {
         <option value="mensal" ${t?.recorrencia === 'mensal' ? 'selected' : ''}>Todo mês</option>
       </select></label>
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
+      ${nova || !t?.dono_email || String(t.dono_email).toLowerCase() === meuEmail() ? `<label class="campo plena cr-priv-campo"><span><input type="checkbox" id="crPriv" ${t?.privada ? 'checked' : ''}> <b>Só eu vejo</b> — a tarefa não aparece para mais ninguém da equipe</span></label>` : ''}
     </div>${nova ? '' : '</details>'}` : ''}
     <div class="grade">
       <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? (it.explicito || '') : '', nomesDe(respsDaArea(it ? it.area : (t?.area || 'esc'), it?.unid)))}</select></label>
@@ -1977,7 +1986,12 @@ function abrirItem(chave) {
         responsavel_id: t?.responsavel_id ?? resp,
         situacao: t?.situacao || 'afazer', feita_em: t?.feita_em || null,
         criado_por: t?.criado_por || acesso.nome || acesso.email || null,
+        privada: t?.privada || false, dono_email: t?.dono_email || meuEmail() || null,
       };
+      if ($('crPriv')) {
+        base.privada = $('crPriv').checked;
+        if (base.privada) base.dono_email = meuEmail() || base.dono_email;
+      }
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp || (nova ? vincTexto(titulo) : null);
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
       base.checklist = textoParaCk($('crCkTxt').value, t?.checklist);
