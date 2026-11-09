@@ -36,6 +36,12 @@ const VERSAO_PJ = '3';
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
    Estoque · (Usuários - Acessos, só admin). */
 export const AREAS = [
+  /* Cronograma geral (28/10/2026, pedido dele): as tarefas e os vencimentos
+     de todas as áreas num lugar só, por pessoa do escritório, com Calendário
+     e Kanban. Mora nesta página (js/cronograma.js), sem moldura.
+     09/11/2026: primeiro cartão da tela inicial, antes de Pessoas (pedido dele). */
+  { id: 'cronograma', nome: 'Cronograma geral', icone: 'icons/area-cronograma.v2.svg',
+    desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
   /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
@@ -74,11 +80,6 @@ export const AREAS = [
      lições aprendidas. Mora em projetos/, numa moldura. */
   { id: 'projetos', nome: 'Projetos (PMBOK)', icone: 'icons/area-projetos.v2.svg',
     desc: 'Painel · Projetos (termo, EAP, rede, riscos, custos, mudanças) · Alertas · Lições aprendidas' },
-  /* Cronograma geral (28/10/2026, pedido dele): as tarefas e os vencimentos
-     de todas as áreas num lugar só, por pessoa do escritório, com Calendário
-     e Kanban. Mora nesta página (js/cronograma.js), sem moldura. */
-  { id: 'cronograma', nome: 'Cronograma geral', icone: 'icons/area-cronograma.v2.svg',
-    desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
      telaConfig (quem acessa o quê + backup), só para administrador. */
