@@ -115,7 +115,7 @@ const RESP_AREA_PADRAO = {
    vêm do app, para as avulsas que abrem essas telas e, nas avulsas sem
    responsável, pelo nome da tarefa. Só a troca feita à mão num item (cron_estado)
    passa por cima. */
-const VINC_ORIGEM = { 'sst-exames': 'reu-vinicius', 'sst-trein': 'reu-vinicius' };
+const VINC_ORIGEM = { 'sst-exames': 'reu-vinicius', 'sst-trein': 'reu-vinicius', 'dp-emp': 'reu-guilherme' };
 const VINC_TELA = { exVenc: 'reu-vinicius', trVenc: 'reu-vinicius', bdDia: 'reu-lincoln', jorLancar: 'reu-lincoln' };
 const VINC_TEXTO = [
   [/\bexames?\b|\baso\b|treinament/, 'reu-vinicius'],
@@ -142,6 +142,7 @@ const ORIGENS = {
   'dp-gozo':    { nome: 'DP › Férias (gozo lançado)', area: 'dp', ir: { a: 'pessoas', t: 'ferPainel' } },
   'dp-afast':   { nome: 'DP › Afastamentos (retorno)', area: 'dp', ir: { a: 'pessoas', t: 'ferAfast' } },
   'dp-feriado': { nome: 'DP › Feriados', area: 'dp' },
+  'dp-emp':     { nome: 'DP › Empréstimo (liberação acima do teto)', area: 'dp', ir: { a: 'pessoas', t: 'empRecibos' } },
   'maq-os':     { nome: 'Máquinas › Ordens de serviço', area: 'maq', ir: { a: 'manutencoes', x: 'acao=ordens' } },
   'maq-ck':     { nome: 'Máquinas › Check list', area: 'maq', ir: { a: 'manutencoes', x: 'acao=checklist' } },
   'maq-gar':    { nome: 'Máquinas › Garantia', area: 'maq', ir: { a: 'manutencoes', x: 'acao=maquinas' } },
@@ -299,6 +300,16 @@ const FONTES = [
     .map(t => ({ chave: `dp-tarefas:${t.chave}:${t.prazo}`, origem: 'dp-tarefas', data: t.prazo,
       titulo: `${t.titulo} — ${nomeFunc(t.funcionario_id) || 'funcionário'}`, unid: unidFunc(t.funcionario_id),
       texto: t.evento ? `Tarefa de ${t.evento}` : '' }))],
+  /* 09/11/2026: empréstimo acima do teto esperando o administrador — sai
+     sozinho quando é liberado ou recusado. */
+  ['dp-emp', async () => {
+    if (!acesso.admin && !podeTela('empRecibos')) return [];
+    const { emprestimosAguardando } = await import('./alerta-emprestimo.js');
+    return (await emprestimosAguardando()).map(e => ({
+      chave: `dp-emp:${e.id}`, origem: 'dp-emp', data: (e.data || hoje()).slice(0, 10), unid: unidFunc(e.funcionario_id),
+      titulo: `Liberar ou recusar empréstimo acima do teto — ${nomeFunc(e.funcionario_id) || 'funcionário'}`,
+      texto: `${Number(e.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em ${e.parcelas || 1}× · lançado por ${e.criado_por || '—'}` }));
+  }],
   ['dp-ferias', async () => {
     const { podeTela } = await import('./acesso.js');
     if (!podeTela('ferPainel')) return [];

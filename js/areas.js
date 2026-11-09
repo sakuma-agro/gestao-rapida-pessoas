@@ -11,6 +11,7 @@
 import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
 import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
+import { desenharAlertaEmprestimo } from './alerta-emprestimo.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -252,6 +253,9 @@ export function mostrarAreas({ direto = false } = {}) {
     desenharAlertaAtividade($('arAlerta'), { abrir: abrirReu });
     desenharFraseInicio($('arFrase'), { abrir: abrirReu });
   } catch (e) { $('arFrase').hidden = true; }
+  try {
+    desenharAlertaEmprestimo($('arEmpAlerta'), { abrir: () => { entrarNaArea('pessoas'); abrirModulo('emprestimo', 'empRecibos'); } });
+  } catch { $('arEmpAlerta').hidden = true; }
 
   // liberadas primeiro, na ordem de AREAS; depois as fantasmas
   const lista = [...AREAS.filter(a => !a.emBreve && liberada(a.id)), ...AREAS.filter(a => a.emBreve || !liberada(a.id))];
