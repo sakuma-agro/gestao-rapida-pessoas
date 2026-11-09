@@ -109,6 +109,19 @@ const RESP_AREA_PADRAO = {
   cad: ['reu-lincoln', 'reu-vinicius'], rh: ['reu-guilherme'], sst: ['reu-vinicius'],
   'dp@Matriz': ['reu-vinicius'], 'dp@Quebra Cocão': ['reu-lais'], dp: ['reu-vinicius', 'reu-lais'],
 };
+/* Vínculos fixos (09/11/2026, pedido dele): toda tarefa de exames e de
+   treinamentos é do Vinícius; toda de Gestão de jornada (boletim, lançamento
+   de jornada, fechamento do DP) é do Lincoln. Vale para os vencimentos que
+   vêm do app, para as avulsas que abrem essas telas e, nas avulsas sem
+   responsável, pelo nome da tarefa. Só a troca feita à mão num item (cron_estado)
+   passa por cima. */
+const VINC_ORIGEM = { 'sst-exames': 'reu-vinicius', 'sst-trein': 'reu-vinicius' };
+const VINC_TELA = { exVenc: 'reu-vinicius', trVenc: 'reu-vinicius', bdDia: 'reu-lincoln', jorLancar: 'reu-lincoln' };
+const VINC_TEXTO = [
+  [/\bexames?\b|\baso\b|treinament/, 'reu-vinicius'],
+  [/boleti|gestao de jornada|\bjornada\b|lancar jornada|fechamento do dp/, 'reu-lincoln'],
+];
+const vincTexto = t => VINC_TEXTO.find(([re]) => re.test(norm(t)))?.[1] || null;
 const unidadeDeTexto = s => /quebra\s*coc/i.test(norm(s)) ? 'Quebra Cocão' : (s ? 'Matriz' : null);
 
 /* Origens automáticas — a chave é a usada em cron_config 'responsaveis'. */
@@ -167,13 +180,13 @@ const sitCor = it => it.sit === 'afazer' && atrasado(it) ? 'atraso' : it.sit;
 
 /* ---------------- dados ---------------- */
 const dados = {
-  pessoas: [], tarefas: [], estados: [], config: [], auto: [],
+  pessoas: [], tarefas: [], estados: [], config: [], auto: [], numeros: {},
   em: null, carregando: false, falhas: [],
 };
 (() => { const c = ler(CACHE, null); if (c) Object.assign(dados, c, { carregando: false }); })();
 const salvarCache = () => gravarLocal(CACHE, {
   pessoas: dados.pessoas, tarefas: dados.tarefas, estados: dados.estados,
-  config: dados.config, auto: dados.auto, em: dados.em,
+  config: dados.config, auto: dados.auto, numeros: dados.numeros, em: dados.em,
 });
 
 const pessoasAtivas = () => dados.pessoas.filter(p => p.ativo !== false)
@@ -718,12 +731,41 @@ export async function carregarCronograma() {
     dados.auto = auto; dados.falhas = falhas;
     dados.em = new Date().toISOString();
     salvarCache();
+    // números do banco (os já dados) e os que faltam
+    const nums = await c.from('cron_numeros').select('chave,numero').limit(20000).then(x => x, e => ({ error: e }));
+    if (!nums.error) { dados.numeros = {}; for (const r of nums.data || []) dados.numeros[r.chave] = Number(r.numero); }
+    dados.carregando = false;
+    await garantirNumeros();
   } catch (e) {
     console.warn('[Cronograma] não carregou tudo', e);
   } finally {
     dados.carregando = false; avisar();
   }
 }
+
+/* ---------------- número de cada tarefa ----------------
+   09/11/2026 (pedido dele): cada tarefa ganha um número fixo (#123), dado
+   pelo banco (cron_numeros, função cron_numerar) na ordem da data — o
+   mesmo em todos os aparelhos. Serve para falar da tarefa na reunião e
+   para achar na pesquisa. Tarefa nova recebe o próximo número. */
+let numerando = null, semNumeracao = false;
+export function garantirNumeros() {
+  if (numerando || semNumeracao || !estado.cliente || !estado.sessao || !navigator.onLine) return numerando;
+  const faltam = todosItens().filter(it => !dados.numeros[it.chave])
+    .sort((a, b) => a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR')).map(it => it.chave);
+  if (!faltam.length) return null;
+  numerando = (async () => {
+    for (let i = 0; i < faltam.length; i += 500) {
+      const { data, error } = await estado.cliente.rpc('cron_numerar', { p_chaves: faltam.slice(i, i + 500) }).then(x => x, e => ({ error: e }));
+      if (error) { if (/function|does not exist|schema cache/i.test(error.message || '')) semNumeracao = true; break; }
+      for (const r of data || []) dados.numeros[r.chave] = Number(r.numero);
+    }
+    salvarCache(); avisar();
+  })().catch(() => {}).finally(() => { numerando = null; });
+  return numerando;
+}
+const numDe = it => dados.numeros[it.chave] || null;
+const seloNum = it => numDe(it) ? `<span class="cr-num">#${numDe(it)}</span>` : '';
 
 /* ---------------- fila offline ---------------- */
 let filaRodando = null;
@@ -753,6 +795,7 @@ async function gravar(tabela, chaveCol, item) {
   if (i >= 0) lista[i] = { ...lista[i], ...item }; else lista.push(item);
   if (tabela === 'cron_tarefas' && item.ativo === false) dados.tarefas = dados.tarefas.filter(t => t.id !== item.id);
   salvarCache(); avisar();
+  if (tabela === 'cron_tarefas') setTimeout(() => garantirNumeros(), 0);
   const enfileirar = () => {
     const f = ler(FILA, []).filter(x => !(x.tabela === tabela && x.item[chaveCol] === item[chaveCol]));
     f.push({ tabela, chave: chaveCol, item }); gravarLocal(FILA, f);
@@ -803,7 +846,7 @@ function todosItens() {
   for (const a of dados.auto) {
     const o = ORIGENS[a.origem] || { nome: a.origem, area: 'esc' };
     const e = estadoDe(a.chave);
-    const explicito = e?.responsavel_id || a.respId || pessoaPorTexto(a.respTexto)?.id || null;
+    const explicito = e?.responsavel_id || VINC_ORIGEM[a.origem] || a.respId || pessoaPorTexto(a.respTexto)?.id || null;
     const resps = explicito ? [explicito] : padrao[a.origem] ? [padrao[a.origem]] : respsDaArea(o.area, a.unid);
     let sit = e?.situacao || (a.feitoNaOrigem ? 'feito' : 'afazer');
     itens.push({ ...a, ir: a.ir || o.ir || null, area: o.area, origemNome: o.nome + (a.unid ? ' · ' + a.unid : ''), auto: true,
@@ -815,7 +858,7 @@ function todosItens() {
     for (const d of vezesVisiveis(t)) {
       const chave = rep ? `t:${t.id}:${d}` : `t:${t.id}`;
       const e = rep ? estadoDe(chave) : null;
-      const explicito = e?.responsavel_id || t.responsavel_id || null;
+      const explicito = e?.responsavel_id || VINC_TELA[t.ir] || t.responsavel_id || vincTexto(t.titulo) || null;
       const resps = explicito ? [explicito] : respsDaArea(t.area || 'esc', null);
       itens.push({
         chave, tarefa: t, data: d, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
@@ -881,7 +924,7 @@ const est = {
   colMob: 'afazer',                     // aba do quadro no celular
   colunas: vis.colunas || 'situacao',   // situacao | pessoa
   filtro: vis.filtro || 'todos',        // todos | minhas
-  pessoa: '', area: '', origem: '',
+  pessoa: '', area: '', origem: '', busca: '',
   periodo: vis.periodo || 30,
   mes: hoje().slice(0, 7), dia: hoje(),
 };
@@ -906,8 +949,24 @@ function filtrados() {
     if (est.area && it.area !== est.area) return false;
     if (est.origem === 'app' && !it.auto) return false;
     if (est.origem === 'avulsa' && it.auto) return false;
+    if (est.busca && !bate(it, est.busca)) return false;
     return true;
   });
+}
+/* Pesquisa (09/11/2026, pedido dele): pelo número (#123 ou 123) ou por
+   qualquer palavra do nome, dos detalhes, do checklist, da origem ou da pessoa. */
+function bate(it, q) {
+  const n = limpo(q).replace(/^#/, '');
+  if (/^\d+$/.test(n)) return String(numDe(it) || '') === n || norm(it.titulo).includes(n);
+  const txt = norm([it.titulo, it.texto, it.origemNome, (it.detalhes || []).join(' '),
+    ...(it.checklist || []).flatMap(g => [g.g, ...(g.i || []).map(x => typeof x === 'object' ? x.t : x)]),
+    ...it.resps.map(id => pessoa(id)?.nome || '')].join(' '));
+  return norm(q).split(/\s+/).filter(Boolean).every(p => txt.includes(p));
+}
+function resultados() {
+  const itens = filtrados().sort((a, b) => (a.sit === 'feito') - (b.sit === 'feito') || (numDe(a) || 1e9) - (numDe(b) || 1e9));
+  if (!itens.length) return `<div class="cr-foco-vazio"><b>Nenhuma tarefa encontrada para "${esc(est.busca)}".</b><p>Confira o número ou tente outra palavra. Os filtros de pessoa, área e origem também valem na pesquisa.</p></div>`;
+  return `<p class="cr-sub">${itens.length} ${itens.length === 1 ? 'tarefa encontrada' : 'tarefas encontradas'}</p><div class="cr-lista cr-busca-res">${itens.map(linha).join('')}</div>`;
 }
 
 const tagArea = a => `<span class="cr-tag" style="background:${areaDe(a).cor}">${esc(areaDe(a).nome)}</span>`;
@@ -969,6 +1028,7 @@ function desenhar() {
     </div>
     ${est.visao === 'reuniao' ? `<div id="crCorpo">${reuniao()}</div>` : `
     <div class="cr-filtros">
+      <input type="search" id="crBusca" class="cr-busca" placeholder="Pesquisar nº ou nome da tarefa" value="${esc(est.busca)}" aria-label="Pesquisar tarefa" autocomplete="off">
       <button type="button" class="cr-chip" data-filtro="todos" aria-pressed="${est.filtro === 'todos'}">Todos</button>
       <button type="button" class="cr-chip" data-filtro="minhas" aria-pressed="${est.filtro === 'minhas'}" ${meu ? '' : 'disabled title="Seu nome não está entre as pessoas do escritório (Reunião semanal › Responsáveis)."'}>Só as minhas</button>
       <select id="crPessoa" aria-label="Pessoa">
@@ -990,7 +1050,7 @@ function desenhar() {
         <button type="button" class="cr-chip" data-colunas="situacao" aria-pressed="${est.colunas === 'situacao'}">Situação</button>
         <button type="button" class="cr-chip" data-colunas="pessoa" aria-pressed="${est.colunas === 'pessoa'}">Pessoa</button>` : ''}
     </div>
-    <div id="crCorpo">${est.visao === 'foco' ? foco() : calendario()}</div>
+    <div id="crCorpo">${est.busca ? resultados() : est.visao === 'foco' ? foco() : calendario()}</div>
     <div class="cr-legenda">${est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
       <span class="cr-auto-leg"><span class="cr-tag" style="background:#51534A">Do app</span> vem sozinha de outra área · <span class="cr-tag avulsa">Avulsa</span> lançada à mão</span></div>`}
   </div>`;
@@ -1089,7 +1149,7 @@ function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
-    <span class="cr-item-txt"><b>${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
+    <span class="cr-item-txt"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
     <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span>
       ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? (it.focoEm ? '<span class="cr-nofoco">🎯 no foco</span>'
         : `<span class="cr-ac foco" role="button" tabindex="0" data-acao="foco" data-alvo="${esc(it.chave)}">Foco do dia →</span>`) : ''}</span>
@@ -1127,7 +1187,7 @@ function card(it, { semResp = false, comSit = false, comAcoes = true } = {}) {
   const r = it.sit === 'fazendo' && it.inicioEm ? { txt: 'iniciada ' + brCurto(it.inicioEm) + (atrasado(it) ? ' · venceu ' + brCurto(it.data) : ''), cls: atrasado(it) ? 'atraso' : '' }
     : atrasado(it) ? { txt: 'venceu ' + brCurto(it.data), cls: 'atraso' } : rotuloData(it);
   return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
-    <span class="cr-card-top">${tagOrigem(it)}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
+    <span class="cr-card-top"><span class="cr-card-tags">${seloNum(it)}${tagOrigem(it)}</span>${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
     <b>${esc(it.titulo)}</b>
     ${it.checklist ? `<span class="cr-ckbar"><i style="width:${Math.round(feitosCk(it) / totalCk(it) * 100)}%"></i></span>` : ''}
     ${seloNaoFeito(it)}
@@ -1306,6 +1366,17 @@ function ligarTela() {
   r.querySelectorAll('[data-visao]').forEach(b => b.onclick = () => { est.visao = b.dataset.visao; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { est.filtro = b.dataset.filtro; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
+  if ($('crBusca')) {
+    let tm = null;
+    $('crBusca').oninput = e => {
+      clearTimeout(tm);
+      tm = setTimeout(() => {
+        const pos = e.target.selectionStart;
+        est.busca = e.target.value; desenhar();
+        const b = $('crBusca'); if (b) { b.focus(); try { b.setSelectionRange(pos, pos); } catch {} }
+      }, 250);
+    };
+  }
   if ($('crPessoa')) $('crPessoa').onchange = e => { est.pessoa = e.target.value; desenhar(); };
   if ($('crOrigem')) $('crOrigem').onchange = e => { est.origem = e.target.value; desenhar(); };
   if ($('crArea')) $('crArea').onchange = e => { est.area = e.target.value; desenhar(); };
@@ -1520,7 +1591,7 @@ function abrirItem(chave) {
   const rep = t && t.recorrencia && t.recorrencia !== 'nenhuma';
   const r = it ? rotuloData(it) : null;
   d.innerHTML = `<form method="dialog" id="crForm">
-    <h3>${nova ? 'Nova tarefa' : esc(it.titulo)}</h3>
+    <h3>${nova ? 'Nova tarefa' : `${numDe(it) ? `<span class="cr-num g">#${numDe(it)}</span> ` : ''}${esc(it.titulo)}`}</h3>
     ${it ? `<p class="cr-dlg-orig">${tagOrigem(it)} ${tagArea(it.area)} · <span class="cr-data ${r.cls}">${esc(br(it.data))} · ${esc(r.txt)}</span></p>` : ''}
     ${it?.texto ? `<p class="cr-dlg-txt">${esc(it.texto)}</p>` : ''}
     ${it?.checklist ? blocoCk(it) : ''}
@@ -1599,7 +1670,7 @@ function abrirItem(chave) {
         situacao: t?.situacao || 'afazer', feita_em: t?.feita_em || null,
         criado_por: t?.criado_por || acesso.nome || acesso.email || null,
       };
-      if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp;
+      if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp || (nova ? vincTexto(titulo) : null);
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
       base.checklist = textoParaCk($('crCkTxt').value, t?.checklist);
       if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext); }

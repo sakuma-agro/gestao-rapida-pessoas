@@ -94,3 +94,28 @@ alter table public.cron_estado
 -- 07/11/2026 — rotinas do Trello com checklist e ligação com as telas do app.
 alter table public.cron_tarefas add column if not exists checklist jsonb, add column if not exists checks jsonb, add column if not exists ir text;
 alter table public.cron_estado add column if not exists checks jsonb;
+
+-- 09/11/2026 — número fixo de cada tarefa (#123) para falar na reunião e pesquisar.
+-- cron_numerar(chaves) dá o próximo número às chaves que ainda não têm, na ordem enviada.
+create table if not exists public.cron_numeros (
+  chave text primary key,
+  numero bigint generated always as identity unique,
+  criado_em timestamptz not null default now()
+);
+alter table public.cron_numeros enable row level security;
+drop policy if exists cron_numeros_ler on public.cron_numeros;
+create policy cron_numeros_ler on public.cron_numeros for select to authenticated using (public.app_pode('cronograma'));
+drop policy if exists cron_numeros_inserir on public.cron_numeros;
+create policy cron_numeros_inserir on public.cron_numeros for insert to authenticated with check (public.app_pode('cronograma'));
+create or replace function public.cron_numerar(p_chaves text[])
+returns table(chave text, numero bigint)
+language plpgsql security invoker set search_path = public as $$
+begin
+  insert into public.cron_numeros(chave)
+  select u.c from unnest(p_chaves) with ordinality as u(c, o)
+  where u.c is not null and not exists (select 1 from public.cron_numeros n where n.chave = u.c)
+  order by u.o
+  on conflict do nothing;
+  return query select n.chave, n.numero from public.cron_numeros n where n.chave = any(p_chaves);
+end $$;
+grant execute on function public.cron_numerar(text[]) to authenticated;

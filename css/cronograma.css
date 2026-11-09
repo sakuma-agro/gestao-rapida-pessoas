@@ -258,3 +258,11 @@ html[data-tema="escuro"] .cr-reu-bl.bq h4{color:#EFB45A}
 .cr-cki input:checked + span{text-decoration:line-through;color:var(--suave)}
 .cr-ckedit summary{cursor:pointer;font-weight:600}
 .cr-editar{margin:0 0 12px}.cr-editar summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--suave);padding:6px 0}
+
+/* número da tarefa e pesquisa (09/11/2026) */
+.cr-num{display:inline-block;font-size:11px;font-weight:700;color:var(--texto-2,#51534A);background:var(--fundo,#f3f3ef);border:1px solid var(--linha);border-radius:4px;padding:0 5px;line-height:1.5;font-variant-numeric:tabular-nums;vertical-align:1px}
+.cr-num.g{font-size:13px;padding:1px 7px;vertical-align:2px}
+.cr-card-tags{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.cr-busca{flex:1 1 220px;min-width:180px;max-width:340px;min-height:34px;padding:6px 10px;border:1px solid var(--linha);border-radius:8px;background:var(--fundo-card,#fff);color:var(--texto);font:inherit;font-size:13px}
+.cr-busca:focus{outline:none;border-color:var(--verde)}
+@media (max-width:899px){.cr-busca{flex-basis:100%;max-width:none}}
