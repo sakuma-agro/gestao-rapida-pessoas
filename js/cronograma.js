@@ -1362,7 +1362,19 @@ function foco() {
    cronômetro é só referência: não corta ninguém, fica vermelho quando passa.
    A ordem das pessoas fica guardada neste aparelho. */
 const REU_SEG = 15 * 60;
-const reu = { ordem: ler('gr.cronograma.reuOrdem', []), atual: null, rodando: false, acum: 0, marca: 0, porPessoa: {}, timer: null };
+const reu = { ordem: ler('gr.cronograma.reuOrdem', []), atual: null, rodando: false, acum: 0, marca: 0, porPessoa: {}, timer: null, etapa: 'inicio' };
+/* Pauta da reunião (09/11/2026, a do papel na parede do escritório):
+   1 Bom dia! · 2 O que tínhamos para ontem? · 3 Tivemos anomalias? ·
+   4 O que temos para hoje? · 5 Bom trabalho! — às 07:00. 1 e 5 são da
+   equipe toda; 2, 3 e 4 se repetem para cada pessoa. */
+const PAUTA = ['Bom dia!', 'O que tínhamos para ontem?', 'Tivemos anomalias?', 'O que temos para hoje?', 'Bom trabalho!'];
+const ANOMALIA = 'Anomalia é tudo que atrapalha ou dificulta o meu trabalho!';
+function barraPauta() {
+  const ativo = k => reu.etapa === 'inicio' ? k === 0 : reu.etapa === 'fim' ? k === 4 : k >= 1 && k <= 3;
+  const feito = k => (reu.etapa === 'pessoas' && k === 0) || (reu.etapa === 'fim' && k < 4);
+  return `<div class="cr-pauta"><span class="cr-pauta-hora">Pauta · 07:00</span><ol>${PAUTA.map((t, k) =>
+    `<li class="${ativo(k) ? 'ativo' : ''}${feito(k) ? ' foi' : ''}"><i>${k + 1}</i>${esc(t)}</li>`).join('')}</ol></div>`;
+}
 const agoraS = () => Date.now() / 1000;
 function trecho() { return reu.rodando ? agoraS() - reu.marca : 0; }
 const tempoTotal = () => reu.acum + trecho();
@@ -1386,6 +1398,8 @@ function blocosDe(id, itens) {
   const meu = it => it.resps.includes(id);
   return {
     feitos: itens.filter(it => meu(it) && it.sit === 'feito' && (it.feitaEm || it.data) >= desde),
+    naoFeitos: itens.filter(it => meu(it) && naoFeito(it) && it.sit !== 'bloqueado').sort(ordemFoco),
+    focoHoje: itens.filter(it => meu(it) && it.focoEm && !naoFeito(it) && (it.sit === 'afazer' || it.sit === 'fazendo')).sort(ordemFoco),
     foco: itens.filter(it => meu(it) && it.focoEm && (it.sit === 'afazer' || it.sit === 'fazendo')).sort(ordemFoco),
     hoje: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && it.data <= hoje()).sort(ordemQuadro),
     proximos: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && it.data > hoje() && it.data <= addDias(hoje(), 7)).sort(ordemQuadro),
@@ -1393,7 +1407,7 @@ function blocosDe(id, itens) {
   };
 }
 function pessoasReuniao(itens) {
-  const tem = id => { const b = blocosDe(id, itens); return b.feitos.length + b.foco.length + b.hoje.length + b.proximos.length + b.bloq.length > 0; };
+  const tem = id => { const b = blocosDe(id, itens); return b.feitos.length + b.foco.length + b.hoje.length + b.proximos.length + b.bloq.length + b.naoFeitos.length > 0; };
   const ps = pessoasAtivas().filter(p => tem(p.id));
   const pos = id => { const i = reu.ordem.indexOf(id); return i < 0 ? 999 : i; };
   return ps.sort((a, b) => pos(a.id) - pos(b.id) || (a.ordem ?? 999) - (b.ordem ?? 999));
@@ -1402,18 +1416,17 @@ function pessoasReuniao(itens) {
 function reuniao() {
   const itens = todosItens();
   const ps = pessoasReuniao(itens);
-  if (!ps.length) return '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>';
+  if (!ps.length) return barraPauta() + '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>';
   if (!reu.atual || !ps.some(p => p.id === reu.atual)) reu.atual = ps[0].id;
   const idx = ps.findIndex(p => p.id === reu.atual), p = ps[idx], prox = ps[idx + 1];
   const b = blocosDe(p.id, itens);
   const porPessoa = REU_SEG / ps.length;
   const resto = REU_SEG - tempoTotal();
   const dow = new Date().getDay();
-  const bloco = (cls, ic, tit, l, vazio) => `<section class="cr-reu-bl ${cls}"><h4>${ic} ${tit} <span>${l.length}</span></h4>
-    ${l.map(i => card(i, { semResp: true })).join('') || `<p class="cr-vazio">${vazio}</p>`}</section>`;
+  const lista = (l, vazio) => l.map(i => card(i, { semResp: true })).join('') || `<p class="cr-vazio">${vazio}</p>`;
+  const sub = (t, n) => `<h5 class="cr-reu-sub">${t} <span>${n}</span></h5>`;
   const abertas = itens.filter(i => i.resps.includes(p.id) && i.sit !== 'feito');
-  return `<div class="cr-reu">
-    <aside class="cr-reu-lado">
+  const lado = `<aside class="cr-reu-lado">
       <small>${reu.rodando || tempoTotal() ? 'Tempo restante' : 'Reunião de 15 minutos'}</small>
       <div class="cr-reu-relogio${resto < 0 ? ' estourou' : ''}" id="crReuRel">${mmss(resto)}</div>
       <div class="cr-reu-barra"><i id="crReuBar" style="width:${Math.min(100, tempoTotal() / REU_SEG * 100)}%"></i></div>
@@ -1424,25 +1437,66 @@ function reuniao() {
         ${tempoTotal() ? '<button type="button" class="btn" id="crReuFim">Encerrar</button>' : ''}
       </div>
       <small>Ordem</small>
-      <ol class="cr-reu-fila">${ps.map((x, k) => `<li class="${x.id === p.id ? 'atual' : ''}${k < idx ? ' foi' : ''}">
+      <ol class="cr-reu-fila">${ps.map((x, k) => `<li class="${reu.etapa === 'pessoas' && x.id === p.id ? 'atual' : ''}${reu.etapa === 'fim' || (reu.etapa === 'pessoas' && k < idx) ? ' foi' : ''}">
         <button type="button" class="cr-reu-p" data-reup="${x.id}">${avatar(x.id)}<span>${esc(x.nome)}</span><em data-reut="${x.id}">${tempoDe(x.id) ? mmss(tempoDe(x.id)) : ''}</em></button>
         ${k ? `<button type="button" class="cr-reu-sobe" data-reusobe="${x.id}" aria-label="Subir ${esc(x.nome)} na ordem">↑</button>` : '<span class="cr-reu-sobe"></span>'}
       </li>`).join('')}</ol>
-    </aside>
+    </aside>`;
+
+  // 1 · Bom dia! — visão da equipe antes de começar
+  if (reu.etapa === 'inicio') {
+    const linhaP = x => { const y = blocosDe(x.id, itens), at = itens.filter(i => i.resps.includes(x.id) && i.sit !== 'feito' && atrasado(i)).length;
+      return `<li>${avatar(x.id)}<b>${esc(x.nome)}</b><span>${y.feitos.length} feitas · ${y.naoFeitos.length ? `<em class="cr-at">${y.naoFeitos.length} não feitas</em> · ` : ''}${at ? `<em class="cr-at">${at} atrasadas</em> · ` : ''}${y.bloq.length} bloqueadas</span></li>`; };
+    return barraPauta() + `<div class="cr-reu">${lado}<div class="cr-reu-main">
+      <section class="cr-reu-abre">
+        <h3><i>1</i> Bom dia!</h3>
+        <p>${esc(SEMANA[dow])}, ${esc(br(hoje()))} · ${ps.length} ${ps.length === 1 ? 'pessoa' : 'pessoas'} na reunião</p>
+        <ul class="cr-reu-equipe">${ps.map(linhaP).join('')}</ul>
+        <p class="cr-anomalia">⚠ ${esc(ANOMALIA)}</p>
+        <button type="button" class="btn principal" id="crReuComecar">Começar: ${esc(ps[0].nome)} →</button>
+      </section></div></div>`;
+  }
+
+  // 5 · Bom trabalho! — fechamento
+  if (reu.etapa === 'fim') {
+    return barraPauta() + `<div class="cr-reu">${lado}<div class="cr-reu-main">
+      <section class="cr-reu-abre fim">
+        <h3><i>5</i> Bom trabalho!</h3>
+        <p>Reunião em ${mmss(tempoTotal())}${tempoTotal() > REU_SEG ? ' — passou dos 15 minutos' : ''}.</p>
+        <ul class="cr-reu-equipe">${ps.map(x => { const y = blocosDe(x.id, itens);
+          return `<li>${avatar(x.id)}<b>${esc(x.nome)}</b><span>🎯 ${y.focoHoje.length + y.naoFeitos.length} no foco hoje${y.bloq.length ? ` · 🔒 ${y.bloq.length} anomalia${y.bloq.length > 1 ? 's' : ''} em aberto` : ''}</span></li>`; }).join('')}</ul>
+        <div class="cr-reu-nav"><button type="button" class="btn" id="crReuVoltar">‹ Voltar</button>
+          <button type="button" class="btn principal" data-visao="foco">Abrir o Foco do dia</button></div>
+      </section></div></div>`;
+  }
+
+  // 2 · 3 · 4 — uma pessoa por vez
+  return barraPauta() + `<div class="cr-reu">${lado}
     <div class="cr-reu-main">
       <div class="cr-reu-cab">${avatar(p.id, true)}
-        <div><b>${esc(p.nome)}</b><small>${b.foco.length} no foco${b.foco.filter(naoFeito).length ? ` (${b.foco.filter(naoFeito).length} não feitas)` : ''} · ${abertas.filter(atrasado).length} atrasadas · ${b.bloq.length} bloqueadas</small></div>
+        <div><b>${esc(p.nome)}</b><small>${b.focoHoje.length + b.naoFeitos.length} no foco · ${abertas.filter(atrasado).length} atrasadas · ${b.bloq.length} bloqueadas</small></div>
         <span class="cr-reu-nav">
-          ${idx ? '<button type="button" class="btn" id="crReuAnt" aria-label="Pessoa anterior">‹</button>' : ''}
-          ${prox ? `<button type="button" class="btn principal" id="crReuProx">Próxima: ${esc(prox.nome)} →</button>` : '<span class="cr-reu-fim">Última pessoa</span>'}
+          ${idx ? '<button type="button" class="btn" id="crReuAnt" aria-label="Pessoa anterior">‹</button>' : '<button type="button" class="btn" id="crReuInicio" aria-label="Voltar ao Bom dia">‹</button>'}
+          ${prox ? `<button type="button" class="btn principal" id="crReuProx">Próxima: ${esc(prox.nome)} →</button>`
+            : '<button type="button" class="btn principal" id="crReuTermina">5 · Bom trabalho! →</button>'}
         </span>
       </div>
       <div class="cr-reu-grade">
-        ${bloco('ok', '✓', dow === 1 ? 'Concluiu desde sexta' : 'Concluiu desde ontem', b.feitos, 'Nada concluído.')}
-        ${bloco('and', '🎯', 'No foco — ainda não terminou', b.foco, 'Nada no foco ainda.')}
-        ${bloco('hoje', '📅', 'Vence hoje ou atrasado — puxar para o foco?', b.hoje, 'Nada vencendo hoje.')}
-        ${bloco('prox', '🗓', 'Próximos 7 dias', b.proximos, 'Nada nos próximos dias.')}
-        ${bloco('bq largo', '🔒', 'Bloqueado — alguém pode destravar?', b.bloq, 'Nada travado.')}
+        <section class="cr-reu-bl ok"><h4><i class="cr-reu-n">2</i> O que tínhamos para ${dow === 1 ? 'sexta' : 'ontem'}?</h4>
+          ${sub('✓ Feito', b.feitos.length)}${lista(b.feitos, 'Nada concluído.')}
+          ${b.naoFeitos.length ? sub('✗ Não feito — continua no foco', b.naoFeitos.length) + lista(b.naoFeitos, '') : ''}
+        </section>
+        <section class="cr-reu-bl bq"><h4><i class="cr-reu-n">3</i> Tivemos anomalias? <span>${b.bloq.length}</span></h4>
+          <p class="cr-anomalia">${esc(ANOMALIA)}</p>
+          ${lista(b.bloq, 'Nenhuma anomalia registrada.')}
+          <div class="cr-reu-anom"><button type="button" class="btn" id="crReuAnom" data-pessoa="${p.id}">+ Registrar anomalia</button>
+            <small>Se uma tarefa travou, use Bloquear no cartão dela.</small></div>
+        </section>
+        <section class="cr-reu-bl and largo"><h4><i class="cr-reu-n">4</i> O que temos para hoje?</h4>
+          ${sub('🎯 No foco', b.focoHoje.length)}${lista(b.focoHoje, 'Nada no foco ainda — escolha abaixo.')}
+          ${sub('📅 Vence hoje ou atrasado — puxar para o foco?', b.hoje.length)}${lista(b.hoje, 'Nada vencendo hoje.')}
+          ${b.proximos.length ? `<details class="cr-reu-prox"><summary>🗓 Próximos 7 dias <span>${b.proximos.length}</span></summary>${lista(b.proximos, '')}</details>` : ''}
+        </section>
       </div>
     </div>
   </div>`;
@@ -1460,14 +1514,26 @@ function ligarReuniao() {
   const r = alvo;
   const trocar = id => { fecharTrecho(); reu.atual = id; desenhar(); window.scrollTo?.({ top: r.offsetTop, behavior: 'smooth' }); };
   if ($('crReuIni')) $('crReuIni').onclick = () => { reu.rodando = true; reu.marca = agoraS(); desenhar(); };
+  const comecar = () => { if (!reu.rodando) { reu.rodando = true; reu.marca = agoraS(); } reu.etapa = 'pessoas'; reu.atual = pessoasReuniao(todosItens())[0]?.id || null; desenhar(); };
+  if ($('crReuComecar')) $('crReuComecar').onclick = comecar;
+  if ($('crReuInicio')) $('crReuInicio').onclick = () => { fecharTrecho(); reu.etapa = 'inicio'; desenhar(); };
+  if ($('crReuTermina')) $('crReuTermina').onclick = () => { fecharTrecho(); reu.rodando = false; reu.etapa = 'fim'; desenhar(); };
+  if ($('crReuVoltar')) $('crReuVoltar').onclick = () => { reu.etapa = 'pessoas'; desenhar(); };
+  if ($('crReuAnom')) $('crReuAnom').onclick = () => {
+    const pid = $('crReuAnom').dataset.pessoa;
+    abrirItem(null);
+    const t = $('crTit'); if (t) { t.value = 'Anomalia: '; t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+    const r2 = $('crRespSel'); if (r2) r2.value = pid;
+    const d2 = $('crData'); if (d2) d2.value = hoje();
+  };
   if ($('crReuPausa')) $('crReuPausa').onclick = () => { fecharTrecho(); reu.rodando = false; desenhar(); };
   if ($('crReuFim')) $('crReuFim').onclick = () => {
     if (!confirm('Encerrar a reunião e zerar o cronômetro?')) return;
-    Object.assign(reu, { rodando: false, acum: 0, marca: 0, porPessoa: {}, atual: null }); desenhar();
+    Object.assign(reu, { rodando: false, acum: 0, marca: 0, porPessoa: {}, atual: null, etapa: 'inicio' }); desenhar();
   };
   if ($('crReuProx')) $('crReuProx').onclick = () => { const ps = pessoasReuniao(todosItens()); const i = ps.findIndex(x => x.id === reu.atual); if (ps[i + 1]) trocar(ps[i + 1].id); };
   if ($('crReuAnt')) $('crReuAnt').onclick = () => { const ps = pessoasReuniao(todosItens()); const i = ps.findIndex(x => x.id === reu.atual); if (i > 0) trocar(ps[i - 1].id); };
-  r.querySelectorAll('[data-reup]').forEach(b => b.onclick = () => trocar(b.dataset.reup));
+  r.querySelectorAll('[data-reup]').forEach(b => b.onclick = () => { reu.etapa = 'pessoas'; trocar(b.dataset.reup); });
   r.querySelectorAll('[data-reusobe]').forEach(b => b.onclick = () => {
     const ids = pessoasReuniao(todosItens()).map(x => x.id), i = ids.indexOf(b.dataset.reusobe);
     if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; reu.ordem = ids; gravarLocal('gr.cronograma.reuOrdem', ids); desenhar(); }

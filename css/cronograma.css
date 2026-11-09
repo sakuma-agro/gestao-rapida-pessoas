@@ -297,3 +297,32 @@ html[data-tema="escuro"] .cr-reu-bl.bq h4{color:#EFB45A}
 .cr-mod-sub:first-child{margin-top:0}
 .cr-mod-sub span{font-weight:400;color:var(--suave)}
 @media (max-width:899px){.cr-mods .cr-col{flex-basis:86vw;max-width:86vw;scroll-snap-align:start}}
+
+/* Pauta da reunião (09/11/2026) */
+.cr-pauta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:0 0 14px;padding:10px 12px;background:var(--papel);border:1px solid var(--linha);border-radius:12px}
+.cr-pauta-hora{font-size:12px;font-weight:700;color:var(--verde-esc);background:var(--verde-fundo);border-radius:6px;padding:3px 8px}
+.cr-pauta ol{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.cr-pauta li{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--suave);padding:4px 10px 4px 4px;border-radius:16px;border:1px solid transparent}
+.cr-pauta li i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--linha);color:var(--texto);font-size:12px;font-weight:700}
+.cr-pauta li.ativo{color:var(--texto);font-weight:700;border-color:var(--verde);background:var(--verde-fundo)}
+.cr-pauta li.ativo i{background:var(--verde);color:#fff}
+.cr-pauta li.foi{color:var(--suave);text-decoration:line-through}
+.cr-reu-n{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:2px solid currentColor;font-size:12px;flex:none}
+.cr-reu-sub{margin:4px 0 0;font-size:12px;font-weight:700;color:var(--texto-2,#51534A);display:flex;gap:6px}
+.cr-reu-sub span{font-weight:400;color:var(--suave)}
+.cr-anomalia{margin:0;font-size:12.5px;font-style:italic;color:#8A560F}
+html[data-tema="escuro"] .cr-anomalia{color:#EFB45A}
+.cr-reu-anom{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cr-reu-anom small{font-size:12px;color:var(--suave)}
+.cr-reu-prox summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--suave);padding:4px 0}
+.cr-reu-prox[open]{display:flex;flex-direction:column;gap:8px}
+.cr-reu-abre{background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.cr-reu-abre h3{margin:0;font-size:26px;display:flex;align-items:center;gap:10px}
+.cr-reu-abre h3 i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--verde);color:#fff;font-size:17px}
+.cr-reu-abre p{margin:0;color:var(--suave)}
+.cr-reu-abre .cr-anomalia{font-size:14px;padding:10px 12px;border-radius:8px;background:rgba(186,117,23,.08);border:1px solid rgba(186,117,23,.35);font-style:normal;font-weight:600;align-self:stretch}
+.cr-reu-equipe{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;align-self:stretch}
+.cr-reu-equipe li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:8px 10px;border:1px solid var(--linha);border-radius:10px}
+.cr-reu-equipe li b{min-width:110px}
+.cr-reu-equipe li span{font-size:12.5px;color:var(--suave)}
+.cr-reu-equipe em{font-style:normal}
