@@ -39,6 +39,22 @@ const hhmm = frac => {
 };
 const temProd = l => String(l.produtor || '').trim() !== '';
 
+/* Vários plantios numa linha (pivô "pizza", 09/11/2026, pedido dele): cada
+   combinação é uma linha própria no Resumo por plantio, com as horas e o %
+   dela. Para a mesma combinação cair sempre na mesma linha, o texto é
+   padronizado: maiúsculas, "pl 1" → "PL1", separados por vírgula e em
+   ordem ("pl3 , pl2" → "PL2, PL3"). */
+export function padronizarPlantio(txt) {
+  let t = String(txt || '');
+  // só números de PL separados por espaço ("pl1 pl2 pl3") também vale como lista
+  if (/^\s*(pl\s*\d+\s*)+$/i.test(t)) t = t.match(/pl\s*\d+/gi).join(',');
+  const partes = t.split(/\s*[,;+]\s*/)
+    .map(p => p.trim().replace(/\s+/g, ' ').toUpperCase().replace(/\bPL\s+(\d)/g, 'PL$1'))
+    .filter(Boolean);
+  if (partes.length < 2) return partes[0] || '';
+  return [...new Set(partes)].sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true })).join(', ');
+}
+
 /** Calcula o acerto inteiro: linhas, totais por produtor e resumo por plantio. */
 export function calcular(ac, produtores) {
   const fatura = (ac.contas || []).reduce((s, c) => s + (Number(c.valor) || 0), 0);
@@ -53,10 +69,10 @@ export function calcular(ac, produtores) {
   const porProd = prods.map(p => ({ produtor: p, horas: linhas.filter(l => l.produtor === p).reduce((s, l) => s + (l.frac || 0), 0) * 24 }));
   const hTot = porProd.reduce((s, p) => s + p.horas, 0);
   for (const p of porProd) { p.pct = hTot === 0 ? 0 : p.horas / hTot; p.valor = fatura * p.pct; }
-  const nomes = [...new Set(linhas.map(l => String(l.plantio || '').trim()).filter(Boolean))]
+  const nomes = [...new Set(linhas.map(l => padronizarPlantio(l.plantio)).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
   const resumo = nomes.map(n => {
-    const ls = linhas.filter(l => String(l.plantio || '').trim() === n);
+    const ls = linhas.filter(l => padronizarPlantio(l.plantio) === n);
     const quem = prods.filter(p => ls.some(l => l.produtor === p));
     const horas = ls.reduce((s, l) => s + (l.frac || 0), 0) * 24;
     return { plantio: n, produtor: quem.join('/'), horas, pct: base === 0 ? null : horas / 24 / base,
@@ -154,7 +170,7 @@ function desenharMes() {
               <td class="ce" data-o="horas">${esc(hhmm(l.frac))}</td>
               <td class="dir" data-o="pct">${l.pct === null ? '' : esc(pct(l.pct))}</td>
               <td class="dir" data-o="valor">${l.valor === null ? '' : esc(num(l.valor))}</td>
-              <td><input type="text" data-c="plantio" list="irPlantios" value="${esc(l.plantio || '')}" placeholder="ex.: PIVO 5 - MILHO"></td>
+              <td><input type="text" data-c="plantio" list="irPlantios" value="${esc(l.plantio || '')}" placeholder="ex.: PL1, PL2, PL3" title="Vários plantios no mesmo pivô: separe por vírgula"></td>
               <td><select data-c="produtor"><option value=""></option>${prods.concat(temProd(l) && !prods.includes(l.produtor) ? [l.produtor] : []).map(p => `<option${p === l.produtor ? ' selected' : ''}>${esc(p)}</option>`).join('')}</select></td>
               <td class="naoimprimir"><button type="button" class="ir-x" data-del="${esc(l.id)}" title="Apagar esta linha" aria-label="Apagar linha">×</button></td>
             </tr>`).join('') || '<tr><td colspan="9" class="vazio">Nenhum lançamento neste mês. Toque em “+ Linha”.</td></tr>'}
@@ -289,7 +305,7 @@ function ligarMes(alvo, ac, assunto) {
   // linhas
   alvo.querySelectorAll('tr[data-lin] [data-c]').forEach(inp => inp.addEventListener('change', async () => {
     const id = inp.closest('tr').dataset.lin, campo = inp.dataset.c;
-    const val = campo === 'plantio' ? inp.value.trim().replace(/\s+/g, ' ').toUpperCase() : inp.value;
+    const val = campo === 'plantio' ? padronizarPlantio(inp.value) : inp.value;
     if (campo === 'plantio') inp.value = val;
     ac = await salvar({ ...ac, linhas: ac.linhas.map(l => l.id === id ? { ...l, [campo]: val } : l) });
     recalcular(ac);
