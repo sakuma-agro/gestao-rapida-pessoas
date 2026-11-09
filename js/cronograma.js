@@ -924,7 +924,7 @@ const est = {
   colMob: 'afazer',                     // aba do quadro no celular
   colunas: vis.colunas || 'situacao',   // situacao | pessoa
   filtro: vis.filtro || 'todos',        // todos | minhas
-  pessoa: '', area: '', origem: '', busca: '',
+  pessoa: '', area: '', origem: '', busca: '', mostrar: 'abertas', abertos: new Set(ler('gr.cronograma.modAbertos', [])),
   periodo: vis.periodo || 30,
   mes: hoje().slice(0, 7), dia: hoje(),
 };
@@ -953,6 +953,49 @@ function filtrados() {
     return true;
   });
 }
+/* Por módulo (09/11/2026, pedido dele): todas as tarefas separadas pelos
+   módulos do app — Pessoas (Cadastros, SST, RH, DP), Certificação, Máquinas…
+   — e dentro de cada um pela tela de origem. Cada linha tem "Foco do dia →".
+   Mostra as abertas (atrasadas primeiro); "Com concluídas" traz as feitas. */
+const MODULOS = [
+  { id: 'pessoas', nome: 'Pessoas', areas: ['cad', 'sst', 'rh', 'dp'] },
+  { id: 'cert', nome: 'Certificação', areas: ['cert'] },
+  { id: 'maq', nome: 'Máquinas e Patrimônio', areas: ['maq'] },
+  { id: 'vist', nome: 'Vistorias', areas: ['vist'] },
+  { id: 'custo', nome: 'Custo Base', areas: ['custo'] },
+  { id: 'colh', nome: 'Colheita e Produção', areas: ['colh'] },
+  { id: 'prog', nome: 'Programação Campo', areas: ['prog'] },
+  { id: 'est', nome: 'Estoque', areas: ['est'] },
+  { id: 'proj', nome: 'Projetos', areas: ['proj'] },
+  { id: 'esc', nome: 'Escritório e avulsas gerais', areas: ['esc'] },
+];
+function modulos() {
+  const conhecidas = new Set(MODULOS.flatMap(m => m.areas));
+  const itens = filtrados().filter(it => est.mostrar === 'todas' || it.sit !== 'feito');
+  const blocos = MODULOS.map(m => {
+    const l = itens.filter(it => m.areas.includes(it.area) || (m.id === 'esc' && !conhecidas.has(it.area)));
+    if (!l.length) return '';
+    const grupos = new Map();
+    for (const it of l) {
+      const g = it.auto ? (ORIGENS[it.origem]?.nome || it.origemNome) : `${areaDe(it.area).nome} › Tarefas avulsas`;
+      if (!grupos.has(g)) grupos.set(g, []);
+      grupos.get(g).push(it);
+    }
+    const ordemG = [...grupos.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const atr = l.filter(it => it.sit !== 'feito' && atrasado(it)).length;
+    const nf = l.filter(it => it.focoEm && it.sit !== 'feito').length;
+    const ab = l.filter(it => it.sit !== 'feito').length;
+    const cor = areaDe(m.areas[0]).cor;
+    return `<details class="cr-mod" data-mod="${m.id}" ${est.abertos.has(m.id) ? 'open' : ''}>
+      <summary><span class="cr-pt" style="background:${cor}"></span><b>${esc(m.nome)}</b>
+        <span class="cr-mod-cont">${ab} ${ab === 1 ? 'aberta' : 'abertas'}${atr ? ` · <span class="cr-at">${atr} atrasada${atr > 1 ? 's' : ''}</span>` : ''}${nf ? ` · 🎯 ${nf} no foco` : ''}</span></summary>
+      ${ordemG.map(g => `<div class="cr-mod-grupo"><h4>${esc(g)} <span>${grupos.get(g).length}</span></h4>
+        <div class="cr-lista">${grupos.get(g).sort((a, b) => (a.sit === 'feito') - (b.sit === 'feito') || ordemQuadro(a, b)).map(linha).join('')}</div></div>`).join('')}
+    </details>`;
+  }).join('');
+  return blocos || `<div class="cr-foco-vazio"><b>Nenhuma tarefa ${est.mostrar === 'todas' ? '' : 'aberta '}nos filtros atuais.</b><p>Confira os filtros de pessoa, área e origem.</p></div>`;
+}
+
 /* Pesquisa (09/11/2026, pedido dele): pelo número (#123 ou 123) ou por
    qualquer palavra do nome, dos detalhes, do checklist, da origem ou da pessoa. */
 function bate(it, q) {
@@ -1023,6 +1066,7 @@ function desenhar() {
     ${dados.semTabelas ? '<div class="aviso erro">O banco ainda não tem as tabelas do Cronograma. As tarefas lançadas à mão e a mudança de situação só funcionam depois disso — os vencimentos das áreas já aparecem.</div>' : ''}
     <div class="cr-seg" role="tablist">
       <button type="button" role="tab" data-visao="calendario" aria-selected="${est.visao === 'calendario'}">Calendário</button>
+      <button type="button" role="tab" data-visao="modulos" aria-selected="${est.visao === 'modulos'}">Por módulo</button>
       <button type="button" role="tab" data-visao="foco" aria-selected="${est.visao === 'foco'}">Foco do dia</button>
       <button type="button" role="tab" data-visao="reuniao" aria-selected="${est.visao === 'reuniao'}">Reunião</button>
     </div>
@@ -1045,12 +1089,16 @@ function desenhar() {
         <option value="app" ${est.origem === 'app' ? 'selected' : ''}>Do app</option>
         <option value="avulsa" ${est.origem === 'avulsa' ? 'selected' : ''}>Avulsas</option>
       </select>
+      ${est.visao === 'modulos' ? `
+        <span class="cr-sep">Mostrar:</span>
+        <button type="button" class="cr-chip" data-mostrar="abertas" aria-pressed="${est.mostrar !== 'todas'}">Abertas</button>
+        <button type="button" class="cr-chip" data-mostrar="todas" aria-pressed="${est.mostrar === 'todas'}">Com concluídas</button>` : ''}
       ${est.visao === 'foco' ? `
         <span class="cr-sep">Colunas por:</span>
         <button type="button" class="cr-chip" data-colunas="situacao" aria-pressed="${est.colunas === 'situacao'}">Situação</button>
         <button type="button" class="cr-chip" data-colunas="pessoa" aria-pressed="${est.colunas === 'pessoa'}">Pessoa</button>` : ''}
     </div>
-    <div id="crCorpo">${est.busca ? resultados() : est.visao === 'foco' ? foco() : calendario()}</div>
+    <div id="crCorpo">${est.busca ? resultados() : est.visao === 'foco' ? foco() : est.visao === 'modulos' ? modulos() : calendario()}</div>
     <div class="cr-legenda">${est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
       <span class="cr-auto-leg"><span class="cr-tag" style="background:#51534A">Do app</span> vem sozinha de outra área · <span class="cr-tag avulsa">Avulsa</span> lançada à mão</span></div>`}
   </div>`;
@@ -1376,6 +1424,11 @@ function ligarTela() {
   const r = alvo;
   r.querySelectorAll('[data-visao]').forEach(b => b.onclick = () => { est.visao = b.dataset.visao; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { est.filtro = b.dataset.filtro; guardarVis(); desenhar(); });
+  r.querySelectorAll('[data-mostrar]').forEach(b => b.onclick = () => { est.mostrar = b.dataset.mostrar; desenhar(); });
+  r.querySelectorAll('details[data-mod]').forEach(d => d.ontoggle = () => {
+    if (d.open) est.abertos.add(d.dataset.mod); else est.abertos.delete(d.dataset.mod);
+    gravarLocal('gr.cronograma.modAbertos', [...est.abertos]);
+  });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
   if ($('crBusca')) {
     let tm = null;
