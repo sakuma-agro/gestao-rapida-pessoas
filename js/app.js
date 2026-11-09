@@ -1922,7 +1922,7 @@ async function sincronizarTudo() {
   const b = $('btnSincronizar');
   if (!navigator.onLine) { alert('Sem internet agora. Os lançamentos ficam guardados neste aparelho e sobem na próxima sincronização.'); return; }
   sincronizandoTudo = true;
-  const rotulo = b.textContent; b.textContent = 'Sincronizando…'; b.disabled = true;
+  const t = $('sincTxt'); t.textContent = 'Sincronizando…'; b.disabled = true;  // 09/11/2026: o botão é ícone; o texto só aparece enquanto sincroniza
   nucleo.retentarParados();   // os parados também voltam à fila neste toque
   try {
     for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarFilaCron(), () => enviarAnexos()]) {
@@ -1936,11 +1936,11 @@ async function sincronizarTudo() {
     try { await carregarSst(); } catch {}
     await contarPendentes();
     const par = nucleo.parados();
-    b.textContent = par ? `${par} parado${par > 1 ? 's' : ''}` : estado.pendentesTotal ? 'Ainda enviando…' : 'Sincronizado ✓';
+    t.textContent = par ? `${par} parado${par > 1 ? 's' : ''}` : estado.pendentesTotal ? 'Ainda enviando…' : 'Sincronizado ✓';
     if (par && !$('dlgFila').open) abrirDlgFila();
   } finally {
     sincronizandoTudo = false; b.disabled = false;
-    setTimeout(() => { b.textContent = rotulo; }, 2500);
+    setTimeout(() => { t.textContent = ''; }, 2500);
   }
 }
 $('btnSincronizar').addEventListener('click', sincronizarTudo);

@@ -201,10 +201,19 @@ addEventListener('beforeinstallprompt', function (ev) {
       <span class="cresce"></span>
       <span class="estado" id="estadoRede"><span class="pt"></span><span id="estadoTexto">online</span></span>
       <span class="versao-app" id="versaoApp" title="Versão do app neste aparelho"></span>
-      <button class="btn mini" id="btnSincronizar" title="Envia o que está esperando e busca o que mudou no servidor">Sincronizar</button>
+      <!-- 09/11/2026 (opção A): Sincronizar vira ícone (o texto só aparece
+           enquanto sincroniza), o LOP - Principal vira a engrenagem (só admin)
+           e Trocar senha e Sair ficam no menu do usuário. -->
+      <button class="btn mini topo-ic" id="btnSincronizar" title="Sincronizar: envia o que está esperando e busca o que mudou no servidor" aria-label="Sincronizar"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></svg><span class="sinc-txt" id="sincTxt"></span></button>
       <button class="btn mini" id="btnInstalar" data-instalar hidden>Instalar app</button>
-      <button class="btn mini" id="btnTrocarSenha" title="Escolher uma senha nova">Trocar senha</button>
-      <button class="btn mini" id="btnSair">Sair</button>
+      <button class="btn mini topo-ic" id="btnPrincipal" title="LOP - Principal: Usuários - Acessos e Backup" aria-label="LOP - Principal" hidden><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      <details class="usu-menu" id="usuMenu">
+        <summary title="Sua conta"><span class="usu-ini" id="usuIni">?</span><span class="usu-nome" id="usuNome">Conta</span><span class="usu-seta" aria-hidden="true">▾</span></summary>
+        <div class="usu-lista">
+          <button type="button" id="btnTrocarSenha" title="Escolher uma senha nova">Trocar senha</button>
+          <button type="button" id="btnSair">Sair</button>
+        </div>
+      </details>
     </div>
     <nav class="abas" role="tablist" id="navModulos"></nav>
     <nav class="aba2s" role="tablist" id="navTelas" hidden></nav>
@@ -233,7 +242,7 @@ addEventListener('beforeinstallprompt', function (ev) {
       <div class="reu-alertas" id="arAlerta" hidden></div>
       <!-- Empréstimo acima do teto aguardando o administrador (09/11/2026) — js/alerta-emprestimo.js -->
       <div class="reu-alertas" id="arEmpAlerta" hidden></div>
-      <div class="ar-grade" id="arGrade"></div>
+      <div class="ar-grade ar-colunas" id="arGrade"></div>
       <div class="ar-pe" id="arPe"></div>
     </section>
 

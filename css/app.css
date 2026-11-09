@@ -2702,3 +2702,46 @@ body.crq-aberto{overflow:hidden}
 .fo2-ed button:disabled{opacity:.35;cursor:default}
 .fo2-fixo{color:var(--suave)}.fo2-fixo small{margin-left:8px;background:var(--linha);border-radius:5px;padding:1px 6px;font-size:10.5px}
 @media (max-width:760px){.fo2-cats{grid-template-columns:1fr}.fo2-cards{grid-template-columns:1fr}}
+
+/* ===== Tela inicial em colunas por grupo (09/11/2026, pedido dele — opção A) ===== */
+.ar-grade.ar-colunas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:start}
+.ar-col{background:var(--papel);border:1px solid var(--linha);border-top:4px solid var(--ar-cor,#84BD00);
+  border-radius:12px;overflow:hidden}
+.ar-col h3{margin:0;padding:13px 16px 9px;font-size:11px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:#51534A}
+.ar-colunas .ar-cartao.ar-linha{flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;
+  width:100%;padding:11px 14px 11px 16px;border:0;border-top:1px solid var(--linha);border-radius:0;
+  box-shadow:none;background:transparent;text-align:left;transform:none}
+.ar-colunas .ar-cartao.ar-linha:not([disabled]):hover{background:var(--verde-fundo);transform:none;box-shadow:none}
+.ar-colunas .ar-cartao.ar-linha img{width:40px;height:40px;border-radius:10px}
+.ar-colunas .ar-cartao.ar-linha .ar-txt{flex:1;align-items:flex-start;width:auto;min-width:0}
+.ar-colunas .ar-cartao.ar-linha .ar-txt b{font-size:14.5px;line-height:1.25}
+.ar-colunas .ar-cartao.ar-linha .ar-txt small{display:block;font-size:12px;color:var(--suave)}
+.ar-colunas .ar-seta{margin-left:auto;color:#A9ACA5;font-size:22px;line-height:1}
+.ar-colunas .ar-cartao.ar-linha.ar-fantasma{background:#F3F4F1}
+.ar-colunas .ar-cartao.ar-linha.ar-fantasma .ar-seta{visibility:hidden}
+@media (max-width:1100px){.ar-grade.ar-colunas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.ar-grade.ar-colunas{grid-template-columns:1fr;gap:12px}}
+
+/* Topo: Sincronizar em ícone, engrenagem do LOP - Principal e menu do usuário (09/11/2026) */
+.topo-ic{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:34px;height:34px;padding:0 8px}
+#btnSincronizar.topo-ic{background:var(--papel);border-color:var(--linha);color:#51534A;font-weight:600}
+#btnSincronizar.topo-ic:hover{border-color:var(--verde);color:var(--verde-esc)}
+#btnSincronizar.topo-ic:disabled svg{animation:sinc-gira 1s linear infinite}
+@keyframes sinc-gira{to{transform:rotate(360deg)}}
+.sinc-txt{font-size:12px}.sinc-txt:empty{display:none}
+#btnPrincipal{color:#51534A}#btnPrincipal[hidden]{display:none}
+.usu-menu{position:relative}
+.usu-menu summary{list-style:none;display:flex;align-items:center;gap:7px;cursor:pointer;
+  border:1px solid var(--linha);border-radius:20px;padding:3px 10px 3px 3px;font-size:13px;font-weight:600;background:var(--papel)}
+.usu-menu summary::-webkit-details-marker{display:none}
+.usu-menu summary:hover{border-color:var(--verde)}
+.usu-ini{width:26px;height:26px;border-radius:50%;background:#744F28;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.usu-seta{font-size:10px;color:var(--suave)}
+.usu-lista{position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:170px;background:var(--papel);
+  border:1px solid var(--linha);border-radius:10px;box-shadow:0 8px 24px rgba(27,35,43,.14);padding:6px;display:flex;flex-direction:column}
+.usu-lista button{font:inherit;text-align:left;background:none;border:0;border-radius:7px;padding:9px 12px;cursor:pointer;color:var(--texto)}
+.usu-lista button:hover{background:var(--verde-fundo)}
+@media (max-width:640px){.usu-nome{display:none}}
+/* Frase da semana no celular: a caixa empilha e não pode herdar 640px de altura (09/11/2026) */
+@media (max-width:760px){.ar-topo .reu-ini{flex:none;width:100%}}

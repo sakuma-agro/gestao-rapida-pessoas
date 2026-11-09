@@ -90,6 +90,29 @@ export const AREAS = [
     desc: 'Usuários - Acessos · Backup' },
 ];
 
+/* Tela inicial em colunas por grupo (09/11/2026, pedido dele — opção A). */
+const GRUPOS = [
+  { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao'] },
+  { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita'] },
+  { nome: 'Operação e custos', cor: '#51534A', ids: ['manutencoes', 'estoque', 'custobase'] },
+  { nome: 'Gestão', cor: '#7552B0', ids: ['projetos', 'cronograma'] },
+];
+/* O que aparece embaixo do nome em cada linha (curto; o completo fica no title). */
+const CURTA = {
+  pessoas: 'Cadastros, SST, RH, DP', vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
+  programacao: 'Mês e semana', colheita: 'Carregamentos, safra',
+  manutencoes: 'Manutenções, OS', estoque: 'Contagem, acerto', custobase: 'Rateio mensal',
+  projetos: 'PMBOK', cronograma: 'Calendário e Kanban',
+};
+const ROTULO = { projetos: 'Projetos' };
+
+/* Nome e inicial no menu do usuário (topo), com Trocar senha e Sair dentro. */
+function pintarUsuario() {
+  const n = (acesso.nome || acesso.email || '').trim();
+  $('usuIni').textContent = (n[0] || '?').toUpperCase();
+  $('usuNome').textContent = n.split(/[\s@]/)[0] || 'Conta';
+}
+
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
 const VERSAO_VIST = '18';
@@ -195,6 +218,12 @@ export function ligarAreas(callback) {
   // logo/nome do sistema: escolher a área. Etiqueta: início da área atual.
   $('bInicio').addEventListener('click', () => { if (!$('app').hidden) mostrarAreas(); });
   $('bArea').addEventListener('click', () => { if (areaAtual) entrarNaArea(areaAtual); });
+  /* 09/11/2026: o LOP - Principal (Usuários - Acessos e Backup) é a engrenagem do topo. */
+  $('btnPrincipal').addEventListener('click', () => { if (!$('app').hidden && liberada('usuarios')) entrarNaArea('usuarios'); });
+  /* Menu do usuário: fecha ao escolher uma opção ou ao tocar fora. */
+  const menu = $('usuMenu');
+  menu.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { menu.open = false; }));
+  document.addEventListener('click', e => { if (menu.open && !menu.contains(e.target)) menu.open = false; });
   addEventListener('resize', medirTopo);
   // A moldura pede o login por aqui.
   window.grCliente = estado.cliente;
@@ -258,18 +287,30 @@ export function mostrarAreas({ direto = false } = {}) {
     desenharAlertaEmprestimo($('arEmpAlerta'), { abrir: () => { entrarNaArea('pessoas'); abrirModulo('emprestimo', 'empRecibos'); } });
   } catch { $('arEmpAlerta').hidden = true; }
 
-  // liberadas primeiro, na ordem de AREAS; depois as fantasmas
-  const lista = [...AREAS.filter(a => !a.emBreve && liberada(a.id)), ...AREAS.filter(a => a.emBreve || !liberada(a.id))];
-  $('arGrade').innerHTML = lista.map(a => {
-    const ok = !a.emBreve && liberada(a.id);
-    const fantasma = !ok && !a.emBreve;
-    return `<button type="button" class="ar-cartao${a.emBreve ? ' ar-embreve' : ''}${fantasma ? ' ar-fantasma' : ''}" data-area="${a.id}"
-        ${ok ? '' : 'disabled aria-disabled="true"'} title="${fantasma ? 'Você não tem acesso a esta área. Peça ao administrador.' : esc(a.desc)}">
-      <img src="${a.icone}" alt="">
-      <span class="ar-txt"><b>${esc(a.nome)}</b><small>${esc(a.desc)}</small></span>
-      <span class="ar-ir">${a.emBreve ? 'Em breve' : fantasma ? 'Sem acesso' : 'Entrar →'}</span>
-    </button>`;
+  /* 09/11/2026, pedido dele (opção A): as áreas em colunas por grupo, cada
+     uma em linha com ícone, nome e o que tem dentro. O LOP - Principal saiu
+     da grade e virou a engrenagem no topo (#btnPrincipal), só para admin.
+     Dentro de cada coluna fica a ordem do grupo; sem acesso, em cinza. */
+  const usados = new Set(GRUPOS.flatMap(g => g.ids));
+  const sobra = AREAS.filter(a => !usados.has(a.id) && a.id !== 'usuarios').map(a => a.id);
+  const grupos = sobra.length ? [...GRUPOS, { nome: 'Outras', cor: '#8A8C82', ids: sobra }] : GRUPOS;
+  $('arGrade').innerHTML = grupos.map(g => {
+    const itens = g.ids.map(id => AREAS.find(a => a.id === id)).filter(Boolean).map(a => {
+      const ok = !a.emBreve && liberada(a.id);
+      const fantasma = !ok && !a.emBreve;
+      const rot = ROTULO[a.id] || a.nome;
+      const curta = fantasma ? 'Sem acesso' : a.emBreve ? 'Em breve' : (CURTA[a.id] || '');
+      return `<button type="button" class="ar-cartao ar-linha${a.emBreve ? ' ar-embreve' : ''}${fantasma ? ' ar-fantasma' : ''}" data-area="${a.id}"
+          ${ok ? '' : 'disabled aria-disabled="true"'} title="${fantasma ? 'Você não tem acesso a esta área. Peça ao administrador.' : esc(a.desc)}">
+        <img src="${a.icone}" alt="">
+        <span class="ar-txt"><b>${esc(rot)}</b><small>${esc(curta)}</small></span>
+        <span class="ar-seta" aria-hidden="true">›</span>
+      </button>`;
+    }).join('');
+    return `<section class="ar-col" style="--ar-cor:${g.cor}"><h3>${esc(g.nome)}</h3>${itens}</section>`;
   }).join('');
+  $('btnPrincipal').hidden = !liberada('usuarios');
+  pintarUsuario();
   $('arGrade').querySelectorAll('[data-area]:not([disabled])').forEach(b =>
     b.addEventListener('click', () => entrarNaArea(b.dataset.area)));
 
