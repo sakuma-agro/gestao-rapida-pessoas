@@ -483,7 +483,7 @@ export function reciboHTML(e, reimpressao = false) {
     a título de empréstimo, <b>sem juros e sem correção</b>, e autorizo o desconto no meu pagamento em <b>${esc(parc)}</b>,
     <b>a partir da ${esc(folha)}</b>${fila ? ' (previsão, após quitar o empréstimo anterior)' : ''}, conforme o art. 462 da CLT. Em caso de desligamento, autorizo o desconto do saldo nas verbas
     rescisórias, no limite da lei.${e.motivo ? ` Motivo informado: ${esc(e.motivo)}.` : ''}</p>
-    ${e.liberado_por ? `<p class="rel-nota">Liberado acima do teto de ${TETO_PERC}% do salário pelo administrador: ${esc(e.justificativa_teto || '')}</p>` : ''}
+    ${/* 09/11/2026, pedido dele: a liberação acima do teto não sai mais no recibo — fica só no app (Recibos emitidos e auditoria). */ ""}
     <div class="rel-assinaturas rel-assina-so-func">
       <div class="rel-assina"><span></span><small>${esc(f.nome || 'Funcionário')}</small></div>
     </div>
@@ -1087,7 +1087,7 @@ function cancelar(e) {
 function liberar(id) {
   const e = emprestimos().find(x => x.id === id);
   dialogo(`<h3>Liberar ${numeroTxt(e)} acima do teto</h3>
-    <p class="dc-sem">${esc(nomeDe(e.funcionario_id))} · ${brl(e.valor)} em ${e.parcelas}×. A liberação e a justificativa saem no recibo, com o seu nome.</p>
+    <p class="dc-sem">${esc(nomeDe(e.funcionario_id))} · ${brl(e.valor)} em ${e.parcelas}×. A justificativa fica registrada no app (não sai no recibo).</p>
     ${campoJust()}${rodapeDlg('<button class="btn principal" type="button" id="empOkDlg">Liberar e emitir recibo</button>')}`, () =>
     $('empOkDlg').addEventListener('click', async () => {
       const j = exigeJust(); if (!j) return;
