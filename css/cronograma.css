@@ -286,3 +286,7 @@ html[data-tema="escuro"] .cr-reu-bl.bq h4{color:#EFB45A}
 .cr-mod-grupo{padding:4px 14px 12px}
 .cr-mod-grupo h4{margin:6px 2px 8px;font-size:12.5px;font-weight:700;color:var(--texto-2,#51534A)}
 .cr-mod-grupo h4 span{font-weight:400;color:var(--suave)}
+
+/* coluna Bloqueado no Foco do dia (09/11/2026) */
+.cr-col.col-bloqueado .cr-col-corpo{gap:8px}
+@media (min-width:900px){.cr-quadro.sit .cr-col{flex:1 1 0;min-width:240px}}

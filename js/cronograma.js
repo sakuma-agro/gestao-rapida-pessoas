@@ -1304,7 +1304,7 @@ const ordemFocoBase = (a, b) => (naoFeito(b) - naoFeito(a)) || (a.focoEm || '').
 function foco() {
   const pos = posFoco();
   const itens = filtrados().filter(it => it.focoEm && it.sit !== 'bloqueado' && (it.sit !== 'feito' || (it.feitaEm || hoje()) >= hoje())).sort((a, b) => ordemFoco(a, b, pos));
-  if (!itens.length) return `<div class="cr-foco-vazio"><b>Ninguém tem tarefa no foco agora.</b>
+  if (!itens.length && (est.colunas === 'pessoa' || !filtrados().some(i => i.sit === 'bloqueado'))) return `<div class="cr-foco-vazio"><b>Ninguém tem tarefa no foco agora.</b>
     <p>Na reunião da manhã, cada pessoa escolhe o que vai fazer no dia e toca em "Foco do dia →". Fora da reunião, o botão também aparece nas tarefas do calendário.</p>
     <button type="button" class="btn principal" data-visao="reuniao">Abrir a reunião</button></div>`;
   let cols;
@@ -1325,6 +1325,12 @@ function foco() {
     { id: 'afazer', nome: 'A fazer', cor: '#51534A', itens: itens.filter(i => i.sit === 'afazer') },
     { id: 'fazendo', nome: 'Em andamento', cor: COR_SIT.fazendo, itens: itens.filter(i => i.sit === 'fazendo') },
     { id: 'feito', nome: 'Concluído hoje', cor: COR_SIT.feito, itens: itens.filter(i => i.sit === 'feito') },
+    /* Bloqueado (09/11/2026, pedido dele): lista de todas as bloqueadas — no
+       foco ou não — com do que depende, quem precisa agir e há quantos dias
+       está parada; as paradas há mais tempo em cima. "Liberar" volta para
+       A fazer no foco. Arrastar um cartão para cá pede o "depende de". */
+    { id: 'bloqueado', nome: 'Bloqueado', cor: COR_SIT.bloqueado, itens: filtrados().filter(i => i.sit === 'bloqueado')
+      .sort((a, b) => (a.bloq?.desde || '9').localeCompare(b.bloq?.desde || '9') || a.titulo.localeCompare(b.titulo, 'pt-BR')) },
   ];
   const extra = c => { const n = c.itens.filter(naoFeito).length; return n ? ` · <span class="cr-at">${n} não feita${n > 1 ? 's' : ''}</span>` : ''; };
   // No celular as colunas viram abas (uma por vez); no computador ficam lado a lado.
@@ -1332,7 +1338,7 @@ function foco() {
   return `<div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmob="${c.id}" aria-selected="${est.colMob === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
     <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMob === c.id ? ' ativa' : ''}" data-col="${c.id}">
       <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.nome}</b><span class="cr-cont">${c.itens.length}${extra(c)}</span></header>
-      <div class="cr-col-corpo">${c.itens.map(i => card(i, { mover: true })).join('') || '<p class="cr-vazio">Nada aqui.</p>'}</div>
+      <div class="cr-col-corpo">${c.itens.map(i => card(i, { mover: c.id !== 'bloqueado' })).join('') || `<p class="cr-vazio">${c.id === 'bloqueado' ? 'Nenhuma tarefa bloqueada.' : 'Nada aqui.'}</p>`}</div>
     </section>`).join('')}</div>`;
 }
 
@@ -1544,6 +1550,7 @@ function ligarTela() {
       if (!it) return;
       const c = col.dataset.col;
       const origem = r.querySelector(`.cr-card[data-item="${CSS.escape(chave)}"]`)?.closest('.cr-col');
+      if (c === 'bloqueado') { if (it.sit !== 'bloqueado') abrirBloquear(it); return; }
       if (est.visao === 'foco') {
         const antes = cartaoAntes(col, ev.clientY);
         const lista = [...col.querySelectorAll('.cr-card[data-item]')].map(x => x.dataset.item).filter(k => k !== chave);
@@ -1584,7 +1591,7 @@ function acaoRapida(chave, acao) {
   const it = todosItens().find(x => x.chave === chave);
   if (!it) return;
   if (acao === 'bloquear') return abrirBloquear(it);
-  if (acao === 'liberar') return mudar(it, { sit: 'afazer' });          // volta para o calendário
+  if (acao === 'liberar') return est.visao === 'foco' ? mudar(it, { sit: 'afazer', foco: true }) : mudar(it, { sit: 'afazer' });
   if (acao === 'foco') return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true });
   if (acao === 'tirar') return mudar(it, { foco: false });
   if (acao === 'subir') return moverNoFoco(chave, -1);
