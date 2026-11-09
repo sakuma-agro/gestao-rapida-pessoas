@@ -77,7 +77,7 @@ export const AREAS = [
   /* Cronograma geral (28/10/2026, pedido dele): as tarefas e os vencimentos
      de todas as áreas num lugar só, por pessoa do escritório, com Calendário
      e Kanban. Mora nesta página (js/cronograma.js), sem moldura. */
-  { id: 'cronograma', nome: 'Cronograma geral', icone: 'icons/area-cronograma.v1.svg',
+  { id: 'cronograma', nome: 'Cronograma geral', icone: 'icons/area-cronograma.v2.svg',
     desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
      quem entra e o que vê" virou um cartão da tela principal. É a tela
