@@ -97,7 +97,7 @@ const GRUPOS = [
   { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao'] },
   { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita'] },
   { nome: 'Operação e custos', cor: '#51534A', ids: ['manutencoes', 'estoque', 'custobase'] },
-  { nome: 'Gestão', cor: '#7552B0', ids: ['projetos', 'cronograma'] },
+  { nome: 'Gestão', cor: '#7552B0', ids: ['cronograma', 'projetos'] }, // 09/11/2026: Rastro acima de Projetos (pedido dele)
 ];
 /* O que aparece embaixo do nome em cada linha (curto; o completo fica no title). */
 const CURTA = {
