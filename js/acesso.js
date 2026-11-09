@@ -1606,7 +1606,7 @@ function blocoCron(e) {
   return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="cronograma">
     <label class="us-mod__topo">
       <input type="checkbox" id="usCron" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
-      <b>Área Cronograma geral</b>
+      <b>Área Rastro (tarefas e prazos)</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · tarefas e vencimentos das áreas que já acessa'}</span>
     </label>
   </div>`;

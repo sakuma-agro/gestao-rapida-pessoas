@@ -2745,3 +2745,6 @@ body.crq-aberto{overflow:hidden}
 @media (max-width:640px){.usu-nome{display:none}}
 /* Frase da semana no celular: a caixa empilha e não pode herdar 640px de altura (09/11/2026) */
 @media (max-width:760px){.ar-topo .reu-ini{flex:none;width:100%}}
+
+/* Rastro (ex-Cronograma geral), 09/11/2026: nome com a linha de apoio */
+.cr-cab h2 .cr-marca{display:block;font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--suave);margin-top:2px}

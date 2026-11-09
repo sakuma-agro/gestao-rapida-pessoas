@@ -1123,7 +1123,7 @@ function desenhar() {
   <div class="cr">
     <div class="cr-cab">
       <div>
-        <h2>Cronograma geral</h2>
+        <h2>Rastro <small class="cr-marca">Gestão de tarefas e prazos</small></h2>
         <p class="cr-sub">Tarefas e vencimentos de todas as áreas, por pessoa · <span id="crStatus">${esc(status)}</span></p>
       </div>
       <div class="cr-acoes">

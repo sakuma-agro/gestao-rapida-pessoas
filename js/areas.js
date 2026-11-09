@@ -40,7 +40,9 @@ export const AREAS = [
      de todas as áreas num lugar só, por pessoa do escritório, com Calendário
      e Kanban. Mora nesta página (js/cronograma.js), sem moldura.
      09/11/2026: primeiro cartão da tela inicial, antes de Pessoas (pedido dele). */
-  { id: 'cronograma', nome: 'Cronograma geral', icone: 'icons/area-cronograma.v2.svg',
+  /* 09/11/2026, pedido dele: a área ganhou nome próprio, "Rastro" (Gestão de
+     tarefas e prazos). O id segue 'cronograma'. */
+  { id: 'cronograma', nome: 'Rastro', icone: 'icons/area-cronograma.v2.svg',
     desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
@@ -102,7 +104,7 @@ const CURTA = {
   pessoas: 'Cadastros, SST, RH, DP', vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
   programacao: 'Mês e semana', colheita: 'Carregamentos, safra',
   manutencoes: 'Manutenções, OS', estoque: 'Contagem, acerto', custobase: 'Rateio mensal',
-  projetos: 'PMBOK', cronograma: 'Calendário e Kanban',
+  projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos',
 };
 const ROTULO = { projetos: 'Projetos' };
 
