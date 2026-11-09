@@ -918,6 +918,16 @@ function ocorrencias(t) {
   }
   return out;
 }
+/* Tarefa mensal com período (09/11/2026, pedido dele): começa no dia da
+   vez (data) e tem prazo até o dia `prazo_dia` do mesmo mês (mês curto: o
+   último dia). O item fica com data = prazo e comeca = início. */
+function prazoDe(t, d) {
+  if (!t.prazo_dia || t.recorrencia !== 'mensal') return null;
+  const [a, m] = d.split('-').map(Number);
+  const ult = new Date(a, m, 0).getDate();
+  const f = `${a}-${String(m).padStart(2, '0')}-${String(Math.min(t.prazo_dia, ult)).padStart(2, '0')}`;
+  return f < d ? d : f;
+}
 /* Rotina que repete: das vezes que já passaram, só a mais recente continua
    aparecendo (as anteriores somem quando chega a próxima), a não ser que
    tenham sido concluídas ou estejam no foco/bloqueadas. Evita a pilha de
@@ -956,8 +966,9 @@ function todosItens() {
       const e = rep ? estadoDe(chave) : null;
       const explicito = e?.responsavel_id || VINC_TELA[t.ir] || t.responsavel_id || vincTexto(t.titulo) || null;
       const resps = explicito ? [explicito] : respsDaArea(t.area || 'esc', null);
+      const fim = prazoDe(t, d);
       itens.push({
-        chave, tarefa: t, data: d, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
+        chave, tarefa: t, data: fim || d, comeca: fim ? d : null, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
         ir: t.ir ? (IR_CK[t.ir] || null) : null,
         origemNome: rep ? (t.recorrencia === 'semanal' ? 'Tarefa · toda semana' : 'Tarefa · todo mês') : 'Tarefa',
         auto: false, resp: resps[0] || null, resps, explicito,
@@ -1093,7 +1104,7 @@ const fimSemana = () => addDias(hoje(), 6 - dataDe(hoje()).getDay());
 function noPrazo(it) {
   if (est.prazo === 'tudo') return true;
   if (it.sit === 'feito') return (it.feitaEm || it.data) >= (est.prazo === 'hoje' ? hoje() : addDias(hoje(), -dataDe(hoje()).getDay()));
-  return it.data <= (est.prazo === 'hoje' ? hoje() : fimSemana());
+  return (it.comeca || it.data) <= (est.prazo === 'hoje' ? hoje() : fimSemana());
 }
 function modulos() {
   const conhecidas = new Set(MODULOS.flatMap(m => m.areas));
@@ -1163,6 +1174,9 @@ const avatares = it => it.resps.length > 1
 function rotuloData(it) {
   if (it.sit === 'feito') return { txt: it.feitaEm ? 'feito ' + brCurto(it.feitaEm) : brCurto(it.data), cls: 'ok' };
   const n = diasAte(it.data);
+  if (it.comeca && n >= 0) return hoje() < it.comeca
+    ? { txt: `de ${brCurto(it.comeca)} a ${brCurto(it.data)}`, cls: '' }
+    : { txt: n === 0 ? 'prazo hoje' : `prazo ${brCurto(it.data)} · faltam ${n} ${n === 1 ? 'dia' : 'dias'}`, cls: n === 0 ? 'hoje' : '' };
   if (n < 0) return { txt: n === -1 ? 'venceu ontem' : `${-n} dias atrasado`, cls: 'atraso' };
   if (n === 0) return { txt: 'hoje', cls: 'hoje' };
   if (n === 1) return { txt: 'amanhã', cls: '' };
@@ -1249,6 +1263,8 @@ function calendario() {
   const por = (d, it) => { if (!porDia.has(d)) porDia.set(d, []); porDia.get(d).push(it); };
   for (const it of itens) {
     por(it.data, it);
+    // tarefa com período: aparece também no dia em que começa ("Começa: …")
+    if (it.comeca && it.comeca !== it.data && it.sit !== 'feito') por(it.comeca, { ...it, inicio: true });
     // bloqueada com data de cobrança: aparece também no dia de cobrar
     if (it.sit === 'bloqueado' && it.bloq?.cobrar && it.bloq.cobrar !== it.data) por(it.bloq.cobrar, { ...it, cobrar: true });
   }
@@ -1263,7 +1279,7 @@ function calendario() {
     cel += `<button type="button" class="${cls}" data-dia="${s}" aria-label="${br(s)}: ${l.length} itens">
       <span class="n">${d.getDate()}</span>
       <span class="pts">${sits.map(k => `<i style="background:${COR_SIT[k]}"></i>`).join('')}</span>
-      <span class="cr-evs">${l.slice(0, 3).map(x => `<span class="cr-ev s-${sitCor(x)}">${x.cobrar ? 'Cobrar: ' : ''}${esc(x.titulo)}</span>`).join('')}${l.length > 3 ? `<span class="cr-ev-mais">+ ${l.length - 3}</span>` : ''}</span>
+      <span class="cr-evs">${l.slice(0, 3).map(x => `<span class="cr-ev s-${sitCor(x)}">${x.cobrar ? 'Cobrar: ' : ''}${x.inicio ? 'Começa: ' : ''}${esc(x.titulo)}</span>`).join('')}${l.length > 3 ? `<span class="cr-ev-mais">+ ${l.length - 3}</span>` : ''}</span>
       ${l.length ? `<span class="q">${l.length}</span>` : ''}
     </button>`;
   }
@@ -1329,7 +1345,7 @@ function linha(it) {
   const r = rotuloData(it);
   return `<button type="button" class="cr-item${it.sit === 'feito' ? ' feito' : ''}" data-item="${esc(it.chave)}">
     <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
-    <span class="cr-item-txt"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${seloPriv(it)}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
+    <span class="cr-item-txt"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.inicio ? 'Começa: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${seloPriv(it)}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
     <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span>
       ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? (it.focoEm ? '<span class="cr-nofoco">🎯 no foco</span>'
         : `<span class="cr-ac foco" role="button" tabindex="0" data-acao="foco" data-alvo="${esc(it.chave)}">Foco do dia →</span>`) : ''}</span>
@@ -1487,8 +1503,8 @@ function blocosDe(id, itens) {
     naoFeitos: itens.filter(it => meu(it) && naoFeito(it) && it.sit !== 'bloqueado').sort(ordemFoco),
     focoHoje: itens.filter(it => meu(it) && it.focoEm && !naoFeito(it) && (it.sit === 'afazer' || it.sit === 'fazendo')).sort(ordemFoco),
     foco: itens.filter(it => meu(it) && it.focoEm && (it.sit === 'afazer' || it.sit === 'fazendo')).sort(ordemFoco),
-    hoje: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && it.data <= hoje()).sort(ordemQuadro),
-    proximos: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && it.data > hoje() && it.data <= addDias(hoje(), 7)).sort(ordemQuadro),
+    hoje: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && (it.comeca || it.data) <= hoje()).sort(ordemQuadro),
+    proximos: itens.filter(it => meu(it) && !it.focoEm && it.sit !== 'feito' && it.sit !== 'bloqueado' && (it.comeca || it.data) > hoje() && (it.comeca || it.data) <= addDias(hoje(), 7)).sort(ordemQuadro),
     bloq: itens.filter(it => it.sit === 'bloqueado' && (meu(it) || it.bloq?.quem === id)).sort((a, b) => (a.bloq?.desde || '').localeCompare(b.bloq?.desde || '')),
   };
 }
@@ -2009,7 +2025,7 @@ function abrirTarefa(chave) {
         <div class="cr-tk-chips">
           <label class="cr-tk-chip sel">${avatar(respId)}<span>${esc(p ? p.nome : (padraoArea ? 'Da área — ' + padraoArea : 'Sem responsável'))} ▾</span>${selResp}</label>
           ${edita && !rep ? `<span class="cr-tk-chip data ${r.cls}" id="tkDataBt" role="button" tabindex="0">📅 ${esc(br(it.data))} · ${esc(r.txt)} ▾<input type="date" id="tkData" value="${esc(t.data || '')}" tabindex="-1" aria-label="Data"></span>`
-            : `<span class="cr-tk-chip data ${r.cls} fixo">📅 ${esc(br(it.data))} · ${esc(r.txt)}</span>`}
+            : `<span class="cr-tk-chip data ${r.cls} fixo">📅 ${it.comeca ? `${esc(brCurto(it.comeca))} → ${esc(brCurto(it.data))} · ${esc(r.txt.replace(/^prazo \S+ · /, '').replace(/^de \S+ a \S+$/, 'ainda não começou'))}` : `${esc(br(it.data))} · ${esc(r.txt)}`}</span>`}
           ${edita ? `<label class="cr-tk-chip sel">🔁 <span>${repTxt} ▾</span><select id="tkRep" aria-label="Repete">
               <option value="nenhuma" ${!rep ? 'selected' : ''}>Não repete</option>
               <option value="semanal" ${t.recorrencia === 'semanal' ? 'selected' : ''}>Toda semana</option>
@@ -2019,6 +2035,7 @@ function abrirTarefa(chave) {
         ${edita && rep ? `<div class="cr-tk-rep">
             <label>Começa em <input type="date" id="tkIni" value="${esc(t.data || '')}"></label>
             <label>Até <input type="date" id="tkAte" value="${esc(t.ate || '')}"></label>
+            ${t.recorrencia === 'mensal' ? `<label>Prazo até o dia <input type="number" id="tkPrazo" min="1" max="31" style="width:64px" value="${esc(t.prazo_dia || '')}" placeholder="—"></label>` : ''}
             <small>O responsável vale para todas as vezes.</small></div>` : ''}
 
         <div class="cr-tk-rot">Situação${rep ? ' (desta vez)' : ''}</div>
@@ -2115,6 +2132,11 @@ function abrirTarefa(chave) {
     reabrir(novos[0]?.chave || it.chave);
   };
   if ($('tkAte')) $('tkAte').onchange = async () => { await salvarT({ ate: $('tkAte').value || null }); };
+  if ($('tkPrazo')) $('tkPrazo').onchange = async () => {
+    const n = parseInt($('tkPrazo').value, 10);
+    await salvarT({ prazo_dia: n >= 1 && n <= 31 ? n : null });
+    reabrir();
+  };
   // área
   if ($('tkArea')) $('tkArea').onchange = async () => { await salvarT({ area: $('tkArea').value }); reabrir(); };
   // só eu vejo
