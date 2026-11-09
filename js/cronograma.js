@@ -956,11 +956,11 @@ const est = {
   colMob: 'afazer',                     // aba do quadro no celular
   colunas: vis.colunas || 'situacao',   // situacao | pessoa
   filtro: vis.filtro || 'todos',        // todos | minhas
-  pessoa: '', area: '', origem: '', busca: '', mostrar: 'abertas', abertos: new Set(ler('gr.cronograma.modAbertos', [])),
+  pessoa: '', area: '', origem: '', busca: '', mostrar: 'abertas', prazo: vis.prazo || 'semana', abertos: new Set(ler('gr.cronograma.modAbertos', [])),
   periodo: vis.periodo || 30,
   mes: hoje().slice(0, 7), dia: hoje(),
 };
-const guardarVis = () => gravarLocal('gr.cronograma.vis', { visao: est.visao, colunas: est.colunas, filtro: est.filtro, periodo: est.periodo });
+const guardarVis = () => gravarLocal('gr.cronograma.vis', { visao: est.visao, colunas: est.colunas, filtro: est.filtro, periodo: est.periodo, prazo: est.prazo });
 
 let alvo = null;
 let ligado = false;
@@ -1006,10 +1006,19 @@ const MODULOS = [
   { id: 'proj', nome: 'Projetos', areas: ['proj'] },
   { id: 'esc', nome: 'Escritório e avulsas gerais', areas: ['esc'] },
 ];
+/* 09/11/2026 (pedido dele): Por módulo virou quadro estilo Kanban — uma
+   coluna por módulo, cartões agrupados pela tela de origem — com o prazo
+   Hoje (vence até hoje, atrasadas incluídas) / Semana (até domingo) / Tudo. */
+const fimSemana = () => addDias(hoje(), 6 - dataDe(hoje()).getDay());
+function noPrazo(it) {
+  if (est.prazo === 'tudo') return true;
+  if (it.sit === 'feito') return (it.feitaEm || it.data) >= (est.prazo === 'hoje' ? hoje() : addDias(hoje(), -dataDe(hoje()).getDay()));
+  return it.data <= (est.prazo === 'hoje' ? hoje() : fimSemana());
+}
 function modulos() {
   const conhecidas = new Set(MODULOS.flatMap(m => m.areas));
-  const itens = filtrados().filter(it => est.mostrar === 'todas' || it.sit !== 'feito');
-  const blocos = MODULOS.map(m => {
+  const itens = filtrados().filter(it => (est.mostrar === 'todas' || it.sit !== 'feito') && noPrazo(it));
+  const cols = MODULOS.map(m => {
     const l = itens.filter(it => m.areas.includes(it.area) || (m.id === 'esc' && !conhecidas.has(it.area)));
     if (!l.length) return '';
     const grupos = new Map();
@@ -1018,19 +1027,19 @@ function modulos() {
       if (!grupos.has(g)) grupos.set(g, []);
       grupos.get(g).push(it);
     }
-    const ordemG = [...grupos.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR'));
     const atr = l.filter(it => it.sit !== 'feito' && atrasado(it)).length;
-    const nf = l.filter(it => it.focoEm && it.sit !== 'feito').length;
     const ab = l.filter(it => it.sit !== 'feito').length;
-    const cor = areaDe(m.areas[0]).cor;
-    return `<details class="cr-mod" data-mod="${m.id}" ${est.abertos.has(m.id) ? 'open' : ''}>
-      <summary><span class="cr-pt" style="background:${cor}"></span><b>${esc(m.nome)}</b>
-        <span class="cr-mod-cont">${ab} ${ab === 1 ? 'aberta' : 'abertas'}${atr ? ` · <span class="cr-at">${atr} atrasada${atr > 1 ? 's' : ''}</span>` : ''}${nf ? ` · 🎯 ${nf} no foco` : ''}</span></summary>
-      ${ordemG.map(g => `<div class="cr-mod-grupo"><h4>${esc(g)} <span>${grupos.get(g).length}</span></h4>
-        <div class="cr-lista">${grupos.get(g).sort((a, b) => (a.sit === 'feito') - (b.sit === 'feito') || ordemQuadro(a, b)).map(linha).join('')}</div></div>`).join('')}
-    </details>`;
+    return `<section class="cr-col cr-mod-col" data-col="mod-${m.id}">
+      <header class="cr-col-cab"><span class="cr-pt" style="background:${areaDe(m.areas[0]).cor}"></span><b>${esc(m.nome)}</b>
+        <span class="cr-cont">${ab}${atr ? ` · <span class="cr-at">${atr} atrasada${atr > 1 ? 's' : ''}</span>` : ''}</span></header>
+      <div class="cr-col-corpo">${[...grupos.keys()].sort((a, b) => a.localeCompare(b, 'pt-BR')).map(g =>
+        `<h4 class="cr-mod-sub">${esc(g)} <span>${grupos.get(g).length}</span></h4>` +
+        grupos.get(g).sort((a, b) => (a.sit === 'feito') - (b.sit === 'feito') || ordemQuadro(a, b)).map(it => card(it, { comSit: true })).join('')).join('')}</div>
+    </section>`;
   }).join('');
-  return blocos || `<div class="cr-foco-vazio"><b>Nenhuma tarefa ${est.mostrar === 'todas' ? '' : 'aberta '}nos filtros atuais.</b><p>Confira os filtros de pessoa, área e origem.</p></div>`;
+  const nomeP = { hoje: 'para hoje', semana: 'para esta semana', tudo: '' }[est.prazo];
+  return cols ? `<div class="cr-quadro cr-mods">${cols}</div>`
+    : `<div class="cr-foco-vazio"><b>Nenhuma tarefa ${est.mostrar === 'todas' ? '' : 'aberta '}${nomeP} nos filtros atuais.</b><p>Troque o prazo para Semana ou Tudo, ou confira os filtros.</p></div>`;
 }
 
 /* Pesquisa (09/11/2026, pedido dele): pelo número (#123 ou 123) ou por
@@ -1127,6 +1136,10 @@ function desenhar() {
         <option value="avulsa" ${est.origem === 'avulsa' ? 'selected' : ''}>Avulsas</option>
       </select>
       ${est.visao === 'modulos' ? `
+        <span class="cr-sep">Prazo:</span>
+        <button type="button" class="cr-chip" data-prazo="hoje" aria-pressed="${est.prazo === 'hoje'}">Hoje</button>
+        <button type="button" class="cr-chip" data-prazo="semana" aria-pressed="${est.prazo === 'semana'}">Semana</button>
+        <button type="button" class="cr-chip" data-prazo="tudo" aria-pressed="${est.prazo === 'tudo'}">Tudo</button>
         <span class="cr-sep">Mostrar:</span>
         <button type="button" class="cr-chip" data-mostrar="abertas" aria-pressed="${est.mostrar !== 'todas'}">Abertas</button>
         <button type="button" class="cr-chip" data-mostrar="todas" aria-pressed="${est.mostrar === 'todas'}">Com concluídas</button>` : ''}
@@ -1467,6 +1480,7 @@ function ligarTela() {
   const r = alvo;
   r.querySelectorAll('[data-visao]').forEach(b => b.onclick = () => { est.visao = b.dataset.visao; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-filtro]').forEach(b => b.onclick = () => { est.filtro = b.dataset.filtro; guardarVis(); desenhar(); });
+  r.querySelectorAll('[data-prazo]').forEach(b => b.onclick = () => { est.prazo = b.dataset.prazo; guardarVis(); desenhar(); });
   r.querySelectorAll('[data-mostrar]').forEach(b => b.onclick = () => { est.mostrar = b.dataset.mostrar; desenhar(); });
   r.querySelectorAll('details[data-mod]').forEach(d => d.ontoggle = () => {
     if (d.open) est.abertos.add(d.dataset.mod); else est.abertos.delete(d.dataset.mod);
@@ -1536,6 +1550,7 @@ function ligarTela() {
   });
   r.querySelectorAll('.cr-col').forEach(col => {
     col.addEventListener('dragover', ev => {
+      if (est.visao === 'modulos') return;
       ev.preventDefault(); col.classList.add('alvo');
       if (est.visao !== 'foco') return;
       limparMarca();
@@ -1550,6 +1565,7 @@ function ligarTela() {
       if (!it) return;
       const c = col.dataset.col;
       const origem = r.querySelector(`.cr-card[data-item="${CSS.escape(chave)}"]`)?.closest('.cr-col');
+      if (est.visao === 'modulos') return;   // colunas de módulo não mudam a tarefa
       if (c === 'bloqueado') { if (it.sit !== 'bloqueado') abrirBloquear(it); return; }
       if (est.visao === 'foco') {
         const antes = cartaoAntes(col, ev.clientY);
