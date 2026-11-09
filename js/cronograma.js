@@ -121,6 +121,16 @@ const VINC_TEXTO = [
   [/\bexames?\b|\baso\b|treinament/, 'reu-vinicius'],
   [/boleti|gestao de jornada|\bjornada\b|lancar jornada|fechamento do dp/, 'reu-lincoln'],
 ];
+/* Exceções por tarefa (09/11/2026, planilha "Atividades do app" revisada por
+   ele): a origem tem o responsável padrão (cron_config 'responsaveis') e
+   estas tarefas vão para outra pessoa — vale para as próximas vezes também. */
+const VINC_REGRAS = [
+  ['dp-tarefas', /lancar salario e ticket/, 'reu-guilherme'],
+  ['cert-docs', /^an (77|10) /, 'reu-matheus'],
+  ['cert-docs', /^an (58|115) /, 'reu-vinicius'],
+  ['cert-melh', /caixa de reclama/, 'reu-vinicius'],
+];
+const vincRegra = a => VINC_REGRAS.find(([o, re]) => o === a.origem && re.test(norm(a.titulo)))?.[2] || null;
 const vincTexto = t => VINC_TEXTO.find(([re]) => re.test(norm(t)))?.[1] || null;
 const unidadeDeTexto = s => /quebra\s*coc/i.test(norm(s)) ? 'Quebra Cocão' : (s ? 'Matriz' : null);
 
@@ -889,7 +899,7 @@ function todosItens() {
   for (const a of dados.auto) {
     const o = ORIGENS[a.origem] || { nome: a.origem, area: 'esc' };
     const e = estadoDe(a.chave);
-    const explicito = e?.responsavel_id || VINC_ORIGEM[a.origem] || a.respId || pessoaPorTexto(a.respTexto)?.id || null;
+    const explicito = e?.responsavel_id || VINC_ORIGEM[a.origem] || vincRegra(a) || a.respId || pessoaPorTexto(a.respTexto)?.id || null;
     const resps = explicito ? [explicito] : padrao[a.origem] ? [padrao[a.origem]] : respsDaArea(o.area, a.unid);
     let sit = e?.situacao || (a.feitoNaOrigem ? 'feito' : 'afazer');
     itens.push({ ...a, ir: a.ir || o.ir || null, area: o.area, origemNome: o.nome + (a.unid ? ' · ' + a.unid : ''), auto: true,
