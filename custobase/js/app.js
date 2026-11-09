@@ -11,6 +11,7 @@ import { abrirCulturas } from './culturas.js';
 import { abrirHoraHomem } from './horahomem.js';
 import { abrirAdmMensais } from './admmensais.js';
 import { abrirHorimetros } from './horimetros.js';
+import { abrirIrrigacao } from './irrigacao.js';
 
 const $ = id => document.getElementById(id);
 
@@ -30,6 +31,7 @@ function abrirAba(nome) {
   if (nome.startsWith('hh')) abrirHoraHomem(nome);
   if (nome.startsWith('am')) abrirAdmMensais(nome);
   if (nome === 'hzConf') abrirHorimetros();
+  if (nome.startsWith('ir')) abrirIrrigacao(nome);
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 

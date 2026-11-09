@@ -22,6 +22,8 @@ const ICONES = {
   adm: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="M15.5 16.5l1.5 1.5 3-3"/>',
   horimetro: '<circle cx="12" cy="13" r="8"/><path d="M12 13l3.5-3.5"/><path d="M8 18h8"/><path d="M10 3h4"/>',
   lista: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+  irrigacao: '<path d="M12 2.5c-3.5 4.4-6 7.9-6 11a6 6 0 0 0 12 0c0-3.1-2.5-6.6-6-11z"/><path d="M9.5 15a2.5 2.5 0 0 0 2.5 2.5"/>',
+  fazenda: '<path d="M3 21h18"/><path d="M5 21V10l7-5 7 5v11"/><path d="M10 21v-6h4v6"/>',
   culturas: '<path d="M12 22V12"/><path d="M12 12c-4 0-7-3-7-7 4 0 7 3 7 7z"/><path d="M12 15c0-4 3-7 7-7 0 4-3 7-7 7z"/>',
 };
 export const svgIcone = nome =>
@@ -78,6 +80,19 @@ export const MODULOS = [
      tarefa mensal no Rastro, dia 10. */
   { id: 'horimetros', nome: 'Conferência de horímetros', icone: 'horimetro', telas: [
     ['hzConf', 'Conferência do mês', 'horimetro'],
+  ] },
+  /* Controle de irrigação (09/11/2026, pedido dele): a planilha "Custo
+     Irrigação" no mesmo modelo — por fazenda e mês, horas ligado por plantio,
+     acerto da fatura CEMIG entre os produtores (Sakuma / G8), envio do acerto
+     e resumo por plantio com "Lançado Agro". */
+  { id: 'irrigacao', nome: 'Controle de irrigação', icone: 'irrigacao', inicial: 'irMes', subs: [
+    { id: 'irSubAcerto', nome: 'Acerto', icone: 'irrigacao', telas: [
+      ['irMes',       'Acerto do mês', 'mes'],
+      ['irHistorico', 'Histórico',     'historico'],
+    ] },
+    { id: 'irSubParam', nome: 'Parâmetros', icone: 'param', telas: [
+      ['irFazendas',  'Fazendas (produtores e e-mail)', 'fazenda'],
+    ] },
   ] },
 ];
 

@@ -291,3 +291,42 @@ table.hz-gaps tbody tr.fixed td{background:rgba(132,189,0,.16)}
 @media (max-width:559px){ .hz-mhead .mprog{display:none} .hz-chart .crow{grid-template-columns:minmax(80px,120px) 1fr auto} }
 @media print{ .hz-naoimp{display:none !important} .hz-mach .mbody{display:block !important} .hz-mach{break-inside:avoid} }
 .hz-tools input[type=search]{font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--linha);border-radius:8px;background:var(--fundo);color:var(--texto);width:100%;min-height:40px}
+
+/* ---- Controle de irrigação (09/11/2026): o desenho da planilha "Custo Irrigação", nas cores do app ---- */
+.ir-titulo{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;background:#80561B;color:#fff;border-radius:10px 10px 0 0;padding:10px 14px;font-weight:700;font-size:16px;margin-top:6px}
+.ir-titulo b{color:#F0E6D3;font-size:15px}
+.ir-contas{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;background:rgba(116,79,40,.08);border:1px solid var(--linha);border-top:0;border-radius:0 0 10px 10px;padding:10px 14px;margin-bottom:12px}
+.ir-conta{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--marrom)}
+.ir-conta-nome{width:90px;font:inherit;font-weight:700;color:var(--marrom);background:transparent;border:1px dashed transparent;border-radius:6px;padding:3px 4px;text-align:right}
+.ir-conta-nome:hover,.ir-conta-nome:focus{border-color:var(--linha)}
+.ir-conta-valor{width:130px;text-align:right;font:inherit;font-size:15px;font-weight:700;padding:5px 8px;border:1px solid var(--linha);border-radius:6px;background:var(--papel);color:var(--marrom)}
+.ir-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.ir-grade{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+.ir-tab td{padding:3px 4px}
+.ir-tab input,.ir-tab select{font:inherit;font-size:13px;padding:4px 5px;border:1px solid var(--linha);border-radius:6px;background:var(--fundo);color:var(--texto);max-width:100%}
+.ir-tab input[type=date]{width:128px} .ir-tab input[type=time]{width:84px} .ir-tab input[data-c=plantio]{width:150px}
+.ir-tab .ir-fora{border-color:var(--alerta);background:rgba(201,138,0,.12)}
+.ir-tab tbody tr:nth-child(even) td{background:rgba(132,189,0,.07)}
+.ir-tab td[data-o]{white-space:nowrap;color:var(--marrom);font-weight:600}
+.ir-x{border:0;background:transparent;color:var(--suave);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px}
+.ir-x:hover{color:var(--erro);background:rgba(192,57,43,.1)}
+.ir-caixa{border:1px solid var(--linha);border-radius:10px;background:var(--papel);overflow:hidden;margin-bottom:12px}
+.ir-cx-tit{background:#80561B;color:#fff;font-weight:700;padding:8px 12px;font-size:13px}
+.ir-ac{margin:0;width:100%}
+.ir-ac td,.ir-ac th{white-space:nowrap}
+.ir-ac .ir-ac-cab th{background:var(--verde);color:#fff}
+.ir-ac .ir-ac-tot td{background:#80561B !important;color:#fff}
+.ir-envio .ir-env{display:grid;grid-template-columns:80px 1fr;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--linha);background:rgba(116,79,40,.05);font-size:13px}
+.ir-envio .ir-env > span{font-weight:700;color:var(--marrom)}
+.ir-envio .ir-env input{font:inherit;padding:4px 6px;border:1px solid var(--linha);border-radius:6px;background:var(--papel);color:var(--texto);width:100%}
+.ir-envio .ir-env-msg{align-items:start}
+.ir-envio .barra{padding:0 12px 10px}
+.ir-res tr.am-ok td{background:rgba(132,189,0,.14) !important}
+.ir-res tr.am-pend td:first-child{box-shadow:inset 3px 0 0 #C98A00}
+.ir-hist .ir-link{cursor:pointer} .ir-hist .ir-link:hover td{background:var(--verde-fundo)}
+.ir-param{border:1px solid var(--linha);border-radius:10px;padding:12px;margin-bottom:12px;background:var(--papel)}
+.ir-param textarea{font:inherit;width:100%;padding:6px 8px;border:1px solid var(--linha);border-radius:6px;background:var(--fundo);color:var(--texto)}
+@media (max-width:1500px){ .ir-grade{grid-template-columns:1fr} .ir-dir{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px} .ir-dir .ir-caixa{margin:0} }
+@media (max-width:640px){ .ir-conta-valor{width:110px} .ir-tab input[data-c=plantio]{width:130px} }
+#irFaz{min-width:180px}
+@media (max-width:640px){ #irMesCorpo .cb-mes-nav label:first-child{flex:1 1 100%} #irFaz{width:100%} }

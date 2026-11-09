@@ -6,7 +6,7 @@
 <title>Custo Base · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=1">
-<link rel="stylesheet" href="css/custobase.css?v=10">
+<link rel="stylesheet" href="css/custobase.css?v=11">
 <link rel="stylesheet" href="../css/categoria-moldura.css?v=1">
 <!-- Área Custo Base do LOP - Gestão Rápida (20/10/2026).
      Módulo Rateio mensal culturas: substitui a planilha "Rateio - Direcionador
@@ -148,6 +148,28 @@
         <div id="hzCorpo"></div>
       </div>
     </section>
+    <!-- =================== CONTROLE DE IRRIGAÇÃO (09/11/2026) =================== -->
+    <section class="tela" id="telaIrMes" hidden>
+      <div class="cartao">
+        <h2>Controle de irrigação · acerto do mês</h2>
+        <p class="dica">O modelo da planilha "Custo Irrigação": escolha a fazenda e o mês, digite as contas da fatura CEMIG e lance cada vez que a irrigação ligou (data, hora que ligou e desligou, plantio e produtor). As horas, o % e o valor de cada linha, o acerto entre os produtores e o resumo por plantio saem sozinhos.</p>
+        <div id="irMesCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaIrHistorico" hidden>
+      <div class="cartao">
+        <h2>Controle de irrigação · histórico</h2>
+        <p class="dica">Todos os acertos por mês e fazenda: fatura, horas, quanto ficou para cada produtor, Lançado Agro e envio.</p>
+        <div id="irHistCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaIrFazendas" hidden>
+      <div class="cartao">
+        <h2>Controle de irrigação · fazendas</h2>
+        <p class="dica">Para cada fazenda: os produtores que dividem a fatura, o e-mail de quem recebe o acerto, o anexo e a mensagem do envio.</p>
+        <div id="irFazCorpo"></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -168,7 +190,7 @@
 <script src="../vendor/xlsx-js-style.min.js" defer></script>
 <script src="js/config.js?v=3"></script>
 <script src="../js/moldura-nucleo.js?v=6"></script>
-<script src="js/base.js?v=6"></script>
-<script type="module" src="js/app.js?v=17"></script>
+<script src="js/base.js?v=7"></script>
+<script type="module" src="js/app.js?v=18"></script>
 </body>
 </html>
