@@ -141,3 +141,7 @@ create policy cron_tarefas_alterar on public.cron_tarefas for update
   with check (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()));
 create policy cron_tarefas_apagar on public.cron_tarefas for delete
   using (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()));
+
+-- 09/11/2026 (pedido do Guilherme): tarefa mensal com período — começa no dia de `data`
+-- e tem prazo até o dia `prazo_dia` do mesmo mês. Migração cron_tarefas_prazo_dia.
+alter table public.cron_tarefas add column if not exists prazo_dia smallint check (prazo_dia between 1 and 31);
