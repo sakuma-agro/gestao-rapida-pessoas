@@ -1393,7 +1393,11 @@ function foco() {
    cronômetro é só referência: não corta ninguém, fica vermelho quando passa.
    A ordem das pessoas fica guardada neste aparelho. */
 const REU_SEG = 15 * 60;
-const reu = { ordem: ler('gr.cronograma.reuOrdem', []), atual: null, rodando: false, acum: 0, marca: 0, porPessoa: {}, timer: null, etapa: 'inicio' };
+/* 09/11/2026, pedido dele: escolher quem fica na reunião (gr.cronograma.reuFora,
+   guardado no aparelho como a ordem). E a reunião é vista pela equipe toda:
+   tarefa "Só eu vejo" não entra nela. */
+const itensReu = () => todosItens().filter(i => !i.privada);
+const reu = { fora: ler('gr.cronograma.reuFora', []), ordem: ler('gr.cronograma.reuOrdem', []), atual: null, rodando: false, acum: 0, marca: 0, porPessoa: {}, timer: null, etapa: 'inicio' };
 /* Pauta da reunião (09/11/2026, a do papel na parede do escritório):
    1 Bom dia! · 2 O que tínhamos para ontem? · 3 Tivemos anomalias? ·
    4 O que temos para hoje? · 5 Bom trabalho! — às 07:00. 1 e 5 são da
@@ -1437,17 +1441,29 @@ function blocosDe(id, itens) {
     bloq: itens.filter(it => it.sit === 'bloqueado' && (meu(it) || it.bloq?.quem === id)).sort((a, b) => (a.bloq?.desde || '').localeCompare(b.bloq?.desde || '')),
   };
 }
-function pessoasReuniao(itens) {
+function candidatosReuniao(itens) {
   const tem = id => { const b = blocosDe(id, itens); return b.feitos.length + b.foco.length + b.hoje.length + b.proximos.length + b.bloq.length + b.naoFeitos.length > 0; };
-  const ps = pessoasAtivas().filter(p => tem(p.id));
+  return pessoasAtivas().filter(p => tem(p.id));
+}
+function pessoasReuniao(itens) {
+  const ps = candidatosReuniao(itens).filter(p => !reu.fora.includes(p.id));
   const pos = id => { const i = reu.ordem.indexOf(id); return i < 0 ? 999 : i; };
   return ps.sort((a, b) => pos(a.id) - pos(b.id) || (a.ordem ?? 999) - (b.ordem ?? 999));
 }
 
+/* Quem fica na reunião: um botão por pessoa que tem algo; tocar tira ou põe. */
+function quemFica(itens) {
+  const cands = candidatosReuniao(itens);
+  return `<div class="cr-reu-quem"><small>Quem fica na reunião <span>(toque para tirar ou pôr)</span></small><div>${cands.map(x => {
+    const fora = reu.fora.includes(x.id);
+    return `<button type="button" class="cr-reu-chip${fora ? ' fora' : ''}" data-reufica="${x.id}" aria-pressed="${!fora}">${fora ? '' : '✓ '}${esc(x.nome)}</button>`;
+  }).join('')}</div></div>`;
+}
 function reuniao() {
-  const itens = todosItens();
+  const itens = itensReu();
   const ps = pessoasReuniao(itens);
-  if (!ps.length) return barraPauta() + '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>';
+  if (!candidatosReuniao(itens).length) return barraPauta() + '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>';
+  if (!ps.length) return barraPauta() + `<section class="cr-reu-abre"><h3><i>1</i> Bom dia!</h3>${quemFica(itens)}<p class="cr-vazio">Escolha pelo menos uma pessoa para a reunião.</p></section>`;
   if (!reu.atual || !ps.some(p => p.id === reu.atual)) reu.atual = ps[0].id;
   const idx = ps.findIndex(p => p.id === reu.atual), p = ps[idx], prox = ps[idx + 1];
   const b = blocosDe(p.id, itens);
@@ -1482,6 +1498,7 @@ function reuniao() {
       <section class="cr-reu-abre">
         <h3><i>1</i> Bom dia!</h3>
         <p>${esc(SEMANA[dow])}, ${esc(br(hoje()))} · ${ps.length} ${ps.length === 1 ? 'pessoa' : 'pessoas'} na reunião</p>
+        ${quemFica(itens)}
         <ul class="cr-reu-equipe">${ps.map(linhaP).join('')}</ul>
         <p class="cr-anomalia">⚠ ${esc(ANOMALIA)}</p>
         <button type="button" class="btn principal" id="crReuComecar">Começar: ${esc(ps[0].nome)} →</button>
@@ -1545,7 +1562,7 @@ function ligarReuniao() {
   const r = alvo;
   const trocar = id => { fecharTrecho(); reu.atual = id; desenhar(); window.scrollTo?.({ top: r.offsetTop, behavior: 'smooth' }); };
   if ($('crReuIni')) $('crReuIni').onclick = () => { reu.rodando = true; reu.marca = agoraS(); desenhar(); };
-  const comecar = () => { if (!reu.rodando) { reu.rodando = true; reu.marca = agoraS(); } reu.etapa = 'pessoas'; reu.atual = pessoasReuniao(todosItens())[0]?.id || null; desenhar(); };
+  const comecar = () => { if (!reu.rodando) { reu.rodando = true; reu.marca = agoraS(); } reu.etapa = 'pessoas'; reu.atual = pessoasReuniao(itensReu())[0]?.id || null; desenhar(); };
   if ($('crReuComecar')) $('crReuComecar').onclick = comecar;
   if ($('crReuInicio')) $('crReuInicio').onclick = () => { fecharTrecho(); reu.etapa = 'inicio'; desenhar(); };
   if ($('crReuTermina')) $('crReuTermina').onclick = () => { fecharTrecho(); reu.rodando = false; reu.etapa = 'fim'; desenhar(); };
@@ -1562,12 +1579,17 @@ function ligarReuniao() {
     if (!confirm('Encerrar a reunião e zerar o cronômetro?')) return;
     Object.assign(reu, { rodando: false, acum: 0, marca: 0, porPessoa: {}, atual: null, etapa: 'inicio' }); desenhar();
   };
-  if ($('crReuProx')) $('crReuProx').onclick = () => { const ps = pessoasReuniao(todosItens()); const i = ps.findIndex(x => x.id === reu.atual); if (ps[i + 1]) trocar(ps[i + 1].id); };
-  if ($('crReuAnt')) $('crReuAnt').onclick = () => { const ps = pessoasReuniao(todosItens()); const i = ps.findIndex(x => x.id === reu.atual); if (i > 0) trocar(ps[i - 1].id); };
+  if ($('crReuProx')) $('crReuProx').onclick = () => { const ps = pessoasReuniao(itensReu()); const i = ps.findIndex(x => x.id === reu.atual); if (ps[i + 1]) trocar(ps[i + 1].id); };
+  if ($('crReuAnt')) $('crReuAnt').onclick = () => { const ps = pessoasReuniao(itensReu()); const i = ps.findIndex(x => x.id === reu.atual); if (i > 0) trocar(ps[i - 1].id); };
   r.querySelectorAll('[data-reup]').forEach(b => b.onclick = () => { reu.etapa = 'pessoas'; trocar(b.dataset.reup); });
   r.querySelectorAll('[data-reusobe]').forEach(b => b.onclick = () => {
-    const ids = pessoasReuniao(todosItens()).map(x => x.id), i = ids.indexOf(b.dataset.reusobe);
+    const ids = pessoasReuniao(itensReu()).map(x => x.id), i = ids.indexOf(b.dataset.reusobe);
     if (i > 0) { [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; reu.ordem = ids; gravarLocal('gr.cronograma.reuOrdem', ids); desenhar(); }
+  });
+  r.querySelectorAll('[data-reufica]').forEach(b => b.onclick = () => {
+    const id = b.dataset.reufica;
+    reu.fora = reu.fora.includes(id) ? reu.fora.filter(x => x !== id) : [...reu.fora, id];
+    gravarLocal('gr.cronograma.reuFora', reu.fora); desenhar();
   });
   if (!reu.timer) reu.timer = setInterval(tic, 1000);
 }
