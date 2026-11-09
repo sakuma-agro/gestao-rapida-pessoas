@@ -10,6 +10,7 @@ import { abrirTalhoes } from './talhoes.js';
 import { abrirCulturas } from './culturas.js';
 import { abrirHoraHomem } from './horahomem.js';
 import { abrirAdmMensais } from './admmensais.js';
+import { abrirHorimetros } from './horimetros.js';
 
 const $ = id => document.getElementById(id);
 
@@ -28,6 +29,7 @@ function abrirAba(nome) {
   if (nome === 'rtCulturas') abrirCulturas();
   if (nome.startsWith('hh')) abrirHoraHomem(nome);
   if (nome.startsWith('am')) abrirAdmMensais(nome);
+  if (nome === 'hzConf') abrirHorimetros();
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 

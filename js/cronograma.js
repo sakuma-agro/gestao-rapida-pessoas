@@ -192,13 +192,13 @@ const sitCor = it => it.sit === 'afazer' && atrasado(it) ? 'atraso' : it.sit;
 /* ---------------- dados ---------------- */
 const dados = {
   pessoas: [], tarefas: [], estados: [], config: [], auto: [], numeros: {},
-  adm: { itens: [], lanc: [] },
+  adm: { itens: [], lanc: [] }, hor: [],
   em: null, carregando: false, falhas: [],
 };
 (() => { const c = ler(CACHE, null); if (c) Object.assign(dados, c, { carregando: false }); })();
 const salvarCache = () => gravarLocal(CACHE, {
   pessoas: dados.pessoas, tarefas: dados.tarefas, estados: dados.estados,
-  config: dados.config, auto: dados.auto, numeros: dados.numeros, adm: dados.adm, em: dados.em,
+  config: dados.config, auto: dados.auto, numeros: dados.numeros, adm: dados.adm, hor: dados.hor, em: dados.em,
 });
 /* Custo Base › Adm mensais (09/11/2026, pedido dele): a tarefa mensal
    "Adm - mensais" (ir = 'admMes') tem o checklist montado do cadastro do
@@ -212,7 +212,15 @@ async function lerAdm(c) {
     c.from('cb_adm_lanc').select('id,mes,item_id,valor,lancado').gte('mes', de).limit(5000),
   ].map(q => q.then(x => x, e => ({ error: e }))));
   if (!it.error && !la.error) dados.adm = { itens: it.data || [], lanc: la.data || [] };
+  // Conferência de horímetros (09/11/2026): resumo de cada mês
+  const hz = await c.from('cb_hor_conf').select('id,diferencas,corrigidas').then(x => x, e => ({ error: e }));
+  if (!hz.error) dados.hor = hz.data || [];
 }
+/* Tarefa "Conferência de horímetros" (dia 10, ir = 'hzConf'): a do dia 10 de
+   novembro confere o mês anterior (outubro). Com PDF importado → Em andamento;
+   sem diferença pendente → Concluída. */
+const HZ_IR = 'hzConf';
+const mesAntes = d => { const [a, m] = d.split('-').map(Number); const x = new Date(a, m - 2, 1); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0'); };
 const ADM_IR = 'admMes';
 function ckAdm(mes) {
   const its = (dados.adm?.itens || []).filter(i => i.periodicidade !== 'anual' || Number(mes.slice(5, 7)) === Number(i.mes_anual || 1))
@@ -989,6 +997,12 @@ function todosItens() {
           else if (f && f < tot && it.sit === 'afazer') it.sit = 'fazendo';
         }
       }
+      if (t.ir === HZ_IR) {
+        const it = itens[itens.length - 1], mc = mesAntes(d), c = (dados.hor || []).find(x => x.id === mc);
+        it.texto = `Conferência de ${mc.slice(5, 7)}/${mc.slice(0, 4)}` + (c ? ` · ${c.corrigidas}/${c.diferencas} diferença(s) corrigida(s)` : ' · PDF ainda não importado') + (t.descricao ? '\n' + t.descricao : '');
+        if (c && c.corrigidas >= c.diferencas && it.sit !== 'feito') { it.sit = 'feito'; it.feitaEm = it.feitaEm || hoje(); }
+        else if (c && it.sit === 'afazer') it.sit = 'fazendo';
+      }
     }
   }
   return itens;
@@ -1030,7 +1044,7 @@ const IR_CK = {
   qcSaida: { a: 'estoque', t: 'qcSaida' }, qcEntrada: { a: 'estoque', t: 'qcEntrada' }, ctNova: { a: 'estoque', t: 'ctNova' },
   acPainel: { a: 'estoque', t: 'acPainel' }, acSaldo: { a: 'estoque', t: 'acSaldo' },
   acTransf: { a: 'estoque', t: 'acTransferencias' }, acRelatorio: { a: 'estoque', t: 'acRelatorio' },
-  rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' }, admMes: { a: 'custobase', t: 'amMes' },
+  rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' }, admMes: { a: 'custobase', t: 'amMes' }, hzConf: { a: 'custobase', t: 'hzConf' },
   colheita: { a: 'colheita', t: 'cpCargas' }, certDocs: { a: 'certificacao', t: 'ceDocumentos' },
   vencMaq: { a: 'manutencoes', x: 'acao=vencimentos' }, certAud: { a: 'certificacao', t: 'ceCertificacoes' },
   certAcoes: { a: 'certificacao', t: 'mcMelhorias' }, cadRel: { a: 'pessoas', t: 'cadRelatorios' },

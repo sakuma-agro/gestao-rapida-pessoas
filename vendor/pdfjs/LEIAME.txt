@@ -1,0 +1,1 @@
+pdf.js 5.7.284 (Mozilla, Apache-2.0) — tirado do HTML "Conferência de Horímetros" (09/11/2026). Usado em custobase/js/horimetros.js.

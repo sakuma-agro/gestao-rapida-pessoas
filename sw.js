@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v600';
+const VERSAO = 'gr-v601';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -66,7 +66,7 @@ const ARQUIVOS = [
   './icons/area-custobase.v3.svg',
   './custobase/', './custobase/index.html', './custobase/css/app.css', './custobase/css/custobase.css',
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
-  './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/admmensais.js', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
+  './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/admmensais.js', './custobase/js/horimetros.js', './vendor/pdfjs/pdf.min.mjs', './vendor/pdfjs/pdf.worker.min.mjs', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
   './custobase/img/sakuma-logo.png', './custobase/img/lop-marca.png', './custobase/img/sakuma-marca-vertical.png', './custobase/img/lop-assinatura-laser-claro.png',
   // Colheita e Produção (20/10/2026)
   './icons/area-colheita.v3.svg',
