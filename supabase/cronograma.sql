@@ -125,3 +125,19 @@ grant execute on function public.cron_numerar(text[]) to authenticated;
 -- ativo = false (não foram apagados); os novos têm descricao 'Rotina · <quando>'
 -- e checklist com um só grupo. Situação, foco e marcações de hoje foram levados
 -- para os cartões novos (cron_estado com a mesma data).
+
+-- 09/11/2026 (pedido do Guilherme): tarefa privada — só o dono vê.
+-- Aplicado no banco pela migração cron_tarefas_privadas.
+alter table public.cron_tarefas
+  add column if not exists privada boolean not null default false,
+  add column if not exists dono_email text default public.app_email();
+drop policy if exists cron_tarefas_todos on public.cron_tarefas;
+create policy cron_tarefas_ver on public.cron_tarefas for select
+  using (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()));
+create policy cron_tarefas_incluir on public.cron_tarefas for insert
+  with check (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()));
+create policy cron_tarefas_alterar on public.cron_tarefas for update
+  using (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()))
+  with check (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()));
+create policy cron_tarefas_apagar on public.cron_tarefas for delete
+  using (public.app_pode('cronograma') and (not privada or lower(coalesce(dono_email,'')) = public.app_email()));
