@@ -743,6 +743,38 @@ export async function carregarCronograma() {
   }
 }
 
+/* ---------------- atualização sozinha (09/11/2026) ----------------
+   Bloqueio/conclusão feito por outra pessoa aparecia só depois de tocar em
+   "Atualizar". Agora, com o Cronograma aberto, a cada 30 s (e ao voltar para
+   a aba) relê só as tarefas, situações e números — leve. A cada 10 min, ou
+   ao voltar depois de muito tempo, recarrega tudo (vencimentos das áreas). */
+let relendo = false;
+async function releituraLeve() {
+  if (relendo || dados.carregando || !estado.cliente || !estado.sessao || !navigator.onLine) return;
+  relendo = true;
+  try {
+    await enviarFila();
+    const c = estado.cliente;
+    const [tar, est2, nums] = await Promise.all([
+      c.from('cron_tarefas').select('*').eq('ativo', true),
+      c.from('cron_estado').select('*'),
+      c.from('cron_numeros').select('chave,numero').limit(20000).then(x => x, e => ({ error: e })),
+    ]);
+    const antes = JSON.stringify([dados.tarefas, dados.estados, dados.numeros]);
+    if (!tar.error) dados.tarefas = tar.data || [];
+    if (!est2.error) dados.estados = est2.data || [];
+    if (nums && !nums.error) { const n = {}; for (const r of nums.data || []) n[r.chave] = Number(r.numero); dados.numeros = n; }
+    // não redesenha no meio de um arrasto nem com uma tarefa aberta (fica para a próxima volta)
+    const ocupado = alvo?.querySelector('.arrastando') || document.querySelector('dialog[open]');
+    if (JSON.stringify([dados.tarefas, dados.estados, dados.numeros]) !== antes) { salvarCache(); if (!ocupado) avisar(); }
+    garantirNumeros();
+  } catch {} finally { relendo = false; }
+}
+const visivel = () => alvo && !alvo.closest('[hidden]') && document.visibilityState === 'visible';
+const velho = (min) => !dados.em || Date.now() - new Date(dados.em).getTime() > min * 60000;
+setInterval(() => { if (visivel()) (velho(10) ? carregarCronograma() : releituraLeve()); }, 30000);
+document.addEventListener('visibilitychange', () => { if (visivel()) (velho(10) ? carregarCronograma() : releituraLeve()); });
+
 /* ---------------- número de cada tarefa ----------------
    09/11/2026 (pedido dele): cada tarefa ganha um número fixo (#123), dado
    pelo banco (cron_numeros, função cron_numerar) na ordem da data — o
@@ -935,7 +967,12 @@ let ligado = false;
 
 export function abrirCronograma(el) {
   alvo = el;
-  if (!ligado) { ligado = true; ouvintes.add(() => { if (alvo && !alvo.closest('[hidden]')) desenhar(); }); }
+  if (!ligado) { ligado = true; ouvintes.add(() => {
+    if (!alvo || alvo.closest('[hidden]')) return;
+    const b = document.activeElement?.id === 'crBusca' ? $('crBusca') : null, pos = b?.selectionStart;
+    desenhar();
+    if (b && $('crBusca')) { $('crBusca').focus(); try { $('crBusca').setSelectionRange(pos, pos); } catch {} }
+  }); }
   desenhar();
   carregarCronograma();
 }
