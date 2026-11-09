@@ -1183,11 +1183,11 @@ function linhaBloq(it) {
   const n = diasParado(it), q = it.bloq.quem ? pessoa(it.bloq.quem)?.nome : null;
   return `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir na reunião')}${q ? ` · com ${esc(q)}` : ''}${n != null ? ` · parado há ${n} ${n === 1 ? 'dia' : 'dias'}` : ''}${it.bloq.cobrar ? ` · cobrar ${brCurto(it.bloq.cobrar)}` : ''}</small>`;
 }
-function card(it, { semResp = false, comSit = false, comAcoes = true } = {}) {
+function card(it, { semResp = false, comSit = false, comAcoes = true, mover = false } = {}) {
   const r = it.sit === 'fazendo' && it.inicioEm ? { txt: 'iniciada ' + brCurto(it.inicioEm) + (atrasado(it) ? ' · venceu ' + brCurto(it.data) : ''), cls: atrasado(it) ? 'atraso' : '' }
     : atrasado(it) ? { txt: 'venceu ' + brCurto(it.data), cls: 'atraso' } : rotuloData(it);
   return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
-    <span class="cr-card-top"><span class="cr-card-tags">${seloNum(it)}${tagOrigem(it)}</span>${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
+    <span class="cr-card-top"><span class="cr-card-tags">${seloNum(it)}${tagOrigem(it)}</span>${mover ? `<span class="cr-mover"><span class="cr-mv" role="button" tabindex="0" data-acao="subir" data-alvo="${esc(it.chave)}" title="Subir">▲</span><span class="cr-mv" role="button" tabindex="0" data-acao="descer" data-alvo="${esc(it.chave)}" title="Descer">▼</span></span>` : ''}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
     <b>${esc(it.titulo)}</b>
     ${it.checklist ? `<span class="cr-ckbar"><i style="width:${Math.round(feitosCk(it) / totalCk(it) * 100)}%"></i></span>` : ''}
     ${seloNaoFeito(it)}
@@ -1205,9 +1205,20 @@ const ordemQuadro = (a, b) => (atrasado(b) - atrasado(a)) || a.data.localeCompar
    e não terminou ganha a etiqueta "Não feito". Concluído mostra o de hoje.
    Bloquear tira do foco (volta ao calendário com cadeado). Sem limite de
    tarefas por pessoa (decisão dele). */
-const ordemFoco = (a, b) => (naoFeito(b) - naoFeito(a)) || (a.focoEm || '').localeCompare(b.focoEm || '') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
+/* Ordem manual do Foco do dia (09/11/2026, pedido dele: "mover para cima e
+   para baixo, estilo Trello"). Fica no banco, igual para todos, numa linha de
+   cron_estado (chave 'ordem:foco', lista de chaves em checks). O que ainda não
+   foi movido vai para o fim, na ordem de antes. */
+const ORDEM_FOCO = 'ordem:foco';
+const posFoco = () => { const l = estadoDe(ORDEM_FOCO)?.checks || []; return new Map(l.map((k, i) => [k, i])); };
+const ordemFoco = (a, b, pos = posFoco()) => {
+  const pa = pos.has(a.chave) ? pos.get(a.chave) : 1e9, pb = pos.has(b.chave) ? pos.get(b.chave) : 1e9;
+  return pa - pb || ordemFocoBase(a, b);
+};
+const ordemFocoBase = (a, b) => (naoFeito(b) - naoFeito(a)) || (a.focoEm || '').localeCompare(b.focoEm || '') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
 function foco() {
-  const itens = filtrados().filter(it => it.focoEm && it.sit !== 'bloqueado' && (it.sit !== 'feito' || (it.feitaEm || hoje()) >= hoje())).sort(ordemFoco);
+  const pos = posFoco();
+  const itens = filtrados().filter(it => it.focoEm && it.sit !== 'bloqueado' && (it.sit !== 'feito' || (it.feitaEm || hoje()) >= hoje())).sort((a, b) => ordemFoco(a, b, pos));
   if (!itens.length) return `<div class="cr-foco-vazio"><b>Ninguém tem tarefa no foco agora.</b>
     <p>Na reunião da manhã, cada pessoa escolhe o que vai fazer no dia e toca em "Foco do dia →". Fora da reunião, o botão também aparece nas tarefas do calendário.</p>
     <button type="button" class="btn principal" data-visao="reuniao">Abrir a reunião</button></div>`;
@@ -1221,7 +1232,7 @@ function foco() {
       const ok = c.itens.filter(i => i.sit === 'feito').length, nf = c.itens.filter(naoFeito).length;
       return `<section class="cr-col" data-col="${c.id}">
         <header class="cr-col-cab pessoa">${c.cab}<span class="cr-quem"><b>${esc(c.nome)}</b><small>${ok} de ${c.itens.length} concluídas${nf ? ` · ${nf} não feita${nf > 1 ? 's' : ''}` : ''}</small></span></header>
-        <div class="cr-col-corpo">${c.itens.map(i => card(i, { semResp: true, comSit: true })).join('')}</div>
+        <div class="cr-col-corpo">${c.itens.map(i => card(i, { semResp: true, comSit: true, mover: true })).join('')}</div>
       </section>`;
     }).join('')}</div>`;
   }
@@ -1236,7 +1247,7 @@ function foco() {
   return `<div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmob="${c.id}" aria-selected="${est.colMob === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
     <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMob === c.id ? ' ativa' : ''}" data-col="${c.id}">
       <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.nome}</b><span class="cr-cont">${c.itens.length}${extra(c)}</span></header>
-      <div class="cr-col-corpo">${c.itens.map(i => card(i)).join('') || '<p class="cr-vazio">Nada aqui.</p>'}</div>
+      <div class="cr-col-corpo">${c.itens.map(i => card(i, { mover: true })).join('') || '<p class="cr-vazio">Nada aqui.</p>'}</div>
     </section>`).join('')}</div>`;
 }
 
@@ -1413,22 +1424,70 @@ function ligarTela() {
     ev.preventDefault(); ev.stopPropagation(); irPara(todosItens().find(x => x.chave === b.dataset.ir)?.ir);
   });
 
-  // arrastar entre colunas (computador)
-  r.querySelectorAll('.cr-card[draggable]').forEach(c => c.addEventListener('dragstart', ev => {
-    ev.dataTransfer.setData('text/plain', c.dataset.item); ev.dataTransfer.effectAllowed = 'move';
-  }));
+  // arrastar (computador): entre colunas muda a situação/pessoa; na mesma
+  // coluna, ou ao soltar entre dois cartões, muda a ordem (estilo Trello).
+  let arrastando = null;
+  const limparMarca = () => r.querySelectorAll('.cr-ins').forEach(x => x.classList.remove('cr-ins'));
+  const cartaoAntes = (col, y) => [...col.querySelectorAll('.cr-card[data-item]')]
+    .filter(c => c.dataset.item !== arrastando)
+    .find(c => { const b = c.getBoundingClientRect(); return y < b.top + b.height / 2; }) || null;
+  r.querySelectorAll('.cr-card[draggable]').forEach(c => {
+    c.addEventListener('dragstart', ev => {
+      arrastando = c.dataset.item; c.classList.add('arrastando');
+      ev.dataTransfer.setData('text/plain', c.dataset.item); ev.dataTransfer.effectAllowed = 'move';
+    });
+    c.addEventListener('dragend', () => { c.classList.remove('arrastando'); arrastando = null; limparMarca(); r.querySelectorAll('.cr-col.alvo').forEach(x => x.classList.remove('alvo')); });
+  });
   r.querySelectorAll('.cr-col').forEach(col => {
-    col.addEventListener('dragover', ev => { ev.preventDefault(); col.classList.add('alvo'); });
-    col.addEventListener('dragleave', () => col.classList.remove('alvo'));
+    col.addEventListener('dragover', ev => {
+      ev.preventDefault(); col.classList.add('alvo');
+      if (est.visao !== 'foco') return;
+      limparMarca();
+      const antes = cartaoAntes(col, ev.clientY);
+      (antes || col.querySelector('.cr-col-corpo'))?.classList.add('cr-ins');
+    });
+    col.addEventListener('dragleave', ev => { if (!col.contains(ev.relatedTarget)) { col.classList.remove('alvo'); limparMarca(); } });
     col.addEventListener('drop', async ev => {
-      ev.preventDefault(); col.classList.remove('alvo');
-      const it = todosItens().find(x => x.chave === ev.dataTransfer.getData('text/plain'));
+      ev.preventDefault(); col.classList.remove('alvo'); limparMarca();
+      const chave = ev.dataTransfer.getData('text/plain');
+      const it = todosItens().find(x => x.chave === chave);
       if (!it) return;
       const c = col.dataset.col;
+      const origem = r.querySelector(`.cr-card[data-item="${CSS.escape(chave)}"]`)?.closest('.cr-col');
+      if (est.visao === 'foco') {
+        const antes = cartaoAntes(col, ev.clientY);
+        const lista = [...col.querySelectorAll('.cr-card[data-item]')].map(x => x.dataset.item).filter(k => k !== chave);
+        const i = antes ? lista.indexOf(antes.dataset.item) : lista.length;
+        lista.splice(i < 0 ? lista.length : i, 0, chave);
+        if (origem === col) return guardarOrdemFoco(lista);
+        guardarOrdemFoco(lista, false);
+      }
       if (est.colunas === 'pessoa' && est.visao === 'foco') await mudar(it, { resp: c === '-' ? null : c, foco: true });
       else await mudar(it, { sit: c, foco: true });
     });
   });
+}
+
+/* Grava a nova ordem de uma coluna do Foco do dia: a coluna vem primeiro, o
+   resto mantém a ordem que já tinha (só o que ainda está no foco). */
+function guardarOrdemFoco(coluna, redesenhar = true) {
+  const noFoco = new Set(todosItens().filter(it => it.focoEm).map(it => it.chave));
+  const pos = posFoco();
+  const resto = [...noFoco].filter(k => !coluna.includes(k)).sort((a, b) => (pos.has(a) ? pos.get(a) : 1e9) - (pos.has(b) ? pos.get(b) : 1e9));
+  const checks = [...coluna.filter(k => noFoco.has(k)), ...resto];
+  const e = estadoDe(ORDEM_FOCO);
+  const p = gravar('cron_estado', 'chave', { chave: ORDEM_FOCO, situacao: e?.situacao || 'afazer', checks });
+  if (redesenhar) p.then(recado);
+  return p;
+}
+function moverNoFoco(chave, passo) {
+  const corpo = alvo?.querySelector(`.cr-card[data-item="${CSS.escape(chave)}"]`)?.closest('.cr-col-corpo');
+  if (!corpo) return;
+  const lista = [...corpo.querySelectorAll('.cr-card[data-item]')].map(x => x.dataset.item);
+  const i = lista.indexOf(chave), j = i + passo;
+  if (i < 0 || j < 0 || j >= lista.length) return;
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  guardarOrdemFoco(lista);
 }
 
 function acaoRapida(chave, acao) {
@@ -1438,6 +1497,8 @@ function acaoRapida(chave, acao) {
   if (acao === 'liberar') return mudar(it, { sit: 'afazer' });          // volta para o calendário
   if (acao === 'foco') return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true });
   if (acao === 'tirar') return mudar(it, { foco: false });
+  if (acao === 'subir') return moverNoFoco(chave, -1);
+  if (acao === 'descer') return moverNoFoco(chave, 1);
   return mudar(it, { sit: acao });
 }
 
