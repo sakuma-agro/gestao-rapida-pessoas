@@ -192,13 +192,52 @@ const sitCor = it => it.sit === 'afazer' && atrasado(it) ? 'atraso' : it.sit;
 /* ---------------- dados ---------------- */
 const dados = {
   pessoas: [], tarefas: [], estados: [], config: [], auto: [], numeros: {},
+  adm: { itens: [], lanc: [] },
   em: null, carregando: false, falhas: [],
 };
 (() => { const c = ler(CACHE, null); if (c) Object.assign(dados, c, { carregando: false }); })();
 const salvarCache = () => gravarLocal(CACHE, {
   pessoas: dados.pessoas, tarefas: dados.tarefas, estados: dados.estados,
-  config: dados.config, auto: dados.auto, numeros: dados.numeros, em: dados.em,
+  config: dados.config, auto: dados.auto, numeros: dados.numeros, adm: dados.adm, em: dados.em,
 });
+/* Custo Base › Adm mensais (09/11/2026, pedido dele): a tarefa mensal
+   "Adm - mensais" (ir = 'admMes') tem o checklist montado do cadastro do
+   Custo Base (cb_adm_itens) e marcado pelo "Lançado" do mês (cb_adm_lanc).
+   Quem não tem o Custo Base liberado não recebe as linhas (RLS) e vê o
+   checklist guardado na tarefa. */
+async function lerAdm(c) {
+  const de = (() => { const d = new Date(); d.setMonth(d.getMonth() - 7); return iso(d).slice(0, 7); })();
+  const [it, la] = await Promise.all([
+    c.from('cb_adm_itens').select('id,nome,grupo,ordem,ativo,periodicidade,mes_anual,valor_padrao').eq('ativo', true),
+    c.from('cb_adm_lanc').select('id,mes,item_id,valor,lancado').gte('mes', de).limit(5000),
+  ].map(q => q.then(x => x, e => ({ error: e }))));
+  if (!it.error && !la.error) dados.adm = { itens: it.data || [], lanc: la.data || [] };
+}
+const ADM_IR = 'admMes';
+function ckAdm(mes) {
+  const its = (dados.adm?.itens || []).filter(i => i.periodicidade !== 'anual' || Number(mes.slice(5, 7)) === Number(i.mes_anual || 1))
+    .sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
+  if (!its.length) return null;
+  const g = new Map();
+  for (const i of its) { const k = i.grupo || 'Outros'; if (!g.has(k)) g.set(k, []); g.get(k).push({ t: i.nome, ir: ADM_IR, id: i.id }); }
+  const checklist = [...g.entries()].map(([gg, i]) => ({ g: gg, i }));
+  const ok = new Set((dados.adm.lanc || []).filter(l => l.mes === mes && l.lancado).map(l => l.item_id));
+  const checks = checklist.flatMap(gr => gr.i.filter(x => ok.has(x.id)).map(x => `${gr.g}|${x.t}`));
+  return { checklist, checks };
+}
+async function gravarAdm(mes, itemId, lancado) {
+  const i = (dados.adm?.itens || []).find(x => x.id === itemId);
+  if (!i) return;
+  const id = mes + ':' + itemId;
+  const l = (dados.adm.lanc || []).find(x => x.id === id);
+  const reg = { id, mes, item_id: itemId, valor: l?.valor ?? (lancado ? (i.valor_padrao ?? null) : null), lancado,
+    lancado_em: lancado ? new Date().toISOString() : null, lancado_por: lancado ? (acesso.nome || acesso.email || null) : null };
+  if (l) Object.assign(l, reg); else dados.adm.lanc.push(reg);
+  salvarCache();
+  if (!estado.cliente || !navigator.onLine) return;
+  const { error } = await estado.cliente.from('cb_adm_lanc').upsert(reg, { onConflict: 'id' }).then(x => x, e => ({ error: e }));
+  if (error) console.warn('[Rastro] não marquei no Custo Base', error);
+}
 
 const pessoasAtivas = () => dados.pessoas.filter(p => p.ativo !== false)
   .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -741,6 +780,7 @@ export async function carregarCronograma() {
     if (!tar.error) dados.tarefas = tar.data || [];
     if (!est.error) dados.estados = est.data || [];
     if (!cfg.error) dados.config = cfg.data || [];
+    await lerAdm(c);
     dados.semTabelas = !!(tar.error && /does not exist|relation|schema cache/i.test(tar.error.message || ''));
 
     const rs = await Promise.allSettled(FONTES.map(([, fn]) => fn()));
@@ -781,6 +821,7 @@ async function releituraLeve() {
       c.from('cron_estado').select('*'),
       c.from('cron_numeros').select('chave,numero').limit(20000).then(x => x, e => ({ error: e })),
     ]);
+    await lerAdm(c);
     const antes = JSON.stringify([dados.tarefas, dados.estados, dados.numeros]);
     if (!tar.error) dados.tarefas = tar.data || [];
     if (!est2.error) dados.estados = est2.data || [];
@@ -927,6 +968,16 @@ function todosItens() {
         checks: (rep ? e?.checks : t.checks) || [],
         privada: !!t.privada,
       });
+      // Adm - mensais: checklist e marcas vêm do Custo Base (lançado do mês)
+      if (t.ir === ADM_IR) {
+        const it = itens[itens.length - 1], adm = ckAdm(d.slice(0, 7));
+        if (adm) {
+          Object.assign(it, adm, { ckDoApp: true, mesAdm: d.slice(0, 7) });
+          const tot = adm.checklist.reduce((n, g) => n + g.i.length, 0), f = adm.checks.length;
+          if (f === tot && it.sit !== 'feito') { it.sit = 'feito'; it.feitaEm = it.feitaEm || hoje(); }
+          else if (f && f < tot && it.sit === 'afazer') it.sit = 'fazendo';
+        }
+      }
     }
   }
   return itens;
@@ -968,7 +1019,7 @@ const IR_CK = {
   qcSaida: { a: 'estoque', t: 'qcSaida' }, qcEntrada: { a: 'estoque', t: 'qcEntrada' }, ctNova: { a: 'estoque', t: 'ctNova' },
   acPainel: { a: 'estoque', t: 'acPainel' }, acSaldo: { a: 'estoque', t: 'acSaldo' },
   acTransf: { a: 'estoque', t: 'acTransferencias' }, acRelatorio: { a: 'estoque', t: 'acRelatorio' },
-  rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' },
+  rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' }, admMes: { a: 'custobase', t: 'amMes' },
   colheita: { a: 'colheita', t: 'cpCargas' }, certDocs: { a: 'certificacao', t: 'ceDocumentos' },
   vencMaq: { a: 'manutencoes', x: 'acao=vencimentos' }, certAud: { a: 'certificacao', t: 'ceCertificacoes' },
   certAcoes: { a: 'certificacao', t: 'mcMelhorias' }, cadRel: { a: 'pessoas', t: 'cadRelatorios' },
@@ -1829,11 +1880,12 @@ let ocultarMarcados = false;
 function blocoCk(it) {
   const set = new Set(it.checks || []);
   const tot = totalCk(it), feitos = feitosCk(it), pct = tot ? Math.round(feitos / tot * 100) : 0;
-  const edita = !it.auto && it.tarefa;
+  const edita = !it.auto && it.tarefa && !it.ckDoApp;
   const umGrupo = it.checklist.length === 1;
   return `<div class="cr-ckbox${ocultarMarcados ? ' oculta' : ''}" id="crCkBox">
     <div class="cr-ckcab"><b>☑ Checklist</b>
       <button type="button" class="cr-ckocultar" id="crCkOcultar">${ocultarMarcados ? 'Mostrar marcados' : 'Ocultar marcados'}</button></div>
+    ${it.ckDoApp ? `<p class="dc-sem" style="margin:2px 0 6px">Itens do cadastro de Custo Base › Adm mensais (${esc(it.mesAdm.slice(5, 7) + '/' + it.mesAdm.slice(0, 4))}). Marcar aqui marca "Lançado" lá; para incluir ou tirar um item, use o cadastro.</p>` : ''}
     <div class="cr-ckprog"><span id="crCkPct">${pct}%</span><span class="cr-ckbar g${pct === 100 ? ' ok' : ''}"><i id="crCkBar" style="width:${pct}%"></i></span><span id="crCkCont">${feitos}/${tot}</span></div>
     ${it.checklist.map((g, gi) => `<fieldset class="cr-ckg">${umGrupo && norm(g.g) === norm(it.titulo) ? '' : `<legend>${esc(g.g)}</legend>`}
       ${(g.i || []).map((x, xi) => { const ir = irCk(x), on = set.has(chaveCk(g.g, x)); return `<div class="cr-cki${on ? ' on' : ''}">
@@ -1884,6 +1936,7 @@ function ligarCk(d, it) {
       marcados.push(chaveCk(it.checklist[gi].g, it.checklist[gi].i[xi]));
     });
     it.checks = marcados;
+    if (it.ckDoApp) { const [gi, xi] = c.dataset.ck.split(':').map(Number); gravarAdm(it.mesAdm, it.checklist[gi].i[xi].id, c.checked); }
     c.closest('.cr-cki')?.classList.toggle('on', c.checked);
     const pct = Math.round(marcados.length / totalCk(it) * 100);
     $('crCkCont').textContent = `${marcados.length}/${totalCk(it)}`;

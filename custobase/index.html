@@ -6,7 +6,7 @@
 <title>Custo Base · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=1">
-<link rel="stylesheet" href="css/custobase.css?v=8">
+<link rel="stylesheet" href="css/custobase.css?v=9">
 <link rel="stylesheet" href="../css/categoria-moldura.css?v=1">
 <!-- Área Custo Base do LOP - Gestão Rápida (20/10/2026).
      Módulo Rateio mensal culturas: substitui a planilha "Rateio - Direcionador
@@ -118,6 +118,28 @@
         <div id="hhIndCorpo"></div>
       </div>
     </section>
+    <!-- =================== ADM MENSAIS (09/11/2026) =================== -->
+    <section class="tela" id="telaAmMes" hidden>
+      <div class="cartao">
+        <h2>Adm mensais · lançamentos do mês</h2>
+        <p class="dica">O que o administrativo lança todo mês (antiga planilha "Lançamento Administrativos Mensais"). A tarefa mensal "Adm - mensais" do Rastro tem o checklist com todos: marcar aqui marca lá.</p>
+        <div id="amMesCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaAmHistorico" hidden>
+      <div class="cartao">
+        <h2>Adm mensais · histórico</h2>
+        <p class="dica">Cada lançamento mês a mês, como na planilha: verde é lançado.</p>
+        <div id="amHistCorpo"></div>
+      </div>
+    </section>
+    <section class="tela" id="telaAmItens" hidden>
+      <div class="cartao">
+        <h2>Adm mensais · cadastro</h2>
+        <p class="dica">Cada lançamento com grupo, unidade, valor previsto e se repete todo mês ou uma vez por ano. Cadastro novo já entra no mês e no checklist do Rastro; desativar tira dos próximos meses sem apagar o histórico.</p>
+        <div id="amItensCorpo"></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -138,7 +160,7 @@
 <script src="../vendor/xlsx-js-style.min.js" defer></script>
 <script src="js/config.js?v=3"></script>
 <script src="../js/moldura-nucleo.js?v=6"></script>
-<script src="js/base.js?v=4"></script>
-<script type="module" src="js/app.js?v=15"></script>
+<script src="js/base.js?v=5"></script>
+<script type="module" src="js/app.js?v=16"></script>
 </body>
 </html>

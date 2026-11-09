@@ -204,3 +204,18 @@ body.embutido .abas{padding-top:4px}
 /* hora-homem: grupos Campo e ADM (20/10/2026) */
 .hh-tab tr.hh-grupo td{background:rgba(116,79,40,.10) !important;color:var(--marrom);font-weight:700;font-size:12px;letter-spacing:.3px;text-transform:uppercase}
 .hh-tab tr.hh-sub td{background:var(--fundo) !important}
+
+/* ---- Adm mensais (09/11/2026): padrão das planilhas dele — grade, verde claro, lançado em verde, pendente em destaque, total sombreado ---- */
+.am-tab .am-grupo td, .am-hist .am-grupo td{background:rgba(116,79,40,.10) !important;color:var(--marrom)}
+.am-tab tr.am-ok td{background:rgba(132,189,0,.14) !important}
+.am-tab tr.am-pend td:first-child{box-shadow:inset 3px 0 0 #C98A00}
+.am-tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(201,138,0,.18);color:#8a5f00}
+.am-valor{width:110px;text-align:right;font:inherit;padding:4px 6px;border:1px solid var(--linha);border-radius:6px;background:var(--fundo);color:var(--texto)}
+.am-valor::placeholder{color:var(--suave);opacity:.75}
+.am-total td{background:rgba(81,83,74,.16) !important;border-top:2px solid var(--linha)}
+.am-hist td{white-space:nowrap;font-size:12px}
+.am-c-ok{background:rgba(132,189,0,.22) !important;color:#3f5c00}
+.am-c-pend{background:rgba(201,138,0,.20) !important;color:#8a5f00}
+.am-leg{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px}
+.am-leg.ok{background:rgba(132,189,0,.5)} .am-leg.pend{background:rgba(201,138,0,.45)}
+@media (max-width:640px){ .am-valor{width:90px} }

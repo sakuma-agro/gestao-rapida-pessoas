@@ -66,7 +66,7 @@ const ARQUIVOS = [
   './icons/area-custobase.v3.svg',
   './custobase/', './custobase/index.html', './custobase/css/app.css', './custobase/css/custobase.css',
   './custobase/js/config.js', './custobase/js/base.js', './custobase/js/acesso.js', './custobase/js/app.js',
-  './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
+  './custobase/js/dados.js', './custobase/js/rateio.js', './custobase/js/historico.js', './custobase/js/talhoes.js', './custobase/js/culturas.js', './custobase/js/horahomem.js', './custobase/js/admmensais.js', './custobase/js/pdf.js', './custobase/img/whatsapp.png',
   './custobase/img/sakuma-logo.png', './custobase/img/lop-marca.png', './custobase/img/sakuma-marca-vertical.png', './custobase/img/lop-assinatura-laser-claro.png',
   // Colheita e Produção (20/10/2026)
   './icons/area-colheita.v3.svg',

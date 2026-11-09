@@ -19,6 +19,8 @@ const ICONES = {
   pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.6c2.7.2 4.7 2 5.3 5"/>',
   param: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   indices: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  adm: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/><path d="M15.5 16.5l1.5 1.5 3-3"/>',
+  lista: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
   culturas: '<path d="M12 22V12"/><path d="M12 12c-4 0-7-3-7-7 4 0 7 3 7 7z"/><path d="M12 15c0-4 3-7 7-7 0 4-3 7-7 7z"/>',
 };
 export const svgIcone = nome =>
@@ -55,6 +57,18 @@ export const MODULOS = [
     ] },
     { id: 'hhSubParam', nome: 'Parâmetros', icone: 'param', telas: [
       ['hhIndices',   'Encargos e horas padrão', 'indices'],
+    ] },
+  ] },
+  /* Adm mensais (09/11/2026, pedido dele): a planilha "Lançamento
+     Administrativos Mensais" — o que precisa ser lançado todo mês, com
+     editar e cadastro novo. A tarefa mensal fica no Rastro ("Adm - mensais"). */
+  { id: 'admmensais', nome: 'Adm mensais', icone: 'adm', inicial: 'amMes', subs: [
+    { id: 'amSubMes', nome: 'Lançamentos', icone: 'adm', telas: [
+      ['amMes',       'Lançamentos do mês', 'mes'],
+      ['amHistorico', 'Histórico',          'historico'],
+    ] },
+    { id: 'amSubCad', nome: 'Cadastro', icone: 'lista', telas: [
+      ['amItens',     'Lançamentos cadastrados', 'lista'],
     ] },
   ] },
 ];

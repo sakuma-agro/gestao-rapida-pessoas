@@ -9,6 +9,7 @@ import { abrirHistorico } from './historico.js';
 import { abrirTalhoes } from './talhoes.js';
 import { abrirCulturas } from './culturas.js';
 import { abrirHoraHomem } from './horahomem.js';
+import { abrirAdmMensais } from './admmensais.js';
 
 const $ = id => document.getElementById(id);
 
@@ -26,6 +27,7 @@ function abrirAba(nome) {
   if (nome === 'rtTalhoes') abrirTalhoes();
   if (nome === 'rtCulturas') abrirCulturas();
   if (nome.startsWith('hh')) abrirHoraHomem(nome);
+  if (nome.startsWith('am')) abrirAdmMensais(nome);
   window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 
