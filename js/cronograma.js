@@ -1919,7 +1919,190 @@ function dialogo() {
 const opcoesPessoas = (sel, padrao) => `<option value="">${padrao ? esc('Responsável da área — ' + padrao) : 'Sem responsável'}</option>` +
   pessoasAtivas().map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
 
+/* ---------------- janela da tarefa estilo Trello (09/11/2026, pedido dele) ----------------
+   Tudo à mostra e editável direto: nome (toca e escreve), chips de
+   Responsável / Data / Repete / Área, barra de Situação, descrição que se
+   edita tocando, checklist, e a coluna da direita com "Adicionar à tarefa"
+   (Checklist, Data, Repetir, Só eu vejo) e Ações (Foco do dia, Bloquear,
+   Abrir a tela, Apagar). Salva na hora, sem botão Salvar. A tarefa nova
+   continua no formulário de antes (abrirItem(null)), com "Lançar". */
+function abrirTarefa(chave) {
+  const d = dialogo();
+  const it = todosItens().find(x => x.chave === chave);
+  if (!it) { if (d.open) d.close(); return; }
+  const t = it.tarefa || null;
+  const edita = !it.auto && !!t;
+  const rep = !!(t && t.recorrencia && t.recorrencia !== 'nenhuma');
+  const podePriv = edita && (!t.dono_email || String(t.dono_email).toLowerCase() === meuEmail());
+  const r = rotuloData(it);
+  const respId = rep ? (t.responsavel_id || it.explicito || it.resp) : (it.explicito || it.resp);
+  const padraoArea = nomesDe(respsDaArea(it.area, it.unid));
+  const chip = (cls, rot, conteudo, extra = '') => `<span class="cr-tk-chip ${cls}"${extra}><small>${rot}</small><span>${conteudo}</span></span>`;
+  const selResp = `<select id="tkResp" aria-label="Responsável">${opcoesPessoas(respId || '', padraoArea)}</select>`;
+  const p = pessoa(respId);
+  const repTxt = !rep ? 'Não repete' : t.recorrencia === 'semanal' ? 'Toda semana' : 'Todo mês';
+
+  d.innerHTML = `<form method="dialog" class="cr-tk" id="crTk">
+    <div class="cr-tk-cab">
+      <div class="cr-tk-tags">${numDe(it) ? `<span class="cr-num g">#${numDe(it)}</span>` : ''}${seloPriv(it)}${tagOrigem(it)} ${tagArea(it.area)}</div>
+      ${edita ? `<input class="cr-tk-tit" id="tkTit" maxlength="160" value="${esc(t.titulo || '')}" aria-label="Nome da tarefa" title="Toque para editar o nome">`
+        : `<h3 class="cr-tk-tit fixo">${esc(it.titulo)}</h3>`}
+      ${edita ? '<small class="cr-tk-dica">toque no nome para editar · Enter salva</small>' : ''}
+      <button type="button" class="cr-tk-x" id="tkFechar" aria-label="Fechar">×</button>
+    </div>
+    <div class="cr-tk-corpo">
+      <div class="cr-tk-main">
+        <div class="cr-tk-rot">Responsável · Data${edita ? ' · Repete · Área' : ''}</div>
+        <div class="cr-tk-chips">
+          <label class="cr-tk-chip sel">${avatar(respId)}<span>${esc(p ? p.nome : (padraoArea ? 'Da área — ' + padraoArea : 'Sem responsável'))} ▾</span>${selResp}</label>
+          ${edita && !rep ? `<span class="cr-tk-chip data ${r.cls}" id="tkDataBt" role="button" tabindex="0">📅 ${esc(br(it.data))} · ${esc(r.txt)} ▾<input type="date" id="tkData" value="${esc(t.data || '')}" tabindex="-1" aria-label="Data"></span>`
+            : `<span class="cr-tk-chip data ${r.cls} fixo">📅 ${esc(br(it.data))} · ${esc(r.txt)}</span>`}
+          ${edita ? `<label class="cr-tk-chip sel">🔁 <span>${repTxt} ▾</span><select id="tkRep" aria-label="Repete">
+              <option value="nenhuma" ${!rep ? 'selected' : ''}>Não repete</option>
+              <option value="semanal" ${t.recorrencia === 'semanal' ? 'selected' : ''}>Toda semana</option>
+              <option value="mensal" ${t.recorrencia === 'mensal' ? 'selected' : ''}>Todo mês</option></select></label>
+            <label class="cr-tk-chip sel">🏷 <span>${esc(areaDe(t.area || 'esc').nome)} ▾</span><select id="tkArea" aria-label="Área">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t.area || 'esc') === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>` : ''}
+        </div>
+        ${edita && rep ? `<div class="cr-tk-rep">
+            <label>Começa em <input type="date" id="tkIni" value="${esc(t.data || '')}"></label>
+            <label>Até <input type="date" id="tkAte" value="${esc(t.ate || '')}"></label>
+            <small>O responsável vale para todas as vezes.</small></div>` : ''}
+
+        <div class="cr-tk-rot">Situação${rep ? ' (desta vez)' : ''}</div>
+        <div class="cr-tk-seg" role="group" aria-label="Situação">${Object.entries(SIT).map(([k, n]) =>
+          `<button type="button" data-tksit="${k}" class="${it.sit === k ? 'on' : ''}" aria-pressed="${it.sit === k}">${it.sit === k ? '● ' : ''}${n}</button>`).join('')}</div>
+        ${it.sit === 'bloqueado' ? `<p class="cr-tk-bloq">🔒 Depende de: <b>${esc(it.bloq?.motivo || 'a definir')}</b>${it.bloq?.quem ? ' · com ' + esc(pessoa(it.bloq.quem)?.nome || '') : ''}${it.bloq?.cobrar ? ' · cobrar ' + esc(brCurto(it.bloq.cobrar)) : ''} <button type="button" class="cr-tk-link" id="tkBloqEd">editar</button></p>` : ''}
+
+        ${edita ? `<div class="cr-tk-rot">Descrição</div>
+          <textarea class="cr-tk-desc" id="tkDesc" rows="2" placeholder="Toque para escrever uma descrição…">${esc(t.descricao || '')}</textarea>`
+          : (it.texto ? `<div class="cr-tk-rot">Descrição</div><p class="cr-tk-desc fixo">${esc(it.texto)}</p>` : '')}
+        ${it.detalhes?.length ? `<div class="cr-dlg-det"><b>${it.detalhes.length} ${(it.detRot || ['pessoa', 'pessoas'])[it.detalhes.length === 1 ? 0 : 1]}</b><ul>${it.detalhes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>` : ''}
+        <div id="tkCkLugar">${it.checklist ? `<div class="cr-tk-rot">Checklist</div>${blocoCk(it)}` : ''}</div>
+        ${it.auto ? '<p class="dica">Este item vem sozinho da área de origem e some quando ela for atualizada (exame renovado, OS concluída…). Aqui você marca o andamento e quem cuida.</p>' : ''}
+      </div>
+      <aside class="cr-tk-lado">
+        ${edita ? `<div class="cr-tk-rot">Adicionar à tarefa</div>
+          ${it.checklist ? '' : '<button type="button" class="cr-tk-ab" id="tkAddCk">☑ Checklist</button>'}
+          ${!rep ? '<button type="button" class="cr-tk-ab" id="tkAddData">📅 Data</button>' : ''}
+          <button type="button" class="cr-tk-ab" id="tkAddRep">🔁 Repetir</button>
+          ${podePriv ? `<button type="button" class="cr-tk-ab priv${t.privada ? ' on' : ''}" id="tkPriv" aria-pressed="${!!t.privada}">👁 Só eu vejo${t.privada ? ' ✓' : ''}</button>` : ''}` : ''}
+        <div class="cr-tk-rot">Ações</div>
+        ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? `<button type="button" class="cr-tk-ab foco${it.focoEm ? ' on' : ''}" id="tkFoco">🎯 ${it.focoEm ? 'Tirar do foco' : 'Foco do dia'}</button>` : ''}
+        ${it.sit === 'bloqueado' ? '<button type="button" class="cr-tk-ab" id="tkLiberar">🔓 Liberar</button>' : it.sit !== 'feito' ? '<button type="button" class="cr-tk-ab" id="tkBloq">🔒 Bloquear</button>' : ''}
+        ${podeIr(it.ir) ? `<button type="button" class="cr-tk-ab" id="tkIr">↗ ${it.auto ? `Ir para ${esc(ORIGENS[it.origem]?.nome || 'a origem')}` : 'Abrir a tela no app'}</button>` : ''}
+        ${edita ? `<button type="button" class="cr-tk-ab perigo" id="tkApagar">🗑 Apagar tarefa</button>` : ''}
+        <small class="cr-tk-salvo" id="tkSalvo" aria-live="polite"></small>
+      </aside>
+    </div>
+    <div class="cr-tk-pe"><small>Tudo salva na hora, sem botão Salvar.</small><button class="btn" value="fechar">Fechar</button></div>
+  </form>`;
+  if (!d.open) d.showModal();
+  // não abre já com o nome em edição (no celular subiria o teclado)
+  if (document.activeElement && d.contains(document.activeElement)) document.activeElement.blur();
+
+  const reabrir = (k = it.chave) => setTimeout(() => abrirTarefa(k), 0);
+  const salvo = r => { const s = $('tkSalvo'); if (s) { s.textContent = r === 'ok' ? '✓ Salvo' : r === 'fila' ? '✓ Salvo neste aparelho' : ''; } recado(r); };
+  // grava campos da tarefa (modelo) e devolve o resultado
+  const salvarT = async patch => {
+    const novo = { ...t, ...patch };
+    const r = await gravar('cron_tarefas', 'id', novo);
+    Object.assign(t, patch); salvo(r); return r;
+  };
+
+  $('tkFechar').onclick = () => d.close();
+  ligarCk(d, it);
+
+  // nome
+  const tit = $('tkTit');
+  if (tit) {
+    const gravarNome = async () => { const v = limpo(tit.value); if (!v) { tit.value = t.titulo; return; } if (v !== t.titulo) await salvarT({ titulo: v }); };
+    tit.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); tit.blur(); } if (ev.key === 'Escape') { tit.value = t.titulo; } };
+    tit.onblur = gravarNome;
+  }
+  // descrição
+  const desc = $('tkDesc');
+  if (desc) {
+    const crescer = () => { desc.style.height = 'auto'; desc.style.height = Math.min(desc.scrollHeight + 2, 320) + 'px'; };
+    crescer(); desc.oninput = crescer;
+    desc.onblur = async () => { const v = desc.value.trim() || null; if (v !== (t.descricao || null)) await salvarT({ descricao: v }); };
+  }
+  // responsável
+  $('tkResp').onchange = async () => {
+    const v = $('tkResp').value || null;
+    if (rep) {
+      await salvarT({ responsavel_id: v });
+      if (estadoDe(it.chave)?.responsavel_id) await mudar(it, { resp: v });
+    } else if (edita) {
+      await salvarT({ responsavel_id: v });
+    } else {
+      await mudar(it, { resp: v });
+    }
+    reabrir();
+  };
+  // data
+  const dt = $('tkData');
+  if (dt) {
+    $('tkDataBt').onclick = ev => { if (ev.target === dt) return; try { dt.showPicker(); } catch { dt.focus(); dt.click(); } };
+    dt.onchange = async () => { if (!dt.value || dt.value === t.data) return; await salvarT({ data: dt.value }); reabrir(`t:${t.id}`); };
+  }
+  if ($('tkAddData')) $('tkAddData').onclick = () => $('tkDataBt')?.click();
+  // repete / começa / até
+  const rp = $('tkRep');
+  if (rp) rp.onchange = async () => {
+    const v = rp.value;
+    await salvarT({ recorrencia: v, ate: v === 'nenhuma' ? null : t.ate || null });
+    const novos = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? 1 : -1));
+    reabrir(novos[0]?.chave || `t:${t.id}`);
+  };
+  if ($('tkAddRep')) $('tkAddRep').onclick = () => { try { rp.showPicker(); } catch { rp.focus(); } };
+  if ($('tkIni')) $('tkIni').onchange = async () => {
+    const v = $('tkIni').value; if (!v || v === t.data) return;
+    await salvarT({ data: v });
+    const novos = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? 1 : -1));
+    reabrir(novos[0]?.chave || it.chave);
+  };
+  if ($('tkAte')) $('tkAte').onchange = async () => { await salvarT({ ate: $('tkAte').value || null }); };
+  // área
+  if ($('tkArea')) $('tkArea').onchange = async () => { await salvarT({ area: $('tkArea').value }); reabrir(); };
+  // só eu vejo
+  if ($('tkPriv')) $('tkPriv').onclick = async () => {
+    const on = !t.privada;
+    if (!on && !confirm('Deixar a tarefa visível para a equipe toda?')) return;
+    await salvarT({ privada: on, dono_email: on ? (meuEmail() || t.dono_email) : (t.dono_email || meuEmail() || null) });
+    reabrir();
+  };
+  // situação
+  d.querySelectorAll('[data-tksit]').forEach(b => b.onclick = async () => {
+    const s = b.dataset.tksit;
+    if (s === it.sit) return;
+    if (s === 'bloqueado') { abrirBloquear(it); return; }
+    await mudar(it, { sit: s });
+    if (s === 'feito') { d.close(); return; }
+    reabrir();
+  });
+  if ($('tkBloq')) $('tkBloq').onclick = () => abrirBloquear(it);
+  if ($('tkBloqEd')) $('tkBloqEd').onclick = () => abrirBloquear(it);
+  if ($('tkLiberar')) $('tkLiberar').onclick = async () => { await mudar(it, { sit: 'afazer' }); reabrir(); };
+  if ($('tkFoco')) $('tkFoco').onclick = async () => { await mudar(it, { foco: !it.focoEm }); reabrir(); };
+  if ($('tkIr')) $('tkIr').onclick = () => irPara(it.ir);
+  // checklist novo
+  if ($('tkAddCk')) $('tkAddCk').onclick = () => {
+    it.checklist = [{ g: 'Checklist', i: [] }];
+    $('tkCkLugar').innerHTML = `<div class="cr-tk-rot">Checklist</div>${blocoCk(it)}`;
+    ligarCk(d, it);
+    $('tkAddCk').remove();
+    d.querySelector('[data-ckadd="0"]')?.focus();
+  };
+  // apagar
+  if ($('tkApagar')) $('tkApagar').onclick = async () => {
+    if (!confirm(rep ? 'Apagar esta tarefa e todas as repetições?' : 'Apagar esta tarefa?')) return;
+    const r = await gravar('cron_tarefas', 'id', { ...t, ativo: false });
+    d.close(); recado(r);
+  };
+}
+
 function abrirItem(chave) {
+  if (chave) return abrirTarefa(chave);
   const d = dialogo();
   const it = chave ? todosItens().find(x => x.chave === chave) : null;
   if (chave && !it) return;
