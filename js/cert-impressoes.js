@@ -31,14 +31,14 @@ const linhas = t => so(t).split('\n').map(so).filter(Boolean);
 
 const ELAB = 'Guilherme Ribeiro Lopes';
 const FORMS = {
-  f018: { codigo: 'FORM 018', titulo: 'Lista de presença', data: '01/12/2026', nrev: '02', aprovador: 'Produtor – Fabio Massao Sakuma' },
-  f024: { codigo: 'FORM 024', titulo: 'Reunião com a gerência e funcionários', data: '01/12/2026', nrev: '02', aprovador: 'Fabio Massao Sakuma' },
-  f044: { codigo: 'FORM 044', titulo: 'Ata de reunião mensal – GRASP', data: '01/12/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
+  f018: { codigo: 'FORM 018', titulo: 'Lista de presença', data: '01/11/2026', nrev: '02', aprovador: 'Produtor – Fabio Massao Sakuma' },
+  f024: { codigo: 'FORM 024', titulo: 'Reunião com a gerência e funcionários', data: '01/11/2026', nrev: '02', aprovador: 'Fabio Massao Sakuma' },
+  f044: { codigo: 'FORM 044', titulo: 'Ata de reunião mensal – GRASP', data: '01/11/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
   // 04/11/2026: fichas de papel por funcionário (uma folha para cada marcado).
   f007: { codigo: 'FORM 007', titulo: "Higienização dos EPI's", data: '01/11/2026', nrev: '02', aprovador: 'Produtor – Fabio Massao Sakuma' },
   f054: { codigo: 'FORM 054', titulo: 'Controle de banho e higiene pessoal', data: '01/11/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
-  f045: { codigo: 'FORM 045', titulo: 'Ata de treinamento do representante dos trabalhadores – GRASP', data: '01/12/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
-  f046: { codigo: 'FORM 046', titulo: 'Declaração de direitos e deveres do representante dos trabalhadores', data: '01/12/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
+  f045: { codigo: 'FORM 045', titulo: 'Ata de treinamento do representante dos trabalhadores – GRASP', data: '01/11/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
+  f046: { codigo: 'FORM 046', titulo: 'Declaração de direitos e deveres do representante dos trabalhadores', data: '01/11/2026', nrev: '01', aprovador: 'Produtor – Fabio Massao Sakuma' },
 };
 const POR_FUNC = new Set(['f007', 'f054']);
 
@@ -129,12 +129,12 @@ const caixaTemas = (txt, livres = 4) => {
 const secao = (t, quebra) => `<p class="rel-secao"${quebra ? ' style="page-break-before:always"' : ''}>${esc(t)}</p>`;
 const assinaturas = pares => `<div class="rel-assinaturas">${pares.map(([nome, papel]) =>
   `<div class="rel-assina"><span></span><small>${nome ? esc(nome) + '<br>' : ''}${esc(papel)}</small></div>`).join('')}</div>`;
-/** Lista de presença: marcados primeiro, depois linhas em branco (mínimo `min`, pelo menos 4 sobrando). */
+/** Lista de presença: marcados primeiro (10/11/2026, pedido dele: 1 cm de altura na linha onde o funcionário assina; antes 24 px), depois linhas em branco (mínimo `min`, pelo menos 4 sobrando). */
 function tabelaPresenca(pres, { funcao = true, min = 15 } = {}) {
   const total = Math.max(pres.length + 4, min);
   const todas = [...pres, ...Array.from({ length: total - pres.length }, () => ['', ''])];
   return `<table class="rel-tabela"><thead><tr><th style="width:5%">Nº</th><th style="width:${funcao ? 40 : 55}%">Nome</th>${funcao ? '<th style="width:22%">Função</th>' : ''}<th>Assinatura</th></tr></thead><tbody>
-    ${todas.map(([n, f], i) => `<tr><td>${i + 1}</td><td style="height:24px">${esc(n)}</td>${funcao ? `<td>${esc(f)}</td>` : ''}<td></td></tr>`).join('')}
+    ${todas.map(([n, f], i) => `<tr><td>${i + 1}</td><td style="height:1cm">${esc(n)}</td>${funcao ? `<td>${esc(f)}</td>` : ''}<td></td></tr>`).join('')}
   </tbody></table>`;
 }
 
