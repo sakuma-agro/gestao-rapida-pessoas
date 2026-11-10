@@ -78,9 +78,22 @@ try {
   $docs = @{}
   foreach ($d in $mapa.docs) { $docs[(Chave $d.codigo)] = $d }
   $itens = @{}   # "<doc id>|<FAZENDA>" -> item id (o item sem "local" tem preferência)
-  foreach ($i in $mapa.itens) {
+  $pontos = @{}  # "<doc id>|<FAZENDA>" -> itens com "local" (ponto), para a fazenda com mais de um ponto — 10/11/2026
+  foreach ($i in ($mapa.itens | Sort-Object { Chave ([string]$_.local) })) {
     $k = "$($i.documento_id)|$(Chave $i.fazenda)"
     if (-not $itens.ContainsKey($k) -or -not $i.local) { $itens[$k] = $i.id }
+    if ($i.local) { if (-not $pontos.ContainsKey($k)) { $pontos[$k] = @() }; $pontos[$k] += $i }
+  }
+  # Fazenda com mais de um ponto (ex.: AN 72 Faz. Faca: Bebedouro e Caixa Morador): o arquivo vai para o ponto
+  # cujo nome aparece no caminho dele (subpasta ou nome do arquivo; "Caixa Morador" casa com "Casa moradores").
+  # Sem nenhum nome de ponto no caminho, vai para o primeiro ponto em ordem alfabética.
+  function PontoDoArquivo($k, $caminho) {
+    $c = Chave $caminho
+    foreach ($p in $pontos[$k]) {
+      $pal = (Chave $p.local) -split '[^A-Z0-9]+' | Where-Object { $_.Length -ge 5 -and $_ -notin @('CAIXA', 'FAZENDA') }
+      foreach ($w in $pal) { if ($c.Contains($w.Substring(0, [Math]::Min($w.Length, 7)))) { return $p.id } }
+    }
+    return $null
   }
 
   # Arquivos movidos por organização (29/10/2026, pastas de ano nos AN): movidos.json nesta pasta traz
@@ -156,7 +169,11 @@ try {
           $segs = $resto.Split('\'); $segs = $segs[0..($segs.Length - 2)]
           foreach ($sg in $segs) {
             $k = "$($doc.id)|$(Chave $sg)"
-            if ($itens.ContainsKey($k)) { $destino = 'item'; $id = $itens[$k]; break }
+            if ($itens.ContainsKey($k)) {
+              $destino = 'item'; $id = $itens[$k]
+              if ($pontos.ContainsKey($k) -and $pontos[$k].Count -gt 1) { $pt = PontoDoArquivo $k $resto; if ($pt) { $id = $pt } }
+              break
+            }
           }
         }
         $mime = switch -regex ($a.Extension.ToLower()) { '\.pdf' { 'application/pdf' } '\.png' { 'image/png' } default { 'image/jpeg' } }
