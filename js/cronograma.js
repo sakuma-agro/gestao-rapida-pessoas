@@ -1863,7 +1863,7 @@ function abrirBloquear(it) {
     </div>
     <p class="cr-erro" id="crBqErro" hidden>Escreva do que a tarefa depende.</p>
     <div class="barra entre"><span></span><span class="barra">
-      <button class="btn" value="cancelar">Cancelar</button>
+      <button class="btn" value="cancelar" formnovalidate>Cancelar</button>
       <button type="button" class="btn principal" id="crBqOk">Bloquear</button></span></div>
   </form>`;
   d.showModal();
@@ -2239,7 +2239,7 @@ function abrirItem(chave) {
     <div class="barra entre">
       <span class="barra">${!nova && !it.auto ? '<button type="button" class="btn perigo" id="crApagar">Apagar tarefa</button>' : ''}${it && podeIr(it.ir) ? `<button type="button" class="btn" id="crIr">${it.auto ? `Ir para ${esc(ORIGENS[it.origem]?.nome || 'a origem')}` : 'Abrir a tela no app'} ↗</button>` : ''}</span>
       <span class="barra">
-        <button class="btn" value="cancelar">Fechar</button>
+        <button class="btn" value="cancelar" formnovalidate>Fechar</button>
         ${it && it.sit !== 'feito' && it.sit !== 'bloqueado' ? `<button type="button" class="btn" id="crFoco">${it.focoEm ? 'Tirar do foco' : 'Foco do dia →'}</button>` : ''}
         <button type="button" class="btn principal" id="crSalvar">${nova ? 'Lançar' : 'Salvar'}</button>
       </span>
@@ -2338,7 +2338,7 @@ function abrirResponsaveis() {
       </div>
     </details>
     <div class="barra entre"><span></span><span class="barra">
-      <button class="btn" value="cancelar">Fechar</button>
+      <button class="btn" value="cancelar" formnovalidate>Fechar</button>
       <button type="button" class="btn principal" id="crRespSalvar">Salvar</button></span></div>
   </form>`;
   d.showModal();
