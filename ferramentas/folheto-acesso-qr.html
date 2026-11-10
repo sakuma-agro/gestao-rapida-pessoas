@@ -1,5 +1,6 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-<!-- Folheto "Como acessar os documentos da fazenda" (10/11/2026, pedido do Guilherme: meia folha A4, depois
+<!-- IT 01 – Acesso aos documentos por QR Code (primeira IT da série nova, 10/11/2026).
+     Folheto "Como acessar os documentos da fazenda" (10/11/2026, pedido do Guilherme: meia folha A4, depois
      "mais instrutivo, com imagens de dentro"). Duas cópias por A4, linha de corte no meio.
      As fotos de tela ficam em folheto-telas/ (tiradas da página consulta/). Gera o PDF da Sinalética:
      sinaletica/p/acesso-qr-code-folheto-instrucoes.pdf (imprimir em A4, sem margem). -->
@@ -14,7 +15,10 @@ html,body{margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;color:
 .corte span{position:absolute;right:6mm;top:-2.4mm;background:#fff;padding:0 1.5mm;font-size:7pt;color:#8A8C82}
 .topo{display:flex;align-items:center;gap:4mm;border-bottom:.8mm solid #84BD00;padding-bottom:2mm;margin-bottom:3mm}
 .topo img{height:10.5mm}
-.topo h1{margin:0;font-size:16pt;line-height:1.05}
+.topo h1{margin:0;font-size:15pt;line-height:1.05}
+.topo .tit{flex:1}
+.topo .it{border:.35mm solid #1B232B;border-radius:1.2mm;text-align:center;padding:1mm 2.2mm;font-size:7pt;line-height:1.25;color:#51534A}
+.topo .it b{display:block;font-size:11pt;color:#1B232B}
 .topo p{margin:.6mm 0 0;font-size:9pt;color:#51534A}
 .meio{display:flex;gap:5mm;flex:1}
 .passos{display:flex;gap:3.5mm;flex:1}
@@ -61,7 +65,7 @@ const URL='https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/';
 const svg=(t,m=1)=>{const q=qrcode(0,'M');q.addData(t);q.make();return q.createSvgTag({cellSize:8,margin:m,scalable:true});};
 const passo=(n,miolo,tit,txt)=>`<div class="passo"><div class="cel">${miolo}</div><div class="num">${n}</div><div class="leg"><b>${tit}</b>${txt}</div></div>`;
 const um=c=>`<section class="f ${c}">
- <div class="topo"><img src="../img/sakuma-logo.png" alt="SAKUMA"><div><h1>COMO ACESSAR OS DOCUMENTOS DA FAZENDA</h1><p>Pelo celular · sem senha · só para consulta</p></div></div>
+ <div class="topo"><img src="../img/sakuma-logo.png" alt="SAKUMA"><div class="tit"><h1>COMO ACESSAR OS DOCUMENTOS DA FAZENDA</h1><p>Instrução de trabalho · pelo celular · sem senha · só para consulta</p></div><div class="it"><b>IT 01</b>Rev. 00 · 10/11/2026</div></div>
  <div class="meio">
   <div class="passos">
    ${passo(1,`<div class="cam"><div class="link"><b>sakuma-agro.github.io</b>Toque para abrir</div><span class="dedo">👆</span><div class="mira">${svg(URL,0)}<i></i><i></i><i></i><i></i></div><div class="disparo"></div></div>`,
