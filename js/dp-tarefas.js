@@ -68,11 +68,13 @@ export const ACOES = {
 const PADRAO = [
   ['admissao', 'Imprimir e assinar a ficha cadastral', 0, 'fichaCadastral'],
   ['admissao', 'ASO admissional', 0, 'exames'],
+  ['admissao', 'Lançar exames', 1, 'exames'],
   ['admissao', 'Imprimir a ficha de EPI e colher assinatura', 1, 'fichaEpi'],
   ['admissao', 'Entregar os EPIs', 1, null],
   ['admissao', 'Imprimir o termo de liberdade sindical', 7, 'termoSindical'],
   ['admissao', 'Imprimir o recebimento do contrato', 7, 'termoContrato'],
   ['admissao', 'Integração e treinamentos da função', 7, 'treinamentos'],
+  ['admissao', 'Lançar treinamentos', 7, 'treinamentos'],
   ['admissao', 'Lançar salário e ticket no RH', 5, 'salario'],
   ['admissao', 'Etiqueta do armário', 3, 'armario'],
   ['admissao', 'Folha de ponto do mês', 1, 'folhaPonto'],
