@@ -29,7 +29,10 @@ const ler = (k, p) => { try { const v = localStorage.getItem(k); return v ? JSON
 
 const CACHE = 'gr.compras';
 const FILA = 'gr.compras.fila';
-export const LINK_PEDIR = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/?area=compras';
+// QR da parede SEM LOGIN (10/11/2026, "quero que o qr code não peça login"):
+// abre pedido.html, página solta que só chama cmp_pedir_publico com o código
+// secreto do QR. O código vem do banco (cmp_chave_qr, só comprador/admin).
+const LINK_QR = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/pedido.html?k=';
 
 export const ehComprador = () => !!acesso.admin || (acesso.modulos || []).includes('compras');
 
@@ -182,6 +185,7 @@ function desenhar() {
       <div><h2>Compras <small>Pedido de compra</small></h2>
       <p class="cm-sub">Lance o que precisa ser comprado — o comprador recebe e você acompanha · <span id="cmStatus">${esc(statusTxt())}</span></p></div>
       <div class="cm-acoes">${comp ? '<button type="button" class="btn" id="cmQr">QR code para a parede</button>' : ''}
+        ${acesso.admin ? '<button type="button" class="btn" id="cmTrocarQr" title="O QR antigo para de funcionar">Trocar código do QR</button>' : ''}
         <button type="button" class="btn" id="cmAtualizar">Atualizar</button></div>
     </div>`}
     ${dentroRastro ? `<div class="cm-cab cm-cab-r"><p class="cm-sub" style="margin:0">Pedidos de compra · <span id="cmStatus">${esc(statusTxt())}</span></p>
@@ -260,7 +264,7 @@ function cartaoQuadro(p) {
     <div class="cm-card-top"><span class="cm-pill mini ${u.cls}">${esc(u.nome)}</span><span class="cm-num">${numTxt(p)}</span></div>
     <b class="cm-item">${esc(p.item)}</b>
     <div class="cm-meta">${esc([qtdTxt(p), p.destino].filter(Boolean).join(' · '))}</div>
-    <div class="cm-meta">${esc(primeiroNome(p.pedido_por_nome) || primeiroNome(p.pedido_por_email))} · ${esc(idade(p))}</div>
+    <div class="cm-meta">${esc(p.origem === 'qr' ? p.pedido_por_nome : (primeiroNome(p.pedido_por_nome) || primeiroNome(p.pedido_por_email)))}${p.origem === 'qr' ? ' <span class="cm-qr">via QR</span>' : ''} · ${esc(idade(p))}</div>
     ${p.situacao === 'comprado' && p.previsao ? `<div class="cm-meta">Chega ${brCurto(p.previsao)}${p.fornecedor ? ' · ' + esc(p.fornecedor) : ''}</div>` : ''}
     ${p.situacao === 'entregue' && p.entregue_em ? `<div class="cm-meta">Recebido ${br(p.entregue_em)}</div>` : ''}
     ${prox ? `<button type="button" class="btn mini cm-avancar" data-avancar="${p.id}" data-para="${prox}">${esc(SIT[prox].nome)} →</button>` : ''}
@@ -307,7 +311,7 @@ function abrirPedido(id) {
   d.innerHTML = `<form method="dialog" class="cm-dlg-in">
     <div class="cm-dlg-top"><div><span class="cm-num">${numTxt(p)}</span> <span class="cm-pill mini ${u.cls}">${esc(u.nome)}</span>
       <h3>${esc(p.item)}</h3>
-      <p class="cm-meta">${esc([qtdTxt(p), p.destino].filter(Boolean).join(' · '))} · pedido por ${esc(p.pedido_por_nome || p.pedido_por_email)} em ${br(p.criado_em)}</p>
+      <p class="cm-meta">${esc([qtdTxt(p), p.destino].filter(Boolean).join(' · '))} · pedido por ${esc(p.pedido_por_nome || p.pedido_por_email)}${p.origem === 'qr' ? ' (pelo QR, sem login)' : ''} em ${br(p.criado_em)}</p>
       ${p.motivo ? `<p class="cm-motivo">${esc(p.motivo)}</p>` : ''}</div>
       <button type="button" class="btn mini" data-x aria-label="Fechar">✕</button></div>
     <div class="cm-sits">${[...COLUNAS, 'recusado'].map(s => `<button type="button" data-sit="${s}" aria-pressed="${p.situacao === s}" style="--c:${SIT[s].cor}">${esc(SIT[s].nome)}</button>`).join('')}</div>
@@ -352,6 +356,12 @@ function ligar() {
   r.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { est.aba = b.dataset.aba; est.msg = null; guardarVis(); desenhar(); });
   r.querySelector('#cmAtualizar')?.addEventListener('click', () => carregarCompras());
   r.querySelector('#cmQr')?.addEventListener('click', () => mostrarQr());
+  r.querySelector('#cmTrocarQr')?.addEventListener('click', async () => {
+    if (!confirm('Trocar o código do QR? As placas impressas até agora PARAM de funcionar e será preciso imprimir a nova. Use só se o QR vazou para quem não devia.')) return;
+    const { error } = await estado.cliente.rpc('cmp_trocar_chave_qr').then(x => x, e => ({ error: e }));
+    if (error) { alert('Não deu para trocar o código agora.'); return; }
+    alert('Código trocado. Imprima a placa nova em "QR code para a parede".');
+  });
 
   const f = r.querySelector('#cmForm');
   if (f) {
@@ -448,7 +458,11 @@ export async function svgQr(texto) {
 }
 async function mostrarQr() {
   let svg;
-  try { svg = await svgQr(LINK_PEDIR); } catch { alert('Não deu para montar o QR code agora. Tente de novo com internet.'); return; }
+  try {
+    const { data: chave, error } = await estado.cliente.rpc('cmp_chave_qr');
+    if (error || !chave) throw new Error('chave');
+    svg = await svgQr(LINK_QR + chave);
+  } catch { alert('Não deu para montar o QR code agora. Tente de novo com internet.'); return; }
   const placa = `<style>
       .cm-placa{width:180mm;margin:0 auto;padding:14mm 12mm 10mm;border:1.2mm solid #1B232B;border-radius:6mm;font-family:Arial,sans-serif;color:#1B232B;text-align:center;box-sizing:border-box;background:#fff}
       .cm-placa h1{margin:0;font-size:30pt;letter-spacing:.5pt}
@@ -465,9 +479,9 @@ async function mostrarQr() {
       <h1>PEDIDO DE COMPRA</h1>
       <p class="sub">Precisa de algo? Aponte a câmera do celular</p>
       <div class="qr">${svg}</div>
-      <ol><li>Abra a câmera e aponte para o código.</li><li>Entre com o seu login do app LOP - Gestão Rápida.</li>
-        <li>Escreva o que precisa, a quantidade e para onde vai.</li><li>Toque em <b>Enviar ao comprador</b>.</li></ol>
-      <div class="faixa">Acompanhe em "Meus pedidos" — o comprador vê na hora.</div>
+      <ol><li>Abra a câmera e aponte para o código.</li><li>Escreva seu nome, o que precisa, a quantidade e para onde vai.</li>
+        <li>Toque em <b>Enviar ao comprador</b>.</li><li>Anote o número do pedido (#C-…) para perguntar ao comprador.</li></ol>
+      <div class="faixa">Não precisa de login — o comprador vê o pedido na hora.</div>
       <footer><img src="img/lop-marca.png" alt="LOP"></footer>
     </article>`;
   mostrar(placa, { barra: true });

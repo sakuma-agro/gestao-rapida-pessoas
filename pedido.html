@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1B232B">
+<title>Pedido de compra · LOP - Gestão Rápida</title>
+<link rel="icon" href="icons/area-compras.v1.svg">
+<!--
+  Pedido de compra pelo QR code da parede — SEM LOGIN (10/11/2026, pedido do
+  Guilherme: "quero que o qr code não peça login, funcione para qq um").
+  Página separada do app: não carrega nada do app nem lê o banco. Só chama
+  a função public.cmp_pedir_publico, que confere o código secreto do QR
+  (?k=...), valida os campos, limita a 60 pedidos por hora e grava em
+  cmp_pedidos com origem 'qr'. Quem pede pelo QR não consegue ler nenhum
+  pedido nem dado do app. Trocar o código (botão do admin em Compras) faz o
+  QR antigo parar de funcionar.
+-->
+<style>
+  :root{--grafite:#1B232B;--verde:#84BD00;--verde-esc:#5E8A00;--cinza:#51534A;--linha:#DCDDD5;--fundo:#EFEFEA;--papel:#fff;--erro:#B42318}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Arial,system-ui,sans-serif;background:var(--fundo);color:var(--grafite)}
+  header{background:var(--papel);border-bottom:1px solid var(--linha);padding:10px 16px;display:flex;align-items:center;gap:10px}
+  header .lop{height:32px;width:32px;border-radius:7px}
+  header .barra{width:1px;height:26px;background:var(--linha)}
+  header h1{font-size:15px;margin:0}
+  header small{display:block;font-size:11px;color:var(--cinza)}
+  header .cresce{flex:1}
+  header .sk{height:30px}
+  main{max-width:520px;margin:0 auto;padding:16px}
+  h2{font-size:22px;margin:4px 0 2px}
+  .sub{color:var(--cinza);font-size:14px;margin:0 0 14px}
+  form,.ok,.ruim{background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:13px}
+  label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--cinza)}
+  input,select,textarea{font:inherit;font-size:16px;font-weight:400;color:var(--grafite);border:1px solid var(--linha);border-radius:9px;padding:10px 12px;background:#F7F7F3;width:100%}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);border-color:var(--verde);background:#fff}
+  .duas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .urg{display:flex;flex-wrap:wrap;gap:6px}
+  .urg button{font:inherit;font-size:14px;padding:8px 13px;border-radius:18px;border:1px solid var(--linha);background:#fff;cursor:pointer}
+  .urg [data-u=normal]{color:var(--verde-esc)} .urg [data-u=urgente]{color:#B54708} .urg [data-u=parou]{color:var(--erro)}
+  .urg [aria-checked=true][data-u=normal]{background:var(--verde);border-color:var(--verde);color:#fff}
+  .urg [aria-checked=true][data-u=urgente]{background:#BA7517;border-color:#BA7517;color:#fff}
+  .urg [aria-checked=true][data-u=parou]{background:var(--erro);border-color:var(--erro);color:#fff}
+  .enviar{font:inherit;font-size:16px;font-weight:700;min-height:50px;border:0;border-radius:10px;background:var(--grafite);color:#fff;cursor:pointer}
+  .enviar:disabled{opacity:.6}
+  .erro{color:var(--erro);font-size:14px;margin:0}
+  .erro[hidden],[hidden]{display:none!important}
+  .ok{align-items:center;text-align:center}
+  .ok .num{font-size:30px;font-weight:800;color:var(--verde-esc);margin:4px 0}
+  .ok p,.ruim p{margin:0;color:var(--cinza)}
+  .ok button{font:inherit;font-size:15px;padding:12px 18px;border-radius:10px;border:1px solid var(--grafite);background:#fff;cursor:pointer;margin-top:6px}
+  .ruim{border-color:var(--erro)}
+  footer{text-align:center;padding:18px 0 26px}
+  footer img{height:26px;opacity:.85}
+</style>
+</head>
+<body>
+<header>
+  <img class="lop" src="img/lop-marca.png" alt="LOP">
+  <span class="barra"></span>
+  <div><h1>Gestão Rápida</h1><small>Inteligência para o agronegócio</small></div>
+  <span class="cresce"></span>
+  <img class="sk" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+</header>
+<main>
+  <h2>Pedido de compra</h2>
+  <p class="sub">Escreva o que precisa ser comprado. O pedido vai direto para o comprador.</p>
+
+  <div class="ruim" id="semCodigo" hidden>
+    <b>Este link não está completo.</b>
+    <p>Aponte a câmera para o QR code da placa de novo. Se continuar, avise o escritório.</p>
+  </div>
+
+  <form id="f" novalidate autocomplete="off">
+    <label>Seu nome *<input id="nome" maxlength="80" placeholder="Nome e sobrenome" autocomplete="name"></label>
+    <label>O que precisa? *<input id="item" maxlength="160" placeholder="Luva nitrílica, correia do trator 7…"></label>
+    <div class="duas">
+      <label>Quantidade<input id="qtd" inputmode="decimal" placeholder="20"></label>
+      <label>Unidade<select id="un"><option>un</option><option>par</option><option>cx</option><option>pct</option><option>L</option><option>kg</option><option>m</option><option>rolo</option><option>saco</option><option>galão</option><option>jogo</option></select></label>
+    </div>
+    <label>Para onde *<select id="dest"><option value="">Escolha</option><option>Lote 35 PADAP</option><option>Faz. Faca</option><option>Faz. Morro Branco</option><option>Faz. Três Riachos</option><option>Faz. Quebra Cocão</option><option>Escritório</option><option>Oficina</option></select></label>
+    <div><label style="margin-bottom:6px">Urgência</label>
+      <div class="urg" role="radiogroup">
+        <button type="button" role="radio" data-u="normal" aria-checked="true">Normal</button>
+        <button type="button" role="radio" data-u="urgente" aria-checked="false">Urgente</button>
+        <button type="button" role="radio" data-u="parou" aria-checked="false">Parou o serviço</button>
+      </div></div>
+    <label>Motivo / onde vai usar<textarea id="motivo" rows="2" maxlength="400" placeholder="Reposição da equipe de colheita"></textarea></label>
+    <p class="erro" id="erro" hidden></p>
+    <button class="enviar" id="bEnviar" type="submit">Enviar ao comprador</button>
+  </form>
+
+  <div class="ok" id="ok" hidden>
+    <b>Pedido enviado</b>
+    <div class="num" id="okNum"></div>
+    <p id="okTxt"></p>
+    <p>Anote o número para perguntar ao comprador.</p>
+    <button type="button" id="bOutro">Pedir outra coisa</button>
+  </div>
+</main>
+<footer><img src="img/lop-marca.png" alt="LOP"></footer>
+<script>
+(() => {
+  const URL_BANCO = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co';
+  const CHAVE_PUBLICA = 'sb_publishable_3oelhDSjKjwwJ67IJDdSAg_-Hmgs3Pn';
+  const $ = id => document.getElementById(id);
+  const codigo = new URLSearchParams(location.search).get('k') || '';
+  if (!/^[0-9a-f]{16,64}$/i.test(codigo)) { $('semCodigo').hidden = false; $('f').hidden = true; return; }
+
+  // o aparelho lembra o nome e o local da última vez (só neste celular)
+  try { $('nome').value = localStorage.getItem('pedido.nome') || ''; $('dest').value = localStorage.getItem('pedido.dest') || ''; } catch {}
+  let urg = 'normal';
+  document.querySelectorAll('[data-u]').forEach(b => b.onclick = () => {
+    urg = b.dataset.u; document.querySelectorAll('[data-u]').forEach(x => x.setAttribute('aria-checked', String(x === b)));
+  });
+  const erro = t => { $('erro').textContent = t; $('erro').hidden = !t; };
+  ['nome', 'item', 'qtd', 'dest'].forEach(id => $(id).addEventListener('input', () => erro('')));
+
+  $('f').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const nome = $('nome').value.trim(), item = $('item').value.trim();
+    const qtdTxt = $('qtd').value.trim().replace(',', '.');
+    if (nome.length < 2) { erro('Escreva o seu nome.'); $('nome').focus(); return; }
+    if (item.length < 2) { erro('Escreva o que precisa ser comprado.'); $('item').focus(); return; }
+    if (qtdTxt && !(Number(qtdTxt) > 0)) { erro('A quantidade precisa ser um número maior que zero.'); $('qtd').focus(); return; }
+    if (!$('dest').value) { erro('Escolha para onde vai.'); $('dest').focus(); return; }
+    const b = $('bEnviar'); b.disabled = true; b.textContent = 'Enviando…';
+    try {
+      const r = await fetch(URL_BANCO + '/rest/v1/rpc/cmp_pedir_publico', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUBLICA, Authorization: 'Bearer ' + CHAVE_PUBLICA },
+        body: JSON.stringify({ p_chave: codigo, p_nome: nome, p_item: item, p_quantidade: qtdTxt ? Number(qtdTxt) : null,
+          p_unidade: $('un').value, p_destino: $('dest').value, p_urgencia: urg, p_motivo: $('motivo').value.trim() || null })
+      });
+      const corpo = await r.json().catch(() => null);
+      if (!r.ok) {
+        const m = (corpo && (corpo.message || corpo.hint)) || '';
+        erro(/codigo_invalido/.test(m) ? 'Este QR code não vale mais. Peça ao escritório a placa nova.'
+          : /muitos_pedidos/.test(m) ? 'Muitos pedidos agora. Espere alguns minutos e tente de novo.'
+          : /nome_invalido|item_invalido|qtd_invalida|texto_longo/.test(m) ? 'Confira os campos e tente de novo.'
+          : 'Não deu para enviar agora. Confira a internet e tente de novo.');
+        return;
+      }
+      try { localStorage.setItem('pedido.nome', nome); localStorage.setItem('pedido.dest', $('dest').value); } catch {}
+      $('okNum').textContent = '#C-' + String(corpo).padStart(3, '0');
+      $('okTxt').textContent = item + ($('dest').value ? ' · ' + $('dest').value : '');
+      $('f').hidden = true; $('ok').hidden = false; scrollTo(0, 0);
+    } catch {
+      erro('Sem internet. Tente de novo quando tiver sinal.');
+    } finally { b.disabled = false; b.textContent = 'Enviar ao comprador'; }
+  });
+  $('bOutro').onclick = () => {
+    $('item').value = ''; $('qtd').value = ''; $('motivo').value = ''; urg = 'normal';
+    document.querySelectorAll('[data-u]').forEach(x => x.setAttribute('aria-checked', String(x.dataset.u === 'normal')));
+    $('ok').hidden = true; $('f').hidden = false; $('item').focus();
+  };
+})();
+</script>
+</body>
+</html>
