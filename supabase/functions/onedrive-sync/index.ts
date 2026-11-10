@@ -15,7 +15,8 @@
 //   - arquivo dentro da subpasta EVIDÊNCIAS de qualquer documento → uma
 //     evidência do documento (sem fazenda), na linha do tempo dele.
 // Nada é apagado aqui: tirar um arquivo do OneDrive não tira do app.
-// Desde 01/11/2026 só POP e FORM ganham cópia no Drive (abrem como PDF no app); o resto é só
+// Desde 01/11/2026 só POP e FORM ganham cópia no Drive (abrem como PDF no app) — e, desde 10/11/2026, os
+// documentos marcados para a consulta por QR Code (cert_documentos.qr); o resto é só
 // registrado (drive_id vazio) e o app abre a pasta no computador ou na nuvem.
 //
 // Autenticação: cabeçalho x-sync-token, conferido pelo sha-256 na tabela
@@ -251,7 +252,13 @@ async function enviar(req: Request, u: URL) {
   const origem = "onedrive:" + caminho.replace(/\\/g, "/");
   const sufixo = (await sha256(origem)).slice(0, 10);
   // já está no app (anexado pelo app e gravado no OneDrive pelo computador, ou rodada anterior): não duplica
-  const ja = await db(`arquivos?select=chave&origem=eq.${encodeURIComponent(origem)}`);
+  const ja = await db(`arquivos?select=chave,tipo,dono_id,drive_id&origem=eq.${encodeURIComponent(origem)}`);
+  // 10/11/2026 (consulta por QR Code): documento marcado para o QR precisa da cópia no Drive — o arquivo que já
+  // estava no app sem cópia (a sincronização devolve como "faltando") ganha a cópia agora, na mesma chave.
+  if (ja?.length && !ja[0].drive_id && ja[0].tipo === "documento" && await abreNoApp(ja[0].tipo, ja[0].dono_id)) {
+    await gravar(ja[0].chave, "documento", ja[0].dono_id, nome, mime, corpo, origem, data);
+    return json({ ok: true, chave: ja[0].chave, copia_drive: true });
+  }
   if (ja?.length) {
     await db(`arquivos?origem=eq.${encodeURIComponent(origem)}`, { method: "PATCH", body: JSON.stringify({ data_arquivo: data, atualizado_em: new Date().toISOString() }) });
     return json({ ok: true, chave: ja[0].chave, ja: true });

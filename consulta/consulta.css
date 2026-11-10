@@ -1,0 +1,88 @@
+/* Consulta pública por QR Code — LOP - Gestão Rápida (10/11/2026).
+   Celular primeiro: botões grandes, letra grande, nada de menu escondido. Tema claro sempre
+   (a logo da SAKUMA vai sem alteração, sobre fundo branco). */
+:root{
+  --verde:#84BD00; --verde-esc:#5f8a00; --verde-claro:#eef6dc;
+  --marrom:#744F28; --cinza:#51534A; --grafite:#1B232B;
+  --papel:#fff; --fundo:#f4f6ef; --linha:#dfe3d6; --texto:#2b2d27;
+  color-scheme: light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--fundo);color:var(--texto);font-family:Arial,Helvetica,sans-serif;font-size:17px;line-height:1.4;
+  min-height:100vh;display:flex;flex-direction:column;-webkit-text-size-adjust:100%}
+a{color:var(--verde-esc)}
+
+.cq-topo{background:var(--papel);border-bottom:4px solid var(--verde);position:sticky;top:0;z-index:5}
+.cq-topo-int{max-width:720px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.cq-lop{height:30px;width:auto;mix-blend-mode:multiply}
+.cq-barra{width:1px;align-self:stretch;background:var(--linha)}
+.cq-nome{display:flex;flex-direction:column;line-height:1.1;flex:1;min-width:0}
+.cq-nome b{font-size:16px;color:var(--grafite)}
+.cq-nome small{font-size:12px;color:var(--cinza)}
+.cq-sakuma{height:34px;width:auto}
+
+.cq{flex:1;width:100%;max-width:720px;margin:0 auto;padding:16px 16px 28px}
+.cq-carregando,.cq-vazio{color:var(--cinza);text-align:center;padding:40px 0}
+.cq-erro{background:#fff4e5;border:1px solid #f0c27a;border-radius:10px;padding:14px;color:#6b4a12}
+
+.cq-titulo{display:flex;align-items:center;gap:10px;margin:2px 0 14px}
+.cq-titulo h1{font-size:22px;margin:0;color:var(--grafite)}
+.cq-voltar{flex:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--linha);background:var(--papel);
+  display:grid;place-items:center;color:var(--grafite);text-decoration:none;font-size:24px}
+.cq-sub{color:var(--cinza);font-size:14px;margin:-8px 0 14px}
+
+/* menu */
+.cq-chamada{background:var(--verde);color:#fff;border-radius:14px;padding:14px 16px;margin-bottom:14px;font-weight:700;font-size:18px;text-align:center}
+.cq-menu{display:grid;gap:12px}
+.cq-bt{display:flex;align-items:center;gap:14px;background:var(--papel);border:2px solid var(--verde);border-radius:14px;
+  padding:16px;text-decoration:none;color:var(--grafite);min-height:72px;box-shadow:0 2px 0 rgba(0,0,0,.04)}
+.cq-bt:active{background:var(--verde-claro)}
+.cq-bt .ic{flex:none;width:44px;height:44px;border-radius:12px;background:var(--verde-claro);display:grid;place-items:center;color:var(--verde-esc)}
+.cq-bt .ic svg{width:26px;height:26px}
+.cq-bt .tx{flex:1;min-width:0}
+.cq-bt .tx b{display:block;font-size:19px;text-transform:uppercase;letter-spacing:.2px}
+.cq-bt .tx small{display:block;color:var(--cinza);font-size:14px}
+.cq-bt .seta{color:var(--verde-esc);font-size:26px;flex:none}
+.cq-bt.fds{border-color:var(--marrom)}
+.cq-bt.fds .ic{background:#f3ebe2;color:var(--marrom)}
+.cq-bt.fds .seta{color:var(--marrom)}
+
+/* busca */
+.cq-busca{position:relative;margin:0 0 12px}
+.cq-busca input{width:100%;font:inherit;font-size:18px;padding:14px 14px 14px 46px;border:2px solid var(--linha);border-radius:12px;background:var(--papel)}
+.cq-busca input:focus{outline:none;border-color:var(--verde)}
+.cq-busca svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:22px;height:22px;color:var(--cinza)}
+
+/* listas */
+.cq-lista{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cq-item{display:flex;align-items:center;gap:12px;background:var(--papel);border:1px solid var(--linha);border-radius:12px;
+  padding:14px;text-decoration:none;color:var(--texto);min-height:60px}
+.cq-item:active{background:var(--verde-claro)}
+.cq-item .cod{flex:none;font-weight:700;color:var(--verde-esc);font-size:14px;min-width:58px}
+.cq-item .nm{flex:1;min-width:0;font-size:17px}
+.cq-item .nm small{display:block;color:var(--cinza);font-size:13px;margin-top:2px}
+.cq-item .pdf{flex:none;font-size:11px;font-weight:700;color:#fff;background:var(--cinza);border-radius:5px;padding:3px 6px}
+
+.cq-grupo{margin:0 0 10px}
+.cq-grupo>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;background:var(--papel);
+  border:2px solid var(--linha);border-radius:12px;padding:14px;font-weight:700;font-size:17px;color:var(--grafite)}
+.cq-grupo>summary::-webkit-details-marker{display:none}
+.cq-grupo>summary .n{margin-left:auto;font-weight:400;color:var(--cinza);font-size:14px}
+.cq-grupo>summary::after{content:"›";font-size:24px;color:var(--marrom);transition:transform .15s}
+.cq-grupo[open]>summary{border-color:var(--marrom)}
+.cq-grupo[open]>summary::after{transform:rotate(90deg)}
+.cq-grupo .cq-lista{margin:8px 0 4px 8px}
+
+/* leitor */
+.cq-leitor{display:grid;gap:10px}
+.cq-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.cq-acao{flex:1;min-width:140px;text-align:center;padding:12px;border-radius:12px;border:2px solid var(--verde);background:var(--papel);
+  color:var(--verde-esc);font-weight:700;text-decoration:none;font-size:16px}
+.cq-pag{background:#fff;border:1px solid var(--linha);border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.08);width:100%;height:auto;display:block}
+.cq-pag-n{color:var(--cinza);font-size:12px;text-align:center;margin:-4px 0 4px}
+.cq-img{width:100%;height:auto;border-radius:8px;border:1px solid var(--linha);background:#fff}
+
+.cq-pe{text-align:center;color:var(--cinza);font-size:13px;padding:14px 16px 22px;border-top:1px solid var(--linha);background:var(--papel)}
+
+@media (min-width:640px){ .cq-menu{grid-template-columns:1fr 1fr} .cq-chamada{grid-column:1/-1} }

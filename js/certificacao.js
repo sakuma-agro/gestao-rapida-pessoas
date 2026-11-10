@@ -1832,6 +1832,13 @@ function formDocumento(id, preset = {}) {
     ${DICA_LINK}
     <label class="campo" style="margin-top:8px">Observação <textarea id="cedObs" rows="2" maxlength="1000" placeholder="Anote aqui o que for importante deste documento…">${val('observacao')}</textarea></label>
     <div id="cedAnexos" style="margin-top:8px"></div>
+    <label class="campo" style="margin-top:8px">Mostrar no QR Code dos funcionários
+      <select id="cedQr">
+        <option value=""${!v.qr ? ' selected' : ''}>Não mostrar</option>
+        <option value="docs"${v.qr === 'docs' ? ' selected' : ''}>QR de documentos (POPs, políticas, manual)</option>
+        <option value="fds"${v.qr === 'fds' ? ' selected' : ''}>QR das FISPQ / FDS</option>
+      </select></label>
+    <p class="dica" style="margin:2px 0 0">Aparece na consulta sem senha (quadro de avisos) — só para ver. Arquivo novo entra em até 1 hora. Placas em Certificação › Impressões.</p>
     <details class="ce-mais"><summary>Mais detalhes <small>(categoria, situação, revisão, certificações)</small></summary>
       <div class="grade">
         <label class="campo">Categoria <input type="text" id="cedCat" list="ceListaCat" maxlength="40" value="${val('categoria')}" placeholder="pelo código"></label>
@@ -1903,6 +1910,7 @@ async function gravarDocumento(d) {
     codigo: g('cedCod'), nome: g('cedNome'), categoria: (g('cedCat') || tipoDoc(pre).cat || 'ANEXO').toUpperCase(), periodicidade: per,
     responsavel: g('cedResp'), situacao: $('cedSit').value, revisao: g('cedRev'), data_revisao: g('cedData'),
     certificacoes: lerCaixas('dcert'), observacao: g('cedObs'), link: g('cedLink'), atualizado_em: new Date().toISOString(),
+    qr: $('cedQr').value || null,   // consulta pública por QR Code (10/11/2026)
     vence_em: comVenc ? g('cedVence') : null,
     dia_vencimento: (n => n >= 1 && n <= 31 ? Math.round(n) : null)(Number($('cedDia').value)),
     aviso_dias: $('cedAviso').value !== '' ? Math.max(0, Math.round(Number($('cedAviso').value))) : null,

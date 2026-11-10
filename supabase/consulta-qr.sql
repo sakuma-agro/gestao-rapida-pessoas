@@ -1,0 +1,11 @@
+-- Consulta pública por QR Code (10/11/2026) — já aplicado no Supabase como migração "cert_consulta_qr".
+-- Funcionários abrem sem senha (quadro de avisos) o que estiver marcado aqui:
+--   cert_documentos.qr = 'docs' → QR de documentos (POPs, políticas, leis trabalhistas, manual)
+--   cert_documentos.qr = 'fds'  → QR das FISPQ/FDS
+-- Quem entrega é a função consulta-publica (sem login, só leitura, só esses documentos).
+-- Documento marcado ganha cópia no Drive (arquivo_cert_abre_no_app) e a sincronização do sakumasrv
+-- reenvia os arquivos que estão sem cópia (arquivos_marcar_datas → "faltando").
+-- Página: consulta/ (consulta/?g=fds abre direto na FISPQ). Placas: Certificação › Impressões.
+alter table public.cert_documentos add column if not exists qr text check (qr in ('docs','fds'));
+-- Marcados na criação: POL 01–13 → docs; AN 30 (FISPQ/FDS e Bulas) → fds.
+-- Funções alteradas: arquivo_cert_abre_no_app, arquivos_marcar_datas; nova: consulta_qr_lista (só service_role).

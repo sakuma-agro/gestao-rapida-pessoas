@@ -336,6 +336,8 @@ function doc046(v) {
    =================================================================== */
 /* 04/11/2026: a GRASP imprime só a ata (mensal); a presença sai na Lista de presença (FORM 018). */
 const IMPRESSOS = [
+  // 10/11/2026: placas do quadro de avisos com o QR da consulta sem senha (consulta/ no GitHub Pages).
+  { tipo: 'qrConsulta', codigo: 'QR Code', freq: 'Quadro de avisos', nome: 'Placas do QR Code de consulta', desc: 'Duas placas A4 para o quadro de avisos: Documentos (POPs, políticas, leis trabalhistas, manual) e FISPQ / FDS. O funcionário aponta a câmera e vê, sem senha. O que aparece se escolhe na Lista mestra (Editar › Mostrar no QR Code).' },
   { tipo: 'fichaEpi', codigo: 'Ficha de EPI', freq: 'Mensal · por funcionário', nome: 'Ficha de EPI', desc: 'A ficha de entrega de EPI de SST › EPI\'s › Fichas, com o modelo do app. Uma ficha para cada funcionário marcado; o que já foi preenchido no mês vem junto.' },
   { tipo: 'f018', codigo: 'FORM 018', freq: 'Por evento', nome: 'Lista de presença', desc: 'Treinamentos, palestras e reuniões (também a reunião GRASP): temas, horário, ministrante e quem assina.' },
   { tipo: 'f024', codigo: 'FORM 024', freq: 'Anual', nome: 'Reunião com a gerência', desc: 'Reunião da gerência com os funcionários, com a lista de participantes.' },
@@ -370,6 +372,7 @@ const fechar = () => $('dlgCi')?.open && $('dlgCi').close();
 function formImpresso(tipo) {
   aplicarRevisoes(_ce?.S?.docs); carregarRevisoes();
   if (tipo === 'fichaEpi') return formFichaEpi();
+  if (tipo === 'qrConsulta') return formPlacasQr();
   const f = FORMS[tipo], ant = lembrado()[tipo] || {};
   const fs = funcionarios();
   const ehGrasp = tipo === 'f044';
@@ -574,3 +577,87 @@ export const TELAS_IMPRESSOES = ['ceImpressoes'];
 export function abrirImpressoes(tela) { if (tela === 'ceImpressoes') { desenhar(); carregarRevisoes(); } }
 export function limparImpressoes() { fechar(); const t = $('telaCeImpressoes'); if (t) t.innerHTML = ''; }
 export const _ci = { doc018, doc024, doc044, doc007, doc054, doc045, doc046 };
+
+/* ===================================================================
+   PLACAS DO QR CODE DE CONSULTA (10/11/2026)
+   Pedido do Guilherme: "vou imprimir e deixar no quadro de aviso o QR Code". Substituem o
+   "MENU - SAKUMA.pdf". O endereço é fixo (o do GitHub Pages): a placa impressa vale para
+   sempre; o que aparece na consulta muda pela Lista mestra, sem reimprimir.
+   =================================================================== */
+const URL_CONSULTA = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/';
+const PLACAS = {
+  docs: { url: URL_CONSULTA, titulo: 'DOCUMENTOS DA FAZENDA', sub: 'Aponte a câmera do celular — sem senha, só para consulta',
+    itens: ['Procedimentos (POPs)', 'Políticas', 'Leis trabalhistas', 'Manual de cultura', 'FISPQ / FDS', 'Telefones úteis', 'Mapa até o pronto-socorro'], lista: true },
+  fds: { url: URL_CONSULTA + '?g=fds', titulo: 'FISPQ / FDS', sub: 'Fichas de segurança dos produtos — aponte a câmera do celular',
+    itens: ['Abra a câmera e aponte para o código.', 'Digite o nome do produto (ou procure pela categoria).', 'Toque na ficha: primeiros socorros, cuidados e o que fazer em acidente.'], lista: false },
+};
+let qrLibCi = null;
+function qrLib() {
+  if (window.qrcode) return Promise.resolve(window.qrcode);
+  if (!qrLibCi) qrLibCi = new Promise((ok, nao) => {
+    const s = document.createElement('script');
+    s.src = 'vendor/qrcode-generator.js';
+    s.onload = () => ok(window.qrcode); s.onerror = () => { qrLibCi = null; nao(new Error('qr')); };
+    document.head.appendChild(s);
+  });
+  return qrLibCi;
+}
+async function svgQrCi(texto) {
+  const qrcode = await qrLib();
+  const q = qrcode(0, 'M'); q.addData(texto); q.make();
+  return q.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+}
+function formPlacasQr() {
+  dialogo(`<h3>Placas do QR Code de consulta</h3>
+    <p class="dica">Para o quadro de avisos. Cada placa sai numa folha A4 em pé e funciona em impressora preto e branco.</p>
+    <div class="grade">
+      <label class="rs-check"><input type="checkbox" id="ciQrDocs" checked> Documentos <span class="dc-sem">(POPs, políticas, leis, manual, FISPQ, telefones, mapa)</span></label>
+      <label class="rs-check"><input type="checkbox" id="ciQrFds" checked> FISPQ / FDS <span class="dc-sem">(abre direto nas fichas — bom para o depósito)</span></label>
+    </div>
+    <p class="dica">Endereços: <a href="${URL_CONSULTA}" target="_blank" rel="noopener">documentos</a> · <a href="${URL_CONSULTA}?g=fds" target="_blank" rel="noopener">FISPQ</a> — abra para conferir antes de imprimir.</p>
+    <div class="barra entre">
+      <button class="btn" type="button" data-fechar>Cancelar</button>
+      <button class="btn principal" type="button" id="ciQrImp">Ver e imprimir</button>
+    </div>`, d => {
+    $('ciQrImp').addEventListener('click', async () => {
+      const qual = [$('ciQrDocs').checked && 'docs', $('ciQrFds').checked && 'fds'].filter(Boolean);
+      if (!qual.length) return;
+      let html = '';
+      try { for (const k of qual) html += placaQr(PLACAS[k], await svgQrCi(PLACAS[k].url)); }
+      catch { alert('Não deu para montar o QR Code agora. Tente de novo com internet.'); return; }
+      fechar(); mostrar(ESTILO_PLACA + html, { barra: true });
+    });
+  });
+}
+const ESTILO_PLACA = `<style>
+  .ci-placa{width:186mm;min-height:265mm;margin:0 auto 6mm;padding:12mm 12mm 9mm;border:1.4mm solid #1B232B;border-radius:6mm;
+    font-family:Arial,sans-serif;color:#1B232B;text-align:center;box-sizing:border-box;background:#fff;display:flex;flex-direction:column}
+  .ci-placa .logo{height:17mm;width:auto;margin:0 auto 4mm}
+  .ci-placa h1{margin:0;font-size:31pt;letter-spacing:.4pt;line-height:1.1}
+  .ci-placa .sub{margin:3mm 0 5mm;font-size:14pt;color:#51534A}
+  .ci-placa .qr{width:118mm;height:118mm;margin:0 auto}
+  .ci-placa .qr svg{width:100%;height:100%}
+  .ci-placa .itens{margin:6mm auto 0;max-width:150mm;font-size:14pt;line-height:1.5;text-align:left}
+  .ci-placa ul.itens{columns:2;column-gap:8mm;list-style:none;padding:0}
+  .ci-placa ul.itens li{break-inside:avoid;padding-left:6mm;position:relative}
+  .ci-placa ul.itens li::before{content:"";position:absolute;left:0;top:2.6mm;width:3mm;height:3mm;border-radius:50%;background:#84BD00;border:.3mm solid #1B232B}
+  .ci-placa ol.itens{padding-left:8mm}
+  .ci-placa .faixa{margin-top:auto;background:#84BD00;color:#1B232B;font-weight:700;font-size:13pt;padding:3mm;border-radius:2mm}
+  .ci-placa .end{font-size:9pt;color:#51534A;margin:2mm 0 0;word-break:break-all}
+  .ci-placa footer{margin-top:4mm;display:flex;justify-content:center}
+  .ci-placa footer img{height:9mm}
+  @media print{.ci-placa{page-break-after:always;margin:6mm auto 0}.ci-placa:last-of-type{page-break-after:auto}}
+</style>`;
+function placaQr(p, svg) {
+  return `<article class="ci-placa">
+    <img class="logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+    <h1>${esc(p.titulo)}</h1>
+    <p class="sub">${esc(p.sub)}</p>
+    <div class="qr">${svg}</div>
+    ${p.lista ? `<ul class="itens">${p.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`
+      : `<ol class="itens">${p.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ol>`}
+    <div class="faixa">Dúvidas: escritório (34) 9 9646-3296</div>
+    <p class="end">${esc(p.url)}</p>
+    <footer><img src="img/lop-marca.png" alt="LOP"></footer>
+  </article>`;
+}
