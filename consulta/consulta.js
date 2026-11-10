@@ -50,9 +50,11 @@ const urlArquivo = chave => `${FUNCAO}?acao=ver&chave=${encodeURIComponent(chave
 
 const eLei = a => /leis?\s+trabalhist/i.test(a.nome);
 const eManual = d => /manual|cultura/i.test(d.nome);
+const eTelefones = d => /telefone/i.test(d.nome);
+const eMapa = d => /mapa/i.test(d.nome) && /socorro|hospital|rota/i.test(d.nome);
 /** Separa os documentos do grupo "docs" nas seções do menu. */
 function secoes(docs) {
-  const s = { procedimentos: [], politicas: [], leis: [], manual: [], instrucoes: [], outros: [] };
+  const s = { procedimentos: [], politicas: [], leis: [], manual: [], telefones: [], mapa: [], instrucoes: [], outros: [] };
   for (const d of docs) {
     const arqs = d.arquivos.filter(a => !eLei(a));
     d.arquivos.filter(eLei).forEach(a => s.leis.push({ ...d, codigo: '', nome: limparNome(a.nome), arquivos: [a] }));
@@ -60,6 +62,8 @@ function secoes(docs) {
     const x = { ...d, arquivos: arqs };
     if (d.categoria === 'P.O.Ps') s.procedimentos.push(x);
     else if (d.categoria === 'POLÍTICAS') s.politicas.push(x);
+    else if (eTelefones(d)) s.telefones.push(x);   // 10/11/2026: AN 51 — placa "Telefones úteis"
+    else if (eMapa(d)) s.mapa.push(x);
     else if (eManual(d)) s.manual.push(x);
     else if (d.categoria === 'INST. TRABALHO') s.instrucoes.push(x);
     else s.outros.push(x);
@@ -71,6 +75,8 @@ const SECOES = {
   politicas: { t: 'Políticas', sub: 'O que a empresa garante a todos', ic: IC.pol },
   leis: { t: 'Leis trabalhistas', sub: 'Fundamentação legal do contrato', ic: IC.lei },
   manual: { t: 'Manual de cultura', sub: 'Quem somos e como trabalhamos', ic: IC.man },
+  telefones: { t: 'Telefones úteis', sub: 'Emergência e contatos', ic: IC.tel },
+  mapa: { t: 'Mapa – pronto-socorro', sub: 'Faz. Faca até o pronto-socorro', ic: IC.mapa },
   instrucoes: { t: 'Instruções de trabalho', sub: 'Passo a passo das tarefas', ic: IC.doc },
   outros: { t: 'Outros documentos', sub: 'Anexos e orientações', ic: IC.doc },
 };
@@ -105,8 +111,10 @@ async function menu() {
   for (const k of ['politicas', 'leis', 'manual', 'instrucoes', 'outros'])
     if (s && s[k].length) b.push(botao(`#s/${k}`, SECOES[k].ic, SECOES[k].t, SECOES[k].sub));
   b.push(botao('#fispq', IC.fds, 'FISPQ / FDS', 'Fichas de segurança dos produtos', 'fds'));
-  b.push(botao(LINKS.telefones, IC.tel, 'Telefones úteis', 'Emergência e contatos', '', true));
-  b.push(botao(LINKS.mapa, IC.mapa, 'Mapa – pronto-socorro', 'Faz. Faca até o pronto-socorro', '', true));
+  // Telefones e mapa: do app quando o documento estiver marcado para o QR; senão, o link antigo do Drive.
+  for (const k of ['telefones', 'mapa'])
+    b.push(s && s[k].length ? botao(`#s/${k}`, SECOES[k].ic, SECOES[k].t, SECOES[k].sub)
+      : botao(LINKS[k], SECOES[k].ic, SECOES[k].t, SECOES[k].sub, '', true));
   tela.innerHTML = `<div class="cq-menu"><div class="cq-chamada">Toque para abrir</div>${b.join('')}</div>` +
     (s ? '' : '<p class="cq-erro" style="margin-top:14px">Sem conexão com o servidor agora. Os botões de telefones e mapa funcionam; tente os outros daqui a pouco.</p>');
 }
@@ -190,7 +198,7 @@ async function ver(chave) {
     try {
       for (const d of await cache[g]) {
         const a = d.arquivos.find(x => x.chave === chave);
-        if (a) { titulo = g === 'fds' ? limparNome(a.nome) : (eLei(a) ? 'Leis trabalhistas' : `${d.codigo} ${d.nome}`.trim()); voltar = g === 'fds' ? '#fispq' : '#'; }
+        if (a) { titulo = g === 'fds' ? limparNome(a.nome) : eLei(a) ? 'Leis trabalhistas' : eTelefones(d) ? 'Telefones úteis' : `${d.codigo} ${d.nome}`.trim(); voltar = g === 'fds' ? '#fispq' : '#'; }
       }
     } catch { /* lista falhou: segue com o título padrão */ }
   }
