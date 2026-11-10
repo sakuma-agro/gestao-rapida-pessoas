@@ -31,6 +31,14 @@
    "alt": 297
   },
   {
+   "id": "acesso-qr-code-folheto-instrucoes",
+   "titulo": "Acesso QR Code – Folheto de instruções (meia folha, 2 por A4)",
+   "cat": "qr",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
    "id": "atencao-acesso-restrito",
    "titulo": "Atenção – Acesso restrito",
    "cat": "seg",
