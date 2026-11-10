@@ -196,6 +196,26 @@ async function htmlInstrucao() {
     .ri-alerta{margin-top:4mm;border:.7mm solid ${GRAFITE};border-radius:2.5mm;padding:3mm 4mm;font-size:10.5pt}
     .ri-pe{margin-top:auto;padding-top:4mm;display:flex;justify-content:space-between;align-items:flex-end;font-size:9pt;color:${CINZA}}
     .ri-pe img{height:8mm}
+    .ri-folha{page-break-after:always;break-after:page}
+    .ri-folha:last-of-type{page-break-after:auto;break-after:auto}
+    /* página 2: o formulário como aparece no celular (prints de 10/11/2026) */
+    .ri-telas{display:grid;grid-template-columns:1fr 1fr;gap:9mm;margin-top:4mm;align-items:start}
+    .ri-cel{border:1.6mm solid ${GRAFITE};border-radius:7mm;padding:3mm 2mm 4mm;background:${GRAFITE}}
+    .ri-cel .ri-tel{position:relative;border-radius:3mm;overflow:visible;background:#fff}
+    .ri-cel .ri-tel img{border-radius:3mm}
+    .ri-cel img{display:block;width:100%}
+    .ri-cel .ri-fala{display:block;width:12mm;height:1.2mm;border-radius:1mm;background:#4A535C;margin:0 auto 2.5mm}
+    .ri-mk{position:absolute;left:-7mm;display:flex;align-items:center;gap:1.5mm;transform:translateY(-50%)}
+    .ri-mk b{width:8.5mm;height:8.5mm;border-radius:50%;background:${VERDE};color:${GRAFITE};font-size:13pt;display:flex;align-items:center;justify-content:center;
+      border:.7mm solid ${GRAFITE};box-shadow:0 0 0 .8mm #fff}
+    .ri-leg{display:flex;flex-direction:column;gap:3mm}
+    .ri-leg > div:not(.ri-cel){display:grid;grid-template-columns:9mm 1fr;gap:2.5mm;align-items:start;font-size:10.5pt}
+    .ri-leg b.n{width:8mm;height:8mm;border-radius:50%;background:${VERDE};color:${GRAFITE};border:.6mm solid ${GRAFITE};display:flex;align-items:center;justify-content:center;font-size:12pt}
+    .ri-leg p{margin:.5mm 0 0;color:${CINZA}}
+    .ri-ex{margin-top:5mm;display:grid;grid-template-columns:1fr 1fr;gap:4mm}
+    .ri-ex div{border:.4mm solid #C9CBC2;border-radius:2.5mm;padding:3mm 4mm;font-size:10pt}
+    .ri-ex .bom{border-color:${VERDE_ESC};border-width:.7mm}
+    .ri-ex i{display:block;margin-top:1.5mm;font-style:normal;background:#F2F2EE;border-radius:1.5mm;padding:2mm 3mm}
   </style>
   <article class="ri-folha">
     <header class="ri-cab"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
@@ -236,6 +256,32 @@ async function htmlInstrucao() {
     <div class="ri-alerta"><b>Emergência ou acidente não é pelo QR Code.</b> Avise na hora o encarregado ou o técnico de
       segurança e siga o plano de emergência da fazenda. Sem celular? Fale com o escritório ou use a caixa de sugestões.</div>
 
+    <footer class="ri-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão</span><img src="img/lop-marca.png" alt="LOP"></footer>
+  </article>
+  <article class="ri-folha">
+    <header class="ri-cab"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <h1>Veja como é o formulário no celular<small>É esta tela que abre quando você aponta a câmera para o QR Code · FORM 042</small></h1></header>
+    <div class="ri-telas">
+      <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
+        <img src="img/jotform-042-tela1.jpg" alt="Início do formulário: título, tipo de feedback e local">
+        <span class="ri-mk" style="top:71.5%"><b>1</b></span>
+        <span class="ri-mk" style="top:91%"><b>2</b></span></div></div>
+      <div class="ri-leg">
+        <div><b class="n">1</b><span><b>Tipo de feedback</b><p>Toque em RECLAMAÇÃO, SUGESTÃO ou ELOGIO.</p></span></div>
+        <div><b class="n">2</b><span><b>Local</b><p>Toque na fazenda onde aconteceu: Faca, Lote 35, Três Riachos, Morro Branco ou Quebra Cocão.</p></span></div>
+        <div class="ri-cel" style="display:block;margin-top:3mm"><span class="ri-fala"></span><div class="ri-tel">
+          <img src="img/jotform-042-tela2.jpg" alt="Final do formulário: campo para escrever e botão Enviar">
+          <span class="ri-mk" style="top:36%"><b>3</b></span>
+          <span class="ri-mk" style="top:80%"><b>4</b></span></div></div>
+        <div><b class="n">3</b><span><b>Descreva seu feedback</b><p>Escreva o que aconteceu. É o único campo obrigatório. Role a tela para baixo se não aparecer.</p></span></div>
+        <div><b class="n">4</b><span><b>Enviar</b><p>Toque no botão verde Enviar. A tela muda confirmando o envio: pronto, chegou no escritório.</p></span></div>
+      </div>
+    </div>
+    <div class="ri-alerta" style="margin-top:5mm"><b>O topo diz "É totalmente anônimo!"</b> — o formulário não tem campo de nome nem de telefone. Ninguém sabe quem enviou.</div>
+    <div class="ri-ex">
+      <div><b>Mensagem que ajuda pouco</b><i>"O banheiro está ruim."</i></div>
+      <div class="bom"><b>Mensagem que ajuda a resolver</b><i>"Banheiro do alojamento da Faca: a descarga do 2º vaso está vazando desde segunda e falta papel toalha."</i></div>
+    </div>
     <footer class="ri-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão</span><img src="img/lop-marca.png" alt="LOP"></footer>
   </article>`;
 }
