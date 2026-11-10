@@ -310,8 +310,143 @@
     doc.text(cfg.titulo, cx, y + h - faixa / 2, { align: 'center', baseline: 'middle' });
   }
 
+  /* ---------------- DEFENSIVO: SAIU E VOLTOU (FORM 056) ----------------
+     Pedido dele (10/11/2026): na aplicação de defensivo o gerente tira do
+     estoque, entrega ao operador e depois devolve a sobra; não havia folha
+     para saber quanto saiu, quanto voltou e quanto foi usado. Quem preenche é
+     leigo ("tem como ser mais simples? serão pessoas leigas"): uma folha por
+     aplicação, 3 campos em cima (data, onde vai aplicar, quem vai aplicar) e 5
+     colunas — Produto · Saiu do estoque · Voltou · Usou (saiu − voltou, coluna
+     pedida por ele) · Embalagem lavada e perfurada? (Sim/Não). Embaixo, quem
+     entregou (gerente) e quem recebeu a sobra de volta. Marrom SAKUMA, para não
+     confundir com a ENTRADA (azul) e a SAÍDA (vermelho); data centralizada. */
+  const SV = { form: 'FORM 056', cor: '#744F28', claro: '#F3EBDF', data: '10/11/2026', rev: '01' };
+  function saiuVoltou(doc, img, estoque) {
+    const COR = SV.cor, CL = '#F1F1EF', LN = '#B9B9B4', x0 = M, x1 = W - M;
+    // cabeçalho: logo, faixa marrom com o título e o quadro do FORM
+    const lh = 17, lw = Math.min(38, lh * img.sakuma.w / img.sakuma.h);
+    doc.addImage(img.sakuma.url, 'PNG', x0, M, lw, lw * img.sakuma.h / img.sakuma.w > lh ? lh : lw * img.sakuma.h / img.sakuma.w);
+    const fx = x0 + 42, fw = x1 - x0 - 42 - 46;
+    doc.setFillColor(COR); doc.rect(fx, M, fw, lh, 'F');
+    doc.setTextColor('#FFFFFF'); doc.setFont('helvetica', 'bold'); doc.setFontSize(19);
+    doc.text('DEFENSIVO: SAIU E VOLTOU', fx + 5, M + 8.3);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+    doc.text(estoque ? 'Estoque: ' + estoque + '   ·   anote o que saiu e o que sobrou e voltou.'
+      : 'Anote o que saiu do estoque e o que sobrou e voltou.', fx + 5, M + 14.3);
+    // quadro de controle do documento (Código · Data · Revisão · Página), como nos outros FORMs
+    const cw = 44, cx0 = x1 - cw, rh4 = lh / 4;
+    doc.setLineWidth(0.25); doc.setDrawColor(COR);
+    [['Código', SV.form], ['Data', SV.data], ['Revisão', SV.rev], ['Página', '1 / 1']].forEach(([r, v], i) => {
+      const y = M + i * rh4;
+      doc.setFillColor(SV.claro); doc.rect(cx0, y, 16, rh4, 'FD');
+      doc.setFillColor('#FFFFFF'); doc.rect(cx0 + 16, y, cw - 16, rh4, 'FD');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(CINZA);
+      doc.text(r, cx0 + 1.8, y + rh4 - 1.2);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(i === 0 ? 9.5 : 8.5); doc.setTextColor(i === 0 ? COR : CINZA);
+      doc.text(v, cx0 + 18, y + rh4 - 1.1);
+    });
+    // dados da aplicação
+    let y = M + 21; const h = 15;
+    const campos = [['DATA', '/          /', 70], ['ONDE VAI APLICAR (talhão / pivô)', '', 110], ['QUEM VAI APLICAR', '', 0]];
+    const livre = (x1 - x0) - campos.reduce((s, c) => s + c[2], 0);
+    let x = x0;
+    campos.forEach(([rot, txt, w]) => {
+      const ww = w || livre;
+      doc.setLineWidth(0.2); doc.setDrawColor(LN); doc.setFillColor(CL); doc.rect(x, y, ww, h, 'FD');
+      doc.setTextColor(CINZA); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text(rot, x + 2, y + 5);
+      if (txt) { doc.setFont('helvetica', 'normal'); doc.setFontSize(15); doc.text(txt, x + ww / 2, y + 12.5, { align: 'center' }); }
+      x += ww;
+    });
+    y += h + 3;
+    // tabela em duas etapas (pedido dele, 10/11/2026: "aqui vai ser a primeira etapa,
+    // segunda etapa é as outras colunas, tem como destacar e criar a legenda?"):
+    // 1ª etapa na retirada (marrom) · 2ª etapa na devolução (verde SAKUMA)
+    const E = [
+      { cor: COR, claro: '#F3EBDF', claro2: '#FBF7F1', rot: '1ª ETAPA  ·  NA RETIRADA' },
+      { cor: '#5E8A00', claro: '#EAF3D6', claro2: '#F7FBEF', rot: '2ª ETAPA  ·  NA DEVOLUÇÃO' },
+    ];
+    const cols = [['PRODUTO', '', 0, 0], ['SAIU DO ESTOQUE', '(quanto pegou)', 50, 0], ['VOLTOU', '(quanto sobrou)', 50, 1],
+      ['USOU', '(saiu - voltou)', 50, 1], ['EMBALAGEM', 'lavada e perfurada?', 50, 1]];
+    const livreT = (x1 - x0) - cols.reduce((s, c) => s + c[2], 0);
+    const hf = 7, hc = 13, hl = 12.5, n = 8;
+    x = x0; const xs = [];
+    cols.forEach(c => { const ww = c[2] || livreT; xs.push([x, ww, c[3]]); x += ww; });
+    // faixa das etapas, com o número em destaque
+    [0, 1].forEach(k => {
+      const cs = xs.filter(c => c[2] === k), ex = cs[0][0], ew = cs.reduce((s, c) => s + c[1], 0);
+      doc.setFillColor(E[k].cor); doc.rect(ex, y, ew, hf, 'F');
+      doc.setFillColor('#FFFFFF'); doc.circle(ex + 5, y + hf / 2, 2.6, 'F');
+      doc.setTextColor(E[k].cor); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text(String(k + 1), ex + 5, y + hf / 2 + 1.25, { align: 'center' });
+      doc.setTextColor('#FFFFFF'); doc.setFontSize(10.5);
+      doc.text(E[k].rot, ex + ew / 2, y + hf / 2 + 1.3, { align: 'center' });
+    });
+    y += hf;
+    xs.forEach(([xx, ww, k], i) => {
+      doc.setFillColor(E[k].cor); doc.rect(xx, y, ww, hc, 'F');
+      const [a, b] = cols[i];
+      doc.setTextColor('#FFFFFF'); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text(a, xx + ww / 2, y + (b ? 5.6 : 7.8), { align: 'center' });
+      if (b) { doc.setFontSize(9.5); doc.text(b, xx + ww / 2, y + 10.4, { align: 'center' }); }
+    });
+    const t0 = y; y += hc;
+    for (let i = 0; i < n; i++) {
+      xs.forEach(([xx, ww, k]) => { doc.setFillColor(i % 2 ? E[k].claro2 : E[k].claro); doc.rect(xx, y, ww, hl, 'F'); });
+      const [ex] = xs[4];
+      doc.setDrawColor(CINZA); doc.setLineWidth(0.3); doc.setFillColor('#FFFFFF');
+      doc.rect(ex + 8, y + 4, 4.5, 4.5, 'FD'); doc.rect(ex + 27, y + 4, 4.5, 4.5, 'FD');
+      doc.setTextColor(CINZA); doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
+      doc.text('Sim', ex + 14, y + 8); doc.text('Não', ex + 33, y + 8);
+      y += hl;
+    }
+    doc.setDrawColor(LN); doc.setLineWidth(0.2);
+    xs.forEach(([xx]) => doc.line(xx, t0, xx, y)); doc.line(x1, t0, x1, y);
+    for (let i = 0; i <= n; i++) doc.line(x0, t0 + hc + i * hl, x1, t0 + hc + i * hl);
+    // divisa forte entre as etapas
+    doc.setDrawColor(CINZA); doc.setLineWidth(0.8); doc.line(xs[2][0], t0 - hf, xs[2][0], y);
+    // quem entregou / quem recebeu a sobra
+    y += 3; const hb = 15, bw = (x1 - x0 - 3) / 2;
+    ['QUEM ENTREGOU (gerente)', 'QUEM RECEBEU A SOBRA DE VOLTA'].forEach((t, k) => {
+      const bx = x0 + k * (bw + 3);
+      doc.setDrawColor(LN); doc.setFillColor('#FFFFFF'); doc.rect(bx, y, bw, hb, 'FD');
+      doc.setTextColor(CINZA); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text(t, bx + 2, y + 5);
+    });
+    // pé: legenda das etapas e o exemplo de como escrever
+    const leg = (k, yy, txt) => {
+      doc.setFillColor(E[k].cor); doc.circle(x0 + 2.6, yy - 1.2, 2.4, 'F');
+      doc.setTextColor('#FFFFFF'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.text(String(k + 1), x0 + 2.6, yy - 0.05, { align: 'center' });
+      doc.setTextColor(E[k].cor); doc.setFontSize(9.5); doc.text(E[k].rot.replace('  ·  ', ' – '), x0 + 7, yy);
+      const lw2 = doc.getTextWidth(E[k].rot.replace('  ·  ', ' – '));
+      doc.setTextColor(CINZA); doc.setFont('helvetica', 'normal'); doc.text(txt, x0 + 9 + lw2, yy);
+    };
+    leg(0, H - M - 14.5, 'o gerente escreve o PRODUTO e quanto SAIU DO ESTOQUE antes de entregar ao operador.');
+    leg(1, H - M - 8.5, 'quando a sobra volta: quanto VOLTOU, quanto USOU (saiu - voltou) e se a embalagem foi lavada e perfurada.');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(CINZA);
+    doc.text('Escreva a quantidade com a medida: 5 L, 2 kg, 500 mL. Não sobrou nada? Escreva 0 em VOLTOU.', x0, H - M - 2);
+    const sh = 7, sw = sh * img.lop.w / img.lop.h;
+    doc.addImage(img.lop.url, 'PNG', x1 - sw, H - M + 1 - sh, sw, sh);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+    doc.text('SAKUMA Agronegócios', x1 - sw - 3, H - M - 2, { align: 'right' });
+  }
+
   /* ---------------- PDF ---------------- */
   async function montar(o) {
+    if (o.saiuVoltou) {
+      await carregarJsPdf();
+      const img = { sakuma: await imagem('sakuma-logo.png'), lop: await imagem('lop-assinatura-laser-claro.png') };
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+      const lista = o.estoques.length ? o.estoques : [''];
+      let primeira = true;
+      for (const e of lista) for (let c = 0; c < (o.copias || 1); c++) {
+        if (!primeira) doc.addPage('a4', 'landscape'); primeira = false;
+        saiuVoltou(doc, img, e);
+      }
+      doc.setProperties({ title: o.titulo, author: 'SAKUMA Agronegócios' });
+      return doc;
+    }
     if (o.adesivos) {
       await carregarJsPdf();
       const img = { sakuma: await imagem('sakuma-logo.png') };
@@ -477,11 +612,56 @@
     resumo();
   }
 
+  /* Tela do FORM 056 — Defensivo: saiu e voltou (10/11/2026). */
+  function desenharSaiuVoltou(el, op) {
+    const est = (op.estoques && op.estoques.length) ? op.estoques : ESTOQUES;
+    el.innerHTML = `
+<div class="cartao">
+  <h2>Defensivo: saiu e voltou <small style="color:#744F28;font-weight:700">FORM 056</small></h2>
+  <p class="dica">Uma folha por aplicação de defensivo. O gerente anota o que <strong>saiu do estoque</strong> e entrega ao operador; quando a sobra volta, anota quanto <strong>voltou</strong> e quanto <strong>usou</strong> (saiu − voltou), e se a embalagem foi <strong>lavada e perfurada</strong>. A4 deitado, letra grande e linhas altas.</p>
+  <div class="fe-grade">
+    <div class="fe-bloco" data-grupo="est"><h3>Estoque impresso na folha</h3>
+      <label class="fe-op"><input type="checkbox" name="svSem" checked>Sem nome — serve em qualquer estoque</label>
+      ${est.map(e => `<label class="fe-op"><input type="checkbox" name="est" value="${esc(e)}">${esc(e)}</label>`).join('')}</div>
+    <div class="fe-bloco"><h3>Folhas</h3>
+      <label class="campo">Cópias${est.length ? ' de cada' : ''}
+        <input class="fe-num" type="number" name="copias" min="1" max="50" value="10"></label>
+      <p class="dica" style="margin:8px 0 0">Colunas: Produto · Saiu do estoque · Voltou · Usou · Embalagem lavada e perfurada? (Sim/Não). Embaixo: quem entregou (gerente) e quem recebeu a sobra de volta.</p></div>
+  </div>
+  <p class="fe-resumo" data-resumo></p>
+  <div class="barra fim">
+    <button type="button" class="btn" data-acao="baixar">Baixar PDF</button>
+    <button type="button" class="btn principal" data-acao="abrir">Abrir para imprimir</button>
+  </div>
+</div>`;
+    const ler = () => {
+      const nomes = [...el.querySelectorAll('input[name="est"]:checked')].map(i => i.value);
+      const sem = el.querySelector('[name=svSem]').checked;
+      const estoques = [...(sem ? [''] : []), ...nomes];
+      const copias = Math.max(1, Math.min(50, Number(el.querySelector('[name=copias]').value) || 1));
+      return { saiuVoltou: true, estoques, copias, paginas: estoques.length * copias,
+        titulo: 'FORM 056 — Defensivo: saiu e voltou',
+        arquivo: 'FORM056_Defensivo_Saiu_e_Voltou' + (nomes.length === 1 && !sem ? '_' + nomes[0] : '') };
+    };
+    const resumo = () => {
+      const o = ler();
+      el.querySelector('[data-resumo]').innerHTML = !o.paginas ? 'Marque pelo menos uma opção de estoque.'
+        : `Vai sair <strong>${o.paginas} folha${o.paginas > 1 ? 's' : ''} A4</strong> deitada${o.paginas > 1 ? 's' : ''}.`;
+      el.querySelectorAll('[data-acao]').forEach(b => { b.disabled = !o.paginas; });
+    };
+    el.addEventListener('change', resumo); el.addEventListener('input', resumo);
+    el.querySelectorAll('[data-acao]').forEach(b => b.addEventListener('click', () => {
+      const o = ler(); if (o.paginas) entregar(o, b.dataset.acao, b);
+    }));
+    resumo();
+  }
+
   function desenhar(el, opcoes) {
     if (!el) return;
     estilo();
     const op = opcoes || {};
     if (op.tela === 'adesivos') return desenharAdesivos(el);
+    if (op.tela === 'saiuvoltou') return desenharSaiuVoltou(el, op);
     const est = (op.estoques && op.estoques.length) ? op.estoques : ESTOQUES;
     const placas = op.tela === 'placas';
     const etiq = op.tela === 'etiquetas';

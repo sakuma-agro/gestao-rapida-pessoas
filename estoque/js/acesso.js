@@ -39,6 +39,8 @@ export const MODULOS = [
   { id: 'forms', nome: 'Formulários', telas: [
     ['fmFolhas', 'Folhas de entrada e saída'],
     ['fmPlacas', 'Placas das pranchetas'],
+    // FORM 056 (10/11/2026): defensivo que sai para a aplicação e a sobra que volta
+    ['fmSaiuVoltou', 'Defensivo: saiu e voltou'],
   ] },
   { id: 'acerto', nome: 'Acerto', telas: [
     ['acSaldo',           'Saldo do sistema'],
