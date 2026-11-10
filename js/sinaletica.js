@@ -225,7 +225,7 @@
        No celular, "Enviar com a instrução" usa o compartilhar do sistema (imagem do folheto IT 01 + mensagem);
        no computador, "Só a mensagem" abre o WhatsApp com o texto e os links. */
     const URL_CONSULTA = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/';
-    const URL_INSTRUCAO = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/como-acessar.v1.jpg';
+    const URL_INSTRUCAO = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/como-acessar.v2.jpg';
     const MSG_PADRAO = `📄 *Documentos da fazenda no seu celular*
 
 Agora você pode consultar, sem senha, o *Manual de Cultura*, os *POPs*, as *Políticas*, as *Leis trabalhistas*, as *FISPQ/FDS* dos produtos, os *Telefones úteis* e o *Mapa até o pronto-socorro*.
@@ -243,7 +243,7 @@ Dúvidas: administrativo (34) 9 9646-3296`;
     const lerMsg = () => { try { return localStorage.getItem(CHAVE_MSG) || MSG_PADRAO; } catch (e) { return MSG_PADRAO; } };
     const caixaWhats = () => `
 <div class="sg-whats" style="grid-column:1/-1">
-  <div class="sg-whats-img"><img src="${RAIZ}consulta/como-acessar.v1.jpg" alt="Instrução IT 01"></div>
+  <div class="sg-whats-img"><img src="${RAIZ}consulta/como-acessar.v2.jpg" alt="Instrução IT 01"></div>
   <div class="sg-whats-txt">
     <strong>Enviar pelo WhatsApp</strong>
     <small>A mensagem abaixo vai junto. Dá para editar antes de enviar.</small>
@@ -274,7 +274,7 @@ Dúvidas: administrativo (34) 9 9646-3296`;
         if (a === 'texto') { soTexto(); return; }
         // com o arquivo: compartilhar do sistema (celular). Sem suporte, cai na mensagem com o link da instrução.
         try {
-          const blob = await fetch(RAIZ + 'consulta/como-acessar.v1.jpg').then(r => { if (!r.ok) throw 0; return r.blob(); });
+          const blob = await fetch(RAIZ + 'consulta/como-acessar.v2.jpg').then(r => { if (!r.ok) throw 0; return r.blob(); });
           const arq = new File([blob], 'Como acessar os documentos - SAKUMA.jpg', { type: 'image/jpeg' });
           if (navigator.canShare && navigator.canShare({ files: [arq] })) {
             await navigator.share({ files: [arq], text: ta.value });

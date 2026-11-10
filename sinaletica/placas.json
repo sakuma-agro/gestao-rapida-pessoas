@@ -16,7 +16,7 @@
  "placas": [
   {
    "id": "acesso-qr-code-documentos",
-   "titulo": "Acesso QR Code – Documentos (POPs, políticas, leis, FISPQ, telefones)",
+   "titulo": "Acesso QR Code – Documentos (Manual de Cultura, POPs, políticas, leis, FISPQ, telefones)",
    "cat": "qr",
    "folhas": 1,
    "larg": 210,

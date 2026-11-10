@@ -587,7 +587,7 @@ export const _ci = { doc018, doc024, doc044, doc007, doc054, doc045, doc046 };
 const URL_CONSULTA = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/';
 const PLACAS = {
   docs: { url: URL_CONSULTA, titulo: 'DOCUMENTOS DA FAZENDA', sub: 'Aponte a câmera do celular — sem senha, só para consulta',
-    itens: ['Procedimentos (POPs)', 'Políticas', 'Leis trabalhistas', 'Manual de cultura', 'FISPQ / FDS', 'Telefones úteis', 'Mapa até o pronto-socorro'], lista: true },
+    itens: ['Manual de Cultura', 'Procedimentos (POPs)', 'Políticas', 'Leis trabalhistas', 'FISPQ / FDS', 'Telefones úteis', 'Mapa até o pronto-socorro'], lista: true },
   fds: { url: URL_CONSULTA + '?g=fds', titulo: 'FISPQ / FDS', sub: 'Fichas de segurança dos produtos — aponte a câmera do celular',
     itens: ['Abra a câmera e aponte para o código.', 'Digite o nome do produto (ou procure pela categoria).', 'Toque na ficha: primeiros socorros, cuidados e o que fazer em acidente.'], lista: false },
 };
