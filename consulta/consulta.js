@@ -10,7 +10,7 @@
 //   #s/<seção>         lista da seção    #ver/<chave>  o documento aberto (pdf.js, página por página)
 // ?g=fds abre direto na FISPQ (QR do depósito).
 
-import { htmlCultura } from './cultura.js?v=1';
+import { htmlCultura } from './cultura.js?v=2';
 
 const FUNCAO = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/consulta-publica';
 
