@@ -660,7 +660,7 @@ function placaQr(p, svg) {
     <div class="qr">${svg}</div>
     ${p.lista ? `<ul class="itens">${p.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`
       : `<ol class="itens">${p.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ol>`}
-    <div class="faixa">Dúvidas: escritório (34) 9 9646-3296</div>
+    <div class="faixa">Dúvidas: administrativo (34) 9 9646-3296</div>
     <p class="end">${esc(p.url)}</p>
     <footer><img src="img/lop-marca-limpa.v1.png" alt="LOP"><span class="barra"></span><span class="nome"><b>Gestão Rápida</b><small>Inteligência para o agronegócio</small></span></footer>
   </article>`;
