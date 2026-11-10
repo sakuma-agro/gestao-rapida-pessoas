@@ -17,6 +17,7 @@
 /* formulário (celular primeiro) */
 .cm-form{display:flex;flex-direction:column;gap:12px;max-width:520px;background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:16px}
 .cm-campo{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--suave)}
+.cm-campo[hidden]{display:none}
 .cm-campo>span{font-weight:700}
 .cm-campo input,.cm-campo select,.cm-campo textarea{font:inherit;font-size:16px;color:var(--texto)}
 .cm-duas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -76,7 +77,7 @@
 .cm-dlg{border:1px solid var(--linha);border-radius:14px;padding:0;width:min(560px,94vw);background:var(--papel);color:var(--texto)}
 .cm-dlg::backdrop{background:rgba(0,0,0,.4)}
 .cm-dlg-in{display:flex;flex-direction:column;gap:12px;padding:16px}
-.cm-dlg-top{display:flex;justify-content:space-between;gap:10px}
+.cm-dlg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .cm-dlg-top h3{margin:6px 0 2px;font-size:18px}
 .cm-motivo{margin:6px 0 0;font-size:13px;background:var(--fundo);border-radius:8px;padding:8px 10px}
 .cm-sits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}

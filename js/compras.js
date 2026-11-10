@@ -185,11 +185,12 @@ function desenhar() {
       <div><h2>Compras <small>Pedido de compra</small></h2>
       <p class="cm-sub">Lance o que precisa ser comprado — o comprador recebe e você acompanha · <span id="cmStatus">${esc(statusTxt())}</span></p></div>
       <div class="cm-acoes">${comp ? '<button type="button" class="btn" id="cmQr">QR code para a parede</button>' : ''}
+        ${comp ? '<button type="button" class="btn" id="cmZap" title="Manda o link e o QR code para pedir compra, sem login">Enviar QR pelo WhatsApp</button>' : ''}
         ${acesso.admin ? '<button type="button" class="btn" id="cmTrocarQr" title="O QR antigo para de funcionar">Trocar código do QR</button>' : ''}
         <button type="button" class="btn" id="cmAtualizar">Atualizar</button></div>
     </div>`}
     ${dentroRastro ? `<div class="cm-cab cm-cab-r"><p class="cm-sub" style="margin:0">Pedidos de compra · <span id="cmStatus">${esc(statusTxt())}</span></p>
-      <div class="cm-acoes">${comp ? '<button type="button" class="btn" id="cmQr">QR code para a parede</button>' : ''}<button type="button" class="btn" id="cmAtualizar">Atualizar</button></div></div>` : ''}
+      <div class="cm-acoes">${comp ? '<button type="button" class="btn" id="cmQr">QR code para a parede</button><button type="button" class="btn" id="cmZap" title="Manda o link e o QR code para pedir compra, sem login">Enviar QR pelo WhatsApp</button>' : ''}<button type="button" class="btn" id="cmAtualizar">Atualizar</button></div></div>` : ''}
     <div class="cm-seg" role="tablist">
       <button type="button" role="tab" data-aba="pedir" aria-selected="${est.aba === 'pedir'}">+ Pedir compra</button>
       <button type="button" role="tab" data-aba="meus" aria-selected="${est.aba === 'meus'}">Meus pedidos${abertosMeus ? ` <span>${abertosMeus}</span>` : ''}</button>
@@ -356,6 +357,7 @@ function ligar() {
   r.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { est.aba = b.dataset.aba; est.msg = null; guardarVis(); desenhar(); });
   r.querySelector('#cmAtualizar')?.addEventListener('click', () => carregarCompras());
   r.querySelector('#cmQr')?.addEventListener('click', () => mostrarQr());
+  r.querySelector('#cmZap')?.addEventListener('click', () => enviarZap());
   r.querySelector('#cmTrocarQr')?.addEventListener('click', async () => {
     if (!confirm('Trocar o código do QR? As placas impressas até agora PARAM de funcionar e será preciso imprimir a nova. Use só se o QR vazou para quem não devia.')) return;
     const { error } = await estado.cliente.rpc('cmp_trocar_chave_qr').then(x => x, e => ({ error: e }));
@@ -456,6 +458,38 @@ export async function svgQr(texto) {
   const q = qrcode(0, 'M'); q.addData(texto); q.make();
   return q.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
 }
+/* Enviar o QR pelo WhatsApp (10/11/2026, pedido dele): no celular abre a
+   folha de compartilhar com a imagem do QR + o texto com o link (escolhe o
+   WhatsApp); onde não dá para mandar imagem (computador), abre o WhatsApp
+   com o texto e o link — quem recebe toca no link e pede, sem login. */
+async function pngQr(texto) {
+  const qrcode = await carregarQrLib();
+  const q = qrcode(0, 'M'); q.addData(texto); q.make();
+  const n = q.getModuleCount(), cel = 12, borda = 4 * cel, topo = 70, lado = n * cel + borda * 2;
+  const cv = document.createElement('canvas'); cv.width = lado; cv.height = lado + topo;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = '#1B232B'; g.font = 'bold 34px Arial'; g.textAlign = 'center';
+  g.fillText('PEDIDO DE COMPRA', lado / 2, 50);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) g.fillRect(borda + x * cel, topo + borda + y * cel, cel, cel);
+  return new Promise(ok => cv.toBlob(ok, 'image/png'));
+}
+async function enviarZap() {
+  let link;
+  try {
+    const { data: chave, error } = await estado.cliente.rpc('cmp_chave_qr');
+    if (error || !chave) throw new Error('chave');
+    link = LINK_QR + chave;
+  } catch { alert('Não deu para montar o link agora. Tente de novo com internet.'); return; }
+  const texto = `*Pedido de compra — SAKUMA*\nPrecisa de algo? Toque no link, escreva seu nome, o que precisa e para onde vai, e envie. Não precisa de login.\n${link}`;
+  try {
+    const png = await pngQr(link);
+    const arq = png && new File([png], 'QR - Pedido de compra.png', { type: 'image/png' });
+    if (arq && navigator.canShare?.({ files: [arq] })) { await navigator.share({ files: [arq], text: texto }); return; }
+  } catch (e) { if (e?.name === 'AbortError') return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+}
+
 async function mostrarQr() {
   let svg;
   try {
