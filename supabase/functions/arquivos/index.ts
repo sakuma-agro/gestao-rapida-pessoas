@@ -33,6 +33,7 @@
 //   enviar&chave=&nome=       POST corpo = arquivo → grava no Drive e registra
 //   ver&chave=                GET  → o arquivo
 //   apagar&chave=             POST → lixeira do Drive (recuperável 30 dias) e tira o registro
+//   enviar-qr&chave=&passe=   POST → foto do pedido de compra pelo QR, sem login (compras/foto/<id>/foto.jpg)
 //
 // Certificação: o OneDrive é o lugar oficial (30/10/2026, pedido do Guilherme — "deixe o Drive
 // somente para os outros apps, vamos usar na certificação o OneDrive", opção 1). Todo arquivo
@@ -51,10 +52,10 @@ const G_SEGREDO = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
 const G_RENOVA = Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "";
 const RAIZ_NOME = "LOP - Gestão Rápida – arquivos";
 const MAX_BYTES = 15 * 1024 * 1024;
-const CHAVE_OK = /^(pessoas|manutencoes|certificacao|programacao)\/(funcionario|treinamento|exame|os|checklist|documento|maquina|patrimonio|diario|atividade|reuniao|caderno|fauna|energia|evidencia|residuo)\/[\w.-]{1,80}\/[\w.-]{1,120}\.(jpe?g|png|webp|pdf)$/;   // chaves geradas pelo app, sempre em minúsculas
+const CHAVE_OK = /^(pessoas|manutencoes|certificacao|programacao|compras)\/(funcionario|treinamento|exame|os|checklist|documento|maquina|patrimonio|diario|atividade|reuniao|caderno|fauna|energia|evidencia|residuo|foto)\/[\w.-]{1,80}\/[\w.-]{1,120}\.(jpe?g|png|webp|pdf)$/;   // chaves geradas pelo app, sempre em minúsculas
 const TIPOS_OK = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
 
-const NOME_AREA: Record<string, string> = { pessoas: "Pessoas", manutencoes: "Manutenções", certificacao: "Certificação", programacao: "Programação Campo" };
+const NOME_AREA: Record<string, string> = { pessoas: "Pessoas", manutencoes: "Manutenções", certificacao: "Certificação", programacao: "Programação Campo", compras: "Compras" };
 const NOME_TIPO: Record<string, string> = {
   funcionario: "Fotos dos funcionários", treinamento: "Certificados de treinamento", exame: "ASO e exames",
   os: "Ordens de serviço", checklist: "Check lists", documento: "Documentos",
@@ -62,6 +63,7 @@ const NOME_TIPO: Record<string, string> = {
   diario: "Relatórios diários", atividade: "Atividades", reuniao: "Reuniões semanais",
   caderno: "Caderno de campo", fauna: "Monitoramento de animais",
   energia: "Consumo de energia", evidencia: "Evidências", residuo: "Comprovantes de resíduos",
+  foto: "Fotos dos pedidos de compra",
 };
 
 const CORS = {
@@ -252,11 +254,11 @@ function nomeLimpo(nome: string, chave: string) {
   return n;
 }
 
-async function enviar(req: Request, db: Db, chave: string, area: string, tipo: string, dono: string, nome: string) {
+async function enviar(req: Request, db: Db, chave: string, area: string, tipo: string, dono: string, nome: string, jaLiberado = false) {
   const mime = (req.headers.get("content-type") || "").split(";")[0].trim();
   if (!TIPOS_OK.test(mime)) return json({ erro: "tipo-invalido" }, 415);
   if ((mime === "application/pdf") !== chave.toLowerCase().endsWith(".pdf")) return json({ erro: "tipo-invalido" }, 415);
-  if ((await pode(db, area, tipo, true)) !== true) return json({ erro: "sem-acesso" }, 403);
+  if (!jaLiberado && (await pode(db, area, tipo, true)) !== true) return json({ erro: "sem-acesso" }, 403);
   const corpo = new Uint8Array(await req.arrayBuffer());
   if (!corpo.length) return json({ erro: "vazio" }, 400);
   if (corpo.length > MAX_BYTES) return json({ erro: "grande-demais" }, 413);
@@ -340,15 +342,44 @@ async function apagar(db: Db, chave: string) {
   return json({ apagado: chave });
 }
 
+/* Foto do pedido de compra pelo QR, SEM LOGIN (10/11/2026, pedido.html).
+   Só vale com o "passe" que cmp_pedir_publico devolveu para aquele pedido:
+   pedido feito pelo QR, há menos de 30 min, e o passe é apagado depois da
+   primeira foto — ninguém consegue pôr foto em pedido de outro. A gravação no
+   banco usa a chave de serviço (quem pede pelo QR não tem login). */
+const PASSE_OK = /^[0-9a-f]{32}$/;
+const ID_OK = /^[0-9a-f-]{36}$/;
+async function enviarQr(req: Request, chave: string, passe: string) {
+  const [area, tipo, dono] = chave.split("/");
+  if (area !== "compras" || tipo !== "foto" || !ID_OK.test(dono) || !PASSE_OK.test(passe)) return json({ erro: "sem-acesso" }, 403);
+  const p = (await sdb(`cmp_pedidos?select=id,foto_passe,criado_em&id=eq.${dono}&origem=eq.qr`))?.[0];
+  if (!p || p.foto_passe !== passe || Date.now() - new Date(p.criado_em).getTime() > 30 * 60000) return json({ erro: "sem-acesso" }, 403);
+  const r = await enviar(req, sdb as Db, chave, area, tipo, dono, "foto do pedido.jpg", true);
+  if (r.ok) await sdb(`cmp_pedidos?id=eq.${dono}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ foto_passe: null }) });
+  return r;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  {
+    const u0 = new URL(req.url);
+    if (u0.searchParams.get("acao") === "enviar-qr" && req.method === "POST") {
+      const ch = u0.searchParams.get("chave") || "";
+      if (!CHAVE_OK.test(ch)) return json({ erro: "chave-invalida" }, 400);
+      try { return await enviarQr(req, ch, u0.searchParams.get("passe") || ""); }
+      catch (e) { console.error(String(e)); return json({ erro: e instanceof FalhaDrive ? e.codigo : "falha" }, 502); }
+    }
+  }
   const jwt = req.headers.get("Authorization") || "";
   if (!jwt.startsWith("Bearer ")) return json({ erro: "sem-login" }, 401);
   const u = new URL(req.url);
   const acao = u.searchParams.get("acao") || "";
   const chave = u.searchParams.get("chave") || "";
   try {
-    if (acao === "status") return await status();
+    // 10/11/2026: a função passou a ter verify_jwt desligado (o QR de compras manda a chave pública);
+    // o status (conta do Drive) só para quem tem login no app.
+    if (acao === "status") return (await banco(jwt)("rpc/app_usuario", { method: "POST", body: "{}" }).catch(() => false)) === true
+      ? await status() : json({ erro: "sem-login" }, 401);
     if (!CHAVE_OK.test(chave)) return json({ erro: "chave-invalida" }, 400);
     const [area, tipo, dono] = chave.split("/");
     const db = banco(jwt);

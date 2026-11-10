@@ -121,3 +121,13 @@ revoke all on function public.cmp_chave_qr() from public, anon;
 revoke all on function public.cmp_trocar_chave_qr() from public, anon;
 grant execute on function public.cmp_chave_qr() to authenticated;
 grant execute on function public.cmp_trocar_chave_qr() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Foto opcional no pedido (10/11/2026, migração cmp_foto_pedido): vai para o Google
+-- Drive pela função arquivos (área compras, tipo foto, dono = id do pedido).
+-- arquivos_area_check/arquivos_tipo_check ganharam 'compras' e 'foto';
+-- arquivo_pode('compras','foto') = app_usuario().
+-- cmp_pedidos.foto_passe + cmp_pedir_publico(..., p_com_foto) agora devolve
+-- jsonb {numero, id, passe}; a função arquivos?acao=enviar-qr aceita a foto sem
+-- login só com esse passe (pedido do QR, até 30 min, passe apagado depois).
+-- A função arquivos passou a ter verify_jwt desligado (v12).

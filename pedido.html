@@ -51,6 +51,10 @@
   .ok p,.ruim p{margin:0;color:var(--cinza)}
   .ok button{font:inherit;font-size:15px;padding:12px 18px;border-radius:10px;border:1px solid var(--grafite);background:#fff;cursor:pointer;margin-top:6px}
   .ruim{border-color:var(--erro)}
+  .foto{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .fotobt{font:inherit;font-size:14px;font-weight:700;color:var(--grafite);border:1px solid var(--linha);border-radius:10px;padding:10px 14px;background:#fff;cursor:pointer;flex-direction:row}
+  .foto img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--linha)}
+  .tirar{font:inherit;font-size:13px;border:1px solid var(--linha);border-radius:8px;background:#fff;padding:6px 10px;cursor:pointer}
   footer{text-align:center;padding:18px 0 26px}
   footer img{height:26px;opacity:.85}
 </style>
@@ -87,6 +91,9 @@
         <button type="button" role="radio" data-u="parou" aria-checked="false">Parou o serviço</button>
       </div></div>
     <label>Motivo / onde vai usar<textarea id="motivo" rows="2" maxlength="400" placeholder="Reposição da equipe de colheita"></textarea></label>
+    <div><label style="margin-bottom:6px">Foto (opcional)</label>
+      <div class="foto"><label class="fotobt">📷 <span id="fotoTxt">Tirar ou escolher foto</span><input type="file" id="foto" accept="image/*" hidden></label>
+        <img id="fotoPrev" alt="" hidden><button type="button" id="fotoTirar" class="tirar" hidden>Tirar</button></div></div>
     <p class="erro" id="erro" hidden></p>
     <button class="enviar" id="bEnviar" type="submit">Enviar ao comprador</button>
   </form>
@@ -115,6 +122,24 @@
     urg = b.dataset.u; document.querySelectorAll('[data-u]').forEach(x => x.setAttribute('aria-checked', String(x === b)));
   });
   const erro = t => { $('erro').textContent = t; $('erro').hidden = !t; };
+  // foto opcional (10/11/2026): reduz no celular e sobe para o Drive pela função arquivos, com o passe do pedido
+  let foto = null;
+  const pintarFoto = () => {
+    $('fotoPrev').hidden = !foto; $('fotoTirar').hidden = !foto;
+    $('fotoTxt').textContent = foto ? 'Trocar foto' : 'Tirar ou escolher foto';
+    if (foto) $('fotoPrev').src = URL.createObjectURL(foto);
+  };
+  $('foto').addEventListener('change', ev => { const a = ev.target.files?.[0]; if (a && /^image\//.test(a.type)) foto = a; ev.target.value = ''; pintarFoto(); });
+  $('fotoTirar').onclick = () => { foto = null; pintarFoto(); };
+  async function reduzir(arq) {
+    try {
+      const bmp = await createImageBitmap(arq);
+      const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+      const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+      cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+      return await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.82));
+    } catch { return arq.type === 'image/jpeg' ? arq : null; }
+  }
   ['nome', 'item', 'qtd', 'dest'].forEach(id => $(id).addEventListener('input', () => erro('')));
 
   $('f').addEventListener('submit', async ev => {
@@ -131,7 +156,8 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: CHAVE_PUBLICA, Authorization: 'Bearer ' + CHAVE_PUBLICA },
         body: JSON.stringify({ p_chave: codigo, p_nome: nome, p_item: item, p_quantidade: qtdTxt ? Number(qtdTxt) : null,
-          p_unidade: $('un').value, p_destino: $('dest').value, p_urgencia: urg, p_motivo: $('motivo').value.trim() || null })
+          p_unidade: $('un').value, p_destino: $('dest').value, p_urgencia: urg, p_motivo: $('motivo').value.trim() || null,
+          p_com_foto: !!foto })
       });
       const corpo = await r.json().catch(() => null);
       if (!r.ok) {
@@ -143,8 +169,20 @@
         return;
       }
       try { localStorage.setItem('pedido.nome', nome); localStorage.setItem('pedido.dest', $('dest').value); } catch {}
-      $('okNum').textContent = '#C-' + String(corpo).padStart(3, '0');
-      $('okTxt').textContent = item + ($('dest').value ? ' · ' + $('dest').value : '');
+      $('okNum').textContent = '#C-' + String(corpo?.numero ?? corpo).padStart(3, '0');
+      let avisoFoto = '';
+      if (foto && corpo?.id && corpo?.passe) {
+        b.textContent = 'Enviando a foto…';
+        try {
+          const jpg = await reduzir(foto);
+          if (!jpg) throw new Error('foto');
+          const rf = await fetch(URL_BANCO + '/functions/v1/arquivos?acao=enviar-qr&chave=' + encodeURIComponent('compras/foto/' + corpo.id + '/foto.jpg') + '&passe=' + corpo.passe, {
+            method: 'POST', headers: { 'Content-Type': 'image/jpeg', apikey: CHAVE_PUBLICA, Authorization: 'Bearer ' + CHAVE_PUBLICA }, body: jpg });
+          if (!rf.ok) throw new Error('foto');
+        } catch { avisoFoto = ' (a foto não subiu, mas o pedido foi registrado)'; }
+      }
+      $('okTxt').textContent = item + ($('dest').value ? ' · ' + $('dest').value : '') + avisoFoto;
+      foto = null; pintarFoto();
       $('f').hidden = true; $('ok').hidden = false; scrollTo(0, 0);
     } catch {
       erro('Sem internet. Tente de novo quando tiver sinal.');

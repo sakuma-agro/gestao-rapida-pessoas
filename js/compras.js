@@ -19,6 +19,9 @@
 import { estado, gravarLocal } from './store.js';
 import { acesso } from './acesso.js';
 import { mostrar } from './jornada-relatorios.js';
+// Foto opcional do pedido (10/11/2026, pedido dele "coloque opcional foto"): vai para o
+// Google Drive pela função arquivos (área compras, tipo foto, dono = id do pedido).
+import { enfileirarArquivo, enviarPendentes, donosComArquivo, listarArquivos, urlDoArquivo, abrirArquivo } from './arquivos.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -65,7 +68,8 @@ const meuEmail = () => limpo(acesso.email).toLowerCase();
 const primeiroNome = s => limpo(s).split(/[\s@]/)[0] || '';
 
 /* ---------------- dados ---------------- */
-const dados = { pedidos: ler(CACHE, []), em: null, carregando: false, erro: '' };
+const dados = { pedidos: ler(CACHE, []), em: null, carregando: false, erro: '', fotos: new Set() };
+const temFoto = p => dados.fotos.has(String(p.id).toLowerCase());
 const ouvintes = new Set();
 const avisar = () => ouvintes.forEach(fn => { try { fn(); } catch {} });
 export const ouvirCompras = fn => { ouvintes.add(fn); return () => ouvintes.delete(fn); };
@@ -79,6 +83,7 @@ export async function carregarCompras() {
       .order('criado_em', { ascending: false }).limit(2000);
     if (error) dados.erro = /does not exist|schema cache/i.test(error.message || '') ? 'O banco ainda não tem a tabela de Compras.' : 'Não deu para ler os pedidos agora.';
     else { dados.pedidos = data || []; dados.erro = ''; dados.em = new Date().toISOString(); gravarLocal(CACHE, dados.pedidos); }
+    try { dados.fotos = await donosComArquivo('compras', 'foto'); } catch {}
   } catch { dados.erro = 'Sem conexão — mostrando o último retrato.'; }
   finally { dados.carregando = false; avisar(); }
   return dados.pedidos;
@@ -104,8 +109,12 @@ function enviarFila() {
 addEventListener('online', () => { enviarFila().then(() => carregarCompras()).catch(() => {}); });
 const naFila = () => ler(FILA, []);
 
-async function pedir(p) {
-  const linha = { ...p, pedido_por_nome: acesso.nome || primeiroNome(acesso.email) || null, atualizado_por: acesso.nome || acesso.email || null };
+async function pedir(p, foto = null) {
+  const id = (crypto.randomUUID ? crypto.randomUUID() : null);
+  if (foto && id) {   // a foto entra na fila do aparelho já com o id do pedido; sobe sozinha
+    try { await enfileirarArquivo('compras', 'foto', id, foto, 'foto do pedido'); dados.fotos.add(id); } catch {}
+  }
+  const linha = { ...(id ? { id } : {}), ...p, pedido_por_nome: acesso.nome || primeiroNome(acesso.email) || null, atualizado_por: acesso.nome || acesso.email || null };
   if (!estado.cliente || !estado.sessao || !navigator.onLine) {
     gravarLocal(FILA, [...naFila(), linha]); avisar(); return 'fila';
   }
@@ -114,6 +123,7 @@ async function pedir(p) {
     if (/permission|policy|violates/i.test(error.message || '')) return 'negado';
     gravarLocal(FILA, [...naFila(), linha]); return 'fila';
   }
+  if (foto) enviarPendentes();
   await carregarCompras();
   return 'ok';
 }
@@ -139,6 +149,7 @@ const est = {
   mostrarRecusados: false,
   rascunho: { item: '', quantidade: '', unidade: 'un', destino: vis.destino || '', urgencia: 'normal', motivo: '' },
   msg: null,
+  foto: null,           // File escolhido no formulário (some depois de enviar)
 };
 const guardarVis = () => gravarLocal('gr.compras.vis', { aba: est.aba, destino: est.rascunho.destino });
 
@@ -220,6 +231,11 @@ function form() {
         `<button type="button" role="radio" class="cm-pill ${u.cls}" data-urg="${k}" aria-checked="${r.urgencia === k}">${esc(u.nome)}</button>`).join('')}</div></div>
     <label class="cm-campo"><span>Motivo / onde vai usar</span>
       <textarea id="cmMotivo" rows="2" maxlength="400" placeholder="Reposição da equipe de colheita">${esc(r.motivo)}</textarea></label>
+    <div class="cm-campo"><span>Foto (opcional)</span>
+      <div class="cm-foto">
+        <label class="btn cm-foto-bt">📷 ${est.foto ? 'Trocar foto' : 'Tirar ou escolher foto'}<input type="file" id="cmFoto" accept="image/*" hidden></label>
+        ${est.foto ? `<img id="cmFotoPrev" alt="Foto do pedido"><button type="button" class="btn mini" id="cmFotoTirar">Tirar foto</button>` : ''}
+      </div></div>
     <p class="cm-erro" id="cmErro" hidden></p>
     <button type="submit" class="btn principal cm-enviar">Enviar ao comprador</button>
     <p class="cm-nota">Pedido por <b>${esc(acesso.nome || acesso.email || '')}</b>. Você acompanha em "Meus pedidos".</p>
@@ -229,7 +245,7 @@ function form() {
 function cartaoMeu(p) {
   const s = SIT[p.situacao] || SIT.solicitado;
   return `<div class="cm-card">
-    <div class="cm-card-top"><b>${numTxt(p)} ${esc(p.item)}</b><span class="cm-sit" style="--c:${s.cor}">${esc(s.nome)}</span></div>
+    <div class="cm-card-top"><b>${numTxt(p)} ${esc(p.item)}${temFoto(p) ? ' <span title="Tem foto">📷</span>' : ''}</b><span class="cm-sit" style="--c:${s.cor}">${esc(s.nome)}</span></div>
     <div class="cm-meta">${esc([qtdTxt(p), p.destino].filter(Boolean).join(' · '))} · pedido ${esc(idade(p))}
       ${p.urgencia !== 'normal' ? ` · <span class="cm-pill mini ${URG[p.urgencia]?.cls || ''}">${esc(URG[p.urgencia]?.nome || '')}</span>` : ''}</div>
     ${p.situacao === 'comprado' && p.previsao ? `<div class="cm-meta">Previsão de chegada: <b>${br(p.previsao)}</b>${p.fornecedor ? ' · ' + esc(p.fornecedor) : ''}</div>` : ''}
@@ -263,7 +279,7 @@ function cartaoQuadro(p) {
   const prox = { solicitado: 'cotacao', cotacao: 'comprado', comprado: 'entregue' }[p.situacao];
   return `<div class="cm-card cm-q" draggable="true" data-id="${p.id}" tabindex="0">
     <div class="cm-card-top"><span class="cm-pill mini ${u.cls}">${esc(u.nome)}</span><span class="cm-num">${numTxt(p)}</span></div>
-    <b class="cm-item">${esc(p.item)}</b>
+    <b class="cm-item">${esc(p.item)}${temFoto(p) ? ' <span title="Tem foto">📷</span>' : ''}</b>
     <div class="cm-meta">${esc([qtdTxt(p), p.destino].filter(Boolean).join(' · '))}</div>
     <div class="cm-meta">${esc(p.origem === 'qr' ? p.pedido_por_nome : (primeiroNome(p.pedido_por_nome) || primeiroNome(p.pedido_por_email)))}${p.origem === 'qr' ? ' <span class="cm-qr">via QR</span>' : ''} · ${esc(idade(p))}</div>
     ${p.situacao === 'comprado' && p.previsao ? `<div class="cm-meta">Chega ${brCurto(p.previsao)}${p.fornecedor ? ' · ' + esc(p.fornecedor) : ''}</div>` : ''}
@@ -313,7 +329,8 @@ function abrirPedido(id) {
     <div class="cm-dlg-top"><div><span class="cm-num">${numTxt(p)}</span> <span class="cm-pill mini ${u.cls}">${esc(u.nome)}</span>
       <h3>${esc(p.item)}</h3>
       <p class="cm-meta">${esc([qtdTxt(p), p.destino].filter(Boolean).join(' · '))} · pedido por ${esc(p.pedido_por_nome || p.pedido_por_email)}${p.origem === 'qr' ? ' (pelo QR, sem login)' : ''} em ${br(p.criado_em)}</p>
-      ${p.motivo ? `<p class="cm-motivo">${esc(p.motivo)}</p>` : ''}</div>
+      ${p.motivo ? `<p class="cm-motivo">${esc(p.motivo)}</p>` : ''}
+      ${temFoto(p) ? '<div class="cm-dlg-foto" id="cmdFoto">Carregando a foto…</div>' : ''}</div>
       <button type="button" class="btn mini" data-x aria-label="Fechar">✕</button></div>
     <div class="cm-sits">${[...COLUNAS, 'recusado'].map(s => `<button type="button" data-sit="${s}" aria-pressed="${p.situacao === s}" style="--c:${SIT[s].cor}">${esc(SIT[s].nome)}</button>`).join('')}</div>
     <div class="cm-duas">
@@ -326,6 +343,16 @@ function abrirPedido(id) {
     <div class="cm-dlg-pe"><button type="button" class="btn principal" data-salvar>Salvar</button><button type="button" class="btn" data-x>Fechar</button></div>
   </form>`;
   document.body.appendChild(d);
+  if (temFoto(p)) (async () => {
+    const box = d.querySelector('#cmdFoto');
+    try {
+      const l = await listarArquivos('compras', 'foto', String(p.id).toLowerCase());
+      if (!l.length) { box.textContent = 'Foto ainda subindo — abra de novo daqui a pouco.'; return; }
+      const u = await urlDoArquivo(l[0].chave);
+      box.innerHTML = `<img src="${u}" alt="Foto do pedido" title="Toque para ampliar">`;
+      box.querySelector('img').onclick = () => abrirArquivo(l[0].chave);
+    } catch (e) { box.textContent = e?.message || 'Não deu para abrir a foto agora.'; }
+  })();
   let sit = p.situacao;
   const pintarSit = () => { d.querySelectorAll('[data-sit]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sit === sit))); d.querySelector('#cmdRecBox').hidden = sit !== 'recusado'; };
   d.querySelectorAll('[data-sit]').forEach(b => b.onclick = () => { sit = b.dataset.sit; pintarSit(); });
@@ -372,6 +399,13 @@ function ligar() {
     ligaCampo('#cmItem', 'item'); ligaCampo('#cmQtd', 'quantidade'); ligaCampo('#cmMotivo', 'motivo');
     r.querySelector('#cmUn').addEventListener('change', ev => { ras.unidade = ev.target.value; });
     r.querySelector('#cmDest').addEventListener('change', ev => { ras.destino = ev.target.value; guardarVis(); });
+    if (est.foto) { const u = URL.createObjectURL(est.foto); const im = r.querySelector('#cmFotoPrev'); if (im) im.src = u; }
+    r.querySelector('#cmFoto').addEventListener('change', ev => {
+      const arq = ev.target.files?.[0]; if (!arq) return;
+      if (!/^image\//.test(arq.type)) { alert('Escolha uma foto (JPG ou PNG).'); return; }
+      est.foto = arq; desenhar();
+    });
+    r.querySelector('#cmFotoTirar')?.addEventListener('click', () => { est.foto = null; desenhar(); });
     r.querySelectorAll('[data-urg]').forEach(b => b.onclick = () => {
       ras.urgencia = b.dataset.urg;
       r.querySelectorAll('[data-urg]').forEach(x => x.setAttribute('aria-checked', String(x === b)));
@@ -386,11 +420,11 @@ function ligar() {
       if (!ras.destino) { erro.textContent = 'Escolha para onde vai.'; erro.hidden = false; r.querySelector('#cmDest').focus(); return; }
       const bt = f.querySelector('.cm-enviar'); bt.disabled = true; bt.textContent = 'Enviando…';
       const res = await pedir({ item, quantidade: qtd ? Number(qtd) : null, unidade: ras.unidade || null,
-        destino: ras.destino, urgencia: ras.urgencia || 'normal', motivo: limpo(ras.motivo) || null });
+        destino: ras.destino, urgencia: ras.urgencia || 'normal', motivo: limpo(ras.motivo) || null }, est.foto);
       if (res === 'negado') { bt.disabled = false; bt.textContent = 'Enviar ao comprador'; erro.textContent = 'Seu login não pode lançar pedidos. Peça ao administrador.'; erro.hidden = false; return; }
       est.msg = res === 'ok' ? { tipo: 'ok', txt: `Pedido enviado: ${item}. O comprador já vê no quadro dele.` }
         : { tipo: 'info', txt: `Sem internet: o pedido "${item}" ficou guardado no aparelho e sobe sozinho quando a rede voltar.` };
-      Object.assign(ras, { item: '', quantidade: '', motivo: '', urgencia: 'normal' });
+      Object.assign(ras, { item: '', quantidade: '', motivo: '', urgencia: 'normal' }); est.foto = null;
       est.aba = 'meus'; guardarVis(); desenhar();
       setTimeout(() => { est.msg = null; }, 8000);
     });
