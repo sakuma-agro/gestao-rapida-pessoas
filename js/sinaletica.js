@@ -144,6 +144,16 @@
 .sg-card.marcada .sg-check{background:#84BD00}
 .sg-ver{position:absolute;top:7px;right:7px;font-size:11px;background:rgba(255,255,255,.92);border:1px solid #D5D8CC;border-radius:6px;padding:2px 7px;color:#51534A;text-decoration:none}
 .sg-cat-tit{grid-column:1/-1;margin:10px 0 0;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#744F28;display:flex;align-items:center;gap:10px}
+.sg-whats{grid-column:1/-1;display:flex;gap:14px;align-items:flex-start;border:1.5px solid #25D366;background:#F3FBF5;border-radius:12px;padding:12px}
+.sg-whats-img{flex:none;width:200px}
+.sg-whats-img img{width:100%;border-radius:6px;border:1px solid #DFE3D6;display:block}
+.sg-whats-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.sg-whats-txt strong{font-size:15px;color:#1B232B}
+.sg-whats-txt small{color:#51534A;font-size:12px}
+.sg-whats-txt textarea{width:100%;font:inherit;font-size:13px;line-height:1.4;border:1px solid #DFE3D6;border-radius:8px;padding:8px;box-sizing:border-box;resize:vertical}
+.sg-whats-bts{display:flex;flex-wrap:wrap;gap:8px}
+.sg-whats-bts .principal{background:#25D366;border-color:#25D366;color:#fff}
+@media (max-width:640px){.sg-whats{flex-direction:column}.sg-whats-img{width:100%}}
 .sg-cat-tit button{font:inherit;font-size:11.5px;text-transform:none;letter-spacing:0;background:none;border:0;color:#5E8A00;text-decoration:underline;cursor:pointer;padding:0}
 .sg-barra{position:sticky;bottom:0;z-index:5;margin-top:14px;background:#fff;border:1px solid #E1E3DA;border-radius:12px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;box-shadow:0 -4px 14px rgba(0,0,0,.06)}
 .sg-barra .sg-n{font-size:13.5px;color:#51534A;margin-right:auto}
@@ -210,13 +220,81 @@
   <div class="sg-info">${esc(p.titulo)}<small>${esc(tamanho(p))}${p.folhas > 1 ? ' · ' + p.folhas + ' folhas' : ''}</small></div>
 </div>`;
 
+    /* Enviar pelo WhatsApp (10/11/2026, pedido do Guilherme: "deixe a opção enviar WhatsApp, perto da sinalética,
+       aonde vai aparecer a mensagem e enviar o arquivo e a instrução"). Fica dentro da categoria Acesso QR Code.
+       No celular, "Enviar com a instrução" usa o compartilhar do sistema (imagem do folheto IT 01 + mensagem);
+       no computador, "Só a mensagem" abre o WhatsApp com o texto e os links. */
+    const URL_CONSULTA = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/';
+    const URL_INSTRUCAO = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/como-acessar.v1.jpg';
+    const MSG_PADRAO = `📄 *Documentos da fazenda no seu celular*
+
+Agora você pode consultar, sem senha, o *Manual de Cultura*, os *POPs*, as *Políticas*, as *Leis trabalhistas*, as *FISPQ/FDS* dos produtos, os *Telefones úteis* e o *Mapa até o pronto-socorro*.
+
+👉 ${URL_CONSULTA}
+
+*Como acessar:*
+1. Toque no link (ou aponte a câmera para o QR Code do quadro de avisos).
+2. Escolha o assunto.
+3. Na FISPQ, digite o nome do produto.
+Dica: no Chrome, toque em ⋮ e em *Adicionar à tela inicial*.
+
+Dúvidas: administrativo (34) 9 9646-3296`;
+    const CHAVE_MSG = 'gr-sinaletica-whats';
+    const lerMsg = () => { try { return localStorage.getItem(CHAVE_MSG) || MSG_PADRAO; } catch (e) { return MSG_PADRAO; } };
+    const caixaWhats = () => `
+<div class="sg-whats" style="grid-column:1/-1">
+  <div class="sg-whats-img"><img src="${RAIZ}consulta/como-acessar.v1.jpg" alt="Instrução IT 01"></div>
+  <div class="sg-whats-txt">
+    <strong>Enviar pelo WhatsApp</strong>
+    <small>A mensagem abaixo vai junto. Dá para editar antes de enviar.</small>
+    <textarea data-whats-msg rows="9">${esc(lerMsg())}</textarea>
+    <div class="sg-whats-bts">
+      <button type="button" class="btn principal" data-whats="arquivo">Enviar com a instrução</button>
+      <button type="button" class="btn" data-whats="texto">Só a mensagem</button>
+      <button type="button" class="btn" data-whats="copiar">Copiar</button>
+      <button type="button" class="btn mini" data-whats="padrao" title="Voltar ao texto padrão">↺</button>
+    </div>
+    <small data-whats-aviso></small>
+  </div>
+</div>`;
+    function ligarWhats() {
+      const box = el.querySelector('.sg-whats'); if (!box) return;
+      const ta = box.querySelector('[data-whats-msg]'), aviso = box.querySelector('[data-whats-aviso]');
+      const avisar = t => { aviso.textContent = t; };
+      ta.addEventListener('input', () => { try { localStorage.setItem(CHAVE_MSG, ta.value); } catch (e) {} });
+      const soTexto = () => window.open('https://wa.me/?text=' + encodeURIComponent(ta.value + '\n\n🖼️ Instrução: ' + URL_INSTRUCAO), '_blank', 'noopener');
+      box.querySelectorAll('[data-whats]').forEach(b => b.addEventListener('click', async () => {
+        const a = b.dataset.whats;
+        if (a === 'padrao') { ta.value = MSG_PADRAO; try { localStorage.removeItem(CHAVE_MSG); } catch (e) {} return; }
+        if (a === 'copiar') {
+          try { await navigator.clipboard.writeText(ta.value); avisar('Mensagem copiada. É só colar no WhatsApp.'); }
+          catch (e) { ta.select(); avisar('Selecionei o texto: copie com Ctrl+C.'); }
+          return;
+        }
+        if (a === 'texto') { soTexto(); return; }
+        // com o arquivo: compartilhar do sistema (celular). Sem suporte, cai na mensagem com o link da instrução.
+        try {
+          const blob = await fetch(RAIZ + 'consulta/como-acessar.v1.jpg').then(r => { if (!r.ok) throw 0; return r.blob(); });
+          const arq = new File([blob], 'Como acessar os documentos - SAKUMA.jpg', { type: 'image/jpeg' });
+          if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+            await navigator.share({ files: [arq], text: ta.value });
+            avisar('Escolha o WhatsApp e a conversa ou o grupo.');
+            return;
+          }
+        } catch (e) { if (e && e.name === 'AbortError') return; }
+        avisar('Este aparelho não envia arquivo direto daqui: abri o WhatsApp com a mensagem e o link da instrução.');
+        soTexto();
+      }));
+    }
+
     function desenharGrade() {
       const b = semAcento(filtro.busca.trim());
       const lista = placas.filter(p => (!filtro.cat || p.cat === filtro.cat) && (!b || semAcento(p.titulo + ' ' + nomes[p.cat]).includes(b)));
       if (!lista.length) { $('[data-grade]').innerHTML = '<div class="sg-vazio">Nenhuma placa com esse filtro.</div>'; return; }
       $('[data-grade]').innerHTML = ordemCat.filter(c => lista.some(p => p.cat === c)).map(c =>
         `<h3 class="sg-cat-tit">${esc(nomes[c])}<button type="button" data-marcar-cat="${c}">marcar todas</button></h3>` +
-        lista.filter(p => p.cat === c).map(cartao).join('')).join('');
+        lista.filter(p => p.cat === c).map(cartao).join('') + (c === 'qr' ? caixaWhats() : '')).join('');
+      ligarWhats();
       $('[data-grade]').querySelectorAll('.sg-card').forEach(card => {
         const alternar = () => {
           const id = card.dataset.id;
