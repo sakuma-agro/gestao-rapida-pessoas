@@ -1,0 +1,86 @@
+/* Compras — pedido de compra (10/11/2026) — js/compras.js.
+   Mesma linguagem do Rastro (cr-*): tokens do app, claro e escuro. */
+.cm{max-width:var(--largura-app);margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.cm.cm-rastro{padding:0;max-width:none}
+.cm-cab{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between}
+.cm-cab h2{margin:0;font-size:22px}
+.cm-cab h2 small{font-size:13px;font-weight:400;color:var(--suave);margin-left:6px}
+.cm-cab-r{align-items:center}
+.cm-sub{margin:4px 0 0;color:var(--suave);font-size:13px}
+.cm-acoes{display:flex;gap:8px;flex-wrap:wrap}
+
+.cm-seg{display:flex;gap:3px;max-width:640px;background:var(--linha);border-radius:10px;padding:3px}
+.cm-seg button{flex:1;font:inherit;font-size:14px;min-height:42px;border:0;border-radius:8px;background:transparent;color:var(--suave);cursor:pointer}
+.cm-seg button[aria-selected="true"]{background:var(--papel);color:var(--texto);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.cm-seg button span{display:inline-block;min-width:20px;padding:0 6px;border-radius:10px;background:var(--verde);color:#fff;font-size:11px;font-weight:700;line-height:18px}
+
+/* formulário (celular primeiro) */
+.cm-form{display:flex;flex-direction:column;gap:12px;max-width:520px;background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:16px}
+.cm-campo{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--suave)}
+.cm-campo>span{font-weight:700}
+.cm-campo input,.cm-campo select,.cm-campo textarea{font:inherit;font-size:16px;color:var(--texto)}
+.cm-duas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cm-urg{display:flex;flex-wrap:wrap;gap:6px}
+.cm-pill{font:inherit;font-size:13px;padding:7px 12px;border-radius:16px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);cursor:pointer}
+.cm-pill.mini{font-size:11px;padding:1px 8px;border-radius:9px;cursor:default;font-weight:700}
+.cm-pill.nor{color:var(--verde-esc)}
+.cm-pill.urg{color:#B54708}
+.cm-pill.par{color:var(--erro)}
+.cm-pill.mini.nor{background:var(--verde-fundo);border-color:transparent}
+.cm-pill.mini.urg{background:rgba(186,117,23,.14);border-color:transparent}
+.cm-pill.mini.par{background:rgba(192,57,43,.12);border-color:transparent}
+.cm-pill[aria-checked="true"].nor{background:var(--verde);border-color:var(--verde);color:#fff}
+.cm-pill[aria-checked="true"].urg{background:#BA7517;border-color:#BA7517;color:#fff}
+.cm-pill[aria-checked="true"].par{background:var(--erro);border-color:var(--erro);color:#fff}
+.cm-enviar{min-height:46px;font-size:15px;background:#1B232B;border-color:#1B232B}
+.cm-enviar:hover{background:#2c3742;border-color:#2c3742}
+.cm-erro{margin:0;color:var(--erro);font-size:13px}
+.cm-erro[hidden]{display:none}
+.cm-nota{margin:0;color:var(--suave);font-size:12px}
+.cm-vazio{color:var(--suave);font-size:13px;margin:6px 2px}
+.cm-h3{font-size:14px;margin:8px 0 2px;display:flex;gap:6px;align-items:center}
+.cm-h3 span{color:var(--suave);font-weight:400}
+
+/* cartões */
+.cm-card{background:var(--papel);border:1px solid var(--linha);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;max-width:640px}
+.cm-card+.cm-card{margin-top:8px}
+.cm-card-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cm-meta{color:var(--suave);font-size:12.5px;margin-top:2px}
+.cm-rec{color:var(--erro)}
+.cm-card-acoes{margin-top:8px}
+.cm-fila{border-style:dashed}
+.cm-sit{flex:none;font-size:11px;font-weight:700;color:var(--c);border:1px solid var(--c);border-radius:9px;padding:1px 8px}
+.cm-num{font-size:11.5px;font-weight:700;color:var(--suave)}
+
+/* quadro do comprador */
+.cm-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cm-filtros input{flex:1 1 220px;min-height:38px;border-radius:19px;padding:6px 14px;font-size:13px}
+.cm-filtros select{width:auto;min-height:38px;border-radius:19px;padding:6px 12px;font-size:13px;background:var(--papel)}
+.cm-quadro{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
+@media (max-width:820px){.cm-quadro{grid-template-columns:minmax(0,1fr)}}
+.cm-col{background:var(--fundo);border:1px solid var(--linha);border-radius:10px;padding:8px;min-width:0;min-height:80px}
+.cm-col.alvo{outline:2px dashed var(--verde)}
+.cm-col h4{margin:2px 2px 8px;font-size:13px;display:flex;align-items:center;gap:6px}
+.cm-col h4 i{width:9px;height:9px;border-radius:50%}
+.cm-col h4 span{margin-left:auto;color:var(--suave);font-weight:400}
+.cm-q{cursor:pointer;max-width:none}
+.cm-q:hover{border-color:var(--suave)}
+.cm-q.arrastando{opacity:.4}
+.cm-q .cm-item{display:block;font-size:13.5px;margin-top:4px}
+.cm-avancar{margin-top:8px;width:100%}
+.cm-recusados{font-size:13px}
+.cm-recusados summary{cursor:pointer;color:var(--suave);padding:4px 0}
+.cm-linha{padding:6px 2px;border-bottom:1px solid var(--linha);cursor:pointer}
+
+/* janela do pedido */
+.cm-dlg{border:1px solid var(--linha);border-radius:14px;padding:0;width:min(560px,94vw);background:var(--papel);color:var(--texto)}
+.cm-dlg::backdrop{background:rgba(0,0,0,.4)}
+.cm-dlg-in{display:flex;flex-direction:column;gap:12px;padding:16px}
+.cm-dlg-top{display:flex;justify-content:space-between;gap:10px}
+.cm-dlg-top h3{margin:6px 0 2px;font-size:18px}
+.cm-motivo{margin:6px 0 0;font-size:13px;background:var(--fundo);border-radius:8px;padding:8px 10px}
+.cm-sits{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+@media (max-width:520px){.cm-sits{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.cm-sits button{font:inherit;font-size:12px;min-height:38px;border-radius:8px;border:1px solid var(--linha);background:var(--papel);color:var(--texto);cursor:pointer}
+.cm-sits button[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:#fff;font-weight:700}
+.cm-dlg-pe{display:flex;gap:8px;justify-content:flex-end}

@@ -44,6 +44,12 @@ export const AREAS = [
      tarefas e prazos). O id segue 'cronograma'. */
   { id: 'cronograma', nome: 'Rastro', icone: 'icons/area-cronograma.v3.svg',
     desc: 'Calendário · Kanban por situação e por pessoa · Vencimentos de todas as áreas' },
+  /* Compras (10/11/2026, pedido dele): quem tem login lança o que precisa
+     ser comprado e o comprador vê no quadro. Para TODO login (inclusive quem
+     não tem o Rastro). Mora nesta página (js/compras.js); o QR code da parede
+     abre ?area=compras. */
+  { id: 'compras', nome: 'Compras', icone: 'icons/area-compras.v1.svg',
+    desc: 'Pedir compra · Meus pedidos · Quadro do comprador' },
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
   /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
@@ -97,14 +103,14 @@ const GRUPOS = [
   { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao'] },
   { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita'] },
   { nome: 'Operação e custos', cor: '#51534A', ids: ['manutencoes', 'estoque', 'custobase'] },
-  { nome: 'Gestão', cor: '#7552B0', ids: ['cronograma', 'projetos'] }, // 09/11/2026: Rastro acima de Projetos (pedido dele)
+  { nome: 'Gestão', cor: '#7552B0', ids: ['cronograma', 'compras', 'projetos'] }, // 09/11/2026: Rastro acima de Projetos (pedido dele)
 ];
 /* O que aparece embaixo do nome em cada linha (curto; o completo fica no title). */
 const CURTA = {
   pessoas: 'Cadastros, SST, RH, DP', vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
   programacao: 'Mês e semana', colheita: 'Carregamentos, safra',
   manutencoes: 'Manutenções, OS', estoque: 'Contagem, acerto', custobase: 'Rateio mensal',
-  projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos',
+  projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos', compras: 'Pedir compra, acompanhar',
 };
 const ROTULO = { projetos: 'Projetos' };
 
@@ -193,6 +199,8 @@ function liberada(id) {
   if (id === 'projetos') return acesso.admin || (acesso.modulos || []).includes('projetos');
   /* Cronograma geral (28/10/2026): administrador ou módulo 'cronograma'. */
   if (id === 'cronograma') return acesso.admin || (acesso.modulos || []).includes('cronograma');
+  /* Compras (10/11/2026): todo mundo que tem login no app. */
+  if (id === 'compras') return !!acesso.email;
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -447,6 +455,13 @@ export function entrarNaArea(id, tela, extra) {
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
     aoTrocar('cronograma');
+    return;
+  }
+  if (id === 'compras') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('compras');
     return;
   }
   if (id === 'projetos') {

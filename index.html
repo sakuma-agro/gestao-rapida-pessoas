@@ -28,6 +28,7 @@ addEventListener('beforeinstallprompt', function (ev) {
 <link rel="stylesheet" href="css/jornada-impressao.css">
 <link rel="stylesheet" href="css/assistente.css">
 <link rel="stylesheet" href="css/cronograma.css">
+<link rel="stylesheet" href="css/compras.css">
 <style>
 /* Abertura (28/10/2026, pedido do Guilherme): o lobo se preenche de baixo
    para cima enquanto o app carrega e o olho acende verde quando está pronto.
@@ -279,6 +280,10 @@ addEventListener('beforeinstallprompt', function (ev) {
     <!-- ---- ÁREA CRONOGRAMA GERAL: tarefas e vencimentos de todas as áreas, por pessoa (28/10/2026, js/cronograma.js) ---- -->
     <section class="tela" id="telaCron" hidden>
       <div id="crAlvo"></div>
+    </section>
+    <!-- ---- COMPRAS: pedido de compra de quem tem login + quadro do comprador (10/11/2026, js/compras.js) ---- -->
+    <section class="tela" id="telaCompras" hidden>
+      <div id="cmAlvo"></div>
     </section>
 
     <!-- ---- ÁREA VISTORIAS E SEGURANÇA: o app de vistorias mora em vistorias/ e abre nesta moldura (14/10/2026) ---- -->

@@ -28,6 +28,7 @@ import { abrirNrs, limparNrs } from './sst-nrs.js';
 import { abrirEpiCrono, limparEpiCrono, ligarEpiCrono, redesenharEpiCrono } from './sst-epi-crono.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
+import { abrirCompras } from './compras.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
 import { ligarRelExames, abrirRelExames } from './sst-exames-rel.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
@@ -137,6 +138,8 @@ function abrirAba(nome) {
   $('telaPJ').hidden = nome !== 'projetos';
   $('telaCron').hidden = nome !== 'cronograma';
   if (nome === 'cronograma') abrirCronograma($('crAlvo'));
+  $('telaCompras').hidden = nome !== 'compras';   // Compras (10/11/2026)
+  if (nome === 'compras') abrirCompras($('cmAlvo'));
   document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita', 'projetos'].includes(nome));
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';

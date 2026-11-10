@@ -43,6 +43,7 @@ import { linhasCronograma, textoFreq } from './epi-cronograma-dados.js';
 import { estado, gravarLocal } from './store.js';
 import { acesso, abrirModulo, moduloDe, podeTela } from './acesso.js';
 import { entrarNaArea, areasLiberadas } from './areas.js';
+import { abrirCompras, carregarCompras, pedidosAbertos, ehComprador, URG as URG_CMP } from './compras.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -91,6 +92,7 @@ export const AREAS_C = {
   colh: { nome: 'Colheita e Produção', cor: '#C2410C' },
   prog: { nome: 'Programação Campo', cor: '#3F7D20' },
   est:  { nome: 'Estoque', cor: '#6B5B95' },
+  cmp:  { nome: 'Compras', cor: '#B7791F' },   // pedidos de compra (10/11/2026)
 };
 const areaDe = k => AREAS_C[k] || AREAS_C.esc;
 
@@ -101,7 +103,7 @@ const areaDe = k => AREAS_C[k] || AREAS_C.esc;
 const UNIDADES = ['Matriz', 'Quebra Cocão'];
 const LINHAS_AREA = [
   ['custo'], ['colh'], ['maq', 'Matriz'], ['maq', 'Quebra Cocão'], ['cad'], ['rh'], ['sst'],
-  ['dp', 'Matriz'], ['dp', 'Quebra Cocão'], ['vist'], ['cert'], ['proj'], ['prog'], ['est'], ['esc'],
+  ['dp', 'Matriz'], ['dp', 'Quebra Cocão'], ['vist'], ['cert'], ['proj'], ['prog'], ['est'], ['cmp'], ['esc'],
 ];
 const RESP_AREA_PADRAO = {
   custo: ['reu-lincoln'], colh: ['reu-lincoln'],
@@ -176,6 +178,7 @@ const ORIGENS = {
   'prog-reu':   { nome: 'Programação Campo › Reunião', area: 'prog', ir: { a: 'programacao' } },
   'est-pend':   { nome: 'Estoque › Saídas pendentes', area: 'est', ir: { a: 'estoque' } },
   'colh-pag':   { nome: 'Colheita › Pagamento de cargas', area: 'colh', ir: { a: 'colheita', t: 'cpCargas' } },
+  'compras':    { nome: 'Compras › Pedidos de compra', area: 'cmp', ir: { a: 'compras' } },
 };
 
 /* Situações (07/11/2026, pedido dele para a reunião matinal de 15 minutos):
@@ -751,6 +754,23 @@ const FONTES = [
     .filter(p => naJanela(p.prazo) && !p.concluido_em && !resolvido(p.situacao))
     .map(p => ({ chave: `rh-sd:${p.id}:${p.prazo}`, origem: 'rh-sd', data: p.prazo,
       titulo: `Salário digno: ${p.descricao || p.tipo_acao || 'plano de ação'}`, respTexto: p.responsavel }))],
+  /* Compras (10/11/2026): cada pedido em aberto vira tarefa do comprador
+     (responsável: "Responsáveis" › Compras). Só para quem é comprador — quem
+     só pede acompanha em Compras › Meus pedidos. A chave leva a situação:
+     quando o pedido anda, nasce o item da etapa seguinte. Entregue some. */
+  ['compras', async () => {
+    if (!ehComprador()) return [];
+    await carregarCompras();
+    const etapa = { solicitado: 'cotar', cotacao: 'fechar a compra', comprado: 'receber' };
+    return pedidosAbertos().map(p => {
+      const data = (p.situacao === 'comprado' && p.previsao) ? p.previsao : String(p.criado_em).slice(0, 10);
+      const u = p.urgencia !== 'normal' ? (URG_CMP[p.urgencia]?.nome || '').toUpperCase() + ': ' : '';
+      const qtd = [p.quantidade != null ? String(p.quantidade).replace('.', ',') : '', p.unidade || ''].filter(Boolean).join(' ');
+      return { chave: `compras:${p.id}:${p.situacao}`, origem: 'compras', data,
+        titulo: `${u}Compra #C-${String(p.numero).padStart(3, '0')} (${etapa[p.situacao]}): ${p.item}${qtd ? ' — ' + qtd : ''}${p.destino ? ' · ' + p.destino : ''}`,
+        texto: [p.motivo, p.pedido_por_nome ? 'Pedido por ' + p.pedido_por_nome : ''].filter(Boolean).join('\n') };
+    });
+  }],
   ['reuniao', async () => {
     const reu = await import('./reuniao.js');
     await reu.carregarReuniao();
@@ -1074,6 +1094,7 @@ export function abrirCronograma(el) {
   alvo = el;
   if (!ligado) { ligado = true; ouvintes.add(() => {
     if (!alvo || alvo.closest('[hidden]')) return;
+    if (est.visao === 'compras') return;   // a aba Compras se redesenha sozinha (js/compras.js) — não apaga o que está sendo digitado
     const b = document.activeElement?.id === 'crBusca' ? $('crBusca') : null, pos = b?.selectionStart;
     desenhar();
     if (b && $('crBusca')) { $('crBusca').focus(); try { $('crBusca').setSelectionRange(pos, pos); } catch {} }
@@ -1225,8 +1246,9 @@ function desenhar() {
       <button type="button" role="tab" data-visao="modulos" aria-selected="${est.visao === 'modulos'}">Por módulo</button>
       <button type="button" role="tab" data-visao="foco" aria-selected="${est.visao === 'foco'}">Foco do dia</button>
       <button type="button" role="tab" data-visao="reuniao" aria-selected="${est.visao === 'reuniao'}">Reunião</button>
+      <button type="button" role="tab" data-visao="compras" aria-selected="${est.visao === 'compras'}">Compras</button>
     </div>
-    ${est.visao === 'reuniao' ? `<div id="crCorpo">${reuniao()}</div>` : `
+    ${est.visao === 'compras' ? '<div id="crCorpo"><div id="crCmp"></div></div>' : est.visao === 'reuniao' ? `<div id="crCorpo">${reuniao()}</div>` : `
     <div class="cr-filtros">
       <input type="search" id="crBusca" class="cr-busca" placeholder="Pesquisar nº ou nome da tarefa" value="${esc(est.busca)}" aria-label="Pesquisar tarefa" autocomplete="off">
       <button type="button" class="cr-chip" data-filtro="todos" aria-pressed="${est.filtro === 'todos'}">Todos</button>
@@ -1264,6 +1286,7 @@ function desenhar() {
   </div>`;
   ligarTela();
   if (est.visao === 'reuniao') ligarReuniao();
+  if (est.visao === 'compras') abrirCompras($('crCmp'), { rastro: true });
 }
 
 function calendario() {
@@ -1341,6 +1364,8 @@ function quandoPronta(idMoldura, fn, tentativas = 60) {
 function irPara(ir) {
   if (!podeIr(ir)) return;
   const d = $('dlgCron'); if (d?.open) d.close();
+  // Compras (10/11/2026): abre a aba Compras aqui mesmo, sem sair do Rastro
+  if (ir.a === 'compras') { est.visao = 'compras'; guardarVis(); desenhar(); return; }
   if (ir.a === 'pessoas') { entrarNaArea('pessoas'); abrirModulo(moduloDe(ir.t), ir.t); }
   else if (ir.a === 'certificacao') entrarNaArea('certificacao', ir.t);
   else if (ir.a === 'vistorias') { entrarNaArea('vistorias'); if (ir.m) abrirModulo(ir.m, ir.t); }

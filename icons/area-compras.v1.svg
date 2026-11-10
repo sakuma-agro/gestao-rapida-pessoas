@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<!-- Compras v1 (10/11/2026): carrinho grafite com o selo verde de pedido, mesmas ondas do Rastro -->
+<defs><clipPath id="c"><rect width="160" height="160" rx="36"/></clipPath>
+<linearGradient id="fundo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E9ECE6"/></linearGradient>
+<linearGradient id="gG" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#4A535C"/><stop offset=".55" stop-color="#1B232B"/><stop offset="1" stop-color="#11171C"/></linearGradient>
+<linearGradient id="gC" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#D2EB8F"/><stop offset=".55" stop-color="#B9DC5C"/><stop offset="1" stop-color="#93B33F"/></linearGradient>
+<linearGradient id="gV" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#A6D43D"/><stop offset=".55" stop-color="#84BD00"/><stop offset="1" stop-color="#5E8A00"/></linearGradient></defs>
+<rect width="160" height="160" rx="36" fill="url(#fundo)"/>
+<g clip-path="url(#c)">
+<path d="M-10 170 Q30 100 170 96 L170 170 Z" fill="url(#gC)"/>
+<path d="M40 170 Q72 120 170 118 L170 170 Z" fill="url(#gG)"/>
+<path d="M40 170 Q72 120 170 118" fill="none" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="2"/>
+</g>
+<g fill="none" stroke="#1B232B" stroke-linecap="round" stroke-linejoin="round">
+<path d="M24 34 H40 L52 92 H112 L124 50 H44" stroke-width="10"/>
+</g>
+<path d="M50 58 H118 L108 84 H56 Z" fill="url(#gG)" opacity=".18"/>
+<circle cx="58" cy="112" r="10" fill="url(#gG)" stroke="#FFFFFF" stroke-width="4"/>
+<circle cx="106" cy="112" r="10" fill="url(#gG)" stroke="#FFFFFF" stroke-width="4"/>
+<circle cx="118" cy="38" r="20" fill="url(#gV)" stroke="#FFFFFF" stroke-width="4"/>
+<path d="M118 28 V48 M108 38 H128" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+</svg>

@@ -1179,6 +1179,8 @@ export function desenharConfig() {
             .concat(!u.admin && (u.modulos || []).includes('estoque') && (u.telas || []).some(x => x.startsWith(EST_LOCAL))
               ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="estoque">Estoque · ${esc((u.telas || []).filter(x => x.startsWith(EST_LOCAL))
                 .map(x => (estq.locais.find(l => l.id === x.slice(EST_LOCAL.length)) || {}).nome || '1 estoque').join(', '))}</button>`] : [])
+            .concat((u.modulos || []).includes('compras')
+              ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="compras">Comprador</button>`] : [])
             .concat((u.modulos || []).includes(PERM_SALARIOS)
               ? [`<button type="button" class="cf-chip cf-manut" data-editar-us="${esc(u.email)}" data-foco="salarios">Vê salários</button>`] : [])
             .join('') || '<span class="dc-sem">nenhum módulo — não vê nada</span>';
@@ -1394,6 +1396,7 @@ function desenharPermissoes() {
     ${blocoCP(e)}
     ${blocoPJ(e)}
     ${blocoCron(e)}
+    ${blocoCompras(e)}
     ${blocoSal(e)}`}`;
 
   const raiz = $('usPermissoes');
@@ -1454,6 +1457,12 @@ function desenharPermissoes() {
   $('usCP')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('colheita'); else mods.delete('colheita');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usCmp')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('compras'); else mods.delete('compras');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -1608,6 +1617,20 @@ function blocoCron(e) {
       <input type="checkbox" id="usCron" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Rastro (tarefas e prazos)</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · tarefas e vencimentos das áreas que já acessa'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Comprador" (10/11/2026): pedir compra todo login pode; o comprador
+   vê os pedidos de todos no quadro e anda com eles (cmp_pedidos, RLS
+   app_pode('compras')). */
+function blocoCompras(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('compras'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="compras">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usCmp" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Comprador (Compras)</b>
+      <span class="dc-sem">${!tem ? 'só pede compra e vê os próprios pedidos' : e.admin ? 'administrador do sistema · vê tudo' : 'vê o quadro com os pedidos de todos e muda a situação'}</span>
     </label>
   </div>`;
 }
