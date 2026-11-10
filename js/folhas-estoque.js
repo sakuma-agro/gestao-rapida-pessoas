@@ -365,7 +365,7 @@
     // não de cor — 1ª etapa com cabeçalho CHEIO e linhas sombreadas; 2ª etapa com
     // cabeçalho VAZADO (só contorno) e linhas brancas; número 1 cheio, 2 vazado.
     const E = [
-      { cheio: true, rot: '1ª ETAPA  ·  NA RETIRADA', l1: '#DCDCD9', l2: '#E9E9E6' },
+      { cheio: true, rot: '1ª ETAPA  ·  NA RETIRADA', l1: '#F0F0EE', l2: '#F7F7F5' },
       { cheio: false, rot: '2ª ETAPA  ·  NA DEVOLUÇÃO', l1: '#FFFFFF', l2: '#FFFFFF' },
     ];
     const cols = [['PRODUTO', '', 0, 0], ['SAIU DO ESTOQUE', '(quanto pegou)', 50, 0], ['VOLTOU', '(quanto sobrou)', 50, 1],
