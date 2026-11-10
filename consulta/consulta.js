@@ -129,7 +129,7 @@ async function menu() {
   const b = [];
   b.push(botao('#s/procedimentos', IC.pop, 'Procedimentos', s?.procedimentos.length ? `${s.procedimentos.length} POPs` : 'POPs'));
   for (const k of ['politicas', 'leis', 'manual', 'instrucoes', 'outros']) {
-    if (k === 'leis') { b.push(botao('#leis', IC.lei, 'Leis trabalhistas', 'Cláusulas do contrato e o link de cada lei')); continue; }
+    if (k === 'leis') { b.push(botao('#leis', IC.lei, 'Leis trabalhistas', 'Cada cláusula com o link da lei')); continue; }
     if (s && s[k].length) b.push(botao(`#s/${k}`, SECOES[k].ic, SECOES[k].t, SECOES[k].sub));
   }
   b.push(botao('#fispq', IC.fds, 'FISPQ / FDS', 'Fichas de segurança dos produtos', 'fds'));
@@ -137,7 +137,7 @@ async function menu() {
   for (const k of ['telefones', 'mapa'])
     b.push(s && s[k].length ? botao(`#s/${k}`, SECOES[k].ic, SECOES[k].t, SECOES[k].sub)
       : botao(LINKS[k], SECOES[k].ic, SECOES[k].t, SECOES[k].sub, '', true));
-  tela.innerHTML = `<div class="cq-menu"><div class="cq-chamada">Toque para abrir</div>${b.join('')}</div>` +
+  tela.innerHTML = `<div class="cq-menu"><div class="cq-chamada">Consulta de documentos<small>Toque para abrir</small></div>${b.join('')}</div>` +
     (s ? '' : '<p class="cq-erro" style="margin-top:14px">Sem conexão com o servidor agora. Os botões de telefones e mapa funcionam; tente os outros daqui a pouco.</p>');
 }
 

@@ -659,6 +659,6 @@ function placaQr(p, svg) {
       : `<ol class="itens">${p.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ol>`}
     <div class="faixa">Dúvidas: escritório (34) 9 9646-3296</div>
     <p class="end">${esc(p.url)}</p>
-    <footer><img src="img/lop-marca.png" alt="LOP"><span>– <b>Inteligência para o agronegócio</b></span></footer>
+    <footer><img src="img/lop-marca-limpa.v1.png" alt="LOP"><span>– <b>Inteligência para o agronegócio</b></span></footer>
   </article>`;
 }
