@@ -360,11 +360,13 @@
     });
     y += h + 3;
     // tabela em duas etapas (pedido dele, 10/11/2026: "aqui vai ser a primeira etapa,
-    // segunda etapa é as outras colunas, tem como destacar e criar a legenda?"):
-    // 1ª etapa na retirada (marrom) · 2ª etapa na devolução (verde SAKUMA)
+    // segunda etapa é as outras colunas, tem como destacar e criar a legenda?").
+    // A impressora é preto e branco ("como destacar?"): a diferença é de FORMA,
+    // não de cor — 1ª etapa com cabeçalho CHEIO e linhas sombreadas; 2ª etapa com
+    // cabeçalho VAZADO (só contorno) e linhas brancas; número 1 cheio, 2 vazado.
     const E = [
-      { cor: COR, claro: '#F3EBDF', claro2: '#FBF7F1', rot: '1ª ETAPA  ·  NA RETIRADA' },
-      { cor: '#5E8A00', claro: '#EAF3D6', claro2: '#F7FBEF', rot: '2ª ETAPA  ·  NA DEVOLUÇÃO' },
+      { cheio: true, rot: '1ª ETAPA  ·  NA RETIRADA', l1: '#DCDCD9', l2: '#E9E9E6' },
+      { cheio: false, rot: '2ª ETAPA  ·  NA DEVOLUÇÃO', l1: '#FFFFFF', l2: '#FFFFFF' },
     ];
     const cols = [['PRODUTO', '', 0, 0], ['SAIU DO ESTOQUE', '(quanto pegou)', 50, 0], ['VOLTOU', '(quanto sobrou)', 50, 1],
       ['USOU', '(saiu - voltou)', 50, 1], ['EMBALAGEM', 'lavada e perfurada?', 50, 1]];
@@ -372,27 +374,35 @@
     const hf = 7, hc = 13, hl = 12.5, n = 8;
     x = x0; const xs = [];
     cols.forEach(c => { const ww = c[2] || livreT; xs.push([x, ww, c[3]]); x += ww; });
-    // faixa das etapas, com o número em destaque
+    const numero = (cx, cy, r, k, fs, noEscuro) => {
+      doc.setLineWidth(0.6); doc.setDrawColor(noEscuro ? '#FFFFFF' : COR);
+      if (noEscuro) { doc.setFillColor('#FFFFFF'); doc.circle(cx, cy, r, 'FD'); doc.setTextColor(COR); }
+      else if (E[k].cheio) { doc.setFillColor(COR); doc.circle(cx, cy, r, 'FD'); doc.setTextColor('#FFFFFF'); }
+      else { doc.setFillColor('#FFFFFF'); doc.circle(cx, cy, r, 'FD'); doc.setTextColor(COR); }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(fs);
+      doc.text(String(k + 1), cx, cy + fs * 0.125, { align: 'center' });
+    };
+    // faixa das etapas + cabeçalho das colunas: cheio na 1ª, vazado na 2ª
+    const tTop = y;
     [0, 1].forEach(k => {
       const cs = xs.filter(c => c[2] === k), ex = cs[0][0], ew = cs.reduce((s, c) => s + c[1], 0);
-      doc.setFillColor(E[k].cor); doc.rect(ex, y, ew, hf, 'F');
-      doc.setFillColor('#FFFFFF'); doc.circle(ex + 5, y + hf / 2, 2.6, 'F');
-      doc.setTextColor(E[k].cor); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-      doc.text(String(k + 1), ex + 5, y + hf / 2 + 1.25, { align: 'center' });
-      doc.setTextColor('#FFFFFF'); doc.setFontSize(10.5);
+      if (E[k].cheio) { doc.setFillColor(COR); doc.rect(ex, y, ew, hf + hc, 'F'); }
+      else { doc.setFillColor('#FFFFFF'); doc.setDrawColor(COR); doc.setLineWidth(0.9); doc.rect(ex + 0.45, y + 0.45, ew - 0.9, hf + hc - 0.9, 'FD'); }
+      doc.setDrawColor(E[k].cheio ? '#FFFFFF' : COR); doc.setLineWidth(0.3); doc.line(ex, y + hf, ex + ew, y + hf);
+      numero(ex + 5, y + hf / 2, 2.7, k, 10, E[k].cheio);
+      doc.setTextColor(E[k].cheio ? '#FFFFFF' : COR); doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
       doc.text(E[k].rot, ex + ew / 2, y + hf / 2 + 1.3, { align: 'center' });
     });
     y += hf;
     xs.forEach(([xx, ww, k], i) => {
-      doc.setFillColor(E[k].cor); doc.rect(xx, y, ww, hc, 'F');
       const [a, b] = cols[i];
-      doc.setTextColor('#FFFFFF'); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.setTextColor(E[k].cheio ? '#FFFFFF' : COR); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
       doc.text(a, xx + ww / 2, y + (b ? 5.6 : 7.8), { align: 'center' });
       if (b) { doc.setFontSize(9.5); doc.text(b, xx + ww / 2, y + 10.4, { align: 'center' }); }
     });
     const t0 = y; y += hc;
     for (let i = 0; i < n; i++) {
-      xs.forEach(([xx, ww, k]) => { doc.setFillColor(i % 2 ? E[k].claro2 : E[k].claro); doc.rect(xx, y, ww, hl, 'F'); });
+      xs.forEach(([xx, ww, k]) => { doc.setFillColor(i % 2 ? E[k].l2 : E[k].l1); doc.rect(xx, y, ww, hl, 'F'); });
       const [ex] = xs[4];
       doc.setDrawColor(CINZA); doc.setLineWidth(0.3); doc.setFillColor('#FFFFFF');
       doc.rect(ex + 8, y + 4, 4.5, 4.5, 'FD'); doc.rect(ex + 27, y + 4, 4.5, 4.5, 'FD');
@@ -400,13 +410,17 @@
       doc.text('Sim', ex + 14, y + 8); doc.text('Não', ex + 33, y + 8);
       y += hl;
     }
-    doc.setDrawColor(LN); doc.setLineWidth(0.2);
-    xs.forEach(([xx]) => doc.line(xx, t0, xx, y)); doc.line(x1, t0, x1, y);
+    doc.setDrawColor(GRADE); doc.setLineWidth(0.2);
+    xs.forEach(([xx]) => doc.line(xx, t0 + hc, xx, y)); doc.line(x1, t0 + hc, x1, y);
     for (let i = 0; i <= n; i++) doc.line(x0, t0 + hc + i * hl, x1, t0 + hc + i * hl);
-    // divisa forte entre as etapas
-    doc.setDrawColor(CINZA); doc.setLineWidth(0.8); doc.line(xs[2][0], t0 - hf, xs[2][0], y);
+    xs.forEach(([xx, ww, k], i) => { if (i && !E[k].cheio) { doc.setDrawColor(COR); doc.setLineWidth(0.3); doc.line(xx, t0, xx, t0 + hc); } });
+    // contorno forte da 2ª etapa e divisa grossa entre as etapas
+    doc.setDrawColor(COR); doc.setLineWidth(0.9);
+    doc.rect(xs[2][0], tTop, x1 - xs[2][0], y - tTop);
+    doc.setLineWidth(1.6); doc.line(xs[2][0], tTop, xs[2][0], y);
     // quem entregou / quem recebeu a sobra
     y += 3; const hb = 15, bw = (x1 - x0 - 3) / 2;
+    doc.setLineWidth(0.2);
     ['QUEM ENTREGOU (gerente)', 'QUEM RECEBEU A SOBRA DE VOLTA'].forEach((t, k) => {
       const bx = x0 + k * (bw + 3);
       doc.setDrawColor(LN); doc.setFillColor('#FFFFFF'); doc.rect(bx, y, bw, hb, 'FD');
@@ -415,15 +429,14 @@
     });
     // pé: legenda das etapas e o exemplo de como escrever
     const leg = (k, yy, txt) => {
-      doc.setFillColor(E[k].cor); doc.circle(x0 + 2.6, yy - 1.2, 2.4, 'F');
-      doc.setTextColor('#FFFFFF'); doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-      doc.text(String(k + 1), x0 + 2.6, yy - 0.05, { align: 'center' });
-      doc.setTextColor(E[k].cor); doc.setFontSize(9.5); doc.text(E[k].rot.replace('  ·  ', ' – '), x0 + 7, yy);
-      const lw2 = doc.getTextWidth(E[k].rot.replace('  ·  ', ' – '));
+      numero(x0 + 2.7, yy - 1.2, 2.5, k, 9);
+      const r = E[k].rot.replace('  ·  ', ' – ');
+      doc.setTextColor(COR); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(r, x0 + 7, yy);
+      const lw2 = doc.getTextWidth(r);
       doc.setTextColor(CINZA); doc.setFont('helvetica', 'normal'); doc.text(txt, x0 + 9 + lw2, yy);
     };
-    leg(0, H - M - 14.5, 'o gerente escreve o PRODUTO e quanto SAIU DO ESTOQUE antes de entregar ao operador.');
-    leg(1, H - M - 8.5, 'quando a sobra volta: quanto VOLTOU, quanto USOU (saiu - voltou) e se a embalagem foi lavada e perfurada.');
+    leg(0, H - M - 14.5, '(colunas SOMBREADAS) o gerente escreve o PRODUTO e quanto SAIU DO ESTOQUE antes de entregar ao operador.');
+    leg(1, H - M - 8.5, '(colunas BRANCAS) quando a sobra volta: quanto VOLTOU, quanto USOU (saiu - voltou) e se a embalagem foi lavada e perfurada.');
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(CINZA);
     doc.text('Escreva a quantidade com a medida: 5 L, 2 kg, 500 mL. Não sobrou nada? Escreva 0 em VOLTOU.', x0, H - M - 2);
     const sh = 7, sw = sh * img.lop.w / img.lop.h;
