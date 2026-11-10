@@ -1,7 +1,8 @@
 {
- "atualizado": "2026-10-29",
+ "atualizado": "2026-11-10",
  "pasta": "1 - ADM - PRINCIPAL\\18 - Placas",
  "categorias": {
+  "qr": "Acesso QR Code",
   "seg": "Atenção e segurança",
   "epi": "EPI",
   "hig": "Higiene",
@@ -13,6 +14,22 @@
   "com": "Comunicados e avisos"
  },
  "placas": [
+  {
+   "id": "acesso-qr-code-documentos",
+   "titulo": "Acesso QR Code – Documentos (POPs, políticas, leis, FISPQ, telefones)",
+   "cat": "qr",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
+  {
+   "id": "acesso-qr-code-fispq-fds",
+   "titulo": "Acesso QR Code – FISPQ / FDS (fichas de segurança)",
+   "cat": "qr",
+   "folhas": 1,
+   "larg": 210,
+   "alt": 297
+  },
   {
    "id": "atencao-acesso-restrito",
    "titulo": "Atenção – Acesso restrito",
