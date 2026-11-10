@@ -10,6 +10,8 @@
 //   #s/<seção>         lista da seção    #ver/<chave>  o documento aberto (pdf.js, página por página)
 // ?g=fds abre direto na FISPQ (QR do depósito).
 
+import { htmlCultura } from './cultura.js?v=1';
+
 const FUNCAO = 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/consulta-publica';
 
 // Botões que ainda não estão no app: continuam no link do Google Drive do cardápio antigo.
@@ -127,8 +129,9 @@ async function menu() {
   let s = null;
   try { s = secoes(await lista('docs')); } catch { /* mostra o menu mesmo assim */ }
   const b = [];
+  b.push(botao('#cultura', IC.man, 'Manual de Cultura', 'Nossos valores e nossa história', 'cultura'));
   b.push(botao('#s/procedimentos', IC.pop, 'Procedimentos', s?.procedimentos.length ? `${s.procedimentos.length} POPs` : 'POPs'));
-  for (const k of ['politicas', 'leis', 'manual', 'instrucoes', 'outros']) {
+  for (const k of ['politicas', 'leis', 'instrucoes', 'outros']) {
     if (k === 'leis') { b.push(botao('#leis', IC.lei, 'Leis trabalhistas', 'Cada cláusula com o link da lei')); continue; }
     if (s && s[k].length) b.push(botao(`#s/${k}`, SECOES[k].ic, SECOES[k].t, SECOES[k].sub));
   }
@@ -199,6 +202,15 @@ async function fispq() {
   };
   $('cqBusca').addEventListener('input', e => { filtroFds = e.target.value; desenhar(); });
   desenhar();
+}
+
+function cultura() {
+  document.title = 'Manual de Cultura · SAKUMA';
+  tela.innerHTML = cabecalho('Manual de Cultura', '#') + htmlCultura();
+  // os atalhos internos (#mc-…) rolam a página sem trocar de tela
+  tela.querySelectorAll('a[href^="#mc-"]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); document.getElementById(a.getAttribute('href').slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
 }
 
 function leis() {
@@ -294,6 +306,7 @@ function rota() {
   if (h.startsWith('s/')) return secao(h.slice(2));
   if (h === 'fispq') return fispq();
   if (h === 'leis' || h === 's/leis') return leis();
+  if (h === 'cultura' || h === 's/manual') return cultura();
   if (new URLSearchParams(location.search).get('g') === 'fds') return fispq();
   return menu();
 }
