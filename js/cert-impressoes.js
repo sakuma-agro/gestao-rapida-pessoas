@@ -644,8 +644,9 @@ const ESTILO_PLACA = `<style>
   .ci-placa ol.itens{padding-left:8mm}
   .ci-placa .faixa{margin-top:auto;background:#84BD00;color:#1B232B;font-weight:700;font-size:13pt;padding:3mm;border-radius:2mm}
   .ci-placa .end{font-size:9pt;color:#51534A;margin:2mm 0 0;word-break:break-all}
-  .ci-placa footer{margin-top:4mm;display:flex;justify-content:center}
-  .ci-placa footer img{height:9mm}
+  .ci-placa footer{margin-top:4mm;display:flex;justify-content:center;align-items:center;gap:2.5mm;font-size:11pt;color:#51534A}
+  .ci-placa footer img{height:9mm;mix-blend-mode:multiply}
+  .ci-placa footer b{color:#1B232B}
   @media print{.ci-placa{page-break-after:always;margin:6mm auto 0}.ci-placa:last-of-type{page-break-after:auto}}
 </style>`;
 function placaQr(p, svg) {
@@ -658,6 +659,6 @@ function placaQr(p, svg) {
       : `<ol class="itens">${p.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ol>`}
     <div class="faixa">Dúvidas: escritório (34) 9 9646-3296</div>
     <p class="end">${esc(p.url)}</p>
-    <footer><img src="img/lop-marca.png" alt="LOP"></footer>
+    <footer><img src="img/lop-marca.png" alt="LOP"><span>– <b>Inteligência para o agronegócio</b></span></footer>
   </article>`;
 }

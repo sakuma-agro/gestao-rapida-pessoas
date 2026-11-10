@@ -86,3 +86,11 @@ a{color:var(--verde-esc)}
 .cq-pe{text-align:center;color:var(--cinza);font-size:13px;padding:14px 16px 22px;border-top:1px solid var(--linha);background:var(--papel)}
 
 @media (min-width:640px){ .cq-menu{grid-template-columns:1fr 1fr} .cq-chamada{grid-column:1/-1} }
+
+/* leis trabalhistas (10/11/2026) */
+.cq-leis{display:grid;gap:12px}
+.cq-lei{background:var(--papel);border:1px solid var(--linha);border-left:5px solid var(--verde);border-radius:12px;padding:14px 14px 12px}
+.cq-lei h2{font-size:17px;margin:0 0 6px;color:var(--grafite)}
+.cq-lei p{margin:0 0 12px;color:var(--texto);font-size:16px}
+.cq-link-lei{display:block;min-width:0}
+.cq-nota{color:var(--cinza);font-size:14px;text-align:center;margin:16px 4px 0;font-style:italic}

@@ -19,6 +19,26 @@ const LINKS = {
   mapa: 'https://drive.google.com/file/d/1GVXDQbztM06iwJ5L2_pnLMQR_cRZ-cuA/view',
 };
 
+// Leis trabalhistas (10/11/2026, pedido dele: "precisa dar acesso aos links para os funcionários clicarem; eu
+// deixei somente um resumo de cada lei, cláusula"). Textos do "Acesso - Leis Trabalhistas.pdf" (fundamentação legal
+// do aditivo do contrato de trabalho) — tela própria, cada cláusula com o resumo e o botão para a lei.
+const LEIS = [
+  { c: 'Cláusula 4ª – Da jornada de trabalho / período de safra',
+    r: 'Artigo 67 da Consolidação das Leis do Trabalho (CLT), Lei nº 605/1949 e Portaria SEPRT nº 19.809, de 24 de agosto de 2020, bem como demais normas trabalhistas aplicáveis.',
+    l: 'Lei nº 605/1949 – repouso semanal remunerado', u: 'https://www.planalto.gov.br/ccivil_03/leis/l0605.htm' },
+  { c: 'Cláusula 4ª – Da jornada de trabalho em período de safra',
+    r: 'O regime atende ao artigo 67 da CLT, à Lei 5.889/1973, à Lei nº 605/1949 e à Portaria SEPRT nº 19.809, de 24 de agosto de 2020.',
+    l: 'Lei nº 5.889/1973 – trabalho rural', u: 'https://www.planalto.gov.br/ccivil_03/leis/l5889.htm' },
+  { c: 'Cláusula 6ª – Da remuneração', r: 'Artigo 462, § 1º, da CLT.',
+    l: 'Artigo 462, § 1º, da CLT', u: 'https://www.jusbrasil.com.br/topicos/10712448/paragrafo-1-artigo-462-do-decreto-lei-n-5452-de-01-de-maio-de-1943' },
+  { c: 'Cláusula 8ª – Das penalidades disciplinares', r: 'Artigo 482 da CLT.',
+    l: 'Artigo 482 da CLT', u: 'https://www.jusbrasil.com.br/topicos/10709394/artigo-482-do-decreto-lei-n-5452-de-01-de-maio-de-1943' },
+  { c: 'Cláusula 10ª – Da segurança do trabalho', r: 'Artigo 75-E da CLT.',
+    l: 'Artigo 75-E da CLT', u: 'https://www.jusbrasil.com.br/topicos/173000250/artigo-75e-do-decreto-lei-n-5452-de-01-de-maio-de-1943' },
+  { c: 'Cláusula 15ª – Da proteção de dados', r: 'Lei nº 13.709/2018 (Lei Geral de Proteção de Dados – LGPD).',
+    l: 'Lei nº 13.709/2018 – LGPD', u: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm' },
+];
+
 const IC = {
   pop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg>',
   pol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 21h14M7 7h10"/><path d="m7 7-3 7a3 3 0 0 0 6 0L7 7zM17 7l-3 7a3 3 0 0 0 6 0l-3-7z"/></svg>',
@@ -108,8 +128,10 @@ async function menu() {
   try { s = secoes(await lista('docs')); } catch { /* mostra o menu mesmo assim */ }
   const b = [];
   b.push(botao('#s/procedimentos', IC.pop, 'Procedimentos', s?.procedimentos.length ? `${s.procedimentos.length} POPs` : 'POPs'));
-  for (const k of ['politicas', 'leis', 'manual', 'instrucoes', 'outros'])
+  for (const k of ['politicas', 'leis', 'manual', 'instrucoes', 'outros']) {
+    if (k === 'leis') { b.push(botao('#leis', IC.lei, 'Leis trabalhistas', 'Cláusulas do contrato e o link de cada lei')); continue; }
     if (s && s[k].length) b.push(botao(`#s/${k}`, SECOES[k].ic, SECOES[k].t, SECOES[k].sub));
+  }
   b.push(botao('#fispq', IC.fds, 'FISPQ / FDS', 'Fichas de segurança dos produtos', 'fds'));
   // Telefones e mapa: do app quando o documento estiver marcado para o QR; senão, o link antigo do Drive.
   for (const k of ['telefones', 'mapa'])
@@ -177,6 +199,15 @@ async function fispq() {
   };
   $('cqBusca').addEventListener('input', e => { filtroFds = e.target.value; desenhar(); });
   desenhar();
+}
+
+function leis() {
+  document.title = 'Leis trabalhistas · SAKUMA';
+  tela.innerHTML = cabecalho('Leis trabalhistas', '#', 'Fundamentação legal do aditivo do contrato de trabalho. Toque no botão para ler a lei.') +
+    `<div class="cq-leis">${LEIS.map(x => `<section class="cq-lei">
+      <h2>${esc(x.c)}</h2><p>${esc(x.r)}</p>
+      <a class="cq-acao cq-link-lei" href="${esc(x.u)}" target="_blank" rel="noopener">Ler: ${esc(x.l)} ↗</a></section>`).join('')}</div>
+     <p class="cq-nota">A empresa coloca à disposição dos colaboradores a possibilidade de solicitar vias dos documentos sempre que houver necessidade.</p>`;
 }
 
 /* ---------------- leitor ---------------- */
@@ -262,6 +293,7 @@ function rota() {
   if (h.startsWith('ver/')) return ver(h.slice(4));
   if (h.startsWith('s/')) return secao(h.slice(2));
   if (h === 'fispq') return fispq();
+  if (h === 'leis' || h === 's/leis') return leis();
   if (new URLSearchParams(location.search).get('g') === 'fds') return fispq();
   return menu();
 }
