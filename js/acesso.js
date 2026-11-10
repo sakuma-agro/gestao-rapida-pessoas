@@ -272,6 +272,7 @@ export const MODULOS = [
       ['siPlacasEstoque', 'Placas do estoque'],
       ['siEtiquetasL',    'Etiquetas da pasta L'],
       ['siAdesivos',      'Adesivos entrada e saída'],
+      ['siReclamacao',    'QR de reclamação'],   // 10/11/2026 — js/sinal-reclamacao.js
     ] },
     /* Impressões (04/11/2026, pedido dele): impressos de papel com seleção de
        funcionários e função — Lista de presença (FORM 018, também da reunião GRASP),

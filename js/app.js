@@ -282,7 +282,9 @@ function abrirAba(nome) {
   if (TELAS_CHECKLIST.includes(nome)) abrirChecklist(nome);
   // Certificação › Folhas de estoque (29/10/2026) — js/folhas-estoque.js (o mesmo da área Estoque)
   // e Certificação › Sinalética › Placas do estoque (29/10/2026) — mesmo arquivo
-  for (const t of ['feFolhas', 'siPlacasEstoque', 'siPlacas', 'siEtiquetasL', 'siAdesivos']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  for (const t of ['feFolhas', 'siPlacasEstoque', 'siPlacas', 'siEtiquetasL', 'siAdesivos', 'siReclamacao']) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;
+  // Sinalética › QR de reclamação (10/11/2026) — placa, instrução e imagem do QR do JotForm (FORM 042)
+  if (nome === 'siReclamacao') import('./sinal-reclamacao.js').then(m => m.desenharReclamacaoQr($('telaSiReclamacao')));
   // Sinalética › Adesivos entrada e saída (29/10/2026) — só a palavra e a logo, js/folhas-estoque.js
   if (nome === 'siAdesivos' && window.FolhasEstoque) window.FolhasEstoque.desenhar($('telaSiAdesivos'), { tela: 'adesivos' });
   // Sinalética › Etiquetas da pasta L (29/10/2026) — 80 × 110 mm, js/folhas-estoque.js
