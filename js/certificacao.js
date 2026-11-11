@@ -938,7 +938,7 @@ function docFiltrados() {
    ------------------------------------------------------------------- */
 const TIPOS_DOC = [
   { id: 'POP', nome: 'POP', desc: 'Procedimentos operacionais', icone: 'documento', cat: 'P.O.Ps', cor: '#84BD00', pasta: '1 - PROCEDIMENTOS' },
-  { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO', cor: '#2A8FA6', pasta: '8 - INSTRUÇÕES DE TRABALHO' }   // pasta e ícone 11/11/2026,
+  { id: 'IT', nome: 'IT', desc: 'Instruções de trabalho', icone: 'lista', cat: 'INST. TRABALHO', cor: '#2A8FA6', pasta: '8 - INSTRUÇÕES DE TRABALHO' },   // pasta e ícone 11/11/2026
   { id: 'FORM', nome: 'FORM', desc: 'Formulários (modelos)', icone: 'boletim', cat: 'FORMULÁRIOS', cor: '#2F80C9', pasta: '2 - FORMULÁRIOS' },
   { id: 'RG', nome: 'RG', desc: 'Registros — FORMs preenchidos', icone: 'historico', cat: 'REGISTROS', cor: '#E8862A', pasta: '5 - REGISTROS' },   // 27/10/2026
   { id: 'CL', nome: 'CL', desc: 'Check lists', icone: 'check', cat: 'CHECK LIST', cor: '#E5B800', pasta: '6 - CHECK LIST' },
