@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160">
+<!-- Evento Cultura v1 (11/11/2026): câmera grafite com o selo verde, mesmas ondas das outras áreas -->
+<defs><clipPath id="c"><rect width="160" height="160" rx="36"/></clipPath>
+<linearGradient id="fundo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E9ECE6"/></linearGradient>
+<linearGradient id="gG" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#4A535C"/><stop offset=".55" stop-color="#1B232B"/><stop offset="1" stop-color="#11171C"/></linearGradient>
+<linearGradient id="gC" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#D2EB8F"/><stop offset=".55" stop-color="#B9DC5C"/><stop offset="1" stop-color="#93B33F"/></linearGradient>
+<linearGradient id="gV" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#A6D43D"/><stop offset=".55" stop-color="#84BD00"/><stop offset="1" stop-color="#5E8A00"/></linearGradient></defs>
+<rect width="160" height="160" rx="36" fill="url(#fundo)"/>
+<g clip-path="url(#c)">
+<path d="M-10 170 Q30 100 170 96 L170 170 Z" fill="url(#gC)"/>
+<path d="M40 170 Q72 120 170 118 L170 170 Z" fill="url(#gG)"/>
+<path d="M40 170 Q72 120 170 118" fill="none" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="2"/>
+</g>
+<path d="M30 56 Q30 48 38 48 H54 L62 36 H92 L100 48 H116 Q124 48 124 56 V104 Q124 112 116 112 H38 Q30 112 30 104 Z" fill="url(#gG)" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round"/>
+<circle cx="77" cy="80" r="22" fill="#FFFFFF"/>
+<circle cx="77" cy="80" r="14" fill="url(#gV)"/>
+<circle cx="72" cy="75" r="4" fill="#FFFFFF" opacity=".8"/>
+<circle cx="126" cy="38" r="20" fill="url(#gV)" stroke="#FFFFFF" stroke-width="4"/>
+<path d="M126 26 L129.5 34 L138 34.5 L131.5 40 L133.5 48.5 L126 44 L118.5 48.5 L120.5 40 L114 34.5 L122.5 34 Z" fill="#FFFFFF"/>
+</svg>

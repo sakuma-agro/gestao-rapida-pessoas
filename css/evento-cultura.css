@@ -1,0 +1,37 @@
+/* Evento Cultura (11/11/2026) — js/evento-cultura.js. Tokens do app, claro e escuro. */
+.ev{max-width:var(--largura-app);margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.ev-cab h2{margin:0;font-size:22px}
+.ev-sub{margin:4px 0 0;color:var(--suave);font-size:13px}
+.ev-nota{margin:0;color:var(--suave);font-size:12px}
+.ev-nota[hidden]{display:none}
+.ev-anos{display:flex;gap:3px;background:var(--linha);border-radius:10px;padding:3px;align-self:flex-start}
+.ev-anos button{font:inherit;font-size:14px;min-height:38px;padding:0 18px;border:0;border-radius:8px;background:transparent;color:var(--suave);cursor:pointer}
+.ev-anos button[aria-selected="true"]{background:var(--papel);color:var(--texto);font-weight:700}
+
+.ev-card{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:16px;align-items:center;
+  background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:14px}
+.ev-capa{position:relative;display:block;border-radius:10px;overflow:hidden;aspect-ratio:16/9;background:var(--linha)}
+.ev-capa img{width:100%;height:100%;object-fit:cover;display:block}
+.ev-ano{position:absolute;left:10px;bottom:10px;background:#84BD00;color:#fff;font-weight:700;font-size:15px;padding:3px 10px;border-radius:6px}
+.ev-info{display:flex;flex-direction:column;gap:10px}
+.ev-info h3{margin:0;font-size:18px;color:#744F28}
+.ev-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.ev-acoes a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.ev-qr{width:132px;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--suave);font-size:11px}
+.ev-qr[hidden]{display:none}
+.ev-qr svg{width:132px;height:132px;background:#fff;border-radius:8px}
+
+.ev-amostra{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.ev-amostra a{display:block;aspect-ratio:3/2;border-radius:8px;overflow:hidden;background:var(--linha)}
+.ev-amostra img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s}
+.ev-amostra a:hover img{transform:scale(1.04)}
+
+.ev-todas h3{margin:0 0 8px;font-size:15px}
+.ev-todas iframe{width:100%;height:520px;border:1px solid var(--linha);border-radius:12px;background:#fff}
+
+@media (max-width:820px){
+  .ev-card{grid-template-columns:1fr}
+  .ev-qr{display:none}
+  .ev-amostra{grid-template-columns:repeat(3,1fr)}
+  .ev-todas iframe{height:420px}
+}

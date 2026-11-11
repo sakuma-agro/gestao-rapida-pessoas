@@ -50,6 +50,11 @@ export const AREAS = [
      abre ?area=compras. */
   { id: 'compras', nome: 'Compras', icone: 'icons/area-compras.v1.svg',
     desc: 'Pedir compra · Meus pedidos · Quadro do comprador' },
+  /* Evento Cultura (11/11/2026, pedido dele): fotos e vídeos dos eventos de
+     cultura por ano, guardados no Google Drive com link público só de leitura.
+     Para TODO login, como Compras. Mora nesta página (js/evento-cultura.js). */
+  { id: 'evento', nome: 'Evento Cultura', icone: 'icons/area-evento.v1.svg',
+    desc: 'Fotos e vídeos dos eventos de cultura · 2026' },
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
     desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
   /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
@@ -100,7 +105,7 @@ export const AREAS = [
 
 /* Tela inicial em colunas por grupo (09/11/2026, pedido dele — opção A). */
 const GRUPOS = [
-  { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao'] },
+  { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao', 'evento'] },
   { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita'] },
   { nome: 'Operação e custos', cor: '#51534A', ids: ['manutencoes', 'estoque', 'custobase'] },
   { nome: 'Gestão', cor: '#7552B0', ids: ['cronograma', 'compras', 'projetos'] }, // 09/11/2026: Rastro acima de Projetos (pedido dele)
@@ -110,7 +115,7 @@ const CURTA = {
   pessoas: 'Cadastros, SST, RH, DP', vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
   programacao: 'Mês e semana', colheita: 'Carregamentos, safra',
   manutencoes: 'Manutenções, OS', estoque: 'Contagem, acerto', custobase: 'Rateio mensal',
-  projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos', compras: 'Pedir compra, acompanhar',
+  projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos', compras: 'Pedir compra, acompanhar', evento: 'Fotos e vídeos · 2026',
 };
 const ROTULO = { projetos: 'Projetos' };
 
@@ -201,6 +206,8 @@ function liberada(id) {
   if (id === 'cronograma') return acesso.admin || (acesso.modulos || []).includes('cronograma');
   /* Compras (10/11/2026): todo mundo que tem login no app. */
   if (id === 'compras') return !!acesso.email;
+  /* Evento Cultura (11/11/2026): todo login, como Compras. */
+  if (id === 'evento') return !!acesso.email;
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
@@ -462,6 +469,13 @@ export function entrarNaArea(id, tela, extra) {
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
     aoTrocar('compras');
+    return;
+  }
+  if (id === 'evento') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('evento');
     return;
   }
   if (id === 'projetos') {
