@@ -153,6 +153,16 @@ function escolherLetraImpressao(lista) {
     </div>
     <div class="acoes">
       <button type="button" class="btn" data-letra="">Todas — uma folha por letra</button>
+    </div>
+    <h3 style="margin:18px 0 4px">Quadro de avisos — por tipo, letra grande</h3>
+    <p class="sub">Marque os tipos que entram. Sai o que está na tela (local, grupo, busca).</p>
+    <div id="qa-tipos" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0 10px">
+      ${tiposNaLista(lista).map(t => `<label style="display:flex;gap:6px;align-items:center;font-size:14px">
+        <input type="checkbox" value="${esc(t.id)}"${TIPOS_QUADRO.includes(semAcento(t.nome)) ? ' checked' : ''}>
+        ${esc(t.nome)} <small>${t.n}</small></label>`).join('')}
+    </div>
+    <div class="acoes">
+      <button type="button" class="btn" id="qa-imprimir">Imprimir quadro de avisos</button>
       <button type="button" class="btn neutro" id="lt-fechar">Fechar</button>
     </div>`, corpo => {
     corpo.querySelectorAll('[data-letra]').forEach(b => b.onclick = () => {
@@ -160,8 +170,104 @@ function escolherLetraImpressao(lista) {
       fecharModal();
       imprimirListaMaquinas(l ? lista.filter(e => letraMaq(e) === l) : lista, l);
     });
+    corpo.querySelector('#qa-imprimir').onclick = () => {
+      const ids = [...corpo.querySelectorAll('#qa-tipos input:checked')].map(i => i.value);
+      if (!ids.length) return aviso('Marque pelo menos um tipo.', true);
+      fecharModal();
+      imprimirQuadroAvisos(lista.filter(e => ids.includes(e.tipo_equipamento_id || '')), ids);
+    };
     corpo.querySelector('#lt-fechar').onclick = fecharModal;
   });
+}
+
+/* 11/11/2026 (pedido dele): lista das máquinas para o quadro de avisos, no
+   padrão de relatório SAKUMA e com letra maior. Agrupa por tipo (Tratores,
+   Colhedoras, Pulverizadores, Caminhões, Veículos leves, Motos), em duas
+   colunas para caber numa folha A4. Por padrão vêm marcados os tipos que
+   rodam; implementos, pivôs, bombas etc. ficam desmarcados. */
+const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const TIPOS_QUADRO = ['trator', 'colhedora', 'pulverizador', 'caminhao', 'veiculo leve', 'motocicleta'];
+
+function tiposNaLista(lista) {
+  const conta = {};
+  lista.forEach(e => { const id = e.tipo_equipamento_id || ''; conta[id] = (conta[id] || 0) + 1; });
+  return Object.entries(conta).map(([id, n]) => ({ id, n, nome: q.nome('tipos_equipamento', id) || 'Sem tipo' }))
+    .sort((a, b) => ordemTipoQuadro(a.nome) - ordemTipoQuadro(b.nome) || b.n - a.n || a.nome.localeCompare(b.nome));
+}
+function ordemTipoQuadro(nome) {
+  const i = TIPOS_QUADRO.indexOf(semAcento(nome));
+  return i < 0 ? 99 : i;
+}
+/* Plural do título de cada bloco */
+function pluralTipo(nome) {
+  const m = { 'trator': 'Tratores', 'colhedora': 'Colhedoras', 'pulverizador': 'Pulverizadores',
+    'caminhao': 'Caminhões', 'veiculo leve': 'Veículos leves', 'motocicleta': 'Motos' };
+  return m[semAcento(nome)] || nome;
+}
+
+function imprimirQuadroAvisos(lista) {
+  if (!lista.length) return aviso('Nenhuma máquina desses tipos com os filtros da tela.', true);
+  const porCod = (a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
+  const blocos = tiposNaLista(lista).map(t => ({
+    nome: pluralTipo(t.nome),
+    itens: lista.filter(e => (e.tipo_equipamento_id || '') === t.id).sort(porCod),
+  }));
+  /* Descrição sem o "*" que veio da importação e com "cv" em minúsculo */
+  const limpa = s => String(s || '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+  const local = filtroMaq.local ? q.nome('locais', filtroMaq.local) : 'Todos os locais';
+  const qtd = n => n + (n === 1 ? ' máquina' : ' máquinas');
+  const w = window.open('', '_blank');
+  if (!w) return aviso('O navegador bloqueou a janela de impressão.', true);
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+    <title>Máquinas e veículos — ${esc(local)}</title>
+    <style>
+      @page{size:A4 portrait;margin:9mm 11mm}
+      *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      html,body{margin:0;padding:0}
+      body{font-family:Arial,Helvetica,sans-serif;color:#51534A}
+      .cab{display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:4px solid #84BD00;padding-bottom:6px}
+      .cab img{height:48px}
+      .cab .t{text-align:right}
+      h1{font-size:27px;margin:0;color:#744F28;letter-spacing:.01em}
+      .cab p{margin:4px 0 0;font-size:14px}
+      .kpis{display:flex;gap:6px;margin:8px 0 10px}
+      .kpi{flex:1;border:1px solid #c9d8a6;border-top:4px solid #84BD00;background:#f4f9e8;padding:3px 6px;text-align:center}
+      .kpi b{display:block;font-size:20px;color:#744F28;line-height:1.1}
+      .kpi span{font-size:11.5px}
+      .kpi.tot{background:#51534A;border-color:#51534A;color:#fff}
+      .kpi.tot b{color:#fff}
+      .cols{columns:2;column-gap:7mm}
+      .bloco{break-inside:avoid-column}
+      .bloco.longo{break-inside:auto}
+      h2{margin:0;background:#84BD00;color:#fff;font-size:17px;padding:5px 9px;display:flex;justify-content:space-between;break-after:avoid}
+      h2 small{font-weight:normal;font-size:13px;align-self:center}
+      table{width:100%;border-collapse:collapse;margin-bottom:7px}
+      td{border:1px solid #c9d8a6;padding:2.4px 7px;font-size:15px;line-height:1.2;vertical-align:top}
+      tr{break-inside:avoid}
+      tr:nth-child(even) td{background:#f4f9e8}
+      td.cod{width:17mm;font-weight:bold;color:#744F28;white-space:nowrap;font-size:16px}
+      .pe{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #c9d8a6;padding-top:4px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#7a7c72}
+      .pe img{height:20px;vertical-align:middle}
+      .pe .lop{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:.06em}
+    </style></head><body>
+    <div class="cab"><img src="${new URL('../img/sakuma-marca-vertical.png', location.href)}" alt="SAKUMA">
+      <div class="t"><h1>Máquinas e veículos</h1>
+      <p><b>${esc(local)}</b> · ${qtd(lista.length)} · atualizado em ${formatarData(hoje())}</p></div></div>
+    <div class="kpis">
+      ${blocos.map(b => `<div class="kpi"><b>${b.itens.length}</b><span>${esc(b.nome)}</span></div>`).join('')}
+      <div class="kpi tot"><b>${lista.length}</b><span>Total</span></div>
+    </div>
+    <div class="cols">
+      ${blocos.map(b => `<div class="bloco${b.itens.length > 18 ? ' longo' : ''}">
+        <h2>${esc(b.nome)} <small>${b.itens.length}</small></h2>
+        <table><tbody>${b.itens.map(e => `<tr><td class="cod">${esc(e.codigo || '')}</td><td>${esc(limpa(e.descricao))}</td></tr>`).join('')}</tbody></table>
+      </div>`).join('')}
+    </div>
+    <div class="pe"><span>SAKUMA Agronegócios</span>
+      <span class="lop"><img src="${new URL('../img/lop-marca.png', location.href)}" alt="">DESENVOLVIDO POR LOP · INTELIGÊNCIA PARA O AGRONEGÓCIO</span></div>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>
+    </body></html>`);
+  w.document.close();
 }
 
 function imprimirListaMaquinas(lista, soLetra) {
@@ -198,25 +304,25 @@ function imprimirListaMaquinas(lista, soLetra) {
       @page{size:A4 portrait;margin:12mm 14mm}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       html,body{margin:0;padding:0;width:100%}
-      body{font-family:Arial,Helvetica,sans-serif;color:#51534A;font-size:12px}
+      body{font-family:Arial,Helvetica,sans-serif;color:#51534A;font-size:15.5px}
       .cab{display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:3px solid #84BD00;padding-bottom:8px;margin-bottom:12px}
       .cab img{height:46px}
       .cab .t{text-align:right}
-      h1{font-size:19px;margin:0;color:#744F28}
-      .cab p{margin:3px 0 0;font-size:11px}
+      h1{font-size:24px;margin:0;color:#744F28}
+      .cab p{margin:3px 0 0;font-size:13px}
       table{width:100%;border-collapse:collapse;table-layout:fixed}
-      col.c1{width:26mm}
+      col.c1{width:28mm}
       thead{display:table-header-group}
-      th{background:#51534A;color:#fff;text-align:left;padding:6px 9px;font-size:11px;border:1px solid #51534A}
-      td{padding:4px 9px;border:1px solid #d7dccb;overflow-wrap:anywhere}
-      tr.letra td{background:#84BD00;color:#fff;font-weight:bold;font-size:12.5px;padding:5px 9px;border-color:#84BD00}
-      tr.letra .l{display:inline-block;min-width:22px;font-size:15px}
-      tr.letra td{line-height:18px}
-      tr.letra .n{float:right;font-weight:normal;font-size:11px;line-height:18px}
+      th{background:#51534A;color:#fff;text-align:left;padding:6px 9px;font-size:14px;border:1px solid #51534A}
+      td{padding:5px 9px;border:1px solid #d7dccb;overflow-wrap:anywhere}
+      tr.letra td{background:#84BD00;color:#fff;font-weight:bold;font-size:16px;padding:5px 9px;border-color:#84BD00}
+      tr.letra .l{display:inline-block;min-width:26px;font-size:19px}
+      tr.letra td{line-height:22px}
+      tr.letra .n{float:right;font-weight:normal;font-size:13px;line-height:22px}
       tr.it:nth-child(odd) td{background:#f2f7e6}
       td.cod{font-weight:bold;color:#744F28}
       .folha+.folha{break-before:page;page-break-before:always}
-      .tot{margin-top:10px;font-size:12px;text-align:right}
+      .tot{margin-top:10px;font-size:14px;text-align:right}
       .pe{margin-top:16px;display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:9px;letter-spacing:.06em;color:#7a7c72}
       .pe img{height:22px}
     </style></head><body>
