@@ -225,17 +225,11 @@ function imprimirQuadroAvisos(lista) {
       *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       html,body{margin:0;padding:0}
       body{font-family:Arial,Helvetica,sans-serif;color:#51534A}
-      .cab{display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:4px solid #84BD00;padding-bottom:6px}
+      .cab{display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:4px solid #84BD00;padding-bottom:6px;margin-bottom:10px}
       .cab img{height:48px}
       .cab .t{text-align:right}
       h1{font-size:27px;margin:0;color:#744F28;letter-spacing:.01em}
       .cab p{margin:4px 0 0;font-size:14px}
-      .kpis{display:flex;gap:6px;margin:8px 0 10px}
-      .kpi{flex:1;border:1px solid #c9d8a6;border-top:4px solid #84BD00;background:#f4f9e8;padding:3px 6px;text-align:center}
-      .kpi b{display:block;font-size:20px;color:#744F28;line-height:1.1}
-      .kpi span{font-size:11.5px}
-      .kpi.tot{background:#51534A;border-color:#51534A;color:#fff}
-      .kpi.tot b{color:#fff}
       .cols{columns:2;column-gap:7mm}
       .bloco{break-inside:avoid-column}
       .bloco.longo{break-inside:auto}
@@ -253,10 +247,6 @@ function imprimirQuadroAvisos(lista) {
     <div class="cab"><img src="${new URL('../img/sakuma-marca-vertical.png', location.href)}" alt="SAKUMA">
       <div class="t"><h1>Máquinas e veículos</h1>
       <p><b>${esc(local)}</b> · ${qtd(lista.length)} · atualizado em ${formatarData(hoje())}</p></div></div>
-    <div class="kpis">
-      ${blocos.map(b => `<div class="kpi"><b>${b.itens.length}</b><span>${esc(b.nome)}</span></div>`).join('')}
-      <div class="kpi tot"><b>${lista.length}</b><span>Total</span></div>
-    </div>
     <div class="cols">
       ${blocos.map(b => `<div class="bloco${b.itens.length > 18 ? ' longo' : ''}">
         <h2>${esc(b.nome)} <small>${b.itens.length}</small></h2>
