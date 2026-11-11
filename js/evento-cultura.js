@@ -27,7 +27,7 @@ export const ANOS = [
     pasta: '12LEpeDB8TPyHJsoKY52XnRNmgkFn5D_w',
     fotos: { pasta: '1rqxrp_0Hw7XjnEAdTYXuuGf7CCi7t7-B', qtd: 244 },
     videos: { pasta: '1QTGy3mHM0SOqrsbMYFcndUnKdxWvdVS0', qtd: 2 },
-    capa: '17kvN_MX5L0eJoROBijzjb7cPj3joWcB3',
+    capa: '1BkaD1beSP3cqvID0sI2gr5u0qqNHF3xP',   // IMG_3624 — escolhida por ele (11/11/2026)
     amostra: ['1eVcCa4IfSjWjkAsMvWvKpe_gZyZ0I9S-', '1RhyIB5t9B8P3mcEIJx6RZJ8XYCl3JZn6',
       '1G14TIgTdaDTHChzNfS7p6qcTT9oirl55', '1GrrD1kHKtxC4zy48wTJWpoAzdsbwmnIZ',
       '14tpCjGc9miPjCHaR_2IKLFnMefVnNE1w', '1_YCfS0CoGrRMvyiAKkaJ3-jQatrGlOlM'],
