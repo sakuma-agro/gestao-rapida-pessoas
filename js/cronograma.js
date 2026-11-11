@@ -2152,7 +2152,13 @@ function abrirTarefa(chave) {
   const dt = $('tkData');
   if (dt) {
     $('tkDataBt').onclick = ev => { if (ev.target === dt) return; try { dt.showPicker(); } catch { dt.focus(); dt.click(); } };
-    dt.onchange = async () => { if (!dt.value || dt.value === t.data) return; await salvarT({ data: dt.value }); reabrir(`t:${t.id}`); };
+    dt.onchange = async () => {
+      if (!dt.value || dt.value === t.data) return;
+      // adiou para depois de hoje: sai do Foco do dia (volta pelo calendário/reunião no dia)
+      const adiou = dt.value > hoje() && !!t.foco_em && t.situacao !== 'feito';
+      await salvarT(adiou ? { data: dt.value, foco_em: null } : { data: dt.value });
+      reabrir(`t:${t.id}`);
+    };
   }
   if ($('tkAddData')) $('tkAddData').onclick = () => $('tkDataBt')?.click();
   // repete / começa / até
@@ -2314,7 +2320,9 @@ function abrirItem(chave) {
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp || (nova ? vincTexto(titulo) : null);
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
       base.checklist = textoParaCk($('crCkTxt').value, t?.checklist);
-      if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext); }
+      if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext);
+        // data adiada para depois de hoje tira do Foco do dia
+        if (data !== t.data && data > hoje() && sit !== 'feito') base.foco_em = null; }
       r = await gravar('cron_tarefas', 'id', base);
       if (!nova && rep && it) {
         // ocorrência desta vez
