@@ -910,6 +910,7 @@ window.addEventListener('online', () => { enviarFila().catch(() => {}); });
 
 async function gravar(tabela, chaveCol, item) {
   item = { ...item, atualizado_em: new Date().toISOString(), atualizado_por: acesso.nome || acesso.email || null };
+  cacheAgora = null;
   if (tabela === 'cron_config') delete item.atualizado_por;
   // vale na tela na hora
   const lista = tabela === 'cron_tarefas' ? dados.tarefas : tabela === 'cron_estado' ? dados.estados : dados.config;
@@ -1052,6 +1053,7 @@ function bloqDe(r) {
   return {
     inicioEm: r?.inicio_em || null,
     focoEm: r?.foco_em || null,
+    prio: r?.prioridade || null,
     bloq: r?.situacao === 'bloqueado'
       ? { motivo: r.bloq_motivo || '', quem: r.bloq_quem || null, cobrar: r.bloq_cobrar || null, desde: r.bloq_desde || null }
       : null,
@@ -1235,6 +1237,7 @@ function rotuloData(it) {
 
 function desenhar() {
   if (!alvo) return;
+  cacheAgora = null;
   const meu = eu();
   const pessoas = pessoasAtivas();
   const ultima = dados.em ? new Date(dados.em) : null;
@@ -1402,8 +1405,45 @@ function linha(it) {
     <span class="cr-item-txt"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.inicio ? 'Começa: ' : ''}${it.sit === 'bloqueado' ? '🔒 ' : ''}${seloPriv(it)}${esc(it.titulo)}</b><small>${tagOrigem(it)}${it.checklist ? ' ' + seloCk(it) : ''}${it.sit !== 'afazer' && it.sit !== 'feito' ? ' · ' + SIT[it.sit].toLowerCase() : ''}</small>${it.bloq ? `<small class="cr-bloq-txt">Depende de: ${esc(it.bloq.motivo || 'a definir')}${diasParado(it) != null ? ` · parado há ${diasParado(it)} ${diasParado(it) === 1 ? 'dia' : 'dias'}` : ''}</small>` : ''}</span>
     <span class="cr-item-dir">${botaoIr(it)}${avatares(it)}<span class="cr-data ${r.cls}">${esc(r.txt)}</span>
       ${it.sit !== 'feito' && it.sit !== 'bloqueado' ? (it.focoEm ? '<span class="cr-nofoco">🎯 no foco</span>'
-        : `<span class="cr-ac foco" role="button" tabindex="0" data-acao="foco" data-alvo="${esc(it.chave)}">Foco do dia →</span>`) : ''}</span>
+        : botoesFoco(it)) : ''}</span>
   </button>`;
+}
+
+/* Prioridade no Foco do dia (11/11/2026, pedido dele — matriz de Eisenhower
+   com nomes de ação, porque tudo no foco já é para hoje). "Fazer agora" tem
+   2 vagas por pessoa; quem não tem etiqueta conta como "Por último". O envio
+   ao foco já escolhe a cor, num toque só. Fica em prioridade (cron_tarefas /
+   cron_estado) e continua de um dia para o outro. */
+const PRIO = [
+  { id: 'agora', nome: 'Fazer agora', curto: 'Agora', exp: 'importante e urgente (até 2)', cor: '#F87168', tx: '#5D1010' },
+  { id: 'seguida', nome: 'Fazer em seguida', curto: 'Em seguida', exp: 'importante, sem pressa', cor: '#FEA362', tx: '#633806' },
+  { id: 'rapido', nome: 'Fazer rápido', curto: 'Rápido', exp: 'urgente, mas simples', cor: '#579DFF', tx: '#042C53' },
+  { id: 'ultimo', nome: 'Por último', curto: 'Por último', exp: 'nem urgente nem importante', cor: '#C6C6BE', tx: '#444441', fundo: '#E3E3DD' },
+];
+const VAGAS_AGORA = 2;
+const prioDe = it => PRIO.find(p => p.id === it.prio) || PRIO[3];
+const rankPrio = it => PRIO.indexOf(prioDe(it));
+const noFocoAberta = it => !!it.focoEm && (it.sit === 'afazer' || it.sit === 'fazendo');
+/* Vagas de "Fazer agora" ocupadas, por pessoa responsável pela tarefa. */
+let cacheAgora = null;   // zera a cada gravar() e desenhar()
+function agoraCheio(it) {
+  if (!cacheAgora) cacheAgora = todosItens().filter(x => noFocoAberta(x) && x.prio === 'agora');
+  const outras = cacheAgora.filter(x => x.chave !== it.chave);
+  const quem = it.resps.length ? it.resps : [null];
+  return quem.some(q => outras.filter(x => q ? x.resps.includes(q) : !x.resps.length).length >= VAGAS_AGORA);
+}
+function botoesPrio(it, acao) {
+  const cheio = agoraCheio(it);
+  return `<span class="cr-prio-bts"><span class="cr-prio-l">${acao === 'foco' ? 'Foco:' : 'Trocar:'}</span>${PRIO.map(p => {
+    const off = p.id === 'agora' && cheio && it.prio !== 'agora';
+    const atual = acao === 'prio' && prioDe(it).id === p.id;
+    return `<span class="cr-prio-bt${off ? ' off' : ''}${atual ? ' atual' : ''}" role="button" tabindex="0" ${off ? 'aria-disabled="true" title="As 2 vagas de Fazer agora estão ocupadas"' : ''} data-acao="${off ? 'cheio' : acao + ':' + p.id}" data-alvo="${esc(it.chave)}" style="--pc:${p.fundo || p.cor};--pt:${p.tx}">${off ? 'Agora · cheio' : p.curto}${atual ? ' ✓' : ''}</span>`;
+  }).join('')}</span>`;
+}
+const botoesFoco = it => botoesPrio(it, 'foco');
+const etiquetaPrio = it => { const p = prioDe(it); return `<span class="cr-prio-et" style="--pc:${p.fundo || p.cor};--pt:${p.tx}">${p.nome}</span>`; };
+function legendaPrio() {
+  return `<div class="cr-prio-leg">${PRIO.map(p => `<span><i style="background:${p.cor}"></i><b>${p.nome}</b> ${p.exp}</span>`).join('')}</div>`;
 }
 
 /* Ações rápidas do card (07/11/2026): no celular não dá para arrastar, então
@@ -1411,10 +1451,11 @@ function linha(it) {
 function acoes(it) {
   const b = (a, t, cls = '') => `<span class="cr-ac${cls}" role="button" tabindex="0" data-acao="${a}" data-alvo="${esc(it.chave)}">${t}</span>`;
   if (it.sit === 'bloqueado') return b('liberar', 'Liberar');
-  if (!it.focoEm) return it.sit === 'feito' ? b('afazer', 'Reabrir') : b('foco', 'Foco do dia →', ' foco') + b('bloquear', 'Bloquear');
+  if (!it.focoEm) return it.sit === 'feito' ? b('afazer', 'Reabrir') : botoesFoco(it) + b('bloquear', 'Bloquear');
+  const trocar = est.prioAberta === it.chave ? botoesPrio(it, 'prio') : b('prioMenu', 'Prioridade ▾');
   // Concluir direto do A fazer (09/11/2026): tarefa rápida não precisa passar por Em andamento
-  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear') + b('tirar', 'Tirar do foco');
-  if (it.sit === 'fazendo') return b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear');
+  if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear') + b('tirar', 'Tirar do foco') + trocar;
+  if (it.sit === 'fazendo') return b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear') + trocar;
   return b('fazendo', 'Reabrir');
 }
 /* No foco desde um dia anterior e não concluída = "não feito" (07/11/2026). */
@@ -1438,6 +1479,7 @@ function card(it, { semResp = false, comSit = false, comAcoes = true, mover = fa
     : atrasado(it) ? { txt: 'venceu ' + brCurto(it.data), cls: 'atraso' } : rotuloData(it);
   return `<button type="button" class="cr-card${it.sit === 'bloqueado' ? ' bloq' : ''}${it.sit === 'feito' ? ' feito' : ''}" draggable="true" data-item="${esc(it.chave)}">
     <span class="cr-card-top"><span class="cr-card-tags">${seloNum(it)}${tagOrigem(it)}</span>${mover ? `<span class="cr-mover"><span class="cr-mv" role="button" tabindex="0" data-acao="subir" data-alvo="${esc(it.chave)}" title="Subir">▲</span><span class="cr-mv" role="button" tabindex="0" data-acao="descer" data-alvo="${esc(it.chave)}" title="Descer">▼</span></span>` : ''}${comSit ? `<span class="cr-sit ${sitCor(it)}">${atrasado(it) ? 'Atrasada' : SIT[it.sit]}</span>` : seloSit(it)}</span>
+    ${noFocoAberta(it) ? etiquetaPrio(it) : ''}
     <b>${seloPriv(it)}${esc(it.titulo)}</b>
     ${it.checklist ? `<span class="cr-ckbar"><i style="width:${Math.round(feitosCk(it) / totalCk(it) * 100)}%"></i></span>` : ''}
     ${seloNaoFeito(it)}
@@ -1463,7 +1505,7 @@ const ORDEM_FOCO = 'ordem:foco';
 const posFoco = () => { const l = estadoDe(ORDEM_FOCO)?.checks || []; return new Map(l.map((k, i) => [k, i])); };
 const ordemFoco = (a, b, pos = posFoco()) => {
   const pa = pos.has(a.chave) ? pos.get(a.chave) : 1e9, pb = pos.has(b.chave) ? pos.get(b.chave) : 1e9;
-  return pa - pb || ordemFocoBase(a, b);
+  return (rankPrio(a) - rankPrio(b)) || pa - pb || ordemFocoBase(a, b);
 };
 const ordemFocoBase = (a, b) => (naoFeito(b) - naoFeito(a)) || (a.focoEm || '').localeCompare(b.focoEm || '') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
 function foco() {
@@ -1503,8 +1545,26 @@ function foco() {
   return `<div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmob="${c.id}" aria-selected="${est.colMob === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
     <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMob === c.id ? ' ativa' : ''}" data-col="${c.id}">
       <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${c.nome}</b><span class="cr-cont">${c.itens.length}${extra(c)}</span></header>
-      <div class="cr-col-corpo">${c.itens.map(i => card(i, { mover: c.id !== 'bloqueado' })).join('') || `<p class="cr-vazio">${c.id === 'bloqueado' ? 'Nenhuma tarefa bloqueada.' : 'Nada aqui.'}</p>`}</div>
+      ${c.id === 'afazer' ? colAfazer(c.itens) : `<div class="cr-col-corpo">${c.itens.map(i => card(i, { mover: c.id !== 'bloqueado' })).join('') || `<p class="cr-vazio">${c.id === 'bloqueado' ? 'Nenhuma tarefa bloqueada.' : 'Nada aqui.'}</p>`}</div>`}
     </section>`).join('')}</div>`;
+}
+
+/* A fazer em faixas de prioridade (11/11/2026): Fazer agora no topo, com as
+   2 vagas, depois Em seguida, Rápido e Por último. Cada faixa é um
+   .cr-col-corpo próprio, então ▲▼ move dentro da faixa. */
+function colAfazer(itens) {
+  const vagas = () => {
+    if (!est.pessoa || est.pessoa === '-') return `<p class="cr-prio-vaga leve">Até ${VAGAS_AGORA} por pessoa</p>`;
+    const n = itens.filter(i => i.prio === 'agora').length;
+    return n < VAGAS_AGORA ? `<p class="cr-prio-vaga">${VAGAS_AGORA - n === 1 ? 'Vaga livre' : '2 vagas livres'} — escolha ${VAGAS_AGORA - n === 1 ? 'mais uma' : 'até duas'} para "Fazer agora"</p>` : '';
+  };
+  return legendaPrio() + PRIO.map(p => {
+    const g = itens.filter(i => prioDe(i).id === p.id);
+    if (!g.length && p.id !== 'agora') return '';
+    const nAgora = p.id === 'agora' ? vagas() : '';
+    return `<div class="cr-prio-faixa" style="--pc:${p.cor};--pt:${p.tx}"><h4>${p.nome}${g.length ? ` <span>${g.length}</span>` : ''}</h4>
+      <div class="cr-col-corpo">${g.map(i => card(i, { mover: true })).join('')}${nAgora || (!g.length ? '<p class="cr-vazio">Nenhuma tarefa aqui ainda.</p>' : '')}</div></div>`;
+  }).join('');
 }
 
 /* ---------------- modo Reunião (07/11/2026, pedido dele) ----------------
@@ -1849,6 +1909,10 @@ function acaoRapida(chave, acao) {
   if (acao === 'bloquear') return abrirBloquear(it);
   if (acao === 'liberar') return est.visao === 'foco' ? mudar(it, { sit: 'afazer', foco: true }) : mudar(it, { sit: 'afazer' });
   if (acao === 'foco') return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true });
+  if (acao === 'cheio') return alert('As 2 vagas de "Fazer agora" já estão ocupadas. Conclua uma ou troque a prioridade dela antes.');
+  if (acao.startsWith('foco:')) return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true, prio: acao.slice(5) });
+  if (acao === 'prioMenu') { est.prioAberta = chave; desenhar(); return; }
+  if (acao.startsWith('prio:')) { est.prioAberta = null; return mudar(it, { prio: acao.slice(5) }); }
   if (acao === 'tirar') return mudar(it, { foco: false });
   if (acao === 'subir') return moverNoFoco(chave, -1);
   if (acao === 'descer') return moverNoFoco(chave, 1);
@@ -1859,8 +1923,9 @@ function acaoRapida(chave, acao) {
    - Em andamento: guarda desde quando (inicio_em), se ainda não tinha;
    - Bloqueado: depende de / quem / cobrar / desde (vêm em bloq);
    - qualquer outra: limpa o bloqueio. */
-function camposSit(it, novaSit, bloq, foco) {
+function camposSit(it, novaSit, bloq, foco, prio) {
   const extra = {
+    prioridade: prio !== undefined ? prio : (it.prio || null),
     // Foco do dia: entra com a data do dia; sai quando bloqueia ou quando tiram
     foco_em: foco === true ? (it.focoEm || hoje()) : foco === false || novaSit === 'bloqueado' ? null : (it.focoEm || null),
     inicio_em: novaSit === 'fazendo' ? (it.inicioEm || hoje()) : (novaSit === 'afazer' ? null : it.inicioEm || null),
@@ -1873,10 +1938,10 @@ function camposSit(it, novaSit, bloq, foco) {
   }
   return extra;
 }
-async function mudar(it, { sit, resp, bloq, foco }) {
+async function mudar(it, { sit, resp, bloq, foco, prio }) {
   const novaSit = sit ?? it.sit, novoResp = resp === undefined ? it.explicito : resp;
   const feita = novaSit === 'feito' ? (it.sit === 'feito' ? it.feitaEm || hoje() : hoje()) : null;
-  const extra = camposSit(it, novaSit, bloq, foco);
+  const extra = camposSit(it, novaSit, bloq, foco, prio);
   let r;
   if (!it.auto && !(it.tarefa.recorrencia && it.tarefa.recorrencia !== 'nenhuma')) {
     r = await gravar('cron_tarefas', 'id', { ...it.tarefa, situacao: novaSit, feita_em: feita, responsavel_id: novoResp, ...extra });
