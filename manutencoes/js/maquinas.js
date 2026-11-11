@@ -208,18 +208,26 @@ function pluralTipo(nome) {
 function imprimirQuadroAvisos(lista) {
   if (!lista.length) return aviso('Nenhuma máquina desses tipos com os filtros da tela.', true);
   const porCod = (a, b) => String(a.codigo || '').localeCompare(String(b.codigo || ''), 'pt-BR', { numeric: true, sensitivity: 'base' });
-  const blocos = tiposNaLista(lista).map(t => ({
-    nome: pluralTipo(t.nome),
-    itens: lista.filter(e => (e.tipo_equipamento_id || '') === t.id).sort(porCod),
-  }));
+  /* 11/11/2026: implementos são muitos (161 na Matriz) — um bloco por letra do
+     número (A, C, P, S; "Sem letra" para os só com número), em vez de uma lista só. */
+  const blocos = [];
+  tiposNaLista(lista).forEach(t => {
+    const itens = lista.filter(e => (e.tipo_equipamento_id || '') === t.id).sort(porCod);
+    if (semAcento(t.nome) !== 'implemento' || itens.length <= 20) return blocos.push({ nome: pluralTipo(t.nome), itens });
+    const porLetra = {};
+    itens.forEach(e => (porLetra[letraMaq(e)] = porLetra[letraMaq(e)] || []).push(e));
+    Object.keys(porLetra).sort((x, y) => (x === '#') - (y === '#') || x.localeCompare(y))
+      .forEach(l => blocos.push({ nome: 'Implementos · ' + (l === '#' ? 'sem letra' : l), itens: porLetra[l] }));
+  });
+  const titulo = blocos.every(b => b.nome.startsWith('Implementos')) ? 'Implementos' : 'Máquinas e veículos';
   /* Descrição sem o "*" que veio da importação e com "cv" em minúsculo */
   const limpa = s => String(s || '').replace(/\*/g, '').replace(/\s+/g, ' ').trim();
   const local = filtroMaq.local ? q.nome('locais', filtroMaq.local) : 'Todos os locais';
-  const qtd = n => n + (n === 1 ? ' máquina' : ' máquinas');
+  const qtd = n => n + (titulo === 'Implementos' ? (n === 1 ? ' implemento' : ' implementos') : (n === 1 ? ' máquina' : ' máquinas'));
   const w = window.open('', '_blank');
   if (!w) return aviso('O navegador bloqueou a janela de impressão.', true);
   w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
-    <title>Máquinas e veículos — ${esc(local)}</title>
+    <title>${titulo} — ${esc(local)}</title>
     <style>
       @page{size:A4 portrait;margin:9mm 11mm}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -240,12 +248,12 @@ function imprimirQuadroAvisos(lista) {
       tr{break-inside:avoid}
       tr:nth-child(even) td{background:#f4f9e8}
       td.cod{width:17mm;font-weight:bold;color:#744F28;white-space:nowrap;font-size:16px}
-      .pe{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #c9d8a6;padding-top:4px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#7a7c72}
+      .pe{margin-top:6px;border-top:1px solid #c9d8a6;padding-top:4px;display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#7a7c72}
       .pe img{height:20px;vertical-align:middle}
       .pe .lop{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:.06em}
     </style></head><body>
     <div class="cab"><img src="${new URL('../img/sakuma-marca-vertical.png', location.href)}" alt="SAKUMA">
-      <div class="t"><h1>Máquinas e veículos</h1>
+      <div class="t"><h1>${titulo}</h1>
       <p><b>${esc(local)}</b> · ${qtd(lista.length)} · atualizado em ${formatarData(hoje())}</p></div></div>
     <div class="cols">
       ${blocos.map(b => `<div class="bloco${b.itens.length > 18 ? ' longo' : ''}">
