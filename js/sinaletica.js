@@ -24,6 +24,9 @@
    da pasta (ver claude/cert-sinaletica.md no projeto). */
 (function () {
   'use strict';
+  /* 11/11/2026, pedido do Guilherme: "crie a pasta sinalética em certificações … toda placa vai ser
+     salva dentro da sinalética" → 6 - Certificações › 9 - SINALÉTICA (ícone vermelho SIN, #C62828). */
+  const URL_SINAL = 'https://onedrive.live.com/my?id=%2Fpersonal%2F048fac336e81a458%2FDocuments%2F1%20%2D%20ADM%20%2D%20PRINCIPAL%2F6%20%2D%20Certifica%C3%A7%C3%B5es%2F9%20%2D%20SINAL%C3%89TICA';
 
   const RAIZ = (function () {
     try { return new URL('..', document.currentScript.src).href; } catch (e) { return './'; }
@@ -181,7 +184,8 @@
     el.innerHTML = `
 <div class="cartao">
   <h2>Placas</h2>
-  <p class="dica">As placas da pasta <strong>18 - Placas</strong>. Toque nas placas para marcar e depois em <strong>Abrir para imprimir</strong>: sai um PDF só, uma placa por folha A4. "Ver" abre a placa sozinha.</p>
+  <p class="sg-pasta"><a class="btn sg-btn-pasta" href="${URL_SINAL}" target="_blank" rel="noopener" title="6 - Certificações › 9 - SINALÉTICA">Pasta 9 - SINALÉTICA</a> <span>Toda placa nova fica salva nesta pasta, em 6 - Certificações.</span></p>
+  <p class="dica">As placas da pasta <strong>9 - SINALÉTICA</strong>. Toque nas placas para marcar e depois em <strong>Abrir para imprimir</strong>: sai um PDF só, uma placa por folha A4. "Ver" abre a placa sozinha.</p>
   <div class="sg-filtros" data-filtros></div>
   <input class="sg-busca" type="search" placeholder="Procurar placa (ex.: EPI, lama, T.05)" data-busca>
   <div class="sg-grade" data-grade></div>
