@@ -935,10 +935,25 @@ async function gravar(tabela, chaveCol, item) {
 /* Rotina mensal que cai no sábado ou domingo passa para a segunda (07/11/2026:
    "Semana 1" é dia 1, "Semana 2" dia 8…). */
 const diaUtil = s => { const w = dataDe(s).getDay(); return w === 6 ? addDias(s, 2) : w === 0 ? addDias(s, 1) : s; };
+/* Toda semana com dias marcados (11/11/2026, pedido dele): dias_semana =
+   [1,3,5] (0=dom..6=sáb). Vazio = o mesmo dia da semana da data inicial. */
+const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const diasDe = t => (Array.isArray(t?.dias_semana) ? t.dias_semana.map(Number).filter(n => n >= 0 && n <= 6) : []);
+const textoDias = t => { const ds = diasDe(t); return ds.length ? [1, 2, 3, 4, 5, 6, 0].filter(n => ds.includes(n)).map(n => DIAS_SEM[n]).join(', ') : ''; };
+const seletorDias = (id, marcados) => `<div class="cr-dias" id="${id}" role="group" aria-label="Dias da semana">${[1, 2, 3, 4, 5, 6, 0].map(n =>
+  `<label class="cr-dia${marcados.includes(n) ? ' on' : ''}"><input type="checkbox" value="${n}" ${marcados.includes(n) ? 'checked' : ''}>${DIAS_SEM[n]}</label>`).join('')}</div>`;
+const lerDias = id => [...document.querySelectorAll(`#${id} input:checked`)].map(x => Number(x.value)).sort();
 function ocorrencias(t) {
   const ini = addDias(hoje(), -JANELA_ATRAS), fim = addDias(hoje(), JANELA_FRENTE);
   if (t.recorrencia === 'nenhuma' || !t.recorrencia) return [t.data];
   const out = [];
+  const ds = t.recorrencia === 'semanal' ? diasDe(t) : [];
+  if (ds.length) {
+    let d = t.data > ini ? t.data : ini;
+    for (let k = 0; k < 800 && d <= fim && (!t.ate || d <= t.ate); k++, d = addDias(d, 1))
+      if (ds.includes(dataDe(d).getDay())) out.push(d);
+    return out;
+  }
   let d = t.data;
   for (let k = 0; k < 400 && d <= fim && (!t.ate || d <= t.ate); k++) {
     if (d >= ini) out.push(t.recorrencia === 'mensal' ? diaUtil(d) : d);
@@ -998,7 +1013,7 @@ function todosItens() {
       itens.push({
         chave, tarefa: t, data: fim || d, comeca: fim ? d : null, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
         ir: t.ir ? (IR_CK[t.ir] || null) : null,
-        origemNome: rep ? (t.recorrencia === 'semanal' ? 'Tarefa · toda semana' : 'Tarefa · todo mês') : 'Tarefa',
+        origemNome: rep ? (t.recorrencia === 'semanal' ? 'Tarefa · toda semana' + (textoDias(t) ? ' (' + textoDias(t) + ')' : '') : 'Tarefa · todo mês') : 'Tarefa',
         auto: false, resp: resps[0] || null, resps, explicito,
         sit: rep ? (e?.situacao || 'afazer') : (t.situacao || 'afazer'),
         feitaEm: rep ? e?.feita_em : t.feita_em,
@@ -2048,7 +2063,7 @@ function abrirTarefa(chave) {
   const chip = (cls, rot, conteudo, extra = '') => `<span class="cr-tk-chip ${cls}"${extra}><small>${rot}</small><span>${conteudo}</span></span>`;
   const selResp = `<select id="tkResp" aria-label="Responsável">${opcoesPessoas(respId || '', padraoArea)}</select>`;
   const p = pessoa(respId);
-  const repTxt = !rep ? 'Não repete' : t.recorrencia === 'semanal' ? 'Toda semana' : 'Todo mês';
+  const repTxt = !rep ? 'Não repete' : t.recorrencia === 'semanal' ? 'Toda semana' + (textoDias(t) ? ' · ' + textoDias(t) : '') : 'Todo mês';
 
   d.innerHTML = `<form method="dialog" class="cr-tk" id="crTk">
     <div class="cr-tk-cab">
@@ -2074,6 +2089,7 @@ function abrirTarefa(chave) {
         ${edita && rep ? `<div class="cr-tk-rep">
             <label>Começa em <input type="date" id="tkIni" value="${esc(t.data || '')}"></label>
             <label>Até <input type="date" id="tkAte" value="${esc(t.ate || '')}"></label>
+            ${t.recorrencia === 'semanal' ? `<div class="cr-dias-l"><small>Dias da semana</small>${seletorDias('tkDias', diasDe(t).length ? diasDe(t) : [dataDe(t.data).getDay()])}</div>` : ''}
             ${t.recorrencia === 'mensal' ? `<label>Prazo até o dia <input type="number" id="tkPrazo" min="1" max="31" style="width:64px" value="${esc(t.prazo_dia || '')}" placeholder="—"></label>` : ''}
             <small>O responsável vale para todas as vezes.</small></div>` : ''}
 
@@ -2165,7 +2181,8 @@ function abrirTarefa(chave) {
   const rp = $('tkRep');
   if (rp) rp.onchange = async () => {
     const v = rp.value;
-    await salvarT({ recorrencia: v, ate: v === 'nenhuma' ? null : t.ate || null });
+    await salvarT({ recorrencia: v, ate: v === 'nenhuma' ? null : t.ate || null,
+      dias_semana: v === 'semanal' ? (diasDe(t).length ? diasDe(t) : [dataDe(t.data).getDay()]) : null });
     const novos = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? 1 : -1));
     reabrir(novos[0]?.chave || `t:${t.id}`);
   };
@@ -2177,6 +2194,14 @@ function abrirTarefa(chave) {
     reabrir(novos[0]?.chave || it.chave);
   };
   if ($('tkAte')) $('tkAte').onchange = async () => { await salvarT({ ate: $('tkAte').value || null }); };
+  if ($('tkDias')) $('tkDias').querySelectorAll('input').forEach(c => c.onchange = async () => {
+    const v = lerDias('tkDias');
+    if (!v.length) { c.checked = true; return; } // pelo menos um dia
+    c.closest('.cr-dia')?.classList.toggle('on', c.checked);
+    await salvarT({ dias_semana: v });
+    const novos = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? 1 : -1));
+    reabrir(novos[0]?.chave || it.chave);
+  });
   if ($('tkPrazo')) $('tkPrazo').onchange = async () => {
     const n = parseInt($('tkPrazo').value, 10);
     await salvarT({ prazo_dia: n >= 1 && n <= 31 ? n : null });
@@ -2250,6 +2275,7 @@ function abrirItem(chave) {
         <option value="semanal" ${t?.recorrencia === 'semanal' ? 'selected' : ''}>Toda semana</option>
         <option value="mensal" ${t?.recorrencia === 'mensal' ? 'selected' : ''}>Todo mês</option>
       </select></label>
+      <div class="campo plena" id="crDiasCampo" ${t?.recorrencia === 'semanal' ? '' : 'hidden'}>Dias da semana${seletorDias('crDias', diasDe(t).length ? diasDe(t) : [dataDe(t?.data || est.dia || hoje()).getDay()])}</div>
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
       ${nova || !t?.dono_email || String(t.dono_email).toLowerCase() === meuEmail() ? `<label class="campo plena cr-priv-campo"><span><input type="checkbox" id="crPriv" ${t?.privada ? 'checked' : ''}> <b>Só eu vejo</b> — a tarefa não aparece para mais ninguém da equipe</span></label>` : ''}
     </div>${nova ? '' : '</details>'}` : ''}
@@ -2286,7 +2312,8 @@ function abrirItem(chave) {
     o.textContent = n ? 'Responsável da área — ' + n : 'Sem responsável';
   };
   const rep2 = $('crRep');
-  if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; };
+  if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; $('crDiasCampo').hidden = rep2.value !== 'semanal'; };
+  if ($('crDias')) $('crDias').querySelectorAll('input').forEach(c => c.onchange = () => c.closest('.cr-dia')?.classList.toggle('on', c.checked));
   d.querySelectorAll('input[name=crSit]').forEach(x => x.onchange = () => {
     if ($('crBqCampos')) $('crBqCampos').hidden = d.querySelector('input[name=crSit]:checked')?.value !== 'bloqueado';
   });
@@ -2308,6 +2335,7 @@ function abrirItem(chave) {
         id: t?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
         titulo, descricao: limpo($('crDesc').value) || null, data, area: $('crAreaT').value,
         recorrencia, ate: recorrencia === 'nenhuma' ? null : ($('crAte').value || null), ativo: true,
+        dias_semana: recorrencia === 'semanal' && $('crDias') ? (lerDias('crDias').length ? lerDias('crDias') : [dataDe(data).getDay()]) : null,
         responsavel_id: t?.responsavel_id ?? resp,
         situacao: t?.situacao || 'afazer', feita_em: t?.feita_em || null,
         criado_por: t?.criado_por || acesso.nome || acesso.email || null,

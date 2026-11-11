@@ -412,3 +412,12 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
   .cr-tk-seg button:nth-child(n+3){border-bottom:0}
   .cr-tk-pe{padding:10px 14px}
 }
+
+/* Toda semana: dias da semana marcados (11/11/2026) */
+.cr-dias{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.cr-dia{display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:34px;padding:0 10px;border:1px solid var(--linha);border-radius:17px;background:var(--papel);color:var(--texto);font-size:13px;font-weight:600;cursor:pointer;user-select:none;text-transform:capitalize}
+.cr-dia input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.cr-dia.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.cr-dia:focus-within{outline:2px solid var(--verde-esc);outline-offset:1px}
+.cr-dias-l{display:flex;flex-direction:column;gap:2px;width:100%}
+.cr-dias-l .cr-dias{margin-top:2px}
