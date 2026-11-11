@@ -1025,9 +1025,10 @@ function todosItens() {
       });
       // Adm - mensais: checklist e marcas vêm do Custo Base (lançado do mês)
       if (t.ir === ADM_IR) {
-        const it = itens[itens.length - 1], adm = ckAdm(d.slice(0, 7));
+        // sempre os lançamentos do mês anterior (11/11/2026, pedido dele): a de 10/11 confere outubro
+        const it = itens[itens.length - 1], mesRef = mesAntes(d), adm = ckAdm(mesRef);
         if (adm) {
-          Object.assign(it, adm, { ckDoApp: true, mesAdm: d.slice(0, 7) });
+          Object.assign(it, adm, { ckDoApp: true, mesAdm: mesRef });
           const tot = adm.checklist.reduce((n, g) => n + g.i.length, 0), f = adm.checks.length;
           if (f === tot && it.sit !== 'feito') { it.sit = 'feito'; it.feitaEm = it.feitaEm || hoje(); }
           else if (f && f < tot && it.sit === 'afazer') it.sit = 'fazendo';
