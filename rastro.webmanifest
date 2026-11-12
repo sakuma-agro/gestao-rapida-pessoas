@@ -1,0 +1,38 @@
+{
+  "name": "Rastro · LOP - Gestão Rápida",
+  "short_name": "Rastro",
+  "description": "Atalho do LOP - Gestão Rápida: abre direto o Rastro (tarefas e prazos).",
+  "lang": "pt-BR",
+  "id": "/gestao-rapida-pessoas/rastro",
+  "start_url": "./?area=cronograma",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#1B232B",
+  "theme_color": "#1B232B",
+  "icons": [
+    {
+      "src": "icons/rastro-192.v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/rastro-512.v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/rastro-maskable-192.v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/rastro-maskable-512.v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

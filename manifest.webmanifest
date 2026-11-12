@@ -49,6 +49,24 @@
   },
   "shortcuts": [
     {
+      "name": "Rastro — tarefas e prazos",
+      "short_name": "Rastro",
+      "description": "Abre direto o Rastro",
+      "url": "./?area=cronograma",
+      "icons": [
+        {
+          "src": "icons/rastro-96.v1.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        },
+        {
+          "src": "icons/rastro-192.v1.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
       "name": "Nova tarefa no Rastro",
       "short_name": "+ Tarefa",
       "description": "Abre o Rastro direto no formulário de tarefa nova",
