@@ -2060,6 +2060,72 @@ function textoParaCk(txt, antigo) {
    item" e × para tirar um item — muda o modelo da tarefa (vale para as
    próximas vezes também). */
 let ocultarMarcados = false;
+/* "Adicionar um item" igual ao Trello (12/11/2026, pedido dele): botão que
+   abre a caixa com Adicionar / Cancelar. Enter adiciona e a caixa continua
+   aberta para o próximo; Esc ou Cancelar fecha. Colar várias linhas cria um
+   item por linha. Serve à tarefa nova (rascunho) e à tarefa já lançada. */
+const addTrello = gi => `<div class="cr-ckadd2" data-ckbox="${gi}">
+  <button type="button" class="cr-ckabrir" data-ckabrir="${gi}">Adicionar um item</button>
+  <div class="cr-ckform" hidden><textarea rows="2" maxlength="400" placeholder="Adicionar um item" data-ckadd="${gi}" aria-label="Adicionar um item"></textarea>
+  <div class="cr-ckform-bts"><button type="button" class="btn principal" data-ckaddbt="${gi}">Adicionar</button><button type="button" class="cr-ckcancel" data-ckcancel="${gi}">Cancelar</button></div></div></div>`;
+function abrirAddCk(raiz, gi) {
+  raiz.querySelectorAll('[data-ckbox]').forEach(b => { const on = b.dataset.ckbox === String(gi); b.querySelector('.cr-ckform').hidden = !on; b.querySelector('.cr-ckabrir').hidden = on; });
+  raiz.querySelector(`[data-ckadd="${gi}"]`)?.focus();
+}
+function fecharAddCk(raiz, gi) {
+  const b = raiz.querySelector(`[data-ckbox="${gi}"]`); if (!b) return;
+  b.querySelector('.cr-ckform').hidden = true; b.querySelector('.cr-ckabrir').hidden = false;
+  b.querySelector('textarea').value = '';
+}
+const linhasCk = v => String(v || '').split('\n').map(limpo).filter(Boolean);
+function ligarAddTrello(raiz, adicionar) {
+  raiz.querySelectorAll('[data-ckabrir]').forEach(b => b.onclick = () => abrirAddCk(raiz, b.dataset.ckabrir));
+  raiz.querySelectorAll('[data-ckcancel]').forEach(b => b.onclick = () => fecharAddCk(raiz, b.dataset.ckcancel));
+  const vai = gi => {
+    const ta = raiz.querySelector(`[data-ckadd="${gi}"]`), ls = linhasCk(ta?.value);
+    if (!ls.length) { ta?.focus(); return; }
+    adicionar(+gi, ls);
+  };
+  raiz.querySelectorAll('[data-ckaddbt]').forEach(b => b.onclick = () => vai(b.dataset.ckaddbt));
+  raiz.querySelectorAll('[data-ckadd]').forEach(ta => ta.onkeydown = ev => {
+    if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); ev.stopPropagation(); vai(ta.dataset.ckadd); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); fecharAddCk(raiz, ta.dataset.ckadd); }
+  });
+}
+/* Checklist da TAREFA NOVA (12/11/2026): no lugar da caixa de texto "um item
+   por linha, # é o grupo", o mesmo bloco do Trello — botão "Adicionar
+   checklist", título editável, barra 0%, itens com ×, "Adicionar um item" e
+   "+ Outro checklist". Fica em memória (rascunho) e grava junto no "Lançar". */
+function htmlCkRasc(rasc) {
+  if (!rasc.length) return `<button type="button" class="cr-tk-ab cr-ckr-novo" data-rnovo>☑ Adicionar checklist</button>`;
+  return rasc.map((g, gi) => `<div class="cr-ckbox cr-ckr">
+    <div class="cr-ckcab"><span class="cr-ckr-tit">☑ <input data-rtit="${gi}" maxlength="80" value="${esc(g.g)}" aria-label="Nome do checklist"></span>
+      <button type="button" class="cr-ckocultar" data-rexc="${gi}">Excluir</button></div>
+    <div class="cr-ckprog"><span>0%</span><span class="cr-ckbar g"><i style="width:0%"></i></span><span>${g.i.length ? '0/' + g.i.length : ''}</span></div>
+    ${g.i.map((x, xi) => `<div class="cr-cki"><label><input type="checkbox" disabled><span>${esc(txtCk(x))}</span></label><button type="button" class="cr-ckdel" data-rdel="${gi}:${xi}" title="Tirar este item" aria-label="Tirar este item">×</button></div>`).join('')}
+    ${addTrello(gi)}
+  </div>`).join('') + `<button type="button" class="cr-ckmais" data-rnovo>+ Outro checklist</button>`;
+}
+function ligarCkRasc(lugar, rasc) {
+  const desenhar = abrir => { lugar.innerHTML = htmlCkRasc(rasc); ligarCkRasc(lugar, rasc); if (abrir != null) abrirAddCk(lugar, abrir); };
+  lugar.querySelectorAll('[data-rnovo]').forEach(b => b.onclick = () => { rasc.push({ g: 'Checklist', i: [] }); desenhar(rasc.length - 1); });
+  lugar.querySelectorAll('[data-rtit]').forEach(i => i.oninput = () => { rasc[+i.dataset.rtit].g = i.value; });
+  lugar.querySelectorAll('[data-rtit]').forEach(i => i.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); abrirAddCk(lugar, i.dataset.rtit); } });
+  lugar.querySelectorAll('[data-rexc]').forEach(b => b.onclick = () => {
+    const gi = +b.dataset.rexc;
+    if (rasc[gi].i.length && !confirm(`Excluir o checklist "${rasc[gi].g || 'Checklist'}" com ${rasc[gi].i.length} ${rasc[gi].i.length === 1 ? 'item' : 'itens'}?`)) return;
+    rasc.splice(gi, 1); desenhar();
+  });
+  lugar.querySelectorAll('[data-rdel]').forEach(b => b.onclick = () => { const [gi, xi] = b.dataset.rdel.split(':').map(Number); rasc[gi].i.splice(xi, 1); desenhar(gi); });
+  ligarAddTrello(lugar, (gi, ls) => { rasc[gi].i.push(...ls); desenhar(gi); });
+}
+/* O que está no rascunho vira o checklist da tarefa; texto digitado e ainda
+   não adicionado também entra (melhor que perder). */
+function ckDoRascunho(lugar, rasc) {
+  lugar?.querySelectorAll('[data-ckadd]').forEach(ta => { const ls = linhasCk(ta.value); if (ls.length) rasc[+ta.dataset.ckadd]?.i.push(...ls); });
+  const out = rasc.filter(g => g.i.length).map(g => ({ g: limpo(g.g) || 'Checklist', i: g.i }));
+  return out.length ? out : null;
+}
 function blocoCk(it) {
   const set = new Set(it.checks || []);
   const tot = totalCk(it), feitos = feitosCk(it), pct = tot ? Math.round(feitos / tot * 100) : 0;
@@ -2067,17 +2133,17 @@ function blocoCk(it) {
   const umGrupo = it.checklist.length === 1;
   return `<div class="cr-ckbox${ocultarMarcados ? ' oculta' : ''}" id="crCkBox">
     <div class="cr-ckcab"><b>☑ Checklist</b>
-      <button type="button" class="cr-ckocultar" id="crCkOcultar">${ocultarMarcados ? 'Mostrar marcados' : 'Ocultar marcados'}</button></div>
+      <span class="cr-ckbts"><button type="button" class="cr-ckocultar" id="crCkOcultar">${ocultarMarcados ? 'Mostrar marcados' : 'Ocultar marcados'}</button></span></div>
     ${it.ckDoApp ? `<p class="dc-sem" style="margin:2px 0 6px">Itens do cadastro de Custo Base › Adm mensais (${esc(it.mesAdm.slice(5, 7) + '/' + it.mesAdm.slice(0, 4))}). Marcar aqui marca "Lançado" lá; para incluir ou tirar um item, use o cadastro.</p>` : ''}
     ${it.ckOut ? `<p class="dc-sem" style="margin:2px 0 6px">Fichas de ${esc(it.mesOut.slice(5, 7) + '/' + it.mesOut.slice(0, 4))} da área Outorga e Irrigação. Marcar aqui marca "Recebido" lá; para incluir ou tirar uma ficha, use Cadastros › Itens do recolhimento.</p>` : ''}
     <div class="cr-ckprog"><span id="crCkPct">${pct}%</span><span class="cr-ckbar g${pct === 100 ? ' ok' : ''}"><i id="crCkBar" style="width:${pct}%"></i></span><span id="crCkCont">${feitos}/${tot}</span></div>
-    ${it.checklist.map((g, gi) => `<fieldset class="cr-ckg">${umGrupo && norm(g.g) === norm(it.titulo) ? '' : `<legend>${esc(g.g)}</legend>`}
+    ${it.checklist.map((g, gi) => { const sem = umGrupo && (norm(g.g) === norm(it.titulo) || norm(g.g) === 'checklist'); return `<fieldset class="cr-ckg">${sem && !edita ? '' : `<legend>${sem ? '' : esc(g.g)}${edita ? ` <button type="button" class="cr-ckexc" data-ckexc="${gi}">Excluir</button>` : ''}</legend>`}
       ${(g.i || []).map((x, xi) => { const ir = irCk(x), on = set.has(chaveCk(g.g, x)); return `<div class="cr-cki${on ? ' on' : ''}">
         <label><input type="checkbox" data-ck="${gi}:${xi}" ${on ? 'checked' : ''}><span>${esc(txtCk(x))}</span></label>
         ${ir && podeIr(ir) ? `<button type="button" class="cr-ir" data-ckir="${gi}:${xi}">Abrir ↗</button>` : ''}
         ${edita ? `<button type="button" class="cr-ckdel" data-ckdel="${gi}:${xi}" title="Tirar este item" aria-label="Tirar este item">×</button>` : ''}</div>`; }).join('')}
-      ${edita ? `<div class="cr-ckadd"><input type="text" maxlength="200" placeholder="+ Adicionar um item" data-ckadd="${gi}" aria-label="Adicionar item em ${esc(g.g)}"><button type="button" class="btn" data-ckaddbt="${gi}">Adicionar</button></div>` : ''}
-    </fieldset>`).join('')}</div>`;
+      ${edita ? addTrello(gi) : ''}
+    </fieldset>`; }).join('')}</div>`;
 }
 /* Muda o modelo do checklist (itens) de uma tarefa avulsa e redesenha o bloco. */
 async function mudarModeloCk(d, it, fn) {
@@ -2092,6 +2158,7 @@ async function mudarModeloCk(d, it, fn) {
   else if (box) box.remove();
   recado(r);
 }
+const limparLugarCk = d => { const l = d.querySelector('#tkCkLugar'); if (l) l.innerHTML = ''; };
 function ligarCk(d, it) {
   if (!it?.checklist) return;
   const oc = d.querySelector('#crCkOcultar');
@@ -2101,13 +2168,20 @@ function ligarCk(d, it) {
     if (!confirm(`Tirar "${txtCk(it.checklist[gi].i[xi])}" do checklist? Vale para as próximas vezes também.`)) return;
     mudarModeloCk(d, it, ck => ck[gi].i.splice(xi, 1));
   });
-  const adicionar = gi => {
-    const inp = d.querySelector(`[data-ckadd="${gi}"]`), t = limpo(inp?.value);
-    if (!t) { inp?.focus(); return; }
-    mudarModeloCk(d, it, ck => ck[gi].i.push(t)).then(() => d.querySelector(`[data-ckadd="${gi}"]`)?.focus());
-  };
-  d.querySelectorAll('[data-ckaddbt]').forEach(b => b.onclick = () => adicionar(+b.dataset.ckaddbt));
-  d.querySelectorAll('[data-ckadd]').forEach(i => i.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); adicionar(+i.dataset.ckadd); } });
+  const box = d.querySelector('#crCkBox');
+  if (box) ligarAddTrello(box, (gi, ls) => {
+    const g = it.checklist[gi]?.g;
+    mudarModeloCk(d, it, ck => ck[gi].i.push(...ls)).then(() => {
+      const ngi = (it.checklist || []).findIndex(x => x.g === g);
+      const nb = d.querySelector('#crCkBox'); if (nb && ngi >= 0) abrirAddCk(nb, ngi);
+    });
+  });
+  d.querySelectorAll('[data-ckexc]').forEach(b => b.onclick = () => {
+    const gi = +b.dataset.ckexc, g = it.checklist[gi];
+    if ((g.i || []).length && !confirm(`Excluir o checklist "${g.g}" com ${g.i.length} ${g.i.length === 1 ? 'item' : 'itens'}? Vale para as próximas vezes também.`)) return;
+    if (!(g.i || []).length) { it.checklist.splice(gi, 1); if (!it.checklist.length) it.checklist = null; const bx = d.querySelector('#crCkBox'); if (bx && it.checklist) { bx.outerHTML = blocoCk(it); ligarCk(d, it); } else { bx?.remove(); limparLugarCk(d); } return; }
+    mudarModeloCk(d, it, ck => ck.splice(gi, 1)).then(() => { if (!it.checklist) limparLugarCk(d); });
+  });
   d.querySelectorAll('[data-ckir]').forEach(b => b.onclick = () => {
     const [gi, xi] = b.dataset.ckir.split(':').map(Number);
     irPara(irCk(it.checklist[gi].i[xi]));
@@ -2351,7 +2425,7 @@ function abrirTarefa(chave) {
     $('tkCkLugar').innerHTML = `<div class="cr-tk-rot">Checklist</div>${blocoCk(it)}`;
     ligarCk(d, it);
     $('tkAddCk').remove();
-    d.querySelector('[data-ckadd="0"]')?.focus();
+    const bx = d.querySelector('#crCkBox'); if (bx) abrirAddCk(bx, 0);
   };
   // apagar
   if ($('tkApagar')) $('tkApagar').onclick = async () => {
@@ -2380,9 +2454,7 @@ function abrirItem(chave) {
     ${editavel ? `${nova ? '' : '<details class="cr-editar"><summary>Editar tarefa (nome, data, repetição, checklist)</summary>'}<div class="grade">
       <label class="campo plena">Tarefa<input id="crTit" required maxlength="160" value="${esc(t?.titulo || '')}" placeholder="O que precisa ser feito"></label>
       <label class="campo plena">Detalhes<textarea id="crDesc" rows="2" placeholder="Opcional">${esc(t?.descricao || '')}</textarea></label>
-      <details class="campo plena cr-ckedit"${t?.checklist?.length ? '' : ''}><summary>Checklist (opcional)</summary>
-        <p class="dica">Um item por linha. Linha começando com # é o nome do grupo.</p>
-        <textarea id="crCkTxt" rows="6" placeholder="# Boletins&#10;Buscar boletins&#10;Marcar boletins">${esc(ckParaTexto(t?.checklist))}</textarea></details>
+      <div class="campo plena cr-ckr-campo">Checklist <small class="dica">(opcional)</small><div id="crCkRasc"></div></div>
       <label class="campo">${rep ? 'Começa em' : 'Data'}<input type="date" id="crData" required value="${esc(t?.data || est.dia || hoje())}"></label>
       <label class="campo">Área<select id="crAreaT">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t?.area || 'esc') === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>
       <label class="campo">Repete<select id="crRep">
@@ -2418,6 +2490,8 @@ function abrirItem(chave) {
     </div>
   </form>`;
   d.showModal();
+  const rasc = JSON.parse(JSON.stringify(t?.checklist || []));
+  if ($('crCkRasc')) { $('crCkRasc').innerHTML = htmlCkRasc(rasc); ligarCkRasc($('crCkRasc'), rasc); }
   if ($('crIr')) $('crIr').onclick = () => irPara(it.ir);
   ligarCk(d, it);
   if ($('crFoco')) $('crFoco').onclick = async () => { d.close(); await mudar(it, { foco: !it.focoEm }); };
@@ -2462,7 +2536,7 @@ function abrirItem(chave) {
       }
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp || (nova ? vincTexto(titulo) : null);
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
-      base.checklist = textoParaCk($('crCkTxt').value, t?.checklist);
+      base.checklist = ckDoRascunho($('crCkRasc'), rasc);
       if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext);
         // data adiada para depois de hoje tira do Foco do dia
         if (data !== t.data && data > hoje() && sit !== 'feito') base.foco_em = null; }

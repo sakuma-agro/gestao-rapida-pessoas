@@ -441,3 +441,29 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-prio-vaga{margin:0;border:2px dashed #E9A2A0;border-radius:10px;padding:10px;text-align:center;font-size:12px;color:#A32D2D}
 .cr-prio-vaga.leve{border-style:dotted;padding:6px;color:#A32D2D;opacity:.8}
 @media (prefers-color-scheme:dark){.cr-prio-faixa h4{color:var(--pc)}}
+
+/* Checklist igual ao Trello (12/11/2026, gr-v650) */
+.cr-ckbts{display:flex;gap:6px}
+.cr-ckg legend{display:flex;align-items:center;gap:8px;width:100%}
+.cr-ckexc{margin-left:auto;font:inherit;font-size:12px;font-weight:600;border:1px solid var(--linha);background:var(--papel);color:var(--texto);border-radius:6px;padding:4px 10px;cursor:pointer}
+.cr-ckexc:hover{background:#FBE9E5;border-color:#f0c9c2;color:#9b2c1a}
+.cr-ckadd2{margin-top:8px}
+.cr-ckabrir{font:inherit;font-size:13px;font-weight:600;background:#F1F2EE;border:1px solid transparent;color:var(--texto);border-radius:8px;padding:8px 12px;cursor:pointer}
+.cr-ckabrir:hover{background:#E8E9E4}
+.cr-ckform textarea{width:100%;box-sizing:border-box;min-height:58px;resize:vertical;border:2px solid var(--verde);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;background:var(--papel);color:var(--texto)}
+.cr-ckform textarea:focus{outline:none}
+.cr-ckform-bts{display:flex;align-items:center;gap:10px;margin-top:8px}
+.cr-ckcancel{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--texto);padding:8px 10px;border-radius:8px;cursor:pointer}
+.cr-ckcancel:hover{background:var(--linha)}
+.cr-ckr-campo{display:block}
+.cr-ckr-campo #crCkRasc{margin-top:6px;font-weight:400;text-transform:none;letter-spacing:normal;font-size:14px;color:var(--texto)}
+.cr-ckr{margin:0 0 10px}
+.cr-ckr-tit{display:flex;align-items:center;gap:6px;font-weight:700;flex:1;min-width:0}
+.cr-ckr-tit input{flex:1;min-width:0;font:inherit;font-weight:700;font-size:14px;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;color:var(--texto)}
+.cr-ckr-tit input:hover{background:var(--papel)}
+.cr-ckr-tit input:focus{outline:none;border-color:var(--verde);background:var(--papel)}
+.cr-ckr .cr-ckcab{align-items:center;gap:8px}
+.cr-ckr .cr-cki input[type=checkbox]{opacity:.5}
+.cr-ckr-novo{width:auto}
+.cr-ckmais{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--verde-esc);padding:4px 0;cursor:pointer}
+.cr-ckmais:hover{text-decoration:underline}
