@@ -12,7 +12,7 @@
 //
 // Três peças, cada uma independente:
 //   1. Placa A4 em pé para a parede/quadro de avisos;
-//   2. Instrução (A4) — como usar e o que acontece depois;
+//   2. Instrução (uma folha A4, 12/11/2026) — como usar e o que acontece depois;
 //   3. Imagem do QR (PNG em alta, para mandar ou pôr em outros materiais).
 // Tudo legível em preto e branco (a impressora do escritório é P&B).
 
@@ -164,124 +164,127 @@ async function htmlPlaca() {
   </article>`;
 }
 
-/* ---------------- 2. Instrução A4 ---------------- */
-async function htmlInstrucao() {
+/* ---------------- 2. Instrução — uma folha A4 (12/11/2026) ----------------
+   Pedido dele: "sobre as instruções, vamos deixar melhor, tamanho de uma folha A4".
+   Antes eram 2 páginas (texto + telas do JotForm); agora tudo numa folha, no mesmo
+   estilo da placa "Você sabe o que fazer se…": logo no branco, faixa grafite com o
+   título, os 4 passos desenhados em cima das telas reais do formulário, o que
+   acontece depois, pode enviar × combinados, exemplo de mensagem e o alerta de
+   emergência. Continua legível em P&B (marcadores com borda grafite). */
+export async function htmlInstrucao() {
   const qr = await svgQrBonito(LINK_FORM, { margem: 3 });
-  const passo = (n, ic, tit, txt) => `<div class="ri-passo"><div class="ri-n">${n}</div><div class="ri-ic">${ic}</div>
-    <div><b>${tit}</b><p>${txt}</p></div></div>`;
+  const leg = (n, tit, txt) => `<div class="ri-leg"><b class="ri-n">${n}</b><span><b>${tit}</b><em>${txt}</em></span></div>`;
   return `<style>
-    .ri-folha{width:210mm;height:296mm;overflow:hidden;box-sizing:border-box;padding:9mm 13mm 7mm;margin:0 auto;background:#fff;color:${GRAFITE};
-      font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;font-size:10pt;line-height:1.32}
-    .ri-cab{display:flex;align-items:center;gap:6mm;border-bottom:1.4mm solid ${VERDE};padding-bottom:4mm}
-    .ri-cab img{height:13mm}
-    .ri-cab h1{font-size:17pt;margin:0;line-height:1.15}
-    .ri-cab small{display:block;font-size:10.5pt;color:${CINZA};font-weight:400;margin-top:1mm}
-    .ri-topo{display:grid;grid-template-columns:1fr 40mm;gap:6mm;margin:4mm 0 0;align-items:center}
-    .ri-topo p{margin:0 0 1.8mm}
-    .ri-qr{text-align:center;font-size:9pt;color:${CINZA}}
-    .ri-qr svg{width:40mm;height:40mm;display:block;border:.4mm solid #C9CBC2;border-radius:2mm}
-    .ri-h2{font-size:12pt;margin:4mm 0 2mm;padding-left:3mm;border-left:1.6mm solid ${VERDE}}
-    .ri-passo{display:grid;grid-template-columns:9mm 11mm 1fr;gap:3mm;align-items:center;padding:1.6mm 0;border-bottom:.3mm solid #E0E1DA}
-    .ri-passo p{margin:.5mm 0 0;color:${CINZA}}
-    .ri-n{width:8mm;height:8mm;border-radius:50%;background:${GRAFITE};color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
-    .ri-ic svg{width:10mm;height:10mm;color:${GRAFITE}}
-    .ri-fluxo{display:grid;grid-template-columns:repeat(4,1fr);gap:2mm}
-    .ri-etapa{border:.4mm solid #C9CBC2;border-radius:2.5mm;padding:2.5mm 2.5mm;font-size:9.5pt;position:relative}
-    .ri-etapa b{display:block;font-size:10.5pt;margin-bottom:1mm}
-    .ri-etapa:not(:last-child)::after{content:"›";position:absolute;right:-2.6mm;top:50%;transform:translateY(-50%);font-size:16pt;color:${VERDE_ESC};font-weight:800}
-    .ri-duas{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
-    .ri-caixa{border:.4mm solid #C9CBC2;border-radius:2.5mm;padding:3mm 4mm}
-    .ri-caixa ul{margin:1.5mm 0 0;padding-left:5mm}
-    .ri-caixa li{margin:.6mm 0}
-    .ri-alerta{margin-top:4mm;border:.7mm solid ${GRAFITE};border-radius:2.5mm;padding:3mm 4mm;font-size:10.5pt}
-    .ri-pe{margin-top:auto;padding-top:4mm;display:flex;justify-content:space-between;align-items:flex-end;font-size:9pt;color:${CINZA}}
+    .ri-folha{width:210mm;height:296mm;overflow:hidden;box-sizing:border-box;padding:6mm 11mm 5mm;margin:0 auto;background:#fff;color:${GRAFITE};
+      font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;font-size:10pt;line-height:1.28;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .ri-logo{height:11mm;align-self:center;margin-bottom:2mm}
+    .ri-faixa{margin:0 -11mm;background:${GRAFITE};border-top:1.4mm solid ${VERDE};border-bottom:1.4mm solid ${VERDE};
+      text-align:center;padding:3mm 0 3.2mm;position:relative}
+    .ri-faixa::after{content:"";position:absolute;left:50%;bottom:-5.2mm;margin-left:-4mm;border:4mm solid transparent;border-top-color:${VERDE};border-bottom:0}
+    .ri-k{color:#fff;font-size:12pt;font-weight:700;letter-spacing:2.2mm}
+    .ri-faixa h1{color:${VERDE};font-size:27pt;margin:1mm 0 0;line-height:1;letter-spacing:-.3pt}
+    .ri-selos{display:flex;justify-content:center;gap:3mm;margin:5.5mm 0 0;flex-wrap:wrap}
+    .ri-selo{display:inline-flex;align-items:center;gap:1.8mm;border:.6mm solid ${GRAFITE};border-radius:20mm;padding:1.4mm 4mm;font-size:10.5pt;font-weight:800}
+    .ri-selo svg{width:5.5mm;height:5.5mm}
+    .ri-selo.v{background:${VERDE};border-color:${VERDE}}
+    .ri-h2{font-size:12.5pt;margin:3.5mm 0 2mm;padding-left:2.5mm;border-left:1.6mm solid ${VERDE};line-height:1.1}
+    .ri-h2 small{font-weight:400;color:${CINZA};font-size:9.5pt}
+    /* passos sobre as telas */
+    .ri-passos{display:grid;grid-template-columns:44mm 46mm 1fr;gap:7mm;align-items:start}
+    .ri-col{display:flex;flex-direction:column;gap:2.5mm}
+    .ri-qr{border:.6mm solid ${GRAFITE};border-radius:3mm;padding:2.5mm;position:relative}
+    .ri-qr svg{width:100%;height:auto;display:block}
+    .ri-cel{border:1.3mm solid ${GRAFITE};border-radius:5mm;padding:2.4mm 1.6mm 3mm;background:${GRAFITE}}
+    .ri-cel .ri-fala{display:block;width:10mm;height:1mm;border-radius:1mm;background:#4A535C;margin:0 auto 2mm}
+    .ri-tel{position:relative;background:#fff;border-radius:2.4mm}
+    .ri-tel img{display:block;width:100%;border-radius:2.4mm}
+    .ri-mk{position:absolute;left:-5.5mm;transform:translateY(-50%);width:8mm;height:8mm;border-radius:50%;background:${VERDE};color:${GRAFITE};
+      font-weight:800;font-size:12pt;display:flex;align-items:center;justify-content:center;border:.6mm solid ${GRAFITE};box-shadow:0 0 0 .7mm #fff}
+    .ri-qr .ri-mk{top:2mm;left:-4.5mm;transform:none}
+    .ri-leg{display:grid;grid-template-columns:7.5mm 1fr;gap:2mm;align-items:start}
+    .ri-n{width:7mm;height:7mm;border-radius:50%;background:${VERDE};color:${GRAFITE};border:.5mm solid ${GRAFITE};display:flex;align-items:center;justify-content:center;font-size:11pt}
+    .ri-leg span b{display:block;font-size:10.5pt}
+    .ri-leg em{display:block;font-style:normal;color:${CINZA};font-size:9.3pt;margin-top:.4mm}
+    .ri-ex{display:grid;grid-template-columns:1fr 2fr;gap:4mm;margin-top:2.5mm}
+    .ri-ex div{border:.4mm solid #C9CBC2;border-radius:2mm;padding:1.8mm 3mm;font-size:9.3pt;display:flex;flex-direction:column;justify-content:center}
+    .ri-ex .bom{border:.7mm solid ${VERDE_ESC}}
+    .ri-ex b{display:flex;align-items:center;gap:1.5mm;font-size:9.5pt}
+    .ri-ex i{display:block;font-style:normal;margin-top:.6mm;color:${GRAFITE}}
+    /* depois */
+    .ri-fluxo{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
+    .ri-etapa{background:#F3F8E6;border-radius:2.5mm;padding:1.8mm 2.5mm;font-size:9.2pt;position:relative;color:${CINZA}}
+    .ri-etapa b{display:block;font-size:10.5pt;color:${GRAFITE};margin-bottom:.6mm}
+    .ri-etapa:not(:last-child)::after{content:"›";position:absolute;right:-2.9mm;top:50%;transform:translateY(-50%);font-size:16pt;color:${VERDE_ESC};font-weight:800}
+    .ri-duas{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-top:3mm}
+    .ri-caixa{border:.4mm solid #C9CBC2;border-radius:2.5mm;padding:2.5mm 3.5mm;font-size:9.5pt}
+    .ri-caixa > b{display:block;font-size:10.5pt;margin-bottom:1mm}
+    .ri-caixa ul{margin:0;padding:0;list-style:none}
+    .ri-caixa li{padding-left:5mm;position:relative;margin:.4mm 0}
+    .ri-caixa li::before{content:"✓";position:absolute;left:0;color:${VERDE_ESC};font-weight:800}
+    .ri-caixa.c li::before{content:"•";color:${GRAFITE}}
+    .ri-alerta{margin-top:3mm;border:.8mm solid ${GRAFITE};border-radius:2.5mm;padding:2.5mm 3.5mm;font-size:9.8pt;display:flex;gap:3mm;align-items:center}
+    .ri-alerta .x{flex:none;width:9mm;height:9mm;border-radius:50%;background:${GRAFITE};color:#fff;font-weight:800;font-size:14pt;display:flex;align-items:center;justify-content:center}
+    .ri-pe{margin-top:auto;padding-top:3mm;display:flex;justify-content:space-between;align-items:flex-end;font-size:8.8pt;color:${CINZA};border-top:.4mm solid #E0E1DA}
     .ri-pe img{height:8mm}
-    .ri-folha{page-break-after:always;break-after:page}
-    .ri-folha:last-of-type{page-break-after:auto;break-after:auto}
-    /* página 2: o formulário como aparece no celular (prints de 10/11/2026) */
-    .ri-telas{display:grid;grid-template-columns:1fr 1fr;gap:9mm;margin-top:4mm;align-items:start}
-    .ri-cel{border:1.6mm solid ${GRAFITE};border-radius:7mm;padding:3mm 2mm 4mm;background:${GRAFITE}}
-    .ri-cel .ri-tel{position:relative;border-radius:3mm;overflow:visible;background:#fff}
-    .ri-cel .ri-tel img{border-radius:3mm}
-    .ri-cel img{display:block;width:100%}
-    .ri-cel .ri-fala{display:block;width:12mm;height:1.2mm;border-radius:1mm;background:#4A535C;margin:0 auto 2.5mm}
-    .ri-mk{position:absolute;left:-7mm;display:flex;align-items:center;gap:1.5mm;transform:translateY(-50%)}
-    .ri-mk b{width:8.5mm;height:8.5mm;border-radius:50%;background:${VERDE};color:${GRAFITE};font-size:13pt;display:flex;align-items:center;justify-content:center;
-      border:.7mm solid ${GRAFITE};box-shadow:0 0 0 .8mm #fff}
-    .ri-leg{display:flex;flex-direction:column;gap:3mm}
-    .ri-leg > div:not(.ri-cel){display:grid;grid-template-columns:9mm 1fr;gap:2.5mm;align-items:start;font-size:10.5pt}
-    .ri-leg b.n{width:8mm;height:8mm;border-radius:50%;background:${VERDE};color:${GRAFITE};border:.6mm solid ${GRAFITE};display:flex;align-items:center;justify-content:center;font-size:12pt}
-    .ri-leg p{margin:.5mm 0 0;color:${CINZA}}
-    .ri-ex{margin-top:5mm;display:grid;grid-template-columns:1fr 1fr;gap:4mm}
-    .ri-ex div{border:.4mm solid #C9CBC2;border-radius:2.5mm;padding:3mm 4mm;font-size:10pt}
-    .ri-ex .bom{border-color:${VERDE_ESC};border-width:.7mm}
-    .ri-ex i{display:block;margin-top:1.5mm;font-style:normal;background:#F2F2EE;border-radius:1.5mm;padding:2mm 3mm}
+    @media print{.ri-folha{margin:0}}
   </style>
   <article class="ri-folha">
-    <header class="ri-cab"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <h1>Como usar o QR Code de reclamação e sugestão<small>Instrução para os colaboradores · FORM 042</small></h1></header>
-    <div class="ri-topo">
-      <div>
-        <p><b>Para que serve:</b> é o canal para você contar o que está ruim, dar uma ideia ou elogiar — sobre o trabalho,
-          segurança, alojamento, refeição, transporte, ferramentas, EPIs ou o jeito como as coisas são feitas.</p>
-        <p><b>É anônimo:</b> o formulário não pede nome, telefone nem e-mail. Ninguém fica sabendo quem enviou.</p>
-        <p><b>Onde fica:</b> nas placas com este QR Code e no quadro de avisos de cada fazenda.</p>
-      </div>
-      <div class="ri-qr">${qr}Aponte a câmera aqui</div>
+    <img class="ri-logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+    <div class="ri-faixa"><div class="ri-k">COMO USAR O QR CODE DE</div><h1>RECLAMAÇÃO E SUGESTÃO</h1></div>
+    <div class="ri-selos">
+      <span class="ri-selo v">${ICONE.cadeado} 100% ANÔNIMO · NÃO PEDE NOME</span>
+      <span class="ri-selo">${ICONE.reclamacao} Reclamação</span>
+      <span class="ri-selo">${ICONE.sugestao} Sugestão</span>
+      <span class="ri-selo">${ICONE.elogio} Elogio</span>
     </div>
 
-    <h2 class="ri-h2">Passo a passo</h2>
-    ${passo(1, ICONE.camera, 'Abra a câmera do celular', 'Aponte para o QR Code e espere aparecer o link na tela. Toque nele. (Funciona com a câmera ou com o leitor de QR do WhatsApp/Google Lens.)')}
-    ${passo(2, ICONE.lista, 'Escolha o tipo e a fazenda', 'Marque Reclamação, Sugestão ou Elogio e escolha a fazenda: Faca, Lote 35, Três Riachos, Morro Branco ou Quebra Cocão.')}
-    ${passo(3, ICONE.reclamacao, 'Escreva o que aconteceu', 'Conte com detalhes: o que foi, onde, quando e, se tiver, uma ideia de como resolver. Quanto mais claro, mais rápido resolve.')}
-    ${passo(4, ICONE.enviar, 'Toque em Enviar', 'Pronto: a mensagem chega na hora para o escritório. Não precisa avisar ninguém.')}
+    <h2 class="ri-h2">Em 4 passos, pelo celular <small>· leva menos de 2 minutos</small></h2>
+    <div class="ri-passos">
+      <div class="ri-col">
+        <div class="ri-qr"><span class="ri-mk">1</span>${qr}</div>
+        ${leg(1, 'Aponte a câmera', 'Para este QR ou o da placa e toque no link que aparecer.')}
+      </div>
+      <div class="ri-col">
+        <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
+          <img src="img/jotform-042-tela1.jpg" alt="Início do formulário: tipo de feedback e local">
+          <span class="ri-mk" style="top:71.5%">2</span><span class="ri-mk" style="top:91%">2</span></div></div>
+        ${leg(2, 'Tipo e fazenda', 'Reclamação, Sugestão ou Elogio e a fazenda onde aconteceu.')}
+      </div>
+      <div class="ri-col">
+        <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
+          <img src="img/jotform-042-tela2.jpg" alt="Final do formulário: campo para escrever e botão Enviar">
+          <span class="ri-mk" style="top:36%">3</span><span class="ri-mk" style="top:80%">4</span></div></div>
+        ${leg(3, 'Escreva o que aconteceu', 'O quê, onde e quando — e, se tiver, uma ideia para resolver.')}
+        ${leg(4, 'Toque em Enviar', 'Chega na hora no escritório. Não precisa avisar ninguém.')}
+      </div>
+    </div>
+    <div class="ri-ex">
+      <div><b>✗ Ajuda pouco</b><i>"O banheiro está ruim."</i></div>
+      <div class="bom"><b>✓ Ajuda a resolver</b><i>"Banheiro do alojamento da Faca: a descarga do 2º vaso vaza desde segunda e falta papel toalha."</i></div>
+    </div>
 
     <h2 class="ri-h2">O que acontece depois</h2>
     <div class="ri-fluxo">
-      <div class="ri-etapa"><b>Recebido</b>Chega no sistema do escritório no mesmo instante.</div>
-      <div class="ri-etapa"><b>Analisado</b>O responsável avalia e define o que fazer e o prazo.</div>
-      <div class="ri-etapa"><b>Resolvido</b>A ação é feita e registrada no FORM 042.</div>
-      <div class="ri-etapa"><b>Devolutiva</b>O retorno é dado a todos: DDS, reunião, quadro de avisos ou WhatsApp.</div>
+      <div class="ri-etapa"><b>1 · Recebido</b>Cai no sistema do escritório no mesmo instante.</div>
+      <div class="ri-etapa"><b>2 · Analisado</b>O responsável define o que fazer e o prazo.</div>
+      <div class="ri-etapa"><b>3 · Resolvido</b>A ação é feita e registrada no FORM 042.</div>
+      <div class="ri-etapa"><b>4 · Devolutiva</b>Retorno a todos no DDS, reunião, quadro ou WhatsApp.</div>
     </div>
 
-    <div class="ri-duas" style="margin-top:4mm">
+    <div class="ri-duas">
       <div class="ri-caixa"><b>Pode e deve enviar</b><ul>
-        <li>Problemas de segurança, EPI ou máquina</li><li>Condições do alojamento, banheiro, refeitório e água</li>
+        <li>Segurança, EPI ou máquina com problema</li><li>Alojamento, banheiro, refeitório e água</li>
         <li>Transporte, refeição e horários</li><li>Ideias para melhorar o trabalho</li><li>Elogios a colegas e equipes</li></ul></div>
-      <div class="ri-caixa"><b>Combinados</b><ul>
-        <li>Fale com respeito — critique a situação, não a pessoa</li><li>Não escreva nome, CPF ou telefone de ninguém</li>
-        <li>Um assunto por envio facilita a solução</li><li>Pode enviar quantas vezes quiser</li></ul></div>
+      <div class="ri-caixa c"><b>Combinados</b><ul>
+        <li>Respeito: critique a situação, não a pessoa</li><li>Não escreva nome, CPF ou telefone de ninguém</li>
+        <li>Um assunto por envio</li><li>Pode enviar quantas vezes quiser</li>
+        <li>Sem celular? Fale com o escritório ou use a caixa de sugestões</li></ul></div>
     </div>
 
-    <div class="ri-alerta"><b>Emergência ou acidente não é pelo QR Code.</b> Avise na hora o encarregado ou o técnico de
-      segurança e siga o plano de emergência da fazenda. Sem celular? Fale com o escritório ou use a caixa de sugestões.</div>
+    <div class="ri-alerta"><span class="x">!</span><span><b>Emergência ou acidente não é pelo QR Code.</b> Avise na hora o encarregado
+      ou o técnico de segurança e siga o plano de emergência da fazenda.</span></div>
 
-    <footer class="ri-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão</span><img src="img/lop-marca.png" alt="LOP"></footer>
-  </article>
-  <article class="ri-folha">
-    <header class="ri-cab"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <h1>Veja como é o formulário no celular<small>É esta tela que abre quando você aponta a câmera para o QR Code · FORM 042</small></h1></header>
-    <div class="ri-telas">
-      <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
-        <img src="img/jotform-042-tela1.jpg" alt="Início do formulário: título, tipo de feedback e local">
-        <span class="ri-mk" style="top:71.5%"><b>1</b></span>
-        <span class="ri-mk" style="top:91%"><b>2</b></span></div></div>
-      <div class="ri-leg">
-        <div><b class="n">1</b><span><b>Tipo de feedback</b><p>Toque em RECLAMAÇÃO, SUGESTÃO ou ELOGIO.</p></span></div>
-        <div><b class="n">2</b><span><b>Local</b><p>Toque na fazenda onde aconteceu: Faca, Lote 35, Três Riachos, Morro Branco ou Quebra Cocão.</p></span></div>
-        <div class="ri-cel" style="display:block;margin-top:3mm"><span class="ri-fala"></span><div class="ri-tel">
-          <img src="img/jotform-042-tela2.jpg" alt="Final do formulário: campo para escrever e botão Enviar">
-          <span class="ri-mk" style="top:36%"><b>3</b></span>
-          <span class="ri-mk" style="top:80%"><b>4</b></span></div></div>
-        <div><b class="n">3</b><span><b>Descreva seu feedback</b><p>Escreva o que aconteceu. É o único campo obrigatório. Role a tela para baixo se não aparecer.</p></span></div>
-        <div><b class="n">4</b><span><b>Enviar</b><p>Toque no botão verde Enviar. A tela muda confirmando o envio: pronto, chegou no escritório.</p></span></div>
-      </div>
-    </div>
-    <div class="ri-alerta" style="margin-top:5mm"><b>O topo diz "É totalmente anônimo!"</b> — o formulário não tem campo de nome nem de telefone. Ninguém sabe quem enviou.</div>
-    <div class="ri-ex">
-      <div><b>Mensagem que ajuda pouco</b><i>"O banheiro está ruim."</i></div>
-      <div class="bom"><b>Mensagem que ajuda a resolver</b><i>"Banheiro do alojamento da Faca: a descarga do 2º vaso está vazando desde segunda e falta papel toalha."</i></div>
-    </div>
     <footer class="ri-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão</span><img src="img/lop-marca.png" alt="LOP"></footer>
   </article>`;
 }
@@ -299,7 +302,7 @@ export async function desenharReclamacaoQr(el) {
         <h3>Placa A4</h3><p>Para a parede e o quadro de avisos de cada fazenda. Lê bem em preto e branco; plastificar ajuda.</p>
         <button type="button" class="btn principal" data-rq="placa">Ver e imprimir a placa</button></section>
       <section class="rq-card"><div class="rq-prev rq-prev-ins" id="rqPrevIns"></div>
-        <h3>Instrução</h3><p>Como usar, o que pode enviar, o que acontece depois e os combinados. Para DDS e integração.</p>
+        <h3>Instrução</h3><p>Uma folha A4: os 4 passos com as telas do formulário, o que acontece depois e os combinados. Para DDS e integração.</p>
         <button type="button" class="btn principal" data-rq="instrucao">Ver e imprimir a instrução</button></section>
       <section class="rq-card"><div class="rq-prev rq-prev-img"><img id="rqImg" alt="QR Code de reclamação e sugestão"></div>
         <h3>Imagem do QR</h3><p>PNG em alta qualidade para mandar no WhatsApp ou usar em outros materiais.</p>
