@@ -1334,6 +1334,7 @@ function rotinas() {
    da data mostrada para o Foco do dia de hoje. */
 function botaoFocoRot(it) {
   if (!it || it.sit === 'feito') return '';
+  if (it.sit === 'bloqueado') return ' <span class="cr-rot-foco no">⛔ Bloqueada</span>';
   if (it.focoEm) return ' <span class="cr-rot-foco no">🎯 No foco</span>';
   return ` <button type="button" class="cr-rot-foco" data-rotfoco="${esc(it.chave)}" title="Enviar esta vez (${esc(brCurto(it.data))}) para o Foco do dia">🎯 Enviar para o Foco do dia</button>`;
 }
