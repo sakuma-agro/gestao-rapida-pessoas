@@ -2520,6 +2520,8 @@ body.crq-laudo #crqLaudo{display:block;position:fixed;inset:0;overflow:auto;z-in
 .lau-tab th{background:#84BD00;color:#fff;text-align:left;padding:3px 5px;border:1px solid #84BD00}
 .lau-tab td{border:1px solid #CFDDB0;padding:3px 5px}.lau-tab tbody tr:nth-child(odd) td{background:#F3F8E7}
 .lau-metodo{font-size:9.5px;color:#6B6D63;margin-top:6px;line-height:1.4}
+.lau-lacuna{font-size:9.5px;color:#744F28;background:#FAF6EF;border-radius:4px;padding:5px 9px;margin:-4px 0 8px}
+.crq-lacuna{color:#744F28!important;background:#FAF6EF;padding:6px 8px;border-radius:6px}
 .lau-h2{font-size:13px;color:#744F28;margin:4px 0 2px}
 .lau-normas{font-size:9.5px;color:#51534A;margin-top:10px;background:#F3F8E7;border-left:4px solid #84BD00;padding:6px 9px;line-height:1.45}
 .lau-folha .leaflet-control-scale-line{font-size:8px;padding:0 3px}
