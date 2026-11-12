@@ -467,3 +467,12 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-ckr-novo{width:auto}
 .cr-ckmais{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--verde-esc);padding:4px 0;cursor:pointer}
 .cr-ckmais:hover{text-decoration:underline}
+
+/* Clicar no item edita (12/11/2026, gr-v651) */
+.cr-cki label.cr-ckmk{flex:none;min-height:44px;padding:8px 0;align-items:flex-start}
+.cr-cktxt{flex:1;min-width:0;padding:8px 6px;margin:2px 0;font-size:14px;font-weight:400;border-radius:6px;cursor:pointer;overflow-wrap:anywhere}
+.cr-cktxt:hover,.cr-cktxt:focus-visible{background:rgba(0,0,0,.05);outline:none}
+.cr-cki.on .cr-cktxt{text-decoration:line-through;color:var(--suave)}
+.cr-cki.editando{align-items:flex-start}
+.cr-cki.editando .cr-ckdel,.cr-cki.editando .cr-ir{display:none}
+.cr-ckeditbox{flex:1;padding:6px 0 8px}

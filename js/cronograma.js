@@ -2096,13 +2096,42 @@ function ligarAddTrello(raiz, adicionar) {
    por linha, # é o grupo", o mesmo bloco do Trello — botão "Adicionar
    checklist", título editável, barra 0%, itens com ×, "Adicionar um item" e
    "+ Outro checklist". Fica em memória (rascunho) e grava junto no "Lançar". */
+/* Clicar no texto do item edita, igual ao Trello (12/11/2026, pedido dele):
+   o texto vira caixa já selecionada, com Salvar / Cancelar. Enter salva,
+   Esc cancela. Caixa vazia não apaga — para tirar o item é o ×. */
+function editarItemCk(span, salvar) {
+  const row = span.closest('.cr-cki'); if (!row || row.classList.contains('editando')) return;
+  const orig = span.textContent;
+  row.classList.add('editando');
+  const box = document.createElement('div'); box.className = 'cr-ckform cr-ckeditbox';
+  box.innerHTML = `<textarea rows="2" maxlength="400" aria-label="Editar item"></textarea>
+    <div class="cr-ckform-bts"><button type="button" class="btn principal">Salvar</button><button type="button" class="cr-ckcancel">Cancelar</button></div>`;
+  const ta = box.querySelector('textarea'); ta.value = orig;
+  span.hidden = true; span.after(box);
+  const fechar = () => { box.remove(); span.hidden = false; row.classList.remove('editando'); };
+  const ok = () => { const v = limpo(ta.value.replace(/\n+/g, ' ')); if (!v || v === orig) { fechar(); return; } salvar(v); };
+  box.querySelector('.principal').onclick = ok;
+  box.querySelector('.cr-ckcancel').onclick = fechar;
+  ta.onkeydown = ev => {
+    if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); ev.stopPropagation(); ok(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); fechar(); }
+  };
+  ta.focus(); ta.select();
+}
+function ligarEditarCk(raiz, attr, salvar) {
+  raiz.querySelectorAll(`[${attr}]`).forEach(sp => {
+    const vai = () => { const [gi, xi] = sp.getAttribute(attr).split(':').map(Number); editarItemCk(sp, v => salvar(gi, xi, v)); };
+    sp.onclick = vai;
+    sp.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); vai(); } };
+  });
+}
 function htmlCkRasc(rasc) {
   if (!rasc.length) return `<button type="button" class="cr-tk-ab cr-ckr-novo" data-rnovo>☑ Adicionar checklist</button>`;
   return rasc.map((g, gi) => `<div class="cr-ckbox cr-ckr">
     <div class="cr-ckcab"><span class="cr-ckr-tit">☑ <input data-rtit="${gi}" maxlength="80" value="${esc(g.g)}" aria-label="Nome do checklist"></span>
       <button type="button" class="cr-ckocultar" data-rexc="${gi}">Excluir</button></div>
     <div class="cr-ckprog"><span>0%</span><span class="cr-ckbar g"><i style="width:0%"></i></span><span>${g.i.length ? '0/' + g.i.length : ''}</span></div>
-    ${g.i.map((x, xi) => `<div class="cr-cki"><label><input type="checkbox" disabled><span>${esc(txtCk(x))}</span></label><button type="button" class="cr-ckdel" data-rdel="${gi}:${xi}" title="Tirar este item" aria-label="Tirar este item">×</button></div>`).join('')}
+    ${g.i.map((x, xi) => `<div class="cr-cki"><label class="cr-ckmk"><input type="checkbox" disabled></label><span class="cr-cktxt" data-red="${gi}:${xi}" role="button" tabindex="0" title="Clique para editar">${esc(txtCk(x))}</span><button type="button" class="cr-ckdel" data-rdel="${gi}:${xi}" title="Tirar este item" aria-label="Tirar este item">×</button></div>`).join('')}
     ${addTrello(gi)}
   </div>`).join('') + `<button type="button" class="cr-ckmais" data-rnovo>+ Outro checklist</button>`;
 }
@@ -2118,6 +2147,7 @@ function ligarCkRasc(lugar, rasc) {
   });
   lugar.querySelectorAll('[data-rdel]').forEach(b => b.onclick = () => { const [gi, xi] = b.dataset.rdel.split(':').map(Number); rasc[gi].i.splice(xi, 1); desenhar(gi); });
   ligarAddTrello(lugar, (gi, ls) => { rasc[gi].i.push(...ls); desenhar(gi); });
+  ligarEditarCk(lugar, 'data-red', (gi, xi, v) => { rasc[gi].i[xi] = typeof rasc[gi].i[xi] === 'object' ? { ...rasc[gi].i[xi], t: v } : v; desenhar(); });
 }
 /* O que está no rascunho vira o checklist da tarefa; texto digitado e ainda
    não adicionado também entra (melhor que perder). */
@@ -2139,7 +2169,8 @@ function blocoCk(it) {
     <div class="cr-ckprog"><span id="crCkPct">${pct}%</span><span class="cr-ckbar g${pct === 100 ? ' ok' : ''}"><i id="crCkBar" style="width:${pct}%"></i></span><span id="crCkCont">${feitos}/${tot}</span></div>
     ${it.checklist.map((g, gi) => { const sem = umGrupo && (norm(g.g) === norm(it.titulo) || norm(g.g) === 'checklist'); return `<fieldset class="cr-ckg">${sem && !edita ? '' : `<legend>${sem ? '' : esc(g.g)}${edita ? ` <button type="button" class="cr-ckexc" data-ckexc="${gi}">Excluir</button>` : ''}</legend>`}
       ${(g.i || []).map((x, xi) => { const ir = irCk(x), on = set.has(chaveCk(g.g, x)); return `<div class="cr-cki${on ? ' on' : ''}">
-        <label><input type="checkbox" data-ck="${gi}:${xi}" ${on ? 'checked' : ''}><span>${esc(txtCk(x))}</span></label>
+        ${edita ? `<label class="cr-ckmk"><input type="checkbox" data-ck="${gi}:${xi}" ${on ? 'checked' : ''} aria-label="Marcar ${esc(txtCk(x))}"></label><span class="cr-cktxt" data-cked="${gi}:${xi}" role="button" tabindex="0" title="Clique para editar">${esc(txtCk(x))}</span>`
+          : `<label><input type="checkbox" data-ck="${gi}:${xi}" ${on ? 'checked' : ''}><span>${esc(txtCk(x))}</span></label>`}
         ${ir && podeIr(ir) ? `<button type="button" class="cr-ir" data-ckir="${gi}:${xi}">Abrir ↗</button>` : ''}
         ${edita ? `<button type="button" class="cr-ckdel" data-ckdel="${gi}:${xi}" title="Tirar este item" aria-label="Tirar este item">×</button>` : ''}</div>`; }).join('')}
       ${edita ? addTrello(gi) : ''}
@@ -2175,6 +2206,19 @@ function ligarCk(d, it) {
       const ngi = (it.checklist || []).findIndex(x => x.g === g);
       const nb = d.querySelector('#crCkBox'); if (nb && ngi >= 0) abrirAddCk(nb, ngi);
     });
+  });
+  if (box) ligarEditarCk(box, 'data-cked', (gi, xi, v) => {
+    const g = it.checklist[gi], x = g.i[xi];
+    const velha = chaveCk(g.g, x), nova = chaveCk(g.g, v);
+    const marcado = (it.checks || []).includes(velha);
+    if (marcado) {
+      // o item marcado continua marcado com o texto novo
+      it.checks = it.checks.map(k => k === velha ? nova : k);
+      const rep = it.tarefa?.recorrencia && it.tarefa.recorrencia !== 'nenhuma';
+      if (rep) { const e = estadoDe(it.chave); if (e) gravar('cron_estado', 'chave', { ...e, checks: it.checks }); }
+      else it.tarefa = { ...it.tarefa, checks: it.checks };
+    }
+    mudarModeloCk(d, it, ck => { ck[gi].i[xi] = typeof x === 'object' ? { ...x, t: v } : v; });
   });
   d.querySelectorAll('[data-ckexc]').forEach(b => b.onclick = () => {
     const gi = +b.dataset.ckexc, g = it.checklist[gi];
