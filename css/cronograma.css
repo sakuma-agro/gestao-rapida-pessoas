@@ -514,3 +514,6 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-rot-data.hoje{color:#1D6FB8;font-weight:700}
 .cr-rot-data.atraso{color:#C0392B;font-weight:700}
 .cr-rot-data.ok{color:#4F7A00}
+.cr-rot-foco{font:inherit;font-size:12px;font-weight:700;margin-left:8px;padding:3px 10px;border-radius:999px;border:1px solid #84BD00;background:#F3F9E6;color:#4F7A00;cursor:pointer;white-space:nowrap;vertical-align:middle}
+.cr-rot-foco:hover{background:#84BD00;color:#fff}
+.cr-rot-foco.no{border-color:transparent;background:transparent;color:var(--suave);cursor:default;font-weight:400}

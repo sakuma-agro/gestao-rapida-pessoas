@@ -1313,11 +1313,12 @@ function rotinas() {
       || (f.id === 'semanal' ? ordemDia(a.t) - ordemDia(b.t) : f.id === 'mensal' ? (semDe(a.t) - semDe(b.t)) || (a.t.data < b.t.data ? -1 : a.t.data > b.t.data ? 1 : 0) : a.t.data < b.t.data ? -1 : a.t.data > b.t.data ? 1 : 0)
       || a.t.titulo.localeCompare(b.t.titulo, 'pt-BR'));
     const linhas = l.map(({ t, resps }) => {
+      const vez = vezDe(porT.get(t.id) || []);
       const ck = Array.isArray(t.checklist) ? t.checklist.reduce((n, g) => n + (g.i || []).length, 0) : 0;
       return `<div class="cr-rot-lin" role="button" tabindex="0" data-rot="${esc(t.id)}" style="--fc:${f.cor}">
         <span class="cr-rot-quando">${esc(quandoRotina(t, f.id))}</span>
-        ${dataRotina(vezDe(porT.get(t.id) || []))}
-        <span class="cr-rot-tit">${t.privada ? '🔒 ' : ''}${esc(t.titulo)}${ck ? ` <small>☑ ${ck}</small>` : ''}</span>
+        ${dataRotina(vez)}
+        <span class="cr-rot-tit">${t.privada ? '🔒 ' : ''}${esc(t.titulo)}${ck ? ` <small>☑ ${ck}</small>` : ''}${botaoFocoRot(vez)}</span>
         ${tagArea(t.area || 'esc')}
         <span class="cr-rot-resp">${resps.length ? resps.map(id => avatar(id)).join('') : avatar(null)} <small>${esc(resps.map(id => (pessoa(id)?.nome || '').split(' ')[0]).filter(Boolean).join(', ') || 'Sem responsável')}</small></span>
       </div>`;
@@ -1328,6 +1329,13 @@ function rotinas() {
     </section>`;
   }).join('');
   return `<div class="cr-rotinas">${secoes}</div>`;
+}
+/* Botão "Foco do dia" depois do nome (12/11/2026, pedido dele): manda a vez
+   da data mostrada para o Foco do dia de hoje. */
+function botaoFocoRot(it) {
+  if (!it || it.sit === 'feito') return '';
+  if (it.focoEm) return ' <span class="cr-rot-foco no">🎯 No foco</span>';
+  return ` <button type="button" class="cr-rot-foco" data-rotfoco="${esc(it.chave)}" title="Enviar esta vez (${esc(brCurto(it.data))}) para o Foco do dia">🎯 Enviar para o Foco do dia</button>`;
 }
 const legendaFreq = () => FREQ.map(f => `<span><i style="background:${f.cor}"></i>${f.rot}</span>`).join('');
 
@@ -2045,8 +2053,12 @@ function ligarTela() {
   });
   r.querySelectorAll('[data-rot]').forEach(b => {
     const abre = () => { const t = dados.tarefas.find(x => String(x.id) === b.dataset.rot); const k = t && vezAtual(t); if (k) abrirTarefa(k); };
-    b.onclick = abre;
-    b.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abre(); } };
+    b.onclick = ev => {
+      const f = ev.target.closest('[data-rotfoco]');
+      if (f) { ev.preventDefault(); ev.stopPropagation(); f.disabled = true; f.textContent = 'Enviando…'; acaoRapida(f.dataset.rotfoco, 'foco'); return; }
+      abre();
+    };
+    b.onkeydown = ev => { if (ev.target.closest('[data-rotfoco]')) return; if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abre(); } };
   });
   r.querySelectorAll('[data-colmob]').forEach(b => b.onclick = () => { est.colMob = b.dataset.colmob; desenhar(); });
   r.querySelectorAll('[data-item]').forEach(b => b.onclick = ev => {
