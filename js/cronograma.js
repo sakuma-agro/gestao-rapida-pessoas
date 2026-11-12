@@ -1290,7 +1290,7 @@ function dataRotina(it) {
 }
 function rotinas() {
   const meu = eu();
-  const lista = dados.tarefas.filter(t => t.ativo !== false && freqDaTarefa(t)
+  const lista = dados.tarefas.filter(t => t.ativo !== false && freqDaTarefa(t) && !(t.ate && t.ate < hoje())
     && (!t.privada || String(t.dono_email || '').toLowerCase() === meuEmail()))
     .map(t => { const resps = t.responsavel_id ? [t.responsavel_id] : respsDaArea(t.area || 'esc', null); return { t, f: freqDaTarefa(t), resps }; })
     .filter(({ t, resps }) => {
@@ -1361,7 +1361,7 @@ function quemCriou(t) {
 const tagOrigem = it => it.auto
   ? `<span class="cr-tag" style="background:${areaDe(it.area).cor}" title="Vem sozinha de ${esc(it.origemNome)}">Do app · ${esc((ORIGENS[it.origem]?.nome || areaDe(it.area).nome))}</span>`
   : /^rotina · /i.test(it.tarefa?.descricao || '')
-    ? `<span class="cr-tag rotina" title="Rotina que repete">${esc(it.tarefa.descricao.replace(/ do mês$/, ''))}</span>`
+    ? `<span class="cr-tag rotina" title="Rotina que repete">${esc(it.tarefa.descricao.split('\n')[0].replace(/ do mês$/, ''))}</span>`
     : `<span class="cr-tag avulsa" title="Tarefa lançada à mão">Avulsa${quemCriou(it.tarefa) ? ' · ' + esc(quemCriou(it.tarefa)) : ''}</span>`;
 const avatar = (id, grande) => {
   const p = pessoa(id);
