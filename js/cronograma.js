@@ -1271,9 +1271,22 @@ function quandoRotina(t, f) {
   if (f === 'semestral') return `${dm} e ${br(addMeses(t.data, 6)).slice(0, 5)}`;
   return dm;
 }
-function vezAtual(t) {
-  const its = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? -1 : 1));
-  return (its.find(x => x.sit !== 'feito' && x.data >= hoje()) || its.filter(x => x.data <= hoje()).pop() || its[0])?.chave || null;
+/* A vez que vale agora: a aberta atrasada mais antiga, senão a próxima. */
+function vezDe(its) {
+  its = its.slice().sort((a, b) => (a.data < b.data ? -1 : 1));
+  return its.find(x => x.sit !== 'feito' && x.data < hoje()) || its.find(x => x.sit !== 'feito' && x.data >= hoje())
+    || its.filter(x => x.data <= hoje()).pop() || its[0] || null;
+}
+const vezAtual = t => vezDe(todosItens().filter(x => x.tarefa?.id === t.id))?.chave || null;
+/* Data na linha da rotina (12/11/2026, pedido dele): a próxima vez, ou a atrasada. */
+function dataRotina(it) {
+  if (!it) return '<span class="cr-rot-data">—</span>';
+  const n = diasAte(it.data), dd = `${DIAS_SEM[dataDe(it.data).getDay()]} ${brCurto(it.data)}`;
+  const ini = it.comeca && it.comeca !== it.data && hoje() < it.comeca ? `${brCurto(it.comeca)} a ` : '';
+  if (it.sit === 'feito') return `<span class="cr-rot-data ok" title="Vez de ${esc(br(it.data))} concluída">✓ ${esc(dd)}</span>`;
+  if (n < 0) return `<span class="cr-rot-data atraso" title="Vez atrasada">${esc(dd)} · atrasada</span>`;
+  if (n === 0) return `<span class="cr-rot-data hoje">hoje · ${esc(brCurto(it.data))}</span>`;
+  return `<span class="cr-rot-data">${esc(ini)}${esc(dd)}</span>`;
 }
 function rotinas() {
   const meu = eu();
@@ -1293,6 +1306,8 @@ function rotinas() {
   const ordemDia = t => { const ds = diasDe(t); return ds.length ? Math.min(...ds.map(n => (n + 6) % 7)) : (dataDe(t.data).getDay() + 6) % 7; };
   const semDe = t => Number(((t.descricao || '').match(/semana\s*(\d)/i) || [])[1] || 0);
   const nomeP = id => pessoa(id)?.nome || 'ZZZ';
+  const porT = new Map();
+  for (const it of todosItens()) if (it.tarefa) { if (!porT.has(it.tarefa.id)) porT.set(it.tarefa.id, []); porT.get(it.tarefa.id).push(it); }
   const secoes = FREQ.map(f => {
     const l = lista.filter(x => x.f === f.id).sort((a, b) => nomeP(a.resps[0]).localeCompare(nomeP(b.resps[0]), 'pt-BR')
       || (f.id === 'semanal' ? ordemDia(a.t) - ordemDia(b.t) : f.id === 'mensal' ? (semDe(a.t) - semDe(b.t)) || (a.t.data < b.t.data ? -1 : a.t.data > b.t.data ? 1 : 0) : a.t.data < b.t.data ? -1 : a.t.data > b.t.data ? 1 : 0)
@@ -1301,6 +1316,7 @@ function rotinas() {
       const ck = Array.isArray(t.checklist) ? t.checklist.reduce((n, g) => n + (g.i || []).length, 0) : 0;
       return `<div class="cr-rot-lin" role="button" tabindex="0" data-rot="${esc(t.id)}" style="--fc:${f.cor}">
         <span class="cr-rot-quando">${esc(quandoRotina(t, f.id))}</span>
+        ${dataRotina(vezDe(porT.get(t.id) || []))}
         <span class="cr-rot-tit">${t.privada ? '🔒 ' : ''}${esc(t.titulo)}${ck ? ` <small>☑ ${ck}</small>` : ''}</span>
         ${tagArea(t.area || 'esc')}
         <span class="cr-rot-resp">${resps.length ? resps.map(id => avatar(id)).join('') : avatar(null)} <small>${esc(resps.map(id => (pessoa(id)?.nome || '').split(' ')[0]).filter(Boolean).join(', ') || 'Sem responsável')}</small></span>
