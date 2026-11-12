@@ -116,3 +116,8 @@ a{color:var(--verde-esc)}
 .cq-bt.cultura{border-color:var(--marrom);background:linear-gradient(90deg,#fbf7f2,#fff)}
 .cq-bt.cultura .ic{background:var(--marrom);color:#fff}
 .cq-bt.cultura .seta{color:var(--marrom)}
+
+/* Regras para visitantes (12/11/2026) */
+.cq-regras{margin:0;padding-left:20px;color:var(--texto);font-size:16px;line-height:1.45}
+.cq-regras li{margin:0 0 6px}
+.cq-regras li::marker{color:var(--verde)}

@@ -337,7 +337,7 @@ function doc046(v) {
 /* 04/11/2026: a GRASP imprime só a ata (mensal); a presença sai na Lista de presença (FORM 018). */
 const IMPRESSOS = [
   // 10/11/2026: placas do quadro de avisos com o QR da consulta sem senha (consulta/ no GitHub Pages).
-  { tipo: 'qrConsulta', codigo: 'QR Code', freq: 'Quadro de avisos', nome: 'Placas do QR Code de consulta', desc: 'Duas placas A4 para o quadro de avisos: Documentos (POPs, políticas, leis trabalhistas, manual) e FISPQ / FDS. O funcionário aponta a câmera e vê, sem senha. O que aparece se escolhe na Lista mestra (Editar › Mostrar no QR Code).' },
+  { tipo: 'qrConsulta', codigo: 'QR Code', freq: 'Quadro de avisos', nome: 'Placas do QR Code de consulta', desc: 'Placas A4: Documentos (POPs, políticas, condutas e direitos, leis trabalhistas, manual), FISPQ / FDS e Regras para visitantes (para a entrada). O funcionário aponta a câmera e vê, sem senha. O que aparece se escolhe na Lista mestra (Editar › Mostrar no QR Code).' },
   { tipo: 'fichaEpi', codigo: 'Ficha de EPI', freq: 'Mensal · por funcionário', nome: 'Ficha de EPI', desc: 'A ficha de entrega de EPI de SST › EPI\'s › Fichas, com o modelo do app. Uma ficha para cada funcionário marcado; o que já foi preenchido no mês vem junto.' },
   { tipo: 'f018', codigo: 'FORM 018', freq: 'Por evento', nome: 'Lista de presença', desc: 'Treinamentos, palestras e reuniões (também a reunião GRASP): temas, horário, ministrante e quem assina.' },
   { tipo: 'f024', codigo: 'FORM 024', freq: 'Anual', nome: 'Reunião com a gerência', desc: 'Reunião da gerência com os funcionários, com a lista de participantes.' },
@@ -587,9 +587,12 @@ export const _ci = { doc018, doc024, doc044, doc007, doc054, doc045, doc046 };
 const URL_CONSULTA = 'https://sakuma-agro.github.io/gestao-rapida-pessoas/consulta/';
 const PLACAS = {
   docs: { url: URL_CONSULTA, titulo: 'DOCUMENTOS DA FAZENDA', sub: 'Aponte a câmera do celular — sem senha, só para consulta',
-    itens: ['Manual de Cultura', 'Procedimentos (POPs)', 'Políticas', 'Leis trabalhistas', 'FISPQ / FDS', 'Telefones úteis', 'Mapa até o pronto-socorro'], lista: true },
+    itens: ['Manual de Cultura', 'Condutas e direitos', 'Procedimentos (POPs)', 'Políticas', 'Leis trabalhistas', 'FISPQ / FDS', 'Telefones úteis', 'Mapa até o pronto-socorro'], lista: true },
   fds: { url: URL_CONSULTA + '?g=fds', titulo: 'FISPQ / FDS', sub: 'Fichas de segurança dos produtos — aponte a câmera do celular',
     itens: ['Abra a câmera e aponte para o código.', 'Digite o nome do produto (ou procure pela categoria).', 'Toque na ficha: primeiros socorros, cuidados e o que fazer em acidente.'], lista: false },
+  // 12/11/2026: QR próprio dos visitantes (vinha do botão "Regras visitantes" da folha POL 13).
+  vis: { url: URL_CONSULTA + '?g=vis', titulo: 'VISITANTE, LEIA ANTES DE ENTRAR', sub: 'Regras da fazenda — aponte a câmera do celular',
+    itens: ['EPI obrigatório nas áreas de produção', 'Velocidade máxima 10 km/h', 'Não entre em áreas pulverizadas', 'Proibido fumar', 'Não toque nos frutos', 'Não acione equipamentos'], lista: true },
 };
 let qrLibCi = null;
 function qrLib() {
@@ -613,14 +616,15 @@ function formPlacasQr() {
     <div class="grade">
       <label class="rs-check"><input type="checkbox" id="ciQrDocs" checked> Documentos <span class="dc-sem">(POPs, políticas, leis, manual, FISPQ, telefones, mapa)</span></label>
       <label class="rs-check"><input type="checkbox" id="ciQrFds" checked> FISPQ / FDS <span class="dc-sem">(abre direto nas fichas — bom para o depósito)</span></label>
+      <label class="rs-check"><input type="checkbox" id="ciQrVis" checked> Regras para visitantes <span class="dc-sem">(QR próprio — para a portaria / entrada da fazenda)</span></label>
     </div>
-    <p class="dica">Endereços: <a href="${URL_CONSULTA}" target="_blank" rel="noopener">documentos</a> · <a href="${URL_CONSULTA}?g=fds" target="_blank" rel="noopener">FISPQ</a> — abra para conferir antes de imprimir.</p>
+    <p class="dica">Endereços: <a href="${URL_CONSULTA}" target="_blank" rel="noopener">documentos</a> · <a href="${URL_CONSULTA}?g=fds" target="_blank" rel="noopener">FISPQ</a> · <a href="${URL_CONSULTA}?g=vis" target="_blank" rel="noopener">visitantes</a> — abra para conferir antes de imprimir.</p>
     <div class="barra entre">
       <button class="btn" type="button" data-fechar>Cancelar</button>
       <button class="btn principal" type="button" id="ciQrImp">Ver e imprimir</button>
     </div>`, d => {
     $('ciQrImp').addEventListener('click', async () => {
-      const qual = [$('ciQrDocs').checked && 'docs', $('ciQrFds').checked && 'fds'].filter(Boolean);
+      const qual = [$('ciQrDocs').checked && 'docs', $('ciQrFds').checked && 'fds', $('ciQrVis').checked && 'vis'].filter(Boolean);
       if (!qual.length) return;
       let html = '';
       try { for (const k of qual) html += placaQr(PLACAS[k], await svgQrCi(PLACAS[k].url)); }

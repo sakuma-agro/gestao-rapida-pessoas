@@ -8,7 +8,9 @@
 // Telas (pelo # do endereço, para o "voltar" do celular funcionar):
 //   (vazio)            menu              #fispq        FISPQ/FDS por categoria, com busca
 //   #s/<seção>         lista da seção    #ver/<chave>  o documento aberto (pdf.js, página por página)
+//   #conduta           Condutas e direitos (abre a POL 11 — Código de Conduta dos Colaboradores)
 // ?g=fds abre direto na FISPQ (QR do depósito).
+// ?g=vis abre direto nas regras para visitantes (QR próprio, na portaria/entrada — 12/11/2026).
 
 import { htmlCultura } from './cultura.js?v=2';
 
@@ -39,6 +41,49 @@ const LEIS = [
     l: 'Artigo 75-E da CLT', u: 'https://www.jusbrasil.com.br/topicos/173000250/artigo-75e-do-decreto-lei-n-5452-de-01-de-maio-de-1943' },
   { c: 'Cláusula 15ª – Da proteção de dados', r: 'Lei nº 13.709/2018 (Lei Geral de Proteção de Dados – LGPD).',
     l: 'Lei nº 13.709/2018 – LGPD', u: 'https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm' },
+];
+
+// Regras para visitantes (12/11/2026, pedido dele: "Regras de visitantes vamos fazer um QR Code próprio").
+// Vinham do botão "Regras visitantes" da folha POL 13 (Acesso e divulgação das políticas). Texto juntado de
+// "regras gerais da fazenda" e "Regras EPI - Visitantes" (IT-A 41 — Regras Gerais para Visitantes).
+const VISITANTES = [
+  { t: 'Antes de entrar', r: [
+    'Não entre sem autorização em locais de entrada restrita.',
+    'Receba os EPIs antes de entrar nas áreas de produção.',
+    'Não é permitida a entrada de animais domésticos.',
+  ] },
+  { t: 'EPIs obrigatórios', r: [
+    'Capacete: onde há risco de queda de objetos.',
+    'Botas de segurança ou de borracha: contra escorregões, animais e produtos químicos.',
+    'Óculos de proteção: em pulverização ou manuseio de produtos químicos.',
+    'Máscara respiratória: com poeira, fumaça ou defensivos agrícolas.',
+    'Luvas: nas áreas de preparo, aplicação, descarte e armazenamento de defensivos.',
+    'Perneira: onde há risco de cobras, escorpiões ou vegetação espinhosa.',
+  ] },
+  { t: 'Uso do EPI', r: [
+    'Use o EPI durante toda a visita, sem tirar nenhuma peça.',
+    'Não empreste nem troque EPI com outros visitantes.',
+    'Ajuste o EPI ao corpo para que ele proteja de verdade.',
+    'Se o EPI estragar ou incomodar, avise o responsável na hora.',
+  ] },
+  { t: 'Na fazenda', r: [
+    'Velocidade máxima dos veículos: 10 km/h. A poeira faz mal às pessoas e às plantas.',
+    'Não entre em áreas pulverizadas.',
+    'Não acione nenhum equipamento: pode ser perigoso.',
+    'Não toque nos frutos dentro das áreas de produção.',
+    'Proibido fumar.',
+    'Proibido comer e beber nas áreas de produção.',
+    'Use os banheiros para as necessidades e a higiene.',
+  ] },
+  { t: 'Natureza e limpeza', r: [
+    'Preserve a natureza: não cace, mate ou prenda nenhum animal.',
+    'Não jogue lixo no chão, nas áreas ou nos canais.',
+  ] },
+  { t: 'Na saída', r: [
+    'Devolva os EPIs no ponto de coleta indicado.',
+    'Higienize botas e luvas antes de devolver.',
+    'Jogue os descartáveis (máscaras, toucas) nos recipientes próprios.',
+  ] },
 ];
 
 const IC = {
@@ -130,6 +175,8 @@ async function menu() {
   try { s = secoes(await lista('docs')); } catch { /* mostra o menu mesmo assim */ }
   const b = [];
   b.push(botao('#cultura', IC.man, 'Manual de Cultura', 'Nossos valores e nossa história', 'cultura'));
+  // 12/11/2026: "Condutas e direitos" (vinha da folha POL 13) — abre o Código de Conduta (POL 11).
+  b.push(botao('#conduta', IC.pol, 'Condutas e direitos', 'Código de Conduta: deveres, direitos e convivência'));
   b.push(botao('#s/procedimentos', IC.pop, 'Procedimentos', s?.procedimentos.length ? `${s.procedimentos.length} POPs` : 'POPs'));
   for (const k of ['politicas', 'leis', 'instrucoes', 'outros']) {
     if (k === 'leis') { b.push(botao('#leis', IC.lei, 'Leis trabalhistas', 'Cada cláusula com o link da lei')); continue; }
@@ -222,6 +269,30 @@ function leis() {
      <p class="cq-nota">A empresa coloca à disposição dos colaboradores a possibilidade de solicitar vias dos documentos sempre que houver necessidade.</p>`;
 }
 
+/** Condutas e direitos: abre a POL 11 (Código de Conduta dos Colaboradores) — sempre a versão marcada no QR. */
+async function conduta() {
+  const T = 'Condutas e direitos';
+  document.title = T + ' · SAKUMA';
+  tela.innerHTML = cabecalho(T, '#') + '<p class="cq-carregando">Carregando…</p>';
+  let docs;
+  try { docs = await lista('docs'); } catch { return erro(T); }
+  const d = docs.find(x => /^POL\s*0*11$/i.test(String(x.codigo || '').trim())) || docs.find(x => /conduta/i.test(x.nome));
+  const a = d?.arquivos?.[0];
+  if (!a) { tela.innerHTML = cabecalho(T, '#') + '<p class="cq-vazio">O Código de Conduta está sendo atualizado. Em breve aparece aqui.</p>'; return; }
+  irPara('ver/' + encodeURIComponent(a.chave), true);
+}
+
+/** Regras para visitantes — tela de texto, abre pelo QR próprio (?g=vis). */
+function visitantes() {
+  document.title = 'Regras para visitantes · SAKUMA';
+  const doQr = new URLSearchParams(location.search).get('g') === 'vis';
+  const topo = doQr ? '<div class="cq-titulo"><h1>Regras para visitantes</h1></div>' : cabecalho('Regras para visitantes', '#');
+  tela.innerHTML = topo + '<p class="cq-sub">Bem-vindo à SAKUMA Agronegócios. Para a sua segurança e a de todos, siga estas regras durante a visita.</p>' +
+    `<div class="cq-leis">${VISITANTES.map(g => `<section class="cq-lei"><h2>${esc(g.t)}</h2><ul class="cq-regras">${g.r.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`).join('')}</div>
+     <div class="cq-acoes" style="margin-top:14px"><a class="cq-acao" href="#s/telefones">Telefones de emergência</a></div>
+     <p class="cq-nota">Em caso de dúvida, procure o responsável que acompanha a sua visita.</p>`;
+}
+
 /* ---------------- leitor ---------------- */
 let pdfjs = null;
 async function lib() {
@@ -307,7 +378,11 @@ function rota() {
   if (h === 'fispq') return fispq();
   if (h === 'leis' || h === 's/leis') return leis();
   if (h === 'cultura' || h === 's/manual') return cultura();
-  if (new URLSearchParams(location.search).get('g') === 'fds') return fispq();
+  if (h === 'conduta') return conduta();
+  if (h === 'visitantes') return visitantes();
+  const g = new URLSearchParams(location.search).get('g');
+  if (g === 'fds') return fispq();
+  if (g === 'vis') return visitantes();
   return menu();
 }
 window.addEventListener('hashchange', rota);
