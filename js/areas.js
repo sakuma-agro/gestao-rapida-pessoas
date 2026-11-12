@@ -483,6 +483,8 @@ export function entrarNaArea(id, tela, extra) {
     $('navTelas').hidden = true;
     $('navSub').hidden = true;
     aoTrocar('cronograma');
+    // atalho "+ Tarefa" da tela do celular (12/11/2026): já abre a tarefa nova
+    if (/(^|&)nova=1/.test(extra || '')) setTimeout(() => import('./cronograma.js').then(m => m.abrirNovaTarefaAtalho()).catch(() => {}), 50);
     return;
   }
   if (id === 'compras') {
@@ -577,9 +579,24 @@ export function entrarNaArea(id, tela, extra) {
   }
 }
 
+/* App já aberto e a pessoa toca no atalho "+ Tarefa": o launch_handler
+   (focus-existing) só traz a janela para frente e entrega o endereço aqui. */
+let logado = false;
+try {
+  window.launchQueue?.setConsumer(p => {
+    if (!logado || !p?.targetURL) return;
+    const u = new URL(p.targetURL);
+    const area = u.searchParams.get('area');
+    if (!area || !liberada(area)) return;
+    u.searchParams.delete('area');
+    entrarNaArea(area, null, u.searchParams.toString() || null);
+  });
+} catch {}
+
 /** Depois do login: a área pedida no endereço (?area=…), senão a escolha. */
 export function abrirPrimeiraTela() {
   window.grCliente = estado.cliente;
+  logado = true;
   const p = new URLSearchParams(location.search);
   const pedida = p.get('area');
   if (pedida && liberada(pedida)) {
@@ -593,6 +610,7 @@ export function abrirPrimeiraTela() {
 
 /** Ao sair: esquece a área e descarrega a moldura (com a base de outro login). */
 export function limparAreas() {
+  logado = false;
   areaAtual = null;
   molduraCarregada = false;
   molduraVistCarregada = false;

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+<!-- Atalho "+ Tarefa" do Rastro na tela do celular (12/11/2026): fundo grafite, folha de tarefa e + verde -->
+<rect width="192" height="192" fill="#1B232B"/>
+<rect x="44" y="48" width="92" height="100" rx="12" fill="#FFFFFF"/>
+<rect x="44" y="48" width="92" height="22" rx="12" fill="#84BD00"/>
+<rect x="44" y="60" width="92" height="10" fill="#84BD00"/>
+<rect x="58" y="84" width="48" height="8" rx="4" fill="#C6C6BE"/>
+<rect x="58" y="102" width="36" height="8" rx="4" fill="#C6C6BE"/>
+<rect x="58" y="120" width="42" height="8" rx="4" fill="#C6C6BE"/>
+<circle cx="132" cy="132" r="30" fill="#84BD00" stroke="#1B232B" stroke-width="6"/>
+<rect x="128" y="114" width="8" height="36" rx="3" fill="#FFFFFF"/>
+<rect x="114" y="128" width="36" height="8" rx="3" fill="#FFFFFF"/>
+</svg>

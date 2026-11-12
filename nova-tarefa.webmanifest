@@ -1,0 +1,16 @@
+{
+  "name": "+ Tarefa · Rastro",
+  "short_name": "+ Tarefa",
+  "description": "Atalho do LOP - Gestão Rápida: abre o Rastro direto no formulário de tarefa nova.",
+  "lang": "pt-BR",
+  "id": "/gestao-rapida-pessoas/nova-tarefa",
+  "start_url": "./?area=cronograma&nova=1",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#1B232B",
+  "theme_color": "#1B232B",
+  "icons": [
+    { "src": "icons/atalho-tarefa-192.v1.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/atalho-tarefa-512.v1.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

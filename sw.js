@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v653';
+const VERSAO = 'gr-v654';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -26,6 +26,7 @@ const ARQUIVOS = [
   // que precisa abrir sem internet no pátio (a base dela mora no IndexedDB).
   // Cronograma geral (28/10/2026)
   './js/cronograma.js', './css/cronograma.css', './icons/area-cronograma.v3.svg',
+  './nova-tarefa.html', './nova-tarefa.webmanifest', './icons/atalho-tarefa-96.v1.png', './icons/atalho-tarefa-192.v1.png', './icons/atalho-tarefa-512.v1.png',
   './pedido.html', './js/compras.js', './css/compras.css', './js/sinal-reclamacao.js', './css/sinal-reclamacao.css', './icons/area-compras.v1.svg', './js/evento-cultura.js', './css/evento-cultura.css', './icons/area-evento.v1.svg', './vendor/qrcode-generator.js',
   './js/areas.js', './js/alerta-emprestimo.js', './js/certificacao.js', './js/cert-caderno.js', './js/cert-fauna.js', './js/cert-energia.js', './js/cert-residuos.js', './js/cert-grasp.js', './js/cert-impressoes.js', './js/cert-banho.js', './js/cert-checklist.js', './js/cert-vistorias.js', './js/cert-cartoes.js', './js/cert-croqui.js', './vendor/wayback/wayback-core.js', './js/folhas-estoque.js', './js/sinaletica.js', './sinaletica/placas.json', './js/cert-balanco.js', './js/cert-fornecedores.js', './js/cert-melhorias.js', './js/arquivos.js', './js/nucleo.js', './js/moldura-nucleo.js',
   // Pergunte ao LOP (13/10/2026)

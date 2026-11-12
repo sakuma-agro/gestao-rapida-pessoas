@@ -46,5 +46,25 @@
       "focus-existing",
       "auto"
     ]
-  }
+  },
+  "shortcuts": [
+    {
+      "name": "Nova tarefa no Rastro",
+      "short_name": "+ Tarefa",
+      "description": "Abre o Rastro direto no formulário de tarefa nova",
+      "url": "./?area=cronograma&nova=1",
+      "icons": [
+        {
+          "src": "icons/atalho-tarefa-96.v1.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        },
+        {
+          "src": "icons/atalho-tarefa-192.v1.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
 }

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>+ Tarefa · Rastro</title>
+<!-- Atalho "+ Tarefa" na tela do celular (12/11/2026, pedido do Guilherme).
+     Aberto pelo ícone: vai direto para o Rastro com a tarefa nova aberta.
+     Aberto no navegador: mostra como pôr o ícone na tela. -->
+<link rel="manifest" href="nova-tarefa.webmanifest">
+<link rel="apple-touch-icon" href="icons/atalho-tarefa-192.v1.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="+ Tarefa">
+<meta name="theme-color" content="#1B232B">
+<script>
+  var ALVO = './?area=cronograma&nova=1';
+  var noIcone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (noIcone) location.replace(ALVO);
+</script>
+<style>
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#F4F5F2;color:#1B232B}
+  header{background:#1B232B;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:12px}
+  header img{width:44px;height:44px;border-radius:10px}
+  header b{font-size:17px} header small{display:block;color:#C6C6BE;font-size:12px}
+  main{max-width:520px;margin:0 auto;padding:16px}
+  .cx{background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  h2{font-size:15px;margin:0 0 8px;color:#51534A}
+  ol{margin:0;padding-left:20px;line-height:1.6;font-size:14px}
+  a.bt{display:block;text-align:center;background:#84BD00;color:#1B232B;font-weight:700;text-decoration:none;padding:12px;border-radius:10px;font-size:15px}
+</style>
+</head>
+<body>
+<header><img src="icons/atalho-tarefa-192.v1.png" alt=""><div><b>+ Tarefa</b><small>Atalho do Rastro · LOP - Gestão Rápida</small></div></header>
+<main>
+  <div class="cx">
+    <h2>Android (Chrome) — jeito mais rápido</h2>
+    <ol>
+      <li>Na tela do celular, <b>segure o dedo</b> no ícone do LOP - Gestão Rápida.</li>
+      <li>Aparece <b>"+ Tarefa"</b>. Segure nele e <b>arraste</b> para a tela.</li>
+    </ol>
+  </div>
+  <div class="cx">
+    <h2>iPhone (Safari) ou se o jeito acima não aparecer</h2>
+    <ol>
+      <li>Abra esta página no navegador do celular.</li>
+      <li>iPhone: toque em <b>Compartilhar</b> ⬆ → <b>Adicionar à Tela de Início</b>.<br>
+          Android: menu <b>⋮</b> → <b>Adicionar à tela inicial</b>.</li>
+      <li>Pronto: o ícone <b>+ Tarefa</b> abre o Rastro já com a tarefa nova.</li>
+    </ol>
+  </div>
+  <a class="bt" href="./?area=cronograma&nova=1">Abrir uma tarefa nova agora</a>
+</main>
+</body>
+</html>

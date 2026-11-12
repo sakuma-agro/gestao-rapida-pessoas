@@ -2557,6 +2557,14 @@ function abrirTarefa(chave) {
   };
 }
 
+/* Atalho "+ Tarefa" na tela do celular (12/11/2026, pedido dele): o ícone
+   abre o app já com o formulário de tarefa nova do Rastro, sem passar pelas
+   telas. Espera a base carregar (as pessoas do campo Responsável). */
+export async function abrirNovaTarefaAtalho() {
+  try { await Promise.race([carregarCronograma(), new Promise(ok => setTimeout(ok, 4000))]); } catch {}
+  abrirItem(null);
+}
+
 function abrirItem(chave) {
   if (chave) return abrirTarefa(chave);
   const d = dialogo();
