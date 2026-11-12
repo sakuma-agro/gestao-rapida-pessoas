@@ -372,6 +372,9 @@ const docAtrasado = d => { if (foraDeUso(d)) return false; const p = proximaDoc(
 /** Situação mostrada: no AN por fazenda vem das fazendas (Pendente se alguma está sem evidência ou vencida);
     nos demais, a situação escolhida no cadastro. */
 function sitDoc(d) {
+  /* 12/11/2026: documento com vencimento gravado e ainda dentro do prazo não fica "Pendente" (AN 24 mostrava
+     Pendente com validade até 04/03/2027) — a data manda. */
+  if (!d.por_fazenda && d.situacao === 'Pendente' && d.vence_em && d.vence_em >= hoje()) return 'Em dia';
   if (!d.por_fazenda || foraDeUso(d)) return d.situacao;
   const its = itensDe(d);
   if (!its.length) return d.situacao;
@@ -1345,7 +1348,9 @@ function formEvidencia(d, e, itemId = null, dataSug = null) {
         item_id: $('evItem')?.value || null };
       if (!linha.data) return erroDlg(rd.entrega ? 'Informe a data da devolução destes documentos.' : 'Informe a data.');
       if (rd.entrega && $('evValid')?.value && $('evValid').value <= linha.data) return erroDlg('A próxima devolução precisa ser depois desta.');
-      if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
+      // 12/11/2026: gravou um vencimento futuro num documento "Pendente" → passa para "Em dia".
+  if (linha.situacao === 'Pendente' && linha.vence_em && linha.vence_em >= hoje()) linha.situacao = 'Em dia';
+  if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (!e && !anx.mudou && !linha.link) return erroDlg('Anexe o arquivo ou cole o link da evidência.');
       const salvo = await salvar('cert_evidencias', e, e ? { ...linha, atualizado_por: quem() } : { ...linha, criado_por: quem() }, S.evid, 'evOk');
       if (!salvo) return;
@@ -1554,7 +1559,9 @@ function formItem(d, it) {
         observacao: so($('fzObs').value) || null, atualizado_em: new Date().toISOString() };
       if (rotDatas(d).entrega) { linha.ultima_data = $('fzUlt').value || null; linha.aguardando_data = $('fzAg').value || null; }
       if (!linha.fazenda_id && !linha.local) return erroDlg('Escolha a fazenda ou, num item geral (fornecedor, documento), preencha o Local / item.');
-      if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
+      // 12/11/2026: gravou um vencimento futuro num documento "Pendente" → passa para "Em dia".
+  if (linha.situacao === 'Pendente' && linha.vence_em && linha.vence_em >= hoje()) linha.situacao = 'Em dia';
+  if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https://');
       if (await salvar('cert_doc_itens', it, linha, S.itens, 'fzOk')) { salvarCaixa(); refazFazendas(d); }
     });
     $('fzApagar')?.addEventListener('click', async () => {
@@ -1915,6 +1922,8 @@ async function gravarDocumento(d) {
     dia_vencimento: (n => n >= 1 && n <= 31 ? Math.round(n) : null)(Number($('cedDia').value)),
     aviso_dias: $('cedAviso').value !== '' ? Math.max(0, Math.round(Number($('cedAviso').value))) : null,
   };
+  // 12/11/2026: gravou um vencimento futuro num documento "Pendente" → passa para "Em dia".
+  if (linha.situacao === 'Pendente' && linha.vence_em && linha.vence_em >= hoje()) linha.situacao = 'Em dia';
   if (linha.link && !linkOk(linha.link)) return erroDlg('O link precisa começar com https:// — copie pelo botão Compartilhar › Copiar link do OneDrive.');
   if (!linha.codigo || !linha.nome) return erroDlg('Informe o código e o nome do documento.');
   if (S.docs.some(x => x.id !== d?.id && so(x.codigo).toLowerCase() === linha.codigo.toLowerCase()))
