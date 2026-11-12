@@ -20,7 +20,7 @@ import * as nucleo from './nucleo.js';
 import { mostrar } from './jornada-relatorios.js';
 import { baixarXlsx } from './excel.js';
 import { campoAnexos, donosComArquivo, listarArquivos, abrirArquivo, urlDoArquivo } from './arquivos.js';
-import { abrirModulo } from './acesso.js';
+import { abrirModulo, acesso } from './acesso.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -51,7 +51,11 @@ const ETAPAS = {
 };
 const FIM = new Set(['ENCERRADA', 'CONCLUÍDA', 'ARQUIVADA', 'TRATADO']);
 const NOME_NAT = { NC: 'Não conformidade', MELHORIA: 'Melhoria', FEEDBACK: 'Reclamação / sugestão' };
-const TIPOS_FB = ['RECLAMAÇÃO', 'SUGESTÃO', 'ELOGIO'];
+const TIPOS_FB_BASE = ['RECLAMAÇÃO', 'SUGESTÃO', 'ELOGIO'];
+// 12/11/2026: DENÚNCIA (assédio moral, sexual, discriminação) — chega pelo QR (FORM 042) e só os admins
+// veem (RLS em supabase/cert-denuncias.sql). Só aparece para escolher a quem pode ver.
+const tiposFb = () => acesso?.admin ? [...TIPOS_FB_BASE, 'DENÚNCIA'] : TIPOS_FB_BASE;
+const COR_FB = t => t === 'DENÚNCIA' || t === 'RECLAMAÇÃO' ? 'perigo' : t === 'ELOGIO' ? 'ativo' : 'neutra';
 const VIAS = ['AUDITORIA INTERNA', 'AUDITORIA EXTERNA', 'QR CODE (JOTFORM)', 'QUADRO', 'WHATSAPP', 'DIGITAL', 'VIA PAPEL', 'CAIXA DE SUGESTÕES', 'CHECK LIST'];
 const FAZENDAS = ['FACA', 'LOTE 35 PADAP', 'MORRO BRANCO', 'TRÊS RIACHOS', 'QUEBRA COCÃO'];
 const PRIORIDADES = ['URGENTE', 'ALTA', 'MÉDIA', 'BAIXA'];
@@ -481,7 +485,7 @@ function desenharFeedbacks() {
     </div>
     ${L.length ? `<div class="ac-rola" style="margin-top:10px"><table class="dc-planilha bm-tab"><thead><tr><th class="ce">Data</th><th>Tipo</th><th>O que foi dito</th><th>Fazenda</th><th>Via</th><th>Quem</th>${fech ? '<th class="ce">Fechado em</th><th>Conclusão</th>' : '<th>Situação</th>'}<th></th></tr></thead><tbody>
       ${L.map(c => { const g = gerado(c); const desc = c.descricao && so(c.descricao) !== so(c.titulo) && !so(c.descricao).startsWith(so(c.titulo).replace(/…$/, '')) ? c.descricao : '';
-        return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')}</td><td><b>${esc(c.titulo)}</b>${desc ? `<br><small class="dica">${esc(desc)}</small>` : ''}</td>
+        return `<tr><td class="ce">${br(c.data_abertura)}</td><td>${tag(c.tipo === 'DENÚNCIA' ? '🔒 DENÚNCIA' : c.tipo, COR_FB(c.tipo))}</td><td><b>${esc(c.titulo)}</b>${desc ? `<br><small class="dica">${esc(desc)}</small>` : ''}</td>
         <td>${esc(c.fazenda || '—')}</td><td>${esc(c.via || '')}</td><td>${esc(c.solicitante || 'Anônimo')}</td>
         ${fech ? `<td class="ce">${br(c.data_encerramento)}</td>` : `<td>${tag(c.etapa, COR_ETAPA(c.etapa))}</td>`}
         ${!fech ? '' : `<td class="mc-fb-conc">${c.etapa === 'TRATADO' ? `${esc(c.conclusao || (g ? '' : '—'))}${g ? `${c.conclusao ? '<br>' : ''}virou <button type="button" class="ce-link" data-caso="${esc(g.id)}">${esc(NOME_NAT[g.natureza])}</button>` : ''}${c.comunicado_como ? `<br><small class="dica">Passado aos funcionários: ${esc(c.comunicado_como)}${c.comunicado_detalhe ? ' — ' + esc(c.comunicado_detalhe) : ''}</small>` : ''}` : '—'}</td>`}
@@ -677,8 +681,8 @@ function fichaAbertura(a, caixaId) {
     const pintar = () => {
       const vazia = d.querySelector('input[name=abVaz]:checked')?.value === '1';
       $('abQtdC').hidden = vazia; $('abMais').hidden = vazia;
-      $('abPapeis').innerHTML = (vazia ? '' : papeis.map(c => `<div class="cx-pap cx-pap-ok">${tag(c.tipo, c.tipo === 'RECLAMAÇÃO' ? 'perigo' : c.tipo === 'ELOGIO' ? 'ativo' : 'neutra')} ${esc(c.titulo)} <button type="button" class="ce-link" data-caso="${esc(c.id)}">abrir</button></div>`).join('')
-        + novos.map((n, i) => `<div class="cx-pap"><select data-np="${i}" data-k="tipo">${opcoes(TIPOS_FB, n.tipo)}</select>
+      $('abPapeis').innerHTML = (vazia ? '' : papeis.map(c => `<div class="cx-pap cx-pap-ok">${tag(c.tipo === 'DENÚNCIA' ? '🔒 DENÚNCIA' : c.tipo, COR_FB(c.tipo))} ${esc(c.titulo)} <button type="button" class="ce-link" data-caso="${esc(c.id)}">abrir</button></div>`).join('')
+        + novos.map((n, i) => `<div class="cx-pap"><select data-np="${i}" data-k="tipo">${opcoes(tiposFb(), n.tipo)}</select>
           <input type="text" data-np="${i}" data-k="texto" value="${esc(n.texto || '')}" placeholder="O que está escrito no papel">
           <button class="btn mini" type="button" data-npx="${i}">✕</button></div>`).join(''));
       d.querySelectorAll('[data-npx]').forEach(b => b.addEventListener('click', () => { lerNovos(); novos.splice(Number(b.dataset.npx), 1); pintar(); }));
@@ -759,7 +763,8 @@ function docAberturas(ano) {
 let anexos = null;
 /* Classificação (26/10/2026, pedido dele): uma melhoria pode virar sugestão ou
    reclamação, e vice-versa. Para FEEDBACK o valor é o tipo (RECLAMAÇÃO…). */
-const CLASSES = [['NC', 'Não conformidade'], ['MELHORIA', 'Melhoria'], ['RECLAMAÇÃO', 'Reclamação'], ['SUGESTÃO', 'Sugestão'], ['ELOGIO', 'Elogio']];
+const CLASSES_BASE = [['NC', 'Não conformidade'], ['MELHORIA', 'Melhoria'], ['RECLAMAÇÃO', 'Reclamação'], ['SUGESTÃO', 'Sugestão'], ['ELOGIO', 'Elogio']];
+const classes = () => acesso?.admin ? [...CLASSES_BASE, ['DENÚNCIA', 'Denúncia (assédio)']] : CLASSES_BASE;
 const natDaClasse = k => k === 'NC' || k === 'MELHORIA' ? k : 'FEEDBACK';
 function etapaNaNova(etapa, natNova) {
   const l = ETAPAS[natNova];
@@ -780,15 +785,15 @@ function ficha(c, natNovo, pre) {
   const ehNC = nat === 'NC', ehMe = nat === 'MELHORIA', ehFb = nat === 'FEEDBACK';
   const classe = ehFb ? (v.tipo || 'SUGESTÃO') : nat;
   dialogo(`<div class="barra entre" style="margin:0 0 6px"><h3 style="margin:0">${c ? esc(c.titulo) : 'Novo — ' + esc(NOME_NAT[nat])}</h3>
-      <label class="mc-classe mc-classe-${ehNC ? 'nc' : ehMe ? 'me' : 'fb'}" title="Mudar a classificação">É uma <select id="mcClasse">${opcoes(CLASSES, classe)}</select></label></div>
+      <label class="mc-classe mc-classe-${ehNC ? 'nc' : ehMe ? 'me' : 'fb'}" title="Mudar a classificação">É uma <select id="mcClasse">${opcoes(classes(), classe)}</select></label></div>
     <div class="aviso erro" id="mcErro" hidden></div>
-    ${mudouClasse ? `<div class="aviso info">Classificação muda de <b>${esc(c.natureza === 'FEEDBACK' ? (c.tipo || 'Reclamação / sugestão').toLowerCase() : NOME_NAT[c.natureza].toLowerCase())}</b> para <b>${esc((CLASSES.find(x => x[0] === classe) || [, ''])[1].toLowerCase())}</b> ao salvar.</div>` : ''}
+    ${mudouClasse ? `<div class="aviso info">Classificação muda de <b>${esc(c.natureza === 'FEEDBACK' ? (c.tipo || 'Reclamação / sugestão').toLowerCase() : NOME_NAT[c.natureza].toLowerCase())}</b> para <b>${esc((classes().find(x => x[0] === classe) || [, ''])[1].toLowerCase())}</b> ao salvar.</div>` : ''}
     <div class="mc-etapas" role="radiogroup" aria-label="Etapa">${ETAPAS[nat].map((e, i) => `<button type="button" class="mc-etapa${e === v.etapa ? ' atual' : ''}${ETAPAS[nat].indexOf(v.etapa) > i ? ' feita' : ''}" data-etapa="${esc(e)}"><b>${i + 1}</b>${esc(e[0] + e.slice(1).toLowerCase())}</button>`).join('')}</div>
     <p class="dica mc-etapa-dica">Para mudar de etapa: clique na etapa acima e depois em <b>Salvar</b> — ou use os botões ▸ / Concluir direto na lista.</p>
     <fieldset class="cp-fs"><legend>${ehFb ? 'O que chegou' : 'Identificação'}</legend>
       <div class="grade">
         <label class="campo" style="grid-column:span 2">${ehFb ? 'Resumo' : 'Título'} <input type="text" id="mcTit" value="${esc(v.titulo || '')}"></label>
-        ${ehFb ? `<label class="campo">Tipo <select id="mcTipo">${opcoes(TIPOS_FB, v.tipo)}</select></label>` : ''}
+        ${ehFb ? `<label class="campo">Tipo <select id="mcTipo">${opcoes(tiposFb(), v.tipo)}</select></label>` : ''}
         <label class="campo">Abertura <input type="date" id="mcAb" value="${esc(String(v.data_abertura || '').slice(0, 10))}"></label>
         <label class="campo">Via <select id="mcVia">${opcoes(VIAS, v.via, '—')}</select></label>
         ${ehFb ? '' : `<label class="campo">Prioridade <select id="mcPri">${opcoes(PRIORIDADES, v.prioridade, '—')}</select></label>`}

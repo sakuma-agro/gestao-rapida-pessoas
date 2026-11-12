@@ -10,14 +10,18 @@
 // A mesma resposta não entra duas vezes (origem_externa = jotform:<submissionID>).
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+// 12/11/2026: novo tipo DENÚNCIA (assédio moral, sexual, discriminação…) — pedido do Guilherme.
+// Entra como prioridade URGENTE e, pelo RLS (supabase/cert-denuncias.sql), só os admins do app veem.
 
 const FORM_ID = '243023601071642';
-const TIPOS = ['RECLAMAÇÃO', 'SUGESTÃO', 'ELOGIO'];
+const TIPOS = ['RECLAMAÇÃO', 'SUGESTÃO', 'ELOGIO', 'DENÚNCIA'];
 const FAZENDAS: [RegExp, string][] = [
   [/faca/i, 'FACA'], [/lote\s*35/i, 'LOTE 35 PADAP'], [/tr[eê]s\s*riachos/i, 'TRÊS RIACHOS'],
   [/morro\s*branco/i, 'MORRO BRANCO'], [/quebra\s*coc[aã]o/i, 'QUEBRA COCÃO'],
 ];
 const semAc = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+/** "DENÚNCIA (assédio, …)" também conta como DENÚNCIA (nome do tipo seguido de parênteses). */
+const ehTipo = (v: string, t: string) => { const a = semAc(v), b = semAc(t); return a === b || (a.startsWith(b + ' (') && a.length < 80); };
 const resp = (t: string, s = 200) => new Response(t, { status: s, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 
 /** Os valores das respostas, venham de rawRequest (JSON) ou de "pretty". */
@@ -59,10 +63,10 @@ Deno.serve(async (req: Request) => {
 
   if (campos.formID && String(campos.formID) !== FORM_ID) return resp('formulário errado', 400);
   const vals = valores(campos);
-  const tipo = TIPOS.find(t => vals.some(v => semAc(v) === semAc(t))) || 'SUGESTÃO';
+  const tipo = TIPOS.find(t => vals.some(v => ehTipo(v, t))) || 'SUGESTÃO';
   const valFaz = vals.find(v => FAZENDAS.some(([re]) => re.test(v)) && v.length < 40);
   const fazenda = valFaz ? FAZENDAS.find(([re]) => re.test(valFaz))![1] : null;
-  const texto = vals.filter(v => v !== valFaz && !TIPOS.some(t => semAc(v) === semAc(t)))
+  const texto = vals.filter(v => v !== valFaz && !TIPOS.some(t => ehTipo(v, t)))
     .sort((a, b) => b.length - a.length)[0] || '';
   if (!texto) return resp('sem texto', 200);   // nada a registrar (não faz o JotForm tentar de novo)
 
@@ -70,7 +74,7 @@ Deno.serve(async (req: Request) => {
   const titulo = texto.length > 90 ? texto.slice(0, 87).trimEnd() + '…' : texto;
   const sid = campos.submissionID || campos.submission_id || '';
   const { error } = await sb.from('cmc_casos').insert({
-    natureza: 'FEEDBACK', tipo, titulo, descricao: texto, via: 'QR CODE (JOTFORM)',
+    natureza: 'FEEDBACK', tipo, titulo, prioridade: tipo === 'DENÚNCIA' ? 'URGENTE' : null, descricao: texto, via: 'QR CODE (JOTFORM)',
     fazenda, local: valFaz || null, solicitante: null, etapa: 'RECEBIDO', data_abertura: hoje,
     origem_externa: sid ? 'jotform:' + sid : null, criado_por: 'JotForm (QR Code)',
   });

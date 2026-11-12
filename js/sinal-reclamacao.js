@@ -108,6 +108,7 @@ const ICONE = {
   camera: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="13" y="5" width="22" height="38" rx="4"/><path d="M20 37h8"/><path d="M18 14h4M18 14v4M30 14h-4M30 14v4M18 28h4M18 28v-4M30 28h-4M30 28v-4"/></svg>`,
   lista: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="7" width="30" height="34" rx="3"/><path d="M16 17l2 2 4-4M26 17h7M16 27l2 2 4-4M26 27h7"/></svg>`,
   enviar: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 23 42 8 30 41l-7-14z"/><path d="M23 27 42 8"/></svg>`,
+  escudo: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5 9 11v11c0 9.5 6.4 17.4 15 20 8.6-2.6 15-10.5 15-20V11z"/><path d="M24 16v10"/><circle cx="24" cy="31.5" r="1.3" fill="currentColor"/></svg>`,
   cadeado: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="21" width="28" height="20" rx="3"/><path d="M16 21v-6a8 8 0 0 1 16 0v6"/><circle cx="24" cy="31" r="2" fill="currentColor"/></svg>`,
 };
 
@@ -124,20 +125,21 @@ export async function htmlPlaca() {
     .rq-folha{width:210mm;height:296mm;box-sizing:border-box;padding:6mm 11mm 5mm;margin:0 auto;background:#fff;color:${GRAFITE};
       font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;overflow:hidden;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .rp-logo{height:13mm;margin-bottom:2.5mm}
+    .rp-logo{height:12mm;margin-bottom:2mm}
     .rp-faixa{align-self:stretch;margin:0 -11mm;background:${GRAFITE};border-top:1.4mm solid ${VERDE};border-bottom:1.4mm solid ${VERDE};
-      text-align:center;padding:3.5mm 0 4mm;position:relative}
+      text-align:center;padding:3mm 0 3.4mm;position:relative}
     .rp-faixa::after{content:"";position:absolute;left:50%;bottom:-5.2mm;margin-left:-4mm;border:4mm solid transparent;border-top-color:${VERDE};border-bottom:0}
     .rp-k{color:#fff;font-size:15pt;font-weight:700;letter-spacing:2.6mm}
     .rp-faixa h1{color:${VERDE};font-size:40pt;margin:1mm 0 0;line-height:1;letter-spacing:-.5pt}
     .rp-sub{color:#fff;font-size:12pt;margin-top:1.5mm}
-    .rp-selos{display:flex;justify-content:center;gap:2.5mm;margin:7mm 0 0;flex-wrap:nowrap}
-    .rp-selo{display:inline-flex;align-items:center;gap:1.6mm;border:.6mm solid ${GRAFITE};border-radius:20mm;padding:1.5mm 3.6mm;font-size:11pt;font-weight:800;white-space:nowrap}
-    .rp-selo svg{width:5.8mm;height:5.8mm}
+    .rp-selos{display:flex;justify-content:center;gap:2mm;margin:6.5mm 0 0;flex-wrap:nowrap}
+    .rp-selo{display:inline-flex;align-items:center;gap:1.4mm;border:.6mm solid ${GRAFITE};border-radius:20mm;padding:1.4mm 3mm;font-size:10pt;font-weight:800;white-space:nowrap}
+    .rp-selo svg{width:5.2mm;height:5.2mm}
+    .rp-selo.d{background:${GRAFITE};color:#fff}
     .rp-selo.v{background:${VERDE};border-color:${VERDE}}
-    .rp-meio{display:flex;align-items:center;gap:6mm;margin-top:8mm}
+    .rp-meio{display:flex;align-items:center;gap:6mm;margin-top:6mm}
     .rp-qrcol{display:flex;flex-direction:column;align-items:center}
-    .rp-qrbox{position:relative;width:96mm;height:96mm;padding:3.5mm;box-sizing:border-box}
+    .rp-qrbox{position:relative;width:80mm;height:80mm;padding:3.5mm;box-sizing:border-box}
     .rp-qrbox svg{width:100%;height:100%;display:block}
     .rp-canto{position:absolute;width:14mm;height:14mm;border:1.6mm solid ${VERDE}}
     .rp-canto.a{top:0;left:0;border-right:0;border-bottom:0;border-top-left-radius:5mm}
@@ -148,35 +150,42 @@ export async function htmlPlaca() {
     .rp-cap small{display:block;font-size:10pt;font-weight:400;color:${CINZA};margin-top:.5mm}
     .rp-seta{font-size:30pt;color:${VERDE_ESC};font-weight:800;margin-bottom:12mm}
     .rp-celcol{display:flex;flex-direction:column;align-items:center}
-    .rp-cel{width:52mm;border:1.3mm solid ${GRAFITE};border-radius:6mm;padding:2.6mm 1.8mm 3.2mm;background:${GRAFITE};box-sizing:border-box}
+    .rp-cel{width:44mm;border:1.3mm solid ${GRAFITE};border-radius:6mm;padding:2.6mm 1.8mm 3.2mm;background:${GRAFITE};box-sizing:border-box}
     .rp-fala{display:block;width:10mm;height:1mm;border-radius:1mm;background:#4A535C;margin:0 auto 2mm}
     .rp-tel{position:relative;background:#fff;border-radius:2.6mm}
     .rp-tel img{display:block;width:100%;border-radius:2.6mm}
     .rp-mk{position:absolute;left:-6mm;transform:translateY(-50%);width:8.5mm;height:8.5mm;border-radius:50%;background:${VERDE};color:${GRAFITE};
       font-weight:800;font-size:13pt;display:flex;align-items:center;justify-content:center;border:.6mm solid ${GRAFITE};box-shadow:0 0 0 .7mm #fff}
     .rp-celcol .rp-cap{color:${VERDE_ESC}}
-    .rp-h2{align-self:stretch;font-size:13pt;margin:7mm 0 4mm;padding-left:2.5mm;border-left:1.6mm solid ${VERDE};line-height:1.1}
+    .rp-h2{align-self:stretch;font-size:13pt;margin:5mm 0 3.5mm;padding-left:2.5mm;border-left:1.6mm solid ${VERDE};line-height:1.1}
     .rp-passos{align-self:stretch;display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
-    .rp-passo{background:#F3F8E6;border-radius:3mm;padding:3mm 2.5mm 3mm;text-align:center;display:flex;flex-direction:column;align-items:center;position:relative}
+    .rp-passo{background:#F3F8E6;border-radius:3mm;padding:2.5mm 2.5mm 2.5mm;text-align:center;display:flex;flex-direction:column;align-items:center;position:relative}
     .rp-n{position:absolute;top:-3mm;left:-1.5mm;width:8mm;height:8mm;border-radius:50%;background:${VERDE};color:${GRAFITE};border:.6mm solid ${GRAFITE};
       display:flex;align-items:center;justify-content:center;font-size:12pt}
     .rp-ic svg{width:10mm;height:10mm;color:${GRAFITE}}
     .rp-t{font-size:11pt;margin-top:1mm;line-height:1.15}
     .rp-passo em{font-style:normal;font-size:9.3pt;color:${CINZA};margin-top:1mm;line-height:1.25}
-    .rp-depois{align-self:stretch;margin-top:4mm;border:.6mm solid ${GRAFITE};border-radius:3mm;padding:2.5mm 4mm;font-size:10.3pt;display:flex;gap:3mm;align-items:center}
+    .rp-den{align-self:stretch;margin-top:4mm;background:${GRAFITE};color:#fff;border-radius:3mm;padding:3mm 4mm;display:grid;grid-template-columns:12mm 1fr auto;gap:3.5mm;align-items:center;font-size:10pt;line-height:1.3}
+    .rp-den .ic svg{width:12mm;height:12mm;color:${VERDE}}
+    .rp-den b.t{display:block;color:${VERDE};font-size:13pt;margin-bottom:.6mm}
+    .rp-den .fora{border-left:.4mm solid #4A535C;padding-left:3.5mm;font-size:9.3pt;white-space:nowrap}
+    .rp-den .fora b{color:${VERDE}}
+    .rp-adm{align-self:stretch;margin-top:3mm;background:${VERDE};color:${GRAFITE};border-radius:3mm;padding:2.6mm;text-align:center;font-size:14pt;font-weight:800}
+    .rp-depois{align-self:stretch;margin-top:3mm;border:.6mm solid ${GRAFITE};border-radius:3mm;padding:2mm 4mm;font-size:10pt;display:flex;gap:3mm;align-items:center}
     .rp-depois b.i{flex:none;width:9mm;height:9mm;border-radius:50%;background:${GRAFITE};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13pt}
-    .rq-pe{margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end;border-top:1.4mm solid ${VERDE};padding-top:2.5mm;font-size:9pt;color:${CINZA}}
+    .rq-pe{margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end;border-top:.4mm solid #E0E1DA;padding-top:2mm;font-size:9pt;color:${CINZA}}
     .rq-pe img{height:8.5mm}
     @media print{.rq-folha{margin:0}}
   </style>
   <article class="rq-folha">
     <img class="rp-logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-    <div class="rp-faixa"><div class="rp-k">SUA OPINIÃO</div><h1>FAZ DIFERENÇA</h1><div class="rp-sub">Reclamações, sugestões e elogios pelo celular</div></div>
+    <div class="rp-faixa"><div class="rp-k">SUA OPINIÃO</div><h1>FAZ DIFERENÇA</h1><div class="rp-sub">Reclamações, sugestões, elogios e denúncias pelo celular</div></div>
     <div class="rp-selos">
-      <span class="rp-selo v">${ICONE.cadeado} 100% ANÔNIMO · NÃO PEDE NOME</span>
+      <span class="rp-selo v">${ICONE.cadeado} 100% ANÔNIMO · SEM NOME</span>
       <span class="rp-selo">${ICONE.reclamacao} Reclamação</span>
       <span class="rp-selo">${ICONE.sugestao} Sugestão</span>
       <span class="rp-selo">${ICONE.elogio} Elogio</span>
+      <span class="rp-selo d">${ICONE.escudo} Denúncia</span>
     </div>
     <div class="rp-meio">
       <div class="rp-qrcol">
@@ -194,13 +203,18 @@ export async function htmlPlaca() {
     <h2 class="rp-h2">Como enviar, em 4 passos</h2>
     <div class="rp-passos">
       ${passo(1, ICONE.camera, 'Aponte a câmera', 'E toque no link que aparecer na tela')}
-      ${passo(2, ICONE.lista, 'Escolha o tipo', 'Reclamação, Sugestão ou Elogio')}
+      ${passo(2, ICONE.lista, 'Escolha o tipo', 'Reclamação, Sugestão, Elogio ou Denúncia')}
       ${passo(3, ICONE.reclamacao, 'Fazenda e texto', 'Marque a fazenda e conte o que aconteceu: o quê, onde e quando')}
       ${passo(4, ICONE.enviar, 'Toque em Enviar', 'Chega na hora no escritório. Ninguém sabe quem enviou')}
     </div>
+    <div class="rp-den"><span class="ic">${ICONE.escudo}</span>
+      <span><b class="t">Sofreu ou viu assédio?</b>Assédio moral, assédio sexual, discriminação ou ameaça: escolha <b>DENÚNCIA</b>.
+        Só a gerência e a diretoria leem, com sigilo. Quem denuncia de boa-fé não pode ser punido.</span>
+      <span class="fora">Fora da empresa:<br><b>180</b> Central da Mulher<br><b>100</b> Direitos Humanos<br><b>190</b> Polícia, em perigo</span></div>
     <div class="rp-depois"><b class="i">✓</b><span><b>Depois:</b> o escritório analisa, resolve e dá o retorno a todos no DDS, reunião, quadro ou WhatsApp.
       <b>Emergência ou acidente não é por aqui</b> — avise na hora o encarregado.</span></div>
-    <footer class="rq-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão<br>Sem celular? Fale com o escritório ou use a caixa de sugestões.</span>
+    <div class="rp-adm">Dúvidas ou sem celular? Administrativo · (34) 9 9646-3296</div>
+    <footer class="rq-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação, sugestão e denúncia<br>Também pode usar a caixa de sugestões.</span>
       <img src="img/lop-marca.png" alt="LOP"></footer>
   </article>`;
 }
@@ -219,20 +233,21 @@ export async function htmlInstrucao() {
     .ri-folha{width:210mm;height:296mm;overflow:hidden;box-sizing:border-box;padding:6mm 11mm 5mm;margin:0 auto;background:#fff;color:${GRAFITE};
       font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;font-size:10pt;line-height:1.28;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .ri-logo{height:11mm;align-self:center;margin-bottom:2mm}
+    .ri-logo{height:10mm;align-self:center;margin-bottom:1.6mm}
     .ri-faixa{margin:0 -11mm;background:${GRAFITE};border-top:1.4mm solid ${VERDE};border-bottom:1.4mm solid ${VERDE};
       text-align:center;padding:3mm 0 3.2mm;position:relative}
     .ri-faixa::after{content:"";position:absolute;left:50%;bottom:-5.2mm;margin-left:-4mm;border:4mm solid transparent;border-top-color:${VERDE};border-bottom:0}
     .ri-k{color:#fff;font-size:12pt;font-weight:700;letter-spacing:2.2mm}
     .ri-faixa h1{color:${VERDE};font-size:27pt;margin:1mm 0 0;line-height:1;letter-spacing:-.3pt}
-    .ri-selos{display:flex;justify-content:center;gap:3mm;margin:5.5mm 0 0;flex-wrap:wrap}
-    .ri-selo{display:inline-flex;align-items:center;gap:1.8mm;border:.6mm solid ${GRAFITE};border-radius:20mm;padding:1.4mm 4mm;font-size:10.5pt;font-weight:800}
+    .ri-selos{display:flex;justify-content:center;gap:2mm;margin:5.5mm 0 0;flex-wrap:nowrap}
+    .ri-selo{display:inline-flex;align-items:center;gap:1.5mm;border:.6mm solid ${GRAFITE};border-radius:20mm;padding:1.3mm 3.2mm;font-size:10pt;font-weight:800;white-space:nowrap}
     .ri-selo svg{width:5.5mm;height:5.5mm}
     .ri-selo.v{background:${VERDE};border-color:${VERDE}}
+    .ri-selo.d{background:${GRAFITE};color:#fff}
     .ri-h2{font-size:12.5pt;margin:3.5mm 0 2mm;padding-left:2.5mm;border-left:1.6mm solid ${VERDE};line-height:1.1}
     .ri-h2 small{font-weight:400;color:${CINZA};font-size:9.5pt}
     /* passos sobre as telas */
-    .ri-passos{display:grid;grid-template-columns:44mm 46mm 1fr;gap:7mm;align-items:start}
+    .ri-passos{display:grid;grid-template-columns:40mm 39mm 1fr;gap:7mm;align-items:start}
     .ri-col{display:flex;flex-direction:column;gap:2.5mm}
     .ri-qr{border:.6mm solid ${GRAFITE};border-radius:3mm;padding:2.5mm;position:relative}
     .ri-qr svg{width:100%;height:auto;display:block}
@@ -247,7 +262,8 @@ export async function htmlInstrucao() {
     .ri-n{width:7mm;height:7mm;border-radius:50%;background:${VERDE};color:${GRAFITE};border:.5mm solid ${GRAFITE};display:flex;align-items:center;justify-content:center;font-size:11pt}
     .ri-leg span b{display:block;font-size:10.5pt}
     .ri-leg em{display:block;font-style:normal;color:${CINZA};font-size:9.3pt;margin-top:.4mm}
-    .ri-ex{display:grid;grid-template-columns:1fr 2fr;gap:4mm;margin-top:2.5mm}
+    .ri-ex{display:grid;grid-template-columns:1fr 1.5fr;gap:3mm;margin-top:1mm}
+    .ri-c3{display:grid;grid-template-columns:48mm 1fr;gap:5mm;align-items:center}
     .ri-ex div{border:.4mm solid #C9CBC2;border-radius:2mm;padding:1.8mm 3mm;font-size:9.3pt;display:flex;flex-direction:column;justify-content:center}
     .ri-ex .bom{border:.7mm solid ${VERDE_ESC}}
     .ri-ex b{display:flex;align-items:center;gap:1.5mm;font-size:9.5pt}
@@ -264,8 +280,12 @@ export async function htmlInstrucao() {
     .ri-caixa li{padding-left:5mm;position:relative;margin:.4mm 0}
     .ri-caixa li::before{content:"✓";position:absolute;left:0;color:${VERDE_ESC};font-weight:800}
     .ri-caixa.c li::before{content:"•";color:${GRAFITE}}
-    .ri-alerta{margin-top:3mm;border:.8mm solid ${GRAFITE};border-radius:2.5mm;padding:2.5mm 3.5mm;font-size:9.8pt;display:flex;gap:3mm;align-items:center}
+    .ri-den{margin-top:3mm;background:${GRAFITE};color:#fff;border-radius:2.5mm;padding:2.3mm 3.5mm;font-size:9.6pt;display:flex;gap:3mm;align-items:center;line-height:1.3}
+    .ri-den .ic svg{width:9mm;height:9mm;color:${VERDE};display:block}
+    .ri-den b{color:${VERDE}}.ri-den b.t{display:block;font-size:11pt}
+    .ri-alerta{margin-top:2.5mm;border:.8mm solid ${GRAFITE};border-radius:2.5mm;padding:2.5mm 3.5mm;font-size:9.8pt;display:flex;gap:3mm;align-items:center}
     .ri-alerta .x{flex:none;width:9mm;height:9mm;border-radius:50%;background:${GRAFITE};color:#fff;font-weight:800;font-size:14pt;display:flex;align-items:center;justify-content:center}
+    .ri-adm{margin-top:3.5mm;background:${VERDE};color:${GRAFITE};border-radius:2.5mm;padding:2.4mm;text-align:center;font-size:13pt;font-weight:800}
     .ri-pe{margin-top:auto;padding-top:3mm;display:flex;justify-content:space-between;align-items:flex-end;font-size:8.8pt;color:${CINZA};border-top:.4mm solid #E0E1DA}
     .ri-pe img{height:8mm}
     @media print{.ri-folha{margin:0}}
@@ -274,10 +294,11 @@ export async function htmlInstrucao() {
     <img class="ri-logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
     <div class="ri-faixa"><div class="ri-k">COMO USAR O QR CODE DE</div><h1>RECLAMAÇÃO E SUGESTÃO</h1></div>
     <div class="ri-selos">
-      <span class="ri-selo v">${ICONE.cadeado} 100% ANÔNIMO · NÃO PEDE NOME</span>
+      <span class="ri-selo v">${ICONE.cadeado} 100% ANÔNIMO · SEM NOME</span>
       <span class="ri-selo">${ICONE.reclamacao} Reclamação</span>
       <span class="ri-selo">${ICONE.sugestao} Sugestão</span>
       <span class="ri-selo">${ICONE.elogio} Elogio</span>
+      <span class="ri-selo d">${ICONE.escudo} Denúncia</span>
     </div>
 
     <h2 class="ri-h2">Em 4 passos, pelo celular <small>· leva menos de 2 minutos</small></h2>
@@ -290,43 +311,51 @@ export async function htmlInstrucao() {
         <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
           <img src="img/jotform-042-tela1.jpg" alt="Início do formulário: tipo de feedback e local">
           <span class="ri-mk" style="top:71.5%">2</span><span class="ri-mk" style="top:91%">2</span></div></div>
-        ${leg(2, 'Tipo e fazenda', 'Reclamação, Sugestão ou Elogio e a fazenda onde aconteceu.')}
+        ${leg(2, 'Tipo e fazenda', 'O tipo e a fazenda onde aconteceu.')}
       </div>
       <div class="ri-col">
-        <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
-          <img src="img/jotform-042-tela2.jpg" alt="Final do formulário: campo para escrever e botão Enviar">
-          <span class="ri-mk" style="top:36%">3</span><span class="ri-mk" style="top:80%">4</span></div></div>
-        ${leg(3, 'Escreva o que aconteceu', 'O quê, onde e quando — e, se tiver, uma ideia para resolver.')}
-        ${leg(4, 'Toque em Enviar', 'Chega na hora no escritório. Não precisa avisar ninguém.')}
+        <div class="ri-c3">
+          <div class="ri-cel"><span class="ri-fala"></span><div class="ri-tel">
+            <img src="img/jotform-042-tela2.jpg" alt="Final do formulário: campo para escrever e botão Enviar">
+            <span class="ri-mk" style="top:36%">3</span><span class="ri-mk" style="top:80%">4</span></div></div>
+          <div class="ri-col">
+            ${leg(3, 'Escreva o que aconteceu', 'O quê, onde e quando — e, se tiver, uma ideia para resolver.')}
+            ${leg(4, 'Toque em Enviar', 'Chega na hora no escritório.')}
+          </div>
+        </div>
+        <div class="ri-ex">
+          <div><b>✗ Ajuda pouco</b><i>"O banheiro está ruim."</i></div>
+          <div class="bom"><b>✓ Ajuda a resolver</b><i>"Alojamento da Faca: descarga do 2º vaso vazando desde segunda."</i></div>
+        </div>
       </div>
-    </div>
-    <div class="ri-ex">
-      <div><b>✗ Ajuda pouco</b><i>"O banheiro está ruim."</i></div>
-      <div class="bom"><b>✓ Ajuda a resolver</b><i>"Banheiro do alojamento da Faca: a descarga do 2º vaso vaza desde segunda e falta papel toalha."</i></div>
     </div>
 
     <h2 class="ri-h2">O que acontece depois</h2>
     <div class="ri-fluxo">
-      <div class="ri-etapa"><b>1 · Recebido</b>Cai no sistema do escritório no mesmo instante.</div>
-      <div class="ri-etapa"><b>2 · Analisado</b>O responsável define o que fazer e o prazo.</div>
-      <div class="ri-etapa"><b>3 · Resolvido</b>A ação é feita e registrada no FORM 042.</div>
-      <div class="ri-etapa"><b>4 · Devolutiva</b>Retorno a todos no DDS, reunião, quadro ou WhatsApp.</div>
+      <div class="ri-etapa"><b>1 · Recebido</b>Chega na hora no escritório.</div>
+      <div class="ri-etapa"><b>2 · Analisado</b>Define o que fazer e o prazo.</div>
+      <div class="ri-etapa"><b>3 · Resolvido</b>Ação feita e registrada.</div>
+      <div class="ri-etapa"><b>4 · Devolutiva</b>Retorno no DDS, quadro ou WhatsApp.</div>
     </div>
 
     <div class="ri-duas">
       <div class="ri-caixa"><b>Pode e deve enviar</b><ul>
         <li>Segurança, EPI ou máquina com problema</li><li>Alojamento, banheiro, refeitório e água</li>
-        <li>Transporte, refeição e horários</li><li>Ideias para melhorar o trabalho</li><li>Elogios a colegas e equipes</li></ul></div>
+        <li>Transporte, refeição e horários</li><li>Ideias para melhorar o trabalho</li><li>Elogios a colegas e equipes</li>
+        <li><b>Assédio moral ou sexual, discriminação ou ameaça</b> — escolha Denúncia</li></ul></div>
       <div class="ri-caixa c"><b>Combinados</b><ul>
         <li>Respeito: critique a situação, não a pessoa</li><li>Não escreva nome, CPF ou telefone de ninguém</li>
         <li>Um assunto por envio</li><li>Pode enviar quantas vezes quiser</li>
-        <li>Sem celular? Fale com o escritório ou use a caixa de sugestões</li></ul></div>
+        <li>Sem celular? Administrativo ou caixa de sugestões</li></ul></div>
     </div>
 
+    <div class="ri-den"><span class="ic">${ICONE.escudo}</span><span><b class="t">Denúncia de assédio</b>Só a gerência e a diretoria leem, com sigilo.
+      Quem denuncia de boa-fé não pode ser punido. Fora da empresa: <b>180</b> Central da Mulher · <b>100</b> Direitos Humanos · <b>190</b> Polícia, em perigo.</span></div>
     <div class="ri-alerta"><span class="x">!</span><span><b>Emergência ou acidente não é pelo QR Code.</b> Avise na hora o encarregado
       ou o técnico de segurança e siga o plano de emergência da fazenda.</span></div>
 
-    <footer class="ri-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão</span><img src="img/lop-marca.png" alt="LOP"></footer>
+    <div class="ri-adm">Dúvidas ou sem celular? Administrativo · (34) 9 9646-3296</div>
+    <footer class="ri-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação, sugestão e denúncia</span><img src="img/lop-marca.png" alt="LOP"></footer>
   </article>`;
 }
 
