@@ -195,13 +195,13 @@ const sitCor = it => it.sit === 'afazer' && atrasado(it) ? 'atraso' : it.sit;
 /* ---------------- dados ---------------- */
 const dados = {
   pessoas: [], tarefas: [], estados: [], config: [], auto: [], numeros: {},
-  adm: { itens: [], lanc: [] }, hor: [],
+  adm: { itens: [], lanc: [] }, hor: [], out: { itens: [], rec: [] },
   em: null, carregando: false, falhas: [],
 };
 (() => { const c = ler(CACHE, null); if (c) Object.assign(dados, c, { carregando: false }); })();
 const salvarCache = () => gravarLocal(CACHE, {
   pessoas: dados.pessoas, tarefas: dados.tarefas, estados: dados.estados,
-  config: dados.config, auto: dados.auto, numeros: dados.numeros, adm: dados.adm, hor: dados.hor, em: dados.em,
+  config: dados.config, auto: dados.auto, numeros: dados.numeros, adm: dados.adm, hor: dados.hor, out: dados.out, em: dados.em,
 });
 /* Custo Base › Adm mensais (09/11/2026, pedido dele): a tarefa mensal
    "Adm - mensais" (ir = 'admMes') tem o checklist montado do cadastro do
@@ -218,6 +218,43 @@ async function lerAdm(c) {
   // Conferência de horímetros (09/11/2026): resumo de cada mês
   const hz = await c.from('cb_hor_conf').select('id,diferencas,corrigidas').then(x => x, e => ({ error: e }));
   if (!hz.error) dados.hor = hz.data || [];
+  // Outorga e Irrigação (12/11/2026): itens do recolhimento e o que já chegou
+  const de2 = (() => { const d = new Date(); d.setMonth(d.getMonth() - 4); return iso(d).slice(0, 7); })();
+  const [oi, orc] = await Promise.all([
+    c.from('out_itens').select('id,nome,tipo,ordem,ativo').eq('ativo', true),
+    c.from('out_recebidos').select('id,mes,item_id,recebido').gte('mes', de2).limit(5000),
+  ].map(q => q.then(x => x, e => ({ error: e }))));
+  if (!oi.error && !orc.error) dados.out = { itens: oi.data || [], rec: orc.data || [] };
+}
+/* Outorga e Irrigação › Recolhimento (12/11/2026, pedido dele): a tarefa
+   mensal "Recolhimento" (ir = 'outRec', Vinícius, Semana 1) tem o checklist
+   montado dos itens da área (out_itens), marcado pelo "Recebido" das fichas
+   do mês anterior (a de 01/11 recolhe as fichas de outubro). Os itens que a
+   tarefa guarda (ex.: enviar o relatório do que falta) continuam embaixo. */
+const OUT_IR = 'outRec';
+function ckOut(mes, t, e) {
+  const its = (dados.out?.itens || []).slice().sort((a, b) => (Number(a.ordem) || 0) - (Number(b.ordem) || 0));
+  if (!its.length) return null;
+  const grupos = [['outorga', 'Outorga'], ['irrigacao', 'Irrigação']]
+    .map(([k, g]) => ({ g, i: its.filter(i => i.tipo === k).map(i => ({ t: i.nome, ir: OUT_IR, id: i.id, out: true })) }))
+    .filter(g => g.i.length);
+  const proprios = (Array.isArray(t.checklist) ? t.checklist : []).filter(g => (g.i || []).length);
+  const ok = new Set((dados.out.rec || []).filter(r => r.mes === mes && r.recebido).map(r => r.item_id));
+  const chavesProprias = new Set(proprios.flatMap(g => g.i.map(x => `${g.g}|${txtCk(x)}`)));
+  const checks = [...grupos.flatMap(gr => gr.i.filter(x => ok.has(x.id)).map(x => `${gr.g}|${x.t}`)),
+    ...((e?.checks) || []).filter(k => chavesProprias.has(k))];
+  return { checklist: [...grupos, ...proprios], checks };
+}
+async function gravarOut(mes, itemId, sim) {
+  const id = mes + ':' + itemId;
+  const r = (dados.out.rec || []).find(x => x.id === id);
+  const reg = { id, mes, item_id: itemId, recebido: !!sim, recebido_em: sim ? new Date().toISOString() : null,
+    recebido_por: sim ? (acesso.nome || acesso.email || null) : null };
+  if (r) Object.assign(r, reg); else dados.out.rec.push(reg);
+  salvarCache();
+  if (!estado.cliente || !navigator.onLine) return;
+  const { error } = await estado.cliente.from('out_recebidos').upsert(reg, { onConflict: 'id' }).then(x => x, e => ({ error: e }));
+  if (error) console.warn('[Rastro] não marquei na Outorga', error);
 }
 /* Tarefa "Conferência de horímetros" (dia 10, ir = 'hzConf'): a do dia 10 de
    novembro confere o mês anterior (outubro). Com PDF importado → Em andamento;
@@ -1034,6 +1071,15 @@ function todosItens() {
           else if (f && f < tot && it.sit === 'afazer') it.sit = 'fazendo';
         }
       }
+      if (t.ir === OUT_IR) {
+        const it = itens[itens.length - 1], mesRef = mesAntes(d), o = ckOut(mesRef, t, rep ? estadoDe(chave) : t);
+        if (o) {
+          Object.assign(it, o, { ckOut: true, mesOut: mesRef });
+          const tot = o.checklist.reduce((n, g) => n + g.i.length, 0), f = o.checks.length;
+          if (f === tot && it.sit !== 'feito') { it.sit = 'feito'; it.feitaEm = it.feitaEm || hoje(); }
+          else if (f && f < tot && it.sit === 'afazer') it.sit = 'fazendo';
+        }
+      }
       if (t.ir === HZ_IR) {
         const it = itens[itens.length - 1], mc = mesAntes(d), c = (dados.hor || []).find(x => x.id === mc);
         it.texto = `Conferência de ${mc.slice(5, 7)}/${mc.slice(0, 4)}` + (c ? ` · ${c.corrigidas}/${c.diferencas} diferença(s) corrigida(s)` : ' · PDF ainda não importado') + (t.descricao ? '\n' + t.descricao : '');
@@ -1082,7 +1128,7 @@ const IR_CK = {
   qcSaida: { a: 'estoque', t: 'qcSaida' }, qcEntrada: { a: 'estoque', t: 'qcEntrada' }, ctNova: { a: 'estoque', t: 'ctNova' },
   acPainel: { a: 'estoque', t: 'acPainel' }, acSaldo: { a: 'estoque', t: 'acSaldo' },
   acTransf: { a: 'estoque', t: 'acTransferencias' }, acRelatorio: { a: 'estoque', t: 'acRelatorio' },
-  rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' }, admMes: { a: 'custobase', t: 'amMes' }, hzConf: { a: 'custobase', t: 'hzConf' },
+  outRec: { a: 'outorga', t: 'otRec' }, rtMes: { a: 'custobase', t: 'rtMes' }, hhMes: { a: 'custobase', t: 'hhMes' }, admMes: { a: 'custobase', t: 'amMes' }, hzConf: { a: 'custobase', t: 'hzConf' },
   colheita: { a: 'colheita', t: 'cpCargas' }, certDocs: { a: 'certificacao', t: 'ceDocumentos' },
   vencMaq: { a: 'manutencoes', x: 'acao=vencimentos' }, certAud: { a: 'certificacao', t: 'ceCertificacoes' },
   certAcoes: { a: 'certificacao', t: 'mcMelhorias' }, cadRel: { a: 'pessoas', t: 'cadRelatorios' },
@@ -1393,6 +1439,7 @@ function irPara(ir) {
     if (ir.a === 'colheita' && ir.t) quandoPronta('molduraCP', w => w.abrirTelaColheita?.(ir.t));
     if (ir.a === 'estoque' && ir.t) quandoPronta('molduraEst', w => w.abrirTelaEstoque?.(ir.t));
     if (ir.a === 'custobase' && ir.t) quandoPronta('molduraCB', w => w.abrirTelaCustoBase?.(ir.t));
+    if (ir.a === 'outorga' && ir.t) quandoPronta('molduraOT', w => w.abrirTelaOutorga?.(ir.t));
   }
   window.scrollTo?.(0, 0);
 }
@@ -2016,12 +2063,13 @@ let ocultarMarcados = false;
 function blocoCk(it) {
   const set = new Set(it.checks || []);
   const tot = totalCk(it), feitos = feitosCk(it), pct = tot ? Math.round(feitos / tot * 100) : 0;
-  const edita = !it.auto && it.tarefa && !it.ckDoApp;
+  const edita = !it.auto && it.tarefa && !it.ckDoApp && !it.ckOut;
   const umGrupo = it.checklist.length === 1;
   return `<div class="cr-ckbox${ocultarMarcados ? ' oculta' : ''}" id="crCkBox">
     <div class="cr-ckcab"><b>☑ Checklist</b>
       <button type="button" class="cr-ckocultar" id="crCkOcultar">${ocultarMarcados ? 'Mostrar marcados' : 'Ocultar marcados'}</button></div>
     ${it.ckDoApp ? `<p class="dc-sem" style="margin:2px 0 6px">Itens do cadastro de Custo Base › Adm mensais (${esc(it.mesAdm.slice(5, 7) + '/' + it.mesAdm.slice(0, 4))}). Marcar aqui marca "Lançado" lá; para incluir ou tirar um item, use o cadastro.</p>` : ''}
+    ${it.ckOut ? `<p class="dc-sem" style="margin:2px 0 6px">Fichas de ${esc(it.mesOut.slice(5, 7) + '/' + it.mesOut.slice(0, 4))} da área Outorga e Irrigação. Marcar aqui marca "Recebido" lá; para incluir ou tirar uma ficha, use Cadastros › Itens do recolhimento.</p>` : ''}
     <div class="cr-ckprog"><span id="crCkPct">${pct}%</span><span class="cr-ckbar g${pct === 100 ? ' ok' : ''}"><i id="crCkBar" style="width:${pct}%"></i></span><span id="crCkCont">${feitos}/${tot}</span></div>
     ${it.checklist.map((g, gi) => `<fieldset class="cr-ckg">${umGrupo && norm(g.g) === norm(it.titulo) ? '' : `<legend>${esc(g.g)}</legend>`}
       ${(g.i || []).map((x, xi) => { const ir = irCk(x), on = set.has(chaveCk(g.g, x)); return `<div class="cr-cki${on ? ' on' : ''}">
@@ -2073,6 +2121,7 @@ function ligarCk(d, it) {
     });
     it.checks = marcados;
     if (it.ckDoApp) { const [gi, xi] = c.dataset.ck.split(':').map(Number); gravarAdm(it.mesAdm, it.checklist[gi].i[xi].id, c.checked); }
+    if (it.ckOut) { const [gi, xi] = c.dataset.ck.split(':').map(Number), x = it.checklist[gi].i[xi]; if (x?.out) gravarOut(it.mesOut, x.id, c.checked); }
     c.closest('.cr-cki')?.classList.toggle('on', c.checked);
     const pct = Math.round(marcados.length / totalCk(it) * 100);
     $('crCkCont').textContent = `${marcados.length}/${totalCk(it)}`;

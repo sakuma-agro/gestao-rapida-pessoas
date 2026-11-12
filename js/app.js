@@ -136,6 +136,7 @@ function abrirAba(nome) {
   $('telaEst').hidden = nome !== 'estoque';
   $('telaCB').hidden = nome !== 'custobase';
   $('telaCP').hidden = nome !== 'colheita';
+  $('telaOT').hidden = nome !== 'outorga';
   $('telaPJ').hidden = nome !== 'projetos';
   $('telaCron').hidden = nome !== 'cronograma';
   if (nome === 'cronograma') abrirCronograma($('crAlvo'));
@@ -143,7 +144,7 @@ function abrirAba(nome) {
   if (nome === 'compras') abrirCompras($('cmAlvo'));
   $('telaEvento').hidden = nome !== 'evento';     // Evento Cultura (11/11/2026)
   if (nome === 'evento') abrirEventoCultura($('evAlvo'));
-  document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita', 'projetos'].includes(nome));
+  document.body.classList.toggle('na-moldura', ['manutencoes', 'vistorias', 'programacao', 'estoque', 'custobase', 'colheita', 'outorga', 'projetos'].includes(nome));
   if (nome === 'inicio') desenharAtalhos();
   $('telaFichas').hidden = nome !== 'fichas';
   $('telaLista').hidden = nome !== 'lista';
@@ -1936,7 +1937,7 @@ async function sincronizarTudo() {
     for (const fn of [() => db.enviarFila(), () => jd.enviarFila(), () => enviarFilaSst(), () => enviarFilaCert(), () => enviarFilaCaderno(), () => sincronizarReuniao(), () => enviarFilaCron(), () => enviarAnexos()]) {
       try { await fn(); } catch {}
     }
-    for (const id of ['molduraManut', 'molduraProg', 'molduraEst', 'molduraCB', 'molduraCP', 'molduraPJ']) {
+    for (const id of ['molduraManut', 'molduraProg', 'molduraEst', 'molduraCB', 'molduraCP', 'molduraOT', 'molduraPJ']) {
       const m = $(id); try { if (m && m.src) m.contentWindow.postMessage({ tipo: 'gr-sincronizar' }, location.origin); } catch {}
     }
     try { await db.sincronizar(); } catch {}

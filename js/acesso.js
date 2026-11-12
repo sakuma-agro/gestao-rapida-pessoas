@@ -1395,6 +1395,7 @@ function desenharPermissoes() {
     ${blocoEst(e)}
     ${blocoCB(e)}
     ${blocoCP(e)}
+    ${blocoOT(e)}
     ${blocoPJ(e)}
     ${blocoCron(e)}
     ${blocoCompras(e)}
@@ -1458,6 +1459,12 @@ function desenharPermissoes() {
   $('usCP')?.addEventListener('change', ev => {
     const mods = new Set(e.modulos || []);
     if (ev.target.checked) mods.add('colheita'); else mods.delete('colheita');
+    e.modulos = [...mods];
+    desenharPermissoes();
+  });
+  $('usOT')?.addEventListener('change', ev => {
+    const mods = new Set(e.modulos || []);
+    if (ev.target.checked) mods.add('outorga'); else mods.delete('outorga');
     e.modulos = [...mods];
     desenharPermissoes();
   });
@@ -1593,6 +1600,18 @@ function blocoCP(e) {
       <input type="checkbox" id="usCP" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
       <b>Área Colheita e Produção</b>
       <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · cargas, conferência, painel e cadastros'}</span>
+    </label>
+  </div>`;
+}
+
+/* Bloco "Área Outorga e Irrigação" (12/11/2026): entra ou não. */
+function blocoOT(e) {
+  const tem = !!e && (e.admin || (e.modulos || []).includes('outorga'));
+  return `<div class="us-mod us-manut ${tem ? '' : 'desligado'}" data-bloco="outorga">
+    <label class="us-mod__topo">
+      <input type="checkbox" id="usOT" ${tem ? 'checked' : ''} ${e.admin ? 'disabled' : ''}>
+      <b>Área Outorga e Irrigação</b>
+      <span class="dc-sem">${!tem ? 'não entra' : e.admin ? 'administrador do sistema · vê tudo' : 'entra · recebimento das fichas, impressão e cadastros'}</span>
     </label>
   </div>`;
 }

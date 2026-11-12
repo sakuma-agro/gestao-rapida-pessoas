@@ -31,6 +31,8 @@ const VERSAO_CB = '23';
 const VERSAO_CP = '11';
 /* Sobe a cada publicação da área Projetos (PMBOK) (e nos ?v= do projetos/index.html). */
 const VERSAO_PJ = '3';
+/* Sobe a cada publicação da área Outorga e Irrigação (e nos ?v= do outorga/index.html). */
+const VERSAO_OT = '1';
 
 /* Ordem dos cartões (15/10/2026, pedido dele): Pessoas · Máquinas e
    Patrimônio · Certificação · Vistorias e Segurança · Programação Campo ·
@@ -91,6 +93,12 @@ export const AREAS = [
      abertura, partes interessadas, escopo e requisitos, EAP, rede e caminho
      crítico, RACI, riscos, comunicação, custos, mudanças, encerramento e
      lições aprendidas. Mora em projetos/, numa moldura. */
+  /* Outorga e Irrigação (12/11/2026, pedido dele): o app avulso "Controle de
+     Outorga e Irrigação" veio para dentro do LOP (e foi aposentado) —
+     recebimento das fichas do mês e impressão das fichas de outorga e de
+     irrigação. Mora em outorga/, numa moldura. */
+  { id: 'outorga', nome: 'Outorga e Irrigação', icone: 'icons/area-outorga.v1.svg',
+    desc: 'Recebimento das fichas do mês · Imprimir fichas de outorga e irrigação · Cadastros' },
   { id: 'projetos', nome: 'Projetos (PMBOK)', icone: 'icons/area-projetos.v2.svg',
     desc: 'Painel · Projetos (termo, EAP, rede, riscos, custos, mudanças) · Alertas · Lições aprendidas' },
   /* Usuários - Acessos (14/10/2026, pedido dele): a antiga "Configurações ·
@@ -106,14 +114,14 @@ export const AREAS = [
 /* Tela inicial em colunas por grupo (09/11/2026, pedido dele — opção A). */
 const GRUPOS = [
   { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao', 'evento'] },
-  { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita'] },
+  { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita', 'outorga'] },
   { nome: 'Operação e custos', cor: '#51534A', ids: ['manutencoes', 'estoque', 'custobase'] },
   { nome: 'Gestão', cor: '#7552B0', ids: ['cronograma', 'compras', 'projetos'] }, // 09/11/2026: Rastro acima de Projetos (pedido dele)
 ];
 /* O que aparece embaixo do nome em cada linha (curto; o completo fica no title). */
 const CURTA = {
   pessoas: 'Cadastros, SST, RH, DP', vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
-  programacao: 'Mês e semana', colheita: 'Carregamentos, safra',
+  programacao: 'Mês e semana', colheita: 'Carregamentos, safra', outorga: 'Fichas do mês',
   manutencoes: 'Manutenções, OS', estoque: 'Contagem, acerto', custobase: 'Rateio mensal',
   projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos', compras: 'Pedir compra, acompanhar', evento: 'Fotos e vídeos · 2026',
 };
@@ -200,6 +208,8 @@ function liberada(id) {
   if (id === 'custobase') return acesso.admin || (acesso.modulos || []).includes('custobase');
   /* Colheita e Produção (20/10/2026): administrador ou módulo 'colheita'. */
   if (id === 'colheita') return acesso.admin || (acesso.modulos || []).includes('colheita');
+  /* Outorga e Irrigação (12/11/2026): administrador ou módulo 'outorga'. */
+  if (id === 'outorga') return acesso.admin || (acesso.modulos || []).includes('outorga');
   /* Projetos (PMBOK) (23/10/2026): administrador ou módulo 'projetos'. */
   if (id === 'projetos') return acesso.admin || (acesso.modulos || []).includes('projetos');
   /* Cronograma geral (28/10/2026): administrador ou módulo 'cronograma'. */
@@ -225,6 +235,7 @@ let molduraProgCarregada = false;
 let molduraEstCarregada = false;
 let molduraCBCarregada = false;
 let molduraCPCarregada = false;
+let molduraOTCarregada = false;
 let molduraPJCarregada = false;
 
 export const areaAberta = () => areaAtual;
@@ -496,6 +507,24 @@ export function entrarNaArea(id, tela, extra) {
     }
     return;
   }
+  if (id === 'outorga') {
+    $('navModulos').hidden = true;
+    $('navTelas').hidden = true;
+    $('navSub').hidden = true;
+    aoTrocar('outorga');
+    medirTopo();
+    const moldura = $('molduraOT');
+    if (!molduraOTCarregada || extra) {
+      molduraOTCarregada = true;
+      moldura.src = 'outorga/?v=' + VERSAO_OT + (extra ? '&' + extra : '');
+    } else {
+      let pronta = false;
+      try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
+      if (!pronta) moldura.src = 'outorga/?v=' + VERSAO_OT + '&t=' + Date.now();
+      else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
+    }
+    return;
+  }
   if (id === 'colheita') {
     $('navModulos').hidden = true;
     $('navTelas').hidden = true;
@@ -561,6 +590,7 @@ export function limparAreas() {
   molduraEstCarregada = false;
   molduraCBCarregada = false;
   molduraCPCarregada = false;
+  molduraOTCarregada = false;
   molduraPJCarregada = false;
   vistPronta = false; vistPendente = null; vistTela = null; vistNums = {};
   const m = $('molduraManut');
@@ -575,6 +605,8 @@ export function limparAreas() {
   if (mc) mc.src = 'about:blank';
   const mcp = $('molduraCP');
   if (mcp) mcp.src = 'about:blank';
+  const mot = $('molduraOT');
+  if (mot) mot.src = 'about:blank';
   const mpj = $('molduraPJ');
   if (mpj) mpj.src = 'about:blank';
   pintarEtiqueta();
