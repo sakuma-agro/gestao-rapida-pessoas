@@ -951,17 +951,60 @@ function sairComparar() {
   if (S.tempo.cortina) S.tempo.cortina.hidden = true;
 }
 
+/* Marcos das normas (12/11/2026, pedido: "atender SMETA, GLOBALG.A.P., Rainforest… auditor não botar defeito"). */
+const CORTE_RA = '2014-01-01';     // Rainforest Alliance 2020, Anexo Ambiental, req. 6.1.1 — sem desmatamento/conversão depois de 01/01/2014
+const CORTE_EUDR = '2020-12-31';   // Regulamento UE 2023/1115 (EUDR) — data de corte 31/12/2020
+const AVAL = { ok: 'Vegetação mantida', alt: 'Alteração encontrada' };
+const isoDe = ms => new Date(ms).toISOString().slice(0, 10);
+const brIso = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : '';
+
+function avaliacoes(cq) { return (cq.reserva || {}).tempo || {}; }
+function conclusao(cq) {
+  const anos = S.tempo.anos || []; const av = avaliacoes(cq);
+  const chaves = [...anos.map(a => String(a.ano)), 'hoje'];
+  const alt = chaves.filter(k => av[k]?.sit === 'alt');
+  const falta = chaves.filter(k => !av[k]?.sit);
+  if (!anos.length) return { cls: 'pend', txt: 'Sem imagens para avaliar.' };
+  if (alt.length) return { cls: 'alt', txt: `Alteração registrada em ${alt.map(k => k === 'hoje' ? 'hoje' : k).join(', ')}. Ver observações e plano de ação.` };
+  if (falta.length) return { cls: 'pend', txt: `Avaliação incompleta: falta avaliar ${falta.map(k => k === 'hoje' ? 'a imagem atual' : k).join(', ')}.` };
+  const ult = Object.values(av).map(v => v.em).filter(Boolean).sort().pop();
+  return { cls: 'ok', txt: `Nenhuma conversão de vegetação nativa identificada na reserva legal de ${anos[0].ano} até hoje (${chaves.length} imagens avaliadas${ult ? ', última avaliação em ' + brIso(ult) : ''}). Atende à data de corte de 01/01/2014 (Rainforest Alliance, req. 6.1.1) e à de 31/12/2020 (EUDR).` };
+}
+
+async function avaliar(chave, sit, obs) {
+  const cq = S.atual; const rv = { ...(cq.reserva || {}) }; const t = { ...(rv.tempo || {}) };
+  const a = (S.tempo.anos || []).find(x => String(x.ano) === chave);
+  if (!sit) delete t[chave];
+  else t[chave] = { sit, obs: so(obs || ''), em: hojeIso(), cap: chave === 'hoje' ? hojeIso() : a ? isoDe(a.ms) : '', fonte: a?.fonte || '', rel: a?.rel || null };
+  rv.tempo = t;
+  const { error } = await estado.cliente.from('cert_croquis').update({ reserva: rv, atualizado_por: quem() }).eq('fazenda_id', cq.fazenda_id);
+  if (error) return msg('Não gravou: ' + error.message, true);
+  cq.reserva = rv; painel(); barraTempo(); msg('Avaliação gravada.');
+}
+
 function painelTempo() {
-  const anos = S.tempo.anos;
-  const sel = S.tempo.sel;
-  const linhas = (anos || []).map(a => `<tr data-t-linha="${a.ano}" class="${a.ano === sel ? 'sel' : ''}" style="cursor:pointer"><td>${a.ano}</td><td>${a.dataReal ? dataCap(a.ms) : 'pub. ' + esc(a.pub)}</td><td>${esc(a.fonte || '—')}</td></tr>`).join('');
+  const cq = S.atual; const anos = S.tempo.anos; const sel = S.tempo.sel; const av = avaliacoes(cq); const edita = pode('cert');
+  const celAval = k => {
+    const v = av[k];
+    if (!edita) return v ? `<span class="crq-av crq-av-${v.sit}">${AVAL[v.sit]}</span>` : '<span class="crq-av">—</span>';
+    return `<select data-t-av="${k}" aria-label="Avaliação ${k}"><option value="">Avaliar…</option>${[['ok', '✔ Mantida'], ['alt', '⚠ Alteração']].map(([c, r]) => `<option value="${c}" ${v?.sit === c ? 'selected' : ''}>${r}</option>`).join('')}</select>`;
+  };
+  const marco = a => { const d = isoDe(a.ms); return d < CORTE_RA ? '<small class="crq-marco-t">antes do corte RA</small>' : ''; };
+  const linhas = (anos || []).map(a => `<tr data-t-linha="${a.ano}" class="${a.ano === sel ? 'sel' : ''}"><td>${a.ano}${marco(a)}</td><td>${a.dataReal ? dataCap(a.ms) : 'pub. ' + esc(a.pub)}</td><td>${celAval(String(a.ano))}</td></tr>
+    ${av[a.ano]?.sit === 'alt' || (edita && av[a.ano]?.obs) ? `<tr class="crq-obs-l"><td colspan="3">${edita ? `<input type="text" data-t-obs="${a.ano}" value="${esc(av[a.ano]?.obs || '')}" placeholder="O que mudou e onde (obrigatório)" maxlength="300">` : esc(av[a.ano]?.obs || '')}</td></tr>` : ''}`).join('');
+  const linhaHoje = `<tr data-t-linha="" class="${sel == null ? 'sel' : ''}"><td>Hoje</td><td>imagem atual</td><td>${celAval('hoje')}</td></tr>
+    ${av.hoje?.sit === 'alt' ? `<tr class="crq-obs-l"><td colspan="3">${edita ? `<input type="text" data-t-obs="hoje" value="${esc(av.hoje?.obs || '')}" placeholder="O que mudou e onde (obrigatório)" maxlength="300">` : esc(av.hoje?.obs || '')}</td></tr>` : ''}`;
+  const c = anos?.length ? conclusao(cq) : null;
   return `<section class="crq-rl crq-tempo-pn">
-    <h4 class="crq-sub" style="margin-top:10px">Linha do tempo da reserva legal</h4>
+    <h4 class="crq-sub" style="margin-top:10px">Monitoramento da reserva legal</h4>
+    <div class="crq-cortes"><span><b>01/01/2014</b> corte Rainforest Alliance (6.1.1)</span><span><b>31/12/2020</b> corte EUDR (UE 2023/1115)</span></div>
     ${anos == null && !S.tempo.erro ? '<p class="dica">Buscando as imagens…</p>' : S.tempo.erro ? `<p class="crq-alerta">${esc(S.tempo.erro)}</p>` : !anos.length ? '<p class="dica">Sem imagens antigas para este ponto.</p>' : `
-    <p class="crq-nota" style="margin:0 0 6px">Toque num ano para ver a imagem daquele ano sob o desenho da reserva. ${anos.length} imagem${anos.length > 1 ? 's' : ''} de ${anos[0].ano} a ${anos[anos.length - 1].ano}.</p>
-    <table class="crq-tab crq-tal"><thead><tr><th>Ano</th><th>Captura</th><th>Satélite</th></tr></thead><tbody>${linhas}</tbody></table>
-    ${(() => { const fal = []; for (let y = 2014; y < new Date().getFullYear(); y++) if (!anos.some(a => a.ano === y)) fal.push(y); return fal.length ? `<p class="crq-nota">Sem imagem nova em ${fal.join(', ')}: nesses anos o satélite não atualizou este ponto.</p>` : ''; })()}`}
-    <p class="crq-nota">Fonte: Esri World Imagery Wayback (versões da imagem de satélite publicadas desde fev/2014). Data de captura lida no centro da reserva legal. Para a auditoria, compare o desenho da reserva com a vegetação em cada ano e use <b>⇆ Comparar com hoje</b>.</p>
+    <p class="crq-nota" style="margin:0 0 6px">Abra cada ano, compare a vegetação com o desenho da reserva e marque a avaliação. ${anos.length} imagens de ${anos[0].ano} a ${anos[anos.length - 1].ano} + a atual.</p>
+    <table class="crq-tab crq-tal crq-tab-tempo"><thead><tr><th>Ano</th><th>Captura</th><th>Avaliação</th></tr></thead><tbody>${linhas}${linhaHoje}</tbody></table>
+    <div class="crq-concl crq-concl-${c.cls}">${esc(c.txt)}</div>
+    ${(() => { const fal = []; for (let y = 2014; y < new Date().getFullYear(); y++) if (!anos.some(a => a.ano === y)) fal.push(y); return fal.length ? `<p class="crq-nota">Sem imagem nova em ${fal.join(', ')}: nesses anos o satélite não atualizou este ponto (vale a imagem do ano anterior).</p>` : ''; })()}
+    <button type="button" class="btn principal" data-t-laudo style="margin-top:10px;width:100%">🖨 Laudo para auditoria</button>`}
+    <p class="crq-nota">Fonte: Esri World Imagery Wayback (versões da imagem de satélite desde fev/2014), data de captura lida em ${(() => { const p = pontoReserva(cq); return p ? p.latitude.toFixed(5) + ', ' + p.longitude.toFixed(5) : '—'; })()} (centro da reserva). Desenho: ${esc(cq.reserva?.fonte_car && (cq.feicoes || []).some(f => f.grupo === 'Reserva legal (CAR)') ? 'shapefile do CAR' : cq.fonte || 'croqui')}.</p>
   </section>`;
 }
 
@@ -970,7 +1013,85 @@ function painel() {
   if (!S.tempo.ativo || S.modoSede) return;
   const h = $('crqPainel').querySelector('.crq-h');
   if (h) h.insertAdjacentHTML('afterend', painelTempo()); else $('crqPainel').insertAdjacentHTML('afterbegin', painelTempo());
-  $('crqPainel').querySelectorAll('[data-t-linha]').forEach(tr => tr.addEventListener('click', () => verAno(+tr.dataset.tLinha)));
+  const pn = $('crqPainel');
+  pn.querySelectorAll('[data-t-linha]').forEach(tr => tr.addEventListener('click', e => { if (e.target.closest('select,input')) return; verAno(tr.dataset.tLinha ? +tr.dataset.tLinha : null); }));
+  pn.querySelectorAll('[data-t-av]').forEach(sel => sel.addEventListener('change', () => {
+    const k = sel.dataset.tAv;
+    if (sel.value === 'alt') { const o = prompt(`O que mudou na reserva em ${k === 'hoje' ? 'hoje' : k}? (local e tamanho aproximado)`); if (!so(o || '')) { sel.value = avaliacoes(S.atual)[k]?.sit || ''; return msg('Para registrar alteração, descreva o que mudou.', true); } avaliar(k, 'alt', o); }
+    else avaliar(k, sel.value, '');
+  }));
+  pn.querySelectorAll('[data-t-obs]').forEach(inp => inp.addEventListener('change', () => { const k = inp.dataset.tObs, v = avaliacoes(S.atual)[k]; if (v) avaliar(k, v.sit, inp.value); }));
+  pn.querySelector('[data-t-laudo]')?.addEventListener('click', laudo);
+}
+
+/* Laudo para auditoria: folha A4 deitada com a ficha do CAR, as datas de corte, a conclusão
+ * e uma miniatura de satélite por ano com o desenho da reserva por cima. */
+async function laudo() {
+  const L = window.L, cq = S.atual, anos = S.tempo.anos || []; if (!cq || !anos.length) return;
+  const rv = cq.reserva || {}, av = avaliacoes(cq), c = conclusao(cq);
+  const n = v => { const x = Number(String(v ?? '').replace(',', '.')); return v != null && v !== '' && isFinite(x) ? x : null; };
+  const area = n(rv.car_area_ha), rl = n(rv.rl_car_ha);
+  const partesCar = (cq.feicoes || []).filter(f => f.grupo === 'Reserva legal (CAR)');
+  const partes = (partesCar.length ? partesCar : (cq.feicoes || []).filter(f => f.grupo === 'Reserva')).filter(f => !foraDoLimite(cq, f));
+  const fora = (partesCar.length ? partesCar : (cq.feicoes || []).filter(f => f.grupo === 'Reserva')).filter(f => foraDoLimite(cq, f));
+  const quadros = [...anos.map(a => ({ k: String(a.ano), tit: String(a.ano), cap: a.dataReal ? dataCap(a.ms) : 'pub. ' + a.pub, fonte: a.fonte, res: a.res, url: a.url, sub: true })),
+    { k: 'hoje', tit: 'Hoje', cap: 'imagem atual', fonte: 'Esri World Imagery', url: null }];
+  const POR = 6, paginas = [];
+  for (let k = 0; k < quadros.length; k += POR) paginas.push(quadros.slice(k, k + POR));
+  const chip = k => { const v = av[k]; return `<span class="lau-av lau-av-${v?.sit || 'nao'}">${v ? AVAL[v.sit] : 'Não avaliado'}</span>`; };
+  const cab = (pg) => `<header class="rel-cabecalho"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-titulo"><h1>Monitoramento da reserva legal por satélite</h1><p>${esc(cq.fazenda)} · série histórica de imagens desde 2014</p></div>
+      <div class="rel-comp"><span>emitido em</span><strong>${brIso(hojeIso())}</strong><span>folha ${pg} de ${paginas.length + 1}</span></div></header>`;
+  const pe = `<footer class="rel-rodape"><img src="img/lop-marca.png" alt="LOP"><span class="rel-lop">Inteligência para o agronegócio</span></footer>`;
+  const ficha = `<div class="lau-ficha">
+      <div><span>Imóvel no CAR</span><b>${esc(rv.imovel_car || cq.fazenda)}</b></div>
+      <div class="lau-largo"><span>Nº do CAR</span><b>${esc(rv.car || '—')}</b></div>
+      <div><span>Município</span><b>${esc(rv.municipio || '—')}</b></div>
+      <div><span>Área do imóvel (CAR)</span><b>${area != null ? ha(area) : '—'}</b></div>
+      <div><span>Reserva legal declarada</span><b>${rl != null ? ha(rl) + (area ? ' · ' + pct(rl / area * 100) : '') : '—'}</b></div>
+      <div><span>APP</span><b>${n(rv.app_ha) != null ? ha(n(rv.app_ha)) : '—'}</b></div>
+      <div><span>Matrículas</span><b>${esc(rv.averbacao || '—')}</b></div></div>
+    <div class="lau-cortes"><div><b>01/01/2014</b><span>Data de corte da Rainforest Alliance (Norma 2020, Anexo Ambiental, req. 6.1.1): sem desmatamento ou conversão de ecossistema natural depois dela.</span></div>
+      <div><b>31/12/2020</b><span>Data de corte do Regulamento (UE) 2023/1115 (EUDR), usada pelos compradores europeus.</span></div></div>
+    <div class="lau-concl lau-concl-${c.cls}"><span>Conclusão</span>${esc(c.txt)}</div>`;
+  const metodo = `<div class="lau-metodo"><b>Método.</b> Imagens: Esri World Imagery Wayback, que guarda cada versão publicada da imagem de satélite desde fevereiro de 2014; para cada ano fica a captura mais recente sobre o centro da reserva (${(() => { const p = pontoReserva(cq); return p ? p.latitude.toFixed(5) + ', ' + p.longitude.toFixed(5) : '—'; })()}). Anos sem imagem nova não aparecem porque o satélite não atualizou o local. Contorno verde: reserva legal ${partesCar.length ? 'do shapefile do CAR' : 'do croqui da fazenda'}; tracejado branco: limite do imóvel. Cada imagem foi comparada com o desenho e avaliada no app LOP - Gestão Rápida (data da avaliação na tabela).${fora.length ? ` Parte da reserva fora do limite desenhado (${fora.map(f => esc(f.rot) + ' · ' + ha(f.ha)).join(', ')}) não entra nas miniaturas.` : ''}</div>`;
+  const tabela = `<table class="lau-tab"><thead><tr><th>Ano</th><th>Captura</th><th>Satélite</th><th>Resolução</th><th>Avaliação</th><th>Avaliado em</th><th>Observação</th></tr></thead><tbody>
+    ${quadros.map(q => `<tr><td>${q.tit}</td><td>${esc(q.cap)}</td><td>${esc(q.fonte || '—')}</td><td>${q.res ? String(q.res).replace('.', ',') + ' m' : '—'}</td><td>${chip(q.k)}</td><td>${brIso(av[q.k]?.em)}</td><td>${esc(av[q.k]?.obs || '')}</td></tr>`).join('')}</tbody></table>`;
+
+  let el = $('crqLaudo'); if (!el) { el = document.createElement('div'); el.id = 'crqLaudo'; document.body.appendChild(el); }
+  el.innerHTML = paginas.map((pg, i) => `<article class="rel lau-folha">${cab(i + 1)}${i === 0 ? ficha : ''}
+    <div class="lau-grade">${pg.map(q => `<figure class="lau-q"><div class="lau-mapa" data-q="${q.k}"></div>
+      <figcaption><b>${q.tit}</b><span>${esc(q.cap)}${q.fonte ? ' · ' + esc(q.fonte) : ''}</span>${chip(q.k)}</figcaption></figure>`).join('')}</div>
+    ${pe}</article>`).join('') + `<article class="rel lau-folha">${cab(paginas.length + 1)}
+    <h2 class="lau-h2">Registro das avaliações</h2>${tabela}${metodo}
+    <div class="lau-normas"><b>Onde este laudo é usado.</b> Rainforest Alliance (Norma de Agricultura Sustentável 2020, Anexo Ambiental, req. 6.1.1 — desmatamento e conversão); GLOBALG.A.P. IFA (biodiversidade, áreas protegidas e uso do solo) e compradores sob o EUDR; SMETA 4 pilares (pilar Meio Ambiente). Guardar no AN do CAR e reserva legal, junto do recibo do CAR.</div>${pe}</article>`;
+  document.body.classList.add('crq-laudo');
+  msg('Montando o laudo…');
+
+  const mapas = [];
+  const limite = cq.limite ? aneis(cq).map(a => a.map(([x, y]) => [y, x])) : null;
+  const espera = [];
+  for (const q of quadros) {
+    const div = el.querySelector(`[data-q="${q.k}"]`);
+    const m = L.map(div, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, touchZoom: false, zoomSnap: 0.25 });
+    const tl = q.url
+      ? L.tileLayer(q.url, { subdomains: ['wayback', 'wayback-a', 'wayback-b'], maxZoom: 21, maxNativeZoom: 18, crossOrigin: true })
+      : L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 21, maxNativeZoom: 18, crossOrigin: true });
+    espera.push(new Promise(ok => { tl.once('load', ok); setTimeout(ok, 9000); }));
+    tl.addTo(m);
+    if (limite) L.polygon(limite, { color: '#FFFFFF', weight: 1.5, dashArray: '6 5', fill: false, interactive: false }).addTo(m);
+    const grupo = L.featureGroup(partes.map(f => L.polygon([f.c, ...(f.h || [])].map(a => a.map(([x, y]) => [y, x])), { color: '#3DFF6E', weight: 2.5, fillOpacity: 0.08, fillColor: '#3DFF6E', interactive: false }))).addTo(m);
+    const alvo = partes.length ? grupo.getBounds() : limite ? L.polygon(limite).getBounds() : null;
+    if (alvo) m.fitBounds(alvo, { padding: [8, 8] }); else m.setView([-19.4, -46.2], 13);
+    L.control.scale({ imperial: false, position: 'bottomleft', maxWidth: 80 }).addTo(m);
+    mapas.push(m);
+  }
+  await Promise.all(espera);
+  msg('');
+  setTimeout(() => {
+    window.print();
+    setTimeout(() => { document.body.classList.remove('crq-laudo'); mapas.forEach(m => m.remove()); el.innerHTML = ''; }, 400);
+  }, 400);
 }
 
 function imprimir() {
