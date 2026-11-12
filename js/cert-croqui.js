@@ -50,7 +50,7 @@ const GRUPOS = [
 ];
 const COR = Object.fromEntries(GRUPOS.map(g => [g[0], { fill: g[1], line: g[2] }]));
 
-let S = { lista: [], atual: null, mapa: null, camadas: {}, rotulos: true, ocultos: new Set(), sel: null, marcando: false };
+let S = { lista: [], atual: null, mapa: null, camadas: {}, rotulos: true, ocultos: new Set(), sel: null, marcando: false, tempo: { ativo: false } };
 
 /** Pontos marcados (sede, galpão…): ícone e tamanho no mapa. 03/11/2026 — "falta marcar … sede". */
 const TIPO_MARCO = {
@@ -302,6 +302,7 @@ function montarOverlay() {
         <button class="btn" type="button" id="crqSede" hidden title="Aproxima na sede e lista as construções">🏠 Mapa da sede</button>
         <button class="btn" type="button" id="crqContornar" hidden title="Clique nos cantos da construção e depois em Concluir">✏ Contornar</button>
         <button class="btn" type="button" id="crqMarcar" hidden title="Clique no mapa para marcar sede, galpão, piscinão…">📍 Marcar ponto</button>
+        <button class="btn" type="button" id="crqTempoBtn" title="Imagens de satélite de 2014 até hoje sobre a reserva legal">🕒 Linha do tempo</button>
         <button class="btn" type="button" id="crqApresentar">⛶ Apresentar</button>
         <button class="btn" type="button" id="crqImprimir">Imprimir</button>
         <label class="btn" id="crqImpLbl" hidden title="KML/KMZ do Google Earth (todas as fazendas) ou .zip do shapefile do CAR (fazenda aberta)">Importar<input type="file" id="crqImp" accept=".kml,.kmz,.zip" hidden></label>
@@ -321,6 +322,7 @@ function montarOverlay() {
   });
   document.addEventListener('fullscreenchange', () => setTimeout(() => S.mapa?.invalidateSize(), 200));
   $('crqImprimir').addEventListener('click', imprimir);
+  $('crqTempoBtn').addEventListener('click', () => linhaDoTempo(!S.tempo.ativo));
   $('crqMarcar').addEventListener('click', () => { modoContornar(false); modoMarcar(!S.marcando); });
   $('crqContornar').addEventListener('click', () => { if (S.desenho) concluirContorno(); else { modoMarcar(false); modoContornar(true); } });
   $('crqSede').addEventListener('click', () => { S.modoSede = !S.modoSede; $('crqSede').classList.toggle('principal', S.modoSede); painel(); if (S.modoSede) irParaSede(); else desenhar(true); });
@@ -346,7 +348,7 @@ export async function abrirCroqui(fazendaId) {
     const [L] = await Promise.all([carregarLeaflet(), carregar()]);
     if (!S.mapa) {
       S.mapa = L.map('crqMapa', { maxZoom: 21, zoomControl: true, attributionControl: true, preferCanvas: false });
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      S.base = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         maxZoom: 21, maxNativeZoom: 18, attribution: 'Imagem © Esri, Maxar, Earthstar Geographics', crossOrigin: true,
       }).addTo(S.mapa);
       L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(S.mapa);
@@ -372,6 +374,7 @@ export async function abrirCroqui(fazendaId) {
 function fechar() {
   modoMarcar(false); modoContornar(false);
   if (document.fullscreenElement) document.exitFullscreen?.();
+  if (S.tempo.ativo) linhaDoTempo(false);
   const ov = $('crqOverlay'); if (ov) ov.hidden = true;
   document.body.classList.remove('crq-aberto');
 }
@@ -379,7 +382,7 @@ function fechar() {
 function abas() {
   $('crqFaz').innerHTML = S.lista.map(c => `<button type="button" class="${c === S.atual ? 'on' : ''}" data-faz="${c.fazenda_id}">${esc(c.fazenda)}</button>`).join('');
   $('crqFaz').querySelectorAll('[data-faz]').forEach(b => b.addEventListener('click', () => {
-    S.atual = S.lista.find(c => c.fazenda_id === b.dataset.faz); S.sel = null; S.modoSede = false; $('crqSede').classList.remove('principal'); modoMarcar(false); modoContornar(false); abas(); desenhar(true); painel();
+    S.atual = S.lista.find(c => c.fazenda_id === b.dataset.faz); S.sel = null; S.modoSede = false; $('crqSede').classList.remove('principal'); modoMarcar(false); modoContornar(false); abas(); desenhar(true); painel(); if (S.tempo.ativo) carregarTempo();
   }));
 }
 
@@ -396,6 +399,7 @@ function desenhar(enquadrar) {
   const feics = (cq.feicoes || []).map((f, i) => ({ ...f, i })).sort((a, b) => ordem.indexOf(a.grupo) - ordem.indexOf(b.grupo));
   for (const f of feics) {
     if (S.ocultos.has(f.grupo)) continue;
+    if (S.tempo.ativo && S.tempo.soRl && !AMBIENTAIS.includes(f.grupo)) continue;   // linha do tempo: só reserva e áreas ambientais
     const cor = COR[f.grupo] || COR.Outros;
     const sel = S.sel === f.i;
     const pol = L.polygon([f.c, ...(f.h || [])].map(a => a.map(([x, y]) => [y, x])), {
@@ -418,7 +422,8 @@ function desenhar(enquadrar) {
     if (S.rotulos && !temMarco) pol.bindTooltip(ehConst ? esc(f.rot || '') : `${esc(f.rot || '')}<br><small>${ha(f.ha)}</small>`, { permanent: true, direction: 'center', className: 'crq-rot crq-rot-' + (ehConst ? 'c' : f.ha < 2 && !/piscin/i.test(f.rot || '') ? 'p' : 'g') });
     S.camadas['f' + f.i] = pol; todas.push(pol);
   }
-  if (!S.ocultos.has('__pontos')) (cq.pontos || []).forEach((p, k) => {
+  const soRl = S.tempo.ativo && S.tempo.soRl;
+  if (!soRl && !S.ocultos.has('__pontos')) (cq.pontos || []).forEach((p, k) => {
     if (!isFinite(p.lat) || !isFinite(p.lon)) return;
     const venc = p.venc && p.venc < hojeIso();
     const m = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#FFFFFF', weight: 2.5, fillColor: venc ? '#E53935' : '#0077FF', fillOpacity: 1 }).addTo(S.mapa);
@@ -427,7 +432,7 @@ function desenhar(enquadrar) {
     if (S.rotulos) m.bindTooltip('💧 ' + esc(p.nome), { permanent: true, direction: 'right', offset: [8, 0], className: 'crq-rot crq-rot-agua' });
     S.camadas['p' + k] = m;
   });
-  if (!S.ocultos.has('__marcos')) (cq.marcos || []).forEach((p, k) => {
+  if (!soRl && !S.ocultos.has('__marcos')) (cq.marcos || []).forEach((p, k) => {
     if (!isFinite(p.lat) || !isFinite(p.lon)) return;
     const t = TIPO_MARCO[p.tipo] || TIPO_MARCO.Ponto;
     const m = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'crq-marco crq-marco-' + t.cls, html: t.ico, iconSize: [t.tam, t.tam], iconAnchor: [t.tam / 2, t.tam / 2] }) }).addTo(S.mapa);
@@ -441,7 +446,7 @@ function desenhar(enquadrar) {
   zoomRotulos();
 }
 
-function painel() {
+function painelBase() {
   if (S.modoSede) return painelSede();
   const cq = S.atual; const T = totais(cq); const rv = cq.reserva || {};
   const num = k => { const v = Number(String(rv[k] ?? '').replace(',', '.')); return isFinite(v) && rv[k] !== '' && rv[k] != null ? v : null; };
@@ -757,6 +762,217 @@ async function importarCar(file) {
   msg(`CAR importado em ${cq.fazenda}: ${Object.entries(cam).map(([g, p]) => (g === 'limite' ? 'limite' : g) + ' (' + p.length + ')').join(' · ')}`);
 }
 
+
+/* ---------- Linha do tempo da reserva legal (12/11/2026) ----------
+ * Pedido do Guilherme: acompanhar a reserva legal desde 2014 dentro do app, uma imagem por ano.
+ * Fonte: World Imagery Wayback (Esri) — todas as versões da imagem de satélite publicadas desde
+ * fev/2014. Para a fazenda aberta, procura as versões que mudaram no ponto central da reserva
+ * (vendor/wayback/wayback-core.js, Apache-2.0), lê a data real de captura de cada uma e fica com
+ * a captura mais recente de cada ano. Anos sem imagem nova naquele ponto não aparecem.
+ * Resultado guardado no navegador por 30 dias. Comparar = cortina 2014 × hoje (arrastar). */
+const AMBIENTAIS = ['Reserva', 'Reserva legal (CAR)', 'Vegetação nativa', 'APP', 'Servidão'];
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const dataCap = ms => { const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2, '0')}/${MESES[d.getUTCMonth()]}/${d.getUTCFullYear()}`; };
+let waybackMod = null;
+const wayback = () => (waybackMod ||= import('../vendor/wayback/wayback-core.js').catch(e => { waybackMod = null; throw e; }));
+
+function pontoReserva(cq) {
+  const rl = (cq.feicoes || []).filter(f => f.grupo === 'Reserva legal (CAR)');
+  const usar = rl.length ? rl : (cq.feicoes || []).filter(f => f.grupo === 'Reserva' && !foraDoLimite(cq, f));
+  let pts = usar.flatMap(f => f.c || []);
+  if (!pts.length) pts = aneis(cq).flat();
+  if (!pts.length) pts = (cq.feicoes || []).flatMap(f => f.c || []);
+  if (!pts.length) return null;
+  // centro da maior parte da reserva (o ponto precisa cair dentro dela, não entre duas partes)
+  const maior = usar.length ? usar.reduce((a, b) => (b.ha || 0) > (a.ha || 0) ? b : a) : null;
+  const base = maior?.c?.length ? maior.c : pts;
+  let lon = base.reduce((t, p) => t + p[0], 0) / base.length, lat = base.reduce((t, p) => t + p[1], 0) / base.length;
+  if (maior && !dentro([lon, lat], maior.c)) {                      // reserva em L: procura o ponto de dentro mais perto do centro
+    const xs = maior.c.map(p => p[0]), ys = maior.c.map(p => p[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    let melhor = null;
+    for (let i = 1; i < 40; i++) for (let j = 1; j < 40; j++) {
+      const q = [x0 + (x1 - x0) * i / 40, y0 + (y1 - y0) * j / 40];
+      if (!dentro(q, maior.c)) continue;
+      const d = (q[0] - lon) ** 2 + (q[1] - lat) ** 2;
+      if (!melhor || d < melhor.d) melhor = { q, d };
+    }
+    if (melhor) [lon, lat] = melhor.q;
+  }
+  return { longitude: lon, latitude: lat };
+}
+
+function urlWayback(item) {
+  return item.itemURL.replace('{level}', '{z}').replace('{row}', '{y}').replace('{col}', '{x}').replace('//wayback.maptiles', '//{s}.maptiles');
+}
+
+async function anosDaFazenda(cq) {
+  const pt = pontoReserva(cq); if (!pt) throw new Error('Esta fazenda ainda não tem desenho no mapa.');
+  const chave = `crqTempo:v1:${cq.fazenda_id}:${pt.latitude.toFixed(4)}:${pt.longitude.toFixed(4)}`;
+  try { const c = JSON.parse(localStorage.getItem(chave) || 'null'); if (c && Date.now() - c.em < 30 * 864e5 && c.anos?.length) return c.anos; } catch { /* sem cache */ }
+  const wb = await wayback();
+  const ZOOM = 16;
+  const itens = await wb.getWaybackItemsWithLocalChanges(pt, ZOOM);
+  const lidos = [];
+  for (let k = 0; k < itens.length; k += 6) {                       // 6 consultas por vez
+    const lote = await Promise.all(itens.slice(k, k + 6).map(async it => {
+      let m = null; try { m = await wb.getMetadata(pt, ZOOM, it.releaseNum); } catch { /* sem metadado */ }
+      return { rel: it.releaseNum, url: urlWayback(it), pub: it.releaseDateLabel, data: m?.date || null, fonte: m?.provider || m?.source || '', res: m?.resolution || null };
+    }));
+    lidos.push(...lote);
+  }
+  const porAno = new Map();
+  for (const r of lidos) {
+    const ms = r.data || Date.parse(r.pub); if (!isFinite(ms)) continue;
+    const ano = new Date(ms).getUTCFullYear();
+    const atual = porAno.get(ano);
+    if (!atual || ms > atual.ms) porAno.set(ano, { ano, ms, rel: r.rel, url: r.url, fonte: r.fonte, res: r.res, pub: r.pub, dataReal: !!r.data });
+  }
+  const anos = [...porAno.values()].sort((a, b) => a.ano - b.ano);
+  try { localStorage.setItem(chave, JSON.stringify({ em: Date.now(), anos })); } catch { /* sem espaço */ }
+  return anos;
+}
+
+function linhaDoTempo(on) {
+  const L = window.L; if (!L || !S.mapa) return;
+  S.tempo.ativo = on;
+  $('crqTempoBtn').classList.toggle('principal', on);
+  $('crqOverlay').classList.toggle('crq-tempo-on', on);
+  if (on) {
+    S.tempo.soRl = true; S.modoSede = false; $('crqSede').classList.remove('principal');
+    modoMarcar(false); modoContornar(false);
+    if (!S.tempo.ctrl) {
+      const C = L.Control.extend({ options: { position: 'bottomleft' }, onAdd() {
+        const d = L.DomUtil.create('div', 'crq-tempo'); L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; } });
+      S.tempo.ctrl = new C();
+      const R = L.Control.extend({ options: { position: 'topleft' }, onAdd() { return L.DomUtil.create('div', 'crq-tempo-rot'); } });
+      S.tempo.rot = new R();
+    }
+    S.tempo.ctrl.addTo(S.mapa); S.tempo.rot.addTo(S.mapa);
+    carregarTempo();
+  } else {
+    sairComparar();
+    if (S.tempo.camada) { S.tempo.camada.remove(); S.tempo.camada = null; }
+    if (!S.mapa.hasLayer(S.base)) S.base.addTo(S.mapa);
+    S.tempo.ctrl?.remove(); S.tempo.rot?.remove();
+    S.tempo.sel = null;
+  }
+  desenhar(true); painel();
+}
+
+async function carregarTempo() {
+  const cq = S.atual; if (!cq) return;
+  S.tempo.anos = null; S.tempo.sel = null; S.tempo.erro = null; sairComparar();
+  if (S.tempo.camada) { S.tempo.camada.remove(); S.tempo.camada = null; }
+  if (!S.mapa.hasLayer(S.base)) S.base.addTo(S.mapa);
+  barraTempo(); painel();
+  const faz = cq.fazenda_id;
+  try {
+    const anos = await anosDaFazenda(cq);
+    if (S.atual?.fazenda_id !== faz || !S.tempo.ativo) return;
+    S.tempo.anos = anos;
+    if (anos.length) verAno(anos[0].ano);                            // abre na imagem mais antiga
+  } catch (e) {
+    if (S.atual?.fazenda_id !== faz) return;
+    S.tempo.erro = /fetch|network|Failed/i.test(e.message || '') ? 'Não consegui buscar as imagens antigas (sem internet?).' : (e.message || String(e));
+  }
+  barraTempo(); painel();
+}
+
+function verAno(ano) {
+  const L = window.L; const a = (S.tempo.anos || []).find(x => x.ano === ano);
+  S.tempo.sel = a ? ano : null;
+  if (S.tempo.comparar) { montarComparar(); barraTempo(); painel(); return; }
+  if (S.tempo.camada) { S.tempo.camada.remove(); S.tempo.camada = null; }
+  if (a) {
+    S.tempo.camada = L.tileLayer(a.url, { subdomains: ['wayback', 'wayback-a', 'wayback-b'], maxZoom: 21, maxNativeZoom: 18, crossOrigin: true, attribution: 'Imagem histórica © Esri World Imagery Wayback' }).addTo(S.mapa);
+    S.tempo.camada.bringToBack(); S.base.remove();
+  } else if (!S.mapa.hasLayer(S.base)) S.base.addTo(S.mapa);
+  barraTempo(); painel();
+}
+
+function textoAno(a) {
+  if (!a) return '<b>Hoje</b> · imagem atual do satélite';
+  return `<b>${a.ano}</b> · ${a.dataReal ? 'imagem de ' + dataCap(a.ms) : 'versão publicada em ' + esc(a.pub)}${a.fonte ? ' · ' + esc(a.fonte) : ''}${a.res ? ' · ' + String(a.res).replace('.', ',') + ' m' : ''}`;
+}
+
+function barraTempo() {
+  const el = S.tempo.ctrl?.getContainer?.(); const rot = S.tempo.rot?.getContainer?.();
+  if (!el) return;
+  const anos = S.tempo.anos;
+  const sel = (anos || []).find(a => a.ano === S.tempo.sel);
+  if (rot) rot.innerHTML = S.tempo.comparar
+    ? `<span class="crq-tempo-esq">◀ ${sel ? sel.ano : '—'}</span><span class="crq-tempo-dir">Hoje ▶</span>`
+    : textoAno(sel);
+  if (S.tempo.erro) { el.innerHTML = `<span class="crq-tempo-av">${esc(S.tempo.erro)}</span> <button type="button" class="btn mini" data-t-de-novo>Tentar de novo</button>`; }
+  else if (!anos) el.innerHTML = '<span class="crq-tempo-av">Buscando as imagens de 2014 até hoje…</span>';
+  else if (!anos.length) el.innerHTML = '<span class="crq-tempo-av">Não há imagens antigas para este ponto.</span>';
+  else el.innerHTML = `<div class="crq-tempo-anos">${anos.map(a => `<button type="button" class="${a.ano === S.tempo.sel ? 'on' : ''}" data-t-ano="${a.ano}">${a.ano}</button>`).join('')}
+      ${S.tempo.comparar ? '' : `<button type="button" class="${S.tempo.sel == null ? 'on' : ''}" data-t-ano="">Hoje</button>`}</div>
+    <div class="crq-tempo-op"><button type="button" class="btn mini${S.tempo.comparar ? ' principal' : ''}" data-t-comp>⇆ Comparar com hoje</button>
+      <label><input type="checkbox" data-t-so ${S.tempo.soRl ? 'checked' : ''}> Só reserva e APP</label></div>`;
+  el.querySelector('[data-t-de-novo]')?.addEventListener('click', carregarTempo);
+  el.querySelectorAll('[data-t-ano]').forEach(b => b.addEventListener('click', () => verAno(b.dataset.tAno ? +b.dataset.tAno : null)));
+  el.querySelector('[data-t-comp]')?.addEventListener('click', () => { if (S.tempo.comparar) { sairComparar(); verAno(S.tempo.sel); } else { if (S.tempo.sel == null && anos[0]) S.tempo.sel = anos[0].ano; S.tempo.comparar = true; verAno(S.tempo.sel); } });
+  el.querySelector('[data-t-so]')?.addEventListener('change', e => { S.tempo.soRl = e.target.checked; desenhar(false); });
+}
+
+/* Comparar: ano escolhido à esquerda, hoje à direita, separados por uma cortina que se arrasta. */
+function montarComparar() {
+  const L = window.L, map = S.mapa;
+  const a = (S.tempo.anos || []).find(x => x.ano === S.tempo.sel); if (!a) return;
+  if (S.tempo.camada) { S.tempo.camada.remove(); S.tempo.camada = null; }
+  if (!map.hasLayer(S.base)) S.base.addTo(map);
+  if (!map.getPane('crqAntes')) { const pn = map.createPane('crqAntes'); pn.style.zIndex = 250; }
+  if (S.tempo.antes) S.tempo.antes.remove();
+  S.tempo.antes = L.tileLayer(a.url, { pane: 'crqAntes', subdomains: ['wayback', 'wayback-a', 'wayback-b'], maxZoom: 21, maxNativeZoom: 18, crossOrigin: true }).addTo(map);
+  if (!S.tempo.cortina) {
+    const c = L.DomUtil.create('div', 'crq-cortina', map.getContainer());
+    c.innerHTML = '<span></span>';
+    S.tempo.cortina = c; S.tempo.fr = 0.5;
+    const mover = ev => { const r = map.getContainer().getBoundingClientRect(); const x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left; S.tempo.fr = Math.min(0.98, Math.max(0.02, x / r.width)); cortar(); ev.preventDefault(); };
+    const soltar = () => { document.removeEventListener('pointermove', mover); document.removeEventListener('pointerup', soltar); map.dragging.enable(); };
+    c.addEventListener('pointerdown', ev => { map.dragging.disable(); document.addEventListener('pointermove', mover); document.addEventListener('pointerup', soltar); ev.stopPropagation(); ev.preventDefault(); });
+    S.tempo.cortar = cortar; map.on('move zoom resize', cortar);
+  }
+  S.tempo.cortina.hidden = false;
+  cortar();
+}
+function cortar() {
+  const map = S.mapa, pn = map?.getPane('crqAntes'); if (!pn || !S.tempo.cortina) return;
+  const tam = map.getSize(), x = Math.round(tam.x * S.tempo.fr);
+  const nw = map.containerPointToLayerPoint([0, 0]), se = map.containerPointToLayerPoint(tam), xl = map.containerPointToLayerPoint([x, 0]).x;
+  pn.style.clip = `rect(${nw.y}px, ${xl}px, ${se.y}px, ${nw.x}px)`;
+  S.tempo.cortina.style.left = x + 'px';
+}
+function sairComparar() {
+  S.tempo.comparar = false;
+  if (S.tempo.antes) { S.tempo.antes.remove(); S.tempo.antes = null; }
+  if (S.tempo.cortina) S.tempo.cortina.hidden = true;
+}
+
+function painelTempo() {
+  const anos = S.tempo.anos;
+  const sel = S.tempo.sel;
+  const linhas = (anos || []).map(a => `<tr data-t-linha="${a.ano}" class="${a.ano === sel ? 'sel' : ''}" style="cursor:pointer"><td>${a.ano}</td><td>${a.dataReal ? dataCap(a.ms) : 'pub. ' + esc(a.pub)}</td><td>${esc(a.fonte || '—')}</td></tr>`).join('');
+  return `<section class="crq-rl crq-tempo-pn">
+    <h4 class="crq-sub" style="margin-top:10px">Linha do tempo da reserva legal</h4>
+    ${anos == null && !S.tempo.erro ? '<p class="dica">Buscando as imagens…</p>' : S.tempo.erro ? `<p class="crq-alerta">${esc(S.tempo.erro)}</p>` : !anos.length ? '<p class="dica">Sem imagens antigas para este ponto.</p>' : `
+    <p class="crq-nota" style="margin:0 0 6px">Toque num ano para ver a imagem daquele ano sob o desenho da reserva. ${anos.length} imagem${anos.length > 1 ? 's' : ''} de ${anos[0].ano} a ${anos[anos.length - 1].ano}.</p>
+    <table class="crq-tab crq-tal"><thead><tr><th>Ano</th><th>Captura</th><th>Satélite</th></tr></thead><tbody>${linhas}</tbody></table>
+    ${(() => { const fal = []; for (let y = 2014; y < new Date().getFullYear(); y++) if (!anos.some(a => a.ano === y)) fal.push(y); return fal.length ? `<p class="crq-nota">Sem imagem nova em ${fal.join(', ')}: nesses anos o satélite não atualizou este ponto.</p>` : ''; })()}`}
+    <p class="crq-nota">Fonte: Esri World Imagery Wayback (versões da imagem de satélite publicadas desde fev/2014). Data de captura lida no centro da reserva legal. Para a auditoria, compare o desenho da reserva com a vegetação em cada ano e use <b>⇆ Comparar com hoje</b>.</p>
+  </section>`;
+}
+
+function painel() {
+  painelBase();
+  if (!S.tempo.ativo || S.modoSede) return;
+  const h = $('crqPainel').querySelector('.crq-h');
+  if (h) h.insertAdjacentHTML('afterend', painelTempo()); else $('crqPainel').insertAdjacentHTML('afterbegin', painelTempo());
+  $('crqPainel').querySelectorAll('[data-t-linha]').forEach(tr => tr.addEventListener('click', () => verAno(+tr.dataset.tLinha)));
+}
+
 function imprimir() {
   document.body.classList.add('crq-imprimindo');
   S.mapa?.invalidateSize();
@@ -806,4 +1022,4 @@ export async function abrirAnDigital() {
   }
 }
 
-export function limparCroqui() { fechar(); S = { lista: [], atual: null, mapa: S.mapa, camadas: S.camadas, rotulos: true, ocultos: new Set(), sel: null, marcando: false }; }
+export function limparCroqui() { fechar(); S = { lista: [], atual: null, mapa: S.mapa, base: S.base, camadas: S.camadas, rotulos: true, ocultos: new Set(), sel: null, marcando: false, tempo: S.tempo }; }
