@@ -2830,3 +2830,36 @@ body.crq-laudo #crqLaudo{display:block;position:fixed;inset:0;overflow:auto;z-in
 .sg-pasta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px}
 .sg-pasta span{font-size:13px;color:#51534A}
 .sg-btn-pasta{background:#C62828;border-color:#C62828;color:#fff;text-decoration:none}
+
+/* ===== Certificação › CHECKS Digital › Vistorias (12/11/2026) — js/cert-vistorias.js ===== */
+.cv-ponte{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;border:1px solid #2A8FA6;border-left:5px solid #2A8FA6;border-radius:8px;padding:10px 12px;color:#0E4E60;font-size:13.5px}
+.cv-ponte span{flex:1;min-width:220px}
+.cv-t{display:inline-block;border:1px solid currentColor;border-radius:999px;padding:0 6px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.cv-c{color:#4E7D00}.cv-nc{color:#A12A1E}.cv-na{color:#51534A}
+.cv-folha{font-family:Arial,Helvetica,sans-serif;color:#2b2d27}
+.cv-cab{display:flex;gap:14px;align-items:center;border-bottom:2px solid #84BD00;padding-bottom:8px;margin-bottom:8px}
+.cv-cab img{height:34px}
+.cv-cab>div:nth-child(2){flex:1}
+.cv-cab h1{margin:0;font-size:17px;color:#51534A}
+.cv-cab p{margin:2px 0 0;font-size:11.5px;color:#744F28}
+.cv-id{font-size:11px;text-align:right;line-height:1.5}
+.cv-ref{font-size:11px;margin:0 0 6px}
+.cv-campos{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 10px;border:1px solid #c9cbc2;border-radius:4px;padding:6px 8px;margin-bottom:8px}
+.cv-campos span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:#744F28}
+.cv-campos b{font-size:12px}
+.cv-resumo{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px}
+.cv-resumo div{border:1px solid #c9cbc2;border-radius:4px;padding:4px 6px;text-align:center}
+.cv-resumo span{display:block;font-size:9.5px;text-transform:uppercase;color:#51534A}
+.cv-resumo b{font-size:16px}
+.cv-resumo .c{border-left:4px solid #84BD00}.cv-resumo .c b{color:#4E7D00}
+.cv-resumo .nc{border-left:4px solid #A12A1E}.cv-resumo .nc b{color:#A12A1E}
+.cv-tab{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+.cv-tab th,.cv-tab td{border:1px solid #c9cbc2;padding:3px 5px;vertical-align:top;word-wrap:break-word}
+.cv-tab thead th{border-bottom:2px solid #84BD00;text-align:left;color:#51534A}
+.cv-tab .cv-grupo td{font-weight:700;color:#4E7D00;border-top:2px solid #84BD00}
+.cv-cod{font-size:10px;color:#51534A}
+.cv-res{text-align:center;font-weight:700}
+.cv-r-C{color:#4E7D00}.cv-r-NC{color:#A12A1E}.cv-r-NA{color:#51534A}
+.cv-tab tr{break-inside:avoid}
+.cv-obs,.cv-legenda{font-size:10.5px;margin:6px 0 0}
+@media (max-width:640px){.cv-campos{grid-template-columns:1fr 1fr}.cv-resumo{grid-template-columns:repeat(3,1fr)}}

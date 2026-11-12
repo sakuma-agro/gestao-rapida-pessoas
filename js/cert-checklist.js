@@ -136,7 +136,10 @@ function desenharLista() {
     ${cabecalho('CHECKS Digital', 'Preencha no celular: marque C, NC ou NA em cada item, tire foto e grave. Item NC abre uma não conformidade no FORM 004. Cada preenchimento conta como registro do RG CL.')}
     <div class="rc-cards" style="margin-top:14px">${[...comMod.map(cartao), ...semMod.map(cartaoSem)].join('') || '<div class="vazio">Nenhum check list na Lista mestra.</div>'}</div>
     <div class="rc-legenda"><span><i style="background:var(--verde)"></i>com registro</span><span><i style="border:1.5px dashed var(--suave)"></i>período atual em aberto</span><span><i style="background:var(--marrom);opacity:.75"></i>passou sem registro</span></div>
+    <div class="cv-ponte"><span>🛡 <b>Checklists de certificação do Vistorias</b> — Moradia dos trabalhadores (Rainforest 5.7.1), IFA, GRASP e Inspeção de colheita são preenchidos na área Vistorias e Segurança; o histórico fica aqui.</span>
+      <button class="btn" type="button" data-cv-ir>Ver histórico</button></div>
   </div>`;
+  tela.querySelector('[data-cv-ir]')?.addEventListener('click', () => abrirModulo('cert', 'clVistorias'));
   tela.querySelectorAll('[data-preencher]').forEach(b => b.addEventListener('click', () => formRegistro(null, b.dataset.preencher)));
   tela.querySelectorAll('[data-regs]').forEach(b => b.addEventListener('click', () => { E.fl.doc = b.dataset.regs; abrirModulo('cert', 'clRegistros'); }));
   tela.querySelectorAll('[data-branco]').forEach(b => b.addEventListener('click', () => imprimir(null, b.dataset.branco)));

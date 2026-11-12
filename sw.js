@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v651';
+const VERSAO = 'gr-v652';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -27,7 +27,7 @@ const ARQUIVOS = [
   // Cronograma geral (28/10/2026)
   './js/cronograma.js', './css/cronograma.css', './icons/area-cronograma.v3.svg',
   './pedido.html', './js/compras.js', './css/compras.css', './js/sinal-reclamacao.js', './css/sinal-reclamacao.css', './icons/area-compras.v1.svg', './js/evento-cultura.js', './css/evento-cultura.css', './icons/area-evento.v1.svg', './vendor/qrcode-generator.js',
-  './js/areas.js', './js/alerta-emprestimo.js', './js/certificacao.js', './js/cert-caderno.js', './js/cert-fauna.js', './js/cert-energia.js', './js/cert-residuos.js', './js/cert-grasp.js', './js/cert-impressoes.js', './js/cert-banho.js', './js/cert-checklist.js', './js/cert-cartoes.js', './js/cert-croqui.js', './vendor/wayback/wayback-core.js', './js/folhas-estoque.js', './js/sinaletica.js', './sinaletica/placas.json', './js/cert-balanco.js', './js/cert-fornecedores.js', './js/cert-melhorias.js', './js/arquivos.js', './js/nucleo.js', './js/moldura-nucleo.js',
+  './js/areas.js', './js/alerta-emprestimo.js', './js/certificacao.js', './js/cert-caderno.js', './js/cert-fauna.js', './js/cert-energia.js', './js/cert-residuos.js', './js/cert-grasp.js', './js/cert-impressoes.js', './js/cert-banho.js', './js/cert-checklist.js', './js/cert-vistorias.js', './js/cert-cartoes.js', './js/cert-croqui.js', './vendor/wayback/wayback-core.js', './js/folhas-estoque.js', './js/sinaletica.js', './sinaletica/placas.json', './js/cert-balanco.js', './js/cert-fornecedores.js', './js/cert-melhorias.js', './js/arquivos.js', './js/nucleo.js', './js/moldura-nucleo.js',
   // Pergunte ao LOP (13/10/2026)
   './js/assistente.js', './css/assistente.css',
   './icons/lop-gr-favicon.v1.ico', './icons/lop-gr-32.v1.png', './icons/lop-gr-180.v1.png',

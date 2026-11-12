@@ -136,7 +136,7 @@ function pintarUsuario() {
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '18';
+const VERSAO_VIST = '19';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
@@ -221,6 +221,16 @@ function liberada(id) {
   if (id === 'usuarios') return !!acesso.admin;
   return false;
 }
+/** A pessoa entra nesta área? (a Certificação usa para os atalhos ao Vistorias, 12/11/2026) */
+export const podeArea = id => liberada(id);
+/* O Vistorias (moldura) chama ao tocar em "Certificação · ver histórico" de um
+   checklist de certificação: abre Certificação › CHECKS Digital › Vistorias já
+   filtrado nele (js/cert-vistorias.js lê window.cvFiltroPedido). */
+window.irCertVistorias = chave => {
+  if (!liberada('certificacao')) { alert('O histórico fica na área Certificação, e você ainda não tem acesso a ela.'); return; }
+  window.cvFiltroPedido = chave || '';
+  entrarNaArea('certificacao', 'clVistorias');
+};
 export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.id));
 
 let aoTrocar = () => {};

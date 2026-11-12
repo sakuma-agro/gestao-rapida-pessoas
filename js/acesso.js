@@ -361,6 +361,9 @@ export const MODULOS = [
     { id: 'ceClSub', grupo: 'Registros', secao: 'Check lists e caderno', codigo: 'CL', nome: 'CHECKS Digital', telas: [
       ['clLista',     'Check lists'],
       ['clRegistros', 'Registros'],
+      /* 12/11/2026, pedido dele: os checklists de certificação feitos na área Vistorias
+         (RA Moradia, IFA, GRASP…) com o histórico aqui para a auditoria. js/cert-vistorias.js */
+      ['clVistorias', 'Vistorias'],
       ['clModelos',   'Modelos'],
     ] },
     /* Caderno de campo (19/10/2026): registros por plantio para a auditoria

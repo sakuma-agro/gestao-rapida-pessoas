@@ -400,6 +400,19 @@ async function abrir(id){
   }
 }
 
+/* Abrir direto pelo id, sem a lista (12/11/2026): a Certificação do LOP
+   abre o relatório completo, com fotos, de um checklist de certificação. */
+window.vsAbrirVistoria=async function(id,tentativa){
+  if(typeof rest!=="function"){ if((tentativa||0)<20)setTimeout(function(){window.vsAbrirVistoria(id,(tentativa||0)+1);},300); return; }
+  try{
+    var vs=await rest("vistorias?select=*&id=eq."+encodeURIComponent(id));
+    if(!vs||!vs.length){ if(typeof toast==="function")toast("Essa vistoria não está disponível para o seu acesso."); return; }
+    var outras=(cache.vistorias||[]).filter(function(x){return x.id!==id;});
+    cache.vistorias=outras.concat(vs);
+    await abrir(id);
+  }catch(e){ if(typeof toast==="function")toast(recado(e)); }
+};
+
 function pintar(){
   if(!aberta)return;
   document.querySelector("#doc").innerHTML=documento(aberta.v,aberta.itens);

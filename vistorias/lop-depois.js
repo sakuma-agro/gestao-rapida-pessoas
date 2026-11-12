@@ -96,6 +96,8 @@
     sessao = { token: s.access_token, refresh: "", expira: Infinity,
                email: (s.user && s.user.email) || "", uid: s.user && s.user.id };
     try { await abrirApp(); } catch (e) { console.error("abrir a área:", e); }
+    /* pedido da Certificação (?ck= / ?vist=) só depois da área aberta: com a sessão e as regras */
+    try { window.vsPedidoCertificacao && window.vsPedidoCertificacao(); } catch (e) { console.error("pedido da Certificação:", e); }
     try { window.parent.vistMolduraPronta && window.parent.vistMolduraPronta(); } catch (e) {}
     avisarNumeros();
   })();
@@ -223,6 +225,74 @@
       };
       palco.insertBefore(d, palco.firstChild);
     });
+  }
+
+  /* ─── ligação com a Certificação (12/11/2026) ───
+     Pedido dele: o checklist de certificação feito aqui (ex.: RA Moradia,
+     IFA, GRASP) fica com o histórico na Certificação, para apresentar na
+     auditoria. É certificação o checklist cujo nome/norma fala em Rainforest,
+     GLOBALG.A.P., GRASP, SMETA ou FORMAGR — a mesma regra do banco
+     (vistorias.e_certificacao), que libera a leitura para quem tem a
+     Certificação. A Certificação abre esta moldura com ?ck=<modelo> (começa
+     o checklist) ou ?vist=<id> (abre o relatório salvo). */
+  const RE_CERT = /(rainforest|global ?g\.?a\.?p|grasp|smeta|formagr)/i;
+  const eCert = m => !!m && RE_CERT.test([m.sigla, m.titulo, m.subtitulo, m.ref].join(" "));
+  window.vsECertificacao = eCert;
+  const irCert = chave => { try { const p = pai(); if (p && p.irCertVistorias) p.irCertVistorias(chave || ""); } catch (e) {} };
+
+  if (typeof ckRenderLista === "function") {
+    const _lista = ckRenderLista;
+    ckRenderLista = function(){
+      _lista.apply(this, arguments);
+      try {
+        const ms = ckModelos();
+        document.querySelectorAll("#ck-lista [data-ck-iniciar]").forEach(b => {
+          const k = b.getAttribute("data-ck-iniciar"), card = b.closest(".ck-card");
+          if (!card || !eCert(ms[k]) || card.querySelector(".lop-cert")) return;
+          const s = document.createElement("button");
+          s.type = "button"; s.className = "lop-cert"; s.title = "O histórico deste checklist fica na Certificação";
+          s.innerHTML = "🛡 Certificação · ver histórico";
+          s.onclick = () => irCert(k);
+          card.insertBefore(s, card.firstChild);
+        });
+      } catch (e) {}
+    };
+  }
+  if (typeof ckMontarTela === "function") {
+    const _tela = ckMontarTela;
+    ckMontarTela = function(){
+      _tela.apply(this, arguments);
+      try {
+        const prep = document.getElementById("ck-preencher");
+        prep && prep.querySelectorAll(".lop-cert-faixa").forEach(x => x.remove());
+        if (!prep || !estado.modelo || !eCert(estado.modelo)) return;
+        const d = document.createElement("div");
+        d.className = "lop-cert-faixa";
+        d.innerHTML = `<span>🛡 <b>Checklist de certificação.</b> Depois de salvo, ele entra no histórico da Certificação (CHECKS Digital › Vistorias), pronto para apresentar na auditoria.</span>`
+          + `<button class="bt" type="button">Ver histórico</button>`;
+        d.querySelector("button").onclick = () => irCert(estado.modelo.chave);
+        prep.insertBefore(d, prep.firstChild);
+      } catch (e) {}
+    };
+  }
+  const estiloCert = document.createElement("style");
+  estiloCert.textContent = ".lop-cert{display:block;width:fit-content;border:1px solid #2A8FA6;background:#E8F4F7;color:#0E4E60;border-radius:999px;padding:3px 10px;font:600 12px Arial,sans-serif;cursor:pointer;margin-bottom:6px}"
+    + ".lop-cert:hover{background:#2A8FA6;color:#fff}"
+    + ".lop-cert-faixa{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border:1px solid #2A8FA6;border-left:5px solid #2A8FA6;background:#E8F4F7;color:#0E4E60;border-radius:8px;padding:10px 12px;margin:0 0 12px;font-size:13.5px}"
+    + ".lop-cert-faixa span{flex:1;min-width:220px}";
+  document.head.appendChild(estiloCert);
+
+  window.vsPedidoCertificacao = function(){
+    let q; try { q = new URLSearchParams(location.search); } catch (e) { return; }
+    const ck = q.get("ck"), vist = q.get("vist");
+    if (ck && typeof ckIniciar === "function") {
+      if (estado.modelo && estado.modelo.chave === ck && !estado.salvoEm) ckMostrar("preencher");   // já estava preenchendo este
+      else ckIniciar(ck);
+    } else if (vist && typeof window.vsAbrirVistoria === "function") {
+      window.vsAbrirVistoria(vist);
+    }
+    /* tira o pedido do endereço: recarregar não começa outro checklist */
+    try { history.replaceState(null, "", location.pathname + "?v=" + (q.get("v") || "")); } catch (e) {}
   }
 
   const depoisDoCarregar = () => { setTimeout(() => { moverAcoes(); observar(); avisarNumeros(); mostrarTrazer(); }, 0); };
