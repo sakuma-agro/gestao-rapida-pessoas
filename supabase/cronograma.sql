@@ -21,7 +21,7 @@ create table if not exists public.cron_tarefas (
   responsavel_id text references public.reu_pessoas(id),
   data date not null,
   recorrencia text not null default 'nenhuma'
-    check (recorrencia in ('nenhuma','semanal','mensal')),
+    check (recorrencia in ('nenhuma','diaria','semanal','mensal','semestral','anual')),
   ate date,
   situacao text not null default 'afazer'
     check (situacao in ('afazer','fazendo','feito')),

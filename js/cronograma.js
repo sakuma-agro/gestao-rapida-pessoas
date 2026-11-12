@@ -981,11 +981,30 @@ const textoDias = t => { const ds = diasDe(t); return ds.length ? [1, 2, 3, 4, 5
 const seletorDias = (id, marcados) => `<div class="cr-dias" id="${id}" role="group" aria-label="Dias da semana">${[1, 2, 3, 4, 5, 6, 0].map(n =>
   `<label class="cr-dia${marcados.includes(n) ? ' on' : ''}"><input type="checkbox" value="${n}" ${marcados.includes(n) ? 'checked' : ''}>${DIAS_SEM[n]}</label>`).join('')}</div>`;
 const lerDias = id => [...document.querySelectorAll(`#${id} input:checked`)].map(x => Number(x.value)).sort();
+/* Frequências (12/11/2026, pedido dele, cores da legenda dele): Diário azul,
+   Semanal verde, Mensal laranja, Semestral vermelho, Anual roxo. "Todo dia"
+   = dias úteis (seg a sex) se nenhum dia for marcado. */
+const DIAS_UTEIS = [1, 2, 3, 4, 5];
+const MESES_REC = { mensal: 1, semestral: 6, anual: 12 };
+const FREQ = [
+  { id: 'diaria', nome: 'Diárias', rot: 'Diário', txt: 'Todo dia', cor: '#5B93EE' },
+  { id: 'semanal', nome: 'Semanais', rot: 'Semanal', txt: 'Toda semana', cor: '#4CC994' },
+  { id: 'mensal', nome: 'Mensais', rot: 'Mensal', txt: 'Todo mês', cor: '#F9A602' },
+  { id: 'semestral', nome: 'Semestrais', rot: 'Semestral', txt: 'Todo semestre', cor: '#F2706A' },
+  { id: 'anual', nome: 'Anuais', rot: 'Anual', txt: 'Todo ano', cor: '#C278F2' },
+];
+const freqDe = id => FREQ.find(f => f.id === id) || null;
+const comDias = r => r === 'semanal' || r === 'diaria';
+const diasPadrao = (r, t, data) => diasDe(t).length ? diasDe(t) : r === 'diaria' ? DIAS_UTEIS : [dataDe(data).getDay()];
+const repTexto = t => { const f = freqDe(t?.recorrencia); if (!f) return 'Não repete';
+  return f.txt + (comDias(t.recorrencia) && textoDias(t) ? ' · ' + textoDias(t) : ''); };
+const opcoesRep = t => `<option value="nenhuma" ${!t || !freqDe(t.recorrencia) ? 'selected' : ''}>Não repete</option>` +
+  FREQ.map(f => `<option value="${f.id}" ${t?.recorrencia === f.id ? 'selected' : ''}>${f.txt}${f.id === 'diaria' ? ' (dias úteis)' : ''}</option>`).join('');
 function ocorrencias(t) {
   const ini = addDias(hoje(), -JANELA_ATRAS), fim = addDias(hoje(), JANELA_FRENTE);
   if (t.recorrencia === 'nenhuma' || !t.recorrencia) return [t.data];
   const out = [];
-  const ds = t.recorrencia === 'semanal' ? diasDe(t) : [];
+  const ds = t.recorrencia === 'semanal' ? diasDe(t) : t.recorrencia === 'diaria' ? (diasDe(t).length ? diasDe(t) : DIAS_UTEIS) : [];
   if (ds.length) {
     let d = t.data > ini ? t.data : ini;
     for (let k = 0; k < 800 && d <= fim && (!t.ate || d <= t.ate); k++, d = addDias(d, 1))
@@ -994,8 +1013,8 @@ function ocorrencias(t) {
   }
   let d = t.data;
   for (let k = 0; k < 400 && d <= fim && (!t.ate || d <= t.ate); k++) {
-    if (d >= ini) out.push(t.recorrencia === 'mensal' ? diaUtil(d) : d);
-    d = t.recorrencia === 'semanal' ? addDias(t.data, 7 * (k + 1)) : addMeses(t.data, k + 1);
+    if (d >= ini) out.push(t.recorrencia === 'semanal' ? d : diaUtil(d));
+    d = t.recorrencia === 'semanal' ? addDias(t.data, 7 * (k + 1)) : addMeses(t.data, (k + 1) * (MESES_REC[t.recorrencia] || 1));
   }
   return out;
 }
@@ -1051,7 +1070,7 @@ function todosItens() {
       itens.push({
         chave, tarefa: t, data: fim || d, comeca: fim ? d : null, titulo: t.titulo, texto: t.descricao, area: t.area || 'esc',
         ir: t.ir ? (IR_CK[t.ir] || null) : null,
-        origemNome: rep ? (t.recorrencia === 'semanal' ? 'Tarefa · toda semana' + (textoDias(t) ? ' (' + textoDias(t) + ')' : '') : 'Tarefa · todo mês') : 'Tarefa',
+        origemNome: rep ? 'Tarefa · ' + repTexto(t).toLowerCase().replace(' · ', ' (') + (comDias(t.recorrencia) && textoDias(t) ? ')' : '') : 'Tarefa',
         auto: false, resp: resps[0] || null, resps, explicito,
         sit: rep ? (e?.situacao || 'afazer') : (t.situacao || 'afazer'),
         feitaEm: rep ? e?.feita_em : t.feita_em,
@@ -1232,6 +1251,70 @@ function modulos() {
     : `<div class="cr-foco-vazio"><b>Nenhuma tarefa ${est.mostrar === 'todas' ? '' : 'aberta '}${nomeP} nos filtros atuais.</b><p>Troque o prazo para Semana ou Tudo, ou confira os filtros.</p></div>`;
 }
 
+/* Rotinas (12/11/2026, pedido dele): aba com as tarefas que repetem,
+   separadas por frequência — Diárias, Semanais, Mensais, Semestrais e
+   Anuais — nas cores da legenda dele. "Toda semana" com 5 dias ou mais
+   marcados conta como diária. Tocar na linha abre a vez atual da tarefa. */
+const SEM_LONGO = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+function freqDaTarefa(t) {
+  if (t.recorrencia === 'semanal' && diasDe(t).length >= 5) return 'diaria';
+  return freqDe(t.recorrencia) ? t.recorrencia : null;
+}
+function quandoRotina(t, f) {
+  const dia = Number(String(t.data).slice(8, 10)), dm = br(t.data).slice(0, 5);
+  if (f === 'diaria') { const ds = diasPadrao('diaria', t, t.data); return ds.length === 5 && DIAS_UTEIS.every(n => ds.includes(n)) ? 'seg a sex' : textoDias({ dias_semana: ds }); }
+  if (f === 'semanal') return textoDias(t) || SEM_LONGO[dataDe(t.data).getDay()];
+  if (f === 'mensal') {
+    const sem = (t.descricao || '').match(/semana\s*(\d)/i);
+    return (sem ? `semana ${sem[1]}` : `dia ${dia}`) + (t.prazo_dia ? ` · até dia ${t.prazo_dia}` : '');
+  }
+  if (f === 'semestral') return `${dm} e ${br(addMeses(t.data, 6)).slice(0, 5)}`;
+  return dm;
+}
+function vezAtual(t) {
+  const its = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? -1 : 1));
+  return (its.find(x => x.sit !== 'feito' && x.data >= hoje()) || its.filter(x => x.data <= hoje()).pop() || its[0])?.chave || null;
+}
+function rotinas() {
+  const meu = eu();
+  const lista = dados.tarefas.filter(t => t.ativo !== false && freqDaTarefa(t)
+    && (!t.privada || String(t.dono_email || '').toLowerCase() === meuEmail()))
+    .map(t => { const resps = t.responsavel_id ? [t.responsavel_id] : respsDaArea(t.area || 'esc', null); return { t, f: freqDaTarefa(t), resps }; })
+    .filter(({ t, resps }) => {
+      if (est.filtro === 'minhas' && (!meu || !resps.includes(meu.id))) return false;
+      if (est.pessoa === '-' && resps.length) return false;
+      if (est.pessoa && est.pessoa !== '-' && !resps.includes(est.pessoa)) return false;
+      if (est.area && (t.area || 'esc') !== est.area) return false;
+      if (est.origem === 'app') return false;
+      if (est.busca) { const txt = norm([t.titulo, t.descricao, ...(Array.isArray(t.checklist) ? t.checklist.flatMap(g => [g.g, ...(g.i || []).map(x => typeof x === 'object' ? x.t : x)]) : [])].join(' '));
+        if (!norm(est.busca).split(/\s+/).filter(Boolean).every(p => txt.includes(p))) return false; }
+      return true;
+    });
+  const ordemDia = t => { const ds = diasDe(t); return ds.length ? Math.min(...ds.map(n => (n + 6) % 7)) : (dataDe(t.data).getDay() + 6) % 7; };
+  const semDe = t => Number(((t.descricao || '').match(/semana\s*(\d)/i) || [])[1] || 0);
+  const nomeP = id => pessoa(id)?.nome || 'ZZZ';
+  const secoes = FREQ.map(f => {
+    const l = lista.filter(x => x.f === f.id).sort((a, b) => nomeP(a.resps[0]).localeCompare(nomeP(b.resps[0]), 'pt-BR')
+      || (f.id === 'semanal' ? ordemDia(a.t) - ordemDia(b.t) : f.id === 'mensal' ? (semDe(a.t) - semDe(b.t)) || (a.t.data < b.t.data ? -1 : a.t.data > b.t.data ? 1 : 0) : a.t.data < b.t.data ? -1 : a.t.data > b.t.data ? 1 : 0)
+      || a.t.titulo.localeCompare(b.t.titulo, 'pt-BR'));
+    const linhas = l.map(({ t, resps }) => {
+      const ck = Array.isArray(t.checklist) ? t.checklist.reduce((n, g) => n + (g.i || []).length, 0) : 0;
+      return `<div class="cr-rot-lin" role="button" tabindex="0" data-rot="${esc(t.id)}" style="--fc:${f.cor}">
+        <span class="cr-rot-quando">${esc(quandoRotina(t, f.id))}</span>
+        <span class="cr-rot-tit">${t.privada ? '🔒 ' : ''}${esc(t.titulo)}${ck ? ` <small>☑ ${ck}</small>` : ''}</span>
+        ${tagArea(t.area || 'esc')}
+        <span class="cr-rot-resp">${resps.length ? resps.map(id => avatar(id)).join('') : avatar(null)} <small>${esc(resps.map(id => (pessoa(id)?.nome || '').split(' ')[0]).filter(Boolean).join(', ') || 'Sem responsável')}</small></span>
+      </div>`;
+    }).join('');
+    return `<section class="cr-rot-sec" style="--fc:${f.cor}">
+      <header class="cr-rot-cab"><i></i><b>${f.nome}</b><span>${l.length}</span></header>
+      ${linhas || `<p class="cr-rot-vazio">Nenhuma tarefa ${f.nome.toLowerCase().replace(/s$/, '')} ainda. Para criar, use <b>+ Tarefa</b> e escolha "${f.txt}" em Repete.</p>`}
+    </section>`;
+  }).join('');
+  return `<div class="cr-rotinas">${secoes}</div>`;
+}
+const legendaFreq = () => FREQ.map(f => `<span><i style="background:${f.cor}"></i>${f.rot}</span>`).join('');
+
 /* Pesquisa (09/11/2026, pedido dele): pelo número (#123 ou 123) ou por
    qualquer palavra do nome, dos detalhes, do checklist, da origem ou da pessoa. */
 function bate(it, q) {
@@ -1309,6 +1392,7 @@ function desenhar() {
     <div class="cr-seg" role="tablist">
       <button type="button" role="tab" data-visao="calendario" aria-selected="${est.visao === 'calendario'}">Calendário</button>
       <button type="button" role="tab" data-visao="modulos" aria-selected="${est.visao === 'modulos'}">Por módulo</button>
+      <button type="button" role="tab" data-visao="rotinas" aria-selected="${est.visao === 'rotinas'}">Rotinas</button>
       <button type="button" role="tab" data-visao="foco" aria-selected="${est.visao === 'foco'}">Foco do dia</button>
       <button type="button" role="tab" data-visao="reuniao" aria-selected="${est.visao === 'reuniao'}">Reunião</button>
       <button type="button" role="tab" data-visao="compras" aria-selected="${est.visao === 'compras'}">Compras</button>
@@ -1345,8 +1429,8 @@ function desenhar() {
         <button type="button" class="cr-chip" data-colunas="situacao" aria-pressed="${est.colunas === 'situacao'}">Situação</button>
         <button type="button" class="cr-chip" data-colunas="pessoa" aria-pressed="${est.colunas === 'pessoa'}">Pessoa</button>` : ''}
     </div>
-    <div id="crCorpo">${est.busca ? resultados() : est.visao === 'foco' ? foco() : est.visao === 'modulos' ? modulos() : calendario()}</div>
-    <div class="cr-legenda">${est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
+    <div id="crCorpo">${est.visao === 'rotinas' ? rotinas() : est.busca ? resultados() : est.visao === 'foco' ? foco() : est.visao === 'modulos' ? modulos() : calendario()}</div>
+    <div class="cr-legenda">${est.visao === 'rotinas' ? legendaFreq() : est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
       <span class="cr-auto-leg"><span class="cr-tag" style="background:#51534A">Do app</span> vem sozinha de outra área · <span class="cr-tag avulsa">Avulsa</span> lançada à mão</span></div>`}
   </div>`;
   ligarTela();
@@ -1943,6 +2027,11 @@ function ligarTela() {
     desenhar();
     if (matchMedia('(max-width: 899px)').matches) r.querySelector('.cr-lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+  r.querySelectorAll('[data-rot]').forEach(b => {
+    const abre = () => { const t = dados.tarefas.find(x => String(x.id) === b.dataset.rot); const k = t && vezAtual(t); if (k) abrirTarefa(k); };
+    b.onclick = abre;
+    b.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abre(); } };
+  });
   r.querySelectorAll('[data-colmob]').forEach(b => b.onclick = () => { est.colMob = b.dataset.colmob; desenhar(); });
   r.querySelectorAll('[data-item]').forEach(b => b.onclick = ev => {
     const ac = ev.target.closest('[data-acao]');
@@ -2374,7 +2463,7 @@ function abrirTarefa(chave) {
   const chip = (cls, rot, conteudo, extra = '') => `<span class="cr-tk-chip ${cls}"${extra}><small>${rot}</small><span>${conteudo}</span></span>`;
   const selResp = `<select id="tkResp" aria-label="Responsável">${opcoesPessoas(respId || '', padraoArea)}</select>`;
   const p = pessoa(respId);
-  const repTxt = !rep ? 'Não repete' : t.recorrencia === 'semanal' ? 'Toda semana' + (textoDias(t) ? ' · ' + textoDias(t) : '') : 'Todo mês';
+  const repTxt = repTexto(t);
 
   d.innerHTML = `<form method="dialog" class="cr-tk" id="crTk">
     <div class="cr-tk-cab">
@@ -2392,15 +2481,13 @@ function abrirTarefa(chave) {
           ${edita && !rep ? `<span class="cr-tk-chip data ${r.cls}" id="tkDataBt" role="button" tabindex="0">📅 ${esc(br(it.data))} · ${esc(r.txt)} ▾<input type="date" id="tkData" value="${esc(t.data || '')}" tabindex="-1" aria-label="Data"></span>`
             : `<span class="cr-tk-chip data ${r.cls} fixo">📅 ${it.comeca ? `${esc(brCurto(it.comeca))} → ${esc(brCurto(it.data))} · ${esc(r.txt.replace(/^prazo \S+ · /, '').replace(/^de \S+ a \S+$/, 'ainda não começou'))}` : `${esc(br(it.data))} · ${esc(r.txt)}`}</span>`}
           ${edita ? `<label class="cr-tk-chip sel">🔁 <span>${repTxt} ▾</span><select id="tkRep" aria-label="Repete">
-              <option value="nenhuma" ${!rep ? 'selected' : ''}>Não repete</option>
-              <option value="semanal" ${t.recorrencia === 'semanal' ? 'selected' : ''}>Toda semana</option>
-              <option value="mensal" ${t.recorrencia === 'mensal' ? 'selected' : ''}>Todo mês</option></select></label>
+              ${opcoesRep(t)}</select></label>
             <label class="cr-tk-chip sel">🏷 <span>${esc(areaDe(t.area || 'esc').nome)} ▾</span><select id="tkArea" aria-label="Área">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t.area || 'esc') === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>` : ''}
         </div>
         ${edita && rep ? `<div class="cr-tk-rep">
             <label>Começa em <input type="date" id="tkIni" value="${esc(t.data || '')}"></label>
             <label>Até <input type="date" id="tkAte" value="${esc(t.ate || '')}"></label>
-            ${t.recorrencia === 'semanal' ? `<div class="cr-dias-l"><small>Dias da semana</small>${seletorDias('tkDias', diasDe(t).length ? diasDe(t) : [dataDe(t.data).getDay()])}</div>` : ''}
+            ${comDias(t.recorrencia) ? `<div class="cr-dias-l"><small>Dias da semana</small>${seletorDias('tkDias', diasPadrao(t.recorrencia, t, t.data))}</div>` : ''}
             ${t.recorrencia === 'mensal' ? `<label>Prazo até o dia <input type="number" id="tkPrazo" min="1" max="31" style="width:64px" value="${esc(t.prazo_dia || '')}" placeholder="—"></label>` : ''}
             <small>O responsável vale para todas as vezes.</small></div>` : ''}
 
@@ -2493,7 +2580,7 @@ function abrirTarefa(chave) {
   if (rp) rp.onchange = async () => {
     const v = rp.value;
     await salvarT({ recorrencia: v, ate: v === 'nenhuma' ? null : t.ate || null,
-      dias_semana: v === 'semanal' ? (diasDe(t).length ? diasDe(t) : [dataDe(t.data).getDay()]) : null });
+      dias_semana: v === 'semanal' ? (diasDe(t).length ? diasDe(t) : [dataDe(t.data).getDay()]) : v === 'diaria' ? DIAS_UTEIS : null });
     const novos = todosItens().filter(x => x.tarefa?.id === t.id).sort((a, b) => (a.data < b.data ? 1 : -1));
     reabrir(novos[0]?.chave || `t:${t.id}`);
   };
@@ -2588,11 +2675,9 @@ function abrirItem(chave) {
       <label class="campo">${rep ? 'Começa em' : 'Data'}<input type="date" id="crData" required value="${esc(t?.data || est.dia || hoje())}"></label>
       <label class="campo">Área<select id="crAreaT">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t?.area || 'esc') === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>
       <label class="campo">Repete<select id="crRep">
-        <option value="nenhuma" ${!rep ? 'selected' : ''}>Não repete</option>
-        <option value="semanal" ${t?.recorrencia === 'semanal' ? 'selected' : ''}>Toda semana</option>
-        <option value="mensal" ${t?.recorrencia === 'mensal' ? 'selected' : ''}>Todo mês</option>
+        ${opcoesRep(t)}
       </select></label>
-      <div class="campo plena" id="crDiasCampo" ${t?.recorrencia === 'semanal' ? '' : 'hidden'}>Dias da semana${seletorDias('crDias', diasDe(t).length ? diasDe(t) : [dataDe(t?.data || est.dia || hoje()).getDay()])}</div>
+      <div class="campo plena" id="crDiasCampo" ${comDias(t?.recorrencia) ? '' : 'hidden'}>Dias da semana${seletorDias('crDias', diasPadrao(t?.recorrencia, t, t?.data || est.dia || hoje()))}</div>
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
       ${nova || !t?.dono_email || String(t.dono_email).toLowerCase() === meuEmail() ? `<label class="campo plena cr-priv-campo"><span><input type="checkbox" id="crPriv" ${t?.privada ? 'checked' : ''}> <b>Só eu vejo</b> — a tarefa não aparece para mais ninguém da equipe</span></label>` : ''}
     </div>${nova ? '' : '</details>'}` : ''}
@@ -2631,7 +2716,8 @@ function abrirItem(chave) {
     o.textContent = n ? 'Responsável da área — ' + n : 'Sem responsável';
   };
   const rep2 = $('crRep');
-  if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; $('crDiasCampo').hidden = rep2.value !== 'semanal'; };
+  if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; $('crDiasCampo').hidden = !comDias(rep2.value);
+    if (rep2.value === 'diaria' && !diasDe(t).length) document.querySelectorAll('#crDias input').forEach(x => { x.checked = DIAS_UTEIS.includes(Number(x.value)); x.closest('.cr-dia')?.classList.toggle('on', x.checked); }); };
   if ($('crDias')) $('crDias').querySelectorAll('input').forEach(c => c.onchange = () => c.closest('.cr-dia')?.classList.toggle('on', c.checked));
   d.querySelectorAll('input[name=crSit]').forEach(x => x.onchange = () => {
     if ($('crBqCampos')) $('crBqCampos').hidden = d.querySelector('input[name=crSit]:checked')?.value !== 'bloqueado';
@@ -2654,7 +2740,7 @@ function abrirItem(chave) {
         id: t?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
         titulo, descricao: limpo($('crDesc').value) || null, data, area: $('crAreaT').value,
         recorrencia, ate: recorrencia === 'nenhuma' ? null : ($('crAte').value || null), ativo: true,
-        dias_semana: recorrencia === 'semanal' && $('crDias') ? (lerDias('crDias').length ? lerDias('crDias') : [dataDe(data).getDay()]) : null,
+        dias_semana: comDias(recorrencia) && $('crDias') ? (lerDias('crDias').length ? lerDias('crDias') : diasPadrao(recorrencia, null, data)) : null,
         responsavel_id: t?.responsavel_id ?? resp,
         situacao: t?.situacao || 'afazer', feita_em: t?.feita_em || null,
         criado_por: t?.criado_por || acesso.nome || acesso.email || null,
