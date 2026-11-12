@@ -111,55 +111,96 @@ const ICONE = {
   cadeado: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="21" width="28" height="20" rx="3"/><path d="M16 21v-6a8 8 0 0 1 16 0v6"/><circle cx="24" cy="31" r="2" fill="currentColor"/></svg>`,
 };
 
-/* ---------------- 1. Placa A4 ---------------- */
-async function htmlPlaca() {
-  const qr = await svgQrBonito(LINK_FORM);
+/* ---------------- 1. Placa A4 (refeita 12/11/2026) ----------------
+   Pedido dele: "vamos melhorar a placa, deixando instrutiva e com o print de quando
+   abre o QR Code". Mesmo estilo da placa "Você sabe o que fazer se…" e da instrução:
+   logo no branco, faixa grafite, QR grande ao lado do celular com a tela real do
+   formulário (img/jotform-042-tela1.jpg) e os 4 passos numerados nas telas.
+   Legível em P&B (marcadores com borda grafite). */
+export async function htmlPlaca() {
+  const qr = await svgQrBonito(LINK_FORM, { margem: 3 });
+  const passo = (n, ic, tit, txt) => `<div class="rp-passo"><b class="rp-n">${n}</b><span class="rp-ic">${ic}</span><b class="rp-t">${tit}</b><em>${txt}</em></div>`;
   return `<style>
-    .rq-folha{width:210mm;height:296mm;box-sizing:border-box;padding:10mm 14mm 8mm;margin:0 auto;background:#fff;color:${GRAFITE};
-      font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;page-break-after:always;break-after:page;overflow:hidden}
-    .rq-folha:last-child{page-break-after:auto;break-after:auto}
-    .rq-logo{height:17mm;margin-bottom:3mm}
-    .rq-h1{font-size:30pt;font-weight:800;margin:0;letter-spacing:-.5pt;text-align:center;line-height:1.05}
-    .rq-sub{font-size:14pt;margin:2mm 0 0;color:${CINZA};text-align:center}
-    .rq-anon{display:inline-flex;align-items:center;gap:2.5mm;margin:4mm 0 4mm;padding:2.5mm 6mm;border:.7mm solid ${GRAFITE};border-radius:20mm;font-size:14pt;font-weight:800}
-    .rq-anon svg{width:7mm;height:7mm}
-    .rq-qrbox{position:relative;width:108mm;height:108mm;padding:3.5mm}
-    .rq-qrbox svg{width:100%;height:100%;display:block}
-    .rq-canto{position:absolute;width:14mm;height:14mm;border:1.6mm solid ${VERDE}}
-    .rq-canto.a{top:0;left:0;border-right:0;border-bottom:0;border-top-left-radius:5mm}
-    .rq-canto.b{top:0;right:0;border-left:0;border-bottom:0;border-top-right-radius:5mm}
-    .rq-canto.c{bottom:0;left:0;border-right:0;border-top:0;border-bottom-left-radius:5mm}
-    .rq-canto.d{bottom:0;right:0;border-left:0;border-top:0;border-bottom-right-radius:5mm}
-    .rq-aponte{font-size:16pt;font-weight:800;margin:3mm 0 4mm}
-    .rq-tipos{display:flex;gap:9mm;margin-bottom:5mm}
-    .rq-tipo{display:flex;flex-direction:column;align-items:center;gap:1.5mm;font-size:12pt;font-weight:700}
-    .rq-tipo span{width:16mm;height:16mm;border-radius:50%;border:.6mm solid ${GRAFITE};display:flex;align-items:center;justify-content:center}
-    .rq-tipo svg{width:10mm;height:10mm}
-    .rq-passos{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;width:100%}
-    .rq-passo{border:.4mm solid #C9CBC2;border-radius:3mm;padding:3.5mm 3mm;text-align:center;font-size:11.5pt;line-height:1.3}
-    .rq-passo b{display:flex;align-items:center;justify-content:center;width:8mm;height:8mm;margin:0 auto 2mm;border-radius:50%;background:${GRAFITE};color:#fff;font-size:12pt}
-    .rq-pe{margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end;border-top:1.4mm solid ${VERDE};padding-top:3mm;font-size:9.5pt;color:${CINZA}}
-    .rq-pe img{height:9mm}
+    .rq-folha{width:210mm;height:296mm;box-sizing:border-box;padding:6mm 11mm 5mm;margin:0 auto;background:#fff;color:${GRAFITE};
+      font-family:Arial,Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;overflow:hidden;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .rp-logo{height:13mm;margin-bottom:2.5mm}
+    .rp-faixa{align-self:stretch;margin:0 -11mm;background:${GRAFITE};border-top:1.4mm solid ${VERDE};border-bottom:1.4mm solid ${VERDE};
+      text-align:center;padding:3.5mm 0 4mm;position:relative}
+    .rp-faixa::after{content:"";position:absolute;left:50%;bottom:-5.2mm;margin-left:-4mm;border:4mm solid transparent;border-top-color:${VERDE};border-bottom:0}
+    .rp-k{color:#fff;font-size:15pt;font-weight:700;letter-spacing:2.6mm}
+    .rp-faixa h1{color:${VERDE};font-size:40pt;margin:1mm 0 0;line-height:1;letter-spacing:-.5pt}
+    .rp-sub{color:#fff;font-size:12pt;margin-top:1.5mm}
+    .rp-selos{display:flex;justify-content:center;gap:2.5mm;margin:7mm 0 0;flex-wrap:nowrap}
+    .rp-selo{display:inline-flex;align-items:center;gap:1.6mm;border:.6mm solid ${GRAFITE};border-radius:20mm;padding:1.5mm 3.6mm;font-size:11pt;font-weight:800;white-space:nowrap}
+    .rp-selo svg{width:5.8mm;height:5.8mm}
+    .rp-selo.v{background:${VERDE};border-color:${VERDE}}
+    .rp-meio{display:flex;align-items:center;gap:6mm;margin-top:8mm}
+    .rp-qrcol{display:flex;flex-direction:column;align-items:center}
+    .rp-qrbox{position:relative;width:96mm;height:96mm;padding:3.5mm;box-sizing:border-box}
+    .rp-qrbox svg{width:100%;height:100%;display:block}
+    .rp-canto{position:absolute;width:14mm;height:14mm;border:1.6mm solid ${VERDE}}
+    .rp-canto.a{top:0;left:0;border-right:0;border-bottom:0;border-top-left-radius:5mm}
+    .rp-canto.b{top:0;right:0;border-left:0;border-bottom:0;border-top-right-radius:5mm}
+    .rp-canto.c{bottom:0;left:0;border-right:0;border-top:0;border-bottom-left-radius:5mm}
+    .rp-canto.d{bottom:0;right:0;border-left:0;border-top:0;border-bottom-right-radius:5mm}
+    .rp-cap{font-size:13pt;font-weight:800;margin-top:2mm;text-align:center}
+    .rp-cap small{display:block;font-size:10pt;font-weight:400;color:${CINZA};margin-top:.5mm}
+    .rp-seta{font-size:30pt;color:${VERDE_ESC};font-weight:800;margin-bottom:12mm}
+    .rp-celcol{display:flex;flex-direction:column;align-items:center}
+    .rp-cel{width:52mm;border:1.3mm solid ${GRAFITE};border-radius:6mm;padding:2.6mm 1.8mm 3.2mm;background:${GRAFITE};box-sizing:border-box}
+    .rp-fala{display:block;width:10mm;height:1mm;border-radius:1mm;background:#4A535C;margin:0 auto 2mm}
+    .rp-tel{position:relative;background:#fff;border-radius:2.6mm}
+    .rp-tel img{display:block;width:100%;border-radius:2.6mm}
+    .rp-mk{position:absolute;left:-6mm;transform:translateY(-50%);width:8.5mm;height:8.5mm;border-radius:50%;background:${VERDE};color:${GRAFITE};
+      font-weight:800;font-size:13pt;display:flex;align-items:center;justify-content:center;border:.6mm solid ${GRAFITE};box-shadow:0 0 0 .7mm #fff}
+    .rp-celcol .rp-cap{color:${VERDE_ESC}}
+    .rp-h2{align-self:stretch;font-size:13pt;margin:7mm 0 4mm;padding-left:2.5mm;border-left:1.6mm solid ${VERDE};line-height:1.1}
+    .rp-passos{align-self:stretch;display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
+    .rp-passo{background:#F3F8E6;border-radius:3mm;padding:3mm 2.5mm 3mm;text-align:center;display:flex;flex-direction:column;align-items:center;position:relative}
+    .rp-n{position:absolute;top:-3mm;left:-1.5mm;width:8mm;height:8mm;border-radius:50%;background:${VERDE};color:${GRAFITE};border:.6mm solid ${GRAFITE};
+      display:flex;align-items:center;justify-content:center;font-size:12pt}
+    .rp-ic svg{width:10mm;height:10mm;color:${GRAFITE}}
+    .rp-t{font-size:11pt;margin-top:1mm;line-height:1.15}
+    .rp-passo em{font-style:normal;font-size:9.3pt;color:${CINZA};margin-top:1mm;line-height:1.25}
+    .rp-depois{align-self:stretch;margin-top:4mm;border:.6mm solid ${GRAFITE};border-radius:3mm;padding:2.5mm 4mm;font-size:10.3pt;display:flex;gap:3mm;align-items:center}
+    .rp-depois b.i{flex:none;width:9mm;height:9mm;border-radius:50%;background:${GRAFITE};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13pt}
+    .rq-pe{margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end;border-top:1.4mm solid ${VERDE};padding-top:2.5mm;font-size:9pt;color:${CINZA}}
+    .rq-pe img{height:8.5mm}
     @media print{.rq-folha{margin:0}}
   </style>
   <article class="rq-folha">
-    <img class="rq-logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-    <h1 class="rq-h1">SUA OPINIÃO<br>FAZ DIFERENÇA</h1>
-    <p class="rq-sub">Reclamações, sugestões e elogios</p>
-    <div class="rq-anon">${ICONE.cadeado} 100% ANÔNIMO — NÃO PEDE NOME</div>
-    <div class="rq-qrbox"><i class="rq-canto a"></i><i class="rq-canto b"></i><i class="rq-canto c"></i><i class="rq-canto d"></i>${qr}</div>
-    <div class="rq-aponte">Aponte a câmera do celular</div>
-    <div class="rq-tipos">
-      <div class="rq-tipo"><span>${ICONE.reclamacao}</span>Reclamação</div>
-      <div class="rq-tipo"><span>${ICONE.sugestao}</span>Sugestão</div>
-      <div class="rq-tipo"><span>${ICONE.elogio}</span>Elogio</div>
+    <img class="rp-logo" src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+    <div class="rp-faixa"><div class="rp-k">SUA OPINIÃO</div><h1>FAZ DIFERENÇA</h1><div class="rp-sub">Reclamações, sugestões e elogios pelo celular</div></div>
+    <div class="rp-selos">
+      <span class="rp-selo v">${ICONE.cadeado} 100% ANÔNIMO · NÃO PEDE NOME</span>
+      <span class="rp-selo">${ICONE.reclamacao} Reclamação</span>
+      <span class="rp-selo">${ICONE.sugestao} Sugestão</span>
+      <span class="rp-selo">${ICONE.elogio} Elogio</span>
     </div>
-    <div class="rq-passos">
-      <div class="rq-passo"><b>1</b>Aponte a câmera e toque no link que aparecer</div>
-      <div class="rq-passo"><b>2</b>Escolha o tipo e a fazenda</div>
-      <div class="rq-passo"><b>3</b>Escreva o que aconteceu e toque em <strong>Enviar</strong></div>
+    <div class="rp-meio">
+      <div class="rp-qrcol">
+        <div class="rp-qrbox"><i class="rp-canto a"></i><i class="rp-canto b"></i><i class="rp-canto c"></i><i class="rp-canto d"></i>${qr}</div>
+        <div class="rp-cap">Aponte a câmera do celular<small>Serve a câmera, o WhatsApp ou o Google Lens</small></div>
+      </div>
+      <div class="rp-seta">➜</div>
+      <div class="rp-celcol">
+        <div class="rp-cel"><span class="rp-fala"></span><div class="rp-tel">
+          <img src="img/jotform-042-tela1.jpg" alt="Tela do formulário que abre: tipo de feedback e local">
+          <span class="rp-mk" style="top:71.5%">2</span><span class="rp-mk" style="top:91%">3</span></div></div>
+        <div class="rp-cap">É isso que abre<br>no seu celular</div>
+      </div>
     </div>
-    <footer class="rq-pe"><span>FORM 042 · Reclamação e sugestão<br>Sem celular? Fale com o escritório ou use a caixa de sugestões.</span>
+    <h2 class="rp-h2">Como enviar, em 4 passos</h2>
+    <div class="rp-passos">
+      ${passo(1, ICONE.camera, 'Aponte a câmera', 'E toque no link que aparecer na tela')}
+      ${passo(2, ICONE.lista, 'Escolha o tipo', 'Reclamação, Sugestão ou Elogio')}
+      ${passo(3, ICONE.reclamacao, 'Fazenda e texto', 'Marque a fazenda e conte o que aconteceu: o quê, onde e quando')}
+      ${passo(4, ICONE.enviar, 'Toque em Enviar', 'Chega na hora no escritório. Ninguém sabe quem enviou')}
+    </div>
+    <div class="rp-depois"><b class="i">✓</b><span><b>Depois:</b> o escritório analisa, resolve e dá o retorno a todos no DDS, reunião, quadro ou WhatsApp.
+      <b>Emergência ou acidente não é por aqui</b> — avise na hora o encarregado.</span></div>
+    <footer class="rq-pe"><span>SAKUMA Agronegócios · FORM 042 — Reclamação e sugestão<br>Sem celular? Fale com o escritório ou use a caixa de sugestões.</span>
       <img src="img/lop-marca.png" alt="LOP"></footer>
   </article>`;
 }
@@ -299,7 +340,7 @@ export async function desenharReclamacaoQr(el) {
         Independente do QR de Compras.</p></div>
     <div class="rq-cards">
       <section class="rq-card"><div class="rq-prev" id="rqPrevPlaca"></div>
-        <h3>Placa A4</h3><p>Para a parede e o quadro de avisos de cada fazenda. Lê bem em preto e branco; plastificar ajuda.</p>
+        <h3>Placa A4</h3><p>Para a parede e o quadro de avisos: QR grande, a tela que abre no celular e os 4 passos. Lê bem em preto e branco; plastificar ajuda.</p>
         <button type="button" class="btn principal" data-rq="placa">Ver e imprimir a placa</button></section>
       <section class="rq-card"><div class="rq-prev rq-prev-ins" id="rqPrevIns"></div>
         <h3>Instrução</h3><p>Uma folha A4: os 4 passos com as telas do formulário, o que acontece depois e os combinados. Para DDS e integração.</p>
