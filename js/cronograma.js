@@ -1354,6 +1354,78 @@ function desenhar() {
   if (est.visao === 'compras') abrirCompras($('crCmp'), { rastro: true });
 }
 
+/* Itens de um dia do calendário (o vencimento, o "Começa:" e o "Cobrar:"). */
+function itensDoDia(dia) {
+  const l = [];
+  for (const it of filtrados()) {
+    if (it.data === dia) l.push(it);
+    if (it.comeca && it.comeca !== it.data && it.sit !== 'feito' && it.comeca === dia) l.push({ ...it, inicio: true });
+    if (it.sit === 'bloqueado' && it.bloq?.cobrar && it.bloq.cobrar !== it.data && it.bloq.cobrar === dia) l.push({ ...it, cobrar: true });
+  }
+  return l.sort(ordemItens);
+}
+const livreFoco = it => it.sit !== 'feito' && it.sit !== 'bloqueado' && !it.focoEm;
+
+/* Atalho "+N tarefas" (12/11/2026, pedido dele): tocar no "+9 tarefas" do
+   calendário abre a lista do dia já com os botões do Foco do dia — um toque
+   em Agora / Em seguida / Rápido / Por último manda a tarefa para o foco,
+   sem abrir tarefa por tarefa. "Mandar todas" envia as que faltam como
+   "Por último". A janela fica aberta e vai marcando o que já foi. */
+function abrirAtalhoDia(dia) {
+  const d = dialogo();
+  const desenharAt = () => {
+    const l = itensDoDia(dia);
+    const vistos = new Set();
+    const abertas = l.filter(it => it.sit !== 'feito' && !vistos.has(it.chave) && vistos.add(it.chave));
+    const feitas = l.filter(it => it.sit === 'feito').length;
+    const livres = abertas.filter(livreFoco);
+    const linhaAt = it => {
+      const r = rotuloData(it);
+      const dir = it.sit === 'bloqueado' ? '<span class="cr-nofoco" style="color:#BA7517">🔒 bloqueada</span>'
+        : it.focoEm ? `<span class="cr-nofoco">🎯 no foco</span><span class="cr-ac" role="button" tabindex="0" data-at="tirar" data-alvo="${esc(it.chave)}">Tirar</span>`
+        : botoesFoco(it).replace(/data-acao=/g, 'data-at=');
+      return `<div class="cr-at-lin${it.focoEm ? ' ok' : ''}">
+        <span class="cr-barra" style="background:${areaDe(it.area).cor}"></span>
+        <span class="cr-at-txt" role="button" tabindex="0" data-abrir="${esc(it.chave)}" title="Abrir a tarefa"><b>${numDe(it) ? `<span class="cr-num">#${numDe(it)}</span> ` : ''}${it.cobrar ? 'Cobrar: ' : ''}${it.inicio ? 'Começa: ' : ''}${seloPriv(it)}${esc(it.titulo)}</b>
+          <small>${tagOrigem(it)} · ${esc(nomesDe(it.resps) || 'sem responsável')} · <span class="cr-data ${r.cls}">${esc(r.txt)}</span></small></span>
+        <span class="cr-at-dir">${dir}</span></div>`;
+    };
+    d.innerHTML = `<form method="dialog" class="cr-at">
+      <h3 style="margin:0 0 2px">🎯 Mandar para o Foco do dia</h3>
+      <p class="cr-dlg-orig">${SEMANA[dataDe(dia).getDay()]}, ${brCurto(dia)} · ${abertas.length} ${abertas.length === 1 ? 'tarefa aberta' : 'tarefas abertas'}${feitas ? ` · ${feitas} concluída${feitas === 1 ? '' : 's'}` : ''}</p>
+      <p class="dc-sem" style="margin:0 0 8px">Um toque na cor manda a tarefa para o foco: <b>Agora</b> importante e urgente (até 2) · <b>Em seguida</b> importante · <b>Rápido</b> simples · <b>Por último</b> o resto.</p>
+      ${livres.length > 1 ? `<div class="barra" style="margin-bottom:8px"><button type="button" class="btn" id="crAtTodas">🎯 Mandar as ${livres.length} como "Por último"</button></div>` : ''}
+      <div class="cr-at-lista">${abertas.length ? abertas.map(linhaAt).join('') : '<p class="cr-vazio">Nada aberto neste dia.</p>'}</div>
+      <div class="barra entre" style="margin-top:10px"><span class="dc-sem">Toque no nome para abrir a tarefa.</span><button class="btn principal" value="ok">Fechar</button></div>
+    </form>`;
+    d.querySelectorAll('[data-at]').forEach(b => {
+      const ir = async ev => {
+        ev.preventDefault(); ev.stopPropagation();
+        const ac = b.dataset.at;
+        if (ac === 'cheio') return alert('As 2 vagas de "Fazer agora" já estão ocupadas. Conclua uma ou escolha outra cor.');
+        const it = todosItens().find(x => x.chave === b.dataset.alvo);
+        if (!it) return;
+        const p = ac === 'tirar' ? mudar(it, { foco: false })
+          : mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true, prio: ac.slice(5) });
+        desenharAt(); await p; if (d.open) desenharAt();
+      };
+      b.onclick = ir;
+      b.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') ir(ev); };
+    });
+    d.querySelectorAll('[data-abrir]').forEach(b => {
+      b.onclick = () => abrirTarefa(b.dataset.abrir);
+      b.onkeydown = ev => { if (ev.key === 'Enter') abrirTarefa(b.dataset.abrir); };
+    });
+    if ($('crAtTodas')) $('crAtTodas').onclick = async () => {
+      const ps = livres.map(x => todosItens().find(y => y.chave === x.chave)).filter(Boolean)
+        .map(it => mudar(it, { sit: it.sit, foco: true, prio: 'ultimo' }));
+      desenharAt(); await Promise.all(ps); if (d.open) desenharAt();
+    };
+  };
+  desenharAt();
+  if (!d.open) d.showModal();
+}
+
 function calendario() {
   const itens = filtrados();
   const [a, m] = est.mes.split('-').map(Number);
@@ -1381,7 +1453,7 @@ function calendario() {
     cel += `<button type="button" class="${cls}" data-dia="${s}" aria-label="${br(s)}: ${l.length} itens">
       <span class="n">${d.getDate()}</span>
       <span class="pts">${sits.map(k => `<i style="background:${COR_SIT[k]}"></i>`).join('')}</span>
-      <span class="cr-evs">${l.slice(0, 3).map(x => `<span class="cr-ev s-${sitCor(x)}">${x.cobrar ? 'Cobrar: ' : ''}${x.inicio ? 'Começa: ' : ''}${esc(x.titulo)}</span>`).join('')}${l.length > 3 ? `<span class="cr-ev-mais">+ ${l.length - 3}</span>` : ''}</span>
+      <span class="cr-evs">${l.slice(0, 3).map(x => `<span class="cr-ev s-${sitCor(x)}">${x.cobrar ? 'Cobrar: ' : ''}${x.inicio ? 'Começa: ' : ''}${esc(x.titulo)}</span>`).join('')}${l.length > 3 ? `<span class="cr-ev-mais" role="button" tabindex="0" data-mais="${s}" title="Abrir as tarefas do dia e mandar para o Foco do dia">+${l.length - 3} ${l.length - 3 === 1 ? 'tarefa' : 'tarefas'} 🎯</span>` : ''}</span>
       ${l.length ? `<span class="q">${l.length}</span>` : ''}
     </button>`;
   }
@@ -1402,7 +1474,7 @@ function calendario() {
       ${atrasos ? `<p class="cr-alerta">${atrasos} ${atrasos === 1 ? 'item atrasado' : 'itens atrasados'} no filtro atual — os dias em vermelho.</p>` : ''}
     </div>
     <div class="cr-lista">
-      <div class="cr-lista-cab"><b>${titulo}</b><span>${doDia.length} ${doDia.length === 1 ? 'item' : 'itens'}</span></div>
+      <div class="cr-lista-cab"><b>${titulo}</b><span>${doDia.some(livreFoco) ? `<button type="button" class="btn mini cr-mais-bt" data-mais="${est.dia}">🎯 Mandar para o foco</button> ` : ''}${doDia.length} ${doDia.length === 1 ? 'item' : 'itens'}</span></div>
       ${doDia.length ? doDia.map(linha).join('') : '<p class="cr-vazio">Nada neste dia.</p>'}
     </div>
   </div>`;
@@ -1859,7 +1931,13 @@ function ligarTela() {
     else { est.mes = addMeses(est.mes + '-01', n).slice(0, 7); est.dia = est.mes + '-01'; }
     desenhar();
   });
-  r.querySelectorAll('[data-dia]').forEach(b => b.onclick = () => {
+  r.querySelectorAll('[data-mais]').forEach(b => {
+    const abrir = ev => { ev.preventDefault(); ev.stopPropagation(); abrirAtalhoDia(b.dataset.mais); };
+    b.onclick = abrir;
+    b.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') abrir(ev); };
+  });
+  r.querySelectorAll('[data-dia]').forEach(b => b.onclick = ev => {
+    if (ev.target.closest('[data-mais]')) return;
     est.dia = b.dataset.dia;
     if (est.dia.slice(0, 7) !== est.mes) est.mes = est.dia.slice(0, 7);
     desenhar();

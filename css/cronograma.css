@@ -476,3 +476,18 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-cki.editando{align-items:flex-start}
 .cr-cki.editando .cr-ckdel,.cr-cki.editando .cr-ir{display:none}
 .cr-ckeditbox{flex:1;padding:6px 0 8px}
+
+/* Atalho "+N tarefas" → Foco do dia (12/11/2026) */
+.cr-ev-mais[data-mais]{cursor:pointer;font-weight:700;color:var(--verde-esc);border-radius:4px}
+.cr-ev-mais[data-mais]:hover,.cr-ev-mais[data-mais]:focus-visible{background:var(--verde-fundo);text-decoration:underline;outline:none}
+.cr-lista-cab .cr-mais-bt{font-size:11.5px;padding:2px 8px;margin-right:6px;vertical-align:middle}
+.cr-at-lista{display:flex;flex-direction:column;gap:6px}
+.cr-at-lin{display:flex;align-items:stretch;gap:8px;border:1px solid var(--borda,#DDD);border-radius:8px;padding:6px 8px 6px 0;background:var(--cartao,#fff)}
+.cr-at-lin.ok{background:var(--verde-fundo)}
+.cr-at-lin .cr-barra{width:4px;border-radius:0 3px 3px 0;flex:0 0 4px}
+.cr-at-txt{flex:1 1 auto;min-width:0;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+.cr-at-txt b{font-size:13px;line-height:1.3}
+.cr-at-txt small{font-size:11.5px;color:var(--suave)}
+.cr-at-dir{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:0 1 auto}
+.cr-at-dir .cr-prio-bts{flex:0 1 auto;justify-content:flex-end}
+@media (max-width:599px){.cr-at-lin{flex-wrap:wrap}.cr-at-dir{flex:1 1 100%;justify-content:flex-start;padding-left:12px}}
