@@ -202,15 +202,16 @@ export function saldoRegistrado(localId, mes, ateData, grupo, contagemId) {
      nos estoques que não vivem de movimentos, o saldo do EPI é a última
      contagem + entradas − saídas (js/epi-saldo.js), e esses lançamentos não
      podem fazer os outros grupos (defensivos…) parecerem "de movimentos". */
-  const doEpi = !qc && todos('est_movimentos').some(m => m.local_id === localId && m.origem === 'epi' && m.ativo !== false);
-  if (doEpi && grupo === 'EPIs') {
+  const ORG = grupo === 'EPIs' ? 'epi' : grupo === 'Material de limpeza' ? 'limpeza' : '';
+  const doEpi = !qc && !!ORG && todos('est_movimentos').some(m => m.local_id === localId && m.origem === ORG && m.ativo !== false);
+  if (doEpi) {
     const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);
     const r = saldosEpi({ locais: todos('est_locais'), contagens: todos('est_contagens'), grupos: todos('est_contagem_grupos'),
       linhas: todos('est_contagem_itens'), movimentos: todos('est_movimentos'), itens: todos('est_itens') }, localId,
-      { ateDia: lim, excluirContagem: contagemId || '' });
+      { ateDia: lim, excluirContagem: contagemId || '', grupo });
     const sal = new Map(); let base = '';
     for (const [k, v] of r) { sal.set(k, v.saldo); base = base || v.baseData; }
-    return { fonte: 'epi', saldos: sal, ate: lim, texto: (base ? 'contagem de ' + dataBR(base) : 'zero') + ' + entradas − saídas de EPI até ' + dataBR(lim) };
+    return { fonte: 'epi', saldos: sal, ate: lim, texto: (base ? 'contagem de ' + dataBR(base) : 'zero') + ' + entradas − saídas até ' + dataBR(lim) };
   }
   const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId && (qc || (m.origem !== 'epi' && m.origem !== 'limpeza'))).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false && !m.pendente);

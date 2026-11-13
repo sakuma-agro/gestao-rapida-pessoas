@@ -35,10 +35,14 @@ export const MODULOS = [
   ] },
   /* EPIs (13/11/2026, pedido dele): a entrada de EPI é só aqui no Estoque; o
      SST fica só com a entrega ao funcionário. js/epi.js */
-  { id: 'epi', nome: 'EPIs', telas: [
-    ['epiEntradas', 'Entradas de EPI'],
-    ['epiSaldo',    'Saldo de EPI'],
-    ['limpEntradas', 'Entradas de limpeza'],   // 13/11/2026 — material de limpeza, mesma tela sem CA
+  /* 13/11/2026 (tarde): virou "Estoque EPI e limpeza" — entradas, saídas,
+     transferências entre estoques e fornecedores, para EPI e material de limpeza. */
+  { id: 'epi', nome: 'Estoque EPI e limpeza', telas: [
+    ['epiSaldo',    'Estoque'],
+    ['epiEntradas', 'Entradas'],
+    ['epiSaidas',   'Saídas'],
+    ['epiTransf',   'Transferências'],
+    ['epiForn',     'Fornecedores'],
   ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
      estoque (FORM 048 entrada, FORM 049 saída) e as placas das pranchetas. Ficam

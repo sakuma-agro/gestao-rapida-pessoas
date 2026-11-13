@@ -25,10 +25,10 @@ const unicos = lista => [...new Map((lista || []).map(x => [x.id, x])).values()]
  * @param {string} antesDe  só contagens com data < antesDe (AAAA-MM-DD); vazio = todas
  * @param {string} ateDia   só contagens com data <= ateDia
  */
-export function ultimaContagemEpi(d, localId, { antesDe = '', ateDia = '', excluirId = '' } = {}) {
+export function ultimaContagemEpi(d, localId, { antesDe = '', ateDia = '', excluirId = '', grupo = 'EPIs' } = {}) {
   const grupos = unicos(d.grupos);
   const cands = unicos(d.contagens).filter(c => c.local_id === localId && c.id !== excluirId).map(c => {
-    const g = grupos.find(x => x.contagem_id === c.id && x.grupo === 'EPIs');
+    const g = grupos.find(x => x.contagem_id === c.id && x.grupo === grupo);
     const data = String((g && g.data_contagem) || c.data_contagem || fimDoMes(c.mes)).slice(0, 10);
     const fechada = (g && g.status === 'fechada') || c.status === 'fechada';
     return { c, data, fechada };
@@ -53,11 +53,12 @@ export function ultimaContagemEpi(d, localId, { antesDe = '', ateDia = '', exclu
  * d = { locais, contagens, grupos, linhas, movimentos, itens }
  * @returns Map item_id → { base, baseData, entradas, saidas, saldo }
  */
-export function saldosEpi(d, localId, { ateDia = '', antesDe = '', excluirContagem = '' } = {}) {
+/* grupo: 'EPIs' (padrão) ou 'Material de limpeza' — mesma conta (13/11/2026). */
+export function saldosEpi(d, localId, { ateDia = '', antesDe = '', excluirContagem = '', grupo = 'EPIs' } = {}) {
   const local = (d.locais || []).find(l => l.id === localId);
   const qc = ehQuebraCocao(local);
-  const epis = new Set((d.itens || []).filter(i => i.grupo === 'EPIs').map(i => i.id));
-  const cont = qc ? null : ultimaContagemEpi(d, localId, { antesDe, ateDia, excluirId: excluirContagem });
+  const epis = new Set((d.itens || []).filter(i => i.grupo === grupo).map(i => i.id));
+  const cont = qc ? null : ultimaContagemEpi(d, localId, { antesDe, ateDia, excluirId: excluirContagem, grupo });
   const desde = cont ? cont.data : '';
   const lim = ateDia || (antesDe ? diaAntes(antesDe) : '');
   const r = new Map();

@@ -485,3 +485,16 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 @media (max-width:640px){.epi-linha{grid-template-columns:1fr 1fr 34px}}
 .epi-linha.sem-ca{grid-template-columns:1fr 80px 90px 34px}
 @media (max-width:640px){.epi-linha.sem-ca{grid-template-columns:1fr 1fr 34px}}
+/* Estoque EPI e limpeza (13/11/2026): linha sem R$ e painel de cadastro dentro da entrada */
+.epi-linha.sem-valor{grid-template-columns:1fr 170px 110px 34px}
+.epi-linha .campo small{display:block;min-height:1em;font-size:.72rem;margin-top:2px}
+.mv-sub{border:2px solid #84BD00;border-radius:12px;background:#f6fbec;padding:12px 14px;margin:10px 0}
+.mv-sub h3{margin:0 0 8px;color:#744F28}
+.mv-com-botao{display:flex;gap:8px}
+.mv-com-botao input{flex:1}
+@media (max-width:640px){.epi-linha.sem-valor{grid-template-columns:1fr 1fr 34px}.mv-com-botao{flex-direction:column}}
+.mv-form .epi-linha{align-items:start;grid-template-columns:1.4fr 1fr 1fr 34px;padding-bottom:8px;border-bottom:1px dashed #ddd}
+.mv-form .epi-linha.sem-valor{grid-template-columns:1.4fr 1fr 34px}
+.mv-form .epi-linha > .campo:first-child{grid-column:1/-1}
+.mv-form .epi-linha.sem-valor > .campo:first-child{grid-column:1/-1}
+.mv-form .epi-linha > .btn{margin-top:22px}

@@ -494,7 +494,7 @@ async function carregarEstoques() {
 }
 /* Os módulos da área Estoque (mesmos ids de estoque/js/acesso.js). */
 const EST_MODULOS = [['contagem', 'Contagem'], ['compra', 'Compra inteligente'], ['qc', 'Estoque Quebra Cocão'],
-  ['epi', 'EPIs'], ['acerto', 'Acerto'], ['cadastros', 'Cadastros']];
+  ['epi', 'Estoque EPI e limpeza'], ['acerto', 'Acerto'], ['cadastros', 'Cadastros']];
 const EST_LOCAL = 'estoque.local:', EST_MOD = 'estoque.modulo:';
 const estMarcados = (e, pre) => (e.telas || []).filter(x => x.startsWith(pre)).map(x => x.slice(pre.length));
 
