@@ -194,7 +194,11 @@ function cabecalhoEscolha() {
   </div>`;
 }
 
-/* As contagens do mês (1ª, 2ª…) e o botão de começar outra. */
+/* As contagens do mês (1ª, 2ª…) e o botão de começar outra.
+   Mais fácil abrir uma nova (pedido dele, 13/11/2026): o botão aparece sempre
+   que a última contagem do mês tem algum tipo começado — não precisa mais
+   fechar todos os tipos antes. Na janela a pessoa marca o que vai contar de
+   novo; o resto passa para a nova do jeito que está. */
 function blocoRodadas() {
   if (!sel.localId) return '';
   const lista = contagensDoMes(sel.localId, sel.mes);
@@ -203,47 +207,87 @@ function blocoRodadas() {
   const chips = lista.length > 1 ? `<div class="ct-chips ct-rodadas" role="tablist">${lista.map(c => `<button type="button" role="tab"
     class="ct-chip${c.status === 'fechada' ? ' completo' : ''}" data-rodada="${rodadaDe(c)}" aria-pressed="${vista && vista.id === c.id}">${c.status === 'fechada' ? '✓ ' : ''}${esc(nomeRodada(rodadaDe(c)))}
     <small>${c.status === 'fechada' ? (c.data_contagem ? esc(dataBR(c.data_contagem).slice(0, 5)) : 'fechada') : 'em andamento'}</small></button>`).join('')}</div>` : '';
-  const pode = ultima && ultima.status === 'fechada';
-  const dica = !ultima ? '' : pode
+  const pode = !!ultima && situacaoTipos(sel.localId, sel.mes, rodadaDe(ultima)).some(t => t.comecado);
+  const dica = !pode ? '' : ultima.status === 'fechada'
     ? `A ${esc(nomeRodada(rodadaDe(ultima)))} de ${esc(nomeMes(sel.mes))} está fechada. Precisa contar de novo? Comece outra — a última fechada é a que vale no Acerto.`
-    : lista.length > 1 || rodadaDe(ultima) > 1 ? '' : 'Para começar outra contagem neste mês, feche todos os tipos desta primeiro.';
+    : 'Precisa contar algum tipo de novo? Comece outra contagem e escolha o que recontar.';
   return `${chips}<div class="barra entre ct-rodada-pe">
     <span class="dc-sem">${dica}</span>
     ${pode ? `<button class="btn" type="button" id="ctNovaRodada">+ Nova contagem em ${esc(nomeMes(sel.mes))}</button>` : ''}
   </div>`;
 }
 
+/* registro copiado para a nova contagem, sem os carimbos do servidor */
+const copiaPara = (r, extra) => { const o = Object.assign({}, r, extra); delete o._base; delete o.atualizado_em; delete o.criado_em; return o; };
+
 function novaRodada() {
   const lista = contagensDoMes(sel.localId, sel.mes);
   const ultima = lista[lista.length - 1];
-  if (!ultima || ultima.status !== 'fechada') return;
-  const n = rodadaDe(ultima) + 1;
+  if (!ultima) return;
+  const r = rodadaDe(ultima);
+  const tipos = situacaoTipos(sel.localId, sel.mes, r);
+  const comecados = tipos.filter(t => t.comecado);
+  const naoComecados = tipos.filter(t => !t.comecado);
+  if (!comecados.length) return;
+  const n = r + 1;
   const local = locais().find(l => l.id === sel.localId);
+  const situ = t => t.fechado
+    ? `<span class="tag ativo">fechado${t.cg && t.cg.data_contagem ? ' ' + esc(dataBR(t.cg.data_contagem).slice(0, 5)) : ''}</span>`
+    : `<span class="tag alerta">em andamento ${t.p.feitos}/${t.p.total}</span>`;
   window.abrirModal('Nova contagem no mês', `
     <p>${esc(local ? local.nome : '')} · <strong>${esc(nomeMes(sel.mes))}</strong> · <strong>${esc(nomeRodada(n))}</strong></p>
-    <p>Começa uma lista em branco para contar de novo. A ${esc(nomeRodada(rodadaDe(ultima)))} continua guardada no Histórico.</p>
-    <p class="dc-sem">Quando esta nova fechar, é ela que passa a valer no Acerto de ${esc(nomeMes(sel.mes))}.</p>
+    <p><strong>O que vai contar de novo?</strong> O que ficar marcado começa em branco.</p>
+    <div class="ct-nr-tipos">${comecados.map(t => `<label class="ct-nr-tipo"><input type="checkbox" value="${esc(t.g)}"${t.fechado ? ' checked' : ''}>
+      <span>${esc(t.g)}</span> ${situ(t)}</label>`).join('')}</div>
+    <p class="dc-sem">O que não marcar passa para a ${esc(nomeRodada(n))} do jeito que está — números, lotes e quadras, fechado ou em andamento.${naoComecados.length ? ` ${esc(naoComecados.map(t => t.g).join(', '))} ${naoComecados.length === 1 ? 'ainda não foi começado e entra' : 'ainda não foram começados e entram'} em branco.` : ''}</p>
+    <p class="dc-sem">A ${esc(nomeRodada(r))} continua guardada (botões 1ª/2ª contagem no alto). Quando todos os tipos da nova fecharem, é ela que vale no Acerto.</p>
     <div class="barra fim">
       <button class="btn" type="button" id="ctNrVoltar">Voltar</button>
       <button class="btn principal" type="button" id="ctNrOk">Começar a ${esc(nomeRodada(n))}</button>
     </div>`, corpo => {
+    const ok = corpo.querySelector('#ctNrOk');
+    const marcados = () => [...corpo.querySelectorAll('.ct-nr-tipo input:checked')].map(x => x.value);
+    const conferir = () => { ok.disabled = !marcados().length; ok.title = ok.disabled ? 'Marque ao menos um tipo para contar de novo' : ''; };
+    corpo.querySelectorAll('.ct-nr-tipo input').forEach(x => x.addEventListener('change', conferir));
+    conferir();
     corpo.querySelector('#ctNrVoltar').onclick = window.fecharModal;
-    corpo.querySelector('#ctNrOk').onclick = async () => {
-      corpo.querySelector('#ctNrOk').disabled = true;
+    ok.onclick = async () => {
+      const recontar = new Set(marcados());
+      if (!recontar.size) return;
+      ok.disabled = true;
+      ok.textContent = 'Começando…';
       try {
+        const novoId = idContagem(sel.localId, sel.mes, n);
         await gravar('est_contagens', {
-          id: idContagem(sel.localId, sel.mes, n), local_id: sel.localId, mes: sel.mes, rodada: n,
+          id: novoId, local_id: sel.localId, mes: sel.mes, rodada: n,
           status: 'aberta', responsavel: meuNome(), aberta_por: meuNome(), data_contagem: hojeLocal(),
         });
+        // os tipos que não vão ser recontados passam como estão
+        const levar = comecados.filter(t => !recontar.has(t.g));
+        for (const t of levar) {
+          const ids = new Set(itensDoLocal(sel.localId).filter(i => grupoDe(i) === t.g).map(i => i.id));
+          for (const l of linhasDe(ultima.id).filter(x => ids.has(x.item_id)))
+            await gravar('est_contagem_itens', copiaPara(l, { id: idLinha(novoId, l.item_id), contagem_id: novoId }));
+          for (const l of todos('est_contagem_lotes').filter(x => x.contagem_id === ultima.id && ids.has(x.item_id) && x.ativo !== false))
+            await gravar('est_contagem_lotes', copiaPara(l, { id: crypto.randomUUID(), contagem_id: novoId }));
+          for (const q of todos('est_contagem_quadras').filter(x => x.contagem_id === ultima.id && ids.has(x.item_id) && x.ativo !== false))
+            await gravar('est_contagem_quadras', copiaPara(q, { id: idQuadraLinha(novoId, q.item_id, q.quadra), contagem_id: novoId }));
+          const base = t.cg || (t.fechado ? { status: 'fechada', data_contagem: ultima.data_contagem || null,
+            fechada_por: ultima.fechada_por || null, fechada_em: ultima.fechada_em || null, responsavel: ultima.responsavel || null } : null);
+          if (base) await gravar('est_contagem_grupos', copiaPara(base, { id: idGrupoC(novoId, t.g), contagem_id: novoId, grupo: t.g, ativo: true }));
+        }
         sel.rodada = n;
+        if (!recontar.has(sel.grupo)) sel.grupo = [...recontar][0];
+        try { localStorage.setItem(CHAVE_GRUPO, sel.grupo); } catch { /* sem localStorage */ }
         abertos.clear();
         window.fecharModal();
-        aviso(`${nomeRodada(n)} de ${nomeMes(sel.mes)} começada.`);
+        aviso(`${nomeRodada(n)} de ${nomeMes(sel.mes)} começada — recontar: ${[...recontar].join(', ')}.`);
         desenharContar();
       } catch (e) {
         console.error(e);
         aviso('Não consegui começar a nova contagem (' + (e.message || e) + ').', true);
-        corpo.querySelector('#ctNrOk').disabled = false;
+        ok.disabled = false;
+        ok.textContent = `Começar a ${nomeRodada(n)}`;
       }
     };
   });

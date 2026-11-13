@@ -468,3 +468,10 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .cad-ca-resumo{display:inline-flex;gap:6px;flex-wrap:wrap}
 .cad-ca-val{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
 .item .sub a{color:inherit;text-decoration:underline dotted}
+
+/* Nova contagem: escolher o que recontar (13/11/2026) */
+.ct-nr-tipos { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
+.ct-nr-tipo { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; cursor: pointer; font-weight: 600; }
+.ct-nr-tipo input { width: 20px; height: 20px; accent-color: #84BD00; flex: none; }
+.ct-nr-tipo span:first-of-type { flex: 1; }
+.ct-nr-tipo:has(input:checked) { border-color: #84BD00; background: #f3f9e6; }
