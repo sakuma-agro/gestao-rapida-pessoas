@@ -208,89 +208,97 @@ function desenhar() {
   else if (nome === 'epiSaldo') telaSaldo(tela);
 }
 
-/* ---------------- ENTREGAS (saída para o funcionário) ---------------- */
+/* ---------------- ENTREGAS (saída para o funcionário) ----------------
+   Lean (13/11/2026, pedido dele "deixe o painel mais lean"): a entrega se faz
+   na própria tela, sem janela — funcionário, data, EPI, quantidade, salvar.
+   Estoque e motivo vêm sozinhos (dá para trocar). Pendências viram 2 avisos
+   curtos; a lista do mês fica embaixo, só com Ficha e Assinada. */
+const FORM = { func: '', data: '', local: '', linhas: [{ item: '', qtd: '1', mer: '' }] };
+const limparForm = () => Object.assign(FORM, { func: '', data: '', local: '', linhas: [{ item: '', qtd: '1', mer: '' }] });
+
+function guia(id, passos) {
+  try { if (localStorage.getItem('gr.guia.' + id) === 'x') return ''; } catch (e) { /* sem armazenamento */ }
+  return `<div class="guia" data-guia="${id}">${passos.map((t, i) => `<span class="guia-p"><i>${i + 1}</i><span>${t}</span></span>`).join('')}
+    <button type="button" class="guia-x" title="Entendi, esconder" aria-label="Esconder o passo a passo">✕</button></div>`;
+}
+
 function telaSaida(tela) {
   const todas = entregas();
   const tr = trocas().filter(t => t.sit.chave !== 'fora');
-  const q = semAcento(F.busca);
-  const doMes = todas.filter(e => !F.mes || e.data.startsWith(F.mes));
-  const vis = doMes.filter(e => (!q || semAcento(e.funcionario + ' ' + e.linhas.map(l => itemDe(l.item_id).nome).join(' ')).includes(q))
-    && (!F.sit || (F.sit === 'pend' ? !e.assinada : e.assinada)));
   const pendAss = todas.filter(e => !e.assinada);
-  const atras = tr.filter(t => t.sit.chave === 'atrasada'), logo = tr.filter(t => t.sit.chave === 'logo');
-  const card = (id, nome, n, cor, dica, ativo) => `<button type="button" class="pv-card pv-${cor}${n ? '' : ' pv-zero'}${ativo ? ' epm-ativo' : ''}" data-epm-card="${id}">
-    <span>${nome}</span><strong>${n}</strong><small>${dica}</small></button>`;
-  const listaTrocas = F.verTrocas ? (F.verTrocas === 'atrasada' ? atras : logo) : [];
+  const atras = tr.filter(t => t.sit.chave === 'atrasada');
+  const q = semAcento(F.busca);
+  const vis = todas.filter(e => (F.sit === 'pend' ? !e.assinada : (!F.mes || e.data.startsWith(F.mes)))
+    && (!q || semAcento(e.funcionario + ' ' + e.linhas.map(l => itemDe(l.item_id).nome).join(' ')).includes(q)));
+  const listaTrocas = F.verTrocas ? atras : [];
 
-  tela.innerHTML = `<div class="cartao naoimprimir">
-    <div class="barra entre" style="margin:0">
-      <div><h2 style="margin:0">Entregas de EPI</h2>
-        <p class="dica" style="margin:2px 0 0">O EPI sai do estoque da fazenda e cada entrega gera a ficha de EPI para o funcionário assinar.</p></div>
-      <span class="barra">
-        <button class="btn" type="button" id="epmAtualizar" title="Ler de novo do banco">↻</button>
-        <button class="btn principal" type="button" id="epmNova">+ Nova entrega</button>
+  tela.innerHTML = `<div class="cartao naoimprimir epm-lean">
+    <div class="barra entre" style="margin:0 0 8px">
+      <h2 style="margin:0">Entrega de EPI</h2>
+      <button class="btn mini" type="button" id="epmAtualizar" title="Ler de novo do banco">↻ Atualizar</button>
+    </div>
+    ${guia('epi-entrega', ['Escolha o <b>funcionário</b>', 'Escolha o <b>EPI</b> e a <b>quantidade</b>', '<b>Salvar</b> e imprimir a ficha', 'Ele assinou? Toque em <b>Assinada ✓</b>'])}
+    <form id="epmForm" class="epm-form" autocomplete="off">
+      <div class="epm-topo">
+        <label class="campo epm-func">Funcionário <input type="text" id="epmFunc" list="epmFuncs" value="${esc(FORM.func)}" placeholder="digite o nome"></label>
+        <label class="campo epm-data">Data <input type="date" id="epmData" value="${esc(FORM.data || hoje())}" max="${hoje()}"></label>
+      </div>
+      <datalist id="epmFuncs"></datalist>
+      <p class="epm-info" id="epmInfo"></p>
+      <div id="epmLinhas" class="epm-itens"></div>
+      <datalist id="epmItens"></datalist>
+      <div class="barra entre epm-pe">
+        <button class="btn" type="button" id="epmMais">+ Outro EPI</button>
+        <span class="barra" style="margin:0">
+          <button class="btn" type="button" id="epmLimpar">Limpar</button>
+          <button class="btn principal" type="submit" id="epmSalvar">Salvar e imprimir ficha</button>
+        </span>
+      </div>
+      <p class="aviso erro" id="epmAviso" hidden></p>
+    </form>
+
+    ${pendAss.length || atras.length ? `<div class="epm-pend">
+      ${pendAss.length ? `<button type="button" class="epm-chip alerta${F.sit === 'pend' ? ' on' : ''}" id="epmVerPend">✍ ${pendAss.length} ficha${pendAss.length > 1 ? 's' : ''} sem assinatura</button>` : ''}
+      ${atras.length ? `<button type="button" class="epm-chip perigo${F.verTrocas ? ' on' : ''}" id="epmVerTrocas">⟳ ${atras.length} troca${atras.length > 1 ? 's' : ''} atrasada${atras.length > 1 ? 's' : ''}</button>` : ''}
+    </div>` : ''}
+    ${listaTrocas.length ? `<div class="tc-rolo epm-trocas"><table class="dc-planilha"><tbody>
+      ${listaTrocas.map((t, i) => `<tr><td><b>${esc(t.funcionario)}</b></td><td>${esc(nomeSemCa(t.item.nome))}</td>
+        <td class="dc-sem">recebeu ${br(t.data)} · troca ${esc(textoTroca(t.item))}</td><td>${chip(t.sit.cor, t.sit.rotulo)}</td>
+        <td><button class="btn mini principal" type="button" data-epm-trocar="${i}">Entregar</button></td></tr>`).join('')}
+    </tbody></table></div>` : ''}
+
+    <div class="barra entre epm-listacab">
+      <h3 style="margin:0">${F.sit === 'pend' ? 'Fichas sem assinatura' : 'Entregas'}</h3>
+      <span class="barra" style="margin:0">
+        <input type="search" id="epmBusca" value="${esc(F.busca)}" placeholder="Buscar">
+        ${F.sit === 'pend' ? '' : `<input type="month" id="epmMes" value="${esc(F.mes)}">`}
+        <button class="btn mini" type="button" id="epmImpLista" ${vis.length ? '' : 'disabled'} title="Imprimir todas as fichas da lista">🖨 ${vis.length}</button>
       </span>
     </div>
-    <div class="pv-cards" style="margin-top:12px">
-      ${card('mes', 'Entregas no mês', doMes.length, 'calma', 'no mês escolhido abaixo', false)}
-      ${card('pend', 'Fichas sem assinatura', pendAss.length, 'alerta', 'imprimir e colher a assinatura', F.sit === 'pend')}
-      ${card('atrasada', 'Trocas atrasadas', atras.length, 'perigo', 'passou da periodicidade', F.verTrocas === 'atrasada')}
-      ${card('logo', 'Trocar em 15 dias', logo.length, 'ok', 'próximas trocas', F.verTrocas === 'logo')}
+    <div class="epm-lista">
+    ${vis.length ? vis.map(e => `<div class="epm-ent">
+      <div class="epm-ent-txt"><b>${esc(e.funcionario)}</b> <span class="dc-sem">${br(e.data)} · ${esc(localDe(e.local_id).nome)}</span><br>
+        <span class="epm-ent-itens">${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(nomeSemCa(itemDe(l.item_id).nome))}`).join(' · ')}</span></div>
+      <div class="epm-ent-acoes">
+        <button class="btn mini" type="button" data-epm-ficha="${esc(e.id)}">🖨 Ficha</button>
+        ${e.assinada ? `<button class="btn mini epm-ok" type="button" data-epm-assinar="${esc(e.id)}" title="Desmarcar">✓ Assinada</button>`
+          : `<button class="btn mini principal" type="button" data-epm-assinar="${esc(e.id)}">Assinada ✓</button>`}
+        ${admin() ? `<button class="btn mini epm-x" type="button" data-epm-cancelar="${esc(e.id)}" title="Cancelar a entrega">✕</button>` : ''}
+      </div></div>`).join('') : `<p class="dc-sem" style="margin:8px 0">${F.sit === 'pend' ? 'Todas as fichas estão assinadas.' : 'Nenhuma entrega neste mês.'}</p>`}
     </div>
-    ${listaTrocas.length ? `<div class="epm-trocas">
-      <div class="barra entre" style="margin:12px 0 6px"><b>${F.verTrocas === 'atrasada' ? 'Trocas atrasadas' : 'Trocas nos próximos 15 dias'}</b>
-        <button class="btn mini" type="button" id="epmFecharTrocas">Fechar</button></div>
-      <div class="tc-rolo"><table class="dc-planilha"><thead><tr><th>Funcionário</th><th>EPI</th><th>Periodicidade</th><th>Última entrega</th><th>Próxima troca</th><th>Situação</th><th></th></tr></thead><tbody>
-      ${listaTrocas.map((t, i) => `<tr><td>${esc(t.funcionario)}</td><td>${esc(nomeSemCa(t.item.nome))}</td><td>${esc(textoTroca(t.item))}</td>
-        <td>${br(t.data)}</td><td><b>${br(t.proxima)}</b></td><td>${chip(t.sit.cor, t.sit.rotulo)}</td>
-        <td><button class="btn mini principal" type="button" data-epm-trocar="${i}">Entregar</button></td></tr>`).join('')}
-      </tbody></table></div></div>` : ''}
-    <div class="grade larga" style="margin-top:12px">
-      <label class="campo">Buscar <input type="text" id="epmBusca" value="${esc(F.busca)}" placeholder="Funcionário ou EPI"></label>
-      <label class="campo">Mês <input type="month" id="epmMes" value="${esc(F.mes)}"></label>
-      <label class="campo">Ficha <select id="epmSit">
-        <option value="">Todas</option><option value="pend"${F.sit === 'pend' ? ' selected' : ''}>Sem assinatura</option>
-        <option value="ok"${F.sit === 'ok' ? ' selected' : ''}>Assinadas</option></select></label>
-    </div>
-    <div class="barra fim" style="margin:6px 0">
-      <button class="btn" type="button" id="epmImpLista" ${vis.length ? '' : 'disabled'}>Imprimir as ${vis.length} ficha${vis.length === 1 ? '' : 's'} da lista</button>
-    </div>
-    <div class="tc-rolo"><table class="dc-planilha"><thead><tr>
-      <th>Data</th><th>Funcionário</th><th>Estoque</th><th>EPIs entregues</th><th>Ficha</th><th style="width:1%"></th>
-    </tr></thead><tbody>
-    ${vis.length ? vis.map(e => `<tr>
-      <td>${br(e.data)}</td>
-      <td><b>${esc(e.funcionario)}</b></td>
-      <td>${esc(localDe(e.local_id).nome)}</td>
-      <td>${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(itemDe(l.item_id).unidade || '')} · ${esc(nomeSemCa(itemDe(l.item_id).nome))}${itemDe(l.item_id).ca ? ` <span class="dc-sem">CA ${esc(itemDe(l.item_id).ca)}</span>` : ''}`).join('<br>')}</td>
-      <td>${e.assinada ? chip('ativo', 'assinada') : chip('alerta', 'sem assinatura')}</td>
-      <td style="white-space:nowrap">
-        <button class="btn mini principal" type="button" data-epm-ficha="${esc(e.id)}">Ficha</button>
-        <button class="btn mini" type="button" data-epm-assinar="${esc(e.id)}">${e.assinada ? 'Desmarcar' : 'Assinada ✓'}</button>
-        ${admin() ? `<button class="btn mini perigo" type="button" data-epm-cancelar="${esc(e.id)}">Cancelar</button>` : ''}
-      </td></tr>`).join('') : `<tr><td colspan="6" class="dc-sem">Nenhuma entrega${F.mes ? ' neste mês' : ''}.</td></tr>`}
-    </tbody></table></div>
-    <p class="dica" style="margin:8px 0 0">"Ficha" imprime a ficha de EPI daquela entrega (data, quantidade, C.A, EPI e motivo já preenchidos).
-      Depois que o funcionário assinar, toque em "Assinada ✓". A periodicidade de troca de cada EPI fica em Estoque › Cadastros › Itens.</p>
   </div>`;
 
-  $('epmNova').onclick = () => dialogoEntrega({});
+  ligarForm();
   $('epmAtualizar').onclick = async () => { await carregar(true); desenhar(); };
-  tela.querySelectorAll('[data-epm-card]').forEach(b => b.addEventListener('click', () => {
-    const c = b.dataset.epmCard;
-    if (c === 'pend') { F.sit = F.sit === 'pend' ? '' : 'pend'; F.mes = F.sit ? '' : hoje().slice(0, 7); }
-    else if (c === 'atrasada' || c === 'logo') F.verTrocas = F.verTrocas === c ? '' : c;
-    else if (c === 'mes') { F.sit = ''; F.mes = F.mes || hoje().slice(0, 7); }
-    desenhar();
-  }));
-  $('epmFecharTrocas')?.addEventListener('click', () => { F.verTrocas = ''; desenhar(); });
+  $('epmVerPend')?.addEventListener('click', () => { F.sit = F.sit === 'pend' ? '' : 'pend'; desenhar(); });
+  $('epmVerTrocas')?.addEventListener('click', () => { F.verTrocas = F.verTrocas ? '' : 'atrasada'; desenhar(); });
   tela.querySelectorAll('[data-epm-trocar]').forEach(b => b.addEventListener('click', () => {
-    const t = listaTrocas[+b.dataset.epmTrocar];
-    dialogoEntrega({ funcionario_id: t.funcionario_id, itens: [t.item.id], mer: '1' });
+    const t = listaTrocas[+b.dataset.epmTrocar], f = funcDe(t.funcionario_id);
+    Object.assign(FORM, { func: f ? rotFunc(f) : t.funcionario, local: '', linhas: [{ item: t.item.nome, qtd: '1', mer: '1' }] });
+    F.verTrocas = ''; desenhar(); $('epmForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
   $('epmBusca').addEventListener('input', ev => { F.busca = ev.target.value; const p = ev.target.selectionStart; desenhar(); const i = $('epmBusca'); i.focus(); i.setSelectionRange(p, p); });
-  $('epmMes').addEventListener('change', ev => { F.mes = ev.target.value; desenhar(); });
-  $('epmSit').addEventListener('change', ev => { F.sit = ev.target.value; desenhar(); });
+  $('epmMes')?.addEventListener('change', ev => { F.mes = ev.target.value; desenhar(); });
   $('epmImpLista').addEventListener('click', () => imprimirFichas([...vis].reverse()));
   tela.querySelectorAll('[data-epm-ficha]').forEach(b => b.addEventListener('click', () => imprimirFichas([todas.find(e => e.id === b.dataset.epmFicha)])));
   tela.querySelectorAll('[data-epm-assinar]').forEach(b => b.addEventListener('click', async () => {
@@ -338,105 +346,108 @@ const itemPeloNome = (txt, localId) => {
     || ativos(D.itens).find(i => semAcento(i.nome) === t);
 };
 
-function dialogoEntrega(pre) {
-  const funcs = (estado.funcionarios || []).filter(f => f.situacao === 'ATIVO' || f.id === pre.funcionario_id)
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  const rotFunc = f => `${f.nome}${f.cadastro ? ' · nº ' + f.cadastro : ''}`;
-  const f0 = pre.funcionario_id ? funcDe(pre.funcionario_id) : null;
-  const mot = motivos();
-  const linhasIni = (pre.itens && pre.itens.length ? pre.itens : ['']).map(id => ({ item: id ? itemDe(id).nome : '', qtd: '1', mer: pre.mer || '' }));
-  const d = dialogo(`<form method="dialog" id="epmForm" autocomplete="off">
-    <h3>Nova entrega de EPI</h3>
-    <div class="grade">
-      <label class="campo plena">Funcionário <input type="text" id="epmFunc" list="epmFuncs" required value="${esc(f0 ? rotFunc(f0) : '')}" placeholder="nome do funcionário"></label>
-      <datalist id="epmFuncs">${funcs.map(f => `<option value="${esc(rotFunc(f))}">`).join('')}</datalist>
-      <label class="campo">Data da entrega <input type="date" id="epmData" value="${hoje()}" max="${hoje()}" required></label>
-      <label class="campo">Sai do estoque <select id="epmLocal">${D.locais.map(l => `<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</select></label>
-    </div>
-    <div id="epmHist" class="epm-hist"></div>
-    <table class="dc-planilha epm-linhas"><thead><tr><th>EPI</th><th style="width:80px">Qtd</th><th style="width:150px">Motivo (M.E.R)</th><th style="width:1%"></th></tr></thead>
-      <tbody id="epmLinhas"></tbody></table>
-    <datalist id="epmItens"></datalist>
-    <div class="barra" style="margin:6px 0"><button class="btn mini" type="button" id="epmMais">+ EPI</button></div>
-    <p class="dica" id="epmAviso" style="margin:6px 0 0"></p>
-    <div class="barra" style="justify-content:flex-end;margin-top:12px">
-      <button class="btn" type="button" data-fechar>Cancelar</button>
-      <button class="btn principal" type="submit" id="epmSalvar">Salvar e imprimir a ficha</button>
-    </div></form>`);
+const rotFunc = f => `${f.nome}${f.cadastro ? ' · nº ' + f.cadastro : ''}`;
+const MER_CURTO = { 1: 'Troca (dano justificado)', 2: 'Troca (dano/perda dele)', 3: 'Devolução/mudança', 4: 'Primeira entrega' };
 
-  const linhas = linhasIni;
-  const funcSel = () => { const t = semAcento($('epmFunc').value); return funcs.find(f => semAcento(rotFunc(f)) === t) || funcs.find(f => semAcento(f.nome) === t); };
+/* O formulário da entrega, na própria tela. O estado mora em FORM, então
+   redesenhar a tela (assinar uma ficha, buscar) não perde o que foi digitado. */
+function ligarForm() {
+  const funcs = (estado.funcionarios || []).filter(f => f.situacao === 'ATIVO').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  $('epmFuncs').innerHTML = funcs.map(f => `<option value="${esc(rotFunc(f))}">`).join('');
+  const mot = motivos();
+  const funcSel = () => { const t = semAcento($('epmFunc').value); return t ? funcs.find(f => semAcento(rotFunc(f)) === t) || funcs.find(f => semAcento(f.nome) === t) : null; };
+  const localAtual = () => FORM.local || (D.locais[0] || {}).id || '';
   let sal = new Map();
   const jaRecebeu = (fid, item) => ativos(D.movimentos).some(m => m.sentido === 'saida' && m.funcionario_id === fid && tipoDoEpi(itemDe(m.item_id).nome) === tipoDoEpi(item.nome));
-  const infoItem = l => {
-    const it = l.item ? itemPeloNome(l.item, $('epmLocal').value) : null;
-    if (!it) return l.item ? '<small class="es-num-falta">EPI não encontrado no cadastro</small>' : '';
-    const s = (sal.get(it.id) || {}).saldo || 0, ca = estadoCa(it);
-    return `<small class="dc-sem">${it.ca ? 'CA ' + esc(it.ca) + (ca && ca.rotulo ? ' · ' + esc(ca.rotulo) : '') + ' · ' : ''}saldo ${esc(mostra(s))} ${esc(it.unidade || '')} · troca ${esc(textoTroca(it))}</small>`;
+
+  const info = () => {
+    const f = funcSel();
+    const locSel = `<select id="epmLocal" title="Estoque de onde o EPI sai">${D.locais.map(l => `<option value="${esc(l.id)}"${l.id === localAtual() ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select>`;
+    if (!f) { $('epmInfo').innerHTML = `Sai do estoque ${locSel}`; ligarLocal(); return; }
+    const tr = trocas().filter(t => t.funcionario_id === f.id);
+    const atr = tr.filter(t => t.sit.chave === 'atrasada' || t.sit.chave === 'logo');
+    $('epmInfo').innerHTML = `${esc(f.cargo || '—')}${f.tam_calcado ? ' · calçado <b>' + esc(f.tam_calcado) + '</b>' : ''}${f.tam_camisa ? ' · roupa <b>' + esc(f.tam_camisa) + '</b>' : ''}
+      · sai do estoque ${locSel}
+      ${atr.length ? `<br><span class="epm-avisinho">⟳ trocar: ${atr.map(t => esc(nomeSemCa(t.item.nome)) + ' (' + esc(t.sit.rotulo) + ')').join(', ')}</span>` : ''}
+      ${!tr.length ? '<br><span class="dc-sem">Primeira entrega registrada para ele.</span>' : ''}`;
+    ligarLocal();
   };
+  const ligarLocal = () => $('epmLocal').addEventListener('change', ev => { FORM.local = ev.target.value; trocarLocal(); });
+  const infoItem = l => {
+    const it = l.item ? itemPeloNome(l.item, localAtual()) : null;
+    if (!it) return l.item ? '<span class="es-num-falta">não está no cadastro de EPIs</span>' : '';
+    const s = (sal.get(it.id) || {}).saldo || 0, ca = estadoCa(it);
+    const ruim = ['vencido', 'irregular'].includes(ca.chave);
+    return `${it.ca ? `<span class="${ruim ? 'es-num-falta' : ''}">CA ${esc(it.ca)}${ruim ? ' ' + esc(ca.rotulo) : ''}</span> · ` : ''}<span class="${s <= 0 ? 'es-num-falta' : ''}">tem ${esc(mostra(s))} ${esc(it.unidade || '')}</span>`;
+  };
+  const merSel = (l, i) => `<select data-l="${i}" data-c="mer" class="epm-mer" title="Motivo (M.E.R) — sai na ficha">${mot.map(m =>
+    `<option value="${esc(m.cod)}"${l.mer === m.cod ? ' selected' : ''}>${esc(m.cod)} · ${esc(MER_CURTO[m.cod] || m.texto)}</option>`).join('')}</select>`;
   const desenharLinhas = () => {
-    $('epmLinhas').innerHTML = linhas.map((l, i) => `<tr>
-        <td><input type="text" list="epmItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="escolha o EPI" style="width:100%">
-          <span data-info="${i}">${infoItem(l)}</span></td>
-        <td><input type="text" inputmode="decimal" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}" style="width:100%"></td>
-        <td><select data-l="${i}" data-c="mer" style="width:100%"><option value="">—</option>${mot.map(m => `<option value="${esc(m.cod)}"${l.mer === m.cod ? ' selected' : ''}>${esc(m.cod)} · ${esc(m.texto)}</option>`).join('')}</select></td>
-        <td>${linhas.length > 1 ? `<button class="btn mini" type="button" data-tirar="${i}">✕</button>` : ''}</td></tr>`).join('');
-    $('epmLinhas').querySelectorAll('[data-l]').forEach(inp => inp.addEventListener('change', () => {
-      const i = +inp.dataset.l, l = linhas[i];
-      l[inp.dataset.c] = inp.value;
-      if (inp.dataset.c === 'item') {   // atualiza só a linha, sem redesenhar (não perde o foco)
-        const f = funcSel(), it = itemPeloNome(inp.value, $('epmLocal').value);
-        if (f && it && !l.mer) { l.mer = jaRecebeu(f.id, it) ? '1' : '4'; $('epmLinhas').querySelector(`select[data-l="${i}"]`).value = l.mer; }
+    $('epmLinhas').innerHTML = FORM.linhas.map((l, i) => `<div class="epm-linha">
+      <label class="campo epm-epi">${i ? '' : 'EPI'}<input type="text" list="epmItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o EPI">
+        <small data-info="${i}">${infoItem(l)}</small></label>
+      <label class="campo epm-qtd">${i ? '' : 'Qtd'}<input type="number" min="1" step="1" inputmode="numeric" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}"></label>
+      <label class="campo epm-mot">${i ? '' : 'Motivo'}${merSel(l, i)}</label>
+      ${FORM.linhas.length > 1 ? `<button class="btn mini epm-x" type="button" data-tirar="${i}" title="Tirar este EPI">✕</button>` : '<span class="epm-x"></span>'}
+    </div>`).join('');
+    $('epmLinhas').querySelectorAll('[data-l]').forEach(inp => {
+      const ev = inp.tagName === 'SELECT' ? 'change' : 'input';
+      inp.addEventListener(ev, () => { FORM.linhas[+inp.dataset.l][inp.dataset.c] = inp.value; });
+      if (inp.dataset.c === 'item') inp.addEventListener('change', () => {
+        const i = +inp.dataset.l, l = FORM.linhas[i], f = funcSel(), it = itemPeloNome(inp.value, localAtual());
+        if (it && !l.merManual) { l.mer = f && jaRecebeu(f.id, it) ? '1' : '4'; $('epmLinhas').querySelector(`select[data-l="${i}"]`).value = l.mer; }
         $('epmLinhas').querySelector(`[data-info="${i}"]`).innerHTML = infoItem(l);
-      }
-    }));
-    $('epmLinhas').querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', () => { linhas.splice(+b.dataset.tirar, 1); desenharLinhas(); }));
+      });
+      if (inp.dataset.c === 'mer') inp.addEventListener('change', () => { FORM.linhas[+inp.dataset.l].merManual = true; });
+    });
+    $('epmLinhas').querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', () => { FORM.linhas.splice(+b.dataset.tirar, 1); desenharLinhas(); }));
   };
   const trocarLocal = () => {
-    sal = saldosDo($('epmLocal').value);
-    $('epmItens').innerHTML = opcoesItens($('epmLocal').value, sal);
+    sal = saldosDo(localAtual());
+    $('epmItens').innerHTML = opcoesItens(localAtual(), sal);
     desenharLinhas();
   };
-  const mostrarHist = () => {
-    const f = funcSel();
-    if (!f) { $('epmHist').innerHTML = ''; return; }
-    const tr = trocas().filter(t => t.funcionario_id === f.id);
-    $('epmHist').innerHTML = `<p class="dica" style="margin:6px 0 4px">${esc(f.cargo || '—')} · ${esc(f.fazenda || 'sem fazenda')}${f.tam_calcado ? ' · calçado ' + esc(f.tam_calcado) : ''}${f.tam_camisa ? ' · roupa ' + esc(f.tam_camisa) : ''}</p>
-      ${tr.length ? `<details class="epm-ult"><summary>Últimas entregas e próximas trocas (${tr.length})</summary>
-        <table class="dc-planilha"><tbody>${tr.map(t => `<tr><td>${esc(nomeSemCa(t.item.nome))}</td><td>${br(t.data)}</td><td>próxima ${br(t.proxima)}</td><td>${chip(t.sit.cor, t.sit.rotulo)}</td></tr>`).join('')}</tbody></table></details>`
-        : '<p class="dica" style="margin:0">Primeira entrega registrada para este funcionário (motivo 4).</p>'}`;
-  };
+
+  $('epmFunc').addEventListener('input', () => { FORM.func = $('epmFunc').value; });
   $('epmFunc').addEventListener('change', () => {
+    FORM.func = $('epmFunc').value;
     const f = funcSel();
-    // só redesenha as linhas se o estoque mudar (senão o campo em que a pessoa entrou perde o foco)
-    if (f) { const l = localDoFunc(f); if (l && l !== $('epmLocal').value) { $('epmLocal').value = l; trocarLocal(); } }
-    mostrarHist();
+    const l = f ? localDoFunc(f) : '';
+    if (l && l !== localAtual()) { FORM.local = l; info(); trocarLocal(); } else info();
+    for (const [i, ln] of FORM.linhas.entries()) {   // motivo automático conforme o histórico dele
+      const it = ln.item && itemPeloNome(ln.item, localAtual());
+      if (f && it && !ln.merManual) { ln.mer = jaRecebeu(f.id, it) ? '1' : '4'; const s = $('epmLinhas').querySelector(`select[data-l="${i}"]`); if (s) s.value = ln.mer; }
+    }
   });
-  $('epmLocal').addEventListener('change', trocarLocal);
-  $('epmMais').addEventListener('click', () => { linhas.push({ item: '', qtd: '1', mer: '' }); desenharLinhas(); });
-  if (f0) { const l = localDoFunc(f0); if (l) $('epmLocal').value = l; }
-  trocarLocal(); mostrarHist();
+  $('epmData').addEventListener('change', ev => { FORM.data = ev.target.value; });
+  $('epmMais').addEventListener('click', () => { FORM.linhas.push({ item: '', qtd: '1', mer: '4' }); desenharLinhas(); $('epmLinhas').querySelector(`[data-l="${FORM.linhas.length - 1}"][data-c="item"]`).focus(); });
+  $('epmLimpar').addEventListener('click', () => { limparForm(); desenhar(); });
+  if (!FORM.local) { const f = funcSel(); FORM.local = (f && localDoFunc(f)) || ''; }
+  info(); trocarLocal();
+  for (const l of FORM.linhas) if (!l.mer) l.mer = '4';
 
   $('epmForm').addEventListener('submit', async ev => {
     ev.preventDefault();
+    const aviso = t => { $('epmAviso').textContent = t; $('epmAviso').hidden = !t; };
+    aviso('');
     const f = funcSel();
-    if (!f) { $('epmAviso').textContent = 'Escolha o funcionário da lista.'; return; }
-    const data = $('epmData').value, localId = $('epmLocal').value;
+    if (!f) { aviso('Escolha o funcionário na lista.'); $('epmFunc').focus(); return; }
+    const data = $('epmData').value || hoje(), localId = localAtual();
     const local = localDe(localId);
     const boas = [];
-    for (const l of linhas) {
-      if (!l.item.trim()) continue;
+    for (const l of FORM.linhas) {
+      if (!String(l.item).trim()) continue;
       const it = itemPeloNome(l.item, localId);
       const q = num(l.qtd);
-      if (!it) { $('epmAviso').textContent = `"${l.item}" não está no cadastro de EPIs do Estoque.`; return; }
-      if (!(q > 0)) { $('epmAviso').textContent = `Quantidade inválida em ${it.nome}.`; return; }
-      boas.push({ it, q, mer: l.mer });
+      if (!it) { aviso(`"${l.item}" não está no cadastro de EPIs do Estoque.`); return; }
+      if (!(q > 0)) { aviso(`Quantidade inválida em ${nomeSemCa(it.nome)}.`); return; }
+      boas.push({ it, q, mer: l.mer || '4' });
     }
-    if (!boas.length) { $('epmAviso').textContent = 'Escolha pelo menos um EPI.'; return; }
+    if (!boas.length) { aviso('Escolha pelo menos um EPI.'); return; }
     const faltam = boas.filter(b => ((sal.get(b.it.id) || {}).saldo || 0) < b.q);
     const vencidos = boas.filter(b => caReprovado(b.it));
     const avisos = [];
-    if (faltam.length) avisos.push(`Saldo menor que a entrega em ${local.nome}: ${faltam.map(b => nomeSemCa(b.it.nome)).join(', ')}. (O saldo vem da última contagem + entradas − saídas.)`);
+    if (faltam.length) avisos.push(`O estoque ${local.nome} não tem o suficiente de: ${faltam.map(b => nomeSemCa(b.it.nome)).join(', ')}.`);
     if (vencidos.length) avisos.push(`CA vencido ou irregular: ${vencidos.map(b => `${nomeSemCa(b.it.nome)} (CA ${b.it.ca})`).join(', ')}.`);
     if (avisos.length && !confirm(avisos.join('\n\n') + '\n\nSalvar a entrega mesmo assim?')) return;
     $('epmSalvar').disabled = true;
@@ -446,9 +457,10 @@ function dialogoEntrega(pre) {
       quantidade: b.q, documento: 'Ficha de EPI', funcionario_id: f.id, funcionario: f.nome, operador: quem(), criado_por: quem(),
       lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz, ficha_assinada: false }));
     const r = await estado.cliente.from('est_movimentos').insert(rows).select();
-    if (r.error) { $('epmAviso').textContent = 'Não consegui gravar: ' + r.error.message; $('epmSalvar').disabled = false; return; }
+    if (r.error) { aviso('Não consegui gravar: ' + r.error.message); $('epmSalvar').disabled = false; return; }
     D.movimentos.push(...(r.data || rows));
-    d.close();
+    limparForm();
+    F.sit = ''; F.mes = data.slice(0, 7);
     desenhar();
     const e = entregas().find(x => x.id === lanc);
     if (e) imprimirFichas([e]);

@@ -2910,3 +2910,47 @@ tr.epm-baixo td{background:rgba(201,138,0,.08)}
 .lv-dia b{font-size:14px;color:var(--suave)}
 .lv-dia.lv-on{background:var(--verde-fundo);border-color:var(--verde)}
 .lv-dia.lv-on b{color:var(--verde-esc)}
+
+/* Entrega de EPI enxuta (13/11/2026) */
+.epm-lean .guia{display:flex;gap:10px;align-items:stretch;background:var(--papel);border:1px solid #d7e7b5;border-left:6px solid var(--verde);padding:10px 40px 10px 12px;margin:4px 0 14px;position:relative;border-radius:6px}
+.epm-lean .guia-p{flex:1;display:flex;gap:8px;align-items:center;font-size:13px;line-height:1.3}
+.epm-lean .guia-p i{font-style:normal;flex:none;width:24px;height:24px;border-radius:50%;background:var(--verde);color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center}
+.epm-lean .guia-x{position:absolute;top:6px;right:6px;border:0;background:none;color:var(--suave);font-size:16px;cursor:pointer;padding:4px 8px}
+@media (max-width:720px){.epm-lean .guia{flex-direction:column}}
+.epm-form{background:var(--fundo);border:1px solid var(--linha);border-radius:10px;padding:12px 14px}
+.epm-topo{display:grid;grid-template-columns:1fr 170px;gap:10px}
+.epm-info{margin:6px 0 10px;font-size:12.5px;color:var(--suave);line-height:1.6}
+.epm-info select{font:inherit;font-size:12.5px;padding:1px 4px;border:1px solid var(--linha);border-radius:5px;background:var(--papel)}
+.epm-avisinho{color:#8a5f00;font-weight:600}
+.epm-itens{display:flex;flex-direction:column;gap:6px}
+.epm-linha{display:grid;grid-template-columns:1fr 80px 190px 34px;gap:8px;align-items:start}
+.epm-linha .campo{margin:0}
+.epm-linha small{display:block;font-size:11.5px;color:var(--suave);margin-top:2px;min-height:14px}
+.epm-mer{width:100%}
+.epm-linha .epm-x{align-self:center;margin-top:0}
+.epm-pe{margin:10px 0 0}
+.epm-pend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+.epm-chip{font:inherit;font-size:13px;font-weight:700;border-radius:20px;padding:6px 14px;cursor:pointer;border:1px solid transparent}
+.epm-chip.alerta{background:rgba(201,138,0,.14);color:#8a5f00}
+.epm-chip.perigo{background:rgba(192,57,43,.12);color:#a5342a}
+.epm-chip.on{border-color:currentColor}
+.epm-trocas{margin:6px 0}
+.epm-listacab{margin:16px 0 6px;flex-wrap:wrap;gap:8px}
+.epm-listacab input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--linha);border-radius:6px;background:var(--papel);color:inherit}
+.epm-listacab input[type=search]{width:160px}
+.epm-lista{border-top:1px solid var(--linha)}
+.epm-ent{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--linha)}
+.epm-ent-itens{font-size:12.5px}
+.epm-ent-acoes{display:flex;gap:6px;flex:none}
+.btn.epm-ok{color:var(--verde-esc);border-color:var(--verde)}
+.btn.epm-x{padding:4px 9px}
+@media (max-width:640px){
+  .epm-topo{grid-template-columns:1fr}
+  .epm-linha{grid-template-columns:1fr 64px 34px}
+  .epm-linha .epm-mot{grid-column:1 / 3;grid-row:2}
+  .epm-ent{flex-direction:column;align-items:flex-start}
+}
+.epm-info select{width:auto;display:inline-block;min-height:0;height:auto;margin:0 2px}
+.epm-linha small{text-transform:none;font-weight:400;letter-spacing:0}
+.epm-listacab input{width:auto;min-height:0;height:auto}
+.epm-listacab input[type=month]{width:150px}
