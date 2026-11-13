@@ -80,7 +80,7 @@ function fichaEntrega(func, modelo, opcoes) {
   const cpf = cpfBr(func.cpf);
   const linhaHtml = (l, i) => '<tr class="r43">' +
     celula('faz', i, l.faz, 'f18 b ce brt btt bbt') +
-    celula('data', i, l.data, 'f14 b ce brt btt bbt', '____/____/____') +
+    celula('data', i, l.data, 'f16 b ce brt btt bbt', '___/___/____') +
     celula('qtd', i, l.qtd, 'f18 b ce blt brt btt bbt') +
     celula('ca', i, l.ca, 'f20 b ce blt brt btt bbt') +
     celula('descricao', i, l.descricao, `${tamDescricao(l.descricao)} es blt brt btt bbt`) +
