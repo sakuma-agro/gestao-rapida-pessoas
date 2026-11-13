@@ -3080,3 +3080,32 @@ select.epm-ca-ruim{color:#a5342a;border-color:#a5342a}
 /* linhas da ficha da entrega: texto no meio da linha, CA maior (13/11/2026) */
 .fe tr.r43 .cw .cx{top:0;bottom:0;height:auto;margin:auto 0}
 .fe tr.r43 .cel.es .cw .cx{padding-left:1.2mm}
+
+/* Entrega de EPI · campos mais evidentes (13/11/2026, pedido dele) */
+.epm-claro{background:#fff;padding:14px 16px}
+.epm-claro .epm-bloco{border:1px solid var(--linha);border-radius:12px;padding:12px 14px 14px;margin-bottom:12px;background:#fbfbf8}
+.epm-passo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;color:var(--marrom);margin-bottom:10px}
+.epm-passo i{font-style:normal;width:24px;height:24px;border-radius:50%;background:var(--verde);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px}
+.epm-claro .campo{font-size:11.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#1B232B}
+.epm-claro .epm-func > span{color:#1B232B;font-size:11.5px;font-weight:800}
+.epm-claro input,.epm-claro select{background:#fff !important;border:2px solid #cfd0c6 !important;border-radius:9px !important;font-size:15px !important;font-weight:600;min-height:46px;padding:8px 11px;color:#1B232B;text-transform:none;letter-spacing:0}
+.epm-claro input:focus,.epm-claro select:focus{border-color:var(--verde) !important;box-shadow:0 0 0 3px rgba(132,189,0,.22);outline:0}
+.epm-claro .epm-pick input[type=search]{min-height:50px;font-size:16px !important}
+.epm-claro .epm-escolhido{border-width:2px;background:var(--verde-fundo);min-height:50px}
+.epm-claro .epm-info{margin:10px 0 0;font-size:13px;color:#51534A;text-transform:none}
+.epm-claro .epm-info select{min-height:0;font-size:13px !important;padding:3px 6px;border-width:1px !important}
+.epm-claro .epm-itens{gap:10px}
+.epm-claro .epm-linha{position:relative;background:#fff;border:1px solid var(--linha);border-left:5px solid #cfd0c6;border-radius:10px;padding:10px 12px 8px;align-items:end}
+.epm-claro .epm-linha.cheia{border-left-color:var(--verde)}
+.epm-claro .epm-linha small{text-transform:none;letter-spacing:0;font-weight:500;font-size:12px}
+.epm-claro .epm-qtd input{text-align:center;font-size:17px !important;font-weight:800}
+.epm-num{position:absolute;top:-9px;left:-9px;width:22px;height:22px;border-radius:50%;background:#1B232B;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.epm-claro .epm-linha .epm-x{align-self:end;margin-bottom:22px}
+.epm-claro .epm-mais{margin-top:10px;border-style:dashed;border-width:2px;width:100%;justify-content:center;font-weight:800}
+.epm-claro .epm-pe{border-top:1px solid var(--linha);padding-top:12px}
+.epm-claro #epmSalvar{min-height:48px;font-size:15px;padding:0 22px}
+.epm-claro{border:0;padding:0}
+.epm-claro .epm-linha{align-items:start;grid-template-columns:1fr 200px 80px 200px 240px 40px}
+.epm-claro .epm-linha .epm-x{align-self:start;margin:22px 0 0}
+@media (max-width:1100px){.epm-claro .epm-linha{grid-template-columns:1fr 1fr 80px 40px}.epm-claro .epm-linha .epm-epi{grid-column:1 / 4}.epm-claro .epm-linha .epm-faz{grid-column:1 / 2}.epm-claro .epm-linha .epm-mot{grid-column:2 / 4}}
+@media (max-width:640px){.epm-claro .epm-linha{grid-template-columns:1fr 1fr 40px}.epm-claro .epm-linha .epm-epi{grid-column:1 / 3}.epm-claro .epm-linha .epm-qtd{grid-column:2 / 3}.epm-claro .epm-linha .epm-mot{grid-column:1 / 3}}

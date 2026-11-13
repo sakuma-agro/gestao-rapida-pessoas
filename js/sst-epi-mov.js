@@ -433,16 +433,25 @@ function telaSaida(tela) {
       <button class="btn mini" type="button" id="epmAtualizar" title="Ler de novo do banco">↻ Atualizar</button>
     </div>
     ${guia('epi-entrega', ['Escolha o <b>funcionário</b>', 'Escolha o <b>EPI</b> e a <b>quantidade</b>', '<b>Salvar</b> e imprimir a ficha', 'Ele assinou? Toque em <b>Assinada ✓</b>'])}
-    <form id="epmForm" class="epm-form" autocomplete="off">
-      <div class="epm-topo">
-        <div class="campo epm-func"><span>Funcionário</span><div class="epm-pick" id="epmPick"></div></div>
-        <label class="campo epm-data">Data <input type="date" id="epmData" value="${esc(FORM.data || hoje())}" max="${hoje()}"></label>
+    <form id="epmForm" class="epm-form epm-claro" autocomplete="off">
+      <!-- campos mais evidentes (13/11/2026, pedido dele: "é aquele mesmo que já tem,
+           só quero melhorar ele, deixar ele mais evidente cada campo") -->
+      <div class="epm-bloco">
+        <div class="epm-passo"><i>1</i> Quem vai receber</div>
+        <div class="epm-topo">
+          <div class="campo epm-func"><span>Funcionário</span><div class="epm-pick" id="epmPick"></div></div>
+          <label class="campo epm-data">Data da entrega <input type="date" id="epmData" value="${esc(FORM.data || hoje())}" max="${hoje()}"></label>
+        </div>
+        <p class="epm-info" id="epmInfo"></p>
       </div>
-      <p class="epm-info" id="epmInfo"></p>
-      <div id="epmLinhas" class="epm-itens"></div>
-      <datalist id="epmItens"></datalist>
+      <div class="epm-bloco">
+        <div class="epm-passo"><i>2</i> O que vai levar</div>
+        <div id="epmLinhas" class="epm-itens"></div>
+        <datalist id="epmItens"></datalist>
+        <button class="btn epm-mais" type="button" id="epmMais">+ Outro EPI</button>
+      </div>
       <div class="barra entre epm-pe">
-        <button class="btn" type="button" id="epmMais">+ Outro EPI</button>
+        <div class="epm-passo" style="margin:0"><i>3</i> Confira e salve</div>
         <span class="barra" style="margin:0">
           <button class="btn" type="button" id="epmLimpar">Limpar</button>
           <button class="btn principal" type="submit" id="epmSalvar">Salvar e imprimir ficha</button>
@@ -610,13 +619,14 @@ function ligarForm() {
     return `<select data-l="${i}" data-c="faz" title="Fazenda onde o EPI vai ser usado (FAZ na ficha)">${fazendasLegenda().map(z =>
       `<option value="${esc(z.letra)}"${l.faz === z.letra ? ' selected' : ''}>${esc(z.letra)} · ${esc(z.nome)}</option>`).join('')}</select>`; };
   const desenharLinhas = () => {
-    $('epmLinhas').innerHTML = FORM.linhas.map((l, i) => `<div class="epm-linha">
-      <label class="campo epm-epi">${i ? '' : 'EPI'}<input type="text" list="epmItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o EPI">
+    $('epmLinhas').innerHTML = FORM.linhas.map((l, i) => `<div class="epm-linha${l.item ? ' cheia' : ''}">
+      ${FORM.linhas.length > 1 ? `<span class="epm-num">${i + 1}</span>` : ''}
+      <label class="campo epm-epi">EPI<input type="text" list="epmItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o EPI">
         <small data-info="${i}">${infoItem(l)}</small></label>
-      <label class="campo epm-ca">${i ? '' : 'CA'}<span data-casel="${i}">${caSel(l, i)}</span></label>
-      <label class="campo epm-qtd">${i ? '' : 'Qtd'}<input type="number" min="1" step="1" inputmode="numeric" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}"></label>
-      <label class="campo epm-faz">${i ? '' : 'Fazenda'}${fazSel(l, i)}</label>
-      <label class="campo epm-mot">${i ? '' : 'Motivo'}${merSel(l, i)}</label>
+      <label class="campo epm-ca">CA<span data-casel="${i}">${caSel(l, i)}</span></label>
+      <label class="campo epm-qtd">Qtd<input type="number" min="1" step="1" inputmode="numeric" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}"></label>
+      <label class="campo epm-faz">Fazenda de uso${fazSel(l, i)}</label>
+      <label class="campo epm-mot">Motivo${merSel(l, i)}</label>
       ${FORM.linhas.length > 1 ? `<button class="btn mini epm-x" type="button" data-tirar="${i}" title="Tirar este EPI">✕</button>` : '<span class="epm-x"></span>'}
     </div>`).join('');
     FORM.linhas.forEach((_, i) => ligarCa(i));
@@ -625,6 +635,7 @@ function ligarForm() {
       inp.addEventListener(ev, () => { FORM.linhas[+inp.dataset.l][inp.dataset.c] = inp.value; });
       if (inp.dataset.c === 'item') inp.addEventListener('change', () => {
         const i = +inp.dataset.l, l = FORM.linhas[i], f = funcSel(), it = itemPeloNome(inp.value, localAtual());
+        inp.closest('.epm-linha')?.classList.toggle('cheia', !!inp.value.trim());
         if (it && !l.merManual) { l.mer = f && jaRecebeu(f.id, it) ? '1' : '4'; $('epmLinhas').querySelector(`select[data-l="${i}"]`).value = l.mer; }
         $('epmLinhas').querySelector(`[data-info="${i}"]`).innerHTML = infoItem(l);
         l.ca = '';
