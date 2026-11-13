@@ -75,7 +75,9 @@ export const MODULOS = [
       ['cadEstrutura', 'Empregador e fazenda'],
     ] },
   ] },
-  { id: 'sst', nome: 'SST', subs: [
+  /* 13/11/2026, pedido dele: o SST saiu de Pessoas e virou área própria, logo
+     abaixo de Pessoas na tela inicial (js/areas.js). As telas não mudaram. */
+  { id: 'sst', nome: 'SST', area: 'sst', subs: [
     { id: 'epis', nome: "EPI's", telas: [
       ['fichas', 'Fichas'],
       // Entregas, entradas e saldo pelo estoque (13/11/2026): js/sst-epi-mov.js
@@ -239,7 +241,9 @@ export const MODULOS = [
   /* Reunião semanal do administrativo (15/10/2026, pedido dele): frase da
      semana (aparece na tela principal), responsáveis fixos em rodízio e as
      atividades semanais do escritório. js/reuniao.js; tabelas reu_*. */
-  { id: 'reuniao', nome: 'Reunião semanal', subs: [
+  /* 13/11/2026, pedido dele: saiu do menu de Pessoas (oculto). Continua
+     abrindo pela frase da semana e pelo alerta da tela inicial e pelo Rastro. */
+  { id: 'reuniao', nome: 'Reunião semanal', oculto: true, subs: [
     { id: 'reuSub', nome: 'Reunião semanal', telas: [
       ['reuSemana', 'Esta semana'],
       ['reuFrases', 'Frases'],
@@ -700,7 +704,7 @@ export const moduloAtual = () => moduloAberto;
 
 /* Só os módulos da área Pessoas: módulo com `area` (Certificação) tem menu próprio. */
 export const modulosLiberados = () =>
-  MODULOS.filter(m => !m.area && pode(m.id) && telasLiberadas(m.id).length);
+  MODULOS.filter(m => !m.area && !m.oculto && pode(m.id) && telasLiberadas(m.id).length);
 
 /** Monta o menu com o que a pessoa pode ver e abre o primeiro módulo. */
 export function montarMenu(callback) {
@@ -713,7 +717,7 @@ export function montarMenu(callback) {
   /* 15/10/2026, pedido dele: todos os módulos da área aparecem; os que a
      pessoa não tem ficam em cinza (fantasma) e não abrem. */
   const libs = new Set(modulosLiberados().map(m => m.id));
-  pintarModulos(MODULOS.filter(m => !m.area).map(m =>
+  pintarModulos(MODULOS.filter(m => !m.area && !m.oculto).map(m =>
     ({ id: m.id, nome: m.nome, icone: ICONE_MODULO[m.id] || 'lista', bloqueado: !libs.has(m.id) })));
 
   // Entra na tela de marca, não num módulo: quem escolhe o que abrir é ele.
@@ -784,8 +788,14 @@ const TELA_JUNTA = { ccRegistros: 'ccPainel', ccInsumos: 'ccPlantios', ccCalibra
 export const TELAS_JUNTAS = {};
 for (const [h, p] of Object.entries(TELA_JUNTA)) (TELAS_JUNTAS[p] ||= []).push(h);
 
+/* Módulo que mora numa área própria (Certificação, SST): aberto de fora dela
+   (Rastro, atalhos, "Abrir ›" das tarefas), entra na área primeiro. */
+let entrarNaAreaDoModulo = null;
+export const ligarAreaDoModulo = fn => { entrarNaAreaDoModulo = fn; };
 export function abrirModulo(id, tela) {
   if (!id) return;
+  const mArea = MODULOS.find(m => m.id === id && m.area);
+  if (mArea && entrarNaAreaDoModulo && !$('navModulos').querySelector(`[data-modulo="${id}"]`)) { entrarNaAreaDoModulo(mArea.area, tela); return; }
   if (TELA_JUNTA[tela]) {
     const hist = 'tela' + tela[0].toUpperCase() + tela.slice(1);
     tela = TELA_JUNTA[tela];
@@ -879,7 +889,7 @@ function desenharFaixa(id, subs, tela) {
    Vistorias continuam como eram. */
 const emCategoria = id => !$('navModulos').hidden && !!$('navModulos').querySelector(`.aba[data-modulo="${id}"]`);
 /* Módulo que não fecha ao clicar de novo (Certificação: é o único da área). */
-const SEMPRE_ABERTO = new Set(['cert']);
+const SEMPRE_ABERTO = new Set(['cert', 'sst']);
 /* Submódulo em foco (26/10/2026, pedido dele): na Certificação, ao abrir um
    submódulo (Requisitos, Caderno de campo, Forms…) ele toma o lugar do botão
    verde "Certificação", os outros saem da linha e o que tem dentro fica logo

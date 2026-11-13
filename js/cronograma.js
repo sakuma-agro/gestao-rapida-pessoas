@@ -1598,7 +1598,8 @@ const legendaSit = () => [['atraso', 'Atrasado'], ['afazer', 'A fazer'], ['fazen
    ganham "Ir para", que abre a área e a tela de onde o item veio. */
 function podeIr(ir) {
   if (!ir) return false;
-  if (!areasLiberadas().some(a => a.id === ir.a)) return false;
+  const areaIr = ir.a === 'pessoas' && ir.t && moduloDe(ir.t) === 'sst' ? 'sst' : ir.a;
+  if (!areasLiberadas().some(a => a.id === areaIr)) return false;
   if (ir.a === 'pessoas') return !!ir.t && podeTela(ir.t) && !!moduloDe(ir.t);
   return true;
 }
@@ -1613,7 +1614,8 @@ function irPara(ir) {
   const d = $('dlgCron'); if (d?.open) d.close();
   // Compras (10/11/2026): abre a aba Compras aqui mesmo, sem sair do Rastro
   if (ir.a === 'compras') { est.visao = 'compras'; guardarVis(); desenhar(); return; }
-  if (ir.a === 'pessoas') { entrarNaArea('pessoas'); abrirModulo(moduloDe(ir.t), ir.t); }
+  if (ir.a === 'pessoas' && moduloDe(ir.t) === 'sst') entrarNaArea('sst', ir.t);   // SST virou área própria (13/11/2026)
+  else if (ir.a === 'pessoas') { entrarNaArea('pessoas'); abrirModulo(moduloDe(ir.t), ir.t); }
   else if (ir.a === 'certificacao') entrarNaArea('certificacao', ir.t);
   else if (ir.a === 'vistorias') { entrarNaArea('vistorias'); if (ir.m) abrirModulo(ir.m, ir.t); }
   else {

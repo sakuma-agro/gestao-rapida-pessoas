@@ -12,7 +12,7 @@ import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
 import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
 import { desenharAlertaEmprestimo } from './alerta-emprestimo.js';
-import { moduloAtual } from './acesso.js';
+import { moduloAtual, ligarAreaDoModulo } from './acesso.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -59,7 +59,11 @@ export const AREAS = [
   { id: 'evento', nome: 'Evento Cultura', icone: 'icons/area-evento.v1.svg',
     desc: 'Fotos e vídeos dos eventos de cultura · 2026' },
   { id: 'pessoas', nome: 'Pessoas', icone: 'icons/area-pessoas.v2.svg',
-    desc: 'Cadastros · SST · RH · DP · Reunião semanal' },
+    desc: 'Cadastros · RH · DP' },
+  /* SST (13/11/2026, pedido dele): saiu de Pessoas e virou área própria, logo
+     abaixo dela. Mesmo jeito da Certificação: um módulo só (SST), sempre aberto. */
+  { id: 'sst', nome: 'SST', icone: 'icons/area-sst.v1.svg',
+    desc: "EPI's · Exames · Treinamentos · Brigada · NRs · Campanhas · Acidentes" },
   /* 15/10/2026, pedido dele: a área Manutenções virou "Máquinas e Patrimônio" e
      ganhou o módulo Patrimônio. Só o nome mudou: o id segue 'manutencoes', a
      pasta segue manutencoes/ e o banco segue no esquema manutencao. */
@@ -114,14 +118,14 @@ export const AREAS = [
 
 /* Tela inicial em colunas por grupo (09/11/2026, pedido dele — opção A). */
 const GRUPOS = [
-  { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'vistorias', 'certificacao', 'evento'] },
+  { nome: 'Pessoas e conformidade', cor: '#84BD00', ids: ['pessoas', 'sst', 'vistorias', 'certificacao', 'evento'] },
   { nome: 'Campo', cor: '#744F28', ids: ['programacao', 'colheita', 'outorga'] },
   { nome: 'Operação e custos', cor: '#51534A', ids: ['manutencoes', 'estoque', 'custobase'] },
   { nome: 'Gestão', cor: '#7552B0', ids: ['cronograma', 'compras', 'projetos'] }, // 09/11/2026: Rastro acima de Projetos (pedido dele)
 ];
 /* O que aparece embaixo do nome em cada linha (curto; o completo fica no title). */
 const CURTA = {
-  pessoas: 'Cadastros, SST, RH, DP', vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
+  pessoas: 'Cadastros, RH, DP', sst: "EPI's, exames, treinamentos", vistorias: 'Apontamentos, normas', certificacao: 'Lista mestra, POPs',
   programacao: 'Mês e semana', colheita: 'Carregamentos, safra', outorga: 'Fichas do mês',
   manutencoes: 'Manutenções, OS', estoque: 'Contagem, acerto', custobase: 'Rateio mensal',
   projetos: 'PMBOK', cronograma: 'Gestão de tarefas e prazos', compras: 'Pedir compra, acompanhar', evento: 'Fotos e vídeos · 2026',
@@ -197,6 +201,7 @@ export const ehTelaVist = nome => nome in ABA_VIST;
    a mesma regra que o banco usa (manutencao.pode). */
 function liberada(id) {
   if (id === 'pessoas') return modulosLiberados().length > 0;
+  if (id === 'sst') return telasLiberadas('sst').length > 0;
   if (id === 'manutencoes') return acesso.admin || (acesso.modulos || []).includes('manutencoes');
   /* Certificação (13/10/2026): módulo 'cert' do acesso.js, com menu próprio. */
   if (id === 'certificacao') return telasLiberadas('cert').length > 0;
@@ -235,6 +240,8 @@ window.irCertVistorias = chave => {
   window.cvFiltroPedido = chave || '';
   entrarNaArea('certificacao', 'clVistorias');
 };
+/* abrirModulo('sst'/'cert', tela) vindo de fora da área: entra na área antes. */
+ligarAreaDoModulo((area, tela) => entrarNaArea(area, tela));
 export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.id));
 
 let aoTrocar = () => {};
@@ -285,7 +292,7 @@ function medirTopo() {
 /* "+ Tarefa" no canto (13/11/2026, pedido dele): em todas as áreas, menos no
    próprio Rastro, abre a janela de tarefa nova e lança direto no Rastro.
    Só para quem tem o Rastro. A área da tarefa vem da tela aberta. */
-const AREA_TAREFA = { manutencoes: 'maq', certificacao: 'cert', vistorias: 'vist', programacao: 'prog', estoque: 'est',
+const AREA_TAREFA = { sst: 'sst', manutencoes: 'maq', certificacao: 'cert', vistorias: 'vist', programacao: 'prog', estoque: 'est',
   custobase: 'custo', colheita: 'colh', projetos: 'proj', compras: 'cmp' };
 const MOD_TAREFA = { sst: 'sst', rh: 'rh', jornada: 'dp', reuniao: 'esc' };
 function areaDaTarefa() {
@@ -412,6 +419,13 @@ export function entrarNaArea(id, tela, extra) {
     $('navSub').hidden = true;
     aoTrocar('config');
     desenharPrincipal();
+    return;
+  }
+
+  if (id === 'sst') {
+    pintarModulos([{ id: 'sst', nome: 'SST', icone: 'escudo' }]);
+    $('navModulos').hidden = false;
+    abrirModulo('sst', tela && tela !== 'config' ? tela : undefined);
     return;
   }
 
