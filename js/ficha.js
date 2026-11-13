@@ -76,7 +76,7 @@ function fichaEntrega(func, modelo, opcoes) {
   const cpf = cpfBr(func.cpf);
   const linhaHtml = (l, i) => '<tr class="r43">' +
     celula('faz', i, l.faz, 'f18 b ce brt btt bbt') +
-    celula('data', i, l.data, 'f14 b ce brt btt bbt', TRACO) +
+    celula('data', i, l.data, 'f14 b ce brt btt bbt', '____/____/____') +
     celula('qtd', i, l.qtd, 'f18 b ce blt brt btt bbt') +
     celula('ca', i, l.ca, 'f20 b ce blt brt btt bbt') +
     celula('descricao', i, l.descricao, 'f16 es blt brt btt bbt') +
@@ -111,8 +111,8 @@ function fichaEntrega(func, modelo, opcoes) {
   return `<div class="folha fe">
   <div class="ficha" data-chave="${esc(chave)}">
   <table class="fx"><colgroup>
-    <col style="width:4.729%"><col style="width:13.997%"><col style="width:5.296%"><col style="width:9.269%">
-    <col style="width:22.005%"><col style="width:13.997%"><col style="width:22.131%"><col style="width:8.575%">
+    <col style="width:4.729%"><col style="width:9.5%"><col style="width:5.296%"><col style="width:9.269%">
+    <col style="width:26.502%"><col style="width:13.997%"><col style="width:22.131%"><col style="width:8.575%">
   </colgroup><tbody>
   <tr class="fe-topo"><td colspan="8"><div class="fe-topo-in">
     <div class="fe-logo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios"></div>
