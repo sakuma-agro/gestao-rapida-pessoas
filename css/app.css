@@ -2978,3 +2978,29 @@ select.epm-ca-ruim{color:#a5342a;border-color:#a5342a}
 .epm-ft small{font-size:12px;color:var(--suave);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .epm-escolhido{display:flex;gap:10px;align-items:center;background:var(--papel);border:1px solid var(--verde);border-radius:10px;padding:7px 10px}
 .epm-escolhido .epm-ft{flex:1}
+
+/* Entrega de EPI · fazenda por EPI (13/11/2026) */
+.epm-linha{grid-template-columns:1fr 170px 62px 150px 170px 34px}
+.epm-faz select{width:100%}
+@media (max-width:640px){
+  .epm-linha{grid-template-columns:1fr 1fr 34px}
+  .epm-linha .epm-epi{grid-column:1 / 4}
+  .epm-linha .epm-ca{grid-column:1 / 2;grid-row:auto}
+  .epm-linha .epm-qtd{grid-column:2 / 3}
+  .epm-linha .epm-faz{grid-column:1 / 2}
+  .epm-linha .epm-mot{grid-column:2 / 4;grid-row:auto}
+}
+
+/* Ficha de EPI em meia folha: 2 por A4, com linha de corte (13/11/2026).
+   A ficha é a mesma (js/ficha.js); só sai menor (zoom calculado pela altura). */
+.meias{display:flex;flex-direction:column;align-items:center;gap:16px}
+.meia-slot{display:flex;justify-content:center}
+@media print{
+  .meias{display:block}
+  .meia-slot{height:148.4mm;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    page-break-inside:avoid;break-inside:avoid;box-sizing:border-box}
+  .meia-slot:nth-child(odd){border-bottom:.3mm dashed #9a9a9a}
+  .meia-slot:nth-child(even){page-break-after:always;break-after:page}
+  .meia-slot:last-child{page-break-after:auto;break-after:auto}
+  .meia-slot .folha.meia{transform:none;margin:0;page-break-after:auto;break-after:auto}
+}

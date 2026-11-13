@@ -121,6 +121,15 @@ function letraFaz(local) {
   const p = pares.find(([, nome]) => n.includes(nome));
   return p ? p[0] : (semAcento(local.nome).replace(/^FAZ(ENDA)?\.?\s+/, '')[0] || '');
 }
+/* Fazendas da legenda FAZ (Modelo da ficha): [{ letra:'L', nome:'LOTE 35' }…]. */
+const fazendasLegenda = () => {
+  const r = [];
+  for (const linha of (modeloAtual().legenda_faz || [])) for (const parte of String(linha).split('/')) {
+    const m = /^\s*([A-Z])\s*-\s*(.+?)\s*$/i.exec(parte);
+    if (m) r.push({ letra: m[1].toUpperCase(), nome: m[2].trim() });
+  }
+  return r;
+};
 /* Motivos M.E.R da ficha: "1- Substituição por Dano Justificado" → { cod: '1', texto }. */
 const motivos = () => (modeloAtual().legenda_mer || []).map(t => {
   const m = /^\s*(\d+)\s*-\s*(.+)$/.exec(t); return m ? { cod: m[1], texto: m[2] } : null;
@@ -192,13 +201,26 @@ function fichaHtml(e) {
     return { ...linhaVazia(), faz: l.faz || faz, data: br(e.data), qtd: mostra(l.quantidade), ca: l.ca || casDe(it)[0] || '',
       descricao: nomeSemCa(it.nome).toUpperCase(), mer: l.mer || '' };
   });
-  const n = Math.max(linhas.length, Number(m.linhas_padrao) || 20);
+  /* Meia folha (13/11/2026, pedido dele: "no A4 está ficando muito grande"):
+     6 linhas (ou as da entrega, até 8) e 2 fichas por A4, com linha de corte.
+     Entrega com mais de 8 EPIs sai em folha inteira, como antes. */
+  const meia = linhas.length <= LINHAS_MEIA_MAX;
+  const n = meia ? Math.max(linhas.length, LINHAS_MEIA) : Math.max(linhas.length, Number(m.linhas_padrao) || 20);
   while (linhas.length < n) linhas.push(linhaVazia());
-  return montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id });
+  const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id });
+  if (!meia) return { meia: false, html };
+  // altura da ficha: 107,2 mm fixos + 7,4 mm por linha; cabe em 142 mm da meia folha
+  const zoom = Math.min(1, 142 / (107.2 + 7.4 * n)).toFixed(3);
+  return { meia: true, html: html.replace('<div class="folha">', `<div class="folha meia" style="zoom:${zoom}">`) };
 }
+const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 8;
 function imprimirFichas(lista) {
   if (!lista.length) { alert('Nenhuma entrega para imprimir.'); return; }
-  mostrar(`<div class="previa" style="margin-top:0">${lista.map(fichaHtml).join('')}</div>`, { barra: true });
+  const fs = lista.map(fichaHtml);
+  const meias = fs.filter(x => x.meia), inteiras = fs.filter(x => !x.meia);
+  mostrar(`<div class="previa" style="margin-top:0">
+    ${meias.length ? `<div class="meias">${meias.map(x => `<div class="meia-slot">${x.html}</div>`).join('')}</div>` : ''}
+    ${inteiras.map(x => x.html).join('')}</div>`, { barra: true });
 }
 
 /* ===================================================================
@@ -410,12 +432,19 @@ function ligarForm() {
   };
   const merSel = (l, i) => `<select data-l="${i}" data-c="mer" class="epm-mer" title="Motivo (M.E.R) — sai na ficha">${mot.map(m =>
     `<option value="${esc(m.cod)}"${l.mer === m.cod ? ' selected' : ''}>${esc(m.cod)} · ${esc(MER_CURTO[m.cod] || m.texto)}</option>`).join('')}</select>`;
+  /* Fazenda onde o EPI vai ser usado (coluna FAZ da ficha): vem a do
+     funcionário; dá para trocar em cada EPI. */
+  const fazPadrao = () => { const f = funcSel(); const l = (f && localDoFunc(f)) || localAtual(); return letraFaz(localDe(l)); };
+  const fazSel = (l, i) => { if (!l.faz) l.faz = fazPadrao();
+    return `<select data-l="${i}" data-c="faz" title="Fazenda onde o EPI vai ser usado (FAZ na ficha)">${fazendasLegenda().map(z =>
+      `<option value="${esc(z.letra)}"${l.faz === z.letra ? ' selected' : ''}>${esc(z.letra)} · ${esc(z.nome)}</option>`).join('')}</select>`; };
   const desenharLinhas = () => {
     $('epmLinhas').innerHTML = FORM.linhas.map((l, i) => `<div class="epm-linha">
       <label class="campo epm-epi">${i ? '' : 'EPI'}<input type="text" list="epmItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o EPI">
         <small data-info="${i}">${infoItem(l)}</small></label>
       <label class="campo epm-ca">${i ? '' : 'CA'}<span data-casel="${i}">${caSel(l, i)}</span></label>
       <label class="campo epm-qtd">${i ? '' : 'Qtd'}<input type="number" min="1" step="1" inputmode="numeric" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}"></label>
+      <label class="campo epm-faz">${i ? '' : 'Fazenda'}${fazSel(l, i)}</label>
       <label class="campo epm-mot">${i ? '' : 'Motivo'}${merSel(l, i)}</label>
       ${FORM.linhas.length > 1 ? `<button class="btn mini epm-x" type="button" data-tirar="${i}" title="Tirar este EPI">✕</button>` : '<span class="epm-x"></span>'}
     </div>`).join('');
@@ -432,6 +461,7 @@ function ligarForm() {
         ligarCa(i);
       });
       if (inp.dataset.c === 'mer') inp.addEventListener('change', () => { FORM.linhas[+inp.dataset.l].merManual = true; });
+      if (inp.dataset.c === 'faz') inp.addEventListener('change', () => { FORM.linhas[+inp.dataset.l].fazManual = true; });
     });
     $('epmLinhas').querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', () => { FORM.linhas.splice(+b.dataset.tirar, 1); desenharLinhas(); }));
   };
@@ -509,7 +539,8 @@ function ligarForm() {
     const f = funcSel();
     const l = f ? localDoFunc(f) : '';
     if (l && l !== localAtual()) { FORM.local = l; info(); trocarLocal(); } else info();
-    for (const [i, ln] of FORM.linhas.entries()) {   // motivo automático conforme o histórico dele
+    for (const [i, ln] of FORM.linhas.entries()) {   // motivo automático conforme o histórico dele; fazenda dele
+      if (!ln.fazManual) { ln.faz = fazPadrao(); const z = $('epmLinhas').querySelector(`select[data-c="faz"][data-l="${i}"]`); if (z) z.value = ln.faz; }
       const it = ln.item && itemPeloNome(ln.item, localAtual());
       if (f && it && !ln.merManual) { ln.mer = jaRecebeu(f.id, it) ? '1' : '4'; const s = $('epmLinhas').querySelector(`select[data-l="${i}"]`); if (s) s.value = ln.mer; }
     }
@@ -519,7 +550,8 @@ function ligarForm() {
   };
   desenharPick();
   $('epmData').addEventListener('change', ev => { FORM.data = ev.target.value; });
-  $('epmMais').addEventListener('click', () => { FORM.linhas.push({ item: '', qtd: '1', mer: '4' }); desenharLinhas(); $('epmLinhas').querySelector(`[data-l="${FORM.linhas.length - 1}"][data-c="item"]`).focus(); });
+  $('epmMais').addEventListener('click', () => { const ult = FORM.linhas[FORM.linhas.length - 1] || {};
+    FORM.linhas.push({ item: '', qtd: '1', mer: '4', faz: ult.faz || '', fazManual: !!ult.fazManual }); desenharLinhas(); $('epmLinhas').querySelector(`[data-l="${FORM.linhas.length - 1}"][data-c="item"]`).focus(); });
   $('epmLimpar').addEventListener('click', () => { limparForm(); desenhar(); });
   if (!FORM.local) { const f = funcSel(); FORM.local = (f && localDoFunc(f)) || ''; }
   info(); trocarLocal();
@@ -542,7 +574,7 @@ function ligarForm() {
       if (!(q > 0)) { aviso(`Quantidade inválida em ${nomeSemCa(it.nome)}.`); return; }
       const ca = l.ca || casDe(it)[0] || '';
       if (casDe(it).length > 1 && !ca) { aviso(`Escolha o CA de ${nomeSemCa(it.nome)}.`); return; }
-      boas.push({ it, q, mer: l.mer || '4', ca });
+      boas.push({ it, q, mer: l.mer || '4', ca, faz: l.faz || fazPadrao() });
     }
     if (!boas.length) { aviso('Escolha pelo menos um EPI.'); return; }
     const faltam = boas.filter(b => saldoDoCa(sal.get(b.it.id), b.ca) < b.q);
@@ -556,7 +588,7 @@ function ligarForm() {
     const faz = letraFaz(local);
     const rows = boas.map(b => ({ id: crypto.randomUUID(), local_id: localId, data, sentido: 'saida', tipo: 'uso', item_id: b.it.id,
       quantidade: b.q, documento: 'Ficha de EPI', funcionario_id: f.id, funcionario: f.nome, operador: quem(), criado_por: quem(),
-      lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz, ficha_assinada: false, ca: b.ca || null }));
+      lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz: b.faz || faz, ficha_assinada: false, ca: b.ca || null }));
     const r = await estado.cliente.from('est_movimentos').insert(rows).select();
     if (r.error) { aviso('Não consegui gravar: ' + r.error.message); $('epmSalvar').disabled = false; return; }
     D.movimentos.push(...(r.data || rows));
