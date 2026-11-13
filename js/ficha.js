@@ -84,7 +84,7 @@ function fichaEntrega(func, modelo, opcoes) {
     celula('qtd', i, l.qtd, 'f18 b ce blt brt btt bbt') +
     celula('ca', i, l.ca, 'f20 b ce blt brt btt bbt') +
     celula('descricao', i, l.descricao, `${tamDescricao(l.descricao)} es blt brt btt bbt`) +
-    celula('devolucao', i, l.devolucao, 'f12 b ce brt btt bbt', TRACO) +
+    celula('devolucao', i, l.devolucao, 'f14 b ce brt btt bbt', '___/___/____') +
     celula('assinatura', i, l.assinatura, 'f14 es blt brt btt bbt') +
     celula('mer', i, l.mer, 'f18 b ce blt btt bbt') +
     '</tr>';
@@ -116,7 +116,7 @@ function fichaEntrega(func, modelo, opcoes) {
   <div class="ficha" data-chave="${esc(chave)}">
   <table class="fx"><colgroup>
     <col style="width:4.729%"><col style="width:9.5%"><col style="width:5.296%"><col style="width:9.269%">
-    <col style="width:26.502%"><col style="width:13.997%"><col style="width:22.131%"><col style="width:8.575%">
+    <col style="width:26.502%"><col style="width:10.5%"><col style="width:25.628%"><col style="width:8.575%">
   </colgroup><tbody>
   <tr class="fe-topo"><td colspan="8"><div class="fe-topo-in">
     <div class="fe-logo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios"></div>
