@@ -3077,3 +3077,6 @@ select.epm-ca-ruim{color:#a5342a;border-color:#a5342a}
 .fe .fe-itens.faz{grid-template-columns:repeat(3,auto);justify-content:space-between}
 .fe .fe-itens.mer{grid-template-columns:repeat(2,auto);justify-content:space-between}
 .fe .fe-itens b{display:inline-block;min-width:2.6mm;font-size:7pt}
+/* linhas da ficha da entrega: texto no meio da linha, CA maior (13/11/2026) */
+.fe tr.r43 .cw .cx{top:0;bottom:0;height:auto;margin:auto 0}
+.fe tr.r43 .cel.es .cw .cx{padding-left:1.2mm}

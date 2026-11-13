@@ -75,14 +75,14 @@ function fichaEntrega(func, modelo, opcoes) {
   const decls = modelo.declaracoes || [];
   const cpf = cpfBr(func.cpf);
   const linhaHtml = (l, i) => '<tr class="r43">' +
-    celula('faz', i, l.faz, 'f14 ce brt btt bbt') +
-    celula('data', i, l.data, 'f12 b ce brt btt bbt', TRACO) +
-    celula('qtd', i, l.qtd, 'f14 ce blt brt btt bbt') +
-    celula('ca', i, l.ca, 'f14 ce blt brt btt bbt') +
-    celula('descricao', i, l.descricao, 'f14 es blt brt btt bbt') +
+    celula('faz', i, l.faz, 'f18 b ce brt btt bbt') +
+    celula('data', i, l.data, 'f14 b ce brt btt bbt', TRACO) +
+    celula('qtd', i, l.qtd, 'f18 b ce blt brt btt bbt') +
+    celula('ca', i, l.ca, 'f20 b ce blt brt btt bbt') +
+    celula('descricao', i, l.descricao, 'f16 es blt brt btt bbt') +
     celula('devolucao', i, l.devolucao, 'f12 b ce brt btt bbt', TRACO) +
     celula('assinatura', i, l.assinatura, 'f14 es blt brt btt bbt') +
-    celula('mer', i, l.mer, 'f10 ce blt btt bbt') +
+    celula('mer', i, l.mer, 'f18 b ce blt btt bbt') +
     '</tr>';
   /* Cabeçalho (13/11/2026, sugestão C): logo | título em duas linhas | código
      do formulário; legendas FAZ e M.E.R em duas faixas corridas. "G - GERAL"
