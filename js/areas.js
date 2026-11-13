@@ -397,7 +397,19 @@ export function mostrarAreas({ direto = false } = {}) {
 
 /** Abre uma área. `tela` = 'config' abre as Configurações; `extra` vai para a
  *  moldura (ex.: o link do relatório de check list mandado por WhatsApp). */
+/* Área aberta com versão velha (13/11/2026, pedido dele "vamos melhorar isso"):
+   a moldura (Estoque, Programação…) fica carregada desde a primeira vez que se
+   entra na área e não recarregava depois de uma publicação — ele via o menu
+   antigo ("Estoque Quebra Cocão", "EPIs") horas depois. Agora: cada moldura
+   guarda quando carregou; se uma versão nova assumiu depois disso
+   (window.grNovaVersaoEm, marcado em js/app.js), ela recarrega ao entrar. */
+document.querySelectorAll('iframe[id^="moldura"]').forEach(m => m.addEventListener('load', () => { m.dataset.em = String(Date.now()); }));
+function molduraVelha(m) {
+  const nova = Number(window.grNovaVersaoEm || 0);
+  return !!nova && Number(m.dataset.em || 0) < nova;
+}
 export function entrarNaArea(id, tela, extra) {
+  try { window.grConferirVersao?.(); } catch { /* sem service worker */ }
   if (!liberada(id)) return mostrarAreas();
   areaAtual = id;
   pintarEtiqueta();
@@ -476,7 +488,7 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'programacao/?v=' + VERSAO_PROG + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'programacao/?v=' + VERSAO_PROG + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
     return;
@@ -495,7 +507,7 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'estoque/?v=' + VERSAO_EST + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'estoque/?v=' + VERSAO_EST + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
     return;
@@ -514,7 +526,7 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'custobase/?v=' + VERSAO_CB + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'custobase/?v=' + VERSAO_CB + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
     return;
@@ -555,7 +567,7 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'projetos/?v=' + VERSAO_PJ + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'projetos/?v=' + VERSAO_PJ + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
     return;
@@ -573,7 +585,7 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'outorga/?v=' + VERSAO_OT + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'outorga/?v=' + VERSAO_OT + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
     return;
@@ -591,7 +603,7 @@ export function entrarNaArea(id, tela, extra) {
     } else {
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'colheita/?v=' + VERSAO_CP + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'colheita/?v=' + VERSAO_CP + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
     return;
@@ -614,7 +626,7 @@ export function entrarNaArea(id, tela, extra) {
       // Se a abertura anterior não terminou (ficou em "Baixando…"), recarrega.
       let pronta = false;
       try { pronta = !!moldura.contentWindow.areaPronta; } catch {}
-      if (!pronta) moldura.src = 'manutencoes/?v=' + VERSAO_AREA + '&t=' + Date.now();
+      if (!pronta || molduraVelha(moldura)) moldura.src = 'manutencoes/?v=' + VERSAO_AREA + '&t=' + Date.now();
       else try { moldura.contentWindow.voltarAoInicioDaArea?.(); } catch {}
     }
   }

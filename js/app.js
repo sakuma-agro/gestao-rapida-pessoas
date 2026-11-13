@@ -2203,11 +2203,12 @@ if ('serviceWorker' in navigator) {
   const jaTinhaControle = !!navigator.serviceWorker.controller;
   let faixaMostrada = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.grNovaVersaoEm = Date.now();   // as áreas (molduras) recarregam ao entrar — js/areas.js
     if (!jaTinhaControle || faixaMostrada) return;
     faixaMostrada = true;
     const f = document.createElement('div');
     f.className = 'faixa-versao';
-    f.innerHTML = '<span>Nova versão do app publicada.</span><button type="button">Atualizar agora</button>';
+    f.innerHTML = '<span>Nova versão do app publicada. As áreas abrem já na versão nova; para o resto, toque em atualizar.</span><button type="button">Atualizar agora</button>';
     f.querySelector('button').onclick = () => location.reload();
     document.body.appendChild(f);
   });
@@ -2222,7 +2223,10 @@ if ('serviceWorker' in navigator) {
   mostrarVersao();
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
     mostrarVersao();
-    const conferir = () => reg.update().catch(() => {});
+    let ultimaConf = 0;
+    const conferir = () => { ultimaConf = Date.now(); return reg.update().catch(() => {}); };
+    // ao entrar numa área também confere (no máximo 1 vez por minuto) — 13/11/2026
+    window.grConferirVersao = () => { if (Date.now() - ultimaConf > 60000) conferir(); };
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') conferir(); });
     setInterval(conferir, 30 * 60 * 1000);
   }).catch(() => {}));
