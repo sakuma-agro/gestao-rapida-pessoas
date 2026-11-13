@@ -212,8 +212,8 @@ function fichaHtml(e) {
   while (linhas.length < n) linhas.push(linhaVazia());
   const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id, entrega: true, numero: numEntrega(e) });
   if (!meia) return { meia: false, html };
-  // altura da ficha da entrega com 6 linhas: 97,6 mm fixos + 7,4 mm × 6 ≈ 142 mm → zoom fixo para caber em 142 mm
-  const zoom = (142 / (97.6 + 7.4 * LINHAS_MEIA)).toFixed(3);
+  // altura da ficha da entrega com 6 linhas: 104,3 mm fixos + 7,4 mm × 6 ≈ 148,7 mm → zoom fixo para caber em 142 mm
+  const zoom = (142 / (104.3 + 7.4 * LINHAS_MEIA)).toFixed(3);
   return { meia: true, html: html.replace('<div class="folha fe">', `<div class="folha fe meia" style="zoom:${zoom}">`) };
 }
 const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 6;

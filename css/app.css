@@ -3064,3 +3064,13 @@ select.epm-ca-ruim{color:#a5342a;border-color:#a5342a}
 .fe .fe-num span{font-size:6pt;line-height:1.1;margin-bottom:1mm}
 .fe .fe-num b{font-size:13pt;letter-spacing:.4pt;line-height:1}
 .fe .fe-num i{display:block;width:16mm;height:5mm;border-bottom:.2mm solid #000}
+/* legendas FAZ e M.E.R com rótulo inteiro e itens em grade (13/11/2026) */
+.fe .fe-faixa td{padding:0}
+.fe .fe-leg2{display:flex;align-items:stretch}
+.fe .fe-rot{flex:0 0 36mm;display:flex;flex-direction:column;justify-content:center;padding:.7mm 1.6mm;border-right:.2mm solid #000;background:#F2F2F2;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.fe .fe-rot b{font-size:8pt;line-height:1.1}
+.fe .fe-rot span{font-size:5.8pt;line-height:1.15}
+.fe .fe-itens{flex:1;display:grid;align-items:center;padding:.7mm 1.6mm;gap:.2mm 2mm;font-size:6.3pt;line-height:1.25}
+.fe .fe-itens.faz{grid-template-columns:repeat(6,auto);justify-content:space-between}
+.fe .fe-itens.mer{grid-template-columns:repeat(2,1fr)}
+.fe .fe-itens b{display:inline-block;min-width:3mm;font-size:7pt}

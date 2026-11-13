@@ -97,9 +97,15 @@ function fichaEntrega(func, modelo, opcoes) {
   const numHtml = `<div class="fe-num"><span>Nº da entrega</span><b>${opcoes.numero ? esc(opcoes.numero) : '<i></i>'}</b></div>`;
   const formHtml = campoForm('Formulário', modelo.form_codigo, '') +
     campoForm('Revisão', modelo.form_revisao, '') + campoForm('Data', modelo.form_data, '');
-  // rótulo curto na faixa: "M.E.R: Motivos para…" → "M.E.R:" (o resto cabe na legenda)
-  const curto = r => { const t = String(r || '').trim(); const i = t.indexOf(':'); return i > 0 && t.length > 24 ? t.slice(0, i + 1) : t; };
-  const faixa = (rot, itens) => `<tr class="fe-faixa"><td colspan="8">${rot ? `<b>${esc(curto(rot))}</b> ` : ''}${itens.map(esc).join('&nbsp;&nbsp;·&nbsp; ')}</td></tr>`;
+  /* Legendas (13/11/2026, "faltou deixar melhor sobre o M.E.R - Motivos"): rótulo
+     inteiro à esquerda (sigla em destaque + o que significa) e os itens em grade,
+     cada um com a letra/número em negrito. */
+  const rotulo = r => { const t = String(r || '').trim(); const i = t.indexOf(':');
+    return i > 0 ? `<b>${esc(t.slice(0, i))}</b><span>${esc(t.slice(i + 1).trim())}</span>` : `<b>${esc(t)}</b>`; };
+  const item = t => { const m = String(t).match(/^\s*([A-Z0-9]{1,2})\s*-\s*(.*)$/i);
+    return m ? `<div><b>${esc(m[1])}</b> ${esc(m[2])}</div>` : `<div>${esc(t)}</div>`; };
+  const faixa = (rot, itens, cls) => `<tr class="fe-faixa"><td colspan="8"><div class="fe-leg2">
+    <div class="fe-rot">${rotulo(rot)}</div><div class="fe-itens ${cls}">${itens.map(item).join('')}</div></div></td></tr>`;
   return `<div class="folha fe">
   <div class="ficha" data-chave="${esc(chave)}">
   <table class="fx"><colgroup>
@@ -112,8 +118,8 @@ function fichaEntrega(func, modelo, opcoes) {
     ${numHtml}
     <div class="fe-form">${formHtml}</div>
   </div></td></tr>
-  ${faixa(modelo.rotulo_faz, fazPares)}
-  ${faixa(modelo.rotulo_mer, merLeg)}
+  ${faixa(modelo.rotulo_faz, fazPares, 'faz')}
+  ${faixa(modelo.rotulo_mer, merLeg, 'mer')}
   <tr class="r12">
     <td colspan="2" class="f20 b es vm btt bbt">EMPREGADOR:</td>
     <td colspan="6" class="f20 b es vm btt bbt">${esc(func.empregador)}</td>
