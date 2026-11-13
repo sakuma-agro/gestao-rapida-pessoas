@@ -202,8 +202,11 @@ export function saldoRegistrado(localId, mes, ateData, grupo, contagemId) {
      nos estoques que não vivem de movimentos, o saldo do EPI é a última
      contagem + entradas − saídas (js/epi-saldo.js), e esses lançamentos não
      podem fazer os outros grupos (defensivos…) parecerem "de movimentos". */
-  const ORG = grupo === 'EPIs' ? 'epi' : grupo === 'Material de limpeza' ? 'limpeza' : '';
-  const doEpi = !qc && !!ORG && todos('est_movimentos').some(m => m.local_id === localId && m.origem === ORG && m.ativo !== false);
+  /* Gestão de estoque única (13/11/2026): qualquer tipo com entrada/saída
+     lançada num estoque que não é a Quebra Cocão vale última contagem do tipo
+     + movimentos depois dela. */
+  const idsGrupo = new Set(todos('est_itens').filter(i => i.grupo === grupo).map(i => i.id));
+  const doEpi = !qc && todos('est_movimentos').some(m => m.local_id === localId && m.ativo !== false && !m.pendente && idsGrupo.has(m.item_id));
   if (doEpi) {
     const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);
     const r = saldosEpi({ locais: todos('est_locais'), contagens: todos('est_contagens'), grupos: todos('est_contagem_grupos'),
@@ -213,7 +216,7 @@ export function saldoRegistrado(localId, mes, ateData, grupo, contagemId) {
     for (const [k, v] of r) { sal.set(k, v.saldo); base = base || v.baseData; }
     return { fonte: 'epi', saldos: sal, ate: lim, texto: (base ? 'contagem de ' + dataBR(base) : 'zero') + ' + entradas − saídas até ' + dataBR(lim) };
   }
-  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId && (qc || (m.origem !== 'epi' && m.origem !== 'limpeza'))).map(m => [m.id, m])).values()]
+  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId && qc).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false && !m.pendente);
   if (movs.length) {
     const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);

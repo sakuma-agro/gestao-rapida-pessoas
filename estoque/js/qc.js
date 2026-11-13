@@ -9,7 +9,9 @@
 import {
   $, esc, pronto, todos, aviso, meuNome, locais, itensOrdenados, GRUPOS, UNIDADES,
   lerNumero, mostrarNumero, dataBR, hojeISO, temMinimo as temMinimoGeral, precisaRepor as precisaReporGeral, souAdmin, comMinimoDo, podeLocal, meusLocais, contaNoLocal,
+  locaisDoUsuario,
 } from './dados.js';
+import { saldosEpi, casDe } from '../../js/epi-saldo.js';
 import { lerPlanilhaQc, unidadeDe } from './qc-importar.js';
 import { gravar as gravarDireto } from './dados.js';
 
@@ -31,13 +33,38 @@ let grupoVisao = '';
 let esconderZerados = true;
 let mesLista = hojeISO().slice(0, 7);
 
-/** O estoque da Quebra Cocão no cadastro de almoxarifados. */
-const localQc = () => { const l = todos('est_locais').find(x => x.ativo !== false && semAcento(x.nome).includes('QUEBRA COCAO')) || null;
-  return l && podeLocal(l.id) ? l : null; };   // quem não tem a Quebra Cocão liberada não vê este módulo
-/** Produto novo criado aqui só aparece na contagem mensal da Quebra Cocão. */
+/* GESTÃO DE ESTOQUE ÚNICA (13/11/2026, pedidos dele: "vamos juntar esse
+   estoque? fazer somente uma gestão", "fertilizantes e defensivo, somente a
+   quebra cocão vai usar aí, o restante todas as fazendas vão usar" e "sobre a
+   contagem, quero ter um total de tudo depois"). Este módulo, que era só da
+   Quebra Cocão, agora serve qualquer estoque escolhido no alto da tela:
+     · Quebra Cocão: saldo = entradas − saídas (como sempre), todos os tipos;
+     · outras fazendas: saldo = última contagem de cada tipo + entradas −
+       saídas lançadas depois dela (../../js/epi-saldo.js), e defensivo e
+       fertilizante não entram nos lançamentos (seguem pelo Acerto);
+     · "Todos os estoques" (só na tela Estoque): a soma de todos. */
+const ehQcLocal = l => !!l && semAcento(l.nome).includes('QUEBRA COCAO');
+const SO_QC = ['Defensivos', 'Fertilizantes'];
+const CHAVE_LOCAL_G = 'estoque.gestao.local';
+let localSel = '';
+try { localSel = localStorage.getItem(CHAVE_LOCAL_G) || ''; } catch { /* sem localStorage */ }
+const TODOS = '*';
+/** O estoque escolhido (padrão: Quebra Cocão, se a pessoa tiver; senão o primeiro dela). */
+const localQc = () => { const ls = locaisDoUsuario();
+  return ls.find(x => x.id === localSel) || ls.find(ehQcLocal) || ls[0] || null; };
+const verTodos = () => localSel === TODOS && telaAberta === 'qcVisao' && locaisDoUsuario().length > 1;
+const grupoPermitido = g => ehQcLocal(localQc()) || !SO_QC.includes(g);
+function seletorLocal(comTodos) {
+  const ls = locaisDoUsuario(), atual = comTodos && verTodos() ? TODOS : (localQc() || {}).id;
+  if (ls.length < 2) return '';
+  return `<label class="campo gs-local">Estoque <select id="gsLocal">${comTodos ? `<option value="${TODOS}"${atual === TODOS ? ' selected' : ''}>Todos os estoques (total)</option>` : ''}
+    ${ls.map(l => `<option value="${esc(l.id)}"${l.id === atual ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>`;
+}
+const nomeLocal = () => verTodos() ? 'Todos os estoques' : ((localQc() || {}).nome || '');
+/** Produto novo criado aqui só aparece na contagem do estoque escolhido. */
 const soQc = () => { const l = localQc(); return l ? [l.id] : null; };
-const movimentosTodos = () => {
-  const lc = localQc();
+const movimentosTodos = (lcId) => {
+  const lc = lcId ? { id: lcId } : localQc();
   return lc ? [...new Map(todos('est_movimentos').filter(m => m.local_id === lc.id).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false) : [];
 };
@@ -53,10 +80,26 @@ const precisaRepor = (item, qtd) => precisaReporGeral(comMinimoDo(item, (localQc
 const temMinimo = item => temMinimoGeral(comMinimoDo(item, (localQc() || {}).id));
 const itemDe = id => todos('est_itens').find(i => i.id === id) || { nome: '(item apagado)', unidade: '', grupo: 'Outros' };
 
-/** Saldo de cada item (Map item_id → número). */
+/** Saldo de cada item (Map item_id → número) no estoque escolhido (ou em todos). */
+const dadosSaldo = () => ({ locais: todos('est_locais'), contagens: todos('est_contagens'), grupos: todos('est_contagem_grupos'),
+  linhas: todos('est_contagem_itens'), lotes: todos('est_contagem_lotes'), movimentos: todos('est_movimentos'), itens: todos('est_itens') });
+function saldosDoLocal(l) {
+  if (!l) return new Map();
+  if (ehQcLocal(l)) return saldosMov(l.id);
+  const d = dadosSaldo(), m = new Map();
+  for (const g of new Set(todos('est_itens').map(i => i.grupo).filter(Boolean)))
+    for (const [k, v] of saldosEpi(d, l.id, { grupo: g })) if (v.saldo || v.base || v.entradas || v.saidas) m.set(k, v.saldo);
+  return m;
+}
 function saldos() {
+  if (!verTodos()) return saldosDoLocal(localQc());
   const m = new Map();
-  for (const mv of movimentos()) {
+  for (const l of locaisDoUsuario()) for (const [k, v] of saldosDoLocal(l)) m.set(k, Math.round(((m.get(k) || 0) + v) * 1000) / 1000);
+  return m;
+}
+function saldosMov(lcId) {
+  const m = new Map();
+  for (const mv of movimentosTodos(lcId).filter(x => !x.pendente)) {
     const q = Number(mv.quantidade) || 0;
     m.set(mv.item_id, (m.get(mv.item_id) || 0) + (mv.sentido === 'entrada' ? q : -q));
   }
@@ -75,6 +118,7 @@ const brl = v => vazio(v) || !isFinite(v) ? '—' : Number(v).toLocaleString('pt
 const brlU = v => vazio(v) || !isFinite(v) ? '—' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 function custos(ate) {
   const itens = new Map(), mov = new Map();
+  if (verTodos()) return { itens, mov };
   const lista = movimentos().filter(m => !ate || String(m.data).slice(0, 10) <= ate).sort((a, b) =>
     String(a.data).localeCompare(String(b.data))
     || (a.sentido === b.sentido ? 0 : a.sentido === 'entrada' ? -1 : 1)
@@ -103,8 +147,8 @@ function custos(ate) {
 const unicos = campo => [...new Set(movimentos().map(m => m[campo]).filter(v => !vazio(v)))].sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
 
 function semLocal(alvo) {
-  alvo.innerHTML = `<div class="cartao"><h2>Estoque Faz. Quebra Cocão</h2>
-    <div class="vazio">Não achei o estoque "Faz. Quebra Cocão" em Cadastros › Almoxarifados.</div></div>`;
+  alvo.innerHTML = `<div class="cartao"><h2>Gestão de estoque</h2>
+    <div class="vazio">Você não tem nenhum estoque liberado (Usuários - Acessos).</div></div>`;
 }
 
 /* ===================================================================
@@ -130,8 +174,10 @@ function desenharVisao() {
   let grupo = null;
   alvo.innerHTML = `
   <div class="cartao">
-    <h2>Estoque Faz. Quebra Cocão</h2>
-    <p class="dica">Saldo de cada item = entradas − saídas lançadas aqui. Não tem ligação com a contagem do mês nem com o acerto.</p>
+    <div class="barra entre"><h2 style="margin:0">Estoque · ${esc(nomeLocal())}</h2>${seletorLocal(true)}</div>
+    <p class="dica">${verTodos() ? 'Total de todos os estoques: soma do saldo de cada um.'
+      : ehQcLocal(localQc()) ? 'Saldo de cada item = entradas − saídas lançadas aqui.'
+      : 'Saldo = última contagem de cada tipo + entradas − saídas lançadas depois dela. Defensivo e fertilizante seguem pela contagem e pelo Acerto.'}</p>
     <div class="es-cards">
       <div class="es-card es-ok"><span>Itens com movimento</span><strong>${itens.length}</strong><small>${grupos.length} categoria(s)</small></div>
       <div class="es-card es-transf"><span>Valor em estoque</span><strong class="qc-rs">${esc(brl(vistosValor(itens, cu)))}</strong><small>pelo custo médio${semValor(itens, cu, sd) ? ` · ${semValor(itens, cu, sd)} sem valor` : ''}</small></div>
@@ -150,7 +196,7 @@ function desenharVisao() {
       <label class="es-check"><input type="checkbox" id="qcZerados"${esconderZerados ? ' checked' : ''}> esconder os zerados (${zerados})</label>
       <button class="btn principal" type="button" id="qcRelatorio"${itens.length ? '' : ' disabled'}>Emitir relatório</button>
       <button class="btn" type="button" id="qcImprimir"${vistos.length ? '' : ' disabled'}>Imprimir posição</button>
-      ${souAdmin() ? `<label class="btn" for="qcImpArq">Importar planilhas antigas</label>
+      ${souAdmin() && ehQcLocal(localQc()) && !verTodos() ? `<label class="btn" for="qcImpArq">Importar planilhas antigas</label>
       <input type="file" id="qcImpArq" accept=".xlsx,.xlsm" multiple hidden>` : ''}
     </div>
     <div class="lista">${vistos.map(i => {
@@ -231,7 +277,7 @@ function montarPosicao(itens, sd, cu) {
   const total = grupos.reduce((t, g) => t + g.valor, 0);
   $('qcFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-tit"><h1>Posição do Estoque — Faz. Quebra Cocão</h1>
+      <div class="rel-tit"><h1>Posição do Estoque — ${esc(nomeLocal())}</h1>
         <p>${itens.length} itens${grupoVisao ? ' · ' + esc(grupoVisao) : ''} · valor em estoque ${esc(brl(total))} · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     ${grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
       <table class="rel-tab"><thead><tr><th>Item</th><th class="ce">Unidade</th><th class="ce">Saldo</th><th class="ce">Custo médio</th><th class="ce">Valor</th></tr></thead>
@@ -370,7 +416,7 @@ function montarRelatorio(o) {
   }
   $('qcFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-tit"><h1>${esc(tituloRel(o))} — Faz. Quebra Cocão</h1><p>${esc(subRel(o))}</p></div></div>
+      <div class="rel-tit"><h1>${esc(tituloRel(o))} — ${esc(nomeLocal())}</h1><p>${esc(subRel(o))}</p></div></div>
     ${corpo}
     <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
@@ -393,7 +439,7 @@ function baixarRelatorio(o) {
     linhas = [['Categoria', 'Produto', 'Unidade', 'Saldo', 'Custo médio (R$)', 'Valor (R$)']];
     d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.fim), rs(l.medio), rs(l.vFim)]));
   }
-  const csv = '\ufeff' + [[tituloRel(o) + ' — Faz. Quebra Cocão'], [subRel(o)], [], ...linhas].map(r => r.map(q).join(';')).join('\r\n');
+  const csv = '\ufeff' + [[tituloRel(o) + ' — ' + nomeLocal()], [subRel(o)], [], ...linhas].map(r => r.map(q).join(';')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = `Estoque QC - ${tituloRel(o)} - ${o.tipo === 'posicao' ? hojeISO() : o.de + ' a ' + o.ate}.csv`;
@@ -409,7 +455,7 @@ function baixarRelatorio(o) {
    uma linha nova aparece sozinha. Dá também para colar a lista da NF.
    Cada linha vira um movimento; todos levam o mesmo lancamento_id.
    =================================================================== */
-const outrasFazendas = () => locais().filter(l => !semAcento(l.nome).includes('QUEBRA COCAO')).map(l => l.nome);
+const outrasFazendas = () => locais().filter(l => l.id !== (localQc() || {}).id).map(l => l.nome);
 const itemPorNome = nome => itensOrdenados().find(i => semAcento(i.nome) === semAcento(nome));
 const LINHAS_INICIAIS = 6;
 let abertos = new Set();     // lançamentos expandidos na lista do mês
@@ -422,7 +468,7 @@ let catMov = '';
 try { catMov = localStorage.getItem(CHAVE_CAT) || ''; } catch { /* sem localStorage */ }
 function produtosDoForm() {
   const meus = meusLocais();
-  return itensOrdenados().filter(i => (!catMov || (i.grupo || 'Outros') === catMov)
+  return itensOrdenados().filter(i => (!catMov || (i.grupo || 'Outros') === catMov) && grupoPermitido(i.grupo)
     && (!meus.length || meus.some(l => contaNoLocal(i, l))));
 }
 const listaProdutos = () => produtosDoForm().map(i => `<option value="${esc(i.nome)}">${esc(i.unidade || '')} · ${esc(i.grupo || '')}</option>`).join('');
@@ -488,6 +534,77 @@ async function carregarDestinos() {
   } catch (err) { console.warn('não li máquinas/funcionários', err); }
 }
 
+/* Fornecedores cadastrados (Gestão de estoque › Fornecedores) + os já usados. */
+const fornecedoresCad = () => [...new Map(todos('est_fornecedores').map(x => [x.id, x])).values()].filter(x => x.ativo !== false);
+const listaFornec = () => [...new Set([...fornecedoresCad().map(f => f.nome), ...unicos('fornecedor')])]
+  .sort((a, b) => a.localeCompare(b, 'pt-BR')).map(v => `<option value="${esc(v)}">`).join('');
+
+/* "+ Novo cadastro" e "+ Novo" fornecedor dentro da entrada (13/11/2026, pedido
+   dele: "ao lançar a entrada ter o botão novo cadastro que abre o painel de
+   cadastro sem fechar a entrada"). Painel na própria tela; nada se perde. */
+function ligarCadastrosNaEntrada(sentido) {
+  const sub = $('qcSub');
+  const fechar = () => { sub.hidden = true; sub.innerHTML = ''; };
+  const abrir = (html, salvar) => {
+    sub.innerHTML = html + `<p class="aviso erro" id="qsAviso" hidden></p>
+      <div class="barra fim"><button class="btn" type="button" id="qsFechar">Fechar</button><button class="btn principal" type="button" id="qsOk">Salvar cadastro</button></div>`;
+    sub.hidden = false;
+    sub.querySelector('input')?.focus();
+    sub.querySelector('#qsFechar').onclick = fechar;
+    const ok = async () => { const err = await salvar(); if (err) { const a = sub.querySelector('#qsAviso'); a.textContent = err; a.hidden = false; } };
+    sub.querySelector('#qsOk').onclick = ok;
+    sub.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } }));
+  };
+  const v = id => (sub.querySelector('#' + id) || {}).value?.trim?.() || '';
+  $('qcNovoItem').onclick = () => {
+    const grupos = GRUPOS.filter(grupoPermitido);
+    abrir(`<h3>Novo cadastro</h3><div class="grade">
+      <label class="campo">Tipo <select id="qsGrupo">${grupos.map(g => `<option${g === catMov ? ' selected' : ''}>${esc(g)}</option>`).join('')}</select></label>
+      <label class="campo plena">Nome <input type="text" id="qsNome" placeholder="ex.: Luva Nitrílica - M ou Detergente 500 mL"></label>
+      <label class="campo">Unidade <select id="qsUni">${UNIDADES.map(u => `<option${u === 'un' ? ' selected' : ''}>${u}</option>`).join('')}</select></label>
+      <label class="campo" id="qsCaCampo">CA <input type="text" id="qsCa" placeholder="nº do CA (mais de um: vírgula)"></label>
+      <label class="campo">Estoque mínimo <input type="text" inputmode="decimal" id="qsMin" placeholder="opcional"></label></div>`, async () => {
+      const nome = v('qsNome').replace(/\s+/g, ' '), grupo = v('qsGrupo');
+      if (!nome) return 'Escreva o nome.';
+      if (itemPorNome(nome)) return `"${nome}" já está cadastrado.`;
+      const min = v('qsMin') ? lerNumero(v('qsMin')) : null;
+      if (Number.isNaN(min)) return 'Estoque mínimo: use só números.';
+      await gravar('est_itens', { nome, grupo, unidade: v('qsUni'), ativo: true, locais_contagem: null, estoque_minimo: min,
+        ca: grupo === 'EPIs' ? v('qsCa').split(/[,/;\s]+/).filter(Boolean).join(', ') || null : null });
+      $('qcProdutos').innerHTML = listaProdutos();
+      let lin = [...document.querySelectorAll('#qcLins .qc-lin')].find(l => !l.querySelector('.qc-prod').value.trim());
+      if (!lin) { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); lin = $('qcLins').lastElementChild; }
+      lin.querySelector('.qc-prod').value = nome;
+      lin.querySelector('.qc-prod').dispatchEvent(new Event('change'));
+      fechar();
+      aviso(`${nome} cadastrado.`);
+      lin.querySelector('.qc-qtd').focus();
+      return '';
+    });
+    const g = sub.querySelector('#qsGrupo'), caC = sub.querySelector('#qsCaCampo');
+    const ver = () => { caC.hidden = g.value !== 'EPIs'; };
+    g.addEventListener('change', ver); ver();
+  };
+  $('qcNovoForn').onclick = () => {
+    const atual = (document.querySelector('#qcForm [name=fornecedor]') || {}).value || '';
+    abrir(`<h3>Novo fornecedor</h3><div class="grade">
+      <label class="campo plena">Nome <input type="text" id="qsFNome" value="${esc(atual)}"></label>
+      <label class="campo">CNPJ / CPF <input type="text" id="qsFCnpj"></label>
+      <label class="campo">Telefone <input type="text" id="qsFTel"></label>
+      <label class="campo">Cidade <input type="text" id="qsFCid"></label></div>`, async () => {
+      const nome = v('qsFNome');
+      if (!nome) return 'Escreva o nome do fornecedor.';
+      if (fornecedoresCad().some(f => semAcento(f.nome) === semAcento(nome))) return `"${nome}" já está cadastrado.`;
+      await gravar('est_fornecedores', { nome, cnpj: v('qsFCnpj') || null, telefone: v('qsFTel') || null, cidade: v('qsFCid') || null, ativo: true });
+      $('qcFornec').innerHTML = listaFornec();
+      document.querySelector('#qcForm [name=fornecedor]').value = nome;
+      fechar();
+      aviso(`Fornecedor ${nome} cadastrado.`);
+      return '';
+    });
+  };
+}
+
 function linhaProduto(sentido) {
   const ent = sentido === 'entrada';
   return `<div class="qc-lin${ent ? ' com-valor' : ''}">
@@ -495,6 +612,7 @@ function linhaProduto(sentido) {
     <input type="text" class="qc-qtd" inputmode="decimal" placeholder="qtd" autocomplete="off" enterkeyhint="next">
     ${ent ? '<input type="text" class="qc-vu" inputmode="decimal" placeholder="R$ por unid." autocomplete="off" enterkeyhint="next" aria-label="Valor por unidade">' : ''}
     <button type="button" class="cl-tirar qc-x" title="Tirar a linha" aria-label="Tirar a linha">×</button>
+    <select class="qc-ca" hidden aria-label="CA do EPI"></select>
     <small class="qc-info"></small>
     ${ent ? '' : `<label class="qc-dest" hidden><span class="qc-dest-rot"></span>
       <input type="text" class="qc-dest-inp" autocomplete="off" enterkeyhint="next"></label>`}
@@ -509,9 +627,10 @@ function desenharMov(sentido) {
   if (!localQc()) return semLocal(alvo);
   const ent = sentido === 'entrada';
   const tipos = ent ? TIPOS_ENTRADA : TIPOS_SAIDA;
+  if (catMov && !grupoPermitido(catMov)) catMov = '';
   alvo.innerHTML = `
   <div class="cartao">
-    <h2>${ent ? 'Entrada' : 'Saída'} · Faz. Quebra Cocão</h2>
+    <div class="barra entre"><h2 style="margin:0">${ent ? 'Entrada' : 'Saída'} · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
     <form id="qcForm" autocomplete="off">
       <div class="qc-tipos">${Object.entries(tipos).map(([k, v], n) => `<label class="qc-tipo">
         <input type="radio" name="tipo" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>
@@ -519,7 +638,8 @@ function desenharMov(sentido) {
         <label class="campo">Data <input type="date" name="data" value="${hojeISO()}" max="${hojeISO()}" required></label>
         <label class="campo">Nº do documento${ent ? ' / NF' : ' *'} <input type="text" name="documento"></label>
         ${ent ? `
-        <label class="campo qc-so" data-so="compra">Fornecedor <input type="text" name="fornecedor" list="qcFornec"></label>
+        <label class="campo qc-so" data-so="compra">Fornecedor <span class="mv-com-botao"><input type="text" name="fornecedor" list="qcFornec">
+          <button type="button" class="btn" id="qcNovoForn">+ Novo</button></span></label>
         <label class="campo qc-so" data-so="transferencia">Fazenda de origem *
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`
         : `
@@ -529,20 +649,22 @@ function desenharMov(sentido) {
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`}
         <label class="campo plena">Observação <input type="text" name="obs"></label>
       </div>
-      <div class="ct-chips qc-cats">${[['', 'Todas'], ...GRUPOS.filter(g => itensOrdenados().some(i => i.grupo === g)).map(g => [g, g])]
+      <div class="ct-chips qc-cats">${[['', 'Todas'], ...GRUPOS.filter(g => grupoPermitido(g) && itensOrdenados().some(i => i.grupo === g)).map(g => [g, g])]
         .map(([id, rot]) => `<button type="button" class="ct-chip" data-qccat="${esc(id)}" aria-pressed="${catMov === id}">${esc(rot)}</button>`).join('')}</div>
       <div class="barra entre qc-prod-cab">
         <h3 class="es-secao" style="margin:0">Produtos <small id="qcConta">0</small> <small id="qcTotal" class="qc-total"></small></h3>
-        <button type="button" class="btn mini" id="qcColar">Colar lista</button>
+        <span class="barra" style="margin:0">${ent ? '<button type="button" class="btn mini" id="qcNovoItem">+ Novo cadastro</button>' : ''}
+          <button type="button" class="btn mini" id="qcColar">Colar lista</button></span>
       </div>
       ${ent ? '<p class="dc-sem qc-vu-dica">Valor por unidade: R$ por kg, por litro ou por peça, como está na nota. Na compra é obrigatório.</p>' : '<p class="dc-sem qc-vu-dica">O valor da saída sai sozinho pelo custo médio das entradas.</p>'}
+      <div id="qcSub" class="mv-sub" hidden></div>
       <div class="qc-lins" id="qcLins">${Array.from({ length: LINHAS_INICIAIS }, () => linhaProduto(sentido)).join('')}</div>
       <div class="barra entre">
         <button type="button" class="btn mini" id="qcMais">+ linha</button>
         <button class="btn principal" type="submit" id="qcEnviar">Lançar ${ent ? 'entrada' : 'saída'}</button>
       </div>
       <datalist id="qcProdutos">${listaProdutos()}</datalist>
-      <datalist id="qcFornec">${unicos('fornecedor').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
+      <datalist id="qcFornec">${listaFornec()}</datalist>
       <datalist id="qcPlantios">${unicos('plantio').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <datalist id="qcOperadores">${unicos('operador').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <div id="qcDestinos">${ent ? '' : opcoesDestino()}</div>
@@ -564,6 +686,7 @@ function desenharMov(sentido) {
   if (!ent) carregarDestinos();
   $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); };
   $('qcColar').onclick = () => colarLista(sentido);
+  if (ent) ligarCadastrosNaEntrada(sentido);
   form.querySelectorAll('[data-qccat]').forEach(b => b.addEventListener('click', () => {
     catMov = b.dataset.qccat;
     try { localStorage.setItem(CHAVE_CAT, catMov); } catch { /* sem localStorage */ }
@@ -595,9 +718,18 @@ function ligarLinhas(sentido) {
       inp.setAttribute('list', d === 'equip' ? 'qcEquip' : 'qcFunc');
       inp.placeholder = d === 'equip' ? 'código ou nome da máquina/implemento' : 'nome do funcionário';
     };
+    const caSel = lin.querySelector('.qc-ca');
+    const mostrarCa = it => {
+      const cas = it && it.grupo === 'EPIs' ? casDe(it) : [];
+      caSel.hidden = !cas.length;
+      if (!cas.length) { caSel.innerHTML = ''; return; }
+      const atual = caSel.value;
+      caSel.innerHTML = cas.map(c => `<option value="${esc(c)}"${c === atual ? ' selected' : ''}>CA ${esc(c)}</option>`).join('');
+    };
     const escreverInfo = () => {
       const it = itemPorNome(prod.value);
       mostrarDestino(it);
+      mostrarCa(it);
       lin.classList.toggle('desconhecido', !!prod.value.trim() && !it);
       if (!prod.value.trim()) { info.textContent = ''; return; }
       if (!it) { info.textContent = 'não está no cadastro'; return; }
@@ -661,7 +793,8 @@ function linhasPreenchidas() {
   return [...document.querySelectorAll('#qcLins .qc-lin')]
     .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim(),
       vuTxt: lin.querySelector('.qc-vu') ? lin.querySelector('.qc-vu').value.trim() : '',
-      destTxt: lin.querySelector('.qc-dest-inp') ? lin.querySelector('.qc-dest-inp').value.trim() : '' }))
+      destTxt: lin.querySelector('.qc-dest-inp') ? lin.querySelector('.qc-dest-inp').value.trim() : '',
+      ca: lin.querySelector('.qc-ca') && !lin.querySelector('.qc-ca').hidden ? lin.querySelector('.qc-ca').value : '' }))
     .filter(x => x.nome || x.txt);
 }
 function contar() {
@@ -744,7 +877,7 @@ async function lancar(sentido, form) {
       if (!dest && x.destTxt && !(lista && lista.length)) dest = { id: null, nome: x.destTxt };
       if (!dest) { x.lin.classList.add('erro'); erros.push(`${item.nome}: ${dt === 'equip' ? 'máquina/implemento' : 'funcionário'}`); continue; }
     }
-    linhas.push({ item, qtd, vu: vu > 0 ? vu : null, dt, dest });
+    linhas.push({ item, qtd, vu: vu > 0 ? vu : null, dt, dest, ca: x.ca || (item.grupo === 'EPIs' ? casDe(item)[0] || null : null) });
   }
   if (desconhecidos.size) return cadastrarNaHora([...desconhecidos.values()], sentido, form);
   if (erros.length) {
@@ -794,16 +927,26 @@ async function lancar(sentido, form) {
     operador: sentido === 'saida' ? txt('operador') : null,
     outra_fazenda: tipo === 'transferencia' ? txt('outra') : null,
     fornecedor: sentido === 'entrada' && tipo === 'compra' ? txt('fornecedor') : null,
+    fornecedor_id: sentido === 'entrada' && tipo === 'compra' ? ((fornecedoresCad().find(x => semAcento(x.nome) === semAcento(txt('fornecedor') || '')) || {}).id || null) : null,
     obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
   };
   const pendAntes = sentido === 'entrada' ? pendenteDe() : null;
   for (const l of linhas) {
-    const linha = { item_id: l.item.id,
+    const linha = { item_id: l.item.id, ca: l.ca || null,
       valor_unitario: sentido === 'entrada' ? l.vu : null,
       equipamento_id: l.dt === 'equip' ? l.dest.id : null, equipamento: l.dt === 'equip' ? l.dest.nome : null,
       funcionario_id: l.dt === 'func' ? l.dest.id : null, funcionario: l.dt === 'func' ? l.dest.nome : null };
     if (l.qtd > 0) await gravar('est_movimentos', Object.assign({ id: crypto.randomUUID() }, base, linha, { quantidade: l.qtd }));
     if (l.pend > 0) await gravar('est_movimentos', Object.assign({ id: crypto.randomUUID() }, base, linha, { quantidade: l.pend, pendente: true, pendente_desde: base.data }));
+  }
+  /* Transferência para outro estoque cadastrado (13/11/2026): a entrada no
+     destino é lançada junto, com o mesmo lançamento. */
+  if (sentido === 'saida' && tipo === 'transferencia') {
+    const dest = locais().find(l => semAcento(l.nome) === semAcento(base.outra_fazenda || ''));
+    if (dest && dest.id !== base.local_id) for (const l of linhas) if (l.qtd > 0)
+      await gravar('est_movimentos', Object.assign({ id: crypto.randomUUID() }, base, { local_id: dest.id, sentido: 'entrada', tipo: 'transferencia',
+        outra_fazenda: (localQc() || {}).nome || null, item_id: l.item.id, ca: l.ca || null, quantidade: l.qtd, operador: null, plantio: null,
+        obs: 'Transferência entre estoques' + (base.obs ? ' · ' + base.obs : '') }));
   }
   const nPend = linhas.filter(l => l.pend > 0).length;
   aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.filter(l => l.qtd > 0).length} produto(s)${nPend ? ` · ${nPend} ficaram em Pendências` : ''}.`);
@@ -950,7 +1093,7 @@ function desenharPainel() {
   let dia = null;
   alvo.innerHTML = `
   <div class="cartao">
-    <h2>Movimentações · Faz. Quebra Cocão</h2>
+    <div class="barra entre"><h2 style="margin:0">Movimentações · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
     <p class="dica">Todas as entradas e saídas, da mais nova para a mais antiga.</p>
     <div class="grade">
       <label class="campo">De <input type="date" id="pfDe" value="${esc(pf.de)}"></label>
@@ -1038,7 +1181,7 @@ function baixarCsv(lista, cu) {
 function montarFolhaMov(lista, cu) {
   $('qcPainelFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-tit"><h1>Movimentações do Estoque — Faz. Quebra Cocão</h1>
+      <div class="rel-tit"><h1>Movimentações do Estoque — ${esc(nomeLocal())}</h1>
         <p>${esc(periodoTxt())} · ${lista.length} lançamento(s) · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     <table class="rel-tab rel-mov" style="margin-top:6mm"><thead><tr><th class="ce">Data</th><th class="ce">E/S</th><th>Tipo</th><th>Produto</th>
       <th class="ce">Qtd.</th><th class="ce">Valor</th><th>Documento</th><th>Destino / Operador / Fazenda</th></tr></thead>
@@ -1215,7 +1358,7 @@ function desenharPendencias() {
   const prontas = lista.filter(m => podeSair.get(m.id) > 0).length;
   alvo.innerHTML = `
   <div class="cartao">
-    <h2>Saídas pendentes · Faz. Quebra Cocão</h2>
+    <div class="barra entre"><h2 style="margin:0">Saídas pendentes · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
     <p class="dica">Saída pedida sem estoque suficiente: o que tinha já saiu e o resto ficou aqui. Pendência não mexe no saldo.
       Quando o produto entrar, toque em <strong>Efetivar</strong>.</p>
     <div class="barra">
@@ -1304,7 +1447,7 @@ function montarFolhaPend(lista, sd, podeSair) {
   });
   $('qcPendFolha').innerHTML = `<div class="folha rel qc-folha-pais">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
-      <div class="rel-tit"><h1>Saídas Pendentes — Faz. Quebra Cocão</h1>
+      <div class="rel-tit"><h1>Saídas Pendentes — ${esc(nomeLocal())}</h1>
         <p>${lista.length} pendência(s) · saídas pedidas sem estoque suficiente · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     <p style="font-size:9pt;color:#51534A;margin:5mm 0 3mm">O que havia no estoque já saiu; a quantidade pendente aguarda entrada do produto (compra, transferência ou ajuste de balanço) para ser efetivada.</p>
     <table class="rel-tab rel-mov"><thead><tr><th class="ce">Pedido em</th><th class="ce">Doc.</th><th>Produto</th><th class="ce">Pedido</th>
@@ -1324,6 +1467,15 @@ export function soltarQc() {
   for (const id of ['qcEntradaCorpo', 'qcSaidaCorpo']) { const el = $(id); if (el) el.innerHTML = ''; }
 }
 
+/* troca de estoque no alto de qualquer tela da gestão */
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'gsLocal') {
+    localSel = e.target.value;
+    try { localStorage.setItem(CHAVE_LOCAL_G, localSel); } catch { /* sem localStorage */ }
+    abertos = new Set();
+    if (telaAberta && DESENHOS[telaAberta]) DESENHOS[telaAberta]();
+  }
+});
 window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;

@@ -498,3 +498,6 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .mv-form .epi-linha > .campo:first-child{grid-column:1/-1}
 .mv-form .epi-linha.sem-valor > .campo:first-child{grid-column:1/-1}
 .mv-form .epi-linha > .btn{margin-top:22px}
+/* Gestão de estoque única (13/11/2026) */
+.qc-lin .qc-ca{grid-column:1 / -1;min-height:40px;font-size:14px}
+.gs-local{margin:0;min-width:220px}

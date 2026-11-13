@@ -26,24 +26,18 @@ export const MODULOS = [
   { id: 'compra', nome: 'Compra inteligente', telas: [
     ['ciLista',      'Levantamentos'],
   ] },
-  { id: 'qc', nome: 'Estoque Quebra Cocão', telas: [
+  /* Gestão de estoque (13/11/2026, pedido dele: "vamos juntar esse estoque?
+     fazer somente uma gestão"): o antigo "Estoque Quebra Cocão" serve agora
+     qualquer estoque (escolhido no alto da tela) e absorveu o "Estoque EPI e
+     limpeza". Id 'qc' mantido para não mexer nos acessos já dados. */
+  { id: 'qc', nome: 'Gestão de estoque', telas: [
     ['qcVisao',    'Estoque'],
     ['qcPainel',   'Movimentações'],
     ['qcEntrada',  'Entradas'],
     ['qcSaida',    'Saídas'],
     ['qcPendencias', 'Pendências'],
-  ] },
-  /* EPIs (13/11/2026, pedido dele): a entrada de EPI é só aqui no Estoque; o
-     SST fica só com a entrega ao funcionário. js/epi.js */
-  /* 13/11/2026 (tarde): virou "Estoque EPI e limpeza" — entradas, saídas,
-     transferências entre estoques e fornecedores, para EPI e material de limpeza. */
-  { id: 'epi', nome: 'Estoque EPI e limpeza', telas: [
-    ['epiSaldo',    'Estoque'],
-    ['epiEntradas', 'Entradas'],
-    ['epiSaidas',   'Saídas'],
-    ['epiTransf',   'Transferências'],
-    ['epiUso',      'Entregas por fazenda'],   // entregas do SST pela fazenda de uso (FAZ)
-    ['epiForn',     'Fornecedores'],
+    ['epiUso',     'Entregas por fazenda'],   // entregas do SST pela fazenda de uso (FAZ) — epi.js
+    ['epiForn',    'Fornecedores'],           // est_fornecedores — epi.js
   ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
      estoque (FORM 048 entrada, FORM 049 saída) e as placas das pranchetas. Ficam
@@ -95,7 +89,8 @@ export const PREFIXO_MODULO = 'estoque.modulo:';
 export function aplicarUsuario(u) {
   if (!u) return;
   const mods = u.admin ? [] : (u.telas || []).filter(x => String(x).startsWith(PREFIXO_MODULO))
-    .map(x => String(x).slice(PREFIXO_MODULO.length)).filter(id => MODULOS.some(m => m.id === id));
+    .map(x => String(x).slice(PREFIXO_MODULO.length)).map(id => id === 'epi' ? 'qc' : id)   // "Estoque EPI e limpeza" entrou na Gestão de estoque
+    .filter(id => MODULOS.some(m => m.id === id));
   const locs = u.admin ? [] : (u.telas || []).filter(x => String(x).startsWith('estoque.local:'));
   acesso.email = u.email || '';
   /* Formulários (29/10/2026) é só impressão das folhas e placas: aparece para
@@ -109,7 +104,7 @@ export function aplicarUsuario(u) {
       .filter(l => locs.includes('estoque.local:' + l.id)).map(l => String(l.nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase());
     const temQc = !nomes.length || nomes.some(n => n.includes('QUEBRA COCAO'));
     acesso.admin = false;
-    acesso.modulos = ['contagem', ...(temQc ? ['qc'] : []), 'forms', 'cadastros'];
+    acesso.modulos = ['contagem', 'qc', 'forms', 'cadastros'];   // a Gestão de estoque serve qualquer estoque (13/11/2026)
     return;
   }
   acesso.admin = true;   // sem recorte = enxerga a área toda, como antes
