@@ -436,8 +436,74 @@ function desenharSaldo() {
   busca('esBusca', 'busca'); busca('esHist', 'histBusca');
 }
 
+/* ===================================================================
+   ENTREGAS POR FAZENDA (13/11/2026)
+   Pedido dele: "vamos vincular esse estoque criado com o SST… criar um módulo
+   aonde mostrar o local que foi entregue os EPIs, por exemplo Guilherme, quero
+   ver o que foi entregue para usar na FACA - F". Lê as entregas do SST
+   (est_movimentos, origem 'epi', saída com funcionário) pela coluna FAZ da
+   ficha (m.faz = letra da fazenda de uso).
+   =================================================================== */
+/* mesma legenda do Modelo da ficha (modelo.legenda_faz) + G = geral */
+const FAZENDAS = [{ letra: 'F', nome: 'Faca' }, { letra: 'L', nome: 'Lote 35' }, { letra: 'M', nome: 'Morro Branco' },
+  { letra: 'T', nome: 'Três Riachos' }, { letra: 'Q', nome: 'Quebra Cocão' }, { letra: 'G', nome: 'Geral' }];
+const MER = { 1: 'Substituição por dano justificado', 2: 'Substituição por dano próprio ou perda', 3: 'Devolução/demissão/mudança de função', 4: 'Primeira entrega/admissão' };   // modelo.legenda_mer
+const fazNome = l => { const z = FAZENDAS.find(x => x.letra === String(l || '').toUpperCase()); return z ? `${z.letra} · ${z.nome}` : (l || '—'); };
+const inicioMes = () => hojeISO().slice(0, 8) + '01';
+const U = { faz: '', func: '', de: '', ate: '' };
+function desenharUso() {
+  const alvo = $('epiUsoCorpo');
+  if (!alvo) return;
+  if (!pronto()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
+  if (!U.de) U.de = inicioMes();
+  if (!U.ate) U.ate = hojeISO();
+  const fb = semAcento(U.func);
+  const meus = new Set(locaisDoUsuario().map(l => l.id));
+  const ent = unicos('est_movimentos').filter(m => m.ativo !== false && m.origem === 'epi' && m.sentido === 'saida' && m.funcionario
+    && meus.has(m.local_id) && (!U.faz || String(m.faz || '').toUpperCase() === U.faz)
+    && String(m.data).slice(0, 10) >= U.de && String(m.data).slice(0, 10) <= U.ate
+    && (!fb || semAcento(m.funcionario).includes(fb)))
+    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(a.funcionario).localeCompare(String(b.funcionario), 'pt-BR'));
+  const porEpi = new Map();
+  for (const m of ent) {
+    const it = itemDe(m.item_id), k = m.item_id;
+    if (!porEpi.has(k)) porEpi.set(k, { it, qtd: 0, cas: new Set(), funcs: new Set() });
+    const r = porEpi.get(k); r.qtd += Number(m.quantidade) || 0; if (m.ca) r.cas.add(m.ca); r.funcs.add(m.funcionario);
+  }
+  const resumo = [...porEpi.values()].sort((a, b) => a.it.nome.localeCompare(b.it.nome, 'pt-BR'));
+  const funcs = new Set(ent.map(m => m.funcionario));
+  const caChip = ca => { if (!ca) return ''; const e = estadoCa(caObj(ca)); return e.rotulo && e.chave !== 'emdia' ? ' ' + chip(e.cor, e.rotulo) : ''; };
+  alvo.innerHTML = `
+    <h2 style="margin:0">Entregas por fazenda</h2>
+    <p class="dc-sem" style="margin:2px 0 8px">EPIs entregues aos funcionários no SST › EPI's › Entregas, pela fazenda onde vão ser usados (coluna FAZ da ficha).</p>
+    <div class="ct-chips">${[{ letra: '', nome: 'Todas' }, ...FAZENDAS].map(z => `<button type="button" class="ct-chip" data-faz="${z.letra}" aria-pressed="${U.faz === z.letra}">${z.letra ? esc(z.letra + ' · ' + z.nome) : 'Todas'}</button>`).join('')}</div>
+    <div class="barra">
+      <label class="campo" style="flex:1;min-width:180px">Funcionário <input type="text" id="usFunc" value="${esc(U.func)}" placeholder="nome do funcionário"></label>
+      <label class="campo">De <input type="date" id="usDe" value="${esc(U.de)}" max="${hojeISO()}"></label>
+      <label class="campo">Até <input type="date" id="usAte" value="${esc(U.ate)}" max="${hojeISO()}"></label>
+      <button class="btn" type="button" id="usImprimir">🖨 Imprimir</button>
+    </div>
+    <p class="dc-sem"><b>${ent.length}</b> ${ent.length === 1 ? 'entrega' : 'entregas'} · <b>${funcs.size}</b> ${funcs.size === 1 ? 'funcionário' : 'funcionários'} · ${esc(dataBR(U.de))} a ${esc(dataBR(U.ate))}${U.faz ? ' · ' + esc(fazNome(U.faz)) : ''}</p>
+    <h3 style="margin:14px 0 6px">Total por EPI</h3>
+    <div class="es-larga"><table class="tabela"><thead><tr><th>EPI</th><th>CA</th><th class="ce">Qtd</th><th class="ce">Funcionários</th></tr></thead>
+    <tbody>${resumo.map(r => `<tr><td>${esc(r.it.nome)}</td><td>${[...r.cas].map(c => 'CA ' + esc(c) + caChip(c)).join('<br>') || '—'}</td>
+      <td class="ce"><b>${esc(mostrarNumero(r.qtd))}</b> <small class="dc-sem">${esc(r.it.unidade || '')}</small></td><td class="ce">${r.funcs.size}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="dc-sem">Nenhuma entrega neste filtro.</td></tr>'}</tbody></table></div>
+    <h3 style="margin:18px 0 6px">Entregas</h3>
+    <div class="es-larga"><table class="tabela"><thead><tr><th>Data</th><th>Funcionário</th><th>EPI</th><th>CA</th><th class="ce">Qtd</th><th>Motivo</th><th>Fazenda de uso</th><th>Saiu do estoque</th></tr></thead>
+    <tbody>${ent.map(m => `<tr><td>${esc(dataBR(m.data))}</td><td>${esc(m.funcionario)}</td><td>${esc(itemDe(m.item_id).nome)}</td>
+      <td>${m.ca ? 'CA ' + esc(m.ca) + caChip(m.ca) : '—'}</td><td class="ce">${esc(mostrarNumero(m.quantidade))}</td>
+      <td>${esc(MER[m.mer] || m.mer || '—')}</td><td>${esc(fazNome(m.faz))}</td><td>${esc(localDe(m.local_id).nome)}</td></tr>`).join('')
+      || '<tr><td colspan="8" class="dc-sem">Nenhuma entrega neste filtro.</td></tr>'}</tbody></table></div>`;
+  alvo.querySelectorAll('[data-faz]').forEach(b => b.onclick = () => { U.faz = b.dataset.faz; desenharUso(); });
+  $('usDe').onchange = ev => { U.de = ev.target.value || inicioMes(); desenharUso(); };
+  $('usAte').onchange = ev => { U.ate = ev.target.value || hojeISO(); desenharUso(); };
+  $('usImprimir').onclick = () => window.print();
+  $('usFunc').addEventListener('input', ev => { U.func = ev.target.value; const p = ev.target.selectionStart; desenharUso(); const el = $('usFunc'); el.focus(); el.setSelectionRange(p, p); });
+}
+
 const DESENHOS = { epiSaldo: desenharSaldo, epiEntradas: () => desenharLista('entrada'), epiSaidas: () => desenharLista('saida'),
-  epiTransf: () => desenharLista('transf'), epiForn: desenharFornecedores };
+  epiTransf: () => desenharLista('transf'), epiUso: desenharUso, epiForn: desenharFornecedores };
 export const TELAS_EPI_ESTOQUE = Object.keys(DESENHOS);
 function redesenhar() { if (document.querySelector('#modal:not(.oculto)')) return; (DESENHOS[telaAberta] || (() => {}))(); }
 export function abrirEpi(nome) {

@@ -42,6 +42,7 @@ export const MODULOS = [
     ['epiEntradas', 'Entradas'],
     ['epiSaidas',   'Saídas'],
     ['epiTransf',   'Transferências'],
+    ['epiUso',      'Entregas por fazenda'],   // entregas do SST pela fazenda de uso (FAZ)
     ['epiForn',     'Fornecedores'],
   ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
