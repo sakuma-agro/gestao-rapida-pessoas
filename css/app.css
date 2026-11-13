@@ -2865,14 +2865,15 @@ body.crq-laudo #crqLaudo{display:block;position:fixed;inset:0;overflow:auto;z-in
 @media (max-width:640px){.cv-campos{grid-template-columns:1fr 1fr}.cv-resumo{grid-template-columns:repeat(3,1fr)}}
 
 /* "+ Tarefa" no canto de todas as áreas, menos o Rastro (13/11/2026) */
-.fab-tarefa{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:60;
+/* fica logo acima do "Pergunte ao LOP" (.ia-botao, mesmo canto) */
+.fab-tarefa{position:fixed;right:18px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:60;
   display:inline-flex;align-items:center;gap:6px;padding:11px 16px;border:0;border-radius:999px;cursor:pointer;
   background:#1B232B;color:#fff;font:600 14px/1 inherit;font-family:inherit;box-shadow:0 4px 14px rgba(27,35,43,.28)}
 .fab-tarefa span{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#84BD00;color:#1B232B;font-size:17px;font-weight:700;line-height:1}
 .fab-tarefa:hover{background:#2a3540}
 .fab-tarefa:focus-visible{outline:3px solid #84BD00;outline-offset:2px}
 .fab-tarefa[hidden]{display:none}
-#avisoGlobal.fixo{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:61;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.15);background:var(--papel)}
+#avisoGlobal.fixo{position:fixed;left:50%;transform:translateX(-50%);bottom:128px;z-index:61;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.15);background:var(--papel)}
 @media print{.fab-tarefa{display:none !important}}
 
 /* Reunião semanal dentro da reunião diária do Rastro (13/11/2026) */

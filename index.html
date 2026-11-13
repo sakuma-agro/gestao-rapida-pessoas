@@ -13,6 +13,69 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="LOP - Gestão Rápida">
 <script>
+/* Guarda contra TELA BRANCA (13/11/2026, pedido dele: "resolva de uma vez,
+   já é a terceira vez"). Causa conhecida: logo depois de uma publicação, com a
+   rede lenta, o navegador pode juntar arquivos da versão nova com arquivos
+   guardados da versão anterior; um arquivo pede ao outro uma função que ele
+   ainda não tem e o app inteiro não sobe (página vazia, sem recado).
+   O que esta guarda faz: se o js/app.js não começar a rodar (erro ao carregar
+   os arquivos ou 25 s sem sinal de vida), ela apaga sozinha as cópias
+   guardadas e o service worker e recarrega — uma vez. Se mesmo assim não
+   abrir, mostra um recado com o botão "Limpar e recarregar" no lugar da tela
+   branca. Sem internet ela não apaga nada (as cópias são o que faz o app
+   abrir no campo): só mostra o recado. O js/app.js marca
+   window.grAppCarregou = true assim que começa. */
+(function () {
+  var CHAVE = 'gr.reparo', mostrou = false;
+  function tentouAgora() { try { return Date.now() - (+sessionStorage.getItem(CHAVE) || 0) < 120000; } catch (e) { return false; } }
+  window.grReparar = function () {
+    try { sessionStorage.setItem(CHAVE, String(Date.now())); } catch (e) {}
+    var feito = [];
+    try { if (navigator.serviceWorker) feito.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); })); } catch (e) {}
+    try { if (window.caches) feito.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (e) {}
+    var ir = function () {
+      var q = location.search.replace(/[?&]atualizado=\d+/, '').replace(/^&/, '?');
+      location.replace(location.pathname + (q ? q + '&' : '?') + 'atualizado=' + Date.now() + location.hash);
+    };
+    Promise.all(feito.map(function (p) { return p.catch(function () {}); })).then(ir, ir);
+    setTimeout(ir, 4000);
+  };
+  function recado(motivo) {
+    if (mostrou) return; mostrou = true;
+    var ab = document.getElementById('abertura'); if (ab) ab.remove();
+    var d = document.createElement('div');
+    d.id = 'grSocorro';
+    d.setAttribute('style', 'position:fixed;inset:0;z-index:99999;background:#F4F4F1;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#51534A');
+    var semRede = !navigator.onLine;
+    d.innerHTML = '<div style="max-width:420px;text-align:center"><img src="img/lop-marca.png" alt="LOP" style="height:56px;margin-bottom:14px">' +
+      '<h1 style="font-size:19px;color:#744F28;margin:0 0 10px">O app não terminou de abrir</h1>' +
+      '<p style="font-size:14px;line-height:1.6;margin:0 0 18px">' + (semRede
+        ? 'Você está sem internet e os arquivos guardados neste aparelho não abriram. Quando o sinal voltar, toque em <b>Limpar e recarregar</b>.'
+        : 'Toque em <b>Limpar e recarregar</b>: o app busca de novo a versão publicada. Seus dados ficam no servidor e na fila deste aparelho — nada se perde.') + '</p>' +
+      '<button type="button" id="grSocLimpar" style="background:#84BD00;color:#fff;border:0;border-radius:8px;padding:12px 20px;font:700 15px Arial;cursor:pointer">Limpar e recarregar</button> ' +
+      '<button type="button" id="grSocDeNovo" style="background:#fff;color:#51534A;border:1px solid #c9ccc4;border-radius:8px;padding:12px 16px;font:600 14px Arial;cursor:pointer;margin-left:6px">Tentar de novo</button>' +
+      '<p style="font-size:11px;color:#8a8d85;margin-top:16px">' + String(motivo || '').replace(/[<>&]/g, '') + '</p></div>';
+    (document.body || document.documentElement).appendChild(d);
+    document.getElementById('grSocLimpar').onclick = function () { this.disabled = true; this.textContent = 'Limpando…'; window.grReparar(); };
+    document.getElementById('grSocDeNovo').onclick = function () { location.reload(); };
+  }
+  window.grRecadoSocorro = recado;
+  function falhou(motivo) {
+    if (window.grAppCarregou || mostrou) return;
+    try { console.error('[LOP] o app não subiu:', motivo); } catch (e) {}
+    if (navigator.onLine && !tentouAgora()) return window.grReparar();
+    recado(motivo);
+  }
+  addEventListener('error', function (ev) {
+    if (window.grAppCarregou) return;
+    var t = ev.target;
+    if (t && t.tagName === 'SCRIPT') return falhou('Não carregou: ' + (t.getAttribute('src') || 'script'));
+    if (/\/js\/[^\/]*\.js/.test(ev.filename || '')) falhou((ev.message || 'erro') + ' (' + String(ev.filename).split('/').pop() + ')');
+  }, true);
+  setTimeout(function () { falhou('O app demorou demais para começar.'); }, 25000);
+})();
+</script>
+<script>
 /* O Chrome avisa que dá para instalar logo no começo — às vezes antes de o
    js/app.js (módulo, carrega por último) existir. Guarda o aviso aqui. */
 window.__promptInstalar = null;

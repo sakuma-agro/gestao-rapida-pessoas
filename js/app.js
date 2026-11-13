@@ -74,6 +74,14 @@ import { abrirFornecedores, limparFornecedores, TELAS_FORNECEDORES } from './cer
 import { abrirMelhorias, limparMelhorias, TELAS_MELHORIAS } from './cert-melhorias.js';
 import { abrirBalanco, limparBalanco, TELAS_BALANCO } from './cert-balanco.js';
 
+/* Sinal de vida para a guarda contra tela branca do index.html (13/11/2026):
+   chegou aqui, todos os arquivos do app carregaram e combinam entre si. */
+window.grAppCarregou = true;
+if (/[?&]atualizado=\d+/.test(location.search)) {
+  const q = location.search.replace(/[?&]atualizado=\d+/, '').replace(/^&/, '?');
+  history.replaceState(null, '', location.pathname + q + location.hash);
+}
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -2270,7 +2278,9 @@ function telaDeSocorro(texto) {
         <h1 style="font-size:19px;color:#744F28;margin:0 0 10px">O app não conseguiu abrir</h1>
         <p style="font-size:14px;line-height:1.6;margin:0 0 18px">${esc(texto)}</p>
         <p style="font-size:13px;color:#7d8175;line-height:1.6">
-          Tente recarregar a página. Se continuar, avise o Guilherme com este recado.</p>
+          Toque em Limpar e recarregar. Se continuar, avise o Guilherme com este recado.</p>
+        <button type="button" onclick="this.disabled=true;this.textContent='Limpando…';window.grReparar&&window.grReparar()"
+          style="background:#84BD00;color:#fff;border:0;border-radius:8px;padding:12px 20px;font:700 15px Arial;cursor:pointer">Limpar e recarregar</button>
       </div>
     </div>`;
 }
