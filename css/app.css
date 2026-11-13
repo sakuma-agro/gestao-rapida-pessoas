@@ -2891,3 +2891,22 @@ body.crq-laudo #crqLaudo{display:block;position:fixed;inset:0;overflow:auto;z-in
 .cr-sem-atv li.ok span{text-decoration:line-through;color:#7a7c75}
 .cr-sem-atv li b{font-weight:600;color:var(--marrom)}
 @media (max-width:520px){.cr-sem-atv li{grid-template-columns:1fr auto}.cr-sem-atv li b{grid-column:1}}
+
+/* SST › EPI's · Entregas, Entradas, Saldo e Lavagem (13/11/2026) */
+.epm-dlg{width:min(760px,96vw)}
+.epm-linhas{margin-top:10px}
+.epm-linhas td{vertical-align:top}
+.epm-linhas small{display:block;margin-top:2px}
+.epm-hist{margin:4px 0}
+.epm-ult summary{cursor:pointer;font-size:12.5px;color:var(--marrom);font-weight:700}
+.pv-card.epm-ativo{border-color:var(--verde);box-shadow:inset 0 0 0 2px var(--verde)}
+tr.epm-baixo td{background:rgba(201,138,0,.08)}
+.lv-conj{margin:2px 0 6px;font-size:12.5px;line-height:1.5}
+.lv-pct{display:block;max-width:220px;margin:2px 0}
+.lv-dias{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.lv-sem{text-align:center;font-size:11px;font-weight:700;color:var(--suave)}
+.lv-dia{display:flex;flex-direction:column;align-items:center;padding:4px 0;border:1px solid var(--linha);border-radius:6px;background:var(--papel);font:inherit;cursor:pointer}
+.lv-dia small{font-size:10px;color:var(--suave)}
+.lv-dia b{font-size:14px;color:var(--suave)}
+.lv-dia.lv-on{background:var(--verde-fundo);border-color:var(--verde)}
+.lv-dia.lv-on b{color:var(--verde-esc)}

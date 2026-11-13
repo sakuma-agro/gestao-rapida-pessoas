@@ -2,6 +2,7 @@
 // Os dados moram no núcleo das molduras (../../js/moldura-nucleo.js), que
 // guarda tudo no aparelho e manda para o servidor quando há sinal.
 
+import { saldosEpi, ehQuebraCocao } from '../../js/epi-saldo.js';
 export const $ = id => document.getElementById(id);
 export const esc = s => String(s == null ? '' : s)
   .replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -194,8 +195,24 @@ export const mesAnterior = m => {
    - senão, o saldo do sistema agro lançado no Acerto para o mês;
    - senão, nada (null): não há com o que comparar. */
 const fimDoMes = m => { const [a, mm] = String(m).split('-').map(Number); const d = new Date(a, mm, 0); return a + '-' + String(mm).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-export function saldoRegistrado(localId, mes, ateData) {
-  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId).map(m => [m.id, m])).values()]
+export function saldoRegistrado(localId, mes, ateData, grupo, contagemId) {
+  const local = todos('est_locais').find(l => l.id === localId);
+  const qc = ehQuebraCocao(local);
+  /* Entregas e entradas de EPI lançadas pela SST (13/11/2026, origem 'epi'):
+     nos estoques que não vivem de movimentos, o saldo do EPI é a última
+     contagem + entradas − saídas (js/epi-saldo.js), e esses lançamentos não
+     podem fazer os outros grupos (defensivos…) parecerem "de movimentos". */
+  const doEpi = !qc && todos('est_movimentos').some(m => m.local_id === localId && m.origem === 'epi' && m.ativo !== false);
+  if (doEpi && grupo === 'EPIs') {
+    const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);
+    const r = saldosEpi({ locais: todos('est_locais'), contagens: todos('est_contagens'), grupos: todos('est_contagem_grupos'),
+      linhas: todos('est_contagem_itens'), movimentos: todos('est_movimentos'), itens: todos('est_itens') }, localId,
+      { ateDia: lim, excluirContagem: contagemId || '' });
+    const sal = new Map(); let base = '';
+    for (const [k, v] of r) { sal.set(k, v.saldo); base = base || v.baseData; }
+    return { fonte: 'epi', saldos: sal, ate: lim, texto: (base ? 'contagem de ' + dataBR(base) : 'zero') + ' + entradas − saídas de EPI até ' + dataBR(lim) };
+  }
+  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId && (qc || m.origem !== 'epi')).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false && !m.pendente);
   if (movs.length) {
     const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);

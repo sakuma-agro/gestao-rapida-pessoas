@@ -261,3 +261,15 @@ alter table public.est_itens
   add column if not exists ca_equipamento text,
   add column if not exists ca_fabricante text,
   add column if not exists ca_conferido_em timestamptz;
+
+-- EPI pelo estoque (13/11/2026): periodicidade de troca, limite de lavagens,
+-- entrega ao funcionário (SST › EPI's › Entregas, origem 'epi') e FORM 007.
+alter table public.est_itens add column if not exists troca_qtd integer, add column if not exists troca_unidade text, add column if not exists lavagens_max integer;
+alter table public.est_movimentos add column if not exists origem text, add column if not exists mer text, add column if not exists faz text,
+  add column if not exists ficha_assinada boolean not null default false, add column if not exists devolucao date;
+alter table public.cl_conjuntos add column if not exists item_id uuid, add column if not exists limite_lavagens integer, add column if not exists movimento_id uuid;
+create table if not exists public.epi_form007 (id text primary key, funcionario_id uuid not null, mes text not null,
+  recolhido boolean not null default false, escaneado boolean not null default false, obs text,
+  atualizado_em timestamptz not null default now(), atualizado_por text default public.app_email());
+-- RLS: est_* leitura e est_movimentos gravação liberadas também para quem tem 'sst' ou 'epis';
+-- cl_conjuntos/cl_lavagens/epi_form007 para '{cert,sst,epis}'. (aplicado pelo MCP em 13/11/2026)

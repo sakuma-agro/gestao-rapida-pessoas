@@ -34,6 +34,31 @@ async function conferirCaAoAbrir() {
   if (r && r.conferidos) desenharItens();
   if (r && r.erro) console.warn('consulta-ca:', r.erro);
 }
+/* ---- Periodicidade de troca e limite de lavagens (13/11/2026) ----
+   est_itens.troca_qtd + troca_unidade (dias/semanas/meses): a entrega do EPI
+   (SST › EPI's › Entregas) mostra a próxima troca de cada funcionário.
+   lavagens_max: vestimenta de aplicação — o painel de lavagem avisa no limite. */
+const UNID_TROCA = ['dias', 'semanas', 'meses'];
+function textoTroca(i) {
+  if (!i.troca_qtd) return '';
+  const u = i.troca_unidade || 'meses';
+  const un = Number(i.troca_qtd) === 1 ? ({ dias: 'dia', semanas: 'semana', meses: 'mês' })[u] || u : u;
+  return ` · troca a cada ${esc(i.troca_qtd)} ${esc(un)}`;
+}
+function camposTroca(i) {
+  if ((i.grupo || '') !== 'EPIs') return '';
+  return `<fieldset class="campo plena cad-troca"><legend>Troca do EPI</legend>
+    <div class="grade">
+      <label class="campo">Trocar a cada <input type="number" name="troca_qtd" min="1" step="1" value="${esc(i.troca_qtd || '')}" placeholder="em branco = conforme desgaste"></label>
+      <label class="campo">Unidade <select name="troca_unidade">${UNID_TROCA.map(u => `<option${(i.troca_unidade || 'meses') === u ? ' selected' : ''}>${u}</option>`).join('')}</select></label>
+      <label class="campo">Limite de lavagens <input type="number" name="lavagens_max" min="1" step="1" value="${esc(i.lavagens_max || '')}" placeholder="só vestimenta (fabricante)"></label>
+    </div></fieldset>`;
+}
+function lerTroca(f, i) {
+  if ((i.grupo || '') !== 'EPIs' && !f.has('troca_qtd')) return {};
+  const q = parseInt(f.get('troca_qtd'), 10), l = parseInt(f.get('lavagens_max'), 10);
+  return { troca_qtd: q > 0 ? q : null, troca_unidade: q > 0 ? (f.get('troca_unidade') || 'meses') : null, lavagens_max: l > 0 ? l : null };
+}
 function resumoCas(itens) {
   const est = itens.filter(i => i.ca && i.ativo !== false).map(i => estadoCa(i).chave);
   const venc = est.filter(c => c === 'vencido' || c === 'irregular').length, perto = est.filter(c => c === 'vencendo').length;
@@ -188,7 +213,7 @@ function desenharItens() {
       const cab = i.grupo !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo)}</h3>` : '';
       return cab + `<div class="item"><span></span>
         <div><div class="nome">${esc(i.nome)}${i.ativo === false ? ' <span class="tag inativo">desativado</span>' : ''}</div>
-          <div class="sub">${i.localizacao ? `<b class="cad-loc">📍 ${esc(i.localizacao)}</b> · ` : ''}${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${etiquetaCa(i)}${temMinimo(i)
+          <div class="sub">${i.localizacao ? `<b class="cad-loc">📍 ${esc(i.localizacao)}</b> · ` : ''}${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${etiquetaCa(i)}${textoTroca(i)}${temMinimo(i)
             ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
               ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
             : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoMinFazendas(i)}${textoLocais(i)}${resumoAgrofit(i)}</div></div>
@@ -278,7 +303,7 @@ function editarItem(id) {
       await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
         estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde,
         codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null,
-        localizacao: String(f.get('localizacao') || '').trim() || null }));
+        localizacao: String(f.get('localizacao') || '').trim() || null }, lerTroca(f, i)));
       window.fecharModal(); desenharItens();
     });
     const btCa = corpo.querySelector('#cadCaConferir');

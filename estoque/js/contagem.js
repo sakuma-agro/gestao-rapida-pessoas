@@ -1195,7 +1195,7 @@ function divergenciasDe(c, localId, mes, grupo, brancoZero) {
   const { itens } = itensDaContagem(localId, mes, c);
   const regs = new Map();
   const regDo = g => {
-    if (!regs.has(g)) { const cg = c ? cgDe(c, g) : null; regs.set(g, saldoRegistrado(localId, mes, (cg && cg.data_contagem) || dataRef(c))); }
+    if (!regs.has(g)) { const cg = c ? cgDe(c, g) : null; regs.set(g, saldoRegistrado(localId, mes, (cg && cg.data_contagem) || dataRef(c), g, c && c.id)); }
     return regs.get(g);
   };
   const linhas = new Map((c ? linhasDe(c.id) : []).map(l => [l.item_id, l]));

@@ -78,8 +78,13 @@ export const MODULOS = [
   { id: 'sst', nome: 'SST', subs: [
     { id: 'epis', nome: "EPI's", telas: [
       ['fichas', 'Fichas'],
+      // Entregas, entradas e saldo pelo estoque (13/11/2026): js/sst-epi-mov.js
+      ['epiSaida', 'Entregas'],
+      ['epiEntrada', 'Entradas'],
+      ['epiSaldo', 'Saldo por estoque'],
       ['epis', 'Tipos de EPI'],
       ['epiCrono', 'Cronograma de troca'],
+      ['epiLavagem', 'Lavagem e higienização'],
       ['modelo', 'Modelo da ficha'],
     ] },
     { id: 'exames', nome: 'Exames', telas: [

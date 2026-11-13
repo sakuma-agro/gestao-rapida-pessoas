@@ -26,6 +26,8 @@ import { abrirCampanhas, limparCampanhas, TELAS_CAMPANHAS } from './sst-campanha
 import { abrirBrigada, limparBrigada, ligarBrigada, avisoDesligamentoBrigada, TELAS_BRIGADA } from './sst-brigada.js';
 import { abrirNrs, limparNrs } from './sst-nrs.js';
 import { abrirEpiCrono, limparEpiCrono, ligarEpiCrono, redesenharEpiCrono } from './sst-epi-crono.js';
+import { abrirEpiMov, TELAS_EPI_MOV } from './sst-epi-mov.js';
+import { abrirEpiLavagem } from './sst-epi-lavagem.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
 import { abrirCompras } from './compras.js';
@@ -169,6 +171,8 @@ function abrirAba(nome) {
   if (nome === 'folhaPonto') folhaPonto.desenhar($('folhaPontoAlvo'), { aviso: () => {} });
   $('telaEpis').hidden = nome !== 'epis';
   $('telaEpiCrono').hidden = nome !== 'epiCrono';   // Cronograma de troca (28/10/2026)
+  for (const t of TELAS_EPI_MOV) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;   // Entregas/Entradas/Saldo (13/11/2026)
+  $('telaEpiLavagem').hidden = nome !== 'epiLavagem';
   $('telaModelo').hidden = nome !== 'modelo';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
@@ -213,6 +217,8 @@ function abrirAba(nome) {
     ['empregadores', 'fazendas', 'unidades', 'destinos'], desenharFuncionarios);
   if (nome === 'epis') { desenharEpis(); conferirCa(false); }
   if (nome === 'epiCrono') abrirEpiCrono();
+  if (TELAS_EPI_MOV.includes(nome)) abrirEpiMov(nome);
+  if (nome === 'epiLavagem') abrirEpiLavagem();
   if (nome === 'modelo') preencherModelo();
   $('telaRhCargos').hidden   = nome !== 'rhCargos';
   /* Gerar proposta e Alteração de salário dividem a mesma tela (03/11/2026). */
