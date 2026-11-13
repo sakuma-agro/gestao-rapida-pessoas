@@ -385,8 +385,8 @@ function desenharContar() {
     const repor = l && precisaRepor(i, l.quantidade);
     return cab + `<div class="ct-item${repor ? ' repor' : ''}" data-nome="${esc(semAcento(i.nome))}" data-item="${esc(i.id)}" data-grupo="${esc(i.grupo || 'Outros')}">
       <div class="ct-linha${valor !== '' ? ' feito' : ''}">
-        <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${i.localizacao ? `📍 ${esc(i.localizacao)} · ` : ''}${esc(i.unidade || '')}${lotes.length
-          ? ` · <b>${lotes.length} ${lotes.length === 1 ? 'lote' : 'lotes'}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}${textoQuadras(quads)}</small>
+        <label class="ct-nome" for="q-${esc(i.id)}">${esc(i.nome)}<small>${i.localizacao ? `📍 ${esc(i.localizacao)} · ` : ''}${esc(i.unidade || '')}${ehEpi(i) && casDoItem(i).length ? ` · <b class="ct-ca">CA ${esc(casDoItem(i).join(', '))}</b>` : ''}${lotes.length
+          ? ` · <b>${lotes.length} ${lotes.length === 1 ? (ehEpi(i) ? 'CA separado' : 'lote') : (ehEpi(i) ? 'CAs separados' : 'lotes')}</b>${vencido(lotes) ? ' · <span class="ct-venc">tem lote vencido</span>' : ''}` : ''}${textoQuadras(quads)}</small>
           <span class="ct-alerta">${repor ? textoAlerta(i, l.quantidade) : ''}</span></label>
         <input class="ct-qtd" id="q-${esc(i.id)}" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="next"
           data-item="${esc(i.id)}" value="${esc(valor)}" placeholder="—"${fechada || lotes.length || quads.length ? ' disabled' : ''}
@@ -585,7 +585,11 @@ function linhaLote(l, fechada, item) {
 function desenharLotes(item, lotes, fechada) {
   const epi = ehEpi(item);
   return `${epi ? `<datalist id="cas-${esc(item.id)}">${casDoItem(item).map(c => `<option value="${esc(c)}">`).join('')}</datalist>` : ''}
-    ${lotes.map(l => linhaLote(l, fechada, item)).join('') || (fechada ? `<p class="dc-sem">${epi ? 'Sem separação por CA.' : 'Sem lotes separados.'}</p>` : '')}
+    ${lotes.map(l => linhaLote(l, fechada, item)).join('') || (fechada ? (epi && casDoItem(item).length
+      ? casDoItem(item).map(ca => { const v = validadeDoCa(ca); const venc = v && v < hojeISO();
+          return `<div class="ct-lote fixo"><span>CA ${esc(ca)}</span><span class="${venc ? 'ct-venc' : ''}">${v ? 'val. ' + esc(dataBR(v)) : 'sem validade'}${venc ? ' · vencido' : ''}</span><strong class="dc-sem">—</strong></div>`; }).join('')
+        + '<p class="dc-sem">Nesta contagem a quantidade não foi separada por CA.</p>'
+      : `<p class="dc-sem">${epi ? 'Sem CA no cadastro.' : 'Sem lotes separados.'}</p>`) : '')}
     ${fechada ? '' : `<div class="ct-lotes-pe">
       <button type="button" class="btn mini" data-novo-lote="${esc(item.id)}">${epi ? '+ Adicionar CA' : '+ Adicionar lote'}</button>
       <span class="dc-sem">${lotes.length ? 'O total do item é a soma dos lotes.' : epi ? 'Separe a quantidade por CA (cada CA vira um lote).' : 'Use quando o produto tiver lotes ou vencimentos diferentes.'}</span>
