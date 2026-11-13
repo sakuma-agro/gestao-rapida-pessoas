@@ -253,9 +253,24 @@ function imprimirFichas(lista) {
   if (!lista.length) { alert('Nenhuma entrega para imprimir.'); return; }
   const fs = lista.map(fichaHtml);
   const meias = fs.filter(x => x.meia), inteiras = fs.filter(x => !x.meia);
-  mostrar(`<div class="previa" style="margin-top:0">
+  /* Metade da folha em branco (13/11/2026, pedido dele: "na impressão das fichas
+     quero aproveitar a outra metade da folha em branco quando tiver somente 6
+     itens"): com número ímpar de meias fichas, oferece outra ficha de até 6 EPIs
+     para sair na metade vazia — primeiro as sem assinatura, depois as mais novas. */
+  const ja = new Set(lista.map(e => e.id));
+  const cands = meias.length % 2 ? entregas().filter(e => !ja.has(e.id) && e.linhas.length <= LINHAS_MEIA_MAX)
+    .sort((a, b) => (a.assinada === b.assinada ? 0 : a.assinada ? 1 : -1) || b.data.localeCompare(a.data)).slice(0, 40) : [];
+  const metade = cands.length ? `<div class="cartao naoimprimir epm-metade">
+    <b>A outra metade da folha vai sair em branco.</b> Aproveite com outra ficha:
+    <span class="barra" style="margin:6px 0 0"><select id="epmMetadeSel">${cands.map(e => `<option value="${esc(e.id)}">${esc(e.funcionario)} · ${br(e.data)}${e.num ? ' · nº ' + numEntrega(e) : ''}${e.assinada ? '' : ' · sem assinatura'}</option>`).join('')}</select>
+    <button class="btn principal mini" type="button" id="epmMetadeOk">Pôr na outra metade</button></span></div>` : '';
+  mostrar(`${metade}<div class="previa" style="margin-top:0">
     ${meias.length ? `<div class="meias">${meias.map(x => `<div class="meia-slot">${x.html}</div>`).join('')}</div>` : ''}
     ${inteiras.map(x => x.html).join('')}</div>`, { barra: true });
+  document.getElementById('epmMetadeOk')?.addEventListener('click', () => {
+    const e = cands.find(x => x.id === document.getElementById('epmMetadeSel').value);
+    if (e) imprimirFichas([...lista, e]);
+  });
 }
 
 /* ===================================================================
