@@ -38,6 +38,7 @@ export const MODULOS = [
   { id: 'epi', nome: 'EPIs', telas: [
     ['epiEntradas', 'Entradas de EPI'],
     ['epiSaldo',    'Saldo de EPI'],
+    ['limpEntradas', 'Entradas de limpeza'],   // 13/11/2026 — material de limpeza, mesma tela sem CA
   ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
      estoque (FORM 048 entrada, FORM 049 saída) e as placas das pranchetas. Ficam

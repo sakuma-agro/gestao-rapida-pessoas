@@ -212,7 +212,7 @@ export function saldoRegistrado(localId, mes, ateData, grupo, contagemId) {
     for (const [k, v] of r) { sal.set(k, v.saldo); base = base || v.baseData; }
     return { fonte: 'epi', saldos: sal, ate: lim, texto: (base ? 'contagem de ' + dataBR(base) : 'zero') + ' + entradas − saídas de EPI até ' + dataBR(lim) };
   }
-  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId && (qc || m.origem !== 'epi')).map(m => [m.id, m])).values()]
+  const movs = [...new Map(todos('est_movimentos').filter(m => m.local_id === localId && (qc || (m.origem !== 'epi' && m.origem !== 'limpeza'))).map(m => [m.id, m])).values()]
     .filter(m => m.ativo !== false && !m.pendente);
   if (movs.length) {
     const lim = /^\d{4}-\d{2}-\d{2}$/.test(String(ateData || '')) ? ateData : fimDoMes(mes);

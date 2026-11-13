@@ -483,3 +483,5 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .epi-linha select{width:100%}
 tr.epi-baixo td{background:rgba(201,138,0,.08)}
 @media (max-width:640px){.epi-linha{grid-template-columns:1fr 1fr 34px}}
+.epi-linha.sem-ca{grid-template-columns:1fr 80px 90px 34px}
+@media (max-width:640px){.epi-linha.sem-ca{grid-template-columns:1fr 1fr 34px}}

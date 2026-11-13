@@ -33,7 +33,7 @@ function abrirAba(nome) {
   if (nome.startsWith('cad')) abrirCadastro(nome);
   if (nome.startsWith('ci')) abrirCompra(nome);
   if (nome.startsWith('qc')) abrirQc(nome);
-  if (nome === 'epiEntradas' || nome === 'epiSaldo') abrirEpi(nome);
+  if (nome === 'epiEntradas' || nome === 'epiSaldo' || nome === 'limpEntradas') abrirEpi(nome);
   // Formulários (29/10/2026): folhas da prancheta e placas — ../js/folhas-estoque.js
   if (nome === 'fmFolhas' || nome === 'fmPlacas' || nome === 'fmSaiuVoltou') {
     const el = $(nome + 'Corpo');

@@ -16,11 +16,21 @@ import { saldosEpi, ehQuebraCocao, semAcento, casDe } from '../../js/epi-saldo.j
 import { estadoCa } from '../../js/ca.js';
 
 const TIPOS = { compra: 'Compra', transferencia: 'Transferência', devolucao: 'Devolução de funcionário' };
+/* Material de limpeza (13/11/2026, pedido dele: "tem como fazer de material de
+   limpeza também?"): mesma tela de entrada, sem CA — origem 'limpeza'. */
+const CFG = {
+  epiEntradas:  { grupo: 'EPIs', origem: 'epi', ca: true, corpo: 'epiEntradasCorpo', titulo: 'Entradas de EPI', um: 'EPI', outro: '+ Outro EPI',
+    dica: 'EPI que chegou no estoque — compra, transferência entre fazendas ou devolução de funcionário. A entrega ao funcionário é no SST › EPI\'s › Entregas.' },
+  limpEntradas: { grupo: 'Material de limpeza', origem: 'limpeza', ca: false, corpo: 'limpEntradasCorpo', titulo: 'Entradas de material de limpeza', um: 'produto', outro: '+ Outro produto',
+    dica: 'Material de limpeza que chegou no estoque — compra ou transferência entre fazendas, com quantidade, valor e fornecedor.' },
+};
+const TIPOS_LIMP = { compra: 'Compra', transferencia: 'Transferência' };
+let C = CFG.epiEntradas;
 const F = { mes: hojeISO().slice(0, 7), local: '', busca: '', soMin: false, histBusca: '' };
 let telaAberta = null;
 
 const unicos = t => [...new Map(todos(t).map(x => [x.id, x])).values()];
-const itens = () => unicos('est_itens').filter(i => i.grupo === 'EPIs' && i.ativo !== false)
+const itens = (grupo = 'EPIs') => unicos('est_itens').filter(i => i.grupo === grupo && i.ativo !== false)
   .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 const itemDe = id => unicos('est_itens').find(i => i.id === id) || { nome: '(item apagado)', unidade: '' };
 const localDe = id => unicos('est_locais').find(l => l.id === id) || { nome: '—' };
@@ -29,7 +39,7 @@ const dados = () => ({ locais: unicos('est_locais'), contagens: todos('est_conta
 const caObj = ca => { const r = unicos('est_cas').find(x => x.id === ca) || {};
   return { ca, ca_situacao: r.situacao, ca_validade: r.validade, ca_conferido_em: r.conferido_em }; };
 const chip = (cor, t) => `<span class="tag ${cor}">${esc(t)}</span>`;
-const itemPeloNome = txt => itens().find(i => semAcento(i.nome) === semAcento(txt));
+const itemPeloNome = txt => itens(C.grupo).find(i => semAcento(i.nome) === semAcento(txt));
 const minimo = (i, localId) => {
   const m = minimoDaFazenda(i.id, localId);
   const v = m && m.estoque_minimo !== null && m.estoque_minimo !== '' && m.estoque_minimo !== undefined ? m.estoque_minimo : i.estoque_minimo;
@@ -41,9 +51,9 @@ const minimo = (i, localId) => {
    =================================================================== */
 function lancamentos() {
   const g = new Map();
-  const epis = new Set(itens().map(i => i.id));
+  const epis = new Set(itens(C.grupo).map(i => i.id));
   for (const m of unicos('est_movimentos')) {
-    if (m.ativo === false || m.sentido !== 'entrada' || m.origem !== 'epi' || !epis.has(m.item_id)) continue;
+    if (m.ativo === false || m.sentido !== 'entrada' || m.origem !== C.origem || !epis.has(m.item_id)) continue;
     if (!locaisDoUsuario().some(l => l.id === m.local_id)) continue;
     const k = m.lancamento_id || m.id;
     if (!g.has(k)) g.set(k, { id: k, data: String(m.data).slice(0, 10), local_id: m.local_id, tipo: m.obs && /Devolução/.test(m.obs) ? 'devolucao' : m.tipo,
@@ -54,23 +64,23 @@ function lancamentos() {
 }
 
 function desenharEntradas() {
-  const alvo = $('epiEntradasCorpo');
+  const alvo = $(C.corpo);
   if (!alvo) return;
   if (!pronto()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   const lista = lancamentos().filter(e => !F.mes || e.data.startsWith(F.mes));
   alvo.innerHTML = `
     <div class="barra entre">
-      <div><h2 style="margin:0">Entradas de EPI</h2>
-        <p class="dc-sem" style="margin:2px 0 0">EPI que chegou no estoque — compra, transferência entre fazendas ou devolução de funcionário. A entrega ao funcionário é no SST › EPI's › Entregas.</p></div>
+      <div><h2 style="margin:0">${esc(C.titulo)}</h2>
+        <p class="dc-sem" style="margin:2px 0 0">${esc(C.dica)}</p></div>
       <button class="btn principal" type="button" id="epiNova">+ Nova entrada</button>
     </div>
     <div class="barra"><label class="campo">Mês <input type="month" id="epiMes" value="${esc(F.mes)}"></label></div>
     <div class="lista">${lista.length ? lista.map(e => `<div class="item"><span></span>
       <div><div class="nome">${esc(dataBR(e.data))} · ${esc(localDe(e.local_id).nome)} <span class="tag ativo">${esc(TIPOS[e.tipo] || e.tipo || '')}</span></div>
-        <div class="sub">${e.linhas.map(l => `${esc(mostrarNumero(l.quantidade))} ${esc(itemDe(l.item_id).unidade || '')} ${esc(itemDe(l.item_id).nome)}${l.ca ? ' (CA ' + esc(l.ca) + ')' : ''}`).join(' · ')}
+        <div class="sub">${e.linhas.map(l => `${esc(mostrarNumero(l.quantidade))} ${esc(itemDe(l.item_id).unidade || '')} ${esc(itemDe(l.item_id).nome)}${l.ca ? ' (CA ' + esc(l.ca) + ')' : ''}${l.valor_unitario ? ' a R$ ' + esc(Number(l.valor_unitario).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })) : ''}`).join(' · ')}
           ${e.documento ? ' · ' + esc(e.documento) : ''}${e.origem ? ' · ' + esc(e.origem) : ''}</div></div>
       <div class="acoes">${souAdmin() ? `<button class="btn mini" type="button" data-cancelar="${esc(e.id)}">Cancelar</button>` : ''}</div>
-    </div>`).join('') : '<div class="vazio">Nenhuma entrada de EPI neste mês.</div>'}</div>`;
+    </div>`).join('') : `<div class="vazio">Nenhuma entrada ${C.ca ? 'de EPI' : 'de material de limpeza'} neste mês.</div>`}</div>`;
   $('epiNova').onclick = novaEntrada;
   $('epiMes').onchange = ev => { F.mes = ev.target.value; desenharEntradas(); };
   alvo.querySelectorAll('[data-cancelar]').forEach(b => b.onclick = async () => {
@@ -84,18 +94,19 @@ function desenharEntradas() {
 function novaEntrada() {
   const locais = locaisDoUsuario();
   const linhas = [{ item: '', ca: '', qtd: '', valor: '' }];
-  window.abrirModal('Nova entrada de EPI', `
+  const tipos = C.ca ? TIPOS : TIPOS_LIMP;
+  window.abrirModal(C.ca ? 'Nova entrada de EPI' : 'Nova entrada de material de limpeza', `
     <form id="epiForm" autocomplete="off">
       <div class="grade">
         <label class="campo">Estoque <select name="local">${locais.map(l => `<option value="${esc(l.id)}">${esc(l.nome)}</option>`).join('')}</select></label>
         <label class="campo">Data <input type="date" name="data" value="${hojeISO()}" max="${hojeISO()}" required></label>
-        <label class="campo">Tipo <select name="tipo">${Object.entries(TIPOS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+        <label class="campo">Tipo <select name="tipo">${Object.entries(tipos).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
         <label class="campo">NF / documento <input type="text" name="doc" placeholder="nº da nota"></label>
-        <label class="campo plena">Origem <input type="text" name="origem" placeholder="fornecedor, fazenda de origem ou funcionário"></label>
+        <label class="campo plena">Origem <input type="text" name="origem" placeholder="${C.ca ? 'fornecedor, fazenda de origem ou funcionário' : 'fornecedor ou fazenda de origem'}"></label>
       </div>
       <div id="epiLinhas" class="epi-linhas"></div>
-      <datalist id="epiItens">${itens().map(i => `<option value="${esc(i.nome)}">`).join('')}</datalist>
-      <div class="barra"><button class="btn mini" type="button" id="epiMais">+ Outro EPI</button></div>
+      <datalist id="epiItens">${itens(C.grupo).map(i => `<option value="${esc(i.nome)}">`).join('')}</datalist>
+      <div class="barra"><button class="btn mini" type="button" id="epiMais">${esc(C.outro)}</button></div>
       <p class="aviso erro" id="epiAviso" hidden></p>
       <div class="barra fim"><button class="btn" type="button" id="epiCancelar">Cancelar</button>
         <button class="btn principal" type="submit" id="epiSalvar">Salvar entrada</button></div>
@@ -111,9 +122,9 @@ function novaEntrada() {
         return `<option value="${esc(c)}"${c === l.ca ? ' selected' : ''}>CA ${esc(c)}${['vencido', 'irregular'].includes(e.chave) ? ' · ' + esc(e.rotulo) : ''}</option>`; }).join('')}</select>`;
     };
     const desenhar = () => {
-      corpo.querySelector('#epiLinhas').innerHTML = linhas.map((l, i) => `<div class="epi-linha">
-        <label class="campo">${i ? '' : 'EPI'}<input type="text" list="epiItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o EPI"></label>
-        <label class="campo">${i ? '' : 'CA'}<span data-casel="${i}">${caSel(l, i)}</span></label>
+      corpo.querySelector('#epiLinhas').innerHTML = linhas.map((l, i) => `<div class="epi-linha${C.ca ? '' : ' sem-ca'}">
+        <label class="campo">${i ? '' : (C.ca ? 'EPI' : 'Produto')}<input type="text" list="epiItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o ${esc(C.um)}"></label>
+        ${C.ca ? `<label class="campo">${i ? '' : 'CA'}<span data-casel="${i}">${caSel(l, i)}</span></label>` : ''}
         <label class="campo">${i ? '' : 'Qtd'}<input type="text" inputmode="decimal" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}"></label>
         <label class="campo">${i ? '' : 'R$ unit.'}<input type="text" inputmode="decimal" data-l="${i}" data-c="valor" value="${esc(l.valor)}" placeholder="opcional"></label>
         ${linhas.length > 1 ? `<button class="btn mini" type="button" data-tirar="${i}">×</button>` : '<span></span>'}</div>`).join('');
@@ -122,7 +133,7 @@ function novaEntrada() {
     const ligar = () => {
       corpo.querySelectorAll('#epiLinhas [data-l]').forEach(inp => {
         inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => { linhas[+inp.dataset.l][inp.dataset.c] = inp.value; });
-        if (inp.dataset.c === 'item') inp.addEventListener('change', () => {
+        if (inp.dataset.c === 'item' && C.ca) inp.addEventListener('change', () => {
           const i = +inp.dataset.l; linhas[i].ca = '';
           const sp = corpo.querySelector(`[data-casel="${i}"]`); sp.innerHTML = caSel(linhas[i], i);
           sp.querySelector('select')?.addEventListener('change', ev => { linhas[i].ca = ev.target.value; });
@@ -142,22 +153,22 @@ function novaEntrada() {
       for (const l of linhas) {
         if (!l.item.trim()) continue;
         const it = itemPeloNome(l.item), q = lerNumero(l.qtd), v = l.valor ? lerNumero(l.valor) : null;
-        if (!it) return erro(`"${l.item}" não está no cadastro de EPIs.`);
+        if (!it) return erro(`"${l.item}" não está no cadastro de ${C.ca ? 'EPIs' : 'material de limpeza'}.`);
         if (!(q > 0)) return erro(`Quantidade inválida em ${it.nome}.`);
         if (v !== null && !(v >= 0)) return erro(`Valor inválido em ${it.nome}.`);
-        boas.push({ it, q, v, ca: l.ca || casDe(it)[0] || null });
+        boas.push({ it, q, v, ca: C.ca ? l.ca || casDe(it)[0] || null : null });
       }
-      if (!boas.length) return erro('Escolha pelo menos um EPI.');
+      if (!boas.length) return erro(`Escolha pelo menos um ${C.um}.`);
       corpo.querySelector('#epiSalvar').disabled = true;
       const tipo = fd.get('tipo'), origem = String(fd.get('origem') || '').trim() || null, lanc = crypto.randomUUID();
       for (const b of boas) await gravar('est_movimentos', { id: crypto.randomUUID(), local_id: fd.get('local'), data: fd.get('data'),
         sentido: 'entrada', tipo: tipo === 'devolucao' ? 'transferencia' : tipo, item_id: b.it.id, quantidade: b.q, valor_unitario: b.v,
         ca: b.ca, documento: String(fd.get('doc') || '').trim() || (tipo === 'devolucao' ? 'Devolução' : null),
         fornecedor: tipo === 'compra' ? origem : null, outra_fazenda: tipo !== 'compra' ? origem : null,
-        operador: meuNome(), criado_por: meuNome(), lancamento_id: lanc, ativo: true, origem: 'epi',
+        operador: meuNome(), criado_por: meuNome(), lancamento_id: lanc, ativo: true, origem: C.origem,
         obs: tipo === 'devolucao' ? 'Devolução de EPI pelo funcionário' : null });
       window.fecharModal();
-      aviso('Entrada de EPI lançada.');
+      aviso(C.ca ? 'Entrada de EPI lançada.' : 'Entrada de material de limpeza lançada.');
       desenharEntradas();
     });
   });
@@ -221,7 +232,7 @@ function desenharSaldo() {
   busca('esBusca', 'busca'); busca('esHist', 'histBusca');
 }
 
-const redesenhar = () => { if (telaAberta === 'epiEntradas') desenharEntradas(); else if (telaAberta === 'epiSaldo') desenharSaldo(); };
+const redesenhar = () => { if (CFG[telaAberta]) { C = CFG[telaAberta]; desenharEntradas(); } else if (telaAberta === 'epiSaldo') desenharSaldo(); };
 export function abrirEpi(nome) {
   telaAberta = nome;
   window.addEventListener('estoque-dados', redesenhar);
