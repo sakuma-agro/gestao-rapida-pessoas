@@ -70,7 +70,11 @@ const TODOS = '*';
 const localQc = () => { const ls = locaisDoUsuario();
   return ls.find(x => x.id === localSel) || ls.find(ehQcLocal) || ls[0] || null; };
 const verTodos = () => localSel === TODOS && telaAberta === 'qcVisao' && locaisDoUsuario().length > 1;
-const grupoPermitido = g => ehQcLocal(localQc()) || !SO_QC.includes(g);
+/* Saída de EPI só pelo SST (13/11/2026, pedido dele: "quero que feche a saída de
+   EPI no estoque, que seja somente pelo SST, deixe um botão lá para abrir a
+   entrega do SST") — a entrega gera a ficha. Entrada, transferência e ajuste de
+   EPI continuam aqui. */
+const grupoPermitido = g => (ehQcLocal(localQc()) || !SO_QC.includes(g)) && !(modoAtual === 'saida' && g === 'EPIs');
 function seletorLocal(comTodos) {
   const ls = locaisDoUsuario(), atual = comTodos && verTodos() ? TODOS : (localQc() || {}).id;
   if (ls.length < 2) return '';
@@ -746,6 +750,8 @@ function desenharMov(modo) {
         <span class="barra" style="margin:0">${ent ? '<button type="button" class="btn mini" id="qcNovoItem">+ Novo cadastro</button>' : ''}
           <button type="button" class="btn mini" id="qcColar">Colar lista</button></span>
       </div>
+      ${modo === 'saida' ? `<div class="qc-epi-sst"><span>EPI sai pela <b>entrega do SST</b>, que gera a ficha do funcionário.</span>
+        <button type="button" class="btn" id="qcIrSst">Entregar EPI (SST) →</button></div>` : ''}
       ${ent ? '<p class="dc-sem qc-vu-dica">Valor por unidade: R$ por kg, por litro ou por peça, como está na nota. Na compra é obrigatório.</p>' : '<p class="dc-sem qc-vu-dica">O valor da saída sai sozinho pelo custo médio das entradas.</p>'}
       <div id="qcSub" class="mv-sub" hidden></div>
       <div class="qc-lins" id="qcLins">${Array.from({ length: LINHAS_INICIAIS }, () => linhaProduto(sentido)).join('')}</div>
@@ -776,6 +782,10 @@ function desenharMov(modo) {
   if (!ent) carregarDestinos();
   $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); };
   $('qcColar').onclick = () => colarLista(sentido);
+  $('qcIrSst')?.addEventListener('click', () => {
+    try { if (window.parent && window.parent.irTelaSst) { window.parent.irTelaSst('epiSaida'); return; } } catch { /* fora do LOP */ }
+    aviso('Abra SST › EPI\'s › Entregas no LOP.', true);
+  });
   if (ent) ligarCadastrosNaEntrada(sentido);
   form.querySelectorAll('[data-qccat]').forEach(b => b.addEventListener('click', () => {
     catMov = b.dataset.qccat;
@@ -992,6 +1002,7 @@ async function lancar(sentido, form) {
     if (!x.nome) { x.lin.classList.add('erro'); erros.push('linha sem produto'); continue; }
     if (!item) { desconhecidos.set(semAcento(x.nome), x.nome); continue; }
     if (catMov && (item.grupo || 'Outros') !== catMov) { x.lin.classList.add('erro'); erros.push(`${item.nome}: não é ${catMov}`); continue; }
+    if (!grupoPermitido(item.grupo)) { x.lin.classList.add('erro'); erros.push(`${item.nome}: EPI sai pela entrega do SST`); continue; }
     if (Number.isNaN(qtd) || !qtd || qtd <= 0) { x.lin.classList.add('erro'); erros.push(`${item.nome}: quantidade`); continue; }
     if (Number.isNaN(vu) || (sentido === 'entrada' && tipo === 'compra' && !(vu > 0))) { x.lin.classList.add('erro'); erros.push(`${item.nome}: valor`); continue; }
     let dest = null;

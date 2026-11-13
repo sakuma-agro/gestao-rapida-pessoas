@@ -504,3 +504,4 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .qc-lin .qc-extra{grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap}
 .qc-lin .qc-extra[hidden]{display:none}
 .qc-lin .qc-extra select{flex:1;min-width:160px;min-height:40px;font-size:14px}
+.qc-epi-sst{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0;padding:10px 12px;border:1px solid #84BD00;border-radius:10px;background:#f6fbec;font-size:14px}
