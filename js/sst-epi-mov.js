@@ -128,6 +128,7 @@ const fazendasLegenda = () => {
     const m = /^\s*([A-Z])\s*-\s*(.+?)\s*$/i.exec(parte);
     if (m) r.push({ letra: m[1].toUpperCase(), nome: m[2].trim() });
   }
+  if (!r.some(z => z.letra === 'G')) r.push({ letra: 'G', nome: 'GERAL' });   // EPI usado em todas (13/11/2026)
   return r;
 };
 /* Motivos M.E.R da ficha: "1- Substituição por Dano Justificado" → { cod: '1', texto }. */
@@ -208,11 +209,11 @@ function fichaHtml(e) {
   const meia = linhas.length <= LINHAS_MEIA_MAX;
   const n = meia ? Math.max(linhas.length, LINHAS_MEIA) : Math.max(linhas.length, Number(m.linhas_padrao) || 20);
   while (linhas.length < n) linhas.push(linhaVazia());
-  const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id });
+  const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id, entrega: true });
   if (!meia) return { meia: false, html };
-  // altura com 6 linhas: 107,2 mm fixos + 7,4 mm × 6 = 151,6 mm → zoom fixo para caber em 142 mm
-  const zoom = (142 / (107.2 + 7.4 * LINHAS_MEIA)).toFixed(3);
-  return { meia: true, html: html.replace('<div class="folha">', `<div class="folha meia" style="zoom:${zoom}">`) };
+  // altura da ficha da entrega com 6 linhas: 100,6 mm fixos + 7,4 mm × 6 = 145 mm → zoom fixo para caber em 142 mm
+  const zoom = (142 / (100.6 + 7.4 * LINHAS_MEIA)).toFixed(3);
+  return { meia: true, html: html.replace('<div class="folha fe">', `<div class="folha fe meia" style="zoom:${zoom}">`) };
 }
 const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 6;
 const SEL = new Set();   // entregas marcadas para imprimir

@@ -58,7 +58,98 @@ function celula(campo, indice, valor, classes, marca) {
     (campo === 'descricao' ? ' list="lista-epis" autocomplete="off"' : '') + `>${ph}</div></td>`;
 }
 
+const cpfBr = c => { const d = String(c || '').replace(/\D/g, ''); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (c || ''); };
+
+/* Ficha da ENTREGA de EPI (SST › EPI's › Entregas, 13/11/2026). Mesmo modelo,
+   com o que ele alinhou item a item:
+   · sem "MÊS" no alto — as legendas FAZ e M.E.R usam esse espaço;
+   · linha do funcionário: FUNCIONÁRIO: nome · CPF · Nº cadastro;
+   · assinatura do termo continua ACIMA da tabela, com nome e CPF embaixo;
+   · coluna ASSINATURA e linhas em branco continuam; faixa de selos mais fina.
+   Textos continuam vindo do Modelo da ficha. */
+function fichaEntrega(func, modelo, opcoes) {
+  const { linhas, chave } = opcoes;
+  const setor = opcoes.setor || func.setor || modelo.setor_padrao || 'CAMPO';
+  const fazLeg = modelo.legenda_faz || [];
+  const merLeg = modelo.legenda_mer || [];
+  const decls = modelo.declaracoes || [];
+  const cpf = cpfBr(func.cpf);
+  const linhaHtml = (l, i) => '<tr class="r43">' +
+    celula('faz', i, l.faz, 'f14 ce brt btt bbt') +
+    celula('data', i, l.data, 'f12 b ce brt btt bbt', TRACO) +
+    celula('qtd', i, l.qtd, 'f14 ce blt brt btt bbt') +
+    celula('ca', i, l.ca, 'f14 ce blt brt btt bbt') +
+    celula('descricao', i, l.descricao, 'f14 es blt brt btt bbt') +
+    celula('devolucao', i, l.devolucao, 'f12 b ce brt btt bbt', TRACO) +
+    celula('assinatura', i, l.assinatura, 'f14 es blt brt btt bbt') +
+    celula('mer', i, l.mer, 'f10 ce blt btt bbt') +
+    '</tr>';
+  /* Legenda FAZ em pares (F | L, M | T, Q | G) e M.E.R ao lado, numa tabela
+     fechada; "G - GERAL" entra sozinho se o Modelo da ficha não tiver G. */
+  const fazPares = [];
+  for (const linha of fazLeg) for (const parte of String(linha).split('/')) if (parte.trim()) fazPares.push(parte.trim().replace(/\s+/g, ' '));
+  if (!fazPares.some(t => /^G\s*-/i.test(t))) fazPares.push('G - GERAL');
+  const nLegFe = Math.max(Math.ceil(fazPares.length / 2), merLeg.length, 3);
+  const legLinha = i => `<tr class="fe-leg">
+    <td colspan="2" class="fe-l blt brt btt bbt">${esc(fazPares[2 * i] || '')}</td>
+    <td class="fe-l brt btt bbt">${esc(fazPares[2 * i + 1] || '')}</td>
+    <td colspan="3" class="fe-l btt bbt">${esc(merLeg[i] || '')}</td></tr>`;
+  return `<div class="folha fe">
+  <div class="ficha" data-chave="${esc(chave)}">
+  <table class="fx"><colgroup>
+    <col style="width:4.729%"><col style="width:13.997%"><col style="width:5.296%"><col style="width:9.269%">
+    <col style="width:22.005%"><col style="width:13.997%"><col style="width:22.131%"><col style="width:8.575%">
+  </colgroup><tbody>
+  <tr class="fe-leg fe-cab">
+    <td class="fe-logo" colspan="2" rowspan="${nLegFe + 1}"><img src="${LOGO}" alt="SAKUMA Agronegócios"></td>
+    <td colspan="3" class="fe-l b blt brt bbt">${esc(modelo.rotulo_faz)}</td>
+    <td colspan="3" class="fe-l b bbt">${esc(modelo.rotulo_mer)}</td>
+  </tr>
+  ${Array.from({ length: nLegFe }, (_, i) => legLinha(i)).join('')}
+  <tr class="fe-tit"><td colspan="8" class="titulo btm">${esc(modelo.titulo)}</td></tr>
+  <tr class="r12">
+    <td colspan="2" class="f20 b es vm btt bbt">EMPREGADOR:</td>
+    <td colspan="6" class="f20 b es vm btt bbt">${esc(func.empregador)}</td>
+  </tr>
+  <tr class="r12">
+    <td colspan="2" class="f20 b es vm btt bbt">CARGO: </td>
+    <td colspan="3" class="f20 b es vm btt bbt">${esc(func.cargo)}</td>
+    <td class="f20 b ce vm btt bbt blt">SETOR:</td>
+    <td colspan="2" class="f20 b es vm btt bbt">${esc(setor)}</td>
+  </tr>
+  <tr class="r12">
+    <td colspan="2" class="f20 b es vm btt bbt">FUNCIONÁRIO: </td>
+    <td colspan="3" class="f20 es vm btt bbt">${esc(func.nome)}</td>
+    <td colspan="2" class="f20 es vm btt bbt blt"><b>CPF:</b> ${esc(cpf)}</td>
+    <td class="f20 ce vm btt bbt blt"><b>Nº</b> ${esc(func.cadastro)}</td>
+  </tr>
+  <tr class="r12">
+    <td colspan="2" class="f20 b es vm btt bbt">ADMISSÃO:</td>
+    <td colspan="3" class="f20 b es vm brt btt bbt">${esc(dataBr(func.admissao))}</td>
+    <td colspan="3" class="f20 es vm blt btt bbt">${esc(modelo.rodape_demissao)}</td>
+  </tr>
+  <tr><td colspan="8" class="fe-decl-tit">${esc(modelo.declaracao_titulo)}</td></tr>
+  <tr><td colspan="8" class="fe-decl">${decls.map(t => `<div>${esc(t)}</div>`).join('')}${modelo.declaracao_longa ? `<div class="fe-longa">${esc(modelo.declaracao_longa)}</div>` : ''}</td></tr>
+  <tr><td colspan="8" class="fe-assin"><div class="fe-traco"></div>
+    <div class="fe-nome">${esc(func.nome)}${cpf ? ` <span>· CPF ${esc(cpf)}</span>` : ''}</div></td></tr>
+  <tr class="r23">
+    <td class="f12 b ce vm btm brt bbt">FAZ</td>
+    <td class="f12 b ce vm btm brt bbt">DATA</td>
+    <td class="f12 b ce vm btm blt brt bbt">QTD.</td>
+    <td class="f12 b ce vm btm blt brt bbt">C.A</td>
+    <td class="f12 b ce vm btm blt brt bbt">DESCRIÇÃO DO EPI</td>
+    <td class="f12 b ce vm btm blt brt bbt">DEVOLUÇÃO</td>
+    <td class="f12 b ce vm btm blt brt bbt">ASSINATURA</td>
+    <td class="f12 b ce vm btm blt bbt">M.E.R</td>
+  </tr>
+  ${linhas.map(linhaHtml).join('')}
+  </tbody></table></div>
+  ${FAIXA_SELOS}
+</div>`;
+}
+
 export function montarFicha(func, modelo, opcoes) {
+  if (opcoes && opcoes.entrega) return fichaEntrega(func, modelo, opcoes);
   const { mes, ano, linhas, chave } = opcoes;
   const setor = opcoes.setor || func.setor || modelo.setor_padrao || 'CAMPO';
   const mesTexto = `${MESES[mes]}, ${ano}`;

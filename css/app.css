@@ -3008,3 +3008,28 @@ select.epm-ca-ruim{color:#a5342a;border-color:#a5342a}
 .epm-ent .epm-ent-txt{flex:1}
 .epm-marca{width:18px;height:18px;flex:none;accent-color:var(--verde);cursor:pointer}
 .epm-ent.marcada{background:var(--verde-fundo)}
+
+/* Ficha da ENTREGA de EPI (13/11/2026) — js/ficha.js › fichaEntrega */
+.fe .fe-leg td{height:4.2mm}
+.fe .fe-l{font-size:6.3pt;vertical-align:middle;white-space:nowrap;padding:0 1.6mm}
+.fe .fe-cab td{height:4.6mm}
+.fe .fe-tit td{height:6.6mm}
+.fe .fe-decl-tit{font-size:7.2pt;font-weight:bold;padding:1.6mm 1.6mm .6mm;white-space:normal;vertical-align:top}
+.fe .fe-decl{font-size:6.6pt;line-height:1.22;padding:0 1.6mm 1mm;white-space:normal;vertical-align:top}
+.fe .fe-decl div{margin:0 0 .3mm}
+.fe .fe-longa{margin-top:1.2mm !important}
+.fe .fe-assin{padding:5mm 0 1.4mm;text-align:center;vertical-align:bottom}
+.fe .fe-traco{width:78mm;margin:0 auto .8mm;border-top:.25mm solid #000}
+.fe .fe-nome{font-size:8pt;font-weight:bold;line-height:1.1}
+.fe .fe-nome span{font-weight:normal}
+.fe .marca{top:.6mm}
+.fe .marca img{height:20mm}
+/* faixa de selos mais fina na ficha da entrega ("divida o espaço") */
+.fe .selos{margin-top:1.6mm;padding:1.4mm 4mm 0;border-top-width:.5mm}
+.fe .selo{flex-direction:row;justify-content:center;gap:1.2mm}
+.fe .selo svg{width:5mm;height:5mm}
+.fe .selo span{font-size:5.6pt}
+/* logo centralizada e legenda fechada (13/11/2026) */
+.fe .fe-logo{text-align:center;vertical-align:middle;padding:1mm;border-right:var(--m)}
+.fe .fe-logo img{height:17mm;width:auto;display:inline-block}
+.fe .fe-leg:last-child td,.fe .fe-leg + .fe-tit td{border-top:var(--m)}
