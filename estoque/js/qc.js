@@ -810,11 +810,17 @@ function ligarLinhas(sentido) {
     };
     const caSel = lin.querySelector('.qc-ca'), embSel = lin.querySelector('.qc-emb'), extra = lin.querySelector('.qc-extra');
     const mostrarCa = it => {
-      const cas = it && it.grupo === 'EPIs' ? casDe(it) : [];
-      caSel.hidden = !cas.length;
-      if (cas.length) {
-        const atual = caSel.value;
-        caSel.innerHTML = cas.map(c => `<option value="${esc(c)}"${c === atual ? ' selected' : ''}>CA ${esc(c)}</option>`).join('');
+      const epi = !!it && it.grupo === 'EPIs';
+      const cas = epi ? casDe(it) : [];
+      caSel.hidden = !epi;
+      caSel.dataset.item = epi ? it.id : '';
+      if (epi) {
+        const atual = caSel.dataset.escolhido || caSel.value;
+        /* CA novo (13/11/2026, pergunta dele: "se for EPI e tiver um CA novo, como faz?"):
+           "+ CA novo…" pede o número e já acrescenta o CA no cadastro do produto. */
+        caSel.innerHTML = (cas.length ? '' : '<option value="">sem CA no cadastro</option>')
+          + cas.map(c => `<option value="${esc(c)}"${c === atual ? ' selected' : ''}>CA ${esc(c)}</option>`).join('')
+          + '<option value="__novo">+ CA novo…</option>';
       } else caSel.innerHTML = '';
       // embalagens do produto (Cadastros › Embalagens): "3 bags" vira 3000 kg
       const embs = it ? embalagensDe(it.id) : [];
@@ -863,6 +869,19 @@ function ligarLinhas(sentido) {
     qtd.addEventListener('input', () => { escreverInfo(); contar(); });
     if (vuInp) vuInp.addEventListener('input', () => { escreverInfo(); contar(); });
     embSel.addEventListener('change', () => { escreverInfo(); contar(); });
+    caSel.addEventListener('change', async () => {
+      if (caSel.value !== '__novo') { caSel.dataset.escolhido = caSel.value; return; }
+      const it = todos('est_itens').filter(i => i.id === caSel.dataset.item).pop();
+      const n = it ? String(prompt(`Número do CA novo de ${it.nome}:`) || '').replace(/\D/g, '') : '';
+      if (!it || !n) { caSel.dataset.escolhido = ''; mostrarCa(it); return; }
+      const cas = casDe(it);
+      if (!cas.includes(n)) {
+        await gravar('est_itens', Object.assign({}, it, { ca: [...cas, n].join(', ') }));
+        aviso(`CA ${n} acrescentado em ${it.nome}. Confira a validade em Cadastros › Produtos (Conferir no ConsultaCA).`);
+      }
+      caSel.dataset.escolhido = n;
+      mostrarCa(Object.assign({}, it, { ca: [...new Set([...cas, n])].join(', ') }));
+    });
     if (vuInp) vuInp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
@@ -898,7 +917,7 @@ function linhasPreenchidas() {
     .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim(),
       vuTxt: lin.querySelector('.qc-vu') ? lin.querySelector('.qc-vu').value.trim() : '',
       destTxt: lin.querySelector('.qc-dest-inp') ? lin.querySelector('.qc-dest-inp').value.trim() : '',
-      ca: lin.querySelector('.qc-ca') && !lin.querySelector('.qc-ca').hidden ? lin.querySelector('.qc-ca').value : '',
+      ca: lin.querySelector('.qc-ca') && !lin.querySelector('.qc-ca').hidden && lin.querySelector('.qc-ca').value !== '__novo' ? lin.querySelector('.qc-ca').value : '',
       emb: embalagemSel(lin) }))
     .filter(x => x.nome || x.txt);
 }
