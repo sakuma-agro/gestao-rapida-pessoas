@@ -240,6 +240,8 @@ window.irCertVistorias = chave => {
   window.cvFiltroPedido = chave || '';
   entrarNaArea('certificacao', 'clVistorias');
 };
+/* Entregas de EPI → aba Devoluções (13/11/2026) */
+window.irTelaSst = tela => entrarNaArea('sst', tela);
 /* abrirModulo('sst'/'cert', tela) vindo de fora da área: entra na área antes. */
 ligarAreaDoModulo((area, tela) => entrarNaArea(area, tela));
 export const areasLiberadas = () => AREAS.filter(a => !a.emBreve && liberada(a.id));

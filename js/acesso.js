@@ -82,6 +82,7 @@ export const MODULOS = [
       ['fichas', 'Fichas'],
       // Entregas, entradas e saldo pelo estoque (13/11/2026): js/sst-epi-mov.js
       ['epiSaida', 'Entregas'],   // entradas e saldo de EPI ficam no Estoque › EPIs (13/11/2026, pedido dele)
+      ['epiDevol', 'Devoluções'],  // troca pede devolução na ficha anterior (13/11/2026)
       ['epis', 'Tipos de EPI'],
       ['epiCrono', 'Cronograma de troca'],
       ['epiLavagem', 'Lavagem e higienização'],

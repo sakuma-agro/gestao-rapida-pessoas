@@ -30,7 +30,7 @@ const chip = (cor, txt) => `<span class="tag ${cor}">${esc(txt)}</span>`;
 const quem = () => estado.sessao?.user?.email || '';
 const admin = () => !!acesso.admin;
 
-export const TELAS_EPI_MOV = ['epiSaida', 'epiEntrada', 'epiSaldo'];
+export const TELAS_EPI_MOV = ['epiSaida', 'epiEntrada', 'epiSaldo', 'epiDevol'];
 
 /* ===================================================================
    DADOS — lidos direto do banco (precisa de internet)
@@ -187,6 +187,34 @@ function trocas() {
     return { ...t, proxima, dias, sit };
   }).sort((a, b) => a.proxima.localeCompare(b.proxima));
 }
+/* Devoluções (13/11/2026, pedido dele): "ao eu entregar uma botina para um
+   funcionário quero uma aba de devolução aonde vc vai me mostrar dar devolução
+   na ficha número tal, e deixar pendente para que eu possa marcar, devolução
+   registrada". Toda entrega de TROCA (M.E.R 1 ou 2) pede a devolução do mesmo
+   tipo de EPI entregue antes ao funcionário: a coluna DEVOLUÇÃO daquela ficha
+   (Nº da entrega) precisa ser preenchida. Pendente = est_movimentos.devolucao
+   vazio; "Devolução registrada" grava a data nele. */
+function devolucoes() {
+  const linhas = ativos(D.movimentos).filter(m => m.sentido === 'saida' && m.funcionario_id && !m.pendente)
+    .map(m => ({ m, tipo: tipoDoEpi(itemDe(m.item_id).nome), dia: String(m.data).slice(0, 10) }))
+    .sort((a, b) => a.dia.localeCompare(b.dia) || (Number(a.m.entrega_num) || 0) - (Number(b.m.entrega_num) || 0));
+  const ents = new Map(entregas().map(e => [e.id, e]));
+  const num = m => numEntrega(ents.get(m.lancamento_id || m.id));
+  const r = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const n = linhas[i];
+    if (!['1', '2'].includes(String(n.m.mer || ''))) continue;
+    // a entrega anterior do mesmo tipo para o mesmo funcionário (sem ser do mesmo lançamento)
+    let velho = null;
+    for (let j = i - 1; j >= 0; j--) {
+      const v = linhas[j];
+      if (v.m.funcionario_id === n.m.funcionario_id && v.tipo === n.tipo && (v.m.lancamento_id || v.m.id) !== (n.m.lancamento_id || n.m.id)) { velho = v; break; }
+    }
+    if (!velho || r.some(x => x.velho.id === velho.m.id)) continue;
+    r.push({ velho: velho.m, novo: n.m, numVelho: num(velho.m), numNovo: num(n.m), pendente: !velho.m.devolucao });
+  }
+  return r.sort((a, b) => String(b.novo.data).localeCompare(String(a.novo.data)));
+}
 const textoTroca = it => it && it.troca_qtd ? `a cada ${it.troca_qtd} ${Number(it.troca_qtd) === 1 ? ({ dias: 'dia', semanas: 'semana', meses: 'mês' })[it.troca_unidade || 'meses'] : (it.troca_unidade || 'meses')}` : 'conforme desgaste';
 
 /* ===================================================================
@@ -201,7 +229,7 @@ function fichaHtml(e) {
   const linhas = e.linhas.map(l => {
     const it = itemDe(l.item_id);
     return { ...linhaVazia(), faz: l.faz || faz, data: br(e.data), qtd: mostra(l.quantidade), ca: l.ca || casDe(it)[0] || '',
-      descricao: nomeSemCa(it.nome).toUpperCase(), mer: l.mer || '' };
+      descricao: nomeSemCa(it.nome).toUpperCase(), mer: l.mer || '', devolucao: l.devolucao ? br(l.devolucao) : '' };
   });
   /* Dois tamanhos padrão (13/11/2026, pedidos dele: "no A4 está ficando muito
      grande" e "deixar padrão, meia folha ou inteira, para não ter desperdício"):
@@ -255,6 +283,51 @@ function desenhar() {
   if (nome === 'epiSaida') telaSaida(tela);
   else if (nome === 'epiEntrada') telaEntrada(tela);
   else if (nome === 'epiSaldo') telaSaldo(tela);
+  else if (nome === 'epiDevol') telaDevol(tela);
+}
+
+/* ---------------- DEVOLUÇÕES ---------------- */
+function telaDevol(tela) {
+  const todas = devolucoes();
+  const pend = todas.filter(d => d.pendente), feitas = todas.filter(d => !d.pendente);
+  const ver = F.devVer === 'feitas' ? feitas : pend;
+  const q = semAcento(F.busca);
+  const vis = ver.filter(d => !q || semAcento(d.velho.funcionario + ' ' + itemDe(d.velho.item_id).nome).includes(q));
+  tela.innerHTML = `<div class="cartao naoimprimir">
+    <div class="barra entre" style="margin:0 0 6px"><h2 style="margin:0">Devoluções de EPI</h2>
+      <button class="btn mini" type="button" id="dvAtualizar" title="Ler de novo do banco">↻ Atualizar</button></div>
+    <p class="dica" style="margin:0 0 10px">Quando o funcionário recebe um EPI de <b>troca</b> (M.E.R 1 ou 2), o anterior do mesmo tipo volta.
+      Preencha a coluna <b>DEVOLUÇÃO</b> na ficha indicada e toque em <b>Devolução registrada</b>.</p>
+    <div class="barra">
+      <button type="button" class="epm-chip${F.devVer !== 'feitas' ? ' on' : ''} alerta" data-dv="pend">Pendentes ${pend.length}</button>
+      <button type="button" class="epm-chip${F.devVer === 'feitas' ? ' on' : ''}" data-dv="feitas">Registradas ${feitas.length}</button>
+      <label class="campo" style="flex:1;min-width:180px;margin:0"><input type="search" id="dvBusca" value="${esc(F.busca)}" placeholder="Procurar funcionário ou EPI"></label>
+    </div>
+    <div class="lista">${vis.length ? vis.map(d => {
+      const it = itemDe(d.velho.item_id), itN = itemDe(d.novo.item_id);
+      return `<div class="item dv-item"><span></span><div>
+        <div class="nome">${esc(d.velho.funcionario)} · ${d.pendente ? 'dar devolução na' : 'devolução registrada na'} <b>ficha nº ${esc(d.numVelho || '—')}</b></div>
+        <div class="sub"><b>${esc(nomeSemCa(it.nome))}</b>${d.velho.ca ? ' (CA ' + esc(d.velho.ca) + ')' : ''} · ${esc(mostra(d.velho.quantidade))} ${esc(it.unidade || '')} entregue em ${br(d.velho.data)}
+          · trocado por ${esc(nomeSemCa(itN.nome))} na entrega nº ${esc(d.numNovo || '—')} de ${br(d.novo.data)}
+          ${d.pendente ? '' : ` · <b>devolvido em ${br(d.velho.devolucao)}</b>`}</div></div>
+        <div class="acoes">${d.pendente
+          ? `<label class="campo" style="margin:0">Data da devolução <input type="date" data-dvdata="${esc(d.velho.id)}" value="${esc(String(d.novo.data).slice(0, 10))}" max="${hoje()}"></label>
+             <button class="btn principal" type="button" data-dvok="${esc(d.velho.id)}">✓ Devolução registrada</button>`
+          : `<button class="btn mini" type="button" data-dvdesfaz="${esc(d.velho.id)}">Desfazer</button>`}</div></div>`;
+    }).join('') : `<div class="vazio">${F.devVer === 'feitas' ? 'Nenhuma devolução registrada.' : 'Nenhuma devolução pendente.'}</div>`}</div></div>`;
+  tela.querySelectorAll('[data-dv]').forEach(b => b.onclick = () => { F.devVer = b.dataset.dv; desenhar(); });
+  $('dvAtualizar').onclick = async () => { await carregar(true); desenhar(); };
+  $('dvBusca').addEventListener('input', ev => { F.busca = ev.target.value; const p = ev.target.selectionStart; desenhar(); const el = $('dvBusca'); el.focus(); el.setSelectionRange(p, p); });
+  const linha = id => D.movimentos.find(m => m.id === id);
+  tela.querySelectorAll('[data-dvok]').forEach(b => b.onclick = async () => {
+    const dt = tela.querySelector(`[data-dvdata="${CSS.escape(b.dataset.dvok)}"]`).value || hoje();
+    b.disabled = true;
+    if (await marcarLinhas([linha(b.dataset.dvok)], { devolucao: dt })) desenhar(); else b.disabled = false;
+  });
+  tela.querySelectorAll('[data-dvdesfaz]').forEach(b => b.onclick = async () => {
+    if (!confirm('Voltar esta devolução para pendente?')) return;
+    if (await marcarLinhas([linha(b.dataset.dvdesfaz)], { devolucao: null })) desenhar();
+  });
 }
 
 /* ---------------- ENTREGAS (saída para o funcionário) ----------------
@@ -276,6 +349,7 @@ function telaSaida(tela) {
   const tr = trocas().filter(t => t.sit.chave !== 'fora');
   const pendAss = todas.filter(e => !e.assinada);
   const atras = tr.filter(t => t.sit.chave === 'atrasada');
+  const devPend = devolucoes().filter(d => d.pendente).length;
   const q = semAcento(F.busca);
   const vis = todas.filter(e => (F.sit === 'pend' ? !e.assinada : (!F.mes || e.data.startsWith(F.mes)))
     && (!q || semAcento(e.funcionario + ' ' + e.linhas.map(l => itemDe(l.item_id).nome).join(' ')).includes(q)));
@@ -305,7 +379,8 @@ function telaSaida(tela) {
       <p class="aviso erro" id="epmAviso" hidden></p>
     </form>
 
-    ${pendAss.length || atras.length ? `<div class="epm-pend">
+    ${pendAss.length || atras.length || devPend ? `<div class="epm-pend">
+      ${devPend ? `<button type="button" class="epm-chip alerta" id="epmVerDevol">↩ ${devPend} devoluç${devPend > 1 ? 'ões' : 'ão'} para registrar na ficha</button>` : ''}
       ${pendAss.length ? `<button type="button" class="epm-chip alerta${F.sit === 'pend' ? ' on' : ''}" id="epmVerPend">✍ ${pendAss.length} ficha${pendAss.length > 1 ? 's' : ''} sem assinatura</button>` : ''}
       ${atras.length ? `<button type="button" class="epm-chip perigo${F.verTrocas ? ' on' : ''}" id="epmVerTrocas">⟳ ${atras.length} troca${atras.length > 1 ? 's' : ''} atrasada${atras.length > 1 ? 's' : ''}</button>` : ''}
     </div>` : ''}
@@ -341,6 +416,7 @@ function telaSaida(tela) {
   ligarForm();
   $('epmAtualizar').onclick = async () => { await carregar(true); desenhar(); };
   $('epmVerPend')?.addEventListener('click', () => { F.sit = F.sit === 'pend' ? '' : 'pend'; desenhar(); });
+  $('epmVerDevol')?.addEventListener('click', () => { if (window.irTelaSst) window.irTelaSst('epiDevol'); });
   $('epmVerTrocas')?.addEventListener('click', () => { F.verTrocas = F.verTrocas ? '' : 'atrasada'; desenhar(); });
   tela.querySelectorAll('[data-epm-trocar]').forEach(b => b.addEventListener('click', () => {
     const t = listaTrocas[+b.dataset.epmTrocar], f = funcDe(t.funcionario_id);
