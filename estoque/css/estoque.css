@@ -463,3 +463,8 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .btn.btn-zap:hover{background:#1EBE5A;border-color:#1EBE5A;color:#fff}
 .btn.btn-zap:disabled{opacity:.6;cursor:wait}
 .btn.btn-zap .ic-zap{width:20px;height:20px;flex:none;border-radius:5px;background:#fff;display:block}
+
+/* Validade do CA nos itens (13/11/2026) */
+.cad-ca-resumo{display:inline-flex;gap:6px;flex-wrap:wrap}
+.cad-ca-val{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.item .sub a{color:inherit;text-decoration:underline dotted}

@@ -253,3 +253,11 @@ alter table public.est_itens add column if not exists localizacao text;
 -- Pendência não entra no saldo nem no custo médio. pendente_desde = data do pedido original.
 alter table public.est_movimentos add column if not exists pendente boolean not null default false,
   add column if not exists pendente_desde date;
+
+-- Validade do CA dos EPIs (13/11/2026) — preenchida pela função consulta-ca (igual a epis.ca_*)
+alter table public.est_itens
+  add column if not exists ca_situacao text,
+  add column if not exists ca_validade date,
+  add column if not exists ca_equipamento text,
+  add column if not exists ca_fabricante text,
+  add column if not exists ca_conferido_em timestamptz;

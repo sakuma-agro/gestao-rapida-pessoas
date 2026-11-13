@@ -6,6 +6,41 @@
 // contagens novas sem sumir das que já foram fechadas.
 import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados, lerNumero, mostrarNumero, temMinimo,
   locais, contaNoLocal, meusLocais, podeLocal, idMinimo, minimoDaFazenda } from './dados.js';
+import { estadoCa, conferirCas, linkCa } from '../../js/ca.js';
+
+/* ---- Validade do CA (13/11/2026): mesma função "consulta-ca" do SST › Tipos de EPI.
+   Guarda em est_itens.ca_situacao / ca_validade / ca_conferido_em. Confere sozinho
+   ao abrir Cadastros (o que passou de 7 dias) e pelo botão no Editar. ---- */
+let conferindoCa = false, jaConferiuCa = false;
+function etiquetaCa(i) {
+  if (!i.ca) return '';
+  const est = estadoCa(i);
+  const link = linkCa(i.ca);
+  const num = link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(i.ca)}</a>` : esc(i.ca);
+  return ` · CA ${num}${est.rotulo ? ` <span class="tag ${esc(est.cor)}">${esc(est.rotulo)}</span>` : ''}`;
+}
+async function conferirCasItens(forcar, ids) {
+  if (conferindoCa || !window.App || !window.App.sb) return null;
+  const alvos = todos('est_itens').filter(i => i.ca && i.ativo !== false && (!ids || ids.includes(i.id)));
+  conferindoCa = true;
+  try {
+    return await conferirCas(window.App.sb, alvos, { forcar }, r => gravar('est_itens', r));
+  } finally { conferindoCa = false; }
+}
+async function conferirCaAoAbrir() {
+  if (jaConferiuCa || !pronto()) return;
+  jaConferiuCa = true;
+  const r = await conferirCasItens(false);
+  if (r && r.conferidos) desenharItens();
+  if (r && r.erro) console.warn('consulta-ca:', r.erro);
+}
+function resumoCas(itens) {
+  const est = itens.filter(i => i.ca && i.ativo !== false).map(i => estadoCa(i).chave);
+  const venc = est.filter(c => c === 'vencido' || c === 'irregular').length, perto = est.filter(c => c === 'vencendo').length;
+  if (!venc && !perto) return '';
+  return `<span class="cad-ca-resumo">${venc ? `<span class="tag perigo">${venc} CA${venc > 1 ? 's' : ''} vencido${venc > 1 ? 's' : ''}</span> ` : ''}${
+    perto ? `<span class="tag alerta">${perto} vence${perto > 1 ? 'm' : ''} em até 30 dias</span>` : ''}</span>`;
+}
 
 /** Campo de número opcional: vazio = null; texto que não é número = NaN. */
 const numOpc = v => lerNumero(v);
@@ -138,6 +173,7 @@ function desenharItens() {
     </form>
     <div class="barra entre">
       <span class="dc-sem">${nAtivos} ${nAtivos === 1 ? 'item ativo' : 'itens ativos'} · cada item aparece na contagem dos estoques marcados em "Contado em"</span>
+      ${resumoCas(todosItens)}
       <button class="btn" type="button" id="cadColar">Colar uma lista</button>
     </div>
     <div class="barra">
@@ -152,7 +188,7 @@ function desenharItens() {
       const cab = i.grupo !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo)}</h3>` : '';
       return cab + `<div class="item"><span></span>
         <div><div class="nome">${esc(i.nome)}${i.ativo === false ? ' <span class="tag inativo">desativado</span>' : ''}</div>
-          <div class="sub">${i.localizacao ? `<b class="cad-loc">📍 ${esc(i.localizacao)}</b> · ` : ''}${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${i.ca ? ` · CA ${esc(i.ca)}` : ''}${temMinimo(i)
+          <div class="sub">${i.localizacao ? `<b class="cad-loc">📍 ${esc(i.localizacao)}</b> · ` : ''}${i.codigo ? `cód. ${esc(i.codigo)} · ` : ''}${esc(i.unidade || 'sem unidade')}${etiquetaCa(i)}${temMinimo(i)
             ? ` · mínimo ${esc(mostrarNumero(i.estoque_minimo))}${i.pedido_reposicao != null && i.pedido_reposicao !== ''
               ? ` · pedir ${esc(mostrarNumero(i.pedido_reposicao))}` : ''}`
             : ' · <span class="cad-sem-min">sem estoque mínimo</span>'}${textoMinFazendas(i)}${textoLocais(i)}${resumoAgrofit(i)}</div></div>
@@ -191,6 +227,7 @@ function desenharItens() {
   $('cadInativos').addEventListener('change', e => { verInativos = e.target.checked; desenharItens(); });
   $('cadColar').addEventListener('click', colarLista);
   alvo.querySelectorAll('[data-editar]').forEach(b => b.addEventListener('click', () => editarItem(b.dataset.editar)));
+  conferirCaAoAbrir();
 }
 
 function editarItem(id) {
@@ -214,6 +251,9 @@ function editarItem(id) {
         <label class="campo">Localização (prateleira) <input type="text" name="localizacao" value="${esc(i.localizacao || '')}" placeholder="ex.: A.1"></label>
       </div>
       ${caixasLocais(i.locais_contagem)}
+      ${i.ca ? `<p class="cad-ca-val" id="cadCaVal">Validade do CA: ${etiquetaCa(i).replace(/^ · CA /, '') || '—'}${
+        i.ca_conferido_em ? ` <small class="dc-sem">conferido em ${esc(new Date(i.ca_conferido_em).toLocaleDateString('pt-BR'))}</small>` : ''}
+        <button class="btn mini" type="button" id="cadCaConferir">Conferir no ConsultaCA</button></p>` : ''}
       ${quadroMinimos(i)}
       ${blocoAgrofit(i)}
       <p class="dc-sem">Quando a contagem der igual ou abaixo do mínimo, o item aparece na Reposição com a quantidade a pedir.</p>
@@ -240,6 +280,14 @@ function editarItem(id) {
         codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null,
         localizacao: String(f.get('localizacao') || '').trim() || null }));
       window.fecharModal(); desenharItens();
+    });
+    const btCa = corpo.querySelector('#cadCaConferir');
+    if (btCa) btCa.addEventListener('click', async () => {
+      btCa.disabled = true; btCa.textContent = 'Conferindo…';
+      const r = await conferirCasItens(true, [id]);
+      if (!r || r.erro || !r.conferidos) aviso('Não deu para consultar o site agora' + (r && r.erro ? ` (${r.erro})` : '') + '.', true);
+      else { aviso('Validade do CA atualizada.'); window.fecharModal(); desenharItens(); editarItem(id); return; }
+      btCa.disabled = false; btCa.textContent = 'Conferir no ConsultaCA';
     });
     corpo.querySelector('#cadAtivo').addEventListener('click', async () => {
       await gravar('est_itens', Object.assign({}, i, { ativo: i.ativo === false }));
