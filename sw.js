@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v663';
+const VERSAO = 'gr-v664';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -133,7 +133,12 @@ self.addEventListener('activate', ev => {
    - Bibliotecas (vendor/), imagens e ícones: abrem na hora pela cópia e a
      rede é conferida por trás. São os arquivos pesados e mudam raramente.
    - Supabase e outros endereços: nunca passam por aqui. */
-const ESPERA_REDE_MS = 3000;
+/* 13/11/2026 (tela branca): com 3 s, logo depois de uma publicação, parte
+   dos arquivos vinha nova da rede e parte velha da cópia — e um não achava a
+   função do outro (página vazia). Agora, com internet, espera a rede até
+   10 s; sem internet usa a cópia na hora. A guarda do index.html cobre o
+   resto (limpa e recarrega sozinha). */
+const ESPERA_REDE_MS = 10000;
 const PESADO = /\/(vendor|img|icons)\/|\.(png|jpe?g|svg|ico|webp|woff2?|xlsx)$/i;
 
 function buscarEGuardar(cache, req, pesado = false) {
@@ -163,7 +168,7 @@ async function reserva(cache, req) {
 async function redeComPrazo(ev, cache, req) {
   const rede = buscarEGuardar(cache, req);
   ev.waitUntil(rede.catch(() => {}));
-  const tempo = new Promise(ok => setTimeout(() => ok(null), ESPERA_REDE_MS));
+  const tempo = new Promise(ok => setTimeout(() => ok(null), self.navigator && self.navigator.onLine === false ? 0 : ESPERA_REDE_MS));
   try {
     const resp = await Promise.race([rede, tempo]);
     if (resp) return resp;

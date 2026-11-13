@@ -72,7 +72,12 @@
     if (t && t.tagName === 'SCRIPT') return falhou('Não carregou: ' + (t.getAttribute('src') || 'script'));
     if (/\/js\/[^\/]*\.js/.test(ev.filename || '')) falhou((ev.message || 'erro') + ' (' + String(ev.filename).split('/').pop() + ')');
   }, true);
-  setTimeout(function () { falhou('O app demorou demais para começar.'); }, 25000);
+  /* Só no tempo-limite: se o login ou o app já estão na tela, o app subiu
+     (mesmo que por uma cópia anterior do app.js) — não mexe. */
+  setTimeout(function () {
+    var vivo = ['telaLogin', 'app', 'telaNovaSenha'].some(function (id) { var e = document.getElementById(id); return e && !e.hidden; });
+    if (!vivo) falhou('O app demorou demais para começar.');
+  }, 25000);
 })();
 </script>
 <script>
