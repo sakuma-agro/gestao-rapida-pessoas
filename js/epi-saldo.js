@@ -36,10 +36,16 @@ export function ultimaContagemEpi(d, localId, { antesDe = '', ateDia = '', exclu
     .sort((a, b) => b.data.localeCompare(a.data) || (Number(b.c.rodada) || 1) - (Number(a.c.rodada) || 1));
   const u = cands[0];
   if (!u) return null;
-  const qtd = new Map();
+  const qtd = new Map(), lotes = new Map();
   for (const l of unicos(d.linhas)) if (l.contagem_id === u.c.id && l.quantidade !== null && l.quantidade !== '' && l.quantidade !== undefined)
     qtd.set(l.item_id, Number(l.quantidade) || 0);
-  return { contagem: u.c, data: u.data, qtd };
+  // EPI: o lote é o CA (13/11/2026) — quanto de cada CA foi contado
+  for (const l of unicos(d.lotes)) if (l.contagem_id === u.c.id) {
+    if (!lotes.has(l.item_id)) lotes.set(l.item_id, new Map());
+    const m = lotes.get(l.item_id), k = String(l.lote || '').trim();
+    m.set(k, (m.get(k) || 0) + (Number(l.quantidade) || 0));
+  }
+  return { contagem: u.c, data: u.data, qtd, lotes };
 }
 
 /**
@@ -55,7 +61,18 @@ export function saldosEpi(d, localId, { ateDia = '', antesDe = '', excluirContag
   const desde = cont ? cont.data : '';
   const lim = ateDia || (antesDe ? diaAntes(antesDe) : '');
   const r = new Map();
-  const linha = id => { if (!r.has(id)) r.set(id, { base: cont ? (cont.qtd.get(id) || 0) : 0, baseData: desde, entradas: 0, saidas: 0, saldo: 0 }); return r.get(id); };
+  const linha = id => {
+    if (!r.has(id)) {
+      const base = cont ? (cont.qtd.get(id) || 0) : 0;
+      // por CA: o que foi contado em cada lote/CA; o resto (contado sem separar) fica em ''
+      const porCa = new Map();
+      let soma = 0;
+      for (const [k, v] of (cont && cont.lotes.get(id)) || []) { porCa.set(k, (porCa.get(k) || 0) + v); soma += v; }
+      if (base - soma) porCa.set('', (porCa.get('') || 0) + base - soma);
+      r.set(id, { base, baseData: desde, entradas: 0, saidas: 0, saldo: 0, porCa });
+    }
+    return r.get(id);
+  };
   if (cont) for (const id of cont.qtd.keys()) if (epis.has(id)) linha(id);
   for (const m of unicos(d.movimentos)) {
     if (m.local_id !== localId || m.pendente || !epis.has(m.item_id)) continue;
@@ -67,10 +84,13 @@ export function saldosEpi(d, localId, { ateDia = '', antesDe = '', excluirContag
     const q = Number(m.quantidade) || 0;
     const l = linha(m.item_id);
     if (m.sentido === 'entrada') l.entradas += q; else l.saidas += q;
+    const k = String(m.ca || '').trim();
+    l.porCa.set(k, (l.porCa.get(k) || 0) + (m.sentido === 'entrada' ? q : -q));
   }
   for (const l of r.values()) {
     l.entradas = arred(l.entradas); l.saidas = arred(l.saidas);
     l.saldo = arred(l.base + l.entradas - l.saidas);
+    for (const [k, v] of l.porCa) { const a = arred(v); if (a) l.porCa.set(k, a); else l.porCa.delete(k); }
   }
   return r;
 }
@@ -88,6 +108,11 @@ export function tipoDoEpi(nome) {
   s = s.replace(/\s*[-–]?\s*\b(pp|p|m|g|gg|xg|xxg|xgg|xxgg|xxxg|exg|exgg|eg|\d{2})\s*$/i, '');
   return semAcento(s.replace(/[-–\s]+$/, '').replace(/\s+/g, ' '));
 }
+/* CAs de um item ("20213, 20214" → ['20213','20214']). */
+export const casDe = i => String((i && i.ca) || '').split(/[,/;]/).map(x => x.trim()).filter(Boolean);
+/* Saldo de um CA: o separado por CA + o contado sem separar (pode ser de qualquer CA). */
+export const saldoDoCa = (linha, ca) => !linha ? 0 : arred((linha.porCa.get(ca) || 0) + (linha.porCa.get('') || 0));
+
 export function somarPrazo(iso, qtd, unidade) {
   const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z');
   const n = Number(qtd) || 0;

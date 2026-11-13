@@ -9,22 +9,30 @@ import { $, esc, pronto, todos, gravar, aviso, GRUPOS, UNIDADES, itensOrdenados,
 import { estadoCa, conferirCas, linkCa } from '../../js/ca.js';
 
 /* ---- Validade do CA (13/11/2026): mesma função "consulta-ca" do SST › Tipos de EPI.
-   Guarda em est_itens.ca_situacao / ca_validade / ca_conferido_em. Confere sozinho
-   ao abrir Cadastros (o que passou de 7 dias) e pelo botão no Editar. ---- */
+   Um EPI pode ter vários CAs (botina 36: 20213 e 20214) — na contagem cada CA é
+   um lote. A validade mora por CA em est_cas (id = nº do CA). Confere sozinho ao
+   abrir Cadastros (o que passou de 7 dias) e pelo botão no Editar. ---- */
 let conferindoCa = false, jaConferiuCa = false;
+const casDe = i => String((i && i.ca) || '').split(/[,/;]/).map(x => x.trim()).filter(Boolean);
+/* est_cas no formato que o js/ca.js entende ({ ca, ca_situacao, ca_validade… }) */
+const caObj = ca => { const r = todos('est_cas').find(x => x.id === ca) || {};
+  return { ca, ca_situacao: r.situacao, ca_validade: r.validade, ca_equipamento: r.equipamento, ca_fabricante: r.fabricante, ca_conferido_em: r.conferido_em }; };
 function etiquetaCa(i) {
-  if (!i.ca) return '';
-  const est = estadoCa(i);
-  const link = linkCa(i.ca);
-  const num = link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(i.ca)}</a>` : esc(i.ca);
-  return ` · CA ${num}${est.rotulo ? ` <span class="tag ${esc(est.cor)}">${esc(est.rotulo)}</span>` : ''}`;
+  const cas = casDe(i);
+  if (!cas.length) return '';
+  return ' · ' + cas.map(ca => {
+    const est = estadoCa(caObj(ca)), link = linkCa(ca);
+    return `CA ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(ca)}</a>` : esc(ca)}${est.rotulo ? ` <span class="tag ${esc(est.cor)}">${esc(est.rotulo)}</span>` : ''}`;
+  }).join(' · ');
 }
 async function conferirCasItens(forcar, ids) {
   if (conferindoCa || !window.App || !window.App.sb) return null;
-  const alvos = todos('est_itens').filter(i => i.ca && i.ativo !== false && (!ids || ids.includes(i.id)));
+  const cas = [...new Set(todos('est_itens').filter(i => i.ativo !== false && (!ids || ids.includes(i.id))).flatMap(casDe))];
   conferindoCa = true;
   try {
-    return await conferirCas(window.App.sb, alvos, { forcar }, r => gravar('est_itens', r));
+    return await conferirCas(window.App.sb, cas.map(caObj), { forcar }, r => gravar('est_cas', Object.assign({},
+      todos('est_cas').find(x => x.id === r.ca) || {}, { id: r.ca, situacao: r.ca_situacao, validade: r.ca_validade,
+        equipamento: r.ca_equipamento, fabricante: r.ca_fabricante, conferido_em: r.ca_conferido_em, ativo: true })));
   } finally { conferindoCa = false; }
 }
 async function conferirCaAoAbrir() {
@@ -60,7 +68,8 @@ function lerTroca(f, i) {
   return { troca_qtd: q > 0 ? q : null, troca_unidade: q > 0 ? (f.get('troca_unidade') || 'meses') : null, lavagens_max: l > 0 ? l : null };
 }
 function resumoCas(itens) {
-  const est = itens.filter(i => i.ca && i.ativo !== false).map(i => estadoCa(i).chave);
+  const cas = [...new Set(itens.filter(i => i.ativo !== false).flatMap(casDe))];
+  const est = cas.map(ca => estadoCa(caObj(ca)).chave);
   const venc = est.filter(c => c === 'vencido' || c === 'irregular').length, perto = est.filter(c => c === 'vencendo').length;
   if (!venc && !perto) return '';
   return `<span class="cad-ca-resumo">${venc ? `<span class="tag perigo">${venc} CA${venc > 1 ? 's' : ''} vencido${venc > 1 ? 's' : ''}</span> ` : ''}${
@@ -191,7 +200,7 @@ function desenharItens() {
       <label class="campo">Estoque mínimo <input type="text" name="minimo" inputmode="decimal" placeholder="ex.: 10"></label>
       <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal" placeholder="quanto pedir"></label>
       <label class="campo">Código <input type="text" name="codigo" placeholder="código do sistema"></label>
-      <label class="campo">CA (EPI) <input type="text" name="ca" placeholder="ex.: 42291"></label>
+      <label class="campo">CA (EPI) <input type="text" name="ca" placeholder="ex.: 20213, 20214"></label>
       <label class="campo">Localização (prateleira) <input type="text" name="localizacao" placeholder="ex.: A.1"></label>
       ${caixasLocais(null)}
       <div class="barra fim" style="align-self:end"><button class="btn principal" type="submit">Adicionar</button></div>
@@ -235,7 +244,7 @@ function desenharItens() {
     if (onde && !onde.length) { aviso('Marque pelo menos um estoque em "Contado em".', true); return; }
     await gravar('est_itens', { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
       estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde, ativo: true,
-      codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null,
+      codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').split(/[,/;\s]+/).filter(Boolean).join(', ') || null,
       localizacao: String(f.get('localizacao') || '').trim() || null });
     aviso('Item adicionado.');
     desenharItens();
@@ -272,13 +281,13 @@ function editarItem(id) {
         <label class="campo">Pedido de reposição <input type="text" name="pedido" inputmode="decimal"
           value="${esc(mostrarNumero(i.pedido_reposicao))}" placeholder="quanto pedir"></label>
         <label class="campo">Código <input type="text" name="codigo" value="${esc(i.codigo || '')}" placeholder="código do sistema"></label>
-        <label class="campo">CA (EPI) <input type="text" name="ca" value="${esc(i.ca || '')}" placeholder="ex.: 42291"></label>
+        <label class="campo">CA (EPI) <input type="text" name="ca" value="${esc(i.ca || '')}" placeholder="ex.: 20213, 20214"></label>
         <label class="campo">Localização (prateleira) <input type="text" name="localizacao" value="${esc(i.localizacao || '')}" placeholder="ex.: A.1"></label>
       </div>
       ${caixasLocais(i.locais_contagem)}
-      ${i.ca ? `<p class="cad-ca-val" id="cadCaVal">Validade do CA: ${etiquetaCa(i).replace(/^ · CA /, '') || '—'}${
-        i.ca_conferido_em ? ` <small class="dc-sem">conferido em ${esc(new Date(i.ca_conferido_em).toLocaleDateString('pt-BR'))}</small>` : ''}
-        <button class="btn mini" type="button" id="cadCaConferir">Conferir no ConsultaCA</button></p>` : ''}
+      ${i.ca ? `<p class="cad-ca-val" id="cadCaVal">Validade do CA: ${etiquetaCa(i).replace(/^ · /, '')}
+        <button class="btn mini" type="button" id="cadCaConferir">Conferir no ConsultaCA</button></p>
+        <p class="dc-sem" style="margin-top:-4px">Mais de um CA? Separe por vírgula (ex.: 20213, 20214). Na contagem, cada CA vira um lote.</p>` : ''}
       ${quadroMinimos(i)}
       ${blocoAgrofit(i)}
       <p class="dc-sem">Quando a contagem der igual ou abaixo do mínimo, o item aparece na Reposição com a quantidade a pedir.</p>
@@ -302,7 +311,7 @@ function editarItem(id) {
       if (!(await gravarMinimos(e.target, id))) { aviso('Mínimo por fazenda: use só números (ex.: 10 ou 2,5).', true); return; }
       await gravar('est_itens', Object.assign({}, i, { nome, unidade: f.get('unidade'), grupo: f.get('grupo'),
         estoque_minimo: minimo, pedido_reposicao: pedido, locais_contagem: onde,
-        codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').trim() || null,
+        codigo: String(f.get('codigo') || '').trim() || null, ca: String(f.get('ca') || '').split(/[,/;\s]+/).filter(Boolean).join(', ') || null,
         localizacao: String(f.get('localizacao') || '').trim() || null }, lerTroca(f, i)));
       window.fecharModal(); desenharItens();
     });

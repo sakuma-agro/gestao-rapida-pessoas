@@ -15,7 +15,7 @@
 import { estado } from './store.js';
 import { mostrar } from './jornada-relatorios.js';
 import { entregasDeEpi } from './sst-epi-mov.js';
-import { semAcento, somarPrazo } from './epi-saldo.js';
+import { semAcento, somarPrazo, casDe } from './epi-saldo.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -250,7 +250,7 @@ function dialogoConjuntos(fid) {
       <label class="campo">Fornecido em <input type="date" id="lvForn" value="${esc(sug ? sug.e.data : hoje())}"></label>
       <label class="campo plena">EPI (vestimenta) <select id="lvItem"><option value="">— outro / sem cadastro —</option>
         ${vests.map(i => `<option value="${esc(i.id)}"${sug && sug.it.id === i.id ? ' selected' : ''}>${esc(i.nome)}</option>`).join('')}</select></label>
-      <label class="campo">CA <input type="text" id="lvCa" value="${esc(sug ? sug.it.ca || '' : '')}"></label>
+      <label class="campo">CA <input type="text" id="lvCa" value="${esc(sug ? sug.l.ca || casDe(sug.it)[0] || '' : '')}"></label>
       <label class="campo">Limite de lavagens <input type="number" id="lvLim" min="1" step="1" placeholder="do cadastro do EPI"></label>
     </div>
     <p class="dica" id="lvAvisoC" style="margin:6px 0 0"></p>
@@ -260,7 +260,7 @@ function dialogoConjuntos(fid) {
     </div></form>`);
   const ocupado = n => todos.some(c => !c.trocado_em && Number(c.numero) === n);
   $('lvNum').value = ocupado(1) && !ocupado(2) ? '2' : '1';
-  $('lvItem').addEventListener('change', () => { const it = itemDe($('lvItem').value); if (it) { $('lvCa').value = it.ca || ''; $('lvLim').placeholder = it.lavagens_max ? `${it.lavagens_max} (do cadastro)` : 'sem limite no cadastro'; } });
+  $('lvItem').addEventListener('change', () => { const it = itemDe($('lvItem').value); if (it) { if (!casDe(it).includes($('lvCa').value)) $('lvCa').value = casDe(it)[0] || ''; $('lvLim').placeholder = it.lavagens_max ? `${it.lavagens_max} (do cadastro)` : 'sem limite no cadastro'; } });
   $('lvItem').dispatchEvent(new Event('change'));
   d.querySelectorAll('[data-trocar]').forEach(b => b.addEventListener('click', async () => {
     const quando = prompt('Data da troca (dd/mm/aaaa):', br(hoje()));

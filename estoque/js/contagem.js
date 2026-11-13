@@ -562,25 +562,33 @@ function ligarEscolha() {
    =================================================================== */
 const vencido = lotes => lotes.some(l => l.validade && String(l.validade).slice(0, 10) < hojeISO());
 
-function linhaLote(l, fechada) {
+/* EPI (13/11/2026, pedido dele): o "lote" do EPI é o CA. A botina 36 tem 2
+   CAs → um lote para cada, com a validade do CA (est_cas) já preenchida. */
+const ehEpi = item => !!item && item.grupo === 'EPIs';
+const casDoItem = item => String((item && item.ca) || '').split(/[,/;]/).map(s => s.trim()).filter(Boolean);
+const validadeDoCa = ca => { const r = todos('est_cas').find(x => x.id === String(ca).trim()); return r && r.validade ? String(r.validade).slice(0, 10) : ''; };
+function linhaLote(l, fechada, item) {
+  const epi = ehEpi(item);
   const venc = l.validade && String(l.validade).slice(0, 10) < hojeISO();
   if (fechada) return `<div class="ct-lote fixo">
-      <span>${esc(l.lote || 'sem nº')}</span>
+      <span>${epi ? 'CA ' : ''}${esc(l.lote || 'sem nº')}</span>
       <span class="${venc ? 'ct-venc' : ''}">${l.validade ? 'val. ' + esc(dataBR(l.validade)) : 'sem validade'}${venc ? ' · vencido' : ''}</span>
       <strong>${esc(mostrarNumero(l.quantidade))}</strong></div>`;
   return `<div class="ct-lote${venc ? ' vencido' : ''}" data-lote="${esc(l.id)}">
-      <label>Lote <input type="text" class="cl-lote" value="${esc(l.lote || '')}" placeholder="nº do lote" autocomplete="off"></label>
-      <label>Validade <input type="date" class="cl-val" value="${esc(l.validade ? String(l.validade).slice(0, 10) : '')}"></label>
+      <label>${epi ? 'CA' : 'Lote'} <input type="text" class="cl-lote" value="${esc(l.lote || '')}" placeholder="${epi ? 'nº do CA' : 'nº do lote'}" autocomplete="off"${epi ? ` list="cas-${esc(item.id)}"` : ''}></label>
+      <label>${epi ? 'Validade do CA' : 'Validade'} <input type="date" class="cl-val" value="${esc(l.validade ? String(l.validade).slice(0, 10) : '')}"></label>
       <label>Quantidade <input type="text" class="cl-qtd" inputmode="decimal" value="${esc(mostrarNumero(l.quantidade))}" placeholder="—" autocomplete="off"></label>
       <button type="button" class="cl-tirar" title="Tirar este lote" aria-label="Tirar este lote">×</button>
     </div>`;
 }
 
 function desenharLotes(item, lotes, fechada) {
-  return `${lotes.map(l => linhaLote(l, fechada)).join('') || (fechada ? '<p class="dc-sem">Sem lotes separados.</p>' : '')}
+  const epi = ehEpi(item);
+  return `${epi ? `<datalist id="cas-${esc(item.id)}">${casDoItem(item).map(c => `<option value="${esc(c)}">`).join('')}</datalist>` : ''}
+    ${lotes.map(l => linhaLote(l, fechada, item)).join('') || (fechada ? `<p class="dc-sem">${epi ? 'Sem separação por CA.' : 'Sem lotes separados.'}</p>` : '')}
     ${fechada ? '' : `<div class="ct-lotes-pe">
-      <button type="button" class="btn mini" data-novo-lote="${esc(item.id)}">+ Adicionar lote</button>
-      <span class="dc-sem">${lotes.length ? 'O total do item é a soma dos lotes.' : 'Use quando o produto tiver lotes ou vencimentos diferentes.'}</span>
+      <button type="button" class="btn mini" data-novo-lote="${esc(item.id)}">${epi ? '+ Adicionar CA' : '+ Adicionar lote'}</button>
+      <span class="dc-sem">${lotes.length ? 'O total do item é a soma dos lotes.' : epi ? 'Separe a quantidade por CA (cada CA vira um lote).' : 'Use quando o produto tiver lotes ou vencimentos diferentes.'}</span>
     </div>`}`;
 }
 
@@ -604,6 +612,13 @@ function ligarLotes(raiz) {
 }
 
 function ligarLinhaLote(div) {
+  // EPI: escolheu o CA → a validade do CA entra sozinha (antes de gravar)
+  const it = todos('est_itens').find(x => x.id === div.closest('.ct-item')?.dataset.item);
+  if (ehEpi(it)) div.querySelector('.cl-lote').addEventListener('change', () => {
+    const v = div.querySelector('.cl-val');
+    const val = validadeDoCa(div.querySelector('.cl-lote').value);
+    if (val && !v.value) v.value = val;
+  });
   div.querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => salvarLote(div)));
   div.querySelector('.cl-qtd').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
@@ -618,12 +633,22 @@ function novoLote(itemId) {
   const pe = bloco.querySelector('.ct-lotes-pe');
   const primeiro = !bloco.querySelector('.ct-lote');
   const totalAtual = primeiro ? lerNumero(bloco.querySelector('.ct-qtd').value) : null;
-  const tmp = document.createElement('div');
-  tmp.innerHTML = linhaLote({ id: crypto.randomUUID(), quantidade: Number.isNaN(totalAtual) ? null : totalAtual }, false);
-  const div = tmp.firstElementChild;
-  pe.before(div);
-  ligarLinhaLote(div);
-  div.querySelector('.cl-lote').focus();
+  const item = todos('est_itens').find(x => x.id === itemId);
+  // EPI na primeira abertura: uma linha para cada CA do cadastro, já com o CA e a validade
+  const usados = new Set([...bloco.querySelectorAll('.cl-lote')].map(i => i.value.trim()));
+  const cas = ehEpi(item) ? casDoItem(item).filter(c => !usados.has(c)) : [];
+  const novos = primeiro && cas.length > 1 ? cas : [cas[0] || ''];
+  let div = null;
+  novos.forEach((ca, k) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = linhaLote({ id: crypto.randomUUID(), lote: ca || null, validade: ca ? validadeDoCa(ca) || null : null,
+      quantidade: k === 0 && !Number.isNaN(totalAtual) ? totalAtual : null }, false, item);
+    const d = tmp.firstElementChild;
+    pe.before(d);
+    ligarLinhaLote(d);
+    if (k === 0) div = d;
+  });
+  (ehEpi(item) && cas.length ? div.querySelector('.cl-qtd') : div.querySelector('.cl-lote')).focus();
   if (primeiro && totalAtual !== null && !Number.isNaN(totalAtual)) salvarLote(div);
 }
 

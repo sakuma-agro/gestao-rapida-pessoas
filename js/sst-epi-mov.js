@@ -17,7 +17,7 @@ import { acesso } from './acesso.js';
 import { montarFicha, linhaVazia } from './ficha.js';
 import { mostrar } from './jornada-relatorios.js';
 import { estadoCa, caReprovado } from './ca.js';
-import { saldosEpi, ehQuebraCocao, semAcento, tipoDoEpi, somarPrazo } from './epi-saldo.js';
+import { saldosEpi, ehQuebraCocao, semAcento, tipoDoEpi, somarPrazo, casDe, saldoDoCa } from './epi-saldo.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -35,7 +35,7 @@ export const TELAS_EPI_MOV = ['epiSaida', 'epiEntrada', 'epiSaldo'];
 /* ===================================================================
    DADOS — lidos direto do banco (precisa de internet)
    =================================================================== */
-const D = { locais: [], itens: [], movimentos: [], contagens: [], grupos: [], linhas: [], minimos: [], lido: 0, erro: '' };
+const D = { locais: [], itens: [], movimentos: [], contagens: [], grupos: [], linhas: [], lotes: [], minimos: [], cas: [], lido: 0, erro: '' };
 async function tudo(tabela, colunas = '*', filtro) {
   let saida = [];
   for (let de = 0; ; de += 1000) {
@@ -52,7 +52,7 @@ async function carregar(forcar) {
   if (!forcar && D.lido && Date.now() - D.lido < 60000) return;
   if (!estado.cliente) { D.erro = 'sem conexão com o banco'; return; }
   try {
-    const [locais, itens, movimentos, contagens, grupos, linhas, minimos] = await Promise.all([
+    const [locais, itens, movimentos, contagens, grupos, linhas, minimos, lotes, cas] = await Promise.all([
       tudo('est_locais', '*', q => q.eq('ativo', true).order('ordem')),
       tudo('est_itens', 'id,nome,unidade,grupo,ca,ca_situacao,ca_validade,ca_conferido_em,troca_qtd,troca_unidade,lavagens_max,estoque_minimo,pedido_reposicao,locais_contagem,codigo,ativo', q => q.eq('grupo', 'EPIs')),
       tudo('est_movimentos', '*', q => q.order('data')),
@@ -60,11 +60,13 @@ async function carregar(forcar) {
       tudo('est_contagem_grupos', '*', q => q.eq('grupo', 'EPIs')),
       tudo('est_contagem_itens', 'id,contagem_id,item_id,quantidade'),
       tudo('est_minimos'),
+      tudo('est_contagem_lotes', 'id,contagem_id,item_id,lote,validade,quantidade,ativo'),
+      tudo('est_cas'),
     ]);
     const ids = new Set(itens.map(i => i.id));
     Object.assign(D, { locais, itens, contagens, grupos, minimos,
       movimentos: movimentos.filter(m => ids.has(m.item_id)),
-      linhas: linhas.filter(l => ids.has(l.item_id)), lido: Date.now(), erro: '' });
+      linhas: linhas.filter(l => ids.has(l.item_id)), lotes: lotes.filter(l => ids.has(l.item_id)), cas, lido: Date.now(), erro: '' });
   } catch (e) {
     console.error(e);
     D.erro = (e && (e.message || e.details)) || String(e);
@@ -82,6 +84,24 @@ const minimoDe = (item, localId) => {
   return v === null || v === undefined || v === '' ? null : Number(v);
 };
 const nomeSemCa = n => String(n || '').replace(/\s*\(\s*ca[^)]*\)/ig, '').replace(/\s+/g, ' ').trim();
+/* Validade por CA (est_cas) no formato do js/ca.js. */
+const caObj = ca => { const r = D.cas.find(x => x.id === ca) || {};
+  return { ca, ca_situacao: r.situacao, ca_validade: r.validade, ca_conferido_em: r.conferido_em }; };
+/* CAs para escolher na entrega/entrada: os do cadastro + algum que tenha saldo,
+   com o saldo e a validade. Padrão: válido com saldo e validade mais curta. */
+function opcoesCa(item, linhaSaldo) {
+  const lista = [...new Set([...casDe(item), ...[...((linhaSaldo && linhaSaldo.porCa) || new Map()).keys()].filter(Boolean)])];
+  return lista.map(ca => {
+    const e = estadoCa(caObj(ca));
+    return { ca, tem: linhaSaldo && linhaSaldo.porCa ? (linhaSaldo.porCa.get(ca) || 0) : 0, est: e, ruim: ['vencido', 'irregular'].includes(e.chave),
+      validade: (D.cas.find(x => x.id === ca) || {}).validade || '9999-12-31' };
+  });
+}
+function caPadrao(ops) {
+  const bons = ops.filter(o => !o.ruim);
+  const comSaldo = bons.filter(o => o.tem > 0).sort((a, b) => String(a.validade).localeCompare(String(b.validade)));
+  return (comSaldo[0] || bons[0] || ops[0] || {}).ca || '';
+}
 
 /* Estoque padrão do funcionário: a fazenda do cadastro. */
 function localDoFunc(f) {
@@ -169,7 +189,7 @@ function fichaHtml(e) {
   const dt = new Date(e.data + 'T12:00:00');
   const linhas = e.linhas.map(l => {
     const it = itemDe(l.item_id);
-    return { ...linhaVazia(), faz: l.faz || faz, data: br(e.data), qtd: mostra(l.quantidade), ca: it.ca || '',
+    return { ...linhaVazia(), faz: l.faz || faz, data: br(e.data), qtd: mostra(l.quantidade), ca: l.ca || casDe(it)[0] || '',
       descricao: nomeSemCa(it.nome).toUpperCase(), mer: l.mer || '' };
   });
   const n = Math.max(linhas.length, Number(m.linhas_padrao) || 20);
@@ -278,7 +298,7 @@ function telaSaida(tela) {
     <div class="epm-lista">
     ${vis.length ? vis.map(e => `<div class="epm-ent">
       <div class="epm-ent-txt"><b>${esc(e.funcionario)}</b> <span class="dc-sem">${br(e.data)} · ${esc(localDe(e.local_id).nome)}</span><br>
-        <span class="epm-ent-itens">${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(nomeSemCa(itemDe(l.item_id).nome))}`).join(' · ')}</span></div>
+        <span class="epm-ent-itens">${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(nomeSemCa(itemDe(l.item_id).nome))}${l.ca ? ` <span class="dc-sem">CA ${esc(l.ca)}</span>` : ''}`).join(' · ')}</span></div>
       <div class="epm-ent-acoes">
         <button class="btn mini" type="button" data-epm-ficha="${esc(e.id)}">🖨 Ficha</button>
         ${e.assinada ? `<button class="btn mini epm-ok" type="button" data-epm-assinar="${esc(e.id)}" title="Desmarcar">✓ Assinada</button>`
@@ -376,9 +396,19 @@ function ligarForm() {
   const infoItem = l => {
     const it = l.item ? itemPeloNome(l.item, localAtual()) : null;
     if (!it) return l.item ? '<span class="es-num-falta">não está no cadastro de EPIs</span>' : '';
-    const s = (sal.get(it.id) || {}).saldo || 0, ca = estadoCa(it);
-    const ruim = ['vencido', 'irregular'].includes(ca.chave);
-    return `${it.ca ? `<span class="${ruim ? 'es-num-falta' : ''}">CA ${esc(it.ca)}${ruim ? ' ' + esc(ca.rotulo) : ''}</span> · ` : ''}<span class="${s <= 0 ? 'es-num-falta' : ''}">tem ${esc(mostra(s))} ${esc(it.unidade || '')}</span>`;
+    const ls = sal.get(it.id), s = (ls || {}).saldo || 0, semCa = ls ? (ls.porCa.get('') || 0) : 0;
+    return `<span class="${s <= 0 ? 'es-num-falta' : ''}">tem ${esc(mostra(s))} ${esc(it.unidade || '')} no estoque</span>${semCa && casDe(it).length > 1 ? ` · ${esc(mostra(semCa))} contado${semCa === 1 ? '' : 's'} sem separar o CA` : ''}`;
+  };
+  /* CA da linha: só os CAs daquele EPI, com saldo e validade; já vem o padrão. */
+  const caSel = (l, i) => {
+    const it = l.item ? itemPeloNome(l.item, localAtual()) : null;
+    if (!it) return `<select data-l="${i}" data-c="ca" disabled><option>—</option></select>`;
+    const ops = opcoesCa(it, sal.get(it.id));
+    if (!ops.length) return `<select data-l="${i}" data-c="ca" disabled><option value="">sem CA no cadastro</option></select>`;
+    if (!l.ca || !ops.some(o => o.ca === l.ca)) l.ca = caPadrao(ops);
+    const ord = [...ops].sort((a, b) => (a.ruim - b.ruim) || (b.tem > 0) - (a.tem > 0) || String(a.validade).localeCompare(String(b.validade)));
+    return `<select data-l="${i}" data-c="ca" class="${ops.find(o => o.ca === l.ca)?.ruim ? 'epm-ca-ruim' : ''}">${ord.map(o =>
+      `<option value="${esc(o.ca)}"${o.ca === l.ca ? ' selected' : ''}>CA ${esc(o.ca)} · tem ${esc(mostra(o.tem))}${o.ruim ? ' · ' + esc(o.est.rotulo) : o.est.chave === 'vencendo' ? ' · ' + esc(o.est.rotulo) : ''}</option>`).join('')}</select>`;
   };
   const merSel = (l, i) => `<select data-l="${i}" data-c="mer" class="epm-mer" title="Motivo (M.E.R) — sai na ficha">${mot.map(m =>
     `<option value="${esc(m.cod)}"${l.mer === m.cod ? ' selected' : ''}>${esc(m.cod)} · ${esc(MER_CURTO[m.cod] || m.texto)}</option>`).join('')}</select>`;
@@ -386,21 +416,31 @@ function ligarForm() {
     $('epmLinhas').innerHTML = FORM.linhas.map((l, i) => `<div class="epm-linha">
       <label class="campo epm-epi">${i ? '' : 'EPI'}<input type="text" list="epmItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="digite o EPI">
         <small data-info="${i}">${infoItem(l)}</small></label>
+      <label class="campo epm-ca">${i ? '' : 'CA'}<span data-casel="${i}">${caSel(l, i)}</span></label>
       <label class="campo epm-qtd">${i ? '' : 'Qtd'}<input type="number" min="1" step="1" inputmode="numeric" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}"></label>
       <label class="campo epm-mot">${i ? '' : 'Motivo'}${merSel(l, i)}</label>
       ${FORM.linhas.length > 1 ? `<button class="btn mini epm-x" type="button" data-tirar="${i}" title="Tirar este EPI">✕</button>` : '<span class="epm-x"></span>'}
     </div>`).join('');
-    $('epmLinhas').querySelectorAll('[data-l]').forEach(inp => {
+    FORM.linhas.forEach((_, i) => ligarCa(i));
+    $('epmLinhas').querySelectorAll('[data-l]:not([data-c="ca"])').forEach(inp => {
       const ev = inp.tagName === 'SELECT' ? 'change' : 'input';
       inp.addEventListener(ev, () => { FORM.linhas[+inp.dataset.l][inp.dataset.c] = inp.value; });
       if (inp.dataset.c === 'item') inp.addEventListener('change', () => {
         const i = +inp.dataset.l, l = FORM.linhas[i], f = funcSel(), it = itemPeloNome(inp.value, localAtual());
         if (it && !l.merManual) { l.mer = f && jaRecebeu(f.id, it) ? '1' : '4'; $('epmLinhas').querySelector(`select[data-l="${i}"]`).value = l.mer; }
         $('epmLinhas').querySelector(`[data-info="${i}"]`).innerHTML = infoItem(l);
+        l.ca = '';
+        $('epmLinhas').querySelector(`[data-casel="${i}"]`).innerHTML = caSel(l, i);
+        ligarCa(i);
       });
       if (inp.dataset.c === 'mer') inp.addEventListener('change', () => { FORM.linhas[+inp.dataset.l].merManual = true; });
     });
     $('epmLinhas').querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', () => { FORM.linhas.splice(+b.dataset.tirar, 1); desenharLinhas(); }));
+  };
+  // o select do CA é refeito quando o EPI muda; liga de novo
+  const ligarCa = i => {
+    const sel = $('epmLinhas').querySelector(`select[data-c="ca"][data-l="${i}"]`);
+    if (sel) sel.addEventListener('change', () => { FORM.linhas[i].ca = sel.value; sel.className = /vencido|irregular|suspenso|cancelado/i.test(sel.selectedOptions[0]?.text || '') ? 'epm-ca-ruim' : ''; });
   };
   const trocarLocal = () => {
     sal = saldosDo(localAtual());
@@ -441,21 +481,23 @@ function ligarForm() {
       const q = num(l.qtd);
       if (!it) { aviso(`"${l.item}" não está no cadastro de EPIs do Estoque.`); return; }
       if (!(q > 0)) { aviso(`Quantidade inválida em ${nomeSemCa(it.nome)}.`); return; }
-      boas.push({ it, q, mer: l.mer || '4' });
+      const ca = l.ca || casDe(it)[0] || '';
+      if (casDe(it).length > 1 && !ca) { aviso(`Escolha o CA de ${nomeSemCa(it.nome)}.`); return; }
+      boas.push({ it, q, mer: l.mer || '4', ca });
     }
     if (!boas.length) { aviso('Escolha pelo menos um EPI.'); return; }
-    const faltam = boas.filter(b => ((sal.get(b.it.id) || {}).saldo || 0) < b.q);
-    const vencidos = boas.filter(b => caReprovado(b.it));
+    const faltam = boas.filter(b => saldoDoCa(sal.get(b.it.id), b.ca) < b.q);
+    const vencidos = boas.filter(b => b.ca && caReprovado(caObj(b.ca)));
     const avisos = [];
-    if (faltam.length) avisos.push(`O estoque ${local.nome} não tem o suficiente de: ${faltam.map(b => nomeSemCa(b.it.nome)).join(', ')}.`);
-    if (vencidos.length) avisos.push(`CA vencido ou irregular: ${vencidos.map(b => `${nomeSemCa(b.it.nome)} (CA ${b.it.ca})`).join(', ')}.`);
+    if (faltam.length) avisos.push(`O estoque ${local.nome} não tem o suficiente de: ${faltam.map(b => `${nomeSemCa(b.it.nome)}${b.ca ? ' (CA ' + b.ca + ')' : ''}`).join(', ')}.`);
+    if (vencidos.length) avisos.push(`CA vencido ou irregular: ${vencidos.map(b => `${nomeSemCa(b.it.nome)} (CA ${b.ca})`).join(', ')}.`);
     if (avisos.length && !confirm(avisos.join('\n\n') + '\n\nSalvar a entrega mesmo assim?')) return;
     $('epmSalvar').disabled = true;
     const lanc = crypto.randomUUID();
     const faz = letraFaz(local);
     const rows = boas.map(b => ({ id: crypto.randomUUID(), local_id: localId, data, sentido: 'saida', tipo: 'uso', item_id: b.it.id,
       quantidade: b.q, documento: 'Ficha de EPI', funcionario_id: f.id, funcionario: f.nome, operador: quem(), criado_por: quem(),
-      lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz, ficha_assinada: false }));
+      lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz, ficha_assinada: false, ca: b.ca || null }));
     const r = await estado.cliente.from('est_movimentos').insert(rows).select();
     if (r.error) { aviso('Não consegui gravar: ' + r.error.message); $('epmSalvar').disabled = false; return; }
     D.movimentos.push(...(r.data || rows));
@@ -482,7 +524,7 @@ function telaEntrada(tela) {
     <div class="tc-rolo"><table class="dc-planilha"><thead><tr><th>Data</th><th>Estoque</th><th>Tipo</th><th>NF / doc.</th><th>Origem</th><th>EPIs</th><th style="width:1%"></th></tr></thead><tbody>
     ${todas.length ? todas.map(e => `<tr><td>${br(e.data)}</td><td>${esc(localDe(e.local_id).nome)}</td><td>${esc(TIPOS_ENT[e.tipo] || e.tipo || '—')}</td>
       <td>${esc(e.documento || '—')}</td><td>${esc(e.fornecedor || '—')}</td>
-      <td>${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(itemDe(l.item_id).unidade || '')} · ${esc(nomeSemCa(itemDe(l.item_id).nome))}`).join('<br>')}</td>
+      <td>${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(itemDe(l.item_id).unidade || '')} · ${esc(nomeSemCa(itemDe(l.item_id).nome))}${l.ca ? ` <span class="dc-sem">CA ${esc(l.ca)}</span>` : ''}`).join('<br>')}</td>
       <td>${admin() ? `<button class="btn mini perigo" type="button" data-epe-cancelar="${esc(e.id)}">Cancelar</button>` : ''}</td></tr>`).join('')
       : '<tr><td colspan="7" class="dc-sem">Nenhuma entrada neste mês.</td></tr>'}
     </tbody></table></div>
@@ -509,7 +551,7 @@ function dialogoEntrada() {
       <label class="campo">NF / documento <input type="text" id="epeDoc" placeholder="nº da nota"></label>
       <label class="campo plena">Origem <input type="text" id="epeOrigem" placeholder="fornecedor, fazenda de origem ou funcionário"></label>
     </div>
-    <table class="dc-planilha epm-linhas"><thead><tr><th>EPI</th><th style="width:90px">Qtd</th><th style="width:110px">R$ unitário</th><th style="width:1%"></th></tr></thead><tbody id="epeLinhas"></tbody></table>
+    <table class="dc-planilha epm-linhas"><thead><tr><th>EPI</th><th style="width:150px">CA</th><th style="width:80px">Qtd</th><th style="width:100px">R$ unitário</th><th style="width:1%"></th></tr></thead><tbody id="epeLinhas"></tbody></table>
     <datalist id="epeItens"></datalist>
     <div class="barra" style="margin:6px 0"><button class="btn mini" type="button" id="epeMais">+ EPI</button></div>
     <p class="dica" id="epeAviso" style="margin:6px 0 0"></p>
@@ -517,13 +559,28 @@ function dialogoEntrada() {
       <button class="btn" type="button" data-fechar>Cancelar</button>
       <button class="btn principal" type="submit" id="epeSalvar">Salvar entrada</button>
     </div></form>`);
+  /* CA que está entrando: os CAs do cadastro do EPI (o padrão é o primeiro válido) */
+  const caEnt = (l, i) => {
+    const it = l.item ? itemPeloNome(l.item, $('epeLocal').value) : null;
+    if (!it) return `<select disabled style="width:100%"><option>—</option></select>`;
+    const ops = opcoesCa(it, null);
+    if (!ops.length) return '<span class="dc-sem">sem CA</span>';
+    if (!l.ca || !ops.some(o => o.ca === l.ca)) l.ca = (ops.find(o => !o.ruim) || ops[0]).ca;
+    return `<select data-l="${i}" data-c="ca" style="width:100%">${ops.map(o => `<option value="${esc(o.ca)}"${o.ca === l.ca ? ' selected' : ''}>${esc(o.ca)}${o.ruim ? ' · ' + esc(o.est.rotulo) : ''}</option>`).join('')}</select>`;
+  };
   const desenharL = () => {
     $('epeLinhas').innerHTML = linhas.map((l, i) => `<tr>
       <td><input type="text" list="epeItens" data-l="${i}" data-c="item" value="${esc(l.item)}" placeholder="escolha o EPI" style="width:100%"></td>
+      <td data-ecasel="${i}">${caEnt(l, i)}</td>
       <td><input type="text" inputmode="decimal" data-l="${i}" data-c="qtd" value="${esc(l.qtd)}" style="width:100%"></td>
       <td><input type="text" inputmode="decimal" data-l="${i}" data-c="valor" value="${esc(l.valor)}" placeholder="opcional" style="width:100%"></td>
       <td>${linhas.length > 1 ? `<button class="btn mini" type="button" data-tirar="${i}">✕</button>` : ''}</td></tr>`).join('');
-    $('epeLinhas').querySelectorAll('[data-l]').forEach(inp => inp.addEventListener('change', () => { linhas[+inp.dataset.l][inp.dataset.c] = inp.value; }));
+    $('epeLinhas').querySelectorAll('[data-l]').forEach(inp => inp.addEventListener('change', () => {
+      const i = +inp.dataset.l;
+      linhas[i][inp.dataset.c] = inp.value;
+      if (inp.dataset.c === 'item') { linhas[i].ca = ''; const td = $('epeLinhas').querySelector(`[data-ecasel="${i}"]`); td.innerHTML = caEnt(linhas[i], i);
+        td.querySelector('select')?.addEventListener('change', ev => { linhas[i].ca = ev.target.value; }); }
+    }));
     $('epeLinhas').querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', () => { linhas.splice(+b.dataset.tirar, 1); desenharL(); }));
   };
   const trocar = () => { $('epeItens').innerHTML = opcoesItens($('epeLocal').value, saldosDo($('epeLocal').value)); };
@@ -540,13 +597,13 @@ function dialogoEntrada() {
       if (!it) { $('epeAviso').textContent = `"${l.item}" não está no cadastro de EPIs do Estoque.`; return; }
       if (!(q > 0)) { $('epeAviso').textContent = `Quantidade inválida em ${it.nome}.`; return; }
       if (v !== null && !(v >= 0)) { $('epeAviso').textContent = `Valor inválido em ${it.nome}.`; return; }
-      boas.push({ it, q, v });
+      boas.push({ it, q, v, ca: l.ca || casDe(it)[0] || null });
     }
     if (!boas.length) { $('epeAviso').textContent = 'Escolha pelo menos um EPI.'; return; }
     $('epeSalvar').disabled = true;
     const lanc = crypto.randomUUID(), origem = $('epeOrigem').value.trim() || null;
     const rows = boas.map(b => ({ id: crypto.randomUUID(), local_id: localId, data: $('epeData').value, sentido: 'entrada',
-      tipo: tipo === 'devolucao' ? 'transferencia' : tipo, item_id: b.it.id, quantidade: b.q, valor_unitario: b.v,
+      tipo: tipo === 'devolucao' ? 'transferencia' : tipo, item_id: b.it.id, quantidade: b.q, valor_unitario: b.v, ca: b.ca,
       documento: $('epeDoc').value.trim() || (tipo === 'devolucao' ? 'Devolução' : null),
       fornecedor: tipo === 'compra' ? origem : null, outra_fazenda: tipo !== 'compra' ? origem : null,
       operador: quem(), criado_por: quem(), lancamento_id: lanc, ativo: true, origem: 'epi',
@@ -565,7 +622,7 @@ function telaSaldo(tela) {
   const sal = saldosDo(F.local);
   const q = semAcento(F.busca);
   const linhas = ativos(D.itens).filter(i => contaNoLocal(i, F.local) || sal.has(i.id))
-    .map(i => ({ i, s: sal.get(i.id) || { base: 0, baseData: '', entradas: 0, saidas: 0, saldo: 0 }, min: minimoDe(i, F.local) }))
+    .map(i => ({ i, s: sal.get(i.id) || { base: 0, baseData: '', entradas: 0, saidas: 0, saldo: 0, porCa: new Map() }, min: minimoDe(i, F.local) }))
     .filter(x => (!q || semAcento(x.i.nome + ' ' + (x.i.ca || '')).includes(q)) && (!F.soMin || (x.min !== null && x.s.saldo <= x.min)))
     .sort((a, b) => a.i.nome.localeCompare(b.i.nome, 'pt-BR'));
   const baseData = [...sal.values()].map(v => v.baseData).find(Boolean) || '';
@@ -593,10 +650,12 @@ function telaSaldo(tela) {
       <th>EPI</th><th>CA</th>${qc ? '' : '<th class="ce">Contagem</th>'}<th class="ce">+ Entradas</th><th class="ce">− Saídas</th><th class="ce">Saldo</th><th class="ce">Mínimo</th>
     </tr></thead><tbody>
     ${linhas.length ? linhas.map(({ i, s, min }) => {
-      const ca = estadoCa(i);
       const baixo = min !== null && s.saldo <= min;
+      const ops = opcoesCa(i, s), semCa = s.porCa ? (s.porCa.get('') || 0) : 0;
+      const cas = ops.map(o => `CA ${esc(o.ca)}${ops.length > 1 ? `: <b>${esc(mostra(o.tem))}</b>` : ''}${o.est.rotulo && o.est.chave !== 'emdia' ? ' ' + chip(o.est.cor, o.est.rotulo) : ''}`).join('<br>')
+        + (semCa && ops.length > 1 ? `<br><span class="dc-sem">sem separar o CA: ${esc(mostra(semCa))}</span>` : '');
       return `<tr${baixo ? ' class="epm-baixo"' : ''}><td>${esc(nomeSemCa(i.nome))} <small class="dc-sem">${esc(i.unidade || '')}</small></td>
-        <td>${esc(i.ca || '—')}${ca.rotulo ? ' ' + chip(ca.cor, ca.rotulo) : ''}</td>
+        <td>${cas || '—'}</td>
         ${qc ? '' : `<td class="ce">${esc(mostra(s.base))}</td>`}<td class="ce">${s.entradas ? esc(mostra(s.entradas)) : '—'}</td>
         <td class="ce">${s.saidas ? esc(mostra(s.saidas)) : '—'}</td><td class="ce"><b${s.saldo < 0 ? ' class="es-num-falta"' : ''}>${esc(mostra(s.saldo))}</b></td>
         <td class="ce">${min === null ? '—' : esc(mostra(min))}${baixo ? ' ' + chip('alerta', 'repor') : ''}</td></tr>`;

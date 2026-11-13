@@ -273,3 +273,9 @@ create table if not exists public.epi_form007 (id text primary key, funcionario_
   atualizado_em timestamptz not null default now(), atualizado_por text default public.app_email());
 -- RLS: est_* leitura e est_movimentos gravação liberadas também para quem tem 'sst' ou 'epis';
 -- cl_conjuntos/cl_lavagens/epi_form007 para '{cert,sst,epis}'. (aplicado pelo MCP em 13/11/2026)
+
+-- EPI: o CA como lote (13/11/2026). Um item por EPI e tamanho; est_itens.ca = lista ("20213, 20214");
+-- validade por CA em est_cas (id = nº do CA); na contagem o lote do EPI é o CA; est_movimentos.ca = CA que entrou/saiu.
+create table if not exists public.est_cas (id text primary key, situacao text, validade date, equipamento text, fabricante text,
+  conferido_em timestamptz, ativo boolean not null default true, atualizado_em timestamptz not null default now());
+alter table public.est_movimentos add column if not exists ca text;
