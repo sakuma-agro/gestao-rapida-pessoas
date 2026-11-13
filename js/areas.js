@@ -137,7 +137,7 @@ function pintarUsuario() {
 
 /* Sobe a cada publicação da área Vistorias (pasta vistorias/, gerada pelo
    montar.py do repositório sakuma-vistorias). */
-const VERSAO_VIST = '20';
+const VERSAO_VIST = '21';
 
 /* Menu da área Vistorias e Segurança (14/10/2026, pedido dele: "pegando
    referência do Pessoas, módulos, submódulos"). Ele escolheu agrupar por etapa
