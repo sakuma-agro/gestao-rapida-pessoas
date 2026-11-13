@@ -11,6 +11,7 @@ import { abrirCadastro, soltarCadastro } from './cadastros.js';
 import { abrirCompra, soltarCompra } from './compra.js';
 import { abrirSaldo, soltarSaldo } from './saldo.js';
 import { abrirQc, soltarQc } from './qc.js';
+import { abrirEpi, soltarEpi } from './epi.js';
 import { locaisDoUsuario } from './dados.js';
 
 const $ = id => document.getElementById(id);
@@ -25,13 +26,14 @@ function abrirAba(nome) {
     const el = $(idDaTela(t));
     if (el) el.hidden = t !== nome;
   }
-  soltarContagem(); soltarCadastro(); soltarCompra(); soltarSaldo(); soltarQc();
+  soltarContagem(); soltarCadastro(); soltarCompra(); soltarSaldo(); soltarQc(); soltarEpi();
   if (nome === 'acSaldo') abrirSaldo();
   else if (nome.startsWith('ac')) abrirAcerto(nome);
   if (nome.startsWith('ct')) abrirContagem(nome);
   if (nome.startsWith('cad')) abrirCadastro(nome);
   if (nome.startsWith('ci')) abrirCompra(nome);
   if (nome.startsWith('qc')) abrirQc(nome);
+  if (nome === 'epiEntradas' || nome === 'epiSaldo') abrirEpi(nome);
   // Formulários (29/10/2026): folhas da prancheta e placas — ../js/folhas-estoque.js
   if (nome === 'fmFolhas' || nome === 'fmPlacas' || nome === 'fmSaiuVoltou') {
     const el = $(nome + 'Corpo');

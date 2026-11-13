@@ -33,6 +33,12 @@ export const MODULOS = [
     ['qcSaida',    'Saídas'],
     ['qcPendencias', 'Pendências'],
   ] },
+  /* EPIs (13/11/2026, pedido dele): a entrada de EPI é só aqui no Estoque; o
+     SST fica só com a entrega ao funcionário. js/epi.js */
+  { id: 'epi', nome: 'EPIs', telas: [
+    ['epiEntradas', 'Entradas de EPI'],
+    ['epiSaldo',    'Saldo de EPI'],
+  ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
      estoque (FORM 048 entrada, FORM 049 saída) e as placas das pranchetas. Ficam
      aqui porque nem todos têm acesso à Certificação — ../js/folhas-estoque.js. */

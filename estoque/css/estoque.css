@@ -475,3 +475,11 @@ input[type=month]{font:inherit;padding:9px 10px;border:1px solid var(--linha);bo
 .ct-nr-tipo input { width: 20px; height: 20px; accent-color: #84BD00; flex: none; }
 .ct-nr-tipo span:first-of-type { flex: 1; }
 .ct-nr-tipo:has(input:checked) { border-color: #84BD00; background: #f3f9e6; }
+
+/* Estoque › EPIs · entrada (13/11/2026) */
+.epi-linhas{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.epi-linha{display:grid;grid-template-columns:1fr 170px 80px 90px 34px;gap:8px;align-items:end}
+.epi-linha .campo{margin:0}
+.epi-linha select{width:100%}
+tr.epi-baixo td{background:rgba(201,138,0,.08)}
+@media (max-width:640px){.epi-linha{grid-template-columns:1fr 1fr 34px}}

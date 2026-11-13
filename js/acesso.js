@@ -81,9 +81,7 @@ export const MODULOS = [
     { id: 'epis', nome: "EPI's", telas: [
       ['fichas', 'Fichas'],
       // Entregas, entradas e saldo pelo estoque (13/11/2026): js/sst-epi-mov.js
-      ['epiSaida', 'Entregas'],
-      ['epiEntrada', 'Entradas'],
-      ['epiSaldo', 'Saldo por estoque'],
+      ['epiSaida', 'Entregas'],   // entradas e saldo de EPI ficam no Estoque › EPIs (13/11/2026, pedido dele)
       ['epis', 'Tipos de EPI'],
       ['epiCrono', 'Cronograma de troca'],
       ['epiLavagem', 'Lavagem e higienização'],
@@ -495,7 +493,7 @@ async function carregarEstoques() {
 }
 /* Os módulos da área Estoque (mesmos ids de estoque/js/acesso.js). */
 const EST_MODULOS = [['contagem', 'Contagem'], ['compra', 'Compra inteligente'], ['qc', 'Estoque Quebra Cocão'],
-  ['acerto', 'Acerto'], ['cadastros', 'Cadastros']];
+  ['epi', 'EPIs'], ['acerto', 'Acerto'], ['cadastros', 'Cadastros']];
 const EST_LOCAL = 'estoque.local:', EST_MOD = 'estoque.modulo:';
 const estMarcados = (e, pre) => (e.telas || []).filter(x => x.startsWith(pre)).map(x => x.slice(pre.length));
 
