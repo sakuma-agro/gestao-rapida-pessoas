@@ -8022,6 +8022,7 @@ function anRenderPainel(){
         <div><h2>Painel das anomalias</h2>
           <p class="anp-dica">Só as anomalias deste módulo. Clique num cartão para ver a lista.${hora?` · atualizado às ${esc(hora)}`:""}</p></div>
         <span class="anp-acoes"><button type="button" class="anp-btn" data-an-atualizar>Atualizar</button>
+          <button type="button" class="anp-btn" data-an-rel-abertas>Relatório das abertas</button>
           <button type="button" class="anp-btn principal" data-an-imp-painel>Imprimir o painel</button></span>
       </div>
       ${anOffline?`<div class="anp-aviso">Sem conexão com a base: mostrando o que estava guardado neste aparelho.</div>`:""}
@@ -8052,7 +8053,7 @@ function anRenderPainel(){
 
     <div class="anp-cartao">
       <div class="anp-barra-tit"><div><h2>Lista · ${esc(nomeSit)}</h2><p class="anp-dica">Com as fotos. Concluir pede a foto do corrigido.</p></div>
-        ${anFiltro.sit!=="abertas"?`<span class="anp-acoes"><button type="button" class="anp-btn" data-an-sit="abertas">Ver todas as abertas</button></span>`:""}</div>
+        <span class="anp-acoes">${anFiltro.sit!=="abertas"?`<button type="button" class="anp-btn" data-an-sit="abertas">Ver todas as abertas</button>`:""}<button type="button" class="anp-btn" data-an-rel-abertas>Relatório das abertas</button></span></div>
       <div class="anp-filtros"><label class="anp-campo larga">Buscar <input type="search" id="an-f-busca" placeholder="Problema, plano, responsável, número…" value="${esc(anFiltro.busca)}"></label></div>
       <div class="an-plista" id="an-plista"></div>
     </div>
@@ -8320,9 +8321,77 @@ async function anMontarDoc(r){
   </div>`;
 }
 
+/* ── Relatório de todas as anomalias em aberto (13/11/2026, pedido dele) ──
+   Junta as abertas de todos os relatórios (respeita os filtros Local e Quem vai
+   arrumar do painel), ordenadas por prazo: quadro-resumo e depois cada uma com a
+   foto, agrupadas por local. A4 em pé, padrão SAKUMA, sem assinatura de pessoa. */
+function anListaAbertas(){
+  return anBase().filter(x=>!anConcluida(x.it))
+    .sort((a,b)=>String(a.it.prazo||"9999").localeCompare(String(b.it.prazo||"9999"))||String(a.rel.codigo||"").localeCompare(String(b.rel.codigo||""))||a.n-b.n);
+}
+async function anMontarAbertas(){
+  const lista=anListaAbertas();
+  const fotos=await Promise.all(lista.map(x=>anSrcDados(x.it.foto,x.it._fotoSrc)));
+  const conta=f=>lista.filter(x=>anFaixa(x.it)===f).length;
+  const filtro=[anFiltro.local&&"Local: "+anFiltro.local,anFiltro.resp&&"Quem vai arrumar: "+anFiltro.resp].filter(Boolean).join(" · ")||"Todos os locais e responsáveis";
+  const sitTxt=it=>{ const f=anFaixa(it), d=anDiasAte(it.prazo);
+    if(d===null)return "Sem prazo"; if(f==="vencidas")return `Vencida há ${-d} d`; if(d===0)return "Vence hoje"; return `Vence em ${d} d`; };
+  const locais=[...new Set(lista.map(x=>(x.rel.local||"").trim()||"Sem local"))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  let k=0; const num=new Map(); lista.forEach(x=>num.set(x,++k));
+  const resumo=lista.length?`<table class="anr-lista"><thead><tr><th class="ce">#</th><th>Problema</th><th>Local</th><th>Quem vai arrumar</th><th class="ce">Prazo</th><th class="ce">Situação</th></tr></thead><tbody>
+    ${lista.map(x=>`<tr><td class="ce">${num.get(x)}</td><td><b>${esc(x.it.problema||"—")}</b><br><small>${esc([x.rel.codigo,"nº "+x.n].filter(Boolean).join(" · "))}</small></td><td>${esc(x.rel.local||"—")}</td><td>${esc(x.it.responsavel||"—")}</td><td class="ce">${esc(anData(x.it.prazo)||"—")}</td><td class="ce">${anTagPrazo(x.it)}</td></tr>`).join("")}
+    </tbody></table>`:`<p class="anr-vazio">Nenhuma anomalia em aberto${anFiltro.local||anFiltro.resp?" com esse filtro":""}.</p>`;
+  const blocos=locais.map(loc=>{
+    const dele=lista.filter(x=>((x.rel.local||"").trim()||"Sem local")===loc);
+    return `<h2 class="anr-h2">${esc(loc)} · ${dele.length} aberta${dele.length===1?"":"s"}</h2>`+dele.map(x=>{
+      const it=x.it, fA=fotos[lista.indexOf(x)], v=anFaixa(it)==="vencidas";
+      return `<section class="anr-item">
+        <div class="anr-item-cab"><span class="anr-n">${num.get(x)}</span><h3>${esc(it.problema||"")}</h3><span class="anr-sit ${v?"venc":""}">${esc(sitTxt(it))}</span></div>
+        <div class="anr-item-corpo">
+          <div class="anr-fotos"><figure><div class="anr-img">${fA?`<img src="${esc(fA)}" alt="">`:`<span>Sem foto</span>`}</div><figcaption class="anomalia">Anomalia</figcaption></figure></div>
+          <table class="anr-tab"><tbody>
+            <tr><th>Plano de ação</th><td>${anNl(it.plano)}</td></tr>
+            <tr><th>Quem vai arrumar</th><td>${esc(it.responsavel||"—")}</td></tr>
+            <tr><th>Prazo</th><td>${esc(anData(it.prazo)||"—")}</td></tr>
+            <tr><th>Relatório</th><td>${esc([x.rel.codigo,"nº "+x.n,anData(x.rel.data),x.rel.responsavel?"apontado por "+x.rel.responsavel:""].filter(Boolean).join(" · "))}</td></tr>
+          </tbody></table>
+        </div>
+      </section>`;}).join("");
+  }).join("");
+  return `<div class="anr-doc">
+    <header class="anr-cab"><div><h1>Anomalias em Aberto</h1><p>${esc(filtro)} · emitido em ${esc(anData(anHoje()))}</p></div><img src="${LOGO}" alt="SAKUMA Agronegócios"></header>
+    <div class="anr-kpis">
+      <div class="ab"><b>${lista.length}</b><span>em aberto</span></div>
+      <div class="venc"><b>${conta("vencidas")}</b><span>vencidas</span></div>
+      <div class="breve"><b>${conta("breve")}</b><span>vencem em até ${AN_BREVE} dias</span></div>
+      <div class="ok"><b>${conta("noprazo")}</b><span>no prazo</span></div>
+    </div>
+    <h2 class="anr-h2">Resumo · por prazo</h2>
+    ${resumo}
+    ${blocos}
+    <footer class="anr-rod"><span>SAKUMA Agronegócios · Anomalias em aberto · emitido em ${esc(anData(anHoje()))}</span>${typeof docLop==="function"?docLop():""}</footer>
+  </div>`;
+}
+async function anPreviaAbertas(voltar){
+  if(!anCarregou){ toast("Ainda carregando as anomalias. Tente de novo em instantes."); return; }
+  anPreviaRel={_abertas:true};
+  anVoltar=voltar||anVista; anVista="previa"; anRender();
+  const C=$("#an-corpo"), n=anListaAbertas().length;
+  C.innerHTML=`<div class="secao-topo ad-previa-topo">
+      <button class="bt bt-fantasma" type="button" data-an-previa-voltar>← Voltar</button>
+      <h2>Anomalias em aberto · ${n}</h2>
+      <div class="ad-previa-bts"><button class="btn" type="button" data-an-imprimir>Imprimir / PDF</button></div>
+    </div>
+    <p class="dica ad-previa-dica">Todas as anomalias ainda não concluídas${anFiltro.local||anFiltro.resp?", com o filtro de local/responsável do painel":""}. Folha A4 em pé. Para mandar em PDF: Imprimir → Salvar como PDF.</p>
+    <div class="an-previa-palco" id="an-palco"><div class="vazio"><p>Montando o relatório…</p></div></div>`;
+  const doc=await anMontarAbertas();
+  const p=$("#an-palco"); if(p&&anVista==="previa"&&anPreviaRel&&anPreviaRel._abertas){ p.innerHTML=doc; anZoom(); }
+}
+
 let anPreviaRel=null;
 /* nome do arquivo ao salvar em PDF: "ANOM-012 - Anomalias - 19-10-2026" */
 function anNomeArquivo(r){
+  if(r&&r._abertas)return "Anomalias em aberto - "+anData(anHoje()).replace(/\//g,"-");
   const data=anData((r&&r.data)||anHoje()).replace(/\//g,"-");
   return [r&&r.codigo?r.codigo:"Relatório","Anomalias",data].join(" - ");
 }
@@ -8417,6 +8486,7 @@ $("#painel-an").addEventListener("click",ev=>{
   if(el=q("[data-an-sit]")){ const v=el.dataset.anSit; anFiltro.sit=(anFiltro.sit===v&&v!=="abertas")?"abertas":v; anRenderPainel(); return; }
   if(q("[data-an-atualizar]")){ anCarregar().then(()=>{ if(anVista==="painel")anRenderPainel(); toast("Painel atualizado."); }); return; }
   if(q("[data-an-imp-painel]")){ anImprimir(anFolhaPainel()); return; }
+  if(q("[data-an-rel-abertas]")){ anPreviaAbertas(anVista); return; }
   if(el=q("[data-an-glocal]")){ anFiltro.local=el.dataset.anGlocal==="Sem local"?"":el.dataset.anGlocal; anFiltro.sit="todas"; anRenderPainel(); $("#an-plista").scrollIntoView({behavior:"smooth"}); return; }
   if(el=q("[data-an-gresp]")){ anFiltro.resp=el.dataset.anGresp==="Sem responsável"?"":el.dataset.anGresp; anFiltro.sit="todas"; anRenderPainel(); $("#an-plista").scrollIntoView({behavior:"smooth"}); return; }
   if(el=q("[data-an-visualizar]")){ const [a,b]=el.dataset.anVisualizar.split("|"); anVisualizar(a,b); return; }
@@ -8917,7 +8987,7 @@ const _renderConfigFD = renderConfig;
 renderConfig = function(){ const r=_renderConfigFD.apply(this, arguments); try{ fdRenderConfig(); }catch(e){} return r; };
 
 </script>
-<script src="vistorias.js?v=19"></script>
-<script src="lop-depois.js?v=19"></script>
+<script src="vistorias.js?v=20"></script>
+<script src="lop-depois.js?v=20"></script>
 </body>
 </html>
