@@ -215,6 +215,7 @@ function fichaHtml(e) {
   return { meia: true, html: html.replace('<div class="folha">', `<div class="folha meia" style="zoom:${zoom}">`) };
 }
 const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 6;
+const SEL = new Set();   // entregas marcadas para imprimir
 function imprimirFichas(lista) {
   if (!lista.length) { alert('Nenhuma entrega para imprimir.'); return; }
   const fs = lista.map(fichaHtml);
@@ -314,11 +315,13 @@ function telaSaida(tela) {
       <span class="barra" style="margin:0">
         <input type="search" id="epmBusca" value="${esc(F.busca)}" placeholder="Buscar">
         ${F.sit === 'pend' ? '' : `<input type="month" id="epmMes" value="${esc(F.mes)}">`}
-        <button class="btn mini" type="button" id="epmImpLista" ${vis.length ? '' : 'disabled'} title="Imprimir todas as fichas da lista">🖨 ${vis.length}</button>
+        <button class="btn mini" type="button" id="epmHoje" title="Marcar as entregas de hoje">Marcar as de hoje</button>
+        <button class="btn mini principal" type="button" id="epmImpLista" ${vis.length ? '' : 'disabled'} title="${SEL.size ? 'Imprimir só as fichas marcadas' : 'Imprimir todas as fichas da lista'}">🖨 Imprimir ${SEL.size ? SEL.size + ' marcada' + (SEL.size > 1 ? 's' : '') : 'todas (' + vis.length + ')'}</button>
       </span>
     </div>
     <div class="epm-lista">
-    ${vis.length ? vis.map(e => `<div class="epm-ent">
+    ${vis.length ? vis.map(e => `<div class="epm-ent${SEL.has(e.id) ? ' marcada' : ''}">
+      <input type="checkbox" class="epm-marca" data-epm-sel="${esc(e.id)}"${SEL.has(e.id) ? ' checked' : ''} title="Marcar para imprimir">
       <div class="epm-ent-txt"><b>${esc(e.funcionario)}</b> <span class="dc-sem">${br(e.data)} · ${esc(localDe(e.local_id).nome)}</span><br>
         <span class="epm-ent-itens">${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(nomeSemCa(itemDe(l.item_id).nome))}${l.ca ? ` <span class="dc-sem">CA ${esc(l.ca)}</span>` : ''}`).join(' · ')}</span></div>
       <div class="epm-ent-acoes">
@@ -341,7 +344,21 @@ function telaSaida(tela) {
   }));
   $('epmBusca').addEventListener('input', ev => { F.busca = ev.target.value; const p = ev.target.selectionStart; desenhar(); const i = $('epmBusca'); i.focus(); i.setSelectionRange(p, p); });
   $('epmMes')?.addEventListener('change', ev => { F.mes = ev.target.value; desenhar(); });
-  $('epmImpLista').addEventListener('click', () => imprimirFichas([...vis].reverse()));
+  /* Marcar fichas para imprimir juntas (13/11/2026, pedido dele: "selecionar 2
+     fichas feitas no dia, e sair meia folha em cada") — saem 2 por A4. */
+  $('epmImpLista').addEventListener('click', () => {
+    const marcadas = todas.filter(e => SEL.has(e.id));
+    imprimirFichas([...(marcadas.length ? marcadas : vis)].reverse());
+  });
+  tela.querySelectorAll('[data-epm-sel]').forEach(cx => cx.addEventListener('change', () => {
+    if (cx.checked) SEL.add(cx.dataset.epmSel); else SEL.delete(cx.dataset.epmSel); desenhar();
+  }));
+  $('epmHoje').addEventListener('click', () => {
+    const h = hoje(), deHoje = todas.filter(e => e.data === h);
+    if (!deHoje.length) { alert('Nenhuma entrega hoje.'); return; }
+    const tudo = deHoje.every(e => SEL.has(e.id));
+    deHoje.forEach(e => tudo ? SEL.delete(e.id) : SEL.add(e.id)); desenhar();
+  });
   tela.querySelectorAll('[data-epm-ficha]').forEach(b => b.addEventListener('click', () => imprimirFichas([todas.find(e => e.id === b.dataset.epmFicha)])));
   tela.querySelectorAll('[data-epm-assinar]').forEach(b => b.addEventListener('click', async () => {
     const e = todas.find(x => x.id === b.dataset.epmAssinar);

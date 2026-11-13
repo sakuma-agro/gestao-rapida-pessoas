@@ -3004,3 +3004,7 @@ select.epm-ca-ruim{color:#a5342a;border-color:#a5342a}
   .meia-slot:last-child{page-break-after:auto;break-after:auto}
   .meia-slot .folha.meia{transform:none;margin:0;page-break-after:auto;break-after:auto}
 }
+.epm-ent{justify-content:flex-start}
+.epm-ent .epm-ent-txt{flex:1}
+.epm-marca{width:18px;height:18px;flex:none;accent-color:var(--verde);cursor:pointer}
+.epm-ent.marcada{background:var(--verde-fundo)}
