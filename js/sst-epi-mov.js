@@ -18,6 +18,7 @@ import { montarFicha, linhaVazia } from './ficha.js';
 import { mostrar } from './jornada-relatorios.js';
 import { estadoCa, caReprovado } from './ca.js';
 import { saldosEpi, ehQuebraCocao, semAcento, tipoDoEpi, somarPrazo, casDe, saldoDoCa } from './epi-saldo.js';
+import * as nucleo from './nucleo.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -48,9 +49,55 @@ async function tudo(tabela, colunas = '*', filtro) {
   }
   return saida;
 }
+/* SEM INTERNET (13/11/2026, pedido dele: a entrega de EPI funcionar offline como o
+   Estoque). O que foi lido fica guardado no aparelho (caixa 'sstepi.cache' do
+   núcleo); sem sinal a tela abre com essa cópia. Entregas, "Assinada ✓" e
+   devoluções vão para a fila 'sstepi' e sobem sozinhas quando o sinal volta
+   (o Nº da entrega chega do banco depois do envio). */
+const CAIXA_EPI = 'sstepi.cache', CAMADA_EPI = 'sstepi';
+const DEF_EPI = {
+  tabelaDe: c => c, chaveDe: () => 'id', paraBanco: (c, item) => item,
+  cliente: () => estado.cliente,
+  podeEnviar: () => !!(estado.cliente && estado.sessao && navigator.onLine),
+  aoEnviado: (tabela, salvo) => {
+    if (!salvo) return;
+    const m = D.movimentos.find(x => x.id === salvo.id);
+    if (m) Object.assign(m, salvo); else D.movimentos.push(salvo);
+    guardarCopia();
+    clearTimeout(DEF_EPI._t); DEF_EPI._t = setTimeout(() => { try { desenhar(); } catch { /* tela fechada */ } }, 300);
+  },
+};
+const guardarCopia = () => { try { const { lido, erro, ...resto } = D; nucleo.gravarCaixa(CAIXA_EPI, resto); } catch { /* cheio */ } };
+const enviarEpi = () => nucleo.enviarFila(CAMADA_EPI, DEF_EPI).catch(() => {});
+addEventListener('online', () => setTimeout(enviarEpi, 1500));
+setTimeout(enviarEpi, 4000);
+/** grava o registro (inteiro) pela fila: sobe já se houver sinal */
+async function gravarMov(reg, base = null) {
+  await nucleo.adicionarNaFila(CAMADA_EPI, { colecao: 'est_movimentos', acao: 'salvar', item: reg, base });
+  const m = D.movimentos.find(x => x.id === reg.id);
+  if (m) Object.assign(m, reg); else D.movimentos.push({ ...reg });
+  guardarCopia();
+  if (DEF_EPI.podeEnviar()) await enviarEpi();
+}
+/** o que ainda está na fila aparece na tela (mesmo depois de ler o banco) */
+async function aplicarFila() {
+  try {
+    for (const p of await nucleo.listarFila(CAMADA_EPI)) {
+      const m = D.movimentos.find(x => x.id === p.item.id);
+      if (m) Object.assign(m, p.item); else D.movimentos.push({ ...p.item });
+    }
+  } catch { /* sem fila */ }
+}
 async function carregar(forcar) {
   if (!forcar && D.lido && Date.now() - D.lido < 60000) return;
-  if (!estado.cliente) { D.erro = 'sem conexão com o banco'; return; }
+  if (!estado.cliente || !navigator.onLine) {
+    if (!D.lido) {
+      const c = await nucleo.lerCaixa(CAIXA_EPI, null).catch(() => null);
+      if (c) { Object.assign(D, c, { lido: Date.now(), erro: '', offline: true }); await aplicarFila(); }
+      else D.erro = 'sem internet e sem cópia guardada neste aparelho (abra uma vez com internet)';
+    }
+    return;
+  }
   try {
     const [locais, itens, movimentos, contagens, grupos, linhas, minimos, lotes, cas] = await Promise.all([
       tudo('est_locais', '*', q => q.eq('ativo', true).order('ordem')),
@@ -66,10 +113,15 @@ async function carregar(forcar) {
     const ids = new Set(itens.map(i => i.id));
     Object.assign(D, { locais, itens, contagens, grupos, minimos,
       movimentos: movimentos.filter(m => ids.has(m.item_id)),
-      linhas: linhas.filter(l => ids.has(l.item_id)), lotes: lotes.filter(l => ids.has(l.item_id)), cas, lido: Date.now(), erro: '' });
+      linhas: linhas.filter(l => ids.has(l.item_id)), lotes: lotes.filter(l => ids.has(l.item_id)), cas, lido: Date.now(), erro: '', offline: false });
+    await aplicarFila();
+    guardarCopia();
   } catch (e) {
     console.error(e);
-    D.erro = (e && (e.message || e.details)) || String(e);
+    // caiu a rede no meio: usa a cópia do aparelho
+    const c = !D.lido ? await nucleo.lerCaixa(CAIXA_EPI, null).catch(() => null) : null;
+    if (c) { Object.assign(D, c, { lido: Date.now(), erro: '', offline: true }); await aplicarFila(); }
+    else D.erro = (e && (e.message || e.details)) || String(e);
   }
 }
 const ativos = l => l.filter(x => x.ativo !== false);
@@ -429,7 +481,8 @@ function telaSaida(tela) {
 
   tela.innerHTML = `<div class="cartao naoimprimir epm-lean">
     <div class="barra entre" style="margin:0 0 8px">
-      <h2 style="margin:0">Entrega de EPI</h2>
+      <h2 style="margin:0">Entrega de EPI ${!navigator.onLine || D.offline ? '<span class="tag alerta" title="A entrega fica guardada no aparelho e sobe sozinha quando o sinal voltar">sem internet · salva no aparelho</span>' : ''}
+        ${nucleo.pendentes(CAMADA_EPI) ? `<span class="tag neutra">${nucleo.pendentes(CAMADA_EPI)} para enviar</span>` : ''}</h2>
       <button class="btn mini" type="button" id="epmAtualizar" title="Ler de novo do banco">↻ Atualizar</button>
     </div>
     ${guia('epi-entrega', ['Escolha o <b>funcionário</b>', 'Escolha o <b>EPI</b> e a <b>quantidade</b>', '<b>Salvar</b> e imprimir a ficha', 'Ele assinou? Toque em <b>Assinada ✓</b>'])}
@@ -537,11 +590,13 @@ function telaSaida(tela) {
 }
 
 async function marcarLinhas(linhas, mudanca) {
+  // pela fila do núcleo: funciona sem internet (13/11/2026)
   for (const l of linhas) {
-    const r = await estado.cliente.from('est_movimentos').update(mudanca).eq('id', l.id).select().maybeSingle();
-    if (r.error) { alert('Não consegui gravar: ' + r.error.message); return false; }
-    Object.assign(l, r.data || mudanca);
-    const m = D.movimentos.find(x => x.id === l.id); if (m) Object.assign(m, r.data || mudanca);
+    const m = D.movimentos.find(x => x.id === l.id) || l;
+    const reg = { ...m, ...mudanca };
+    delete reg._base;
+    Object.assign(l, mudanca);
+    await gravarMov(reg, m.atualizado_em || null);
   }
   return true;
 }
@@ -771,9 +826,8 @@ function ligarForm() {
     const rows = boas.map(b => ({ id: crypto.randomUUID(), local_id: localId, data, sentido: 'saida', tipo: 'uso', item_id: b.it.id,
       quantidade: b.q, documento: 'Ficha de EPI', funcionario_id: f.id, funcionario: f.nome, operador: quem(), criado_por: quem(),
       lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz: b.faz || faz, ficha_assinada: false, ca: b.ca || null }));
-    const r = await estado.cliente.from('est_movimentos').insert(rows).select();
-    if (r.error) { aviso('Não consegui gravar: ' + r.error.message); $('epmSalvar').disabled = false; return; }
-    D.movimentos.push(...(r.data || rows));
+    // pela fila do núcleo: sem internet a entrega fica no aparelho e sobe depois (13/11/2026)
+    for (const row of rows) await gravarMov(row, null);
     limparForm();
     F.sit = ''; F.mes = data.slice(0, 7);
     desenhar();
