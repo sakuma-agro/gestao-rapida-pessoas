@@ -260,10 +260,9 @@ function telaSaida(tela) {
     ${guia('epi-entrega', ['Escolha o <b>funcionário</b>', 'Escolha o <b>EPI</b> e a <b>quantidade</b>', '<b>Salvar</b> e imprimir a ficha', 'Ele assinou? Toque em <b>Assinada ✓</b>'])}
     <form id="epmForm" class="epm-form" autocomplete="off">
       <div class="epm-topo">
-        <label class="campo epm-func">Funcionário <input type="text" id="epmFunc" list="epmFuncs" value="${esc(FORM.func)}" placeholder="digite o nome"></label>
+        <div class="campo epm-func"><span>Funcionário</span><div class="epm-pick" id="epmPick"></div></div>
         <label class="campo epm-data">Data <input type="date" id="epmData" value="${esc(FORM.data || hoje())}" max="${hoje()}"></label>
       </div>
-      <datalist id="epmFuncs"></datalist>
       <p class="epm-info" id="epmInfo"></p>
       <div id="epmLinhas" class="epm-itens"></div>
       <datalist id="epmItens"></datalist>
@@ -314,7 +313,7 @@ function telaSaida(tela) {
   $('epmVerTrocas')?.addEventListener('click', () => { F.verTrocas = F.verTrocas ? '' : 'atrasada'; desenhar(); });
   tela.querySelectorAll('[data-epm-trocar]').forEach(b => b.addEventListener('click', () => {
     const t = listaTrocas[+b.dataset.epmTrocar], f = funcDe(t.funcionario_id);
-    Object.assign(FORM, { func: f ? rotFunc(f) : t.funcionario, local: '', linhas: [{ item: t.item.nome, qtd: '1', mer: '1' }] });
+    Object.assign(FORM, { func: f ? f.id : '', local: '', linhas: [{ item: t.item.nome, qtd: '1', mer: '1' }] });
     F.verTrocas = ''; desenhar(); $('epmForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
   $('epmBusca').addEventListener('input', ev => { F.busca = ev.target.value; const p = ev.target.selectionStart; desenhar(); const i = $('epmBusca'); i.focus(); i.setSelectionRange(p, p); });
@@ -373,9 +372,9 @@ const MER_CURTO = { 1: 'Troca (dano justificado)', 2: 'Troca (dano/perda dele)',
    redesenhar a tela (assinar uma ficha, buscar) não perde o que foi digitado. */
 function ligarForm() {
   const funcs = (estado.funcionarios || []).filter(f => f.situacao === 'ATIVO').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  $('epmFuncs').innerHTML = funcs.map(f => `<option value="${esc(rotFunc(f))}">`).join('');
   const mot = motivos();
-  const funcSel = () => { const t = semAcento($('epmFunc').value); return t ? funcs.find(f => semAcento(rotFunc(f)) === t) || funcs.find(f => semAcento(f.nome) === t) : null; };
+  // FORM.func guarda o id do funcionário escolhido (13/11/2026: seletor próprio, não a lista do navegador)
+  const funcSel = () => FORM.func ? funcs.find(f => f.id === FORM.func) || null : null;
   const localAtual = () => FORM.local || (D.locais[0] || {}).id || '';
   let sal = new Map();
   const jaRecebeu = (fid, item) => ativos(D.movimentos).some(m => m.sentido === 'saida' && m.funcionario_id === fid && tipoDoEpi(itemDe(m.item_id).nome) === tipoDoEpi(item.nome));
@@ -386,8 +385,7 @@ function ligarForm() {
     if (!f) { $('epmInfo').innerHTML = `Sai do estoque ${locSel}`; ligarLocal(); return; }
     const tr = trocas().filter(t => t.funcionario_id === f.id);
     const atr = tr.filter(t => t.sit.chave === 'atrasada' || t.sit.chave === 'logo');
-    $('epmInfo').innerHTML = `${esc(f.cargo || '—')}${f.tam_calcado ? ' · calçado <b>' + esc(f.tam_calcado) + '</b>' : ''}${f.tam_camisa ? ' · roupa <b>' + esc(f.tam_camisa) + '</b>' : ''}
-      · sai do estoque ${locSel}
+    $('epmInfo').innerHTML = `${f.tam_calcado ? 'calçado <b>' + esc(f.tam_calcado) + '</b> · ' : ''}${f.tam_camisa ? 'roupa <b>' + esc(f.tam_camisa) + '</b> · ' : ''}sai do estoque ${locSel}
       ${atr.length ? `<br><span class="epm-avisinho">⟳ trocar: ${atr.map(t => esc(nomeSemCa(t.item.nome)) + ' (' + esc(t.sit.rotulo) + ')').join(', ')}</span>` : ''}
       ${!tr.length ? '<br><span class="dc-sem">Primeira entrega registrada para ele.</span>' : ''}`;
     ligarLocal();
@@ -448,9 +446,66 @@ function ligarForm() {
     desenharLinhas();
   };
 
-  $('epmFunc').addEventListener('input', () => { FORM.func = $('epmFunc').value; });
-  $('epmFunc').addEventListener('change', () => {
-    FORM.func = $('epmFunc').value;
+  /* ---- Seletor do funcionário (pedido dele: "melhore essa seleção") ----
+     Busca por qualquer parte do nome, apelido, nº do cadastro, função ou
+     fazenda, em qualquer ordem e sem acento. Lista com nome, nº, função e
+     fazenda; setas + Enter no teclado. Vazio mostra quem recebeu EPI por
+     último. Escolhido, vira um cartão com "Trocar". */
+  const iniciais = n => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('');
+  const chave = f => semAcento([f.nome, f.apelido, f.cadastro, f.cargo, f.fazenda].filter(Boolean).join(' '));
+  const recentes = () => {
+    const vistos = new Set(), r = [];
+    for (const e of entregas()) if (!vistos.has(e.funcionario_id)) { vistos.add(e.funcionario_id); const f = funcs.find(x => x.id === e.funcionario_id); if (f) r.push(f); if (r.length >= 6) break; }
+    return r;
+  };
+  const buscarFuncs = q => {
+    const t = semAcento(q).split(/\s+/).filter(Boolean);
+    if (!t.length) return null;
+    return funcs.filter(f => { const k = chave(f); return t.every(p => k.includes(p)); })
+      .sort((a, b) => (semAcento(b.nome).startsWith(t[0]) - semAcento(a.nome).startsWith(t[0])) || a.nome.localeCompare(b.nome, 'pt-BR'))
+      .slice(0, 40);
+  };
+  const linhaFunc = (f, i, ativo) => `<li role="option" data-fid="${esc(f.id)}" class="${i === ativo ? 'on' : ''}">
+      <span class="epm-av">${esc(iniciais(f.nome))}</span>
+      <span class="epm-ft"><b>${esc(f.nome)}</b>${f.apelido ? ` <i>(${esc(f.apelido)})</i>` : ''}
+        <small>${f.cadastro ? 'nº ' + esc(f.cadastro) + ' · ' : ''}${esc(f.cargo || 'sem função')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}</small></span></li>`;
+  let ativo = 0, achados = [];
+  const desenharPick = (foco) => {
+    const f = funcSel();
+    if (f) {
+      $('epmPick').innerHTML = `<div class="epm-escolhido"><span class="epm-av">${esc(iniciais(f.nome))}</span>
+        <span class="epm-ft"><b>${esc(f.nome)}</b><small>${f.cadastro ? 'nº ' + esc(f.cadastro) + ' · ' : ''}${esc(f.cargo || '')}${f.fazenda ? ' · ' + esc(f.fazenda) : ''}</small></span>
+        <button class="btn mini" type="button" id="epmTrocarFunc">Trocar</button></div>`;
+      $('epmTrocarFunc').onclick = () => { FORM.func = ''; desenharPick(true); info(); };
+      return;
+    }
+    $('epmPick').innerHTML = `<input type="search" id="epmFunc" placeholder="Digite nome, nº ou função" autocomplete="off" role="combobox" aria-expanded="false">
+      <ul class="epm-lista-func" id="epmFuncLista" role="listbox" hidden></ul>`;
+    const inp = $('epmFunc'), ul = $('epmFuncLista');
+    const abrir = () => {
+      const r = buscarFuncs(inp.value);
+      achados = r || recentes();
+      if (ativo >= achados.length) ativo = 0;
+      ul.innerHTML = (r ? '' : `<li class="epm-cab">${achados.length ? 'Entregas recentes — ou digite para buscar' : 'Digite para buscar'}</li>`)
+        + (achados.length ? achados.map((x, i) => linhaFunc(x, i, ativo)).join('') : (r ? '<li class="epm-cab">Ninguém encontrado</li>' : ''));
+      ul.hidden = false; inp.setAttribute('aria-expanded', 'true');
+      ul.querySelectorAll('[data-fid]').forEach(li => li.addEventListener('mousedown', ev => { ev.preventDefault(); escolher(li.dataset.fid); }));
+      ul.querySelector('li.on')?.scrollIntoView({ block: 'nearest' });
+    };
+    inp.addEventListener('input', () => { ativo = 0; abrir(); });
+    inp.addEventListener('focus', abrir);
+    inp.addEventListener('blur', () => setTimeout(() => { if (ul.isConnected) { ul.hidden = true; inp.setAttribute('aria-expanded', 'false'); } }, 120));
+    inp.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowDown') { ev.preventDefault(); ativo = Math.min(ativo + 1, achados.length - 1); abrir(); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); ativo = Math.max(ativo - 1, 0); abrir(); }
+      else if (ev.key === 'Enter') { ev.preventDefault(); if (achados[ativo]) escolher(achados[ativo].id); }
+      else if (ev.key === 'Escape') { ul.hidden = true; }
+    });
+    if (foco) inp.focus();
+  };
+  const escolher = id => {
+    FORM.func = id;
+    desenharPick();
     const f = funcSel();
     const l = f ? localDoFunc(f) : '';
     if (l && l !== localAtual()) { FORM.local = l; info(); trocarLocal(); } else info();
@@ -458,7 +513,11 @@ function ligarForm() {
       const it = ln.item && itemPeloNome(ln.item, localAtual());
       if (f && it && !ln.merManual) { ln.mer = jaRecebeu(f.id, it) ? '1' : '4'; const s = $('epmLinhas').querySelector(`select[data-l="${i}"]`); if (s) s.value = ln.mer; }
     }
-  });
+    // já leva para o EPI
+    const vazio = $('epmLinhas').querySelector('[data-c="item"]');
+    if (vazio && !vazio.value) vazio.focus();
+  };
+  desenharPick();
   $('epmData').addEventListener('change', ev => { FORM.data = ev.target.value; });
   $('epmMais').addEventListener('click', () => { FORM.linhas.push({ item: '', qtd: '1', mer: '4' }); desenharLinhas(); $('epmLinhas').querySelector(`[data-l="${FORM.linhas.length - 1}"][data-c="item"]`).focus(); });
   $('epmLimpar').addEventListener('click', () => { limparForm(); desenhar(); });
@@ -471,7 +530,7 @@ function ligarForm() {
     const aviso = t => { $('epmAviso').textContent = t; $('epmAviso').hidden = !t; };
     aviso('');
     const f = funcSel();
-    if (!f) { aviso('Escolha o funcionário na lista.'); $('epmFunc').focus(); return; }
+    if (!f) { aviso('Escolha o funcionário.'); $('epmFunc')?.focus(); return; }
     const data = $('epmData').value || hoje(), localId = localAtual();
     const local = localDe(localId);
     const boas = [];
