@@ -40,11 +40,13 @@ let mesLista = hojeISO().slice(0, 7);
    Quebra Cocão, agora serve qualquer estoque escolhido no alto da tela:
      · Quebra Cocão: saldo = entradas − saídas (como sempre), todos os tipos;
      · outras fazendas: saldo = última contagem de cada tipo + entradas −
-       saídas lançadas depois dela (../../js/epi-saldo.js), e defensivo e
-       fertilizante não entram nos lançamentos (seguem pelo Acerto);
+       saídas lançadas depois dela (../../js/epi-saldo.js), todos os tipos liberados;
      · "Todos os estoques" (só na tela Estoque): a soma de todos. */
 const ehQcLocal = l => !!l && semAcento(l.nome).includes('QUEBRA COCAO');
-const SO_QC = ['Defensivos', 'Fertilizantes'];
+/* 13/11/2026 (16h27), ele: "pode deixar liberado tudo para todas, só foi uma
+   observação: somente Quebra Cocão irá usar por enquanto defensivo, fertilizante
+   e sementes" — nenhum tipo fica preso à Quebra Cocão. */
+const SO_QC = [];
 const CHAVE_LOCAL_G = 'estoque.gestao.local';
 let localSel = '';
 try { localSel = localStorage.getItem(CHAVE_LOCAL_G) || ''; } catch { /* sem localStorage */ }
@@ -177,7 +179,7 @@ function desenharVisao() {
     <div class="barra entre"><h2 style="margin:0">Estoque · ${esc(nomeLocal())}</h2>${seletorLocal(true)}</div>
     <p class="dica">${verTodos() ? 'Total de todos os estoques: soma do saldo de cada um.'
       : ehQcLocal(localQc()) ? 'Saldo de cada item = entradas − saídas lançadas aqui.'
-      : 'Saldo = última contagem de cada tipo + entradas − saídas lançadas depois dela. Defensivo e fertilizante seguem pela contagem e pelo Acerto.'}</p>
+      : 'Saldo = última contagem de cada tipo + entradas − saídas lançadas depois dela.'}</p>
     <div class="es-cards">
       <div class="es-card es-ok"><span>Itens com movimento</span><strong>${itens.length}</strong><small>${grupos.length} categoria(s)</small></div>
       <div class="es-card es-transf"><span>Valor em estoque</span><strong class="qc-rs">${esc(brl(vistosValor(itens, cu)))}</strong><small>pelo custo médio${semValor(itens, cu, sd) ? ` · ${semValor(itens, cu, sd)} sem valor` : ''}</small></div>
