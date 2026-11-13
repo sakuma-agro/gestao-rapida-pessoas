@@ -104,8 +104,10 @@ function fichaEntrega(func, modelo, opcoes) {
     return i > 0 ? `<b>${esc(t.slice(0, i))}</b><span>${esc(t.slice(i + 1).trim())}</span>` : `<b>${esc(t)}</b>`; };
   const item = t => { const m = String(t).match(/^\s*([A-Z0-9]{1,2})\s*-\s*(.*)$/i);
     return m ? `<div><b>${esc(m[1])}</b> ${esc(m[2])}</div>` : `<div>${esc(t)}</div>`; };
-  const faixa = (rot, itens, cls) => `<tr class="fe-faixa"><td colspan="8"><div class="fe-leg2">
-    <div class="fe-rot">${rotulo(rot)}</div><div class="fe-itens ${cls}">${itens.map(item).join('')}</div></div></td></tr>`;
+  /* FAZ e M.E.R lado a lado (13/11/2026, "divida esse espaço, primeiro a fazenda,
+     depois os motivos"): cada bloco = título (sigla + significado) e itens em grade. */
+  const bloco = (rot, itens, cls) => `<div class="fe-bloco ${cls}"><div class="fe-rot">${rotulo(rot)}</div>
+    <div class="fe-itens ${cls}">${itens.map(item).join('')}</div></div>`;
   return `<div class="folha fe">
   <div class="ficha" data-chave="${esc(chave)}">
   <table class="fx"><colgroup>
@@ -118,8 +120,7 @@ function fichaEntrega(func, modelo, opcoes) {
     ${numHtml}
     <div class="fe-form">${formHtml}</div>
   </div></td></tr>
-  ${faixa(modelo.rotulo_faz, fazPares, 'faz')}
-  ${faixa(modelo.rotulo_mer, merLeg, 'mer')}
+  <tr class="fe-faixa"><td colspan="8"><div class="fe-leg2">${bloco(modelo.rotulo_faz, fazPares, 'faz')}${bloco(modelo.rotulo_mer, merLeg, 'mer')}</div></td></tr>
   <tr class="r12">
     <td colspan="2" class="f20 b es vm btt bbt">EMPREGADOR:</td>
     <td colspan="6" class="f20 b es vm btt bbt">${esc(func.empregador)}</td>
