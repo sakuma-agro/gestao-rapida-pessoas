@@ -165,6 +165,9 @@ const VIST_MODULOS = [
   ] },
   { id: 'vsEquip', nome: 'Equipamentos', icone: 'extintor', subs: [
     { id: 'vsSubEx', nome: 'Extintores', telas: [['vsEx', 'Extintores']] },
+    { id: 'vsSubExSem', nome: 'Inspeção semanal', telas: [['vsExSem', 'Inspeção semanal']] },
+    { id: 'vsSubExTri', nome: 'Inspeção trimestral', telas: [['vsExTri', 'Inspeção trimestral']] },
+    { id: 'vsSubExHist', nome: 'Histórico das inspeções', telas: [['vsExHist', 'Histórico das inspeções']] },
   ] },
   { id: 'vsRel', nome: 'Relatórios', icone: 'grafico', subs: [
     { id: 'vsSubPainel', nome: 'Painel geral', telas: [['vsPainel', 'Painel geral']] },
@@ -181,7 +184,7 @@ registrarMenuArea(VIST_MODULOS);
 const ABA_VIST = { vsVistoria: 'vistoria', vsChecklists: 'checklists', vsAberto: 'aberto',
   vsAnNovo: 'an', vsAnAberto: 'an', vsAnHist: 'an',
   vsAdNovo: 'ad', vsAdAberto: 'ad', vsAdFechados: 'ad', vsAdHist: 'ad',
-  vsEx: 'ex', vsPainel: 'pg', vsRelatorio: 'relatorio', vsConfig: 'config' };
+  vsEx: 'ex', vsExSem: 'ex', vsExTri: 'ex', vsExHist: 'ex', vsPainel: 'pg', vsRelatorio: 'relatorio', vsConfig: 'config' };
 const TELA_DA_ABA = { vistoria: 'vsVistoria', checklists: 'vsChecklists', aberto: 'vsAberto', an: 'vsAnAberto',
   ad: 'vsAdAberto', ex: 'vsEx', pg: 'vsPainel', relatorio: 'vsRelatorio', config: 'vsConfig' };
 /* A barra de módulos pintada agora é a do Vistorias? (cada área pinta a sua) */

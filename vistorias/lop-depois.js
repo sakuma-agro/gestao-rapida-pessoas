@@ -119,6 +119,12 @@
         const v = anVista === "previa" ? anVoltar : anVista;
         return { apontamento: "vsAnNovo", painel: "vsAnAberto", historico: "vsAnHist" }[v] || null;
       }
+      if (qual === "ex") {
+        if (exVista === "insp") return exiEst && exiEst.per === "trimestral" ? "vsExTri" : "vsExSem";
+        if (exVista === "hist") return "vsExHist";
+        if (exVista === "form") return null;
+        return "vsEx";
+      }
       if (qual === "ad") {
         if (!document.getElementById("ad-form").hidden) return adAtual && adAtual._novo ? "vsAdNovo" : null;
         if (adFiltro.vista === "historico") return "vsAdHist";
@@ -143,6 +149,8 @@
       document.getElementById("t-an").click();
       return true;
     }
+    const ex = { vsEx: "lista", vsExSem: "semanal", vsExTri: "trimestral", vsExHist: "hist" }[tela];
+    if (ex && window.exIr) { window.exIr(ex); return true; }
     if (tela === "vsAdNovo") { adAtual = adNovo(); adMostrar("form"); return true; }
     const ad = { vsAdAberto: ["aguardando", "grade"], vsAdFechados: ["concluidos", "grade"], vsAdHist: ["todos", "historico"] }[tela];
     if (ad) { adFiltro.sit = ad[0]; adFiltro.vista = ad[1]; adMostrar("lista"); return true; }

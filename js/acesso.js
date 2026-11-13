@@ -827,7 +827,7 @@ const ICONE_SUB = {
   emprestimo: 'dinheiro', ferias: 'sol', dpRelatorios: 'grafico', dpConfig: 'config',
   vsSubVistoria: 'escudo', vsSubChecklists: 'boletim', vsSubAberto: 'relogio',
   vsSubAnNovo: 'mais', vsSubAnAberto: 'relogio', vsSubAnHist: 'historico',
-  vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
+  vsSubAdNovo: 'mais', vsSubAdAberto: 'relogio', vsSubAdFechados: 'check', vsSubAdHist: 'historico', vsSubEx: 'extintor', vsSubExSem: 'check', vsSubExTri: 'calendario', vsSubExHist: 'historico', vsSubPainel: 'painel', vsSubRelatorio: 'documento', vsSubConfig: 'config',
   reuSub: 'reuniao',
   cePainelSub: 'painel', ceReqSub: 'check', ceDocSub: 'documento', cePendSub: 'alerta', ceIndAbsSub: 'relogio', ceIndTurnSub: 'pessoas', ceCrono: 'calendario', ceIndSub: 'grafico', ceCertSub: 'escudo', ceCadSub: 'boletim', ceFaunaSub: 'folha', ceEnergiaSub: 'raio', ceResiduosSub: 'reciclar', ceBalancoSub: 'balanca', ceFornSub: 'predio', ceNcSub: 'alerta', ceMelhSub: 'grafico', ceFbSub: 'reuniao', ceGraspSub: 'pessoas', ceBanhoSub: 'pessoa', ceFolhasEstSub: 'ficha', ceSinalSub: 'etiqueta', ceImpSub: 'ficha', ceClSub: 'check', ceAnSub: 'mapa',
 };
