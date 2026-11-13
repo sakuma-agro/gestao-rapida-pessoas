@@ -883,6 +883,8 @@ addEventListener('beforeinstallprompt', function (ev) {
     <section class="tela" id="telaEpiSaldo" hidden></section>
     <section class="tela" id="telaEpiLavagem" hidden></section>
 
+    <section class="tela" id="telaFichaRev" hidden></section>
+
     <!-- ---- MODELO ---- -->
     <section class="tela" id="telaModelo" hidden>
       <form class="cartao" id="formModelo">
@@ -921,6 +923,15 @@ addEventListener('beforeinstallprompt', function (ev) {
           </label>
           <label class="campo">Linhas padrão
             <input type="number" id="mLinhas" min="1" max="40">
+          </label>
+          <label class="campo">Formulário (ficha da entrega)
+            <input type="text" id="mFormCod" placeholder="FORM 057">
+          </label>
+          <label class="campo">Revisão
+            <input type="text" id="mFormRev" placeholder="01">
+          </label>
+          <label class="campo">Data da revisão
+            <input type="text" id="mFormData" placeholder="dd/mm/aaaa">
           </label>
         </div>
         <div class="barra">

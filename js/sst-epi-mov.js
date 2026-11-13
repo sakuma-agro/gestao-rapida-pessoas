@@ -143,9 +143,10 @@ function entregas() {
     if (m.sentido !== 'saida' || !m.funcionario_id || m.pendente) continue;
     const k = m.lancamento_id || m.id;
     if (!g.has(k)) g.set(k, { id: k, data: String(m.data).slice(0, 10), funcionario_id: m.funcionario_id, funcionario: m.funcionario,
-      local_id: m.local_id, linhas: [], assinada: true, por: m.criado_por || m.operador || '', origem: m.origem || '' });
+      local_id: m.local_id, linhas: [], assinada: true, por: m.criado_por || m.operador || '', origem: m.origem || '', num: null });
     const e = g.get(k);
     e.linhas.push(m);
+    if (m.entrega_num) e.num = m.entrega_num;   // Nº da entrega, dado pelo banco (13/11/2026)
     if (!m.ficha_assinada) e.assinada = false;
   }
   return [...g.values()].sort((a, b) => b.data.localeCompare(a.data) || String(a.funcionario).localeCompare(String(b.funcionario), 'pt-BR'));
@@ -209,13 +210,16 @@ function fichaHtml(e) {
   const meia = linhas.length <= LINHAS_MEIA_MAX;
   const n = meia ? Math.max(linhas.length, LINHAS_MEIA) : Math.max(linhas.length, Number(m.linhas_padrao) || 20);
   while (linhas.length < n) linhas.push(linhaVazia());
-  const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id, entrega: true });
+  const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id, entrega: true, numero: numEntrega(e) });
   if (!meia) return { meia: false, html };
-  // altura da ficha da entrega com 6 linhas: 100,6 mm fixos + 7,4 mm × 6 = 145 mm → zoom fixo para caber em 142 mm
-  const zoom = (142 / (100.6 + 7.4 * LINHAS_MEIA)).toFixed(3);
+  // altura da ficha da entrega com 6 linhas: 97,6 mm fixos + 7,4 mm × 6 ≈ 142 mm → zoom fixo para caber em 142 mm
+  const zoom = (142 / (97.6 + 7.4 * LINHAS_MEIA)).toFixed(3);
   return { meia: true, html: html.replace('<div class="folha fe">', `<div class="folha fe meia" style="zoom:${zoom}">`) };
 }
 const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 6;
+/* Nº da entrega (13/11/2026, pedido dele): sequência do banco por lançamento
+   (tabela epi_entrega_numeros, gatilho epi_numerar_entrega). */
+const numEntrega = e => e && e.num ? String(e.num).padStart(4, '0') : '';
 const SEL = new Set();   // entregas marcadas para imprimir
 function imprimirFichas(lista) {
   if (!lista.length) { alert('Nenhuma entrega para imprimir.'); return; }
@@ -323,7 +327,7 @@ function telaSaida(tela) {
     <div class="epm-lista">
     ${vis.length ? vis.map(e => `<div class="epm-ent${SEL.has(e.id) ? ' marcada' : ''}">
       <input type="checkbox" class="epm-marca" data-epm-sel="${esc(e.id)}"${SEL.has(e.id) ? ' checked' : ''} title="Marcar para imprimir">
-      <div class="epm-ent-txt"><b>${esc(e.funcionario)}</b> <span class="dc-sem">${br(e.data)} · ${esc(localDe(e.local_id).nome)}</span><br>
+      <div class="epm-ent-txt"><b>${esc(e.funcionario)}</b> <span class="dc-sem">${e.num ? `Nº ${numEntrega(e)} · ` : ''}${br(e.data)} · ${esc(localDe(e.local_id).nome)}</span><br>
         <span class="epm-ent-itens">${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(nomeSemCa(itemDe(l.item_id).nome))}${l.ca ? ` <span class="dc-sem">CA ${esc(l.ca)}</span>` : ''}`).join(' · ')}</span></div>
       <div class="epm-ent-acoes">
         <button class="btn mini" type="button" data-epm-ficha="${esc(e.id)}">🖨 Ficha</button>

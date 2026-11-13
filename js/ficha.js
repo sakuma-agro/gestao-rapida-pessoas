@@ -84,29 +84,36 @@ function fichaEntrega(func, modelo, opcoes) {
     celula('assinatura', i, l.assinatura, 'f14 es blt brt btt bbt') +
     celula('mer', i, l.mer, 'f10 ce blt btt bbt') +
     '</tr>';
-  /* Legenda FAZ em pares (F | L, M | T, Q | G) e M.E.R ao lado, numa tabela
-     fechada; "G - GERAL" entra sozinho se o Modelo da ficha não tiver G. */
+  /* Cabeçalho (13/11/2026, sugestão C): logo | título em duas linhas | código
+     do formulário; legendas FAZ e M.E.R em duas faixas corridas. "G - GERAL"
+     entra sozinho se o Modelo da ficha não tiver G. */
   const fazPares = [];
   for (const linha of fazLeg) for (const parte of String(linha).split('/')) if (parte.trim()) fazPares.push(parte.trim().replace(/\s+/g, ' '));
   if (!fazPares.some(t => /^G\s*-/i.test(t))) fazPares.push('G - GERAL');
-  const nLegFe = Math.max(Math.ceil(fazPares.length / 2), merLeg.length, 3);
-  const legLinha = i => `<tr class="fe-leg">
-    <td colspan="2" class="fe-l blt brt btt bbt">${esc(fazPares[2 * i] || '')}</td>
-    <td class="fe-l brt btt bbt">${esc(fazPares[2 * i + 1] || '')}</td>
-    <td colspan="3" class="fe-l btt bbt">${esc(merLeg[i] || '')}</td></tr>`;
+  const tit = String(modelo.titulo || '');
+  const iPar = tit.indexOf(' (');
+  const titHtml = iPar > 0 ? `${esc(tit.slice(0, iPar))}<br>${esc(tit.slice(iPar + 1))}` : esc(tit);
+  const campoForm = (rot, val, vazio) => `<div class="fe-fl"><span>${rot}</span><b>${val ? esc(val) : `<i>${vazio}</i>`}</b></div>`;
+  const numHtml = `<div class="fe-num"><span>Nº da entrega</span><b>${opcoes.numero ? esc(opcoes.numero) : '<i></i>'}</b></div>`;
+  const formHtml = campoForm('Formulário', modelo.form_codigo, '') +
+    campoForm('Revisão', modelo.form_revisao, '') + campoForm('Data', modelo.form_data, '');
+  // rótulo curto na faixa: "M.E.R: Motivos para…" → "M.E.R:" (o resto cabe na legenda)
+  const curto = r => { const t = String(r || '').trim(); const i = t.indexOf(':'); return i > 0 && t.length > 24 ? t.slice(0, i + 1) : t; };
+  const faixa = (rot, itens) => `<tr class="fe-faixa"><td colspan="8">${rot ? `<b>${esc(curto(rot))}</b> ` : ''}${itens.map(esc).join('&nbsp;&nbsp;·&nbsp; ')}</td></tr>`;
   return `<div class="folha fe">
   <div class="ficha" data-chave="${esc(chave)}">
   <table class="fx"><colgroup>
     <col style="width:4.729%"><col style="width:13.997%"><col style="width:5.296%"><col style="width:9.269%">
     <col style="width:22.005%"><col style="width:13.997%"><col style="width:22.131%"><col style="width:8.575%">
   </colgroup><tbody>
-  <tr class="fe-leg fe-cab">
-    <td class="fe-logo" colspan="2" rowspan="${nLegFe + 1}"><img src="${LOGO}" alt="SAKUMA Agronegócios"></td>
-    <td colspan="3" class="fe-l b blt brt bbt">${esc(modelo.rotulo_faz)}</td>
-    <td colspan="3" class="fe-l b bbt">${esc(modelo.rotulo_mer)}</td>
-  </tr>
-  ${Array.from({ length: nLegFe }, (_, i) => legLinha(i)).join('')}
-  <tr class="fe-tit"><td colspan="8" class="titulo btm">${esc(modelo.titulo)}</td></tr>
+  <tr class="fe-topo"><td colspan="8"><div class="fe-topo-in">
+    <div class="fe-logo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios"></div>
+    <div class="fe-titulo">${titHtml}</div>
+    ${numHtml}
+    <div class="fe-form">${formHtml}</div>
+  </div></td></tr>
+  ${faixa(modelo.rotulo_faz, fazPares)}
+  ${faixa(modelo.rotulo_mer, merLeg)}
   <tr class="r12">
     <td colspan="2" class="f20 b es vm btt bbt">EMPREGADOR:</td>
     <td colspan="6" class="f20 b es vm btt bbt">${esc(func.empregador)}</td>

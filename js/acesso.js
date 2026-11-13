@@ -86,6 +86,7 @@ export const MODULOS = [
       ['epiCrono', 'Cronograma de troca'],
       ['epiLavagem', 'Lavagem e higienização'],
       ['modelo', 'Modelo da ficha'],
+      ['fichaRev', 'Revisões'],   // revisões da ficha (FORM 057), 13/11/2026
     ] },
     { id: 'exames', nome: 'Exames', telas: [
       ['exPainel', 'Painel'],

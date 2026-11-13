@@ -28,6 +28,7 @@ import { abrirNrs, limparNrs } from './sst-nrs.js';
 import { abrirEpiCrono, limparEpiCrono, ligarEpiCrono, redesenharEpiCrono } from './sst-epi-crono.js';
 import { abrirEpiMov, TELAS_EPI_MOV } from './sst-epi-mov.js';
 import { abrirEpiLavagem } from './sst-epi-lavagem.js';
+import { abrirRevisoesFicha } from './ficha-revisoes.js';
 import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincronizarReuniao } from './reuniao.js';
 import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
 import { abrirCompras } from './compras.js';
@@ -174,6 +175,7 @@ function abrirAba(nome) {
   for (const t of TELAS_EPI_MOV) $('tela' + t[0].toUpperCase() + t.slice(1)).hidden = nome !== t;   // Entregas/Entradas/Saldo (13/11/2026)
   $('telaEpiLavagem').hidden = nome !== 'epiLavagem';
   $('telaModelo').hidden = nome !== 'modelo';
+  $('telaFichaRev').hidden = nome !== 'fichaRev';
   $('telaDisc').hidden = nome !== 'disc';
   $('telaConfig').hidden = nome !== 'config';
   if (nome === 'config') dispatchEvent(new Event('gr:tela-config'));
@@ -220,6 +222,7 @@ function abrirAba(nome) {
   if (TELAS_EPI_MOV.includes(nome)) abrirEpiMov(nome);
   if (nome === 'epiLavagem') abrirEpiLavagem();
   if (nome === 'modelo') preencherModelo();
+  if (nome === 'fichaRev') abrirRevisoesFicha();
   $('telaRhCargos').hidden   = nome !== 'rhCargos';
   /* Gerar proposta e Alteração de salário dividem a mesma tela (03/11/2026). */
   $('telaRhProposta').hidden = !['rhProposta', 'rhAlteracao'].includes(nome);
@@ -1830,6 +1833,9 @@ function preencherModelo() {
   $('mRodape').value = m.rodape_demissao || '';
   $('mSetor').value = m.setor_padrao || '';
   $('mLinhas').value = m.linhas_padrao || 20;
+  $('mFormCod').value = m.form_codigo || '';
+  $('mFormRev').value = m.form_revisao || '';
+  $('mFormData').value = m.form_data || '';
 }
 
 const emLinhas = txt => txt.split('\n').map(s => s.trim()).filter(Boolean);
@@ -1849,6 +1855,9 @@ $('formModelo').addEventListener('submit', async ev => {
     rodape_demissao: $('mRodape').value,
     setor_padrao: $('mSetor').value,
     linhas_padrao: Math.max(1, Math.min(40, parseInt($('mLinhas').value) || 20)),
+    form_codigo: $('mFormCod').value.trim(),
+    form_revisao: $('mFormRev').value.trim(),
+    form_data: $('mFormData').value.trim(),
   });
   atualizarFichas();
   const b = ev.submitter; if (b) { b.textContent = 'Salvo'; setTimeout(() => b.textContent = 'Salvar modelo', 1600); }
