@@ -690,6 +690,8 @@ export async function carregarAcesso() {
 /* =============== menu =============== */
 let aoTrocar = () => {};
 let moduloAberto = null;
+/** Módulo do Pessoas aberto agora (o "+ Tarefa" do canto escolhe a área da tarefa, 13/11/2026). */
+export const moduloAtual = () => moduloAberto;
 
 /* Só os módulos da área Pessoas: módulo com `area` (Certificação) tem menu próprio. */
 export const modulosLiberados = () =>

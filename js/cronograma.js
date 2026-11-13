@@ -43,6 +43,7 @@ import { linhasCronograma, textoFreq } from './epi-cronograma-dados.js';
 import { estado, gravarLocal } from './store.js';
 import { acesso, abrirModulo, moduloDe, podeTela } from './acesso.js';
 import { entrarNaArea, areasLiberadas } from './areas.js';
+import { resumoSemana, marcarAtividadeSemana, salvarFraseSemana, aoMudarReuniao } from './reuniao.js';
 import { abrirCompras, carregarCompras, pedidosAbertos, ehComprador, URG as URG_CMP } from './compras.js';
 
 const $ = id => document.getElementById(id);
@@ -1869,10 +1870,43 @@ function quemFica(itens) {
     return `<button type="button" class="cr-reu-chip${fora ? ' fora' : ''}" data-reufica="${x.id}" aria-pressed="${!fora}">${fora ? '' : '✓ '}${esc(x.nome)}</button>`;
   }).join('')}</div></div>`;
 }
+/* Reunião semanal junto da diária (13/11/2026, pedido dele): no "1 · Bom dia!"
+   entram a frase da semana (quem traz; cadastra ali mesmo) e as atividades
+   do escritório da semana, com o "feito" de cada uma. As telas de rodízio
+   (Frases, Responsáveis, Atividades) continuam em Pessoas › Reunião semanal. */
+function blocoSemanal() {
+  let r; try { r = resumoSemana(); } catch { return ''; }
+  if (!r.escala.length && !r.frase && !r.resp) return '';
+  const frase = r.frase
+    ? `<blockquote class="cr-sem-frase">“${esc(r.frase)}”${r.autor ? `<small>— ${esc(r.autor)}</small>` : ''}</blockquote>`
+    : `<div class="cr-sem-sem">${r.resp ? `Quem traz a frase: <b>${esc(r.resp.nome)}</b>` : 'Ninguém no rodízio da frase.'}
+        ${r.podeFrase && r.resp ? `<span class="cr-sem-in"><input id="crSemFrase" maxlength="300" placeholder="Escreva a frase da semana"><button type="button" class="btn mini principal" id="crSemFraseOk">Salvar</button></span>` : ''}</div>`;
+  const atv = r.escala.map(e => `<li class="${e.feito ? 'ok' : ''}"><span>${esc(e.atividade.nome)}</span><b>${esc(e.pessoa.nome.split(' ')[0])}</b>
+      <button type="button" class="btn mini${e.feito ? '' : ' principal'}" data-semfeito="${esc(e.atividade.id)}" data-v="${e.feito ? '0' : '1'}">${e.feito ? '✓ Feito' : 'Marcar feito'}</button></li>`).join('');
+  return `<section class="cr-sem" data-semana="${r.semana}"><h4>📅 Reunião semanal <span>${esc(r.faixa)}</span></h4>
+    <div class="cr-sem-rot">Frase da semana</div>${frase}
+    ${atv ? `<div class="cr-sem-rot">Atividades do escritório</div><ul class="cr-sem-atv">${atv}</ul>` : ''}</section>`;
+}
+function ligarSemanal(r) {
+  const sec = r.querySelector('.cr-sem'); if (!sec) return;
+  const s = sec.dataset.semana;
+  const ok = $('crSemFraseOk');
+  if (ok) ok.onclick = async () => {
+    const v = limpo($('crSemFrase').value); if (!v) return $('crSemFrase').focus();
+    ok.disabled = true;
+    try { recado(await salvarFraseSemana(s, v)); } catch (e) { const a = $('avisoGlobal'); if (a) { a.textContent = e.message; a.className = 'aviso erro'; a.hidden = false; } }
+    desenhar();
+  };
+  sec.querySelectorAll('[data-semfeito]').forEach(b => b.onclick = async () => {
+    b.disabled = true; recado(await marcarAtividadeSemana(s, b.dataset.semfeito, b.dataset.v === '1')); desenhar();
+  });
+}
+let semOuvindo = false;
+
 function reuniao() {
   const itens = itensReu();
   const ps = pessoasReuniao(itens);
-  if (!candidatosReuniao(itens).length) return barraPauta() + '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>';
+  if (!candidatosReuniao(itens).length) return barraPauta() + '<p class="cr-vazio">Ninguém do escritório tem tarefa aberta agora.</p>' + blocoSemanal();
   if (!ps.length) return barraPauta() + `<section class="cr-reu-abre"><h3><i>1</i> Bom dia!</h3>${quemFica(itens)}<p class="cr-vazio">Escolha pelo menos uma pessoa para a reunião.</p></section>`;
   if (!reu.atual || !ps.some(p => p.id === reu.atual)) reu.atual = ps[0].id;
   const idx = ps.findIndex(p => p.id === reu.atual), p = ps[idx], prox = ps[idx + 1];
@@ -1910,6 +1944,7 @@ function reuniao() {
         <p>${esc(SEMANA[dow])}, ${esc(br(hoje()))} · ${ps.length} ${ps.length === 1 ? 'pessoa' : 'pessoas'} na reunião</p>
         ${quemFica(itens)}
         <ul class="cr-reu-equipe">${ps.map(linhaP).join('')}</ul>
+        ${blocoSemanal()}
         <p class="cr-anomalia">⚠ ${esc(ANOMALIA)}</p>
         <button type="button" class="btn principal" id="crReuComecar">Começar: ${esc(ps[0].nome)} →</button>
       </section></div></div>`;
@@ -1970,6 +2005,11 @@ function tic() {
 }
 function ligarReuniao() {
   const r = alvo;
+  ligarSemanal(r);
+  if (!semOuvindo) { semOuvindo = true; aoMudarReuniao(() => {
+    if (est.visao !== 'reuniao' || !alvo || alvo.closest('[hidden]') || document.activeElement?.id === 'crSemFrase') return;
+    desenhar();
+  }); }
   const trocar = id => { fecharTrecho(); reu.atual = id; desenhar(); window.scrollTo?.({ top: r.offsetTop, behavior: 'smooth' }); };
   if ($('crReuIni')) $('crReuIni').onclick = () => { reu.rodando = true; reu.marca = agoraS(); desenhar(); };
   const comecar = () => { if (!reu.rodando) { reu.rodando = true; reu.marca = agoraS(); } reu.etapa = 'pessoas'; reu.atual = pessoasReuniao(itensReu())[0]?.id || null; desenhar(); };
@@ -2676,13 +2716,21 @@ function abrirTarefa(chave) {
 /* Atalho "+ Tarefa" na tela do celular (12/11/2026, pedido dele): o ícone
    abre o app já com o formulário de tarefa nova do Rastro, sem passar pelas
    telas. Espera a base carregar (as pessoas do campo Responsável). */
-export async function abrirNovaTarefaAtalho() {
+/* Botão "+ Tarefa" no canto de todas as outras áreas (13/11/2026, pedido
+   dele): lembrou de uma tarefa no meio do Pessoas, toca, abre a janela e
+   lança — vai tudo para o Rastro, sem sair da tela. opc.area já deixa a
+   área da tarefa escolhida conforme a tela de onde veio. */
+let novaOpc = {};
+export async function abrirNovaTarefaAtalho(opc = {}) {
+  novaOpc = opc || {};
   try { await Promise.race([carregarCronograma(), new Promise(ok => setTimeout(ok, 4000))]); } catch {}
   abrirItem(null);
 }
 
 function abrirItem(chave) {
   if (chave) return abrirTarefa(chave);
+  const opc = novaOpc; novaOpc = {};
+  const areaIni = AREAS_C[opc.area] ? opc.area : 'esc';
   const d = dialogo();
   const it = chave ? todosItens().find(x => x.chave === chave) : null;
   if (chave && !it) return;
@@ -2701,17 +2749,17 @@ function abrirItem(chave) {
       <label class="campo plena">Tarefa<input id="crTit" required maxlength="160" value="${esc(t?.titulo || '')}" placeholder="O que precisa ser feito"></label>
       <label class="campo plena">Detalhes<textarea id="crDesc" rows="2" placeholder="Opcional">${esc(t?.descricao || '')}</textarea></label>
       <div class="campo plena cr-ckr-campo">Checklist <small class="dica">(opcional)</small><div id="crCkRasc"></div></div>
-      <label class="campo">${rep ? 'Começa em' : 'Data'}<input type="date" id="crData" required value="${esc(t?.data || est.dia || hoje())}"></label>
-      <label class="campo">Área<select id="crAreaT">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t?.area || 'esc') === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>
+      <label class="campo">${rep ? 'Começa em' : 'Data'}<input type="date" id="crData" required value="${esc(t?.data || (opc.area ? hoje() : est.dia) || hoje())}"></label>
+      <label class="campo">Área<select id="crAreaT">${Object.entries(AREAS_C).map(([k, a]) => `<option value="${k}" ${(t?.area || areaIni) === k ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select></label>
       <label class="campo">Repete<select id="crRep">
         ${opcoesRep(t)}
       </select></label>
-      <div class="campo plena" id="crDiasCampo" ${comDias(t?.recorrencia) ? '' : 'hidden'}>Dias da semana${seletorDias('crDias', diasPadrao(t?.recorrencia, t, t?.data || est.dia || hoje()))}</div>
+      <div class="campo plena" id="crDiasCampo" ${comDias(t?.recorrencia) ? '' : 'hidden'}>Dias da semana${seletorDias('crDias', diasPadrao(t?.recorrencia, t, t?.data || (opc.area ? hoje() : est.dia) || hoje()))}</div>
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
       ${nova || !t?.dono_email || String(t.dono_email).toLowerCase() === meuEmail() ? `<label class="campo plena cr-priv-campo"><span><input type="checkbox" id="crPriv" ${t?.privada ? 'checked' : ''}> <b>Só eu vejo</b> — a tarefa não aparece para mais ninguém da equipe</span></label>` : ''}
     </div>${nova ? '' : '</details>'}` : ''}
     <div class="grade">
-      <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? (it.explicito || '') : '', nomesDe(respsDaArea(it ? it.area : (t?.area || 'esc'), it?.unid)))}</select></label>
+      <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? (it.explicito || '') : '', nomesDe(respsDaArea(it ? it.area : (t?.area || areaIni), it?.unid)))}</select></label>
       ${it ? `<div class="campo">Situação${rep ? ' (desta vez)' : ''}<div class="cr-sits">${Object.entries(SIT).map(([k, n]) =>
         `<label><input type="radio" name="crSit" value="${k}" ${it.sit === k ? 'checked' : ''}> ${n}</label>`).join('')}</div></div>` : ''}
     </div>
@@ -2799,6 +2847,11 @@ function abrirItem(chave) {
     }
     d.close();
     recado(r);
+    if (nova && opc.avisar && r === 'ok') {
+      const a = $('avisoGlobal');
+      if (a) { a.textContent = `Tarefa lançada no Rastro: ${limpo($('crTit')?.value || '')}`; a.className = 'aviso ok fixo'; a.hidden = false;
+        clearTimeout(recado.t); recado.t = setTimeout(() => { a.hidden = true; a.className = 'aviso info'; }, 5000); }
+    }
   };
   const ap = $('crApagar');
   if (ap) ap.onclick = async () => {

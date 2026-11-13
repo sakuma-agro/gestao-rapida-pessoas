@@ -12,6 +12,7 @@ import { estado } from './store.js';
 import { desenharBackupInicio } from './backup.js';
 import { desenharFraseInicio, desenharAlertaAtividade } from './reuniao.js';
 import { desenharAlertaEmprestimo } from './alerta-emprestimo.js';
+import { moduloAtual } from './acesso.js';
 import { acesso, modulosLiberados, mostrarInicio, abrirModulo, telasLiberadas, montarMenu,
   registrarMenuArea, pintarModulos, desmarcarModulos, telaNaFaixa, aoPintarFaixa } from './acesso.js';
 
@@ -278,7 +279,28 @@ function medirTopo() {
   if (topo) document.documentElement.style.setProperty('--topo-h', topo.offsetHeight + 'px');
 }
 
+/* "+ Tarefa" no canto (13/11/2026, pedido dele): em todas as áreas, menos no
+   próprio Rastro, abre a janela de tarefa nova e lança direto no Rastro.
+   Só para quem tem o Rastro. A área da tarefa vem da tela aberta. */
+const AREA_TAREFA = { manutencoes: 'maq', certificacao: 'cert', vistorias: 'vist', programacao: 'prog', estoque: 'est',
+  custobase: 'custo', colheita: 'colh', projetos: 'proj', compras: 'cmp' };
+const MOD_TAREFA = { sst: 'sst', rh: 'rh', jornada: 'dp', reuniao: 'esc' };
+function areaDaTarefa() {
+  if (areaAtual === 'pessoas') return MOD_TAREFA[moduloAtual()] || 'cad';
+  return AREA_TAREFA[areaAtual] || 'esc';
+}
+function pintarMaisTarefa() {
+  const b = $('btnMaisTarefa'); if (!b) return;
+  b.hidden = areaAtual === 'cronograma' || !liberada('cronograma');
+  if (!b.dataset.ligado) {
+    b.dataset.ligado = '1';
+    b.addEventListener('click', () => import('./cronograma.js')
+      .then(m => m.abrirNovaTarefaAtalho({ area: areaDaTarefa(), avisar: true })).catch(() => {}));
+  }
+}
+
 function pintarEtiqueta() {
+  pintarMaisTarefa();
   const a = AREAS.find(x => x.id === areaAtual);
   $('bArea').hidden = !a;
   if (!a) return;

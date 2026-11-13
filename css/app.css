@@ -2863,3 +2863,30 @@ body.crq-laudo #crqLaudo{display:block;position:fixed;inset:0;overflow:auto;z-in
 .cv-tab tr{break-inside:avoid}
 .cv-obs,.cv-legenda{font-size:10.5px;margin:6px 0 0}
 @media (max-width:640px){.cv-campos{grid-template-columns:1fr 1fr}.cv-resumo{grid-template-columns:repeat(3,1fr)}}
+
+/* "+ Tarefa" no canto de todas as áreas, menos o Rastro (13/11/2026) */
+.fab-tarefa{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));z-index:60;
+  display:inline-flex;align-items:center;gap:6px;padding:11px 16px;border:0;border-radius:999px;cursor:pointer;
+  background:#1B232B;color:#fff;font:600 14px/1 inherit;font-family:inherit;box-shadow:0 4px 14px rgba(27,35,43,.28)}
+.fab-tarefa span{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#84BD00;color:#1B232B;font-size:17px;font-weight:700;line-height:1}
+.fab-tarefa:hover{background:#2a3540}
+.fab-tarefa:focus-visible{outline:3px solid #84BD00;outline-offset:2px}
+.fab-tarefa[hidden]{display:none}
+#avisoGlobal.fixo{position:fixed;left:50%;transform:translateX(-50%);bottom:76px;z-index:61;max-width:calc(100vw - 32px);box-shadow:0 4px 14px rgba(0,0,0,.15);background:var(--papel)}
+@media print{.fab-tarefa{display:none !important}}
+
+/* Reunião semanal dentro da reunião diária do Rastro (13/11/2026) */
+.cr-sem{margin:14px 0 4px;padding:12px 14px;border:1px solid rgba(132,189,0,.4);border-radius:10px;background:var(--verde-fundo,#f3f9e6)}
+.cr-sem h4{margin:0 0 8px;font-size:15px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.cr-sem h4 span{font-weight:400;font-size:12px;color:var(--suave)}
+.cr-sem-rot{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--suave);margin:8px 0 4px}
+.cr-sem-frase{margin:0;font-size:15px;font-style:italic;color:var(--texto)}
+.cr-sem-frase small{display:block;font-style:normal;font-size:12px;color:var(--suave);margin-top:2px}
+.cr-sem-sem{font-size:13px;display:flex;flex-direction:column;gap:6px}
+.cr-sem-in{display:flex;gap:6px}
+.cr-sem-in input{flex:1;min-width:0;padding:7px 9px;border:1px solid var(--linha);border-radius:6px;font:inherit;background:var(--papel);color:var(--texto)}
+.cr-sem-atv{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.cr-sem-atv li{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:13px;background:var(--papel);border-radius:8px;padding:6px 8px}
+.cr-sem-atv li.ok span{text-decoration:line-through;color:#7a7c75}
+.cr-sem-atv li b{font-weight:600;color:var(--marrom)}
+@media (max-width:520px){.cr-sem-atv li{grid-template-columns:1fr auto}.cr-sem-atv li b{grid-column:1}}

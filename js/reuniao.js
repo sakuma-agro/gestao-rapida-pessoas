@@ -707,6 +707,25 @@ function telaAtiv(sec, pode) {
 }
 
 /** Quantos itens da reunião ainda esperam envio (fila + marcas). Rodada A. */
+/* Reunião semanal dentro da reunião diária do Rastro (13/11/2026, pedido
+   dele: "junte com ela lá na reunião diária"). O Rastro mostra a frase da
+   semana e as atividades do escritório no "1 · Bom dia!" e marca/cadastra
+   por aqui, com as mesmas regras (fila sem rede, permissão do módulo). */
+export function resumoSemana() {
+  const s = segundaDe();
+  const reg = semanaReg(s);
+  const frase = limpo(reg?.frase);
+  const resp = responsavelFrase(s).pessoa;
+  return { semana: s, faixa: faixaSemana(s), frase, autor: limpo(reg?.autor_nome) || resp?.nome || '', resp,
+    escala: escalaDaSemana(s).filter(e => e.pessoa), podeFrase: podeTela('reuSemana') };
+}
+export const marcarAtividadeSemana = (s, id, feito) => marcarFeito(s, id, feito);
+export function salvarFraseSemana(s, frase) {
+  const resp = responsavelFrase(s).pessoa;
+  return salvarSemana(s, { frase: limpo(frase) || null, autor_id: resp?.id || null, autor_nome: resp?.nome || null });
+}
+export function aoMudarReuniao(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); }
+
 export function pendentesReuniao() {
   return ler(FILA, []).length + (ler('gr.reuniao.marcas', []).length || 0);
 }
