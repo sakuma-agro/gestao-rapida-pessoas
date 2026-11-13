@@ -201,19 +201,20 @@ function fichaHtml(e) {
     return { ...linhaVazia(), faz: l.faz || faz, data: br(e.data), qtd: mostra(l.quantidade), ca: l.ca || casDe(it)[0] || '',
       descricao: nomeSemCa(it.nome).toUpperCase(), mer: l.mer || '' };
   });
-  /* Meia folha (13/11/2026, pedido dele: "no A4 está ficando muito grande"):
-     6 linhas (ou as da entrega, até 8) e 2 fichas por A4, com linha de corte.
-     Entrega com mais de 8 EPIs sai em folha inteira, como antes. */
+  /* Dois tamanhos padrão (13/11/2026, pedidos dele: "no A4 está ficando muito
+     grande" e "deixar padrão, meia folha ou inteira, para não ter desperdício"):
+     até 6 EPIs → MEIA FOLHA, sempre igual (6 linhas, 2 por A4, linha de corte);
+     7 ou mais → FOLHA INTEIRA (modelo de 20 linhas, ou mais se a entrega pedir). */
   const meia = linhas.length <= LINHAS_MEIA_MAX;
   const n = meia ? Math.max(linhas.length, LINHAS_MEIA) : Math.max(linhas.length, Number(m.linhas_padrao) || 20);
   while (linhas.length < n) linhas.push(linhaVazia());
   const html = montarFicha(f, m, { mes: dt.getMonth(), ano: dt.getFullYear(), linhas, chave: 'epm|' + e.id });
   if (!meia) return { meia: false, html };
-  // altura da ficha: 107,2 mm fixos + 7,4 mm por linha; cabe em 142 mm da meia folha
-  const zoom = Math.min(1, 142 / (107.2 + 7.4 * n)).toFixed(3);
+  // altura com 6 linhas: 107,2 mm fixos + 7,4 mm × 6 = 151,6 mm → zoom fixo para caber em 142 mm
+  const zoom = (142 / (107.2 + 7.4 * LINHAS_MEIA)).toFixed(3);
   return { meia: true, html: html.replace('<div class="folha">', `<div class="folha meia" style="zoom:${zoom}">`) };
 }
-const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 8;
+const LINHAS_MEIA = 6, LINHAS_MEIA_MAX = 6;
 function imprimirFichas(lista) {
   if (!lista.length) { alert('Nenhuma entrega para imprimir.'); return; }
   const fs = lista.map(fichaHtml);
