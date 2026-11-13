@@ -67,6 +67,10 @@ const cpfBr = c => { const d = String(c || '').replace(/\D/g, ''); return d.leng
    · assinatura do termo continua ACIMA da tabela, com nome e CPF embaixo;
    · coluna ASSINATURA e linhas em branco continuam; faixa de selos mais fina.
    Textos continuam vindo do Modelo da ficha. */
+/* Descrição do EPI: letra menor só nos nomes compridos, para caber na coluna
+   (análise dos 95 EPIs em 13/11/2026: 3 passavam da largura). */
+const tamDescricao = t => { const n = String(t || '').length; return n > 38 ? 'f12' : n > 30 ? 'f14' : 'f16'; };
+
 function fichaEntrega(func, modelo, opcoes) {
   const { linhas, chave } = opcoes;
   const setor = opcoes.setor || func.setor || modelo.setor_padrao || 'CAMPO';
@@ -79,7 +83,7 @@ function fichaEntrega(func, modelo, opcoes) {
     celula('data', i, l.data, 'f14 b ce brt btt bbt', '____/____/____') +
     celula('qtd', i, l.qtd, 'f18 b ce blt brt btt bbt') +
     celula('ca', i, l.ca, 'f20 b ce blt brt btt bbt') +
-    celula('descricao', i, l.descricao, 'f16 es blt brt btt bbt') +
+    celula('descricao', i, l.descricao, `${tamDescricao(l.descricao)} es blt brt btt bbt`) +
     celula('devolucao', i, l.devolucao, 'f12 b ce brt btt bbt', TRACO) +
     celula('assinatura', i, l.assinatura, 'f14 es blt brt btt bbt') +
     celula('mer', i, l.mer, 'f18 b ce blt btt bbt') +
