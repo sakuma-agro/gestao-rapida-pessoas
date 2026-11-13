@@ -24,8 +24,23 @@ const gravar = (t, r) => {
 
 const semAcento = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 const vazio = v => v === null || v === undefined || v === '';
-const TIPOS_ENTRADA = { compra: 'Compra', transferencia: 'Transferência', ajuste: 'Ajuste (balanço)', saldo_inicial: 'Saldo inicial' };
-const TIPOS_SAIDA = { uso: 'Uso', transferencia: 'Transferência', ajuste: 'Ajuste (balanço)' };
+const TIPOS_ENTRADA = { compra: 'Compra', devolucao: 'Devolução', transferencia: 'Transferência', ajuste: 'Ajuste (balanço)', saldo_inicial: 'Saldo inicial' };
+const TIPOS_SAIDA = { uso: 'Uso', perda: 'Perda / descarte', transferencia: 'Transferência', ajuste: 'Ajuste (balanço)' };
+/* Menu em telas separadas (13/11/2026, pedido dele: "Gestão de Estoque (Entrada
+   - Saída - Transferências - Ajustes)"): cada tela mostra só os seus tipos. */
+const MODOS = {
+  entrada: { corpo: 'qcEntradaCorpo', titulo: 'Entrada', lista: 'Entradas', tipos: { compra: 'Compra', devolucao: 'Devolução', saldo_inicial: 'Saldo inicial' } },
+  saida:   { corpo: 'qcSaidaCorpo', titulo: 'Saída', lista: 'Saídas', tipos: { uso: 'Uso', perda: 'Perda / descarte' } },
+  transf:  { corpo: 'qcTransfCorpo', titulo: 'Transferência', lista: 'Transferências', tipos: { transferencia: 'Transferência' } },
+  ajuste:  { corpo: 'qcAjusteCorpo', titulo: 'Ajuste de estoque', lista: 'Ajustes', tipos: { ajuste: 'Ajuste' } },
+};
+let modoAtual = 'entrada';
+const sentidoDoModo = m => m === 'entrada' ? 'entrada' : 'saida';
+const doModo = (m, modo) => modo === 'transf' ? m.tipo === 'transferencia' : modo === 'ajuste' ? m.tipo === 'ajuste'
+  : m.sentido === sentidoDoModo(modo) && m.tipo !== 'transferencia' && m.tipo !== 'ajuste';
+const rotuloTipo = m => m.tipo === 'ajuste' ? (m.sentido === 'entrada' ? 'Ajuste · sobra' : 'Ajuste · falta')
+  : m.tipo === 'transferencia' ? (m.sentido === 'saida' ? 'Transferência enviada' : 'Transferência recebida')
+  : ((m.sentido === 'entrada' ? TIPOS_ENTRADA : TIPOS_SAIDA)[m.tipo] || m.tipo);
 
 let telaAberta = null;
 let busca = '';
@@ -536,6 +551,73 @@ async function carregarDestinos() {
   } catch (err) { console.warn('não li máquinas/funcionários', err); }
 }
 
+/* ===================================================================
+   EMBALAGENS (13/11/2026, pedido dele: Cadastros › Embalagens)
+   Cada produto pode ter embalagens: Bag = 1000 kg, Galão = 20 L, Caixa = 12 un.
+   Nas linhas de entrada/saída aparece "em bag (1000 kg)"; a quantidade e o
+   R$ digitados por embalagem são convertidos para a unidade do produto.
+   =================================================================== */
+const embalagensDe = itemId => [...new Map(todos('est_embalagens').map(e => [e.id, e])).values()]
+  .filter(e => e.item_id === itemId && e.ativo !== false).sort((a, b) => Number(a.fator) - Number(b.fator))
+  .map(e => Object.assign({}, e, { fator: Number(e.fator) }));
+function embalagemSel(lin) {
+  const sel = lin.querySelector('.qc-emb');
+  if (!sel || sel.hidden || !sel.value) return null;
+  return [...new Map(todos('est_embalagens').map(e => [e.id, e])).values()].map(e => Object.assign({}, e, { fator: Number(e.fator) })).find(e => e.id === sel.value) || null;
+}
+let buscaEmb = '';
+function desenharEmbalagens() {
+  const alvo = $('qcEmbalagensCorpo');
+  if (!alvo) return;
+  if (!pronto()) { alvo.innerHTML = '<div class="cartao"><div class="vazio">Abrindo…</div></div>'; return; }
+  const todas = [...new Map(todos('est_embalagens').map(e => [e.id, e])).values()].filter(e => e.ativo !== false);
+  const b = semAcento(buscaEmb);
+  const comEmb = itensOrdenados().filter(i => todas.some(e => e.item_id === i.id) && (!b || semAcento(i.nome).includes(b)));
+  alvo.innerHTML = `
+  <div class="cartao">
+    <h2>Embalagens</h2>
+    <p class="dica">Como o produto chega: <b>Bag</b> de 1.000 kg, <b>Galão</b> de 20 L, <b>Caixa</b> com 12 un. Na entrada e na saída dá para digitar
+      "3 bags" e o estoque grava 3.000 kg (o valor digitado por embalagem também é convertido).</p>
+    <form id="emForm" class="grade" autocomplete="off">
+      <label class="campo plena">Produto <input type="text" name="prod" list="emProdutos" placeholder="digite o produto"></label>
+      <label class="campo">Embalagem <input type="text" name="nome" list="emNomes" placeholder="Bag, Galão, Caixa, Saco…"></label>
+      <label class="campo">Quanto tem em 1 embalagem <input type="text" name="fator" inputmode="decimal" placeholder="ex.: 1000"><small class="dc-sem" id="emUni"></small></label>
+      <div class="barra fim plena"><button class="btn principal" type="submit">Adicionar embalagem</button></div>
+      <datalist id="emProdutos">${itensOrdenados().map(i => `<option value="${esc(i.nome)}">${esc(i.unidade || '')} · ${esc(i.grupo || '')}</option>`).join('')}</datalist>
+      <datalist id="emNomes">${[...new Set(['Bag', 'Saco', 'Galão', 'Balde', 'Bombona', 'Caixa', 'Fardo', 'Pacote', 'Tambor', ...todas.map(e => e.nome)])].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    </form>
+  </div>
+  <div class="cartao">
+    <div class="barra entre"><h2 style="margin:0">Produtos com embalagem <small>${comEmb.length}</small></h2>
+      <label class="campo" style="margin:0;min-width:220px"><input type="search" id="emBusca" value="${esc(buscaEmb)}" placeholder="Procurar produto"></label></div>
+    <div class="lista">${comEmb.map(i => `<div class="item"><span></span><div><div class="nome">${esc(i.nome)}</div>
+      <div class="sub">${todas.filter(e => e.item_id === i.id).sort((a, b) => Number(a.fator) - Number(b.fator)).map(e =>
+        `${esc(e.nome)} = ${esc(mostrarNumero(e.fator))} ${esc(i.unidade || '')} <button type="button" class="btn mini" data-emtira="${esc(e.id)}" title="Tirar esta embalagem">×</button>`).join(' · ')}</div></div></div>`).join('')
+      || '<div class="vazio">Nenhuma embalagem cadastrada ainda.</div>'}</div>
+  </div>`;
+  const f = $('emForm');
+  const uni = () => { const it = itemPorNome(f.prod.value); $('emUni').textContent = it ? `em ${it.unidade || 'unidade'} do produto` : ''; };
+  f.prod.addEventListener('input', uni);
+  f.addEventListener('submit', async e => {
+    e.preventDefault();
+    const it = itemPorNome(f.prod.value), nome = f.nome.value.trim(), fator = lerNumero(f.fator.value);
+    if (!it) { aviso('Escolha um produto do cadastro.', true); return; }
+    if (!nome) { aviso('Escreva o nome da embalagem (ex.: Bag).', true); return; }
+    if (!(fator > 0)) { aviso('Quanto tem em 1 embalagem: use um número maior que zero.', true); return; }
+    if (embalagensDe(it.id).some(x => semAcento(x.nome) === semAcento(nome))) { aviso(`${it.nome} já tem a embalagem ${nome}.`, true); return; }
+    await gravar('est_embalagens', { item_id: it.id, nome, fator, ativo: true });
+    aviso(`${nome} de ${mostrarNumero(fator)} ${it.unidade || ''} em ${it.nome}.`);
+    desenharEmbalagens();
+  });
+  alvo.querySelectorAll('[data-emtira]').forEach(bt => bt.onclick = async () => {
+    const e = todas.find(x => x.id === bt.dataset.emtira);
+    if (!e || !confirm(`Tirar a embalagem ${e.nome}?`)) return;
+    await gravar('est_embalagens', Object.assign({}, e, { ativo: false }));
+    desenharEmbalagens();
+  });
+  $('emBusca').addEventListener('input', ev => { buscaEmb = ev.target.value; const p = ev.target.selectionStart; desenharEmbalagens(); const el = $('emBusca'); el.focus(); el.setSelectionRange(p, p); });
+}
+
 /* Fornecedores cadastrados (Gestão de estoque › Fornecedores) + os já usados. */
 const fornecedoresCad = () => [...new Map(todos('est_fornecedores').map(x => [x.id, x])).values()].filter(x => x.ativo !== false);
 const listaFornec = () => [...new Set([...fornecedoresCad().map(f => f.nome), ...unicos('fornecedor')])]
@@ -614,42 +696,48 @@ function linhaProduto(sentido) {
     <input type="text" class="qc-qtd" inputmode="decimal" placeholder="qtd" autocomplete="off" enterkeyhint="next">
     ${ent ? '<input type="text" class="qc-vu" inputmode="decimal" placeholder="R$ por unid." autocomplete="off" enterkeyhint="next" aria-label="Valor por unidade">' : ''}
     <button type="button" class="cl-tirar qc-x" title="Tirar a linha" aria-label="Tirar a linha">×</button>
-    <select class="qc-ca" hidden aria-label="CA do EPI"></select>
+    <div class="qc-extra" hidden><select class="qc-emb" hidden aria-label="Embalagem"></select><select class="qc-ca" hidden aria-label="CA do EPI"></select></div>
     <small class="qc-info"></small>
     ${ent ? '' : `<label class="qc-dest" hidden><span class="qc-dest-rot"></span>
       <input type="text" class="qc-dest-inp" autocomplete="off" enterkeyhint="next"></label>`}
   </div>`;
 }
 
-function desenharMov(sentido) {
-  const alvo = $(sentido === 'entrada' ? 'qcEntradaCorpo' : 'qcSaidaCorpo');
-  // um formulário só na página: o da outra tela sai (os ids se repetiriam)
-  $(sentido === 'entrada' ? 'qcSaidaCorpo' : 'qcEntradaCorpo').innerHTML = '';
+function desenharMov(modo) {
+  modoAtual = modo;
+  const sentido = sentidoDoModo(modo);
+  const M = MODOS[modo];
+  const alvo = $(M.corpo);
+  // um formulário só na página: o das outras telas sai (os ids se repetiriam)
+  for (const k of Object.keys(MODOS)) if (k !== modo) { const el = $(MODOS[k].corpo); if (el) el.innerHTML = ''; }
   if (!pronto()) { alvo.innerHTML = '<div class="cartao"><div class="vazio">Abrindo…</div></div>'; return; }
   if (!localQc()) return semLocal(alvo);
   const ent = sentido === 'entrada';
-  const tipos = ent ? TIPOS_ENTRADA : TIPOS_SAIDA;
+  const tipos = M.tipos;
+  const tr = modo === 'transf', aj = modo === 'ajuste';
   if (catMov && !grupoPermitido(catMov)) catMov = '';
   alvo.innerHTML = `
   <div class="cartao">
-    <div class="barra entre"><h2 style="margin:0">${ent ? 'Entrada' : 'Saída'} · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
+    <div class="barra entre"><h2 style="margin:0">${M.titulo} · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
     <form id="qcForm" autocomplete="off">
-      <div class="qc-tipos">${Object.entries(tipos).map(([k, v], n) => `<label class="qc-tipo">
+      <div class="qc-tipos"${tr || aj ? ' hidden' : ''}>${Object.entries(tipos).map(([k, v], n) => `<label class="qc-tipo">
         <input type="radio" name="tipo" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>
+      ${aj ? `<div class="qc-tipos">${[['entrada', 'Sobra — entra no estoque'], ['saida', 'Falta — sai do estoque']].map(([k, v], n) => `<label class="qc-tipo">
+        <input type="radio" name="lado" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>` : ''}
       <div class="grade">
         <label class="campo">Data <input type="date" name="data" value="${hojeISO()}" max="${hojeISO()}" required></label>
-        <label class="campo">Nº do documento${ent ? ' / NF' : ' *'} <input type="text" name="documento"></label>
-        ${ent ? `
+        <label class="campo">Nº do documento${ent ? ' / NF' : aj ? '' : ' *'} <input type="text" name="documento"></label>
+        ${aj ? '' : tr ? `
+        <label class="campo qc-so" data-so="transferencia">Estoque de destino *
+          <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}</select></label>
+        <label class="campo">Quem levou <input type="text" name="operador" list="qcOperadores"></label>` : ent ? `
         <label class="campo qc-so" data-so="compra">Fornecedor <span class="mv-com-botao"><input type="text" name="fornecedor" list="qcFornec">
           <button type="button" class="btn" id="qcNovoForn">+ Novo</button></span></label>
-        <label class="campo qc-so" data-so="transferencia">Fazenda de origem *
-          <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`
+        <label class="campo qc-so" data-so="devolucao">Quem devolveu <input type="text" name="devolveu" placeholder="funcionário ou setor"></label>`
         : `
         <label class="campo qc-so" data-so="uso">Plantio / destino <small class="dc-sem">(lubrificante e EPI: destino na linha)</small> <input type="text" name="plantio" list="qcPlantios" placeholder="plantio, área, máquina ou local"></label>
-        <label class="campo">Operador <span class="qc-op-obrig">*</span> <input type="text" name="operador" list="qcOperadores"></label>
-        <label class="campo qc-so" data-so="transferencia">Fazenda de destino *
-          <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}<option>Outra</option></select></label>`}
-        <label class="campo plena">Observação <input type="text" name="obs"></label>
+        <label class="campo">Operador <span class="qc-op-obrig">*</span> <input type="text" name="operador" list="qcOperadores"></label>`}
+        <label class="campo plena">${aj ? 'Motivo do ajuste *' : 'Observação'} <input type="text" name="obs"${aj ? ' placeholder="ex.: diferença na contagem de 13/11, embalagem rasgada…"' : ''}></label>
       </div>
       <div class="ct-chips qc-cats">${[['', 'Todas'], ...GRUPOS.filter(g => grupoPermitido(g) && itensOrdenados().some(i => i.grupo === g)).map(g => [g, g])]
         .map(([id, rot]) => `<button type="button" class="ct-chip" data-qccat="${esc(id)}" aria-pressed="${catMov === id}">${esc(rot)}</button>`).join('')}</div>
@@ -663,7 +751,7 @@ function desenharMov(sentido) {
       <div class="qc-lins" id="qcLins">${Array.from({ length: LINHAS_INICIAIS }, () => linhaProduto(sentido)).join('')}</div>
       <div class="barra entre">
         <button type="button" class="btn mini" id="qcMais">+ linha</button>
-        <button class="btn principal" type="submit" id="qcEnviar">Lançar ${ent ? 'entrada' : 'saída'}</button>
+        <button class="btn principal" type="submit" id="qcEnviar">Lançar ${M.titulo.toLowerCase()}</button>
       </div>
       <datalist id="qcProdutos">${listaProdutos()}</datalist>
       <datalist id="qcFornec">${listaFornec()}</datalist>
@@ -696,8 +784,8 @@ function desenharMov(sentido) {
     $('qcProdutos').innerHTML = listaProdutos();
     document.querySelectorAll('#qcLins .qc-prod').forEach(i => { if (i.value) i.dispatchEvent(new Event('input')); });
   }));
-  form.addEventListener('submit', e => { e.preventDefault(); lancar(sentido, form); });
-  desenharListaMes(sentido);
+  form.addEventListener('submit', e => { e.preventDefault(); lancar(aj ? form.querySelector('[name=lado]:checked').value : sentido, form); });
+  desenharListaMes();
 }
 
 /** Liga as linhas de produto (as novas também): Enter pula, saldo aparece, linha nova sozinha. */
@@ -720,13 +808,23 @@ function ligarLinhas(sentido) {
       inp.setAttribute('list', d === 'equip' ? 'qcEquip' : 'qcFunc');
       inp.placeholder = d === 'equip' ? 'código ou nome da máquina/implemento' : 'nome do funcionário';
     };
-    const caSel = lin.querySelector('.qc-ca');
+    const caSel = lin.querySelector('.qc-ca'), embSel = lin.querySelector('.qc-emb'), extra = lin.querySelector('.qc-extra');
     const mostrarCa = it => {
       const cas = it && it.grupo === 'EPIs' ? casDe(it) : [];
       caSel.hidden = !cas.length;
-      if (!cas.length) { caSel.innerHTML = ''; return; }
-      const atual = caSel.value;
-      caSel.innerHTML = cas.map(c => `<option value="${esc(c)}"${c === atual ? ' selected' : ''}>CA ${esc(c)}</option>`).join('');
+      if (cas.length) {
+        const atual = caSel.value;
+        caSel.innerHTML = cas.map(c => `<option value="${esc(c)}"${c === atual ? ' selected' : ''}>CA ${esc(c)}</option>`).join('');
+      } else caSel.innerHTML = '';
+      // embalagens do produto (Cadastros › Embalagens): "3 bags" vira 3000 kg
+      const embs = it ? embalagensDe(it.id) : [];
+      embSel.hidden = !embs.length;
+      if (embs.length) {
+        const atual = embSel.value;
+        embSel.innerHTML = `<option value="">em ${esc(it.unidade || 'unidade')}</option>` + embs.map(e =>
+          `<option value="${esc(e.id)}"${e.id === atual ? ' selected' : ''}>em ${esc(e.nome)} (${esc(mostrarNumero(e.fator))} ${esc(it.unidade || '')})</option>`).join('');
+      } else embSel.innerHTML = '';
+      extra.hidden = caSel.hidden && embSel.hidden;
     };
     const escreverInfo = () => {
       const it = itemPorNome(prod.value);
@@ -738,8 +836,11 @@ function ligarLinhas(sentido) {
       if (catMov && (it.grupo || 'Outros') !== catMov) { lin.classList.add('desconhecido'); info.textContent = `é de ${it.grupo || 'Outros'}, não de ${catMov}`; return; }
       const st = cu.itens.get(it.id);
       const medio = st && st.medio !== null ? st.medio : null;
-      const q = lerNumero(qtd.value), vu = vuInp ? lerNumero(vuInp.value) : null;
+      const emb = embalagemSel(lin);
+      const q0 = lerNumero(qtd.value), vu0 = vuInp ? lerNumero(vuInp.value) : null;
+      const q = emb && q0 > 0 ? q0 * emb.fator : q0, vu = emb && vu0 > 0 ? vu0 / emb.fator : vu0;
       const partes = [`${it.unidade || ''} · saldo ${mostrarNumero(Math.round((sd.get(it.id) || 0) * 1000) / 1000)}`];
+      if (emb && q0 > 0) partes.push(`${mostrarNumero(q0)} ${emb.nome} = ${mostrarNumero(q)} ${it.unidade || ''}`);
       if (sentido === 'entrada') {
         if (medio !== null) partes.push('custo médio ' + brlU(medio));
         if (q > 0 && vu > 0) partes.push('total ' + brl(q * vu));
@@ -761,6 +862,7 @@ function ligarLinhas(sentido) {
     prod.addEventListener('change', atualizar);
     qtd.addEventListener('input', () => { escreverInfo(); contar(); });
     if (vuInp) vuInp.addEventListener('input', () => { escreverInfo(); contar(); });
+    embSel.addEventListener('change', () => { escreverInfo(); contar(); });
     if (vuInp) vuInp.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
       e.preventDefault();
@@ -796,7 +898,8 @@ function linhasPreenchidas() {
     .map(lin => ({ lin, nome: lin.querySelector('.qc-prod').value.trim(), txt: lin.querySelector('.qc-qtd').value.trim(),
       vuTxt: lin.querySelector('.qc-vu') ? lin.querySelector('.qc-vu').value.trim() : '',
       destTxt: lin.querySelector('.qc-dest-inp') ? lin.querySelector('.qc-dest-inp').value.trim() : '',
-      ca: lin.querySelector('.qc-ca') && !lin.querySelector('.qc-ca').hidden ? lin.querySelector('.qc-ca').value : '' }))
+      ca: lin.querySelector('.qc-ca') && !lin.querySelector('.qc-ca').hidden ? lin.querySelector('.qc-ca').value : '',
+      emb: embalagemSel(lin) }))
     .filter(x => x.nome || x.txt);
 }
 function contar() {
@@ -863,8 +966,10 @@ async function lancar(sentido, form) {
   for (const x of preenchidas) {
     x.lin.classList.remove('erro');
     const item = itemPorNome(x.nome);
-    const qtd = lerNumero(x.txt);
-    const vu = sentido === 'entrada' ? lerNumero(x.vuTxt) : null;
+    const fator = x.emb ? x.emb.fator : 1;   // embalagem: 3 bags × 1000 = 3000 kg; R$ por bag ÷ 1000
+    const qtd = lerNumero(x.txt) * fator;
+    const v0 = sentido === 'entrada' ? lerNumero(x.vuTxt) : null;
+    const vu = v0 !== null && !Number.isNaN(v0) ? v0 / fator : v0;
     if (!x.nome) { x.lin.classList.add('erro'); erros.push('linha sem produto'); continue; }
     if (!item) { desconhecidos.set(semAcento(x.nome), x.nome); continue; }
     if (catMov && (item.grupo || 'Outros') !== catMov) { x.lin.classList.add('erro'); erros.push(`${item.nome}: não é ${catMov}`); continue; }
@@ -886,14 +991,15 @@ async function lancar(sentido, form) {
     aviso(`Confira as linhas em vermelho (${erros.length}: ${erros.slice(0, 3).join('; ')}${erros.length > 3 ? '…' : ''}). Precisa de quantidade maior que zero${sentido === 'entrada' && tipo === 'compra' ? ' e valor por unidade (obrigatório na compra)' : ''}${sentido === 'saida' && tipo === 'uso' ? '; lubrificante pede a máquina/implemento e EPI pede o funcionário, escolhidos da lista' : ''}.`, true);
     return;
   }
-  if (sentido === 'saida') {
+  if (tipo === 'ajuste' && !txt('obs')) { aviso('Escreva o motivo do ajuste.', true); return; }
+  if (sentido === 'saida' && tipo !== 'ajuste') {
     if (!txt('documento')) { aviso('Informe o nº do documento.', true); return; }
     // saída só de EPI (cada um com o funcionário) não pede operador (22/10/2026)
     const soEpi = tipo === 'uso' && linhas.length && linhas.every(l => l.dt === 'func' && l.dest);
-    if (!txt('operador') && !soEpi) { aviso('Informe o operador.', true); return; }
+    if (!txt('operador') && !soEpi && tipo !== 'transferencia') { aviso('Informe o operador.', true); return; }
     if (tipo === 'uso' && !txt('plantio') && linhas.some(l => !l.dest)) { aviso('Informe o plantio ou destino.', true); return; }
   }
-  if (tipo === 'transferencia' && !txt('outra')) { aviso(sentido === 'saida' ? 'Escolha a fazenda de destino.' : 'Escolha a fazenda de origem.', true); return; }
+  if (tipo === 'transferencia' && !txt('outra')) { aviso('Escolha o estoque de destino.', true); return; }
 
   if (sentido === 'saida' && tipo === 'ajuste') {
     const sd = saldos();
@@ -927,7 +1033,7 @@ async function lancar(sentido, form) {
     local_id: localQc().id, data: f.get('data') || hojeISO(), sentido, tipo,
     documento: txt('documento'), plantio: sentido === 'saida' && tipo === 'uso' ? txt('plantio') : null,
     operador: sentido === 'saida' ? txt('operador') : null,
-    outra_fazenda: tipo === 'transferencia' ? txt('outra') : null,
+    outra_fazenda: tipo === 'transferencia' ? txt('outra') : tipo === 'devolucao' ? txt('devolveu') : null,
     fornecedor: sentido === 'entrada' && tipo === 'compra' ? txt('fornecedor') : null,
     fornecedor_id: sentido === 'entrada' && tipo === 'compra' ? ((fornecedoresCad().find(x => semAcento(x.nome) === semAcento(txt('fornecedor') || '')) || {}).id || null) : null,
     obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
@@ -951,14 +1057,14 @@ async function lancar(sentido, form) {
         obs: 'Transferência entre estoques' + (base.obs ? ' · ' + base.obs : '') }));
   }
   const nPend = linhas.filter(l => l.pend > 0).length;
-  aviso(`${sentido === 'entrada' ? 'Entrada' : 'Saída'} lançada: ${linhas.filter(l => l.qtd > 0).length} produto(s)${nPend ? ` · ${nPend} ficaram em Pendências` : ''}.`);
+  aviso(`${MODOS[modoAtual].titulo} lançad${modoAtual === 'ajuste' ? 'o' : 'a'}: ${linhas.filter(l => l.qtd > 0).length} produto(s)${nPend ? ` · ${nPend} ficaram em Pendências` : ''}.`);
   if (pendAntes) {
     const comPend = [...new Set(linhas.filter(l => pendAntes.get(l.item.id)).map(l => l.item.nome))];
     if (comPend.length) setTimeout(() => aviso(`Tem saída pendente esperando: ${comPend.slice(0, 3).join(', ')}${comPend.length > 3 ? '…' : ''}. Efetive em Pendências.`), 2500);
   }
   mesLista = String(base.data).slice(0, 7);
   abertos.add(lancamento);
-  desenharMov(sentido);
+  desenharMov(modoAtual);
 }
 
 /** Produtos que não estão no cadastro: cadastra todos de uma vez e segue. */
@@ -984,12 +1090,11 @@ function cadastrarNaHora(nomes, sentido, form) {
 }
 
 /** Lançamentos do mês, agrupados: um cartão por lançamento (NF/requisição), com os itens dentro. */
-function desenharListaMes(sentido) {
+function desenharListaMes() {
   const alvo = $('qcListaCartao');
   if (!alvo) return;
-  const ent = sentido === 'entrada';
-  const tipos = ent ? TIPOS_ENTRADA : TIPOS_SAIDA;
-  const doMes = movimentosTodos().filter(m => m.sentido === sentido && String(m.data).slice(0, 7) === mesLista);
+  const modo = modoAtual;
+  const doMes = movimentosTodos().filter(m => doModo(m, modo) && String(m.data).slice(0, 7) === mesLista);
   const grupos = new Map();
   for (const m of doMes) {
     const k = m.lancamento_id || m.id;
@@ -1002,7 +1107,7 @@ function desenharListaMes(sentido) {
   const totalDe = ms => { let t = 0, ok = false; for (const x of ms) { const c = cu.mov.get(x.id); if (c && c.total !== null) { t += c.total; ok = true; } } return ok ? t : null; };
   alvo.innerHTML = `
     <div class="barra entre">
-      <h2 style="margin:0">${ent ? 'Entradas' : 'Saídas'} do mês</h2>
+      <h2 style="margin:0">${MODOS[modo].lista} do mês</h2>
       <label class="campo" style="margin:0"><input type="month" id="qcMes" value="${esc(mesLista)}" max="${hojeISO().slice(0, 7)}"></label>
     </div>
     <div class="lista">${lista.map(([k, ms]) => {
@@ -1010,11 +1115,11 @@ function desenharListaMes(sentido) {
       const aberto = abertos.has(k);
       return `<div class="qc-lanc">
         <button type="button" class="qc-lanc-cab" data-abre="${esc(k)}" aria-expanded="${aberto}">
-          <span><b>${dataBR(m.data)} · ${esc(tipos[m.tipo] || m.tipo)}</b> · ${ms.length} produto(s)${totalDe(ms) !== null ? ' · <b>' + esc(brl(totalDe(ms))) + '</b>' : ''}
+          <span><b>${dataBR(m.data)} · ${esc(rotuloTipo(m))}</b> · ${ms.length} produto(s)${totalDe(ms) !== null ? ' · <b>' + esc(brl(totalDe(ms))) + '</b>' : ''}
             <small>${detalhe(m)}${m.criado_por ? ' · lançado por ' + esc(m.criado_por) : ''}</small></span>
           <span class="qc-seta">${aberto ? '▾' : '▸'}</span>
         </button>
-        <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); const c = cu.mov.get(x.id) || {}; return `<div class="qc-lanc-item${ent ? ' com-valor' : ''}">
+        <div class="qc-lanc-itens"${aberto ? '' : ' hidden'}>${ms.map(x => { const i = itemDe(x.item_id); const c = cu.mov.get(x.id) || {}; const ent = x.sentido === 'entrada'; return `<div class="qc-lanc-item${ent ? ' com-valor' : ''}">
           <span>${esc(i.nome)}${x.equipamento || x.funcionario ? `<small class="qc-dest-txt">→ ${esc(x.equipamento || x.funcionario)}</small>` : ''}</span><strong class="${ent ? 'qc-ent' : 'qc-sai'}">${x.pendente ? '<span class="tag alerta">pendente</span> ' : ''}${ent ? '+' : '−'}${esc(mostrarNumero(x.quantidade))} ${esc(i.unidade || '')}</strong>
           ${ent ? `<label class="qc-vu-ed" title="Valor por unidade (R$)">R$/${esc(i.unidade || 'un')} <input type="text" inputmode="decimal" data-vu="${esc(x.id)}"
             value="${vazio(x.valor_unitario) ? '' : esc(Number(x.valor_unitario).toLocaleString('pt-BR', { maximumFractionDigits: 4 }))}"
@@ -1026,11 +1131,11 @@ function desenharListaMes(sentido) {
         </div>
       </div>`;
     }).join('') || '<div class="vazio">Nada lançado neste mês.</div>'}</div>`;
-  $('qcMes').addEventListener('change', e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesLista = e.target.value; desenharListaMes(sentido); } });
+  $('qcMes').addEventListener('change', e => { if (/^\d{4}-\d{2}$/.test(e.target.value)) { mesLista = e.target.value; desenharListaMes(); } });
   alvo.querySelectorAll('[data-abre]').forEach(b => b.addEventListener('click', () => {
     const k = b.dataset.abre;
     if (abertos.has(k)) abertos.delete(k); else abertos.add(k);
-    desenharListaMes(sentido);
+    desenharListaMes();
   }));
   alvo.querySelectorAll('[data-vu]').forEach(inp => inp.addEventListener('change', async () => {
     const m = movimentos().find(x => x.id === inp.dataset.vu);
@@ -1038,19 +1143,19 @@ function desenharListaMes(sentido) {
     if (!m || Number.isNaN(v)) { aviso('Esse valor não deu para entender. Ex.: 3,85', true); return; }
     await gravar('est_movimentos', Object.assign({}, m, { valor_unitario: v > 0 ? v : null }));
     aviso('Valor guardado.');
-    desenharListaMes(sentido);
+    desenharListaMes();
   }));
   alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', async () => {
     const m = movimentosTodos().find(x => x.id === b.dataset.tirar);
     if (!m || !confirm(`Tirar ${itemDe(m.item_id).nome} deste lançamento? O saldo volta como estava.`)) return;
     await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
-    desenharListaMes(sentido);
+    desenharListaMes();
   }));
   alvo.querySelectorAll('[data-tirar-tudo]').forEach(b => b.addEventListener('click', async () => {
     const ms = movimentosTodos().filter(x => (x.lancamento_id || x.id) === b.dataset.tirarTudo);
     if (!confirm(`Tirar o lançamento inteiro (${ms.length} produtos)? Os saldos voltam como estavam.`)) return;
     for (const m of ms) await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
-    desenharListaMes(sentido);
+    desenharListaMes();
   }));
 }
 
@@ -1077,7 +1182,7 @@ function filtrados() {
     || String(b.atualizado_em || '').localeCompare(String(a.atualizado_em || '')));
 }
 
-const nomeTipo = m => (m.sentido === 'entrada' ? TIPOS_ENTRADA : TIPOS_SAIDA)[m.tipo] || m.tipo;
+const nomeTipo = m => rotuloTipo(m);
 
 function desenharPainel() {
   const alvo = $('qcPainelCorpo');
@@ -1462,11 +1567,12 @@ function montarFolhaPend(lista, sd, podeSair) {
 /* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { qcVisao: desenharVisao, qcPainel: desenharPainel, qcEntrada: () => desenharMov('entrada'), qcSaida: () => desenharMov('saida'), qcPendencias: desenharPendencias };
+const DESENHOS = { qcVisao: desenharVisao, qcPainel: desenharPainel, qcEntrada: () => desenharMov('entrada'), qcSaida: () => desenharMov('saida'),
+  qcTransf: () => desenharMov('transf'), qcAjuste: () => desenharMov('ajuste'), qcEmbalagens: () => desenharEmbalagens(), qcPendencias: desenharPendencias };
 export function abrirQc(tela) { telaAberta = tela; (DESENHOS[tela] || (() => {}))(); }
 export function soltarQc() {
   telaAberta = null;
-  for (const id of ['qcEntradaCorpo', 'qcSaidaCorpo']) { const el = $(id); if (el) el.innerHTML = ''; }
+  for (const k of Object.keys(MODOS)) { const el = $(MODOS[k].corpo); if (el) el.innerHTML = ''; }
 }
 
 /* troca de estoque no alto de qualquer tela da gestão */
@@ -1484,7 +1590,7 @@ window.addEventListener('estoque-dados', () => {
   // nunca redesenha com um formulário sendo preenchido
   if (foco && foco.closest && foco.closest('#qcForm, #qcVisaoCorpo, #qcPainelCorpo, #qcPendCorpo') && /INPUT|SELECT|TEXTAREA/.test(foco.tagName)) return;
   const form = $('qcForm');
-  if (form && [...form.querySelectorAll('input[type=text]')].some(i => i.value)) { desenharListaMes(telaAberta === 'qcEntrada' ? 'entrada' : 'saida'); return; }
+  if (form && [...form.querySelectorAll('input[type=text]')].some(i => i.value)) { desenharListaMes(); return; }
   if (document.querySelector('#modal') && !document.querySelector('#modal.oculto')) return;
   DESENHOS[telaAberta]();
 });

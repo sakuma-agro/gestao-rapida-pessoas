@@ -81,7 +81,7 @@ export function saldosEpi(d, localId, { ateDia = '', antesDe = '', excluirContag
     if (desde && dia <= desde) continue;      // já está dentro da contagem
     if (lim && dia > lim) continue;
     // ajuste de balanço da contagem só vale no estoque que vive de movimentos
-    if (!qc && m.tipo === 'ajuste') continue;
+    // (13/11/2026) ajuste agora tem tela própria na Gestão de estoque e vale em qualquer estoque
     const q = Number(m.quantidade) || 0;
     const l = linha(m.item_id);
     if (m.sentido === 'entrada') l.entradas += q; else l.saidas += q;

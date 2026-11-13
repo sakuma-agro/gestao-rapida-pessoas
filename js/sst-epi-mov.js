@@ -30,7 +30,7 @@ const chip = (cor, txt) => `<span class="tag ${cor}">${esc(txt)}</span>`;
 const quem = () => estado.sessao?.user?.email || '';
 const admin = () => !!acesso.admin;
 
-export const TELAS_EPI_MOV = ['epiSaida', 'epiEntrada', 'epiSaldo', 'epiDevol'];
+export const TELAS_EPI_MOV = ['epiSaida', 'epiEntrada', 'epiSaldo', 'epiDevol', 'epiUso'];
 
 /* ===================================================================
    DADOS — lidos direto do banco (precisa de internet)
@@ -284,6 +284,63 @@ function desenhar() {
   else if (nome === 'epiEntrada') telaEntrada(tela);
   else if (nome === 'epiSaldo') telaSaldo(tela);
   else if (nome === 'epiDevol') telaDevol(tela);
+  else if (nome === 'epiUso') telaUso(tela);
+}
+
+/* ---------------- ENTREGAS POR FAZENDA ----------------
+   13/11/2026: veio do Estoque para cá (pedido dele: "saída de EPI com a ficha
+   pode ser em SST"). Pedido original: "mostrar o local que foi entregue os
+   EPIs, por exemplo Guilherme, quero ver o que foi entregue para usar na
+   FACA - F" — filtra as entregas pela coluna FAZ da ficha (m.faz). */
+const U = { faz: '', func: '', de: '', ate: '' };
+function telaUso(tela) {
+  if (!U.de) U.de = hoje().slice(0, 8) + '01';
+  if (!U.ate) U.ate = hoje();
+  const fz = fazendasLegenda();
+  const fazNome = l => { const z = fz.find(x => x.letra === String(l || '').toUpperCase()); return z ? `${z.letra} · ${z.nome}` : (l || '—'); };
+  const fb = semAcento(U.func);
+  const ent = ativos(D.movimentos).filter(m => m.sentido === 'saida' && m.funcionario_id && !m.pendente
+    && (!U.faz || String(m.faz || '').toUpperCase() === U.faz)
+    && String(m.data).slice(0, 10) >= U.de && String(m.data).slice(0, 10) <= U.ate
+    && (!fb || semAcento(m.funcionario).includes(fb)))
+    .sort((a, b) => String(b.data).localeCompare(String(a.data)) || String(a.funcionario).localeCompare(String(b.funcionario), 'pt-BR'));
+  const porEpi = new Map();
+  for (const m of ent) {
+    if (!porEpi.has(m.item_id)) porEpi.set(m.item_id, { it: itemDe(m.item_id), qtd: 0, cas: new Set(), funcs: new Set() });
+    const r = porEpi.get(m.item_id); r.qtd += Number(m.quantidade) || 0; if (m.ca) r.cas.add(m.ca); r.funcs.add(m.funcionario);
+  }
+  const resumo = [...porEpi.values()].sort((a, b) => a.it.nome.localeCompare(b.it.nome, 'pt-BR'));
+  const funcs = new Set(ent.map(m => m.funcionario));
+  const caChip = ca => { if (!ca) return ''; const e = estadoCa(caObj(ca)); return e.rotulo && e.chave !== 'emdia' ? ' ' + chip(e.cor, e.rotulo) : ''; };
+  tela.innerHTML = `<div class="cartao">
+    <div class="barra entre" style="margin:0 0 6px"><h2 style="margin:0">Entregas por fazenda</h2>
+      <span class="barra" style="margin:0"><button class="btn mini naoimprimir" type="button" id="usAtualizar">↻ Atualizar</button>
+      <button class="btn mini naoimprimir" type="button" id="usImprimir">🖨 Imprimir</button></span></div>
+    <p class="dica" style="margin:0 0 8px">EPIs entregues pela fazenda onde vão ser usados (coluna FAZ da ficha).</p>
+    <div class="barra naoimprimir">${[{ letra: '', nome: 'Todas' }, ...fz].map(z => `<button type="button" class="epm-chip${U.faz === z.letra ? ' on' : ''}" data-faz="${esc(z.letra)}">${esc(z.letra ? z.letra + ' · ' + z.nome : 'Todas')}</button>`).join('')}</div>
+    <div class="barra naoimprimir">
+      <label class="campo" style="flex:1;min-width:180px">Funcionário <input type="search" id="usFunc" value="${esc(U.func)}" placeholder="nome do funcionário"></label>
+      <label class="campo">De <input type="date" id="usDe" value="${esc(U.de)}" max="${hoje()}"></label>
+      <label class="campo">Até <input type="date" id="usAte" value="${esc(U.ate)}" max="${hoje()}"></label>
+    </div>
+    <p class="dica"><b>${ent.length}</b> ${ent.length === 1 ? 'entrega' : 'entregas'} · <b>${funcs.size}</b> ${funcs.size === 1 ? 'funcionário' : 'funcionários'} · ${br(U.de)} a ${br(U.ate)}${U.faz ? ' · ' + esc(fazNome(U.faz)) : ''}</p>
+    <h3 style="margin:12px 0 6px">Total por EPI</h3>
+    <div class="tc-rolo"><table class="dc-planilha"><thead><tr><th>EPI</th><th>CA</th><th style="text-align:center">Qtd</th><th style="text-align:center">Funcionários</th></tr></thead><tbody>
+    ${resumo.map(r => `<tr><td>${esc(nomeSemCa(r.it.nome))}</td><td>${[...r.cas].map(c => 'CA ' + esc(c) + caChip(c)).join('<br>') || '—'}</td>
+      <td style="text-align:center"><b>${esc(mostra(r.qtd))}</b></td><td style="text-align:center">${r.funcs.size}</td></tr>`).join('')
+      || '<tr><td colspan="4" class="dc-sem">Nenhuma entrega neste filtro.</td></tr>'}</tbody></table></div>
+    <h3 style="margin:16px 0 6px">Entregas</h3>
+    <div class="tc-rolo"><table class="dc-planilha"><thead><tr><th>Data</th><th>Nº</th><th>Funcionário</th><th>EPI</th><th>CA</th><th style="text-align:center">Qtd</th><th>Motivo</th><th>Fazenda de uso</th></tr></thead><tbody>
+    ${ent.map(m => `<tr><td>${br(m.data)}</td><td>${m.entrega_num ? esc(String(m.entrega_num).padStart(4, '0')) : '—'}</td><td>${esc(m.funcionario)}</td><td>${esc(nomeSemCa(itemDe(m.item_id).nome))}</td>
+      <td>${m.ca ? 'CA ' + esc(m.ca) + caChip(m.ca) : '—'}</td><td style="text-align:center">${esc(mostra(m.quantidade))}</td>
+      <td>${esc(MER_CURTO[m.mer] || m.mer || '—')}</td><td>${esc(fazNome(m.faz))}</td></tr>`).join('')
+      || '<tr><td colspan="8" class="dc-sem">Nenhuma entrega neste filtro.</td></tr>'}</tbody></table></div></div>`;
+  tela.querySelectorAll('[data-faz]').forEach(b => b.onclick = () => { U.faz = b.dataset.faz; desenhar(); });
+  $('usDe').onchange = ev => { U.de = ev.target.value || hoje().slice(0, 8) + '01'; desenhar(); };
+  $('usAte').onchange = ev => { U.ate = ev.target.value || hoje(); desenhar(); };
+  $('usImprimir').onclick = () => window.print();
+  $('usAtualizar').onclick = async () => { await carregar(true); desenhar(); };
+  $('usFunc').addEventListener('input', ev => { U.func = ev.target.value; const p = ev.target.selectionStart; desenhar(); const el = $('usFunc'); el.focus(); el.setSelectionRange(p, p); });
 }
 
 /* ---------------- DEVOLUÇÕES ---------------- */

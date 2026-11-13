@@ -31,13 +31,16 @@ export const MODULOS = [
      qualquer estoque (escolhido no alto da tela) e absorveu o "Estoque EPI e
      limpeza". Id 'qc' mantido para não mexer nos acessos já dados. */
   { id: 'qc', nome: 'Gestão de estoque', telas: [
+    /* 13/11/2026 (16h37), ele: "Gestão de Estoque (Entrada - Saída - Transferências
+       - Ajustes)", "Cadastros (Produtos - Fornecedores - Embalagens)" e "saída de
+       EPI com a ficha pode ser em SST" (Entregas por fazenda foi para o SST). */
     ['qcVisao',    'Estoque'],
-    ['qcPainel',   'Movimentações'],
     ['qcEntrada',  'Entradas'],
     ['qcSaida',    'Saídas'],
+    ['qcTransf',   'Transferências'],
+    ['qcAjuste',   'Ajustes'],
     ['qcPendencias', 'Pendências'],
-    ['epiUso',     'Entregas por fazenda'],   // entregas do SST pela fazenda de uso (FAZ) — epi.js
-    ['epiForn',    'Fornecedores'],           // est_fornecedores — epi.js
+    ['qcPainel',   'Movimentações'],
   ] },
   /* Formulários (29/10/2026): folhas de ENTRADA e SAÍDA da prancheta de cada
      estoque (FORM 048 entrada, FORM 049 saída) e as placas das pranchetas. Ficam
@@ -56,9 +59,15 @@ export const MODULOS = [
     ['acRelatorio',       'Relatório'],
   ] },
   { id: 'cadastros', nome: 'Cadastros', subs: [
-    { id: 'itens',  nome: 'Itens',  telas: [
-      ['cadItens',  'Itens'],
+    { id: 'itens',  nome: 'Produtos',  telas: [
+      ['cadItens',  'Produtos'],
       ['cadGrupos', 'Grupos e unidades'],
+    ] },
+    { id: 'forn', nome: 'Fornecedores', telas: [
+      ['epiForn', 'Fornecedores'],        // est_fornecedores — epi.js
+    ] },
+    { id: 'emb', nome: 'Embalagens', telas: [
+      ['qcEmbalagens', 'Embalagens'],     // est_embalagens — qc.js
     ] },
     { id: 'locais', nome: 'Almoxarifados', telas: [
       ['cadLocais', 'Almoxarifados'],
