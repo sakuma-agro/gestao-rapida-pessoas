@@ -25,6 +25,8 @@ export const MODULOS = [
   ] },
   { id: 'compra', nome: 'Compra inteligente', telas: [
     ['ciLista',      'Levantamentos'],
+    // 14/11/2026: lista de solicitação de orçamento para o fornecedor — orcamento.js
+    ['orcPedido',    'Pedido de orçamento'],
   ] },
   /* Gestão de estoque (13/11/2026, pedido dele: "vamos juntar esse estoque?
      fazer somente uma gestão"): o antigo "Estoque Quebra Cocão" serve agora

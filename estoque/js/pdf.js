@@ -78,8 +78,11 @@ export async function montarPdf(o) {
     doc.text(s.titulo, M, y + 3);
     y += 5;
     const dir = new Set(s.dir || []);
+    const centro = new Set(s.centro || []);
+    const alinhar = i => dir.has(i) ? 'right' : centro.has(i) ? 'center' : 'left';
     const estilos = {};
-    s.head.forEach((_, i) => { estilos[i] = { halign: dir.has(i) ? 'right' : 'left' }; });
+    s.head.forEach((_, i) => { estilos[i] = { halign: alinhar(i) };
+      if (s.larguras && s.larguras[i]) estilos[i].cellWidth = s.larguras[i]; });
     const larg = s.largura === 'meia' ? (L - 2 * M) * 0.62 : null;
     doc.autoTable({
       startY: y, margin: { left: M, right: larg ? L - M - larg : M, bottom: 16, top: 12 },
@@ -93,9 +96,28 @@ export async function montarPdf(o) {
       alternateRowStyles: { fillColor: COR.verdeClaro },
       footStyles: { fillColor: COR.total, textColor: COR.marrom, fontStyle: 'bold', lineColor: COR.verdeLinha },
       columnStyles: estilos,
-      didParseCell: d => { if ((d.section === 'head' || d.section === 'foot') && dir.has(d.column.index)) d.cell.styles.halign = 'right'; },
+      didParseCell: d => { if (d.section === 'head' || d.section === 'foot') d.cell.styles.halign = alinhar(d.column.index); },
     });
     y = doc.lastAutoTable.finalY + 7;
+  }
+
+  /* Notas ao pé (14/11/2026, Solicitação de orçamento): título, linhas para
+     preencher ("Prazo de entrega: ______") e textos soltos. */
+  if (o.notas) {
+    const nt = o.notas, alt = 8 + (nt.linhas || []).length * 7 + (nt.texto || []).length * 9;
+    if (y + alt > A - 18) { doc.addPage(); y = 14; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(COR.marrom);
+    doc.text(nt.titulo || '', M, y + 3); y += 8;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(COR.cinza);
+    doc.setDrawColor(COR.verdeLinha); doc.setLineWidth(0.3);
+    for (const t of nt.linhas || []) {
+      doc.text(t, M, y); const w = doc.getTextWidth(t);
+      doc.line(M + w + 2, y + 0.8, M + 120, y + 0.8); y += 7;
+    }
+    for (const t of nt.texto || []) {
+      const ls = doc.splitTextToSize(t, L - 2 * M);
+      doc.text(ls, M, y + 2); y += ls.length * 4 + 3;
+    }
   }
 
   // pé de todas as folhas: marca da LOP + frase, à direita; nº da folha à esquerda

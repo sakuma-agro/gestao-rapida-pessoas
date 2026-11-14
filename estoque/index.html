@@ -6,7 +6,7 @@
 <title>Estoque · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=4">
-<link rel="stylesheet" href="css/estoque.css?v=20">
+<link rel="stylesheet" href="css/estoque.css?v=21">
 <link rel="stylesheet" href="../css/categoria-moldura.css?v=1">
 <!-- Área Estoque do LOP - Gestão Rápida (15/10/2026).
      Veio do app avulso Gestão Rápida (Estoque Inteligente). Esta página não
@@ -72,6 +72,15 @@
         <div id="ctReporCorpo"></div>
       </div>
       <div class="previa" id="rpFolha"></div>
+    </section>
+
+    <section class="tela" id="telaOrcPedido" hidden>
+      <div class="cartao naoimprimir">
+        <h2>Pedido de orçamento</h2>
+        <p class="dica">A lista para mandar ao fornecedor pedir preço: sai da última contagem do estoque, com o que chegou no mínimo. O fornecedor não vê quanto temos — só o item, o CA e a quantidade.</p>
+        <div id="orcCorpo"></div>
+      </div>
+      <div class="previa so-impressao" id="orcFolha"></div>
     </section>
 
     <section class="tela" id="telaCtMapa" hidden>
@@ -248,6 +257,6 @@
 <script src="js/config.js?v=3"></script>
 <script src="../js/moldura-nucleo.js?v=6"></script>
 <script src="js/base.js?v=6"></script>
-<script type="module" src="js/app.js?v=24"></script>
+<script type="module" src="js/app.js?v=25"></script>
 </body>
 </html>

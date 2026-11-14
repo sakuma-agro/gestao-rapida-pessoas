@@ -13,6 +13,7 @@ import { abrirSaldo, soltarSaldo } from './saldo.js';
 import { abrirQc, soltarQc } from './qc.js';
 import { abrirEpi, soltarEpi, TELAS_EPI_ESTOQUE } from './epi.js';
 import { locaisDoUsuario } from './dados.js';
+import { desenharOrcamento, soltarOrcamento } from './orcamento.js';
 
 const $ = id => document.getElementById(id);
 
@@ -26,7 +27,8 @@ function abrirAba(nome) {
     const el = $(idDaTela(t));
     if (el) el.hidden = t !== nome;
   }
-  soltarContagem(); soltarCadastro(); soltarCompra(); soltarSaldo(); soltarQc(); soltarEpi();
+  soltarContagem(); soltarCadastro(); soltarCompra(); soltarSaldo(); soltarQc(); soltarEpi(); soltarOrcamento();
+  if (nome === 'orcPedido') desenharOrcamento();
   if (nome === 'acSaldo') abrirSaldo();
   else if (nome.startsWith('ac')) abrirAcerto(nome);
   if (nome.startsWith('ct')) abrirContagem(nome);

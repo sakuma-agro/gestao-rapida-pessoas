@@ -505,3 +505,29 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .qc-lin .qc-extra[hidden]{display:none}
 .qc-lin .qc-extra select{flex:1;min-width:160px;min-height:40px;font-size:14px}
 .qc-epi-sst{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:8px 0;padding:10px 12px;border:1px solid #84BD00;border-radius:10px;background:#f6fbec;font-size:14px}
+
+/* ---- Compra inteligente › Pedido de orçamento (14/11/2026) ---- */
+.orc-tab tr.orc-fora td{opacity:.45}
+.orc-tab tr.orc-fora td:first-child{opacity:1}
+.orc-semmin{margin-top:12px}
+.orc-semmin summary{cursor:pointer;font-weight:600;color:var(--marrom)}
+.orc-dados{display:grid;grid-template-columns:1.6fr 1.2fr .8fr;gap:3mm;margin:6mm 0 5mm}
+.orc-dados div{border:.3mm solid #dfe2d8;border-left:1mm solid #84BD00;border-radius:1.5mm;padding:2.2mm 3mm;min-height:13mm}
+.orc-dados span{display:block;font-size:7pt;letter-spacing:.3pt;text-transform:uppercase;color:#51534A}
+.orc-dados b{display:block;font-size:11pt;color:#744F28;line-height:1.3}
+.orc-dados small{display:block;font-size:8pt;color:#51534A}
+.orc-doc td{height:6.2mm}
+.orc-notas{margin-top:3mm;font-size:9pt}
+.orc-notas b{color:#744F28;font-size:10pt}
+.orc-campos{display:grid;grid-template-columns:1fr 1fr;gap:3mm 8mm;margin:3mm 0}
+.orc-campos div{display:flex;align-items:flex-end;gap:2mm;white-space:nowrap}
+.orc-campos span{flex:1;border-bottom:.3mm solid #C9D9A6;height:4mm}
+.orc-notas p{margin:1.5mm 0}
+.orc-lop{display:flex;align-items:center;gap:2mm}
+.orc-lop small{font-size:7.5pt;color:#8A8C83}
+@media print{ .orc-folha{margin:0 auto !important;height:296mm;min-height:0;overflow:hidden} }
+.orc-tab{border-collapse:collapse;width:100%;font-size:13.5px}
+.orc-tab th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--suave);border-bottom:2px solid var(--verde);padding:6px 8px}
+.orc-tab td{border-bottom:1px solid var(--linha);padding:4px 8px}
+.orc-tab .ce{text-align:center}
+.orc-tab .orc-qtd{padding:5px 6px}
