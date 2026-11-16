@@ -283,7 +283,7 @@ function listaManut(el) {
             <span id="pv-sel-n">nenhuma marcada</span>
             <button type="button" class="btn neutro" id="pv-abrir-sel" disabled>Abrir marcadas</button>
             <button type="button" class="btn" id="pv-imp-sel" disabled>Abrir e imprimir marcadas</button></div>` : '';
-        html = barraSel + (maqs.length && modoCk ? '<div class="pv-grupo">Rotinas dos vasos e tanques</div>' : '') + (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
+        html = barraSel + (maqs.length && modoCk ? '<div class="pv-grupo">Rotinas dos vasos e tanques</div>' : '') + (venc.length ? `<div class="pv-grupo">${modoCk ? 'Vencidas' : 'Com troca vencida'} · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
              + (perto.length ? `<div class="pv-grupo">Perto de vencer · ${perto.length} máquina(s)</div>` + perto.map(linhaMaq).join('') : '');
         if (modoCk && (ckPend.length || ckNunca)) html += `<div class="pv-grupo">Check list das máquinas · ${ckPend.length} atrasado(s) ou de hoje</div>`
           + ckPend.map(l => `<div class="pv-linha pv-leve ${l.status === 'atrasado' ? 'pv-r' : 'pv-y'}">
