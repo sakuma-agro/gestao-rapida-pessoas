@@ -538,6 +538,9 @@ export function entrarNaArea(id, tela, extra) {
     aoTrocar('cronograma');
     // atalho "+ Tarefa" da tela do celular (12/11/2026): já abre a tarefa nova
     if (/(^|&)nova=1/.test(extra || '')) setTimeout(() => import('./cronograma.js').then(m => m.abrirNovaTarefaAtalho()).catch(() => {}), 50);
+    // aviso do lembrete (16/11/2026): tocar na notificação abre a tarefa
+    const tk = new URLSearchParams(extra || '').get('tarefa');
+    if (tk) setTimeout(() => import('./cronograma.js').then(m => m.abrirTarefaAtalho(tk)).catch(() => {}), 50);
     return;
   }
   if (id === 'compras') {
@@ -639,6 +642,19 @@ try {
   window.launchQueue?.setConsumer(p => {
     if (!logado || !p?.targetURL) return;
     const u = new URL(p.targetURL);
+    const area = u.searchParams.get('area');
+    if (!area || !liberada(area)) return;
+    u.searchParams.delete('area');
+    entrarNaArea(area, null, u.searchParams.toString() || null);
+  });
+} catch {}
+
+/* Toque na notificação do lembrete com o app já aberto (16/11/2026): o
+   service worker manda o endereço para cá em vez de abrir outra janela. */
+try {
+  navigator.serviceWorker?.addEventListener('message', ev => {
+    if (ev.data?.tipo !== 'gr-abrir' || !logado) return;
+    const u = new URL(ev.data.url);
     const area = u.searchParams.get('area');
     if (!area || !liberada(area)) return;
     u.searchParams.delete('area');

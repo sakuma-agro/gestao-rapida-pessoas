@@ -863,6 +863,7 @@ export async function carregarCronograma() {
     if (!nums.error) { dados.numeros = {}; for (const r of nums.data || []) dados.numeros[r.chave] = Number(r.numero); }
     dados.carregando = false;
     await garantirNumeros();
+    agendarSincLembretes(3000);
   } catch (e) {
     console.warn('[Cronograma] não carregou tudo', e);
   } finally {
@@ -894,7 +895,7 @@ async function releituraLeve() {
     if (nums && !nums.error) { const n = {}; for (const r of nums.data || []) n[r.chave] = Number(r.numero); dados.numeros = n; }
     // não redesenha no meio de um arrasto nem com uma tarefa aberta (fica para a próxima volta)
     const ocupado = alvo?.querySelector('.arrastando') || document.querySelector('dialog[open]');
-    if (JSON.stringify([dados.tarefas, dados.estados, dados.numeros]) !== antes) { salvarCache(); if (!ocupado) avisar(); }
+    if (JSON.stringify([dados.tarefas, dados.estados, dados.numeros]) !== antes) { salvarCache(); if (!ocupado) avisar(); agendarSincLembretes(); }
     garantirNumeros();
   } catch {} finally { relendo = false; }
 }
@@ -957,6 +958,7 @@ async function gravar(tabela, chaveCol, item) {
   if (tabela === 'cron_tarefas' && item.ativo === false) dados.tarefas = dados.tarefas.filter(t => t.id !== item.id);
   salvarCache(); avisar();
   if (tabela === 'cron_tarefas') setTimeout(() => garantirNumeros(), 0);
+  if (tabela === 'cron_tarefas' || tabela === 'cron_estado') agendarSincLembretes();
   const enfileirar = () => {
     const f = ler(FILA, []).filter(x => !(x.tabela === tabela && x.item[chaveCol] === item[chaveCol]));
     f.push({ tabela, chave: chaveCol, item }); gravarLocal(FILA, f);
@@ -1113,7 +1115,9 @@ function todosItens() {
 /* Tarefa privada (09/11/2026, pedido dele): só quem criou vê — o banco nem
    entrega a linha para os outros (RLS em cron_tarefas). Aqui é só o selo. */
 const SELO_PRIV = '<span class="cr-priv" title="Só você vê esta tarefa">\u{1F441} Só eu</span> ';
-const seloPriv = it => it?.privada ? SELO_PRIV : '';
+/* ⏰ 09:00 ao lado do nome quando a tarefa tem lembrete (16/11/2026). */
+const seloPriv = it => (it?.privada ? SELO_PRIV : '') +
+  (!it?.auto && it?.tarefa?.lembrete_hora ? `<span class="cr-lemb" title="Lembrete: ${esc(textoLemb(it.tarefa))}">⏰ ${esc(horaCurta(it.tarefa.lembrete_hora))}</span> ` : '');
 const meuEmail = () => String(acesso.email || '').trim().toLowerCase();
 /* Bloqueio e início vêm da linha que guarda a situação (tarefa ou estado). */
 function bloqDe(r) {
@@ -2513,6 +2517,130 @@ function dialogo() {
 const opcoesPessoas = (sel, padrao) => `<option value="">${padrao ? esc('Responsável da área — ' + padrao) : 'Sem responsável'}</option>` +
   pessoasAtivas().map(p => `<option value="${p.id}" ${sel === p.id ? 'selected' : ''}>${esc(p.nome)}</option>`).join('');
 
+
+/* ---------------- lembrete com aviso no celular (16/11/2026, pedido dele) ----------------
+   "Criar a tarefa e um lembrete que vibre no celular quando chegar a hora."
+   Na tarefa: hora + "lembrar N min antes" (padrão 15 min). Avisa só o
+   responsável (o da vez; sem responsável, os da área). Cada pessoa toca uma
+   vez em "Ativar avisos" em cada aparelho (Web Push). Quem monta a fila
+   (cron_lembretes) é o próprio app, que já sabe as vezes de cada rotina; o
+   servidor (pg_cron + edge function lembretes-push) só envia. */
+const VAPID_PUB = 'BCIZZmUNG84AhD6Ud4zjbWmajfkJf7eX7EOakXNoZHKIm8h2njvk9EWrTH2oi-eA7uvKVdCjuDPGHEEu5ifbU4M';
+const ANTES = [[0, 'Na hora'], [5, '5 min antes'], [10, '10 min antes'], [15, '15 min antes'], [30, '30 min antes'], [60, '1 hora antes'], [120, '2 horas antes'], [1440, '1 dia antes']];
+const ANTES_PADRAO = 15;
+const HORIZONTE_LEMB = 21; // dias à frente que vão para a fila
+const opcoesAntes = v => ANTES.map(([m, n]) => `<option value="${m}" ${Number(v ?? ANTES_PADRAO) === m ? 'selected' : ''}>${n}</option>`).join('');
+const horaCurta = h => String(h || '').slice(0, 5);
+const textoLemb = t => t?.lembrete_hora ? `${horaCurta(t.lembrete_hora)} · ${(ANTES.find(a => a[0] === Number(t.lembrete_antes ?? ANTES_PADRAO)) || ANTES[3])[1].toLowerCase()}` : '';
+const b64u = s => { const p = '='.repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); };
+const ehIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const instalado = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+/** Situação dos avisos neste aparelho: 'ok' | 'pode' | 'negado' | 'ios-instalar' | 'sem-suporte' */
+async function situacaoAvisos() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window))
+    return ehIOS() && !instalado() ? 'ios-instalar' : 'sem-suporte';
+  if (Notification.permission === 'denied') return 'negado';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub && Notification.permission === 'granted' && localStorage.getItem('gr.push.ok') === sub.endpoint) return 'ok';
+  } catch {}
+  return 'pode';
+}
+async function ativarAvisos() {
+  const me = eu();
+  if (!me) throw new Error('Seu nome não está entre as pessoas do escritório (Reunião semanal › Responsáveis).');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error(perm === 'denied' ? 'O aviso foi bloqueado. Libere as notificações do app nas configurações do celular.' : 'Permissão não dada.');
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUB) });
+  const j = sub.toJSON();
+  const aparelho = (ehIOS() ? 'iPhone' : /android/i.test(navigator.userAgent) ? 'Android' : 'Computador') + ' · ' + new Date().toLocaleDateString('pt-BR');
+  const { error } = await estado.cliente.rpc('push_inscrever', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_pessoa: me.id, p_aparelho: aparelho });
+  if (error) throw new Error('Não consegui registrar o aparelho: ' + error.message);
+  try { localStorage.setItem('gr.push.ok', j.endpoint); } catch {}
+  // aviso de teste na hora, para a pessoa ver (e sentir) como chega
+  try { await reg.showNotification('✓ Avisos do Rastro ativados', { body: 'Os lembretes das suas tarefas vão chegar assim.', vibrate: [300, 120, 300], icon: './icons/rastro-192.v1.png', badge: './icons/rastro-96.v1.png', tag: 'rastro-teste' }); } catch {}
+}
+async function desativarAvisos() {
+  try {
+    const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+    if (sub) { await estado.cliente.rpc('push_sair', { p_endpoint: sub.endpoint }); await sub.unsubscribe(); }
+  } catch {}
+  try { localStorage.removeItem('gr.push.ok'); } catch {}
+}
+/** Linha "Avisos neste aparelho" dentro da janela da tarefa. */
+async function desenharAvisos(el) {
+  if (!el) return;
+  const s = await situacaoAvisos();
+  const txt = {
+    ok: '📳 Avisos ativados neste aparelho. <button type="button" class="cr-tk-link" data-av="sair">desativar</button>',
+    pode: '<button type="button" class="btn principal cr-av-bt" data-av="ativar">📳 Ativar avisos neste celular</button> <small>para o lembrete vibrar aqui</small>',
+    negado: '⚠ As notificações do app estão bloqueadas neste aparelho. Libere nas configurações do celular (Notificações › LOP) e volte aqui.',
+    'ios-instalar': '📱 No iPhone o aviso só funciona com o app na Tela de Início: toque em Compartilhar › Adicionar à Tela de Início e abra por lá.',
+    'sem-suporte': 'Este navegador não recebe avisos. No celular, use o app instalado (Chrome no Android; Tela de Início no iPhone).',
+  }[s];
+  el.innerHTML = txt;
+  el.querySelectorAll('[data-av]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try {
+      if (b.dataset.av === 'ativar') await ativarAvisos(); else await desativarAvisos();
+    } catch (e) { alert(e.message || e); }
+    desenharAvisos(el);
+  });
+}
+
+/* Fila de avisos: os próximos HORIZONTE_LEMB dias de cada tarefa com
+   lembrete, uma linha por responsável. Roda depois de carregar e de cada
+   gravação; sobe só o que mudou e tira o que não vale mais. */
+let lembT = null, lembRodando = false;
+function agendarSincLembretes(ms = 1500) { clearTimeout(lembT); lembT = setTimeout(sincronizarLembretes, ms); }
+async function sincronizarLembretes() {
+  if (lembRodando || !estado.cliente || !estado.sessao || !navigator.onLine || dados.semTabelas) return;
+  lembRodando = true;
+  try {
+    const c = estado.cliente, agora = Date.now(), lim = addDias(hoje(), HORIZONTE_LEMB);
+    const visiveis = new Set(dados.tarefas.filter(t => t.ativo !== false).map(t => t.id));
+    const quer = new Map();
+    for (const it of todosItens()) {
+      const t = it.tarefa;
+      if (it.auto || !t?.lembrete_hora || it.sit === 'feito') continue;
+      const dia = it.comeca || it.data;
+      if (dia < hoje() || dia > lim) continue;
+      const quando = new Date(`${dia}T${horaCurta(t.lembrete_hora)}:00-03:00`);
+      const antes = Number(t.lembrete_antes ?? ANTES_PADRAO);
+      const avisar = new Date(quando.getTime() - antes * 60000);
+      if (avisar.getTime() < agora - 5 * 60000) continue;
+      for (const pid of (it.resps || []).filter(Boolean)) {
+        const id = `${it.chave}|${pid}`;
+        quer.set(id, { id, chave: it.chave, tarefa_id: t.id, pessoa_id: pid, titulo: it.titulo, quando: quando.toISOString(),
+          avisar_em: avisar.toISOString(), antes, privada: !!t.privada, dono_email: t.dono_email || null });
+      }
+    }
+    const { data: tem, error } = await c.from('cron_lembretes').select('id,tarefa_id,avisar_em,titulo,enviado_em').is('enviado_em', null);
+    if (error) return;
+    const atual = new Map((tem || []).map(r => [r.id, r]));
+    const subir = [...quer.values()].filter(r => { const a = atual.get(r.id); return !a || new Date(a.avisar_em).getTime() !== new Date(r.avisar_em).getTime() || a.titulo !== r.titulo; })
+      .map(r => ({ ...r, atualizado_em: new Date().toISOString() }));
+    // tira só o que é de tarefa que este aparelho enxerga (a privada de outro fica)
+    // (apagada sai pelo servidor, que confere a tarefa antes de enviar)
+    const tirar = (tem || []).filter(r => !quer.has(r.id) && r.tarefa_id && visiveis.has(r.tarefa_id)).map(r => r.id);
+    if (subir.length) await c.from('cron_lembretes').upsert(subir, { onConflict: 'id' });
+    for (let i = 0; i < tirar.length; i += 100) await c.from('cron_lembretes').delete().in('id', tirar.slice(i, i + 100)).is('enviado_em', null);
+  } catch (e) { console.warn('[Rastro] lembretes', e); }
+  finally { lembRodando = false; }
+}
+
+/** Toque na notificação: abre o Rastro já na tarefa daquele aviso. */
+export async function abrirTarefaAtalho(chave) {
+  try { await Promise.race([carregarCronograma(), new Promise(ok => setTimeout(ok, 4000))]); } catch {}
+  const its = todosItens();
+  const it = its.find(x => x.chave === chave) || its.find(x => x.tarefa && `t:${x.tarefa.id}` === String(chave).split(':').slice(0, 2).join(':'));
+  if (it) abrirTarefa(it.chave);
+}
+
 /* ---------------- janela da tarefa estilo Trello (09/11/2026, pedido dele) ----------------
    Tudo à mostra e editável direto: nome (toca e escreve), chips de
    Responsável / Data / Repete / Área, barra de Situação, descrição que se
@@ -2562,6 +2690,14 @@ function abrirTarefa(chave) {
             ${t.recorrencia === 'mensal' ? `<label>Prazo até o dia <input type="number" id="tkPrazo" min="1" max="31" style="width:64px" value="${esc(t.prazo_dia || '')}" placeholder="—"></label>` : ''}
             <small>O responsável vale para todas as vezes.</small></div>` : ''}
 
+        ${edita ? `<div class="cr-tk-rot" id="tkLembRot">⏰ Lembrete${rep ? ' (todas as vezes)' : ''}</div>
+          <div class="cr-tk-lemb">
+            <label>Hora <input type="time" id="tkHora" value="${esc(horaCurta(t.lembrete_hora))}"></label>
+            <label>Avisar <select id="tkAntes">${opcoesAntes(t.lembrete_antes)}</select></label>
+            ${t.lembrete_hora ? '<button type="button" class="cr-tk-link" id="tkSemLemb">tirar lembrete</button>' : '<small>escolha a hora para ligar o aviso</small>'}
+            <div class="cr-tk-av" id="tkAvisos"></div>
+          </div>` : ''}
+
         <div class="cr-tk-rot">Situação${rep ? ' (desta vez)' : ''}</div>
         <div class="cr-tk-seg" role="group" aria-label="Situação">${Object.entries(SIT).map(([k, n]) =>
           `<button type="button" data-tksit="${k}" class="${it.sit === k ? 'on' : ''}" aria-pressed="${it.sit === k}">${it.sit === k ? '● ' : ''}${n}</button>`).join('')}</div>
@@ -2578,6 +2714,7 @@ function abrirTarefa(chave) {
         ${edita ? `<div class="cr-tk-rot">Adicionar à tarefa</div>
           ${it.checklist ? '' : '<button type="button" class="cr-tk-ab" id="tkAddCk">☑ Checklist</button>'}
           ${!rep ? '<button type="button" class="cr-tk-ab" id="tkAddData">📅 Data</button>' : ''}
+          <button type="button" class="cr-tk-ab${t.lembrete_hora ? ' on' : ''}" id="tkAddLemb">⏰ Lembrete${t.lembrete_hora ? ' ' + esc(horaCurta(t.lembrete_hora)) : ''}</button>
           <button type="button" class="cr-tk-ab" id="tkAddRep">🔁 Repetir</button>
           ${podePriv ? `<button type="button" class="cr-tk-ab priv${t.privada ? ' on' : ''}" id="tkPriv" aria-pressed="${!!t.privada}">👁 Só eu vejo${t.privada ? ' ✓' : ''}</button>` : ''}` : ''}
         <div class="cr-tk-rot">Ações</div>
@@ -2676,6 +2813,23 @@ function abrirTarefa(chave) {
     await salvarT({ prazo_dia: n >= 1 && n <= 31 ? n : null });
     reabrir();
   };
+  // lembrete
+  const hr = $('tkHora');
+  if (hr) {
+    desenharAvisos($('tkAvisos'));
+    hr.onchange = async () => {
+      const v = hr.value || null;
+      if ((v || null) === (horaCurta(t.lembrete_hora) || null)) return;
+      await salvarT({ lembrete_hora: v, lembrete_antes: Number($('tkAntes').value) });
+      agendarSincLembretes(200); reabrir();
+    };
+    $('tkAntes').onchange = async () => {
+      await salvarT({ lembrete_antes: Number($('tkAntes').value) });
+      agendarSincLembretes(200);
+    };
+    if ($('tkSemLemb')) $('tkSemLemb').onclick = async () => { await salvarT({ lembrete_hora: null }); agendarSincLembretes(200); reabrir(); };
+    $('tkAddLemb').onclick = () => { $('tkLembRot')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); try { hr.showPicker(); } catch { hr.focus(); } };
+  }
   // área
   if ($('tkArea')) $('tkArea').onchange = async () => { await salvarT({ area: $('tkArea').value }); reabrir(); };
   // só eu vejo
@@ -2758,6 +2912,8 @@ function abrirItem(chave) {
       </select></label>
       <div class="campo plena" id="crDiasCampo" ${comDias(t?.recorrencia) ? '' : 'hidden'}>Dias da semana${seletorDias('crDias', diasPadrao(t?.recorrencia, t, t?.data || (opc.area ? hoje() : est.dia) || hoje()))}</div>
       <label class="campo" id="crAteCampo" ${rep ? '' : 'hidden'}>Até (opcional)<input type="date" id="crAte" value="${esc(t?.ate || '')}"></label>
+      <label class="campo">⏰ Lembrete (hora)<input type="time" id="crHora" value="${esc(horaCurta(t?.lembrete_hora))}"></label>
+      <label class="campo">Avisar<select id="crAntes">${opcoesAntes(t?.lembrete_antes)}</select></label>
       ${nova || !t?.dono_email || String(t.dono_email).toLowerCase() === meuEmail() ? `<label class="campo plena cr-priv-campo"><span><input type="checkbox" id="crPriv" ${t?.privada ? 'checked' : ''}> <b>Só eu vejo</b> — a tarefa não aparece para mais ninguém da equipe</span></label>` : ''}
     </div>${nova ? '' : '</details>'}` : ''}
     <div class="grade">
@@ -2832,6 +2988,7 @@ function abrirItem(chave) {
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp || (nova ? vincTexto(titulo) : null);
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
       base.checklist = ckDoRascunho($('crCkRasc'), rasc);
+      if ($('crHora')) { base.lembrete_hora = $('crHora').value || null; base.lembrete_antes = Number($('crAntes').value); }
       if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext);
         // data adiada para depois de hoje tira do Foco do dia
         if (data !== t.data && data > hoje() && sit !== 'feito') base.foco_em = null; }
@@ -2849,6 +3006,7 @@ function abrirItem(chave) {
     }
     d.close();
     recado(r);
+    agendarSincLembretes(300);
     if (nova && opc.avisar && r === 'ok') {
       const a = $('avisoGlobal');
       if (a) { a.textContent = `Tarefa lançada no Rastro: ${limpo($('crTit')?.value || '')}`; a.className = 'aviso ok fixo'; a.hidden = false;

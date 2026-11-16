@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v703';
+const VERSAO = 'gr-v704';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -197,4 +197,32 @@ self.addEventListener('fetch', ev => {
 
   ev.respondWith(caches.open(VERSAO).then(cache =>
     PESADO.test(new URL(req.url).pathname) ? copiaPrimeiro(ev, cache, req) : redeComPrazo(ev, cache, req)));
+});
+
+/* Lembretes do Rastro (16/11/2026, pedido dele): o servidor manda o aviso
+   (Web Push) e aqui ele vira notificação com som e vibração, mesmo com o
+   app fechado. Tocar abre o Rastro já na tarefa. */
+self.addEventListener('push', ev => {
+  let d = {};
+  try { d = ev.data ? ev.data.json() : {}; } catch { d = { title: '⏰ Rastro', body: ev.data ? ev.data.text() : '' }; }
+  ev.waitUntil(self.registration.showNotification(d.title || '⏰ Lembrete do Rastro', {
+    body: d.body || '',
+    tag: d.tag || 'rastro',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [300, 120, 300, 120, 600],
+    icon: './icons/rastro-192.v1.png',
+    badge: './icons/rastro-96.v1.png',
+    data: { url: d.url || './?area=cronograma' },
+  }));
+});
+
+self.addEventListener('notificationclick', ev => {
+  ev.notification.close();
+  const alvo = new URL(ev.notification.data?.url || './?area=cronograma', self.registration.scope).href;
+  ev.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+    const c = cs.find(x => x.url.startsWith(self.registration.scope));
+    if (c) { c.postMessage({ tipo: 'gr-abrir', url: alvo }); return c.focus(); }
+    return self.clients.openWindow(alvo);
+  }));
 });

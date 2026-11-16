@@ -517,3 +517,11 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-rot-foco{font:inherit;font-size:12px;font-weight:700;margin-left:8px;padding:3px 10px;border-radius:999px;border:1px solid #84BD00;background:#F3F9E6;color:#4F7A00;cursor:pointer;white-space:nowrap;vertical-align:middle}
 .cr-rot-foco:hover{background:#84BD00;color:#fff}
 .cr-rot-foco.no{border-color:transparent;background:transparent;color:var(--suave);cursor:default;font-weight:400}
+/* Lembrete com aviso no celular (16/11/2026) */
+.cr-tk-lemb{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:4px 0 6px;font-size:12.5px;color:#51534A}
+.cr-tk-lemb label{display:flex;align-items:center;gap:6px}
+.cr-tk-lemb input,.cr-tk-lemb select{width:auto;padding:4px 6px}
+.cr-tk-av{flex-basis:100%;font-size:12.5px;color:#51534A;line-height:1.45}
+.cr-tk-av .cr-av-bt{padding:6px 12px;font-size:13px}
+.cr-tk-ab.on{border-color:#84BD00;background:#F2F8E6}
+.cr-lemb{display:inline-block;font-size:11px;font-weight:600;color:#744F28;background:#F6EFE6;border-radius:8px;padding:0 6px;margin-right:2px}
