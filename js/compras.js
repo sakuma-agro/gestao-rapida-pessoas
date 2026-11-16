@@ -524,33 +524,69 @@ async function enviarZap() {
   window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
 }
 
-async function mostrarQr() {
+/* Placa do QR: "meia" = meia folha A4 (210 × 148,5 mm), duas por folha com linha de
+   corte — pedido de 16/11/2026; "inteira" = a placa A4 em pé de antes. */
+async function mostrarQr(formato = 'meia') {
   let svg;
   try {
     const { data: chave, error } = await estado.cliente.rpc('cmp_chave_qr');
     if (error || !chave) throw new Error('chave');
     svg = await svgQr(LINK_QR + chave);
   } catch { alert('Não deu para montar o QR code agora. Tente de novo com internet.'); return; }
-  const placa = `<style>
+  const passos = `<ol><li>Abra a câmera e aponte para o código.</li><li>Escreva seu nome, o que precisa, a quantidade e para onde vai.</li>
+        <li>Toque em <b>Enviar ao comprador</b>.</li><li>Anote o número do pedido (#C-…) para perguntar ao comprador.</li></ol>`;
+  const escolha = `<div class="cm-formato"><span>Tamanho:</span>
+      <button type="button" class="btn mini${formato === 'meia' ? ' principal' : ''}" data-cm-formato="meia">Meia folha A4 (2 por folha)</button>
+      <button type="button" class="btn mini${formato === 'inteira' ? ' principal' : ''}" data-cm-formato="inteira">Folha A4 inteira</button></div>`;
+  const estilo = `<style>
+      .cm-formato{display:flex;gap:2mm;align-items:center;flex-wrap:wrap;margin:0 auto 4mm;max-width:210mm;font-family:Arial,sans-serif;font-size:10pt;color:#51534A}
+      @media print{.cm-formato{display:none!important}}
       .cm-placa{width:180mm;margin:0 auto;padding:14mm 12mm 10mm;border:1.2mm solid #1B232B;border-radius:6mm;font-family:Arial,sans-serif;color:#1B232B;text-align:center;box-sizing:border-box;background:#fff}
       .cm-placa h1{margin:0;font-size:30pt;letter-spacing:.5pt}
       .cm-placa .sub{margin:3mm 0 7mm;font-size:14pt;color:#51534A}
       .cm-placa .qr{width:110mm;height:110mm;margin:0 auto}
-      .cm-placa .qr svg{width:100%;height:100%}
+      .cm-placa .qr svg,.cm-meia .qr svg{width:100%;height:100%;display:block}
       .cm-placa ol{text-align:left;margin:7mm auto 0;max-width:140mm;font-size:13pt;line-height:1.55;padding-left:8mm}
       .cm-placa .faixa{margin-top:7mm;background:#84BD00;color:#1B232B;font-weight:700;font-size:12pt;padding:3mm;border-radius:2mm}
       .cm-placa footer{margin-top:7mm;display:flex;justify-content:center}
       .cm-placa footer img{height:9mm}
       @media print{.cm-placa{page-break-inside:avoid}}
-    </style>
-    <article class="cm-placa">
+      .cm-folha{width:210mm;height:296mm;margin:0 auto;background:#fff;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}
+      .cm-metade{height:148mm;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+      .cm-corte{position:relative;height:0;border-top:.3mm dashed #51534A}
+      .cm-corte span{position:absolute;left:50%;top:-2.2mm;transform:translateX(-50%);background:#fff;padding:0 2mm;font:8pt Arial,sans-serif;color:#51534A}
+      .cm-meia{width:192mm;height:130mm;border:1mm solid #1B232B;border-radius:5mm;box-sizing:border-box;padding:7mm 8mm;display:flex;gap:7mm;align-items:center;font-family:Arial,sans-serif;color:#1B232B;background:#fff}
+      .cm-meia .qr{flex:0 0 88mm;width:88mm;height:88mm}
+      .cm-meia .txt{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:left;min-width:0}
+      .cm-meia h1{margin:0;font-size:23pt;line-height:1.05;letter-spacing:.3pt}
+      .cm-meia .sub{margin:2mm 0 0;font-size:11.5pt;color:#51534A}
+      .cm-meia ol{margin:4mm 0 0;padding-left:5.5mm;font-size:10.5pt;line-height:1.4}
+      .cm-meia ol li{margin-bottom:.8mm}
+      .cm-meia .faixa{margin-top:4mm;background:#84BD00;color:#1B232B;font-weight:700;font-size:10pt;padding:2.2mm 3mm;border-radius:1.5mm;text-align:center}
+      .cm-meia footer{margin-top:3.5mm;display:flex;justify-content:flex-end}
+      .cm-meia footer img{height:7mm}
+      @media print{.cm-folha{page-break-after:avoid;page-break-inside:avoid}}
+    </style>`;
+  const meia = `<div class="cm-meia">
+        <div class="qr">${svg}</div>
+        <div class="txt">
+          <h1>PEDIDO DE<br>COMPRA</h1>
+          <p class="sub">Precisa de algo? Aponte a câmera do celular</p>
+          ${passos}
+          <div class="faixa">Não precisa de login — o comprador vê o pedido na hora.</div>
+          <footer><img src="img/lop-marca.png" alt="LOP"></footer>
+        </div></div>`;
+  const corpo = formato === 'meia'
+    ? `<div class="cm-folha"><div class="cm-metade">${meia}</div><div class="cm-corte"><span>✂ corte aqui</span></div><div class="cm-metade">${meia}</div></div>`
+    : `<article class="cm-placa">
       <h1>PEDIDO DE COMPRA</h1>
       <p class="sub">Precisa de algo? Aponte a câmera do celular</p>
       <div class="qr">${svg}</div>
-      <ol><li>Abra a câmera e aponte para o código.</li><li>Escreva seu nome, o que precisa, a quantidade e para onde vai.</li>
-        <li>Toque em <b>Enviar ao comprador</b>.</li><li>Anote o número do pedido (#C-…) para perguntar ao comprador.</li></ol>
+      ${passos}
       <div class="faixa">Não precisa de login — o comprador vê o pedido na hora.</div>
       <footer><img src="img/lop-marca.png" alt="LOP"></footer>
     </article>`;
-  mostrar(placa, { barra: true });
+  mostrar(estilo + escolha + corpo, { barra: true });
+  document.querySelectorAll('[data-cm-formato]').forEach(b =>
+    b.addEventListener('click', () => mostrarQr(b.dataset.cmFormato)));
 }
