@@ -1214,6 +1214,20 @@ function filtrados() {
 
 const nomeTipo = m => rotuloTipo(m);
 
+/* Movimentações separadas por data e, dentro do dia, por nº do documento
+   (pedido dele, 16/11/2026). Sem documento: agrupa pelo lançamento. */
+function blocosMov(lista) {
+  const blocos = [], mapa = new Map();
+  for (const m of lista) {
+    const data = String(m.data).slice(0, 10), doc = String(m.documento || '').trim();
+    const chave = data + '|' + (doc ? 'd:' + semAcento(doc) : 'l:' + (m.lancamento_id || m.id));
+    let b = mapa.get(chave);
+    if (!b) { b = { chave, data, doc, quem: m.fornecedor || m.outra_fazenda || m.plantio || '', itens: [] }; mapa.set(chave, b); blocos.push(b); }
+    b.itens.push(m);
+  }
+  return blocos;
+}
+
 function desenharPainel() {
   const alvo = $('qcPainelCorpo');
   if (!pronto()) { alvo.innerHTML = '<div class="cartao"><div class="vazio">Abrindo…</div></div>'; return; }
@@ -1228,6 +1242,7 @@ function desenharPainel() {
   const tipos = pf.sentido === 'entrada' ? TIPOS_ENTRADA : pf.sentido === 'saida' ? TIPOS_SAIDA
     : { ...TIPOS_ENTRADA, uso: 'Uso' };
   let dia = null;
+  const agro = ehQcLocal(localQc());
   alvo.innerHTML = `
   <div class="cartao">
     <div class="barra entre"><h2 style="margin:0">Movimentações · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
@@ -1260,20 +1275,40 @@ function desenharPainel() {
     </div>
   </div>
   <div class="cartao">
-    <div class="qc-mov">${lista.map(m => {
+    <div class="qc-mov${agro ? ' com-agro' : ''}">${agro && lista.length ? `<div class="qc-agro-cab"><span>${lista.filter(m => m.agro_ok).length} de ${lista.length} lançados no Agro</span><b>Agro</b></div>` : ''}${blocosMov(lista).map(b => {
+      const cab = b.data !== dia ? `<h3 class="es-secao">${esc(dataBR(dia = b.data))} <small>${esc(new Date(b.data + 'T12:00').toLocaleDateString('pt-BR', { weekday: 'long' }))}</small></h3>` : '';
+      const tudo = b.itens.every(m => m.agro_ok);
+      const doc = `<div class="qc-doc"><span>${b.doc ? 'Doc. <b>' + esc(b.doc) + '</b>' : '<b>Sem documento</b>'}${b.quem ? ' · ' + esc(b.quem) : ''}
+          <small>${b.itens.length} ${b.itens.length === 1 ? 'item' : 'itens'}</small></span>
+        ${agro ? `<label class="qc-agro" title="Marcar todo o documento como lançado no Agro"><input type="checkbox" data-agro-doc="${esc(b.chave)}"${tudo ? ' checked' : ''}></label>` : ''}</div>`;
+      return cab + doc + b.itens.map(m => {
       const i = itemDe(m.item_id);
-      const d = String(m.data).slice(0, 10);
-      const cab = d !== dia ? `<h3 class="es-secao">${esc(dataBR(dia = d))} <small>${esc(new Date(d + 'T12:00').toLocaleDateString('pt-BR', { weekday: 'long' }))}</small></h3>` : '';
       const e = m.sentido === 'entrada';
-      return cab + `<div class="qc-mov-lin ${e ? 'ent' : 'sai'}">
+      return `<div class="qc-mov-lin ${e ? 'ent' : 'sai'}${m.agro_ok ? ' agro-ok' : ''}">
         <span class="qc-mov-sinal">${e ? 'E' : 'S'}</span>
         <div class="qc-mov-txt"><b>${esc(i.nome)}</b> <span class="tag ${e ? 'ativo' : 'alerta'}">${esc(nomeTipo(m))}</span>
           <small>${detalhe(m)}</small></div>
         <strong class="${e ? 'qc-ent' : 'qc-sai'}">${e ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}
           ${(cu.mov.get(m.id) || {}).total != null ? `<small class="qc-mov-rs">${esc(brl(cu.mov.get(m.id).total))}</small>` : ''}</strong>
-      </div>`;
+        ${agro ? `<label class="qc-agro" title="${m.agro_ok ? esc('Lançado no Agro' + (m.agro_por ? ' por ' + m.agro_por : '') + (m.agro_em ? ' em ' + new Date(m.agro_em).toLocaleString('pt-BR') : '')) : 'Marcar como verificado e lançado no Agro'}"><input type="checkbox" data-agro="${esc(m.id)}"${m.agro_ok ? ' checked' : ''}></label>` : ''}
+      </div>`; }).join('');
     }).join('') || '<div class="vazio">Nenhuma movimentação com esses filtros.</div>'}</div>
   </div>`;
+
+  if (agro) {
+    const marcar = async (ms, ok) => {
+      const agora = new Date().toISOString(), quem = meuNome();
+      try {
+        for (const m of ms) if (!!m.agro_ok !== ok)
+          await gravar('est_movimentos', Object.assign({}, m, ok ? { agro_ok: true, agro_em: agora, agro_por: quem } : { agro_ok: false, agro_em: null, agro_por: null }));
+      } catch (e) { aviso('Não consegui marcar o Agro: ' + (e.message || e), true); }
+      desenharPainel();
+    };
+    const porId = new Map(lista.map(m => [m.id, m]));
+    alvo.querySelectorAll('[data-agro]').forEach(c => c.onchange = () => marcar([porId.get(c.dataset.agro)].filter(Boolean), c.checked));
+    const blocos = new Map(blocosMov(lista).map(b => [b.chave, b.itens]));
+    alvo.querySelectorAll('[data-agro-doc]').forEach(c => c.onchange = () => marcar(blocos.get(c.dataset.agroDoc) || [], c.checked));
+  }
 
   const refaz = () => desenharPainel();
   $('pfDe').onchange = e => { pf.de = e.target.value; refaz(); };
@@ -1303,10 +1338,10 @@ function baixarCsv(lista, cu) {
   const c = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rs = (v, casas = 2) => v == null || !isFinite(v) ? '' : Number(v).toFixed(casas).replace('.', ',');
   const linhas = [['Data', 'Entrada/Saída', 'Tipo', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Valor unitário (R$)', 'Valor total (R$)', 'Documento',
-    'Plantio', 'Máquina / implemento', 'Funcionário', 'Operador', 'Fazenda (origem/destino)', 'Fornecedor', 'Observação', 'Lançado por']]
+    'Plantio', 'Máquina / implemento', 'Funcionário', 'Operador', 'Fazenda (origem/destino)', 'Fornecedor', 'Observação', 'Lançado por'].concat(ehQcLocal(localQc()) ? ['Agro'] : [])]
     .concat(lista.map(m => { const i = itemDe(m.item_id); const k = cu.mov.get(m.id) || {}; return [dataBR(m.data), m.sentido === 'entrada' ? 'Entrada' : 'Saída',
       nomeTipo(m), i.nome, i.grupo || '', String(m.quantidade).replace('.', ','), i.unidade || '', rs(k.vu, 4), rs(k.total), m.documento, m.plantio,
-      m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor, m.obs, m.criado_por]; }));
+      m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor, m.obs, m.criado_por].concat(ehQcLocal(localQc()) ? [m.agro_ok ? 'Sim' : 'Não'] : []); }));
   const blob = new Blob(['﻿' + linhas.map(l => l.map(c).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1316,17 +1351,18 @@ function baixarCsv(lista, cu) {
 }
 
 function montarFolhaMov(lista, cu) {
+  const agro = ehQcLocal(localQc());
   $('qcPainelFolha').innerHTML = `<div class="folha rel">
     <div class="rel-topo"><img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Movimentações do Estoque — ${esc(nomeLocal())}</h1>
         <p>${esc(periodoTxt())} · ${lista.length} lançamento(s) · emitido em ${esc(new Date().toLocaleDateString('pt-BR'))}</p></div></div>
     <table class="rel-tab rel-mov" style="margin-top:6mm"><thead><tr><th class="ce">Data</th><th class="ce">E/S</th><th>Tipo</th><th>Produto</th>
-      <th class="ce">Qtd.</th><th class="ce">Valor</th><th>Documento</th><th>Destino / Operador / Fazenda</th></tr></thead>
+      <th class="ce">Qtd.</th><th class="ce">Valor</th><th>Documento</th><th>Destino / Operador / Fazenda</th>${agro ? '<th class="ce">Agro</th>' : ''}</tr></thead>
     <tbody>${lista.map(m => { const i = itemDe(m.item_id); return `<tr><td class="ce">${esc(dataBR(m.data))}</td>
       <td class="ce">${m.sentido === 'entrada' ? 'E' : 'S'}</td><td>${esc(nomeTipo(m))}</td><td>${esc(i.nome)}</td>
       <td class="ce">${m.sentido === 'entrada' ? '+' : '−'}${esc(mostrarNumero(m.quantidade))} ${esc(i.unidade || '')}</td>
       <td class="ce">${esc(brl((cu.mov.get(m.id) || {}).total))}</td>
-      <td>${esc(m.documento || '')}</td><td>${esc([m.plantio, m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor].filter(Boolean).join(' · '))}</td></tr>`; }).join('')}</tbody></table>
+      <td>${esc(m.documento || '')}</td><td>${esc([m.plantio, m.equipamento, m.funcionario, m.operador, m.outra_fazenda, m.fornecedor].filter(Boolean).join(' · '))}</td>${agro ? `<td class="ce">${m.agro_ok ? '✓' : ''}</td>` : ''}</tr>`; }).join('')}</tbody></table>
     <div class="rel-pe"><div class="rel-assina"><span></span><small>Responsável pelo estoque</small></div>
       <img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;

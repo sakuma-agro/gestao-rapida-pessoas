@@ -531,3 +531,13 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .orc-tab td{border-bottom:1px solid var(--linha);padding:4px 8px}
 .orc-tab .ce{text-align:center}
 .orc-tab .orc-qtd{padding:5px 6px}
+/* Movimentações: separação por documento + coluna Agro (Quebra Cocão), 16/11/2026 */
+.qc-doc{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 0;padding:6px 6px 6px 10px;background:#EEF6DD;border-left:3px solid var(--verde);border-radius:4px;font-size:13px;color:#51534A}
+.qc-doc small{margin-left:8px;color:var(--suave);font-size:12px}
+.qc-mov.com-agro .qc-mov-lin{grid-template-columns:28px 1fr auto 48px}
+.qc-agro{display:flex;justify-content:center;align-items:center;width:48px;cursor:pointer}
+.qc-agro input{width:20px;height:20px;accent-color:#84BD00;cursor:pointer}
+.qc-doc .qc-agro{margin-right:0}
+.qc-agro-cab{display:flex;justify-content:space-between;align-items:center;padding:0 6px 6px;border-bottom:1px solid var(--linha);font-size:12px;color:var(--suave)}
+.qc-agro-cab b{width:48px;text-align:center;color:#744F28;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+.qc-mov-lin.agro-ok{background:#F6FAEE}
