@@ -8363,7 +8363,7 @@ const AN_FAIXAS=[
   {ch:"vencidas",rot:"Vencidas",cor:"perigo",dica:"prazo já passou"},
   {ch:"breve",rot:"Vencem em até 7 dias",cor:"alerta",dica:"resolver esta semana"},
   {ch:"noprazo",rot:"Abertas no prazo",cor:"atencao",dica:"mais de 7 dias"},
-  {ch:"concluidas",rot:"Concluídas",cor:"calma",dica:"com foto do corrigido"}
+  {ch:"concluidas",rot:"Concluídas",cor:"calma",dica:"arrumadas e fechadas"}
 ];
 function anFaixa(it){
   if(anConcluida(it))return "concluidas";
@@ -8492,7 +8492,7 @@ function anRenderPainel(){
     </div>
 
     <div class="anp-cartao">
-      <div class="anp-barra-tit"><div><h2>Lista · ${esc(nomeSit)}</h2><p class="anp-dica">Com as fotos. Concluir pede a foto do corrigido.</p></div>
+      <div class="anp-barra-tit"><div><h2>Lista · ${esc(nomeSit)}</h2><p class="anp-dica">Com as fotos. Ao concluir, a foto do corrigido é opcional.</p></div>
         <span class="anp-acoes">${anFiltro.sit!=="abertas"?`<button type="button" class="anp-btn" data-an-sit="abertas">Ver todas as abertas</button>`:""}<button type="button" class="anp-btn" data-an-rel-abertas>Relatório das abertas</button></span></div>
       <div class="anp-filtros"><label class="anp-campo larga">Buscar <input type="search" id="an-f-busca" placeholder="Problema, plano, responsável, número…" value="${esc(anFiltro.busca)}"></label></div>
       <div class="an-plista" id="an-plista"></div>
@@ -8512,7 +8512,7 @@ function anRenderPlista(){
     return `<article class="an-pcard anp-f-${f}">
       <div class="an-pfotos">
         <figure class="an-pf-ver" data-an-visualizar="${esc(rel.id)}|${esc(it.uid)}" title="Visualizar a anomalia"><img alt="" data-an-pf="${esc(it.foto||"")}"><figcaption class="anomalia">Anomalia</figcaption></figure>
-        ${c?`<figure><img alt="" data-an-pf="${esc(it.fim_foto||"")}"><figcaption class="depois">Corrigido</figcaption></figure>`:""}
+        ${c&&it.fim_foto?`<figure><img alt="" data-an-pf="${esc(it.fim_foto||"")}"><figcaption class="depois">Corrigido</figcaption></figure>`:""}
       </div>
       <div class="an-pinfo">
         <span class="ref">${esc([rel.codigo,"nº "+n,rel.local].filter(Boolean).join(" · "))}</span>
@@ -8580,9 +8580,9 @@ function anVisualizar(relId,uid){
   d.innerHTML=`<div class="dlg-topo"><h3>Anomalia nº ${i+1} · ${esc([rel.codigo,rel.local].filter(Boolean).join(" · "))}</h3><button class="x" type="button" data-an-v-fechar aria-label="Fechar">×</button></div>
     <div class="dlg-corpo an-dlg-corpo">
       <h2 class="an-v-tit">${esc(it.problema||"—")}</h2>
-      <div class="an-v-fotos${c?" duas":""}">
+      <div class="an-v-fotos${c&&it.fim_foto?" duas":""}">
         <figure><img alt="Foto da anomalia" data-an-v-foto="${esc(it.foto||"")}"><figcaption class="anomalia">Anomalia</figcaption></figure>
-        ${c?`<figure><img alt="Foto do corrigido" data-an-v-foto="${esc(it.fim_foto||"")}"><figcaption class="depois">Corrigido</figcaption></figure>`:""}
+        ${c&&it.fim_foto?`<figure><img alt="Foto do corrigido" data-an-v-foto="${esc(it.fim_foto||"")}"><figcaption class="depois">Corrigido</figcaption></figure>`:""}
       </div>
       <table class="anp-tab an-v-tab"><tbody>
         ${linha("Plano de ação",anNl(it.plano)||"—")}
@@ -8605,7 +8605,7 @@ function anVisualizar(relId,uid){
   d.showModal ? d.showModal() : d.setAttribute("open","");
 }
 
-/* ── Concluir com a foto do corrigido ── */
+/* ── Concluir (foto do corrigido opcional — pedido dele, 16/11/2026) ── */
 function anAbrirConcluir(relId,uid){
   const rel=anRels.find(x=>x.id===relId), it=rel&&(rel.itens||[]).find(x=>x.uid===uid); if(!it)return;
   if(!conectado()||anOffline){ toast("Para concluir é preciso estar conectado à base."); return; }
@@ -8625,7 +8625,7 @@ function anDlgHtml(rel,it){
       <div class="an-dlg-fotos">
         <figure><img alt="" data-an-c-antes><figcaption class="anomalia">Anomalia</figcaption></figure>
         <button type="button" class="ad-foto" data-an-c-foto>${s._src?`<img src="${esc(s._src)}" alt="Foto do corrigido"><span class="ad-trocar">Trocar foto</span>`
-          :`<span class="ad-vazia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Foto do corrigido *</span>`}</button>
+          :`<span class="ad-vazia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Foto do corrigido (opcional)</span>`}</button>
       </div>
       <div class="campo"><label for="an-c-obs">O que foi feito</label><textarea id="an-c-obs" placeholder="Ex.: lixo recolhido e lixeira instalada">${esc(s.obs)}</textarea></div>
       <div class="campo"><label for="an-c-data">Data da correção</label><input type="date" id="an-c-data" value="${esc(s.data)}"></div>
@@ -8643,10 +8643,10 @@ async function anDlgClique(ev){
   }
   const ok=ev.target.closest("[data-an-c-ok]");
   if(ok){
-    if(!s._src){ toast("Tire a foto do corrigido para concluir."); return; }
     ok.disabled=true; ok.textContent="Gravando…";
     try{
-      const cam=await enviarFoto(`${s.relId}/an-${s.uid}-fim-${Date.now()}.jpg`,s._src); anDados.set(cam,s._src);
+      let cam="";
+      if(s._src){ cam=await enviarFoto(`${s.relId}/an-${s.uid}-fim-${Date.now()}.jpg`,s._src); anDados.set(cam,s._src); }
       await anGravarItem(s.relId,s.uid,{status:"Concluída",fim_foto:cam,fim_data:s.data||anHoje(),fim_obs:(s.obs||"").trim()});
       anConcluindo=null; d.close?d.close():d.removeAttribute("open");
       toast("Anomalia concluída."); anRender();
@@ -8654,7 +8654,7 @@ async function anDlgClique(ev){
   }
 }
 async function anReabrir(relId,uid){
-  if(!confirm("Reabrir esta anomalia? Ela volta para as abertas e a foto do corrigido sai do relatório."))return;
+  if(!confirm("Reabrir esta anomalia? Ela volta para as abertas e o que foi lançado na conclusão sai do relatório."))return;
   try{ await anGravarItem(relId,uid,{status:"Aberta",fim_foto:"",fim_data:"",fim_obs:""}); toast("Anomalia reaberta."); anRender(); }
   catch(e){ toast("Não deu para reabrir: "+String(e.message).slice(0,100)); }
 }
@@ -9427,7 +9427,7 @@ const _renderConfigFD = renderConfig;
 renderConfig = function(){ const r=_renderConfigFD.apply(this, arguments); try{ fdRenderConfig(); }catch(e){} return r; };
 
 </script>
-<script src="vistorias.js?v=21"></script>
-<script src="lop-depois.js?v=21"></script>
+<script src="vistorias.js?v=22"></script>
+<script src="lop-depois.js?v=22"></script>
 </body>
 </html>
