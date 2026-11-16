@@ -86,29 +86,33 @@ function porQueVence(c) {
 }
 const textoPorQue = c => { const v = porQueVence(c); return v.tipo ? v.ic + ' Por ' + v.tipo + ': ' + v.txt : maiuscula(v.txt); };
 
-TELAS.painel = el => {
+function listaManut(el) {
   document.body.classList.remove('modo-quadro');
   /* Uma OS por máquina (28/10/2026): se apareceu OS duplicada (dois aparelhos
      sem internet), junta na mais antiga e redesenha. */
   /* 28/10/2026 (mais tarde): desligado — agora a mesma máquina pode ter
      mais de uma OS de propósito (serviços que não podem ir juntos). */
   if (false && typeof juntarOSDuplicadas === 'function' && temOSDuplicada()) {
-    juntarOSDuplicadas().then(n => { if (n) aviso(n + ' OS duplicada(s) juntada(s) na OS mais antiga da máquina.'); TELAS.painel(el); });
+    juntarOSDuplicadas().then(n => { if (n) aviso(n + ' OS duplicada(s) juntada(s) na OS mais antiga da máquina.'); redesenhar(el); });
     return;
   }
   // Tela do auxiliar (28/10/2026, aprovada com imagem): quem não é
   // administrador começa por três blocos grandes; "Ver tudo" abre a lista.
-  if (!ehAdmin() && !listaCompletaAux) return inicioAuxiliar(el);
+  if (!modoCk && !ehAdmin() && !listaCompletaAux) return inicioAuxiliar(el);
   if (!ehAdmin() && abaPrev === 'semdado') abaPrev = 'fazer';
-  const planos = planosDaFrota();
+  // Check list não tem Consertos nem Por serviço (16/11/2026)
+  if (modoCk && ['consertos', 'servico'].includes(abaPrev)) abaPrev = 'fazer';
+  /* 16/11/2026: Preventivas fica só com as trocas; as rotinas "acompanha"
+     (check list do vaso/tanque) vão para a tela Check list. */
+  const planos = planosDaFrota().filter(x => ehRotinaCk(x.p.tipo_manutencao_id) === modoCk);
   const mes = hoje().slice(0, 7);
 
   // Em andamento: uma linha por OS preventiva aberta (a OS pode ter vários itens)
   const osAbertas = q.todos('ordens_servico')
-    .filter(o => o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id))
+    .filter(o => o.tipo !== 'CORRETIVA' && ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id) && osDeCk(o) === modoCk)
     .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')));
   // Consertos (28/10/2026): OS corretivas abertas, no mesmo fluxo das preventivas
-  const consertos = q.todos('ordens_servico')
+  const consertos = modoCk ? [] : q.todos('ordens_servico')
     .filter(o => o.tipo === 'CORRETIVA' && ABERTAS.includes(o.status) && noGrupoId(o.equipamento_id))
     .sort((a, b) => String(a.data_emissao || '').localeCompare(String(b.data_emissao || '')));
   // A fazer: precisa de troca e ninguém abriu OS ainda
@@ -120,10 +124,10 @@ TELAS.painel = el => {
   // Feitas no mês: cada troca registrada neste mês
   const feitas = q.todos('manutencoes')
     .filter(m => String(m.data_manutencao || '').slice(0, 7) === mes && noGrupoId(m.equipamento_id)
-      && q.por_id('equipamentos', m.equipamento_id))
+      && q.por_id('equipamentos', m.equipamento_id) && ehRotinaCk(m.tipo_manutencao_id) === modoCk)
     .sort((a, b) => String(b.data_manutencao).localeCompare(String(a.data_manutencao)));
   // Máquinas cujo vencimento depende de horas e o mostrador está velho
-  const velhas = [...new Map(planos
+  const velhas = modoCk ? [] : [...new Map(planos
     .filter(x => x.p.periodicidade_horas != null && idadeLeitura(x.c.equipamento) >= HORIMETRO_VELHO_DIAS)
     .map(x => [x.c.equipamento.id, x.c.equipamento])).values()]
     .sort((a, b) => idadeLeitura(b) - idadeLeitura(a) || porCodigo(a, b));
@@ -142,31 +146,35 @@ TELAS.painel = el => {
   const avisos = [
     atrasadas.length ? `<button type="button" class="pv-av-r" data-ir-aba="${atrasadas.some(o => o.tipo !== 'CORRETIVA') ? 'andamento' : 'consertos'}">⚠ ${atrasadas.length} OS atrasada(s) — aberta(s) há mais de ${OS_ATRASADA_DIAS} dias</button>` : '',
     velhas.length ? `<button type="button" id="pv-hor">⏱ ${velhas.length} horímetro(s) com mais de ${HORIMETRO_VELHO_DIAS} dias</button>` : '',
-    ckAtraso ? `<button type="button" id="pv-ck">☑ ${ckAtraso} check list(s) atrasado(s)</button>` : '',
+
     ehAdmin() && semDado.length ? `<button type="button" data-ir-aba="semdado">✎ ${semDado.length} sem a troca cadastrada</button>` : ''
   ].filter(Boolean);
 
   el.innerHTML = `
     <div class="pn-cabeca pv-cab-leve">
-      <h1>Hoje${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
+      <h1>${modoCk ? 'Check list' : 'Preventivas'}${grupoAtual ? ' · ' + esc(nomeGrupo(grupoAtual)) : ''}</h1>
       <span class="pv-cab-acoes">${!ehAdmin() ? '<button type="button" class="btn neutro" id="pv-inicio">← Início</button>' : ''}
         <details class="pv-menu-mais"><summary class="btn neutro">Mais ▾</summary><div class="pv-mais-lista">
-          <button type="button" class="oculto" id="pv-hm">+ Hora máquina</button>
-          <button type="button" id="pv-levant">🖨 Levantamento da última troca</button>
+          ${modoCk ? `<button type="button" data-ck-antigo="agenda">☑ Agenda completa / folhas em branco</button>
+          <button type="button" data-ck-antigo="realizados">Check lists realizados</button>` : `<button type="button" class="oculto" id="pv-hm">+ Hora máquina</button>
+          <button type="button" id="pv-levant">🖨 Levantamento da última troca</button>`}
           <button type="button" id="pv-atualizar">↻ Atualizar dados</button>
-          ${ehAdmin() ? '<button type="button" data-ir="calendario">Calendário</button><button type="button" data-ir="vencimentos">Planilha</button><button type="button" data-ir="ordens">Todas as OS</button>' : ''}
+          ${ehAdmin() && !modoCk ? '<button type="button" data-ir="calendario">Calendário</button><button type="button" data-ir="vencimentos">Planilha</button><button type="button" data-ir="ordens">Todas as OS</button>' : ''}
         </div></details></span>
     </div>
-    ${guiaPassos('hoje', [
+    ${modoCk ? guiaPassos('ckhoje', [
+      'Em <b>A fazer</b>, toque em <b>Preencher</b> (check list) ou <b>Abrir OS</b> (rotina do vaso/tanque)',
+      'No check list, o que ficar <b>ruim</b> vira conserto em <b>Preventivas</b>',
+      'Rotina feita: em <b>Em andamento</b> toque em <b>Fechar OS</b>']) : guiaPassos('hoje', [
       'Em <b>A fazer</b>, toque em <b>Abrir OS</b> na máquina vencida',
       'Toque em <b>WhatsApp</b> para mandar a OS a quem vai fazer',
       'Feita a troca, em <b>Em andamento</b> toque em <b>Fechar OS</b> e preencha o horímetro']) }
     <div class="pv-tabs">
       ${aba('fazer', 'pv-a-fazer', fazer.length, 'A fazer')}
       ${aba('andamento', 'pv-a-and', osAbertas.length, 'Em andamento' + (atrasadas.filter(o => o.tipo !== 'CORRETIVA').length ? ` <em class="pv-aba-atr">${atrasadas.filter(o => o.tipo !== 'CORRETIVA').length} atrasada(s)</em>` : ''))}
-      ${aba('consertos', 'pv-a-con', consertos.length, 'Consertos')}
-      ${aba('feitas', 'pv-a-feita', feitas.length, 'Feitas no mês')}
-      ${aba('servico', 'pv-a-serv', null, '⚙ Por serviço')}
+      ${modoCk ? '' : aba('consertos', 'pv-a-con', consertos.length, 'Consertos')}
+      ${aba('feitas', 'pv-a-feita', feitas.length, modoCk ? 'Feitos no mês' : 'Feitas no mês')}
+      ${modoCk ? '' : aba('servico', 'pv-a-serv', null, '⚙ Por serviço')}
       ${abaPrev === 'semdado' ? aba('semdado', 'pv-a-sem', semDado.length, 'Sem a troca cadastrada') : ''}
     </div>
     ${avisos.length ? `<p class="pv-avisos">${avisos.join('<span>·</span>')}</p>` : ''}
@@ -204,7 +212,15 @@ TELAS.painel = el => {
       feitas: feitas.filter(m => (!filtroPrev.item || m.tipo_manutencao_id === filtroPrev.item)
         && casa(q.por_id('equipamentos', m.equipamento_id), nomeTipo(m.tipo_manutencao_id))),
     };
-    Object.keys(F).forEach(k => { const n = document.querySelector(`.pv-aba[data-aba="${k}"] strong`); if (n) n.textContent = F[k].length; });
+    /* Check list (16/11/2026): A fazer soma as rotinas e os check lists das
+       máquinas atrasados ou de hoje; Feitos soma os check lists do mês. */
+    const ckMaq = modoCk ? (typeof agendaChecklists === 'function' ? agendaChecklists() : []).filter(l => noGrupo(l.e) && casa(l.e, '')) : [];
+    const ckPend = ckMaq.filter(l => ['atrasado', 'hoje'].includes(l.status));
+    const ckNunca = ckMaq.filter(l => l.status === 'nunca').length;
+    const ckFeitos = modoCk ? q.todos('checklists').filter(c => String(c.data_verificacao || '').slice(0, 7) === mes && noGrupoId(c.equipamento_id)
+      && casa(q.por_id('equipamentos', c.equipamento_id), '')).sort((a, b) => String(b.data_verificacao).localeCompare(String(a.data_verificacao))) : [];
+    const extra = { fazer: ckPend.length, feitas: ckFeitos.length };
+    Object.keys(F).forEach(k => { const n = document.querySelector(`.pv-aba[data-aba="${k}"] strong`); if (n) n.textContent = F[k].length + (extra[k] || 0); });
     const filtrando = !!(filtroPrev.local || filtroPrev.item || b);
     const recorte = [filtroPrev.local && q.nome('locais', filtroPrev.local), filtroPrev.item && nomeTipo(filtroPrev.item), b && '"' + filtroPrev.busca + '"']
       .filter(Boolean).join(' · ');
@@ -267,9 +283,15 @@ TELAS.painel = el => {
             <span id="pv-sel-n">nenhuma marcada</span>
             <button type="button" class="btn neutro" id="pv-abrir-sel" disabled>Abrir marcadas</button>
             <button type="button" class="btn" id="pv-imp-sel" disabled>Abrir e imprimir marcadas</button></div>` : '';
-        html = barraSel + (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
+        html = barraSel + (maqs.length && modoCk ? '<div class="pv-grupo">Rotinas dos vasos e tanques</div>' : '') + (venc.length ? `<div class="pv-grupo">Com troca vencida · ${venc.length} máquina(s)</div>` + venc.map(linhaMaq).join('') : '')
              + (perto.length ? `<div class="pv-grupo">Perto de vencer · ${perto.length} máquina(s)</div>` + perto.map(linhaMaq).join('') : '');
-        if (!html) html = vazio('Nada a fazer: as trocas estão em dia ou já têm OS aberta');
+        if (modoCk && (ckPend.length || ckNunca)) html += `<div class="pv-grupo">Check list das máquinas · ${ckPend.length} atrasado(s) ou de hoje</div>`
+          + ckPend.map(l => `<div class="pv-linha pv-leve ${l.status === 'atrasado' ? 'pv-r' : 'pv-y'}">
+              <button type="button" class="pv-cod" data-maq="${esc(l.e.id)}" title="Abrir a ficha">${esc(l.e.codigo)}</button>
+              <span class="pv-nm2"><b class="pv-abre" data-maq="${esc(l.e.id)}">${esc(l.e.descricao)}</b><small>${esc(l.modelo.nome)} · ${l.status === 'hoje' ? 'vence hoje' : l.atraso + (l.atraso === 1 ? ' dia de atraso' : ' dias de atraso')}</small></span>
+              <span class="pv-acao"><button type="button" class="btn" data-ckpre="${esc(l.e.id)}">Preencher</button></span></div>`).join('')
+          + (ckNunca ? `<p class="pv-ck-nunca"><button type="button" class="pv-ir" data-ck-antigo="agenda">${ckNunca} máquina(s) ainda sem nenhum check list — ver na agenda</button></p>` : '');
+        if (!html) html = vazio(modoCk ? 'Nada a fazer: rotinas e check lists em dia' : 'Nada a fazer: as trocas estão em dia ou já têm OS aberta');
       } else {
         html = base.map(linha).join('') || vazio('Todos os itens têm a troca lançada');
       }
@@ -315,7 +337,7 @@ TELAS.painel = el => {
                  <button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}" data-esquecida="1">✓ Já foi feita</button>`
               : `<button type="button" class="btn pv-fechar" data-fechar="${esc(o.id)}">✓ Fechar OS</button>`}</span>
         </div><div class="pv-fecha oculto" data-painel="${esc(o.id)}"></div></div>`;
-      }).join('') || vazio(conserto ? 'Nenhum conserto em aberto' : 'Nenhuma OS preventiva aberta');
+      }).join('') || vazio(conserto ? 'Nenhum conserto em aberto' : modoCk ? 'Nenhuma OS de rotina aberta' : 'Nenhuma OS preventiva aberta');
     } else {
       html = F.feitas
         .map(m => {
@@ -326,17 +348,23 @@ TELAS.painel = el => {
             <span class="pv-sit"><b>Feita em ${esc(formatarData(m.data_manutencao))}</b><small>${m.leitura != null ? nHoras(m.leitura) + ' ' + unidadeDe(e) + ' · ' : ''}${esc(m.observacao || '')}</small></span>
             <span class="pv-acao">${os ? `<button type="button" class="btn neutro" data-os="${esc(os.id)}">OS ${esc(numeroOS(os))}</button>` : ''}</span>
           </div>`;
-        }).join('') || vazio('Nenhuma troca registrada neste mês');
+        }).join('') + (ckFeitos.length ? (F.feitas.length ? '<div class="pv-grupo">Check lists das máquinas</div>' : '') + ckFeitos.map(c => {
+          const e = q.por_id('equipamentos', c.equipamento_id);
+          return `<div class="pv-linha pv-g">${maq(e)}
+            <span class="pv-item">Check list${c.numero ? ' nº ' + esc(c.numero) : ''}</span>
+            <span class="pv-sit"><b>Feito em ${esc(formatarData(c.data_verificacao))}</b><small>${esc(c.resultado_geral || '')}${c.operador ? ' · ' + esc(c.operador) : ''}</small></span>
+            <span class="pv-acao"><button type="button" class="btn neutro" data-ckver="${esc(c.id)}">Abrir</button></span></div>`;
+        }).join('') : '') || vazio(modoCk ? 'Nada feito neste mês ainda' : 'Nenhuma troca registrada neste mês');
     }
 
     $('#pv-lista').innerHTML = `<div class="pv-lista">${html}</div>`;
-    $$('#pv-lista [data-ir-aba]').forEach(x => x.onclick = () => { abaPrev = x.dataset.irAba; TELAS.painel(el); });
+    $$('#pv-lista [data-ir-aba]').forEach(x => x.onclick = () => { abaPrev = x.dataset.irAba; redesenhar(el); });
     const lf = $('#pv-limpar'); if (lf) lf.onclick = () => {
       $('#pv-busca').value = ''; $('#pv-item').value = ''; $('#pv-local').value = ''; desenhar();
     };
     $$('#pv-lista [data-abrir]').forEach(x => x.onclick = async () => {
       await abrirOSPreventiva(x.dataset.abrir);
-      if (document.querySelector('#pv-lista')) TELAS.painel(el);
+      if (document.querySelector('#pv-lista')) redesenhar(el);
     });
     /* Abrir OS (28/10/2026): com um serviço, abre na hora. Com mais de um,
        abre embaixo da linha a lista dos serviços, todos marcados — desmarca
@@ -347,7 +375,7 @@ TELAS.painel = el => {
       for (const id of ids) os = await abrirOSPreventiva(id, os ? { silencioso: true, osAlvo: os } : { silencioso: true, nova: true });
       const e = os && q.por_id('equipamentos', os.equipamento_id);
       aviso(`OS ${numeroOS(os)} aberta para o ${e ? e.codigo : ''} com ${ids.length} ${ids.length === 1 ? 'serviço' : 'serviços'}. Está em Em andamento.`);
-      TELAS.painel(el);
+      redesenhar(el);
     };
     $$('#pv-lista [data-abrir-maq]').forEach(x => x.onclick = async () => {
       const ids = x.dataset.abrirMaq.split(',');
@@ -381,7 +409,7 @@ TELAS.painel = el => {
     const bnc = $('#pv-novo-conserto'); if (bnc) bnc.onclick = () => formCorretiva();
     $$('#pv-lista [data-fechar]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.fechar);
-      if (os) painelFechar(os, !!x.dataset.esquecida, () => TELAS.painel(el));
+      if (os) painelFechar(os, !!x.dataset.esquecida, () => redesenhar(el));
     });
     $$('#pv-lista [data-wpp]').forEach(x => x.onclick = () => {
       const os = q.por_id('ordens_servico', x.dataset.wpp);
@@ -392,7 +420,7 @@ TELAS.painel = el => {
       if (!os || !confirm(`A OS ${numeroOS(os)} não foi feita? Ela é cancelada e os serviços voltam para A fazer.`)) return;
       await cancelarOS(os);
       aviso(`OS ${numeroOS(os)} cancelada. Os serviços voltaram para A fazer.`);
-      TELAS.painel(el);
+      redesenhar(el);
     });
     // Caixinhas de A fazer
     const sels = $$('#pv-lista [data-sel]');
@@ -416,19 +444,22 @@ TELAS.painel = el => {
         if (os && !oss.includes(os)) oss.push(os);
       }
       aviso(`${oss.length} OS ${oss.length === 1 ? 'aberta' : 'abertas'}. Estão em Em andamento.`);
-      TELAS.painel(el);
+      redesenhar(el);
       if (imprimir) imprimirVariasOS(oss);
     };
     const bas = $('#pv-abrir-sel'); if (bas) bas.onclick = () => abrirMarcadas(false);
     const bis = $('#pv-imp-sel'); if (bis) bis.onclick = () => abrirMarcadas(true);
     $$('#pv-lista [data-maq]').forEach(x => x.onclick = () => fichaMaquina(x.dataset.maq));
+    $$('#pv-lista [data-ckpre]').forEach(x => x.onclick = () => preencherChecklist(x.dataset.ckpre));
+    $$('#pv-lista [data-ckver]').forEach(x => x.onclick = () => abrirRelatorioChecklist(x.dataset.ckver));
+    $$('#pv-lista [data-ck-antigo]').forEach(x => x.onclick = () => verChecklistAntigo(el, x.dataset.ckAntigo));
     $$('#pv-lista [data-prox]').forEach(x => x.onclick = () => {
       const p = q.por_id('planos_manutencao', x.dataset.prox);
-      formItem(q.por_id('equipamentos', p.equipamento_id), p, { modo: 'proxima', depois: () => TELAS.painel(el) });
+      formItem(q.por_id('equipamentos', p.equipamento_id), p, { modo: 'proxima', depois: () => redesenhar(el) });
     });
   };
 
-  $$('.pv-aba').forEach(x => x.onclick = () => { abaPrev = x.dataset.aba; TELAS.painel(el); });
+  $$('.pv-aba').forEach(x => x.onclick = () => { abaPrev = x.dataset.aba; redesenhar(el); });
   ['pv-busca', 'pv-item', 'pv-local'].forEach(id => { const x = document.getElementById(id); x.oninput = desenhar; x.onchange = desenhar; });
   const bh = $('#pv-hor'); if (bh) bh.onclick = () => irPara('atualizar_horimetros');
   const ck = $('#pv-ck'); if (ck) ck.onclick = () => { abaChecklist = 'agenda'; irPara('checklist'); };
@@ -436,21 +467,22 @@ TELAS.painel = el => {
   if (window.HoraMaquina && App.sb) window.HoraMaquina.disponivel(App.sb).then(ok => {
     const bhm = $('#pv-hm'); if (!bhm) return;
     bhm.classList.toggle('oculto', !ok);
-    bhm.onclick = () => window.HoraMaquina.abrir({ cliente: App.sb, aoSalvar: () => { baixarBase().then(() => { if (document.querySelector('#pv-lista')) TELAS.painel(el); }).catch(() => {}); } });
+    bhm.onclick = () => window.HoraMaquina.abrir({ cliente: App.sb, aoSalvar: () => { baixarBase().then(() => { if (document.querySelector('#pv-lista')) redesenhar(el); }).catch(() => {}); } });
   });
-  $('#pv-levant').onclick = () => escolherLevantamento();
+  const blv = $('#pv-levant'); if (blv) blv.onclick = () => escolherLevantamento();
+  el.querySelectorAll('.pv-mais-lista [data-ck-antigo]').forEach(b => b.onclick = () => verChecklistAntigo(el, b.dataset.ckAntigo));
   el.querySelectorAll('.pv-mais-lista [data-ir]').forEach(b => b.onclick = () => irPara(b.dataset.ir));
-  el.querySelectorAll('.pv-avisos [data-ir-aba]').forEach(b => b.onclick = () => { abaPrev = b.dataset.irAba; TELAS.painel(el); });
-  const bv = $('#pv-varias'); if (bv) bv.onclick = () => { modoVarias = !modoVarias; TELAS.painel(el); };
-  const bini = $('#pv-inicio'); if (bini) bini.onclick = () => { listaCompletaAux = false; TELAS.painel(el); };
+  el.querySelectorAll('.pv-avisos [data-ir-aba]').forEach(b => b.onclick = () => { abaPrev = b.dataset.irAba; redesenhar(el); });
+  const bv = $('#pv-varias'); if (bv) bv.onclick = () => { modoVarias = !modoVarias; redesenhar(el); };
+  const bini = $('#pv-inicio'); if (bini) bini.onclick = () => { listaCompletaAux = false; redesenhar(el); };
   $('#pv-atualizar').onclick = async () => {
     if (!App.online) return aviso('Sem internet: a tela mostra o que está guardado neste aparelho.', true);
     aviso('Atualizando…');
     await baixarBase();
-    irPara('painel');
+    irPara(modoCk ? 'checklist' : 'painel');
   };
   desenhar();
-};
+}
 
 /* Enviar pelo WhatsApp (28/10/2026, pedido dele: "somente o PDF, saindo o
    número da OS e a máquina, nada de texto"). Monta o PDF da própria folha da
@@ -776,3 +808,65 @@ function imprimirLevantamento(localId) {
     </body></html>`);
   w.document.close();
 }
+
+/* =====================================================================
+   16/11/2026 — Manutenções em três módulos (pedido dele, "mais lean, fácil
+   visualização", aprovado com imagem): Preventivas (esta lista, só trocas),
+   Check list (a mesma lista, com as rotinas "acompanha" dos vasos/tanques e
+   os check lists das máquinas) e Cadastros (Máquinas · Horímetros · Modelos
+   de check list, em abas).
+   ===================================================================== */
+let modoCk = false;
+const ehRotinaCk = tipoId => !!(q.por_id('tipos_manutencao', tipoId) || {}).acompanha;
+/* OS de check list: todos os serviços dela são rotina "acompanha". OS com
+   troca junto (óleo do compressor + itens do vaso) fica em Preventivas. */
+function osDeCk(o) {
+  const itens = itensDaOS(o.id);
+  return itens.length > 0 && itens.every(i => ehRotinaCk(i.tipo_manutencao_id));
+}
+const redesenhar = el => (modoCk ? TELAS.checklist : TELAS.painel)(el);
+TELAS.painel = el => { modoCk = false; listaManut(el); };
+
+const checklistAntigo = TELAS.checklist;
+TELAS.checklist = el => {
+  if (el && el.id === 'ck-antigo') return checklistAntigo(el);
+  modoCk = true;
+  listaManut(el);
+};
+/* Agenda completa (com folhas em branco e WhatsApp) e Realizados continuam,
+   abertos pelo "Mais ▾" da tela Check list. */
+function verChecklistAntigo(el, aba) {
+  abaChecklist = aba || 'agenda';
+  el.innerHTML = '<p><button type="button" class="btn neutro" id="ck-voltar">← Check list</button></p><div id="ck-antigo"></div>';
+  el.querySelector('#ck-voltar').onclick = () => TELAS.checklist(el);
+  checklistAntigo(el.querySelector('#ck-antigo'));
+}
+
+/* Cadastros: Máquinas · Horímetros · Modelos de check list */
+let abaCad = 'maq';
+const cadMaquinas = TELAS.maquinas, cadHorimetros = TELAS.atualizar_horimetros;
+function telaCadastros(el) {
+  const abas = [
+    ['maq', 'Máquinas', podeTela('maquinas')],
+    ['hor', 'Horímetros', podeTela('atualizar_horimetros')],
+    ['mod', 'Modelos de check list', !!(window.ehAdminTotal && ehAdminTotal() && window.desenharModelosCk)],
+  ].filter(a => a[2]);
+  if (!abas.some(a => a[0] === abaCad)) abaCad = (abas[0] || ['maq'])[0];
+  el.innerHTML = (abas.length > 1 ? `<div class="pv-tabs cad-tabs">${abas.map(([id, rot]) =>
+    `<button type="button" class="pv-aba${abaCad === id ? ' ativa' : ''}" data-cad="${id}"><b>${rot}</b></button>`).join('')}</div>` : '')
+    + '<div id="cad-corpo"></div>';
+  el.querySelectorAll('[data-cad]').forEach(b => b.onclick = () => { abaCad = b.dataset.cad; if (window.marcarMenu) marcarMenu(abaCad === 'hor' ? 'atualizar_horimetros' : 'maquinas'); telaCadastros(el); });
+  const corpo = el.querySelector('#cad-corpo');
+  ({ maq: cadMaquinas, hor: cadHorimetros, mod: window.desenharModelosCk }[abaCad])(corpo);
+}
+TELAS.maquinas = el => {
+  if (el && el.id === 'cad-corpo') return cadMaquinas(el);
+  abaCad = 'maq';
+  telaCadastros(el);
+};
+TELAS.atualizar_horimetros = el => {
+  if (el && el.id === 'cad-corpo') return cadHorimetros(el);
+  abaCad = 'hor';
+  if (window.marcarMenu) marcarMenu('atualizar_horimetros');
+  telaCadastros(el);
+};

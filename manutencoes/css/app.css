@@ -1591,3 +1591,8 @@ tr.ir-volta td{color:var(--cinza-claro)}
 .ah-tab td,.ah-tab th{padding:8px 14px}
 .ah-tab tr.ah-y td{background:#FFF8E6}.ah-tab tr.ah-y td:last-child{color:#A87508;font-weight:bold}
 .ah-tab tr.ah-r td{background:#FDF0EE}.ah-tab tr.ah-r td:last-child{color:var(--urgente);font-weight:bold}
+
+/* 16/11/2026 — Manutenções em 3 módulos: abas de Cadastros e linha dos check lists nunca feitos */
+.cad-tabs { margin: 0 0 14px; }
+.cad-tabs .pv-aba b { font-weight: 600; }
+.pv-ck-nunca { margin: 10px 0 0; font-size: 13px; }

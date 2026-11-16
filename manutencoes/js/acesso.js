@@ -26,10 +26,15 @@ const MODULOS = [
        telas — Hoje, Horímetros, Check list, Máquinas. As outras continuam
        existindo (permissões, atalhos e links), mas saem do menu e viram
        botões dentro de Hoje e de Horímetros (3º campo = fora do menu). */
-    ['painel', 'Hoje'],
-    ['atualizar_horimetros', 'Horímetros'],
+    /* 16/11/2026 (pedido dele, aprovado com imagem "mais lean"): três
+       módulos dentro de Manutenções — Preventivas (só trocas), Check list
+       (rotinas dos vasos/tanques + check lists das máquinas) e Cadastros
+       (Máquinas · Horímetros · Modelos de check list, em abas). Os ids não
+       mudaram; Horímetros saiu do menu e virou aba de Cadastros. */
+    ['painel', 'Preventivas'],
     ['checklist', 'Check list'],
-    ['maquinas', 'Máquinas'],
+    ['maquinas', 'Cadastros'],
+    ['atualizar_horimetros', 'Horímetros', 1],
     ['calendario', 'Calendário', 1], ['ordens', 'Todas as OS', 1],
     ['horimetros', 'Horímetros lançados', 1],
     ['vencimentos', 'Planilha', 1],
@@ -169,8 +174,11 @@ function marcarMenu(tela) {
     $('#menu2').innerHTML = telas.map(botaoTela).join('');
     $$('#menu2 button').forEach(b => b.onclick = () => irPara(b.dataset.tela));
   }
-  $$('#menu2 button').forEach(b => b.classList.toggle('ativo', b.dataset.tela === tela));
+  // Tela fora do menu acende o botão do módulo a que pertence (16/11/2026).
+  const alvo = PAI_TELA_M[tela] || tela;
+  $$('#menu2 button').forEach(b => b.classList.toggle('ativo', b.dataset.tela === alvo));
 }
+const PAI_TELA_M = { atualizar_horimetros: 'maquinas', horimetros: 'maquinas', calendario: 'painel', ordens: 'painel', vencimentos: 'painel' };
 
 /** A primeira tela que a pessoa pode ver, para atalhos e links. */
 function primeiraTela() {
@@ -200,15 +208,16 @@ const ICONE_MODULO_M = { manutencoes: 'manut', patrimonio: 'patrimonio' };
 ICONE_ATALHO.cal = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0M8 18h2M12 18h2"/>';
 ICONE_ATALHO.prev = '<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
 ICONE_ATALHO.planilha = '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>';
-const ICONE_TELA_M = { atualizar_horimetros: 'horimetro', horimetros: 'horimetro', painel: 'prev', maquinas: 'bens', vencimentos: 'planilha', calendario: 'cal',
+ICONE_ATALHO.cad = '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 13h8M8 16h5"/>';
+const ICONE_TELA_M = { atualizar_horimetros: 'horimetro', horimetros: 'horimetro', painel: 'prev', maquinas: 'cad', vencimentos: 'planilha', calendario: 'cal',
   ordens: 'os', checklist: 'check', patrimonio: 'patrimonio', patrimonio_mov: 'mov' };
 const botaoTela = ([t, rot]) =>
   `<button type="button" data-tela="${t}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_ATALHO[ICONE_TELA_M[t]] || ''}</svg><span>${esc(rot)}</span></button>`;
 const ATALHOS_INICIO = [
-  ['painel', 'prev', 'Hoje', 'prim'],
-  ['atualizar_horimetros', 'horimetro', 'Horímetros'],
+  ['painel', 'prev', 'Preventivas', 'prim'],
   ['checklist', 'check', 'Check list'],
-  ['maquinas', 'bens', 'Máquinas'],
+  ['maquinas', 'cad', 'Cadastros'],
+  ['atualizar_horimetros', 'horimetro', 'Horímetros'],
   ['patrimonio', 'patrimonio', 'Patrimônio'],
   ['patrimonio_mov', 'mov', 'Movimentações'],
 ];
