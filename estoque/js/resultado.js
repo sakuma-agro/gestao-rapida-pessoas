@@ -82,7 +82,9 @@ function montar() {
       const falta = qtd !== null && precisaRepor(im, qtd);
       const c = qtd !== null ? aComprar(im, qtd) : 0;
       comprar += c;
-      return { qtd, falta, minimo: temMinimo(im) ? im.estoque_minimo : null };
+      // tem na prateleira mas a fazenda não tem mínimo: nunca entra no Comprar (17/11/2026)
+      const semMin = qtd !== null && qtd > 0 && !temMinimo(im);
+      return { qtd, falta, semMin, minimo: temMinimo(im) ? im.estoque_minimo : null };
     });
     // zerado em todas as fazendas e nada a comprar: não ocupa linha
     if (!algum || (!total && !comprar)) continue;
@@ -109,6 +111,7 @@ export function desenharResultado() {
   const { comContagem, semContagem, linhas } = montar();
   const lista = filtradas(linhas);
   const nComprar = linhas.filter(r => r.comprar > 0).length;
+  const nSemMin = linhas.reduce((t, r) => t + r.cel.filter(c => c.semMin).length, 0);
   const foco = document.activeElement && document.activeElement.id === 'resBusca';
 
   alvo.innerHTML = `
@@ -119,7 +122,7 @@ export function desenharResultado() {
     </div>
     <div class="barra">
       <label class="es-check"><input type="checkbox" id="resSoComprar"${soComprar ? ' checked' : ''}> Só o que precisa comprar</label>
-      <span class="dc-sem">${linhas.length} itens · ${nComprar} para comprar</span>
+      <span class="dc-sem">${linhas.length} itens · ${nComprar} para comprar${nSemMin ? ` · <span class="res-semmin-txt">${nSemMin} sem mínimo</span>` : ''}</span>
     </div>
     ${semContagem.length ? `<p class="es-nota">Sem contagem fechada de ${esc(grupo)}: ${semContagem.map(f => esc(f.local.nome)).join(', ')}.</p>` : ''}
     ${!comContagem.length ? `<div class="vazio">Nenhuma contagem fechada de ${esc(grupo)} ainda.</div>` : `
@@ -129,10 +132,12 @@ export function desenharResultado() {
       <th class="ce">Total</th><th class="ce res-comprar">Comprar</th></tr></thead>
     <tbody>${lista.map(r => `<tr>
       <td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
-      ${r.cel.map(c => `<td class="ce${c.falta ? ' res-falta' : ''}"${c.minimo !== null ? ` title="mínimo ${esc(mostrarNumero(c.minimo))}"` : ''}>${c.qtd === null ? '—' : esc(mostrarNumero(c.qtd))}</td>`).join('')}
+      ${r.cel.map(c => `<td class="ce${c.falta ? ' res-falta' : ''}"${c.minimo !== null ? ` title="mínimo ${esc(mostrarNumero(c.minimo))}"` : ''}>${c.qtd === null ? '—' : esc(mostrarNumero(c.qtd))}${c.semMin ? '<span class="res-semmin">sem mínimo</span>' : ''}</td>`).join('')}
       <td class="ce"><strong>${esc(mostrarNumero(r.total))}</strong></td>
       <td class="ce res-comprar">${r.comprar > 0 ? `<strong>${esc(mostrarNumero(r.comprar))}</strong>` : ''}</td>
     </tr>`).join('') || `<tr><td colspan="${comContagem.length + 4}" class="ce">Nada para mostrar.</td></tr>`}</tbody></table></div>
+    ${nSemMin ? `<p class="es-nota"><strong>Sem mínimo</strong>: o item tem na fazenda, mas ela não tem estoque mínimo cadastrado — ele não entra no Comprar
+      até cadastrar o mínimo e o pedido em Cadastros › Produtos.</p>` : ''}
     <p class="es-nota">Em vermelho: a fazenda está no mínimo ou abaixo. <strong>Comprar</strong> soma, de todas as fazendas,
       a quantidade de pedido cadastrada (Cadastros › Produtos, mínimo da fazenda). Item com mínimo que não apareceu na contagem conta como zero.</p>
     <div class="barra fim">
@@ -166,10 +171,10 @@ function pdf(comContagem, lista) {
       titulo: grupo,
       head: ['Item', 'Un.', ...comContagem.map(f => f.local.nome + (dataCab(f) ? '\n' + dataCab(f) : '')), 'Total', 'Comprar'],
       centro: [1, ...comContagem.map((_, k) => k + 2), comContagem.length + 2, comContagem.length + 3],
-      body: lista.map(r => [r.item.nome, r.item.unidade || '', ...r.cel.map(c => c.qtd === null ? '—' : mostrarNumero(c.qtd) + (c.falta ? ' !' : '')),
+      body: lista.map(r => [r.item.nome, r.item.unidade || '', ...r.cel.map(c => c.qtd === null ? '—' : mostrarNumero(c.qtd) + (c.falta ? ' !' : '') + (c.semMin ? ' (s/ mín.)' : '')),
         mostrarNumero(r.total), r.comprar > 0 ? mostrarNumero(r.comprar) : '']),
     }],
-    notas: { titulo: '', texto: ['"!" = a fazenda está no mínimo ou abaixo. Comprar = soma de todas as fazendas.'] },
+    notas: { titulo: '', texto: ['"!" = a fazenda está no mínimo ou abaixo. "(s/ mín.)" = sem estoque mínimo cadastrado, não entra no Comprar. Comprar = soma de todas as fazendas.'] },
   };
 }
 
@@ -187,9 +192,9 @@ function montarFolha(comContagem, lista) {
       ${comContagem.map(f => `<th class="ce">${esc(f.local.nome)}${dataCab(f) ? '<br>' + esc(dataCab(f)) : ''}</th>`).join('')}
       <th class="ce">Total</th><th class="ce">Comprar</th></tr></thead>
     <tbody>${lista.map(r => `<tr><td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
-      ${r.cel.map(c => `<td class="ce"${c.falta ? ' style="color:#a5342a;font-weight:bold"' : ''}>${c.qtd === null ? '—' : esc(mostrarNumero(c.qtd))}</td>`).join('')}
+      ${r.cel.map(c => `<td class="ce"${c.falta ? ' style="color:#a5342a;font-weight:bold"' : ''}>${c.qtd === null ? '—' : esc(mostrarNumero(c.qtd))}${c.semMin ? '<br><small style="color:#8a5f00">s/ mín.</small>' : ''}</td>`).join('')}
       <td class="ce">${esc(mostrarNumero(r.total))}</td><td class="ce"><b>${r.comprar > 0 ? esc(mostrarNumero(r.comprar)) : ''}</b></td></tr>`).join('')}</tbody></table>
-    <p style="font-size:8pt;color:#51534A;margin:0">Em vermelho: a fazenda está no mínimo ou abaixo. Comprar = soma de todas as fazendas.</p>
+    <p style="font-size:8pt;color:#51534A;margin:0">Em vermelho: a fazenda está no mínimo ou abaixo. "s/ mín." = sem estoque mínimo cadastrado, não entra no Comprar. Comprar = soma de todas as fazendas.</p>
     <div class="rel-pe"><span></span><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
 }
