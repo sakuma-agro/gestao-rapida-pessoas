@@ -202,21 +202,31 @@ const EMPREGADOR = 'FABIO MASSAO SAKUMA E OUTROS';
 const texto = (rot, t) => `<p style="margin:4px 0 0;font-size:9.5px;line-height:1.35"><b style="color:#744F28">${esc(rot)}</b> ${esc(t)}</p>`;
 const mesAno = ym => { const [a, m] = so(ym).split('-'); return a && m ? `${doisD(m)}/${a}` : ''; };
 
+/* 17/11/2026, pedido dele: a ficha sai em preto e branco (só as marcas ficam
+   coloridas) e com mais espaço para marcar a lavagem. As cores saíram das
+   marcações daqui e foram para .f007-folha no jornada-impressao.css.
+   ALTURA_007 é o teto para os 12 meses caberem em UMA folha A4 deitada
+   (antes: 29 px). Renderizado com o CSS real: 38 px fecha em uma folha, 40 px
+   joga o rodapé para a segunda. Se mexer aqui, renderize de novo antes de
+   publicar. */
+const ALTURA_007 = 38;
+const texto007 = (rot, t) => `<p class="f007-txt"><b>${esc(rot)}</b> ${esc(t)}</p>`;
+
 function doc007(p, v, folha) {
   const dias = Array.from({ length: 31 }, (_, i) => i + 1);
-  const td = 'style="padding:0;height:25px"';
+  const td = `style="padding:0;height:${ALTURA_007}px"`;
   return documento(FORMS.f007, `
     ${ficha([linha('Colaborador', p.nome), linha('Função', p.cargo), linha('Fazenda', p.fazenda),
       linha('Ano', v.ano), linha('CA conjunto APL 01', v.ca1), linha('CA conjunto APL 02', v.ca2)])}
-    <p style="margin:0 0 4px;font-size:10px;color:#744F28"><b>Registro de lavagem:</b> marcar a cada lavagem o número do EPI (1 ou 2) no dia do mês.</p>
-    <table class="rel-tabela f007" style="table-layout:fixed;font-size:8.5px;margin-bottom:4px"><thead><tr>
-      <th style="width:58px;padding:3px 4px">Mês / dia</th>${dias.map(d => `<th style="padding:3px 0;text-align:center">${d}</th>`).join('')}
-      <th style="width:96px;padding:3px 4px">Assinatura</th><th style="width:74px;padding:3px 4px">Data do fornecimento</th><th style="width:74px;padding:3px 4px">Data da troca do EPI</th></tr></thead>
-      <tbody>${MESES.map(m => `<tr><td style="padding:0 4px;height:29px;vertical-align:middle">${m}</td>${dias.map(() => `<td ${td}></td>`).join('')}<td ${td}></td><td ${td}></td><td ${td}></td></tr>`).join('')}</tbody></table>
-    ${texto('Orientação:', ORIENT_007)}
-    ${texto('Recomendação de lavagem do EPI:', RECOM_007)}
-    <div style="display:flex;gap:18px;align-items:flex-end;margin-top:6px">
-      <div style="flex:1"><span style="font-size:9px;color:#8A8D86;text-transform:uppercase;letter-spacing:.4px">Observação</span>${caixa('', 2)}</div>
+    <p class="f007-aviso"><b>Registro de lavagem:</b> marcar a cada lavagem o número do EPI (1 ou 2) no dia do mês.</p>
+    <table class="rel-tabela f007" style="table-layout:fixed;font-size:9.5px;margin-bottom:4px"><thead><tr>
+      <th class="f007-rot" style="width:52px;padding:3px 4px">Mês / dia</th>${dias.map(d => `<th style="padding:3px 0;text-align:center">${d}</th>`).join('')}
+      <th class="f007-rot" style="width:76px;padding:3px 4px">Assinatura</th><th class="f007-rot" style="width:70px;padding:3px 4px">Data do fornecimento</th><th class="f007-rot" style="width:70px;padding:3px 4px">Data da troca do EPI</th></tr></thead>
+      <tbody>${MESES.map(m => `<tr><td style="padding:0 4px;height:${ALTURA_007}px;vertical-align:middle">${m}</td>${dias.map(() => `<td ${td}></td>`).join('')}<td ${td}></td><td ${td}></td><td ${td}></td></tr>`).join('')}</tbody></table>
+    ${texto007('Orientação:', ORIENT_007)}
+    ${texto007('Recomendação de lavagem do EPI:', RECOM_007)}
+    <div style="display:flex;gap:18px;align-items:flex-end;margin-top:5px">
+      <div style="flex:1"><span class="f007-obs-rot">Observação</span><div class="f007-obs"></div></div>
       <div class="rel-assina" style="flex:0 0 36%"><span></span><small>${p.nome ? esc(p.nome) + '<br>' : ''}Assinatura do funcionário</small></div>
     </div>`, 'Registro anual de lavagem dos EPIs por colaborador',
   { classe: 'rel-paisagem f007-folha' + (folha ? ' folha2' : ''), compacto: true });

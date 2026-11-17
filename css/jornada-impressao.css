@@ -549,3 +549,46 @@
 }
 .hol-tab .rel-c { text-align: center; }
 .rel-tabela.hol-tab thead th.rel-num { text-align: right; } .rel-tabela.hol-tab thead th.rel-c { text-align: center; }
+
+/* ---- FORM 007 · Higienização dos EPI's (17/11/2026) ----
+   Pedido dele: "quero deixar preto e branco, deixando somente a logo colorida"
+   e "quero ter mais espaço aonde marcar as lavagens". Vale SÓ nesta ficha
+   (.f007-folha) — o resto dos impressos continua na identidade verde/marrom.
+   A folha é preenchida à mão e fotocopiada; em preto e branco a grade fica
+   limpa e o toner rende.
+   A altura da linha (36 px) é o teto para os 12 meses caberem em UMA folha A4
+   deitada: a 37 px o rodapé já escapa para uma segunda página. Se for mexer,
+   renderize de novo antes de publicar. Para a linha caber, o bloco de dados do
+   colaborador virou uma faixa de 6 colunas e as margens foram apertadas. */
+.f007-folha { color: #000; }
+.f007-folha .rel-cabecalho { border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 7px; }
+.f007-folha .rel-cabecalho img { height: 36px; }
+.f007-folha .rel-titulo h1 { color: #000; }
+.f007-folha .rel-titulo p,
+.f007-folha .rel-comp,
+.f007-folha .rel-nota { color: #444; }
+.f007-folha .rel-comp strong { color: #000; }
+/* dados do colaborador: faixa de 6 campos, sem fundo, com pauta para escrever */
+.f007-folha .rel-ficha { grid-template-columns: repeat(6, 1fr); background: #fff;
+  border: 1px solid #000; padding: 4px 10px; margin-bottom: 5px; }
+.f007-folha .rel-ficha span { color: #444; }
+.f007-folha .rel-ficha b { color: #000; display: block; min-height: 13px;
+  border-bottom: 1px solid #000; padding-bottom: 1px; }
+/* grade: borda preta, cabeçalho branco e sem o chumbinho verde das ímpares */
+.f007-folha .rel-tabela th,
+.f007-folha .rel-tabela td { border-color: #000; }
+.f007-folha .rel-tabela thead th { background: #fff; color: #000; font-weight: 700; }
+/* rótulos das colunas de texto: 10 px não cabia em "fornecimento" e empurrava
+   o cabeçalho para três linhas. Os números dos dias continuam em 10 px. */
+.f007-folha .rel-tabela thead th.f007-rot { font-size: 8.5px; letter-spacing: 0; }
+.f007-folha .rel-tabela tbody tr:nth-child(odd) td { background: #fff; }
+.f007-folha .rel-assina span { border-top-color: #000; height: 20px; margin-bottom: 3px; }
+.f007-folha .rel-assina small { color: #000; }
+.f007-folha .rel-rodape { margin-top: 5px; padding-top: 5px; border-top-color: #000; }
+.f007-folha .f007-aviso { margin: 0 0 3px; font-size: 9px; color: #000; }
+.f007-folha .f007-txt { margin: 2px 0 0; font-size: 9px; line-height: 1.25; color: #000; }
+.f007-folha .f007-obs { border: 1px solid #000; height: 32px; }
+.f007-folha .f007-obs-rot { font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: .4px; }
+@media print {
+  .rel.rel-paisagem.f007-folha { padding: 5mm 10mm; }
+}
