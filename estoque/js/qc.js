@@ -726,13 +726,15 @@ function desenharMov(modo) {
     <form id="qcForm" autocomplete="off">
       <div class="qc-tipos"${tr || aj ? ' hidden' : ''}>${Object.entries(tipos).map(([k, v], n) => `<label class="qc-tipo">
         <input type="radio" name="tipo" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>
+      ${tr ? `<div class="qc-tipos">${[['envia', 'Enviar — sai deste estoque'], ['recebe', 'Receber — entra neste estoque']].map(([k, v], n) => `<label class="qc-tipo">
+        <input type="radio" name="dir" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>` : ''}
       ${aj ? `<div class="qc-tipos">${[['entrada', 'Sobra — entra no estoque'], ['saida', 'Falta — sai do estoque']].map(([k, v], n) => `<label class="qc-tipo">
         <input type="radio" name="lado" value="${k}"${n === 0 ? ' checked' : ''}><span>${v}</span></label>`).join('')}</div>` : ''}
       <div class="grade">
         <label class="campo">Data <input type="date" name="data" value="${hojeISO()}" max="${hojeISO()}" required></label>
         <label class="campo">Nº do documento${ent ? ' / NF' : aj ? '' : ' *'} <input type="text" name="documento"></label>
         ${aj ? '' : tr ? `
-        <label class="campo qc-so" data-so="transferencia">Estoque de destino *
+        <label class="campo qc-so" data-so="transferencia"><span id="qcOutraRot">Estoque de destino *</span>
           <select name="outra"><option value="">—</option>${outrasFazendas().map(n => `<option>${esc(n)}</option>`).join('')}</select></label>
         <label class="campo">Quem levou <input type="text" name="operador" list="qcOperadores"></label>` : ent ? `
         <label class="campo qc-so" data-so="compra">Fornecedor <span class="mv-com-botao"><input type="text" name="fornecedor" list="qcFornec">
@@ -778,6 +780,15 @@ function desenharMov(modo) {
     document.querySelectorAll('#qcLins .qc-prod').forEach(i => i.dispatchEvent(new Event('input')));
   }));
   mostrarTipo();
+  /* Transferência nos dois sentidos (17/11/2026, pedido dele: "preciso fazer
+     transferencia de entrada e saida! exemplo transferir da morro branco para
+     quebra cocao"): Receber escolhe o estoque de ORIGEM — a saída é lançada lá
+     e a entrada aqui, sem precisar ter acesso ao outro estoque. */
+  form.querySelectorAll('[name=dir]').forEach(r => r.addEventListener('change', () => {
+    const rec = form.querySelector('[name=dir]:checked').value === 'recebe';
+    $('qcOutraRot').textContent = rec ? 'Estoque de origem *' : 'Estoque de destino *';
+    $('qcEnviar').textContent = rec ? 'Lançar transferência recebida' : 'Lançar transferência';
+  }));
   ligarLinhas(sentido);
   if (!ent) carregarDestinos();
   $('qcMais').onclick = () => { $('qcLins').insertAdjacentHTML('beforeend', linhaProduto(sentido)); ligarLinhas(sentido); };
@@ -1029,7 +1040,17 @@ async function lancar(sentido, form) {
     if (!txt('operador') && !soEpi && tipo !== 'transferencia') { aviso('Informe o operador.', true); return; }
     if (tipo === 'uso' && !txt('plantio') && linhas.some(l => !l.dest)) { aviso('Informe o plantio ou destino.', true); return; }
   }
-  if (tipo === 'transferencia' && !txt('outra')) { aviso('Escolha o estoque de destino.', true); return; }
+  const recebe = tipo === 'transferencia' && f.get('dir') === 'recebe';
+  if (tipo === 'transferencia' && !txt('outra')) { aviso(`Escolha o estoque de ${recebe ? 'origem' : 'destino'}.`, true); return; }
+  const outraL = tipo === 'transferencia' ? locais().find(l => semAcento(l.nome) === semAcento(txt('outra') || '')) : null;
+  if (recebe && !outraL) { aviso('Escolha o estoque de origem da lista.', true); return; }
+  if (recebe) {
+    const sd = saldosDoLocal(outraL), soma = new Map();
+    for (const l of linhas) soma.set(l.item.id, (soma.get(l.item.id) || 0) + l.qtd);
+    const falta = [...soma.entries()].filter(([id, q]) => q > (sd.get(id) || 0) + 0.0001)
+      .map(([id, q]) => `${itemDe(id).nome}: vem ${mostrarNumero(q)}, saldo lá ${mostrarNumero(sd.get(id) || 0)}`);
+    if (falta.length && !confirm(`No estoque ${outraL.nome} estes itens ficam negativos:\n\n${falta.join('\n')}\n\nLançar mesmo assim?`)) return;
+  }
 
   if (sentido === 'saida' && tipo === 'ajuste') {
     const sd = saldos();
@@ -1040,7 +1061,7 @@ async function lancar(sentido, form) {
     if (falta.length && !confirm(`Estes itens ficam com saldo negativo:\n\n${falta.join('\n')}\n\nLançar mesmo assim?`)) return;
   }
   // uso e transferência: sai o que tem, o resto fica pendente (23/10/2026)
-  if (sentido === 'saida' && tipo !== 'ajuste') {
+  if (sentido === 'saida' && tipo !== 'ajuste' && !recebe) {
     const disp = new Map(saldos());
     const avisos = [];
     for (const l of linhas) {
@@ -1060,10 +1081,10 @@ async function lancar(sentido, form) {
   $('qcEnviar').disabled = true;
   const lancamento = crypto.randomUUID();
   const base = {
-    local_id: localQc().id, data: f.get('data') || hojeISO(), sentido, tipo,
+    local_id: recebe ? outraL.id : localQc().id, data: f.get('data') || hojeISO(), sentido, tipo,
     documento: txt('documento'), plantio: sentido === 'saida' && tipo === 'uso' ? txt('plantio') : null,
     operador: sentido === 'saida' ? txt('operador') : null,
-    outra_fazenda: tipo === 'transferencia' ? txt('outra') : tipo === 'devolucao' ? txt('devolveu') : null,
+    outra_fazenda: tipo === 'transferencia' ? (recebe ? (localQc() || {}).nome : outraL ? outraL.nome : txt('outra')) : tipo === 'devolucao' ? txt('devolveu') : null,
     fornecedor: sentido === 'entrada' && tipo === 'compra' ? txt('fornecedor') : null,
     fornecedor_id: sentido === 'entrada' && tipo === 'compra' ? ((fornecedoresCad().find(x => semAcento(x.nome) === semAcento(txt('fornecedor') || '')) || {}).id || null) : null,
     obs: txt('obs'), criado_por: meuNome(), ativo: true, lancamento_id: lancamento,
@@ -1080,14 +1101,16 @@ async function lancar(sentido, form) {
   /* Transferência para outro estoque cadastrado (13/11/2026): a entrada no
      destino é lançada junto, com o mesmo lançamento. */
   if (sentido === 'saida' && tipo === 'transferencia') {
-    const dest = locais().find(l => semAcento(l.nome) === semAcento(base.outra_fazenda || ''));
-    if (dest && dest.id !== base.local_id) for (const l of linhas) if (l.qtd > 0)
+    const orig = recebe ? outraL : localQc();
+    const dest = recebe ? localQc() : outraL;
+    if (dest && orig && dest.id !== orig.id) for (const l of linhas) if (l.qtd > 0)
       await gravar('est_movimentos', Object.assign({ id: crypto.randomUUID() }, base, { local_id: dest.id, sentido: 'entrada', tipo: 'transferencia',
-        outra_fazenda: (localQc() || {}).nome || null, item_id: l.item.id, ca: l.ca || null, quantidade: l.qtd, operador: null, plantio: null,
+        outra_fazenda: orig.nome || null, item_id: l.item.id, ca: l.ca || null, quantidade: l.qtd, operador: null, plantio: null,
         obs: 'Transferência entre estoques' + (base.obs ? ' · ' + base.obs : '') }));
   }
   const nPend = linhas.filter(l => l.pend > 0).length;
-  aviso(`${MODOS[modoAtual].titulo} lançad${modoAtual === 'ajuste' ? 'o' : 'a'}: ${linhas.filter(l => l.qtd > 0).length} produto(s)${nPend ? ` · ${nPend} ficaram em Pendências` : ''}.`);
+  if (recebe) aviso(`Transferência recebida de ${outraL.nome}: ${linhas.length} produto(s) — saída lançada lá e entrada aqui.`);
+  else aviso(`${MODOS[modoAtual].titulo} lançad${modoAtual === 'ajuste' ? 'o' : 'a'}: ${linhas.filter(l => l.qtd > 0).length} produto(s)${nPend ? ` · ${nPend} ficaram em Pendências` : ''}.`);
   if (pendAntes) {
     const comPend = [...new Set(linhas.filter(l => pendAntes.get(l.item.id)).map(l => l.item.nome))];
     if (comPend.length) setTimeout(() => aviso(`Tem saída pendente esperando: ${comPend.slice(0, 3).join(', ')}${comPend.length > 3 ? '…' : ''}. Efetive em Pendências.`), 2500);
@@ -1178,15 +1201,23 @@ function desenharListaMes() {
   alvo.querySelectorAll('[data-tirar]').forEach(b => b.addEventListener('click', async () => {
     const m = movimentosTodos().find(x => x.id === b.dataset.tirar);
     if (!m || !confirm(`Tirar ${itemDe(m.item_id).nome} deste lançamento? O saldo volta como estava.`)) return;
-    await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
+    // transferência: tira também o par no outro estoque (saída lá / entrada aqui)
+    for (const x of [m, ...parDaTransf([m])]) await gravar('est_movimentos', Object.assign({}, x, { ativo: false }));
     desenharListaMes();
   }));
   alvo.querySelectorAll('[data-tirar-tudo]').forEach(b => b.addEventListener('click', async () => {
     const ms = movimentosTodos().filter(x => (x.lancamento_id || x.id) === b.dataset.tirarTudo);
     if (!confirm(`Tirar o lançamento inteiro (${ms.length} produtos)? Os saldos voltam como estavam.`)) return;
-    for (const m of ms) await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
+    for (const m of [...ms, ...parDaTransf(ms)]) await gravar('est_movimentos', Object.assign({}, m, { ativo: false }));
     desenharListaMes();
   }));
+}
+/** Movimentos do outro lado de uma transferência (mesmo lançamento e item, outro estoque). */
+function parDaTransf(ms) {
+  const t = ms.filter(m => m.tipo === 'transferencia' && m.lancamento_id);
+  if (!t.length) return [];
+  return [...new Map(todos('est_movimentos').map(x => [x.id, x])).values()].filter(x => x.ativo !== false && x.tipo === 'transferencia'
+    && t.some(m => x.lancamento_id === m.lancamento_id && x.item_id === m.item_id && x.local_id !== m.local_id && x.sentido !== m.sentido));
 }
 
 /* ===================================================================
