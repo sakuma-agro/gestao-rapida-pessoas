@@ -11,7 +11,7 @@
 import { LOGO, PE_LOP, PE_LOP_SIMBOLO } from './seed.js';
 import { retratoExames, lancamentosSst } from './sst.js';
 import { montarMulti } from './multisel.js';
-import { exigidosPessoa, funcoes, marcadosNoAso } from './aso.js';
+import { exigidosPessoa, funcoes } from './aso.js';
 import { estado } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -461,162 +461,136 @@ export function ligarClinica() {
   });
 }
 
-/* =============== exames realizados, para a médica assinar (17/11/2026) ===============
-   Pedido dele: depois do ASO periódico, uma folha por funcionário com todos os
-   exames que foram feitos, sem resultado, e a assinatura da médica do
-   trabalho. Entra o ASO de cada pessoa no período (o mais recente dela, se
-   houver mais de um) e, como exames feitos:
-     - o exame clínico, na data do ASO;
-     - o que foi marcado como feito dentro daquele ASO;
-     - exame complementar lançado à parte, da mesma pessoa, de 60 dias antes
-       até 30 dias depois do ASO (o que a clínica fez junto e foi lançado solto).
-   Respeita os filtros de Fazenda e Função lá de cima. */
+/* =============== ASO padrão da fazenda (17/11/2026) ===============
+   Pedido dele: o ASO no modelo que a clínica usa, com os dados do funcionário
+   já preenchidos pelo cadastro e os nomes dos exames impressos, para a médica
+   marcar à mão o que foi feito e a data. Tipo de exame, riscos e conclusão
+   (apto/inapto) também saem em branco — nada sai marcado. Uma folha por funcionário ativo, seguindo os filtros
+   de Fazenda e Função lá de cima. */
 const MEDICA = {
-  nome: 'Dra. Marlene Aparecida de S. Silva',
-  linha2: 'Medicina do Trabalho',
-  linha3: 'CRM 19044-T · RM 6843',
+  nome: 'Marlene Aparecida Souza Silva',
+  endereco: 'Av. José Cambraia nº 264 - Sala 1 - Ibiá/MG',
+  telefone: '(34) 9 9985-4995',
+  carimbo: ['Dra. Marlene Aparecida de S. Silva', 'Medicina do Trabalho', 'CRM 19044-T · RM 6843'],
 };
-let RZ = [];   // [{ f, aso, tipoAso, exames:[{nome, data}], semLista }]
-
-const maisDias = (iso, d) => {
-  const x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() + d);
-  return x.toISOString().slice(0, 10);
-};
+const TIPOS_ASO = ['Admissional', 'Periódico', 'Demissional', 'Mudança de Função', 'Retorno ao Trabalho'];
+const RISCOS = [
+  ['a) Físicos', ['Ruídos', 'Vibrações', 'Radiações ionizantes', 'Frio', 'Umidade', 'Calor', 'Outros']],
+  ['b) Químicos', ['Poeiras', 'Fumos', 'Névoas', 'Neblinas', 'Gases', 'Vapores', 'Outros']],
+  ['c) Biológicos', ['Bacilos', 'Bactérias', 'Fungos', 'Parasitas', 'Protozoários', 'Vírus', 'Outros']],
+  ['d) Ergonômicos', ['Esforço físico intenso', 'Postura inadequada', 'Monotonia e repetitividade',
+    'Levantamento manual de peso', 'Manuseio e transporte de peso', 'Ritmos excessivos', 'Outros']],
+];
+let RZ = [];   // funcionários do recorte
 
 function prepararRealizados() {
-  if (!$('rzTipo')) return;
-  const asos = lancamentosSst().exame.tipos.filter(t => t.categoria === 'aso');
-  const sel = $('rzTipo');
-  const antes = sel.value;
-  sel.innerHTML = '<option value="">Todos os ASOs</option>' +
-    asos.map(t => `<option value="${esc(t.id)}">${esc(t.nome)}</option>`).join('');
-  const periodico = asos.find(t => /peri[oó]d/i.test(t.nome));
-  sel.value = antes && asos.some(t => String(t.id) === antes) ? antes : (periodico ? String(periodico.id) : '');
-  if (!$('rzDe').value) $('rzDe').value = maisDias(hoje(), -365);
-  if (!$('rzAte').value) $('rzAte').value = hoje();
+  if (!$('rzFunc')) return;
   calcularRealizados();
 }
 
 function calcularRealizados() {
-  const { tipos, regs } = lancamentosSst().exame;
-  const tipo = id => tipos.find(t => t.id === id);
-  const de = $('rzDe').value || '0000-00-00', ate = $('rzAte').value || '9999-12-31';
-  const tipoAso = $('rzTipo').value;
   const faz = fazendasEscolhidas();
   const fun = $('erFuncao').value;
-
-  // o ASO mais recente de cada pessoa dentro do recorte
-  const porPessoa = new Map();
-  regs.forEach(x => {
-    const t = tipo(x.tipo_id);
-    if (!t || t.categoria !== 'aso' || !x.realizado) return;
-    if (tipoAso && String(x.tipo_id) !== tipoAso) return;
-    const d = String(x.realizado).slice(0, 10);
-    if (d < de || d > ate) return;
-    const ja = porPessoa.get(x.funcionario_id);
-    if (!ja || d > String(ja.realizado).slice(0, 10)) porPessoa.set(x.funcionario_id, x);
-  });
-
-  RZ = [];
-  porPessoa.forEach((aso, fid) => {
-    const f = estado.funcionarios.find(y => y.id === fid);
-    if (!f) return;
-    if (faz && !faz.has(chave(f.fazenda))) return;
-    if (fun && chave(f.cargo) !== fun) return;
-    const dAso = String(aso.realizado).slice(0, 10);
-    const vistos = new Set();
-    const resto = [];
-    const marcados = marcadosNoAso(aso.id).filter(m => m.feito);
-    marcados.forEach(m => {
-      const t = tipo(m.tipo_id);
-      if (!t || vistos.has(t.id)) return;
-      vistos.add(t.id);
-      resto.push({ nome: t.nome, data: m.realizado || dAso });
-    });
-    const ini = maisDias(dAso, -60), fim = maisDias(dAso, 30);
-    regs.forEach(x => {
-      if (x.funcionario_id !== fid || x.doAso || !x.realizado) return;
-      const t = tipo(x.tipo_id);
-      if (!t || t.categoria === 'aso' || vistos.has(t.id)) return;
-      const d = String(x.realizado).slice(0, 10);
-      if (d < ini || d > fim) return;
-      vistos.add(t.id);
-      resto.push({ nome: t.nome, data: d });
-    });
-    resto.sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.nome.localeCompare(b.nome, 'pt-BR'));
-    RZ.push({
-      f, aso, tipoAso: tipo(aso.tipo_id)?.nome || 'ASO',
-      exames: [{ nome: 'Exame clínico ocupacional', data: dAso }, ...resto],
-      semLista: !resto.length,
-    });
-  });
-  RZ.sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
-
+  RZ = estado.funcionarios
+    .filter(f => f.situacao === 'ATIVO')
+    .filter(f => (!faz || faz.has(chave(f.fazenda))) && (!fun || chave(f.cargo) === fun))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   const sel = $('rzFunc');
   const antes = sel.value;
-  sel.innerHTML = `<option value="">Todos (${RZ.length})</option>` +
-    RZ.map(x => `<option value="${esc(x.f.id)}">${esc(x.f.nome)} — ${dataBr(x.aso.realizado)}</option>`).join('');
-  sel.value = RZ.some(x => String(x.f.id) === antes) ? antes : '';
+  sel.innerHTML = `<option value="">Todos do filtro (${RZ.length})</option>` +
+    `<option value="${NOVO}">Admissional — pessoa nova (digitar os dados)</option>` +
+    RZ.map(f => `<option value="${esc(f.id)}">${esc(f.nome)}${f.cargo ? ` — ${esc(f.cargo)}` : ''}</option>`).join('');
+  sel.value = antes === NOVO || RZ.some(f => String(f.id) === antes) ? antes : '';
+  trocarFuncRz();
+}
+
+/* Admissional (17/11/2026, pedido dele): quem vai fazer o ASO admissional
+   ainda não está no cadastro. Os dados são digitados aqui e valem só para a
+   folha — não grava nada. */
+const NOVO = '__novo';
+const pessoaNova = () => ({
+  nome: so($('rzNNome').value).toUpperCase(), cpf: so($('rzNCpf').value),
+  nascimento: $('rzNNasc').value, sexo: $('rzNSexo').value,
+  cargo: so($('rzNCargo').value).toUpperCase(), fazenda: so($('rzNFaz').value).toUpperCase(),
+  admissao: $('rzNAdm').value,
+});
+function trocarFuncRz() {
+  $('rzNovo').hidden = $('rzFunc').value !== NOVO;
   resumoRealizados();
 }
-
-const escolhidosRz = () => { const id = $('rzFunc').value; return id ? RZ.filter(x => String(x.f.id) === id) : RZ; };
+const escolhidosRz = () => {
+  const id = $('rzFunc').value;
+  if (id === NOVO) return [pessoaNova()];
+  return id ? RZ.filter(f => String(f.id) === id) : RZ;
+};
 
 function resumoRealizados() {
-  const lista = escolhidosRz();
-  const sem = lista.filter(x => x.semLista);
-  $('rzResumo').innerHTML = RZ.length
-    ? `<span class="dc-sem"><b>${lista.length}</b> folha(s) para imprimir — uma por funcionário.</span>`
-    : '<span class="dc-sem">Nenhum ASO lançado nesse período.</span>';
-  const av = $('rzAviso');
-  av.hidden = !sem.length;
-  av.innerHTML = sem.length
-    ? `<b>${sem.length} ASO(s) sem os exames marcados</b> — a folha sai só com o exame clínico.
-       Para completar, abra o ASO em Vencimentos e marque os exames feitos:
-       ${sem.slice(0, 12).map(x => esc(x.f.nome)).join(' · ')}${sem.length > 12 ? ` · e mais ${sem.length - 12}` : ''}`
-    : '';
+  const n = escolhidosRz().length;
+  $('rzResumo').innerHTML = `<span class="dc-sem"><b>${n}</b> folha(s) para imprimir — uma por funcionário.</span>`;
 }
 
-function folhaRealizados(x) {
-  const f = x.f;
-  const linha = (rot, val) => `<tr><td class="aso-rot">${rot}</td><td>${esc(val) || '—'}</td></tr>`;
-  return `<div class="an-folha">
-    <div class="an-topo">
+const cx = (marcado, rotulo) => `<span class="asp-op"><span class="asp-cx">${marcado ? 'X' : ''}</span>${esc(rotulo)}</span>`;
+const linhaCampo = (rot, val, larg) =>
+  `<span class="asp-c"${larg ? ` style="flex:${larg}"` : ''}><i>${rot}</i><b>${val ? esc(val) : '&nbsp;'}</b></span>`;
+
+function idade(nasc) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(nasc || '');
+  if (!m) return '';
+  const h = new Date();
+  let a = h.getFullYear() - Number(m[1]);
+  if (h.getMonth() + 1 < Number(m[2]) || (h.getMonth() + 1 === Number(m[2]) && h.getDate() < Number(m[3]))) a--;
+  return a > 0 && a < 120 ? String(a) : '';
+}
+
+function folhaAso(f) {
+  const complementares = (lancamentosSst().exame.tipos || [])
+    .filter(t => t.categoria !== 'aso')
+    .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  const exames = [...complementares.map(t => t.nome), 'Outros: ___________'];
+  const sexo = String(f.sexo || '').toUpperCase();
+  return `<div class="an-folha asp">
+    <div class="asp-topo">
       <img src="${LOGO}" alt="">
-      <div class="an-tit">
-        <h1>RELATÓRIO DE EXAMES REALIZADOS</h1>
-        <p>${esc(x.tipoAso)} · ${dataBr(x.aso.realizado)} · SAKUMA Agronegócios</p>
-      </div>
+      <div><h1>A.S.O</h1><h2>ATESTADO DE SAÚDE OCUPACIONAL</h2></div>
     </div>
-    <table class="an-tab aso-guia">
-      <colgroup><col style="width:38mm"><col></colgroup>
-      <tbody>
-        ${linha('NOME', f.nome)}
-        ${linha('CPF', f.cpf)}
-        ${linha('FUNÇÃO', f.cargo)}
-        ${linha('EMPREGADOR', [f.empregador, f.fazenda].filter(Boolean).join(' – '))}
-        ${linha('ADMISSÃO', f.admissao ? dataBr(f.admissao) : '')}
-        ${linha('TIPO DE ASO', x.tipoAso)}
-        ${linha('DATA DO ASO', dataBr(x.aso.realizado))}
-      </tbody>
-    </table>
-    <table class="an-tab aso-guia" style="margin-top:6mm">
-      <colgroup><col style="width:12mm"><col><col style="width:32mm"></colgroup>
-      <thead><tr><th>Nº</th><th>EXAME REALIZADO</th><th>DATA</th></tr></thead>
-      <tbody>${x.exames.map((e, i) => `<tr>
-        <td class="ce">${i + 1}</td><td class="an-nome">${esc(e.nome)}</td><td class="ce">${dataBr(e.data)}</td>
-      </tr>`).join('')}</tbody>
-    </table>
-    <div class="aso-nota">
-      Declaro que o(a) funcionário(a) acima identificado(a) realizou os ${x.exames.length} exame(s)
-      relacionado(s) neste relatório, referentes ao ${esc(x.tipoAso)} de ${dataBr(x.aso.realizado)},
-      conforme o PCMSO vigente da empresa.
+
+    <h3>01 · Identificação do Médico</h3>
+    <div class="asp-l">${linhaCampo('a) Nome:', MEDICA.nome)}</div>
+    <div class="asp-l">${linhaCampo('b) Endereço:', MEDICA.endereco, 3)}${linhaCampo('c) Telefone:', MEDICA.telefone, 1.3)}</div>
+
+    <h3>02 · Identificação do Colaborador</h3>
+    <div class="asp-l">${linhaCampo('a) Nome:', f.nome, 4)}${linhaCampo('b) Idade:', idade(f.nascimento), 1)}</div>
+    <div class="asp-l">${linhaCampo('c) CPF:', f.cpf, 2)}${linhaCampo('f) Nascimento:', f.nascimento ? dataBr(f.nascimento) : '', 1.6)}${linhaCampo('g) Admissão:', f.admissao ? dataBr(f.admissao) : '', 1.6)}</div>
+    <div class="asp-l"><span class="asp-c" style="flex:1.6"><i>e) Sexo:</i>${cx(sexo === 'F', 'Fem.')}${cx(sexo === 'M', 'Masc.')}</span>${linhaCampo('h) Cargo/Função:', f.cargo, 3)}</div>
+    <div class="asp-l">${linhaCampo('Empregador / Fazenda:', [f.empregador, f.fazenda].filter(Boolean).join(' – '))}</div>
+
+    <h3>03 · Tipo de Exame Médico</h3>
+    <div class="asp-ops">${TIPOS_ASO.map(t => cx(false, t)).join('')}</div>
+    <div class="asp-ops"><i>Retorno ao trabalho após:</i>${cx(false, 'Acidente de trabalho')}${cx(false, 'Doença/acidente não ocupacional')}${cx(false, 'Parto')}</div>
+
+    <h3>04 · Riscos de Acidentes na Função</h3>
+    <div class="asp-riscos">${RISCOS.map(([g, l]) => `<div><b>${g}</b>${l.map(r => cx(false, r)).join('')}</div>`).join('')}</div>
+
+    <h3>05 · Exames Complementares (assinalar e datar)</h3>
+    <div class="asp-exames">${exames.map(n => `<div>${cx(false, n)}<span class="asp-data">___/___/_____</span></div>`).join('')}</div>
+
+    <h3>06 · Conclusão sobre a Capacidade Laborativa</h3>
+    <div class="asp-concl">
+      <p>Em cumprimento às portarias 3.214/78; 3.164/82; 12/83; 24/94 e 08/96 do Ministério do Trabalho, para fins
+        de trabalho, atesto que o(a) funcionário(a) identificado(a) neste ASO foi clinicamente examinado(a) e
+        ficou constatado que está:</p>
+      <div>${cx(false, 'APTO para a função proposta')}${cx(false, 'INAPTO para a função proposta')}${cx(false, 'APTO para trabalho em altura')}</div>
     </div>
-    <p class="rz-local">Local e data: ______________________________, ____/____/________</p>
-    <div class="aso-assinaturas rz-ass">
-      <div><span></span><small><b>${esc(MEDICA.nome)}</b><br>${esc(MEDICA.linha2)}<br>${esc(MEDICA.linha3)}</small></div>
+
+    <div class="asp-ass">
+      <div><span></span><small>Médico que realizou o exame<br><b>${MEDICA.carimbo.map(esc).join('<br>')}</b></small></div>
+      <div><span></span><small>Ass. e carimbo com CRM do coord. do PCMSO</small></div>
     </div>
-    <div class="an-pe"><span>${esc(f.nome)}</span><span>SAKUMA Agronegócios</span></div>
+    <p class="asp-local">Local e data: ______________________________, ____/____/________</p>
+    <p class="asp-2via">(Declaro ter recebido nesta data a 2ª via do ASO)</p>
+    <div class="asp-ass asp-emp">
+      <div><span></span><small>Assinatura do empregado submetido ao exame</small></div>
+    </div>
     ${PE_LOP_SIMBOLO}
   </div>`;
 }
@@ -624,17 +598,14 @@ function folhaRealizados(x) {
 function mostrarRealizados() {
   const lista = escolhidosRz();
   $('erSaida').innerHTML = lista.length
-    ? lista.map(folhaRealizados).join('')
-    : '<div class="an-folha"><p class="pn-nada">Nenhum ASO lançado nesse período.</p></div>';
+    ? lista.map(f => folhaAso(f)).join('')
+    : '<div class="an-folha"><p class="pn-nada">Nenhum funcionário ativo nesse filtro.</p></div>';
   $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function ligarRealizados() {
-  if (!$('rzTipo')) return;
-  ['rzTipo', 'rzDe', 'rzAte'].forEach(id => $(id).addEventListener('change', calcularRealizados));
-  ['erFazenda', 'erFuncao'].forEach(id => $(id).addEventListener('change', () => {
-    if (lancamentosSst().exame.tipos.length) calcularRealizados();
-  }));
-  $('rzFunc').addEventListener('change', resumoRealizados);
+  if (!$('rzFunc')) return;
+  ['erFazenda', 'erFuncao'].forEach(id => $(id).addEventListener('change', calcularRealizados));
+  $('rzFunc').addEventListener('change', trocarFuncRz);
   $('bRzDoc').addEventListener('click', mostrarRealizados);
 }
