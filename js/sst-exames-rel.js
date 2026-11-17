@@ -525,8 +525,11 @@ const escolhidosRz = () => {
 };
 
 function resumoRealizados() {
-  const n = escolhidosRz().length;
-  $('rzResumo').innerHTML = `<span class="dc-sem"><b>${n}</b> folha(s) para imprimir — uma por funcionário.</span>`;
+  const lista = escolhidosRz();
+  const sem = lista.filter(f => !exigidosPessoa(f).length);
+  $('rzResumo').innerHTML = `<span class="dc-sem"><b>${lista.length}</b> folha(s) para imprimir — uma por funcionário.${sem.length
+    ? ` No anexo, ${sem.length} sem lista de exames na função (sai só com linhas em branco — monte em Exames por função): ${
+      sem.slice(0, 8).map(f => esc(f.nome || '—')).join(' · ')}${sem.length > 8 ? ' …' : ''}` : ''}</span>`;
 }
 
 const cx = (marcado, rotulo) => `<span class="asp-op"><span class="asp-cx">${marcado ? 'X' : ''}</span>${esc(rotulo)}</span>`;
@@ -608,4 +611,62 @@ function ligarRealizados() {
   ['erFazenda', 'erFuncao'].forEach(id => $(id).addEventListener('change', calcularRealizados));
   $('rzFunc').addEventListener('change', trocarFuncRz);
   $('bRzDoc').addEventListener('click', mostrarRealizados);
+  $('bRzAnexo').addEventListener('click', mostrarAnexos);
+}
+
+/* =============== anexo do ASO: exames complementares (17/11/2026) ===============
+   A dor dele: no ASO a médica marca "Outros" e não escreve quais exames foram.
+   O anexo lista, por funcionário, os exames que a função (e as atividades)
+   exigem — Exames por função — com a data em branco para ela preencher, mais
+   linhas em branco para exame fora da lista, e a assinatura dela. Vai junto
+   do ASO, mas sai por um botão próprio. */
+const LINHAS_OUTROS = 4;
+
+function folhaAnexo(f) {
+  const exigidos = exigidosPessoa(f);
+  // função que pede quase tudo: menos linhas em branco, para caber numa folha
+  const total = exigidos.length ? exigidos.length + Math.max(1, Math.min(LINHAS_OUTROS, 16 - exigidos.length)) : 8;
+  return `<div class="an-folha asp asx">
+    <div class="asp-topo">
+      <img src="${LOGO}" alt="">
+      <div><h1>ANEXO DO A.S.O</h1><h2>EXAMES COMPLEMENTARES REALIZADOS</h2></div>
+    </div>
+
+    <h3>01 · Identificação do Colaborador</h3>
+    <div class="asp-l">${linhaCampo('Nome:', f.nome, 4)}${linhaCampo('CPF:', f.cpf, 2)}</div>
+    <div class="asp-l">${linhaCampo('Cargo/Função:', f.cargo, 3)}${linhaCampo('Admissão:', f.admissao ? dataBr(f.admissao) : '', 1.4)}</div>
+    <div class="asp-l">${linhaCampo('Empregador / Fazenda:', [f.empregador, f.fazenda].filter(Boolean).join(' – '))}</div>
+
+    <h3>02 · ASO a que se refere</h3>
+    <div class="asp-ops">${TIPOS_ASO.map(t => cx(false, t)).join('')}</div>
+    <div class="asp-l" style="max-width:80mm">${linhaCampo('Data do ASO:', '')}</div>
+
+    <h3>03 · Exames Complementares${exigidos.length ? ' exigidos para a função' : ''}</h3>
+    <table class="asx-tab">
+      <colgroup><col style="width:11mm"><col><col style="width:44mm"></colgroup>
+      <thead><tr><th>Nº</th><th>EXAME</th><th>DATA DE REALIZAÇÃO</th></tr></thead>
+      <tbody>
+        ${exigidos.map((t, i) => `<tr><td class="ce">${i + 1}</td><td><b>${esc(t.nome)}</b></td><td class="ce">____/____/________</td></tr>`).join('')}
+        ${Array.from({ length: total - exigidos.length }, (_, k) => `<tr><td class="ce">${exigidos.length + k + 1}</td>
+          <td>Outro exame: ____________________________________________</td><td class="ce">____/____/________</td></tr>`).join('')}
+      </tbody>
+    </table>
+
+    <p class="asx-decl">Declaro que o(a) colaborador(a) acima identificado(a) realizou os exames complementares
+      relacionados e datados neste anexo, que é parte integrante do ASO de mesma data. Exame sem data não foi realizado.</p>
+
+    <p class="asp-local">Local e data: ______________________________, ____/____/________</p>
+    <div class="asp-ass asp-emp asx-ass">
+      <div><span></span><small>Assinatura e carimbo do médico<br><b>${MEDICA.carimbo.map(esc).join('<br>')}</b></small></div>
+    </div>
+    ${PE_LOP_SIMBOLO}
+  </div>`;
+}
+
+function mostrarAnexos() {
+  const lista = escolhidosRz();
+  $('erSaida').innerHTML = lista.length
+    ? lista.map(folhaAnexo).join('')
+    : '<div class="an-folha"><p class="pn-nada">Nenhum funcionário ativo nesse filtro.</p></div>';
+  $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

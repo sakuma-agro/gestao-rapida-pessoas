@@ -1174,11 +1174,12 @@ addEventListener('beforeinstallprompt', function (ev) {
       <div class="cartao naoimprimir">
         <h2 style="margin:0">ASO padrão da fazenda</h2>
         <p class="dica" style="margin:2px 0 0">
-          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. O tipo de exame, os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. Segue os filtros de Fazenda e Função lá de cima.
+          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. O tipo de exame, os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar. Segue os filtros de Fazenda e Função lá de cima.
         </p>
         <div class="grade" style="margin-top:12px">
           <label class="campo">Funcionário <select id="rzFunc"></select></label>
-          <div class="campo"><span>&nbsp;</span><button type="button" class="btn principal" id="bRzDoc">Gerar ASO</button></div>
+          <div class="campo"><span>&nbsp;</span><button type="button" class="btn principal" id="bRzDoc">Gerar ASO</button>
+            <button type="button" class="btn" id="bRzAnexo">Gerar anexo dos exames</button></div>
         </div>
         <div class="grade" id="rzNovo" hidden style="margin-top:8px">
           <label class="campo">Nome <input id="rzNNome" autocomplete="off"></label>

@@ -304,6 +304,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .asp-emp{margin-top:8mm;justify-content:center}
 .asp-emp div{flex:0 0 110mm}
 .asp .an-lop{margin-top:auto}
+/* Anexo do ASO: exames complementares (17/11/2026) */
+.asx-tab{width:100%;border-collapse:collapse;margin-top:1mm;font-size:9.5pt}
+.asx-tab th{font-size:8.5pt;color:#744F28;text-align:left;border-bottom:.35mm solid #51534A;padding:1.2mm 2mm}
+.asx-tab th:first-child,.asx-tab th:last-child{text-align:center}
+.asx-tab td{border-bottom:.2mm solid #c9ccc4;padding:1.8mm 2mm;color:#51534A}
+.asx-decl{margin:4mm 0 0;line-height:1.4}
+.asx-ass{margin-top:13mm}
 
 /* ---- gráficos do quadro de pessoal ----
    Tudo em SVG: forma vetorial imprime sempre, cor de fundo não. */
