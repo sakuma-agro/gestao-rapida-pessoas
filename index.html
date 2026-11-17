@@ -1170,6 +1170,23 @@ addEventListener('beforeinstallprompt', function (ev) {
         <div class="barra" id="clExtras" style="margin:8px 0 0;flex-wrap:wrap;gap:6px"></div>
       </div>
 
+      <!-- Exames realizados (17/11/2026): uma folha por funcionário para a médica assinar -->
+      <div class="cartao naoimprimir">
+        <h2 style="margin:0">Exames realizados · para a médica assinar</h2>
+        <p class="dica" style="margin:2px 0 0">
+          Uma folha por funcionário com o ASO e todos os exames feitos nele (os marcados no ASO e os lançados à parte perto da data). Sem resultado. Segue os filtros de Fazenda e Função lá de cima.
+        </p>
+        <div class="grade" style="margin-top:12px">
+          <label class="campo">Tipo de ASO <select id="rzTipo"></select></label>
+          <label class="campo">De <input type="date" id="rzDe"></label>
+          <label class="campo">Até <input type="date" id="rzAte"></label>
+          <label class="campo">Funcionário <select id="rzFunc"></select></label>
+          <div class="campo"><span>&nbsp;</span><button type="button" class="btn principal" id="bRzDoc">Gerar folhas</button></div>
+        </div>
+        <div class="barra" id="rzResumo" style="margin:10px 0 0"></div>
+        <div class="aviso info" id="rzAviso" hidden style="margin:10px 0 0"></div>
+      </div>
+
       <div class="previa-lista" id="erSaida"></div>
 
       <div class="rodape-fixo naoimprimir">

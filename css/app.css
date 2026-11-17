@@ -268,6 +268,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .aso-assinaturas div{flex:1;text-align:center}
 .aso-assinaturas span{display:block;border-top:1px solid #51534A;height:8mm;margin-bottom:1mm}
 .aso-assinaturas small{font-size:9pt;color:#5e6657}
+/* Exames realizados (17/11/2026): local e data, e a assinatura da médica no centro */
+.rz-local{margin:12mm 0 0;font-size:10.5pt;color:#51534A}
+.rz-ass{justify-content:center;margin-top:22mm}
+.rz-ass div{flex:0 0 105mm}
+.rz-ass small{font-size:10pt;line-height:1.45;color:#51534A}
 
 /* ---- gráficos do quadro de pessoal ----
    Tudo em SVG: forma vetorial imprime sempre, cor de fundo não. */

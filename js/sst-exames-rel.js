@@ -8,10 +8,11 @@
 //
 // Duas saídas, como todo relatório do app: documento (prévia antes de
 // imprimir) e CSV.
-import { LOGO, PE_LOP } from './seed.js';
-import { retratoExames } from './sst.js';
+import { LOGO, PE_LOP, PE_LOP_SIMBOLO } from './seed.js';
+import { retratoExames, lancamentosSst } from './sst.js';
 import { montarMulti } from './multisel.js';
-import { exigidosPessoa, funcoes } from './aso.js';
+import { exigidosPessoa, funcoes, marcadosNoAso } from './aso.js';
+import { estado } from './store.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -50,6 +51,7 @@ export async function abrirRelExames() {
   desenhar();
   preencherExtras();
   resumoClinica();
+  prepararRealizados();
 }
 
 function preencherFiltros() {
@@ -227,6 +229,7 @@ export function ligarRelExames() {
   });
   $('bErCsv').addEventListener('click', baixarCsv);
   ligarClinica();
+  ligarRealizados();
   $('bImprimirEr').addEventListener('click', () => {
     // prévia antes de imprimir: sem documento na tela, mostra primeiro
     if (!so($('erSaida').innerHTML)) {
@@ -456,4 +459,182 @@ export function ligarClinica() {
     EXTRAS.delete(b.dataset.clTira); guardarExtras(); desenharExtras(); resumoClinica();
     if (ultimaClinica) mostrarClinica(ultimaClinica);
   });
+}
+
+/* =============== exames realizados, para a médica assinar (17/11/2026) ===============
+   Pedido dele: depois do ASO periódico, uma folha por funcionário com todos os
+   exames que foram feitos, sem resultado, e a assinatura da médica do
+   trabalho. Entra o ASO de cada pessoa no período (o mais recente dela, se
+   houver mais de um) e, como exames feitos:
+     - o exame clínico, na data do ASO;
+     - o que foi marcado como feito dentro daquele ASO;
+     - exame complementar lançado à parte, da mesma pessoa, de 60 dias antes
+       até 30 dias depois do ASO (o que a clínica fez junto e foi lançado solto).
+   Respeita os filtros de Fazenda e Função lá de cima. */
+const MEDICA = {
+  nome: 'Dra. Marlene Aparecida de S. Silva',
+  linha2: 'Medicina do Trabalho',
+  linha3: 'CRM 19044-T · RM 6843',
+};
+let RZ = [];   // [{ f, aso, tipoAso, exames:[{nome, data}], semLista }]
+
+const maisDias = (iso, d) => {
+  const x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() + d);
+  return x.toISOString().slice(0, 10);
+};
+
+function prepararRealizados() {
+  if (!$('rzTipo')) return;
+  const asos = lancamentosSst().exame.tipos.filter(t => t.categoria === 'aso');
+  const sel = $('rzTipo');
+  const antes = sel.value;
+  sel.innerHTML = '<option value="">Todos os ASOs</option>' +
+    asos.map(t => `<option value="${esc(t.id)}">${esc(t.nome)}</option>`).join('');
+  const periodico = asos.find(t => /peri[oó]d/i.test(t.nome));
+  sel.value = antes && asos.some(t => String(t.id) === antes) ? antes : (periodico ? String(periodico.id) : '');
+  if (!$('rzDe').value) $('rzDe').value = maisDias(hoje(), -365);
+  if (!$('rzAte').value) $('rzAte').value = hoje();
+  calcularRealizados();
+}
+
+function calcularRealizados() {
+  const { tipos, regs } = lancamentosSst().exame;
+  const tipo = id => tipos.find(t => t.id === id);
+  const de = $('rzDe').value || '0000-00-00', ate = $('rzAte').value || '9999-12-31';
+  const tipoAso = $('rzTipo').value;
+  const faz = fazendasEscolhidas();
+  const fun = $('erFuncao').value;
+
+  // o ASO mais recente de cada pessoa dentro do recorte
+  const porPessoa = new Map();
+  regs.forEach(x => {
+    const t = tipo(x.tipo_id);
+    if (!t || t.categoria !== 'aso' || !x.realizado) return;
+    if (tipoAso && String(x.tipo_id) !== tipoAso) return;
+    const d = String(x.realizado).slice(0, 10);
+    if (d < de || d > ate) return;
+    const ja = porPessoa.get(x.funcionario_id);
+    if (!ja || d > String(ja.realizado).slice(0, 10)) porPessoa.set(x.funcionario_id, x);
+  });
+
+  RZ = [];
+  porPessoa.forEach((aso, fid) => {
+    const f = estado.funcionarios.find(y => y.id === fid);
+    if (!f) return;
+    if (faz && !faz.has(chave(f.fazenda))) return;
+    if (fun && chave(f.cargo) !== fun) return;
+    const dAso = String(aso.realizado).slice(0, 10);
+    const vistos = new Set();
+    const resto = [];
+    const marcados = marcadosNoAso(aso.id).filter(m => m.feito);
+    marcados.forEach(m => {
+      const t = tipo(m.tipo_id);
+      if (!t || vistos.has(t.id)) return;
+      vistos.add(t.id);
+      resto.push({ nome: t.nome, data: m.realizado || dAso });
+    });
+    const ini = maisDias(dAso, -60), fim = maisDias(dAso, 30);
+    regs.forEach(x => {
+      if (x.funcionario_id !== fid || x.doAso || !x.realizado) return;
+      const t = tipo(x.tipo_id);
+      if (!t || t.categoria === 'aso' || vistos.has(t.id)) return;
+      const d = String(x.realizado).slice(0, 10);
+      if (d < ini || d > fim) return;
+      vistos.add(t.id);
+      resto.push({ nome: t.nome, data: d });
+    });
+    resto.sort((a, b) => String(a.data).localeCompare(String(b.data)) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    RZ.push({
+      f, aso, tipoAso: tipo(aso.tipo_id)?.nome || 'ASO',
+      exames: [{ nome: 'Exame clínico ocupacional', data: dAso }, ...resto],
+      semLista: !resto.length,
+    });
+  });
+  RZ.sort((a, b) => a.f.nome.localeCompare(b.f.nome, 'pt-BR'));
+
+  const sel = $('rzFunc');
+  const antes = sel.value;
+  sel.innerHTML = `<option value="">Todos (${RZ.length})</option>` +
+    RZ.map(x => `<option value="${esc(x.f.id)}">${esc(x.f.nome)} — ${dataBr(x.aso.realizado)}</option>`).join('');
+  sel.value = RZ.some(x => String(x.f.id) === antes) ? antes : '';
+  resumoRealizados();
+}
+
+const escolhidosRz = () => { const id = $('rzFunc').value; return id ? RZ.filter(x => String(x.f.id) === id) : RZ; };
+
+function resumoRealizados() {
+  const lista = escolhidosRz();
+  const sem = lista.filter(x => x.semLista);
+  $('rzResumo').innerHTML = RZ.length
+    ? `<span class="dc-sem"><b>${lista.length}</b> folha(s) para imprimir — uma por funcionário.</span>`
+    : '<span class="dc-sem">Nenhum ASO lançado nesse período.</span>';
+  const av = $('rzAviso');
+  av.hidden = !sem.length;
+  av.innerHTML = sem.length
+    ? `<b>${sem.length} ASO(s) sem os exames marcados</b> — a folha sai só com o exame clínico.
+       Para completar, abra o ASO em Vencimentos e marque os exames feitos:
+       ${sem.slice(0, 12).map(x => esc(x.f.nome)).join(' · ')}${sem.length > 12 ? ` · e mais ${sem.length - 12}` : ''}`
+    : '';
+}
+
+function folhaRealizados(x) {
+  const f = x.f;
+  const linha = (rot, val) => `<tr><td class="aso-rot">${rot}</td><td>${esc(val) || '—'}</td></tr>`;
+  return `<div class="an-folha">
+    <div class="an-topo">
+      <img src="${LOGO}" alt="">
+      <div class="an-tit">
+        <h1>RELATÓRIO DE EXAMES REALIZADOS</h1>
+        <p>${esc(x.tipoAso)} · ${dataBr(x.aso.realizado)} · SAKUMA Agronegócios</p>
+      </div>
+    </div>
+    <table class="an-tab aso-guia">
+      <colgroup><col style="width:38mm"><col></colgroup>
+      <tbody>
+        ${linha('NOME', f.nome)}
+        ${linha('CPF', f.cpf)}
+        ${linha('FUNÇÃO', f.cargo)}
+        ${linha('EMPREGADOR', [f.empregador, f.fazenda].filter(Boolean).join(' – '))}
+        ${linha('ADMISSÃO', f.admissao ? dataBr(f.admissao) : '')}
+        ${linha('TIPO DE ASO', x.tipoAso)}
+        ${linha('DATA DO ASO', dataBr(x.aso.realizado))}
+      </tbody>
+    </table>
+    <table class="an-tab aso-guia" style="margin-top:6mm">
+      <colgroup><col style="width:12mm"><col><col style="width:32mm"></colgroup>
+      <thead><tr><th>Nº</th><th>EXAME REALIZADO</th><th>DATA</th></tr></thead>
+      <tbody>${x.exames.map((e, i) => `<tr>
+        <td class="ce">${i + 1}</td><td class="an-nome">${esc(e.nome)}</td><td class="ce">${dataBr(e.data)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="aso-nota">
+      Declaro que o(a) funcionário(a) acima identificado(a) realizou os ${x.exames.length} exame(s)
+      relacionado(s) neste relatório, referentes ao ${esc(x.tipoAso)} de ${dataBr(x.aso.realizado)},
+      conforme o PCMSO vigente da empresa.
+    </div>
+    <p class="rz-local">Local e data: ______________________________, ____/____/________</p>
+    <div class="aso-assinaturas rz-ass">
+      <div><span></span><small><b>${esc(MEDICA.nome)}</b><br>${esc(MEDICA.linha2)}<br>${esc(MEDICA.linha3)}</small></div>
+    </div>
+    <div class="an-pe"><span>${esc(f.nome)}</span><span>SAKUMA Agronegócios</span></div>
+    ${PE_LOP_SIMBOLO}
+  </div>`;
+}
+
+function mostrarRealizados() {
+  const lista = escolhidosRz();
+  $('erSaida').innerHTML = lista.length
+    ? lista.map(folhaRealizados).join('')
+    : '<div class="an-folha"><p class="pn-nada">Nenhum ASO lançado nesse período.</p></div>';
+  $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function ligarRealizados() {
+  if (!$('rzTipo')) return;
+  ['rzTipo', 'rzDe', 'rzAte'].forEach(id => $(id).addEventListener('change', calcularRealizados));
+  ['erFazenda', 'erFuncao'].forEach(id => $(id).addEventListener('change', () => {
+    if (lancamentosSst().exame.tipos.length) calcularRealizados();
+  }));
+  $('rzFunc').addEventListener('change', resumoRealizados);
+  $('bRzDoc').addEventListener('click', mostrarRealizados);
 }
