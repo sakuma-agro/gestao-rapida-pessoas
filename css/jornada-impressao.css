@@ -556,24 +556,28 @@
    (.f007-folha) — o resto dos impressos continua na identidade verde/marrom.
    A folha é preenchida à mão e fotocopiada; em preto e branco a grade fica
    limpa e o toner rende.
-   A altura da linha (36 px) é o teto para os 12 meses caberem em UMA folha A4
-   deitada: a 37 px o rodapé já escapa para uma segunda página. Se for mexer,
-   renderize de novo antes de publicar. Para a linha caber, o bloco de dados do
-   colaborador virou uma faixa de 6 colunas e as margens foram apertadas. */
+   A folha tem altura fixa (185 mm) e a grade estica para ocupar o que sobrar —
+   a altura da linha sai por volta de 8,7 mm, contra 7,7 mm da versão antiga, e
+   se ajusta sozinha quando o nome do colaborador quebra em duas linhas. Para
+   sobrar altura, o bloco de dados virou uma faixa de 6 colunas e o cabeçalho,
+   os textos e o rodapé foram apertados. */
 .f007-folha { color: #000; }
-.f007-folha .rel-cabecalho { border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 7px; }
-.f007-folha .rel-cabecalho img { height: 36px; }
-.f007-folha .rel-titulo h1 { color: #000; }
+.f007-folha .rel-cabecalho { border-bottom: 2px solid #000; padding-bottom: 3px; margin-bottom: 4px; }
+.f007-folha .rel-cabecalho img { height: 30px; }
+.f007-folha .rel-titulo h1 { color: #000; font-size: 13px; }
+.f007-folha .rel-titulo p { font-size: 9px; }
+.f007-folha .rel-comp { font-size: 8px; }
+.f007-folha .rel-comp strong { font-size: 11px; }
 .f007-folha .rel-titulo p,
 .f007-folha .rel-comp,
-.f007-folha .rel-nota { color: #444; }
+.f007-folha .rel-nota { color: #444; font-size: 8px; margin: -4px 0 3px !important; }
 .f007-folha .rel-comp strong { color: #000; }
 /* dados do colaborador: faixa de 6 campos, sem fundo, com pauta para escrever */
 .f007-folha .rel-ficha { grid-template-columns: repeat(6, 1fr); background: #fff;
-  border: 1px solid #000; padding: 4px 10px; margin-bottom: 5px; }
-.f007-folha .rel-ficha span { color: #444; }
-.f007-folha .rel-ficha b { color: #000; display: block; min-height: 13px;
-  border-bottom: 1px solid #000; padding-bottom: 1px; }
+  border: 1px solid #000; padding: 3px 8px; margin: 0 0 4px !important; gap: 0 12px; }
+.f007-folha .rel-ficha span { color: #444; font-size: 8px; }
+.f007-folha .rel-ficha b { color: #000; display: block; font-size: 10px; min-height: 12px;
+  border-bottom: 1px solid #000; padding-bottom: 0; }
 /* grade: borda preta, cabeçalho branco e sem o chumbinho verde das ímpares */
 .f007-folha .rel-tabela th,
 .f007-folha .rel-tabela td { border-color: #000; }
@@ -582,13 +586,23 @@
    o cabeçalho para três linhas. Os números dos dias continuam em 10 px. */
 .f007-folha .rel-tabela thead th.f007-rot { font-size: 8.5px; letter-spacing: 0; }
 .f007-folha .rel-tabela tbody tr:nth-child(odd) td { background: #fff; }
-.f007-folha .rel-assina span { border-top-color: #000; height: 20px; margin-bottom: 3px; }
+.f007-folha .rel-assina span { border-top-color: #000; height: 16px; margin-bottom: 3px; }
 .f007-folha .rel-assina small { color: #000; }
-.f007-folha .rel-rodape { margin-top: 5px; padding-top: 5px; border-top-color: #000; }
+.f007-folha .rel-rodape { margin-top: 3px; padding-top: 3px; border-top-color: #000; }
+.f007-folha .rel-rodape img { height: 14px; }
 .f007-folha .f007-aviso { margin: 0 0 3px; font-size: 9px; color: #000; }
 .f007-folha .f007-txt { margin: 2px 0 0; font-size: 9px; line-height: 1.25; color: #000; }
-.f007-folha .f007-obs { border: 1px solid #000; height: 32px; }
+.f007-folha .f007-obs { border: 1px solid #000; height: 24px; }
 .f007-folha .f007-obs-rot { font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: .4px; }
-@media print {
-  .rel.rel-paisagem.f007-folha { padding: 5mm 10mm; }
-}
+/* A folha tem altura fixa e a grade estica para ocupar tudo que sobrar: se um
+   texto encolher, a linha de marcação cresce sozinha — não há número mágico
+   para manter em dia.
+   185 mm é a altura que sobrevive à margem da impressora (mesma conta do
+   .an-folha.deitada no app.css). Com os 210 mm da folha inteira, a margem
+   "Padrão" do Chrome jogava o rodapé para uma segunda página. */
+.rel.rel-paisagem.f007-folha { display: flex; flex-direction: column; box-sizing: border-box;
+  height: 185mm; padding: 4mm 9mm; font-size: 10px; }
+.f007-folha .rel-tabela.f007 { flex: 1 1 auto; }
+.f007-folha .rel-tabela.f007 tbody { height: 100%; }
+/* Sem @media print aqui de propósito: a prévia na tela usa as mesmas medidas
+   do papel, senão ele confere uma coisa e sai outra na impressora. */

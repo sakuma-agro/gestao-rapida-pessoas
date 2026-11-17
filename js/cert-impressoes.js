@@ -205,11 +205,11 @@ const mesAno = ym => { const [a, m] = so(ym).split('-'); return a && m ? `${dois
 /* 17/11/2026, pedido dele: a ficha sai em preto e branco (só as marcas ficam
    coloridas) e com mais espaço para marcar a lavagem. As cores saíram das
    marcações daqui e foram para .f007-folha no jornada-impressao.css.
-   ALTURA_007 é o teto para os 12 meses caberem em UMA folha A4 deitada
-   (antes: 29 px). Renderizado com o CSS real: 38 px fecha em uma folha, 40 px
-   joga o rodapé para a segunda. Se mexer aqui, renderize de novo antes de
-   publicar. */
-const ALTURA_007 = 38;
+   ALTURA_007 é só o PISO da linha de marcação (antes: 29 px fixos). Quem manda
+   na altura final é o CSS: a folha tem 185 mm e a grade estica para ocupar o
+   que sobrar, então a linha sai por volta de 8,5 mm e cresce sozinha se algum
+   texto encolher. Subir este piso só estoura a folha. */
+const ALTURA_007 = 26;
 const texto007 = (rot, t) => `<p class="f007-txt"><b>${esc(rot)}</b> ${esc(t)}</p>`;
 
 function doc007(p, v, folha) {
