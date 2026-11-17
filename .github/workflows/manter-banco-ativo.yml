@@ -1,0 +1,41 @@
+# Mantém o banco Supabase acordado.
+# O plano gratuito pausa o projeto depois de ~7 dias sem uso. A cada 2 dias
+# esta rotina faz uma leitura simples (1 linha, só o id) com a chave pública
+# do app. Sem login a chave não enxerga dados — a resposta volta vazia, mas
+# conta como uso do banco. Nenhum dado de funcionário passa por aqui.
+#
+# A chave fica no secret SUPABASE_ANON_KEY do repositório
+# (Settings → Secrets and variables → Actions).
+# Se o banco não responder, a execução fica vermelha e o GitHub avisa por e-mail.
+
+name: Manter banco ativo
+
+on:
+  schedule:
+    - cron: '0 12 */2 * *'   # a cada 2 dias, 12:00 UTC = 9h de Brasília
+  workflow_dispatch:          # botão "Run workflow" para testar na hora
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Leitura simples no banco
+        env:
+          SUPABASE_URL: https://ysvmfmnwbcxgsrjewwsy.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Falta cadastrar o secret SUPABASE_ANON_KEY no repositório."
+            exit 1
+          fi
+          codigo=$(curl -sS -o resposta.txt -w '%{http_code}' --retry 3 --retry-delay 20 \
+            "$SUPABASE_URL/rest/v1/jor_feriados?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY")
+          echo "Resposta do banco: HTTP $codigo"
+          if [ "$codigo" != "200" ]; then
+            cat resposta.txt
+            echo "O banco não respondeu como esperado (pode estar pausado)."
+            exit 1
+          fi
+          echo "Banco ativo."
