@@ -3,7 +3,7 @@
 // Estratégia: rede primeiro, cache como reserva.
 // Com internet, o app sempre carrega a versão publicada — nunca fica preso
 // numa versão antiga. Sem internet, cai no que estiver guardado.
-const VERSAO = 'gr-v712';
+const VERSAO = 'gr-v713';
 const ARQUIVOS = [
   './', './index.html', './css/app.css',
   './js/app.js', './js/store.js', './js/ficha.js', './js/ficha-cadastral.js', './js/lista.js',
@@ -107,14 +107,20 @@ self.addEventListener('install', ev => {
        derrubava a instalação inteira e todo mundo ficava preso na versão
        velha (aconteceu: vistorias/icons/area-vistorias.v2.svg). O que falhar
        fica de fora do cache e é buscado na rede quando for pedido. */
-    .then(c => Promise.allSettled(ARQUIVOS.map(u => c.add(new Request(u, { cache: 'reload' })))))
-    .then(() => self.skipWaiting()));
+    .then(c => Promise.allSettled(ARQUIVOS.map(u => c.add(new Request(u, { cache: 'reload' }))))));
+  /* Sem skipWaiting aqui (17/11/2026, pedido dele): a versão nova fica
+     esperando. O app mostra a faixa "Tem atualização — toque para
+     recarregar" e só no toque ela assume (mensagem gr-ativar, abaixo).
+     Nada recarrega sozinho no meio de um formulário. Na primeira instalação
+     (aparelho sem versão nenhuma) ela assume direto, como sempre. */
 });
 
 /* Versão no topo do app (20/10/2026, pedido dele): a página pergunta e o
    service worker responde com a VERSAO que está servindo. */
 self.addEventListener('message', ev => {
   if (ev.data?.tipo === 'gr-versao') ev.source?.postMessage({ tipo: 'gr-versao', versao: VERSAO });
+  // toque na faixa de atualização: a versão que estava esperando assume agora
+  if (ev.data?.tipo === 'gr-ativar') self.skipWaiting();
 });
 
 self.addEventListener('activate', ev => {

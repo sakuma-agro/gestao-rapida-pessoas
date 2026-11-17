@@ -404,6 +404,9 @@ export function mostrarAreas({ direto = false } = {}) {
    guarda quando carregou; se uma versão nova assumiu depois disso
    (window.grNovaVersaoEm, marcado em js/app.js), ela recarrega ao entrar. */
 document.querySelectorAll('iframe[id^="moldura"]').forEach(m => m.addEventListener('load', () => { m.dataset.em = String(Date.now()); }));
+/* 17/11/2026: a versão nova só assume pelo toque na faixa "Tem atualização",
+   que recarrega a página inteira (e as molduras juntas). Então a moldura não
+   recarrega mais sozinha ao entrar — não perde formulário pela metade. */
 function molduraVelha(m) {
   const nova = Number(window.grNovaVersaoEm || 0);
   return !!nova && Number(m.dataset.em || 0) < nova;

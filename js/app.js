@@ -2200,17 +2200,38 @@ if ('serviceWorker' in navigator) {
      fica dias aberto e não pegava a versão nova sem ser fechado. Agora ele
      confere ao voltar para a tela e a cada 30 min; quando a versão nova
      assume, aparece uma faixa "Nova versão — atualizar". */
-  const jaTinhaControle = !!navigator.serviceWorker.controller;
-  let faixaMostrada = false;
+  /* Aviso de versão nova (17/11/2026, pedido dele): antes a versão nova
+     assumia sozinha e a faixa aparecia depois. Agora ela fica esperando
+     (sw.js sem skipWaiting) e a faixa "Tem atualização — toque para
+     recarregar" aparece assim que ela está baixada. No toque: a versão nova
+     assume e a página recarrega. Sem toque, nada recarrega sozinho — nem se
+     outra aba do app tiver atualizado (aí a faixa só pede o toque aqui). */
+  let faixa = null, pediAtualizar = false;
+  let versaoEmUso = navigator.serviceWorker.controller;
+  const mostrarFaixa = () => {
+    // sem versão em uso (primeira instalação, ainda assumindo): não há o que atualizar
+    if (faixa || !navigator.serviceWorker.controller) return;
+    faixa = document.createElement('div');
+    faixa.className = 'faixa-versao';
+    faixa.setAttribute('role', 'status');
+    faixa.innerHTML = '<span>Tem atualização — toque para recarregar</span><button type="button">Recarregar</button>';
+    faixa.addEventListener('click', () => {
+      if (pediAtualizar) return;
+      faixa.querySelector('button').disabled = true;
+      pediAtualizar = true;
+      setTimeout(() => location.reload(), 5000);   // se a troca demorar, recarrega assim mesmo
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg?.waiting) reg.waiting.postMessage({ tipo: 'gr-ativar' });   // recarrega no controllerchange, abaixo
+        else location.reload();
+      }, () => location.reload());
+    });
+    document.body.appendChild(faixa);
+  };
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.grNovaVersaoEm = Date.now();   // as áreas (molduras) recarregam ao entrar — js/areas.js
-    if (!jaTinhaControle || faixaMostrada) return;
-    faixaMostrada = true;
-    const f = document.createElement('div');
-    f.className = 'faixa-versao';
-    f.innerHTML = '<span>Nova versão do app publicada. As áreas abrem já na versão nova; para o resto, toque em atualizar.</span><button type="button">Atualizar agora</button>';
-    f.querySelector('button').onclick = () => location.reload();
-    document.body.appendChild(f);
+    const tinhaVersao = !!versaoEmUso;
+    versaoEmUso = navigator.serviceWorker.controller;
+    if (pediAtualizar) location.reload();
+    else if (tinhaVersao) mostrarFaixa();   // outra aba atualizou: aqui só avisa, não recarrega
   });
   /* Versão ao lado de "sincronizado" (20/10/2026, pedido dele): só o número,
      o que o service worker deste aparelho está servindo — assim dá para ver
@@ -2223,6 +2244,12 @@ if ('serviceWorker' in navigator) {
   mostrarVersao();
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
     mostrarVersao();
+    // versão nova já baixada esperando, ou chegando agora: mostra a faixa
+    if (reg.waiting) mostrarFaixa();
+    reg.addEventListener('updatefound', () => {
+      const nova = reg.installing;
+      nova?.addEventListener('statechange', () => { if (nova.state === 'installed') mostrarFaixa(); });
+    });
     let ultimaConf = 0;
     const conferir = () => { ultimaConf = Date.now(); return reg.update().catch(() => {}); };
     // ao entrar numa área também confere (no máximo 1 vez por minuto) — 13/11/2026
