@@ -541,3 +541,10 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .qc-agro-cab{display:flex;justify-content:space-between;align-items:center;padding:0 6px 6px;border-bottom:1px solid var(--linha);font-size:12px;color:var(--suave)}
 .qc-agro-cab b{width:48px;text-align:center;color:#744F28;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
 .qc-mov-lin.agro-ok{background:#F6FAEE}
+
+/* Contagem › Resultado (17/11/2026): uma coluna por fazenda + Comprar */
+.res-tab-caixa{margin-top:10px;white-space:normal}
+.res-tab th small{display:block;font-weight:400;font-size:10px;opacity:.9}
+.res-tab td.res-falta{color:#a5342a;font-weight:700}
+.res-tab td.res-comprar{background:rgba(132,189,0,.14) !important;color:var(--marrom)}
+.res-tab th.res-comprar{background:var(--marrom)}

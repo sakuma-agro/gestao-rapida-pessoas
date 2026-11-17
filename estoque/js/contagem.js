@@ -21,6 +21,7 @@ const locais = () => todosLocais().filter(l => podeLocal(l.id));
    em Usuários - Acessos › Estoques que vê (ex.: Laís na Quebra Cocão). */
 const podeExcluir = localId => souAdmin() || meusLocais().includes(localId);
 import { desenharMapa, soltarMapa } from './mapa.js';
+import { desenharResultado } from './resultado.js';
 import { gravar as gravarDireto } from './dados.js';
 
 /* Gravações uma de cada vez (15/10/2026): dois campos do mesmo lote salvos
@@ -1686,7 +1687,7 @@ function montarFolhaRepor(lista) {
 /* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico, ctMapa: desenharMapa };
+const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico, ctMapa: desenharMapa, ctResultado: desenharResultado };
 
 export function abrirContagem(tela) {
   telaAberta = tela;
@@ -1698,7 +1699,7 @@ export function abrirContagem(tela) {
 window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;
-  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca' || foco.closest && (foco.closest('.ct-lote') || foco.closest('.ct-quad') || foco.closest('.mp-sel')))) return;
+  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca' || foco.id === 'resBusca' || foco.closest && (foco.closest('.ct-lote') || foco.closest('.ct-quad') || foco.closest('.mp-sel')))) return;
   if (!document.querySelector('#modal.oculto') && document.querySelector('#modal')) return;
   DESENHOS[telaAberta]();
 });

@@ -19,6 +19,8 @@ export const MODULOS = [
   { id: 'contagem', nome: 'Contagem', telas: [
     ['ctNova',       'Contar'],
     ['ctAndamento',  'Em andamento'],
+    // 17/11/2026: uma coluna por fazenda e o total a comprar — resultado.js
+    ['ctResultado',  'Resultado'],
     ['ctRepor',      'Reposição'],
     ['ctMapa',       'Mapa do barracão'],
     ['ctHistorico',  'Histórico'],

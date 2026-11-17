@@ -6,7 +6,7 @@
 <title>Estoque · LOP - Gestão Rápida</title>
 <meta name="theme-color" content="#1B232B">
 <link rel="stylesheet" href="css/app.css?v=4">
-<link rel="stylesheet" href="css/estoque.css?v=22">
+<link rel="stylesheet" href="css/estoque.css?v=23">
 <link rel="stylesheet" href="../css/categoria-moldura.css?v=1">
 <!-- Área Estoque do LOP - Gestão Rápida (15/10/2026).
      Veio do app avulso Gestão Rápida (Estoque Inteligente). Esta página não
@@ -63,6 +63,15 @@
         <p class="dica">Como está cada almoxarifado no mês: não começada, em andamento ou fechada.</p>
         <div id="ctAndCorpo"></div>
       </div>
+    </section>
+
+    <section class="tela" id="telaCtResultado" hidden>
+      <div class="cartao naoimprimir">
+        <h2>Resultado da contagem</h2>
+        <p class="dica">O que tem em cada fazenda, pela última contagem fechada de cada tipo, e quanto comprar somando todas as fazendas.</p>
+        <div id="ctResCorpo"></div>
+      </div>
+      <div class="previa so-impressao" id="resFolha"></div>
     </section>
 
     <section class="tela" id="telaCtRepor" hidden>
@@ -257,6 +266,6 @@
 <script src="js/config.js?v=3"></script>
 <script src="../js/moldura-nucleo.js?v=6"></script>
 <script src="js/base.js?v=6"></script>
-<script type="module" src="js/app.js?v=26"></script>
+<script type="module" src="js/app.js?v=27"></script>
 </body>
 </html>
