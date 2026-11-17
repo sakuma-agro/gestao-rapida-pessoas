@@ -1,10 +1,19 @@
-// backup-drive — entrega o backup de todo o LOP - Gestão Rápida para o
-// script do Google Drive (supabase/backup-drive.gs), que roda sozinho todo dia.
+// backup-drive — backup diário de todo o LOP - Gestão Rápida no Google Drive
+// (conta escritoriosakuma1@gmail.com, pasta "Backup LOP"), sem Apps Script.
 //
-// Sem login de usuário: quem chama prova que é o script mandando o cabeçalho
+// Quem dispara: o próprio banco, todo dia às 3h de Brasília (pg_cron →
+// public.backup_drive_disparar → esta função com ?salvar=drive). A função
+// responde na hora e faz o backup em segundo plano: dados (.json), estrutura
+// (-esquema.sql) e fotos/anexos novos ou alterados; guarda 30 dias. Cada
+// execução fica registrada em public.backup_execucoes (a rotina do GitHub
+// "Manter banco ativo" fica vermelha se o último backup ok tiver mais de 2 dias).
+// Tudo isso é criado pelo supabase/backup-automatico.sql.
+//
+// Sem login de usuário: quem chama prova que pode mandando o cabeçalho
 // x-backup-token. Vale o segredo BACKUP_TOKEN (Edge Function secret), se ele
-// existir; senão, o sha256 do que veio tem que bater com public.backup_config
-// (a senha em si só existe no Apps Script). Sem nenhum dos dois, não entrega nada.
+// existir; senão, o sha256 do que veio tem que bater com public.backup_config.
+// A senha em si fica só em public.integracoes_tokens ('backup-drive'), criada
+// pelo SQL — ninguém precisa ver nem copiar. Sem login nem senha, não entrega nada.
 // Lê com a chave de serviço, então nenhuma tabela fica de fora por RLS.
 //
 // Quais tabelas entram (17/11/2026): quem diz é o BANCO, por
@@ -12,7 +21,7 @@
 // fica fora só o que public.backup_fora() exclui de propósito (chaves, sobras,
 // Outorga). Precisa do supabase/backup-automatico.sql rodado (é ele que deixa
 // a chave de serviço chamar backup_tabelas). Se o banco não devolver a lista,
-// o backup FALHA (o script manda e-mail) em vez de sair pela metade.
+// o backup FALHA (fica registrado e o GitHub avisa) em vez de sair pela metade.
 //
 // GRUPOS abaixo é a mesma lista do js/backup.js e serve só para dar NOME de
 // módulo e ORDEM às abas. Tabela sem linha aqui entra igual.
@@ -95,30 +104,17 @@ async function sha256(t: string) {
 const resp = (status: number, corpo: unknown) =>
   new Response(JSON.stringify(corpo), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 
-Deno.serve(async (req) => {
-  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false },
-  });
+type SB = ReturnType<typeof createClient>;
 
-  const veio = req.headers.get('x-backup-token') || '';
-  const segredo = Deno.env.get('BACKUP_TOKEN') || '';
-  let ok = false;
-  if (segredo.length >= 20) {
-    ok = igual(veio, segredo);
-  } else {
-    const { data } = await sb.from('backup_config').select('token_sha256').eq('id', 1).maybeSingle();
-    if (!data?.token_sha256) return resp(503, { erro: 'senha do backup não configurada' });
-    ok = veio.length >= 20 && igual(await sha256(veio), data.token_sha256);
-  }
-  if (!ok) return resp(401, { erro: 'não autorizado' });
-
+/* ─────────── monta o backup (dados + estrutura + lista de arquivos) ─────────── */
+async function montarBackup(sb: SB) {
   // 1) O banco diz o que existe e o que fica fora de propósito.
   const { data: doBanco, error: erroLista } = await sb.rpc('backup_tabelas');
   if (erroLista || !Array.isArray(doBanco) || !doBanco.length) {
-    return resp(500, { erro: `o banco não devolveu a lista de tabelas (rodou o supabase/backup-automatico.sql?): ${erroLista?.message || 'lista vazia'}` });
+    throw new Error(`o banco não devolveu a lista de tabelas (rodou o supabase/backup-automatico.sql?): ${erroLista?.message || 'lista vazia'}`);
   }
   if (!('fora' in doBanco[0])) {
-    return resp(500, { erro: 'backup_tabelas está na versão antiga: rode o supabase/backup-automatico.sql no SQL Editor' });
+    throw new Error('backup_tabelas está na versão antiga: rode o supabase/backup-automatico.sql no SQL Editor');
   }
   const fora: { tabela: string; motivo: string }[] = [];
   const entram: Item[] = [];
@@ -144,7 +140,6 @@ Deno.serve(async (req) => {
   async function lerUma(i: number) {
     const { grupo, esquema, tabela, chave } = tabelasLista[i];
     const base = esquema === 'public' ? sb : sb.schema(esquema);
-    origem[chave] = `${esquema}.${tabela}`;
     try {
       const linhas: unknown[] = [];
       for (let de = 0; ; de += PAGINA) {
@@ -179,21 +174,18 @@ Deno.serve(async (req) => {
     obsEsquema = `estrutura não veio: ${(e as Error).message || e}`;
   }
 
-  // 4) Fotos e anexos do Storage: o script baixa cada um pelo link assinado (vale 2 h).
-  const arquivos: { bucket: string; nome: string; tamanho: number; atualizado: string; url: string | null }[] = [];
+  // 4) Fotos e anexos do Storage.
+  let arquivos: { bucket: string; nome: string; tamanho: number; atualizado: string }[] = [];
   let obsArquivos = '';
   try {
     const { data, error } = await sb.rpc('backup_arquivos');
     if (error) throw error;
-    for (const a of data || []) {
-      const { data: s } = await sb.storage.from(a.bucket).createSignedUrl(a.nome, 7200);
-      arquivos.push({ bucket: a.bucket, nome: a.nome, tamanho: a.tamanho, atualizado: a.atualizado, url: s?.signedUrl || null });
-    }
+    arquivos = data || [];
   } catch (e) {
     obsArquivos = `lista de arquivos não veio: ${(e as Error).message || e}`;
   }
 
-  return resp(200, {
+  return {
     app: 'LOP - Gestão Rápida · SAKUMA',
     versao_backup: 3,
     gerado_em: new Date().toISOString(),
@@ -203,5 +195,175 @@ Deno.serve(async (req) => {
     origem, resumo, tabelas,
     esquema_sql: esquemaSql, obs_esquema: obsEsquema,
     arquivos, obs_arquivos: obsArquivos,
+  };
+}
+
+/* ─────────── Google Drive ───────────
+   Mesma autorização dos anexos do app (conta escritoriosakuma1@gmail.com):
+   refresh token em public.drive_autorizacao, gravado pela função drive-autorizar;
+   cliente OAuth nos segredos GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. */
+const PASTA = 'Backup LOP';
+const MANTER_DIAS = 30;
+const DRIVE = 'https://www.googleapis.com/drive/v3/files';
+const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
+
+function drive(sb: SB) {
+  let token = '';
+  async function tokenGoogle() {
+    if (token) return token;
+    const { data } = await sb.from('drive_autorizacao').select('refresh_token').eq('id', 1).maybeSingle();
+    const rt = data?.refresh_token || Deno.env.get('GOOGLE_REFRESH_TOKEN') || '';
+    const id = Deno.env.get('GOOGLE_CLIENT_ID') || '', seg = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
+    if (!rt || !id || !seg) throw new Error('Google Drive não está autorizado (rode a função drive-autorizar)');
+    const r = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: id, client_secret: seg, refresh_token: rt, grant_type: 'refresh_token' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Google recusou a autorização do Drive: ${d.error || r.status}`);
+    token = d.access_token;
+    return token;
+  }
+  async function g(url: string, init: RequestInit = {}) {
+    const t = await tokenGoogle();
+    return fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${t}` } });
+  }
+  async function json(url: string, init: RequestInit = {}) {
+    const r = await g(url, init);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Drive ${r.status}: ${JSON.stringify(d).slice(0, 300)}`);
+    return d;
+  }
+  const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  async function listar(consulta: string) {
+    const todos: { id: string; name: string; description?: string }[] = [];
+    let pagina = '';
+    do {
+      const d = await json(`${DRIVE}?q=${encodeURIComponent(consulta)}&fields=nextPageToken,files(id,name,description)&pageSize=1000&spaces=drive${pagina ? `&pageToken=${pagina}` : ''}`);
+      todos.push(...(d.files || []));
+      pagina = d.nextPageToken || '';
+    } while (pagina);
+    return todos;
+  }
+  async function pasta(nome: string, mae: string | null) {
+    const achou = await listar(`name='${q(nome)}' and mimeType='application/vnd.google-apps.folder' and trashed=false` + (mae ? ` and '${mae}' in parents` : ''));
+    if (achou.length) return achou[0].id;
+    const d = await json(`${DRIVE}?fields=id`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: nome, mimeType: 'application/vnd.google-apps.folder', ...(mae ? { parents: [mae] } : {}) }),
+    });
+    return d.id as string;
+  }
+  /** Grava (ou troca) um arquivo. Upload "resumable" num pedaço só: aceita arquivo grande. */
+  async function gravar(mae: string, nome: string, corpo: Uint8Array, mime: string, descricao = '') {
+    const existentes = await listar(`name='${q(nome)}' and '${mae}' in parents and trashed=false`);
+    const atual = existentes[0]?.id;
+    const meta = atual ? { description: descricao } : { name: nome, parents: [mae], description: descricao };
+    const ini = await g(`${UPLOAD}${atual ? '/' + atual : ''}?uploadType=resumable`, {
+      method: atual ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': mime },
+      body: JSON.stringify(meta),
+    });
+    const destino = ini.headers.get('Location');
+    if (!ini.ok || !destino) throw new Error(`Drive não abriu o envio de ${nome}: ${ini.status} ${(await ini.text()).slice(0, 300)}`);
+    const r = await fetch(destino, { method: 'PUT', headers: { 'Content-Type': mime }, body: corpo });
+    if (!r.ok) throw new Error(`Drive não gravou ${nome}: ${r.status} ${(await r.text()).slice(0, 300)}`);
+    for (const extra of existentes.slice(1)) await apagar(extra.id);
+  }
+  async function apagar(id: string) {
+    await json(`${DRIVE}/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+  }
+  return { listar, pasta, gravar, apagar };
+}
+
+/* ─────────── o backup diário: monta, salva no Drive e registra ─────────── */
+async function backupNoDrive(sb: SB) {
+  const { data: exec } = await sb.from('backup_execucoes').insert({}).select('id').single();
+  const registrar = (campos: Record<string, unknown>) =>
+    exec?.id ? sb.from('backup_execucoes').update({ terminado_em: new Date().toISOString(), ...campos }).eq('id', exec.id) : null;
+  try {
+    const corpo = await montarBackup(sb);
+    const d = drive(sb);
+    const raiz = await d.pasta(PASTA, null);
+    const dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()); // AAAA-MM-DD
+    const enc = new TextEncoder();
+    const esquema = corpo.esquema_sql;
+    const semEsquema = { ...corpo, esquema_sql: undefined };
+    await d.gravar(raiz, `lop-backup-${dia}.json`, enc.encode(JSON.stringify(semEsquema)), 'application/json');
+    if (esquema) await d.gravar(raiz, `lop-backup-${dia}-esquema.sql`, enc.encode(esquema), 'text/plain');
+
+    // Fotos e anexos: só os novos ou alterados (a data de alteração fica na descrição do arquivo no Drive).
+    const avisos: string[] = [];
+    let novos = 0;
+    if (corpo.arquivos.length) {
+      const pastaArq = await d.pasta('arquivos', raiz);
+      const noDrive = new Map((await d.listar(`'${pastaArq}' in parents and trashed=false`)).map(f => [f.name, f.description || '']));
+      for (const a of corpo.arquivos) {
+        const nome = `${a.bucket}__${a.nome.replace(/\//g, '__')}`;
+        if (noDrive.get(nome) === String(a.atualizado)) continue;
+        try {
+          const { data: blob, error } = await sb.storage.from(a.bucket).download(a.nome);
+          if (error || !blob) throw error || new Error('vazio');
+          await d.gravar(pastaArq, nome, new Uint8Array(await blob.arrayBuffer()), blob.type || 'application/octet-stream', String(a.atualizado));
+          novos++;
+        } catch (e) {
+          avisos.push(`arquivo não copiou: ${nome} (${(e as Error).message || e})`);
+        }
+      }
+    }
+
+    // Guarda os últimos MANTER_DIAS dias; o resto vai para a lixeira do Drive.
+    const porDia = new Map<string, string[]>();
+    for (const f of await d.listar(`'${raiz}' in parents and trashed=false and name contains 'lop-backup-'`)) {
+      const m = f.name.match(/^lop-backup-(\d{4}-\d{2}-\d{2})/);
+      if (m) porDia.set(m[1], [...(porDia.get(m[1]) || []), f.id]);
+    }
+    for (const velho of [...porDia.keys()].sort().reverse().slice(MANTER_DIAS)) {
+      for (const id of porDia.get(velho)!) await d.apagar(id);
+    }
+
+    corpo.resumo.filter(x => x.obs).forEach(x => avisos.push(`${x.tabela}: ${x.obs}`));
+    if (corpo.obs_esquema) avisos.push(corpo.obs_esquema);
+    if (corpo.obs_arquivos) avisos.push(corpo.obs_arquivos);
+    await registrar({
+      ok: true, tabelas: corpo.resumo.length, registros: corpo.resumo.reduce((s, x) => s + x.registros, 0),
+      arquivos_novos: novos, avisos: avisos.join('\n') || null,
+    });
+  } catch (e) {
+    await registrar({ ok: false, erro: String((e as Error).message || e).slice(0, 2000) });
+  }
+}
+
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
+
+Deno.serve(async (req) => {
+  const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false },
   });
+
+  const veio = req.headers.get('x-backup-token') || '';
+  const segredo = Deno.env.get('BACKUP_TOKEN') || '';
+  let ok = false;
+  if (segredo.length >= 20) {
+    ok = igual(veio, segredo);
+  } else {
+    const { data } = await sb.from('backup_config').select('token_sha256').eq('id', 1).maybeSingle();
+    if (!data?.token_sha256) return resp(503, { erro: 'senha do backup não configurada' });
+    ok = veio.length >= 20 && igual(await sha256(veio), data.token_sha256);
+  }
+  if (!ok) return resp(401, { erro: 'não autorizado' });
+
+  // ?salvar=drive — chamado pelo agendamento diário do banco (public.backup_drive_disparar):
+  // responde na hora e faz o backup em segundo plano, registrando em public.backup_execucoes.
+  if (new URL(req.url).searchParams.get('salvar') === 'drive') {
+    EdgeRuntime.waitUntil(backupNoDrive(sb));
+    return resp(202, { ok: true, msg: 'backup iniciado; o resultado fica em public.backup_execucoes' });
+  }
+
+  // Sem ?salvar: devolve o backup inteiro (como antes).
+  try {
+    return resp(200, await montarBackup(sb));
+  } catch (e) {
+    return resp(500, { erro: String((e as Error).message || e) });
+  }
 });

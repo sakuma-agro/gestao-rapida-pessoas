@@ -6,7 +6,9 @@
 #
 # A chave fica no secret SUPABASE_ANON_KEY do repositório
 # (Settings → Secrets and variables → Actions).
-# Se o banco não responder, a execução fica vermelha e o GitHub avisa por e-mail.
+# Também confere a data do último backup diário no Drive (public.backup_ultimo_ok,
+# que só devolve a data). Se o banco não responder, ou se o último backup que
+# deu certo tiver mais de 2 dias, a execução fica vermelha e o GitHub avisa por e-mail.
 
 name: Manter banco ativo
 
@@ -39,3 +41,25 @@ jobs:
             exit 1
           fi
           echo "Banco ativo."
+
+      - name: Conferir o backup diário no Drive
+        env:
+          SUPABASE_URL: https://ysvmfmnwbcxgsrjewwsy.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          codigo=$(curl -sS -o ultimo.txt -w '%{http_code}' --retry 3 --retry-delay 20 \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/backup_ultimo_ok" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Content-Type: application/json" -d '{}')
+          ultimo=$(tr -d '"' < ultimo.txt)
+          echo "Último backup que deu certo: $ultimo (HTTP $codigo)"
+          if [ "$codigo" != "200" ] || [ -z "$ultimo" ] || [ "$ultimo" = "null" ]; then
+            echo "Não há backup diário registrado. Veja public.backup_execucoes no Supabase."
+            exit 1
+          fi
+          idade=$(( ( $(date -u +%s) - $(date -u -d "$ultimo" +%s) ) / 3600 ))
+          echo "Feito há $idade horas."
+          if [ "$idade" -gt 48 ]; then
+            echo "O backup diário está parado há mais de 2 dias. Veja public.backup_execucoes no Supabase."
+            exit 1
+          fi
+          echo "Backup em dia."

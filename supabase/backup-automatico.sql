@@ -91,3 +91,76 @@ begin
     execute d;
   end if;
 end $$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Backup diário no Google Drive, sem Apps Script (17/11/2026).
+-- O banco dispara a função backup-drive todo dia às 3h de Brasília; ela salva
+-- na pasta "Backup LOP" do Drive da escritoriosakuma1@gmail.com (a mesma
+-- autorização dos anexos, public.drive_autorizacao) e registra o resultado aqui.
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Registro de cada backup (só as funções leem e gravam).
+create table if not exists public.backup_execucoes (
+  id             bigint generated always as identity primary key,
+  iniciado_em    timestamptz not null default now(),
+  terminado_em   timestamptz,
+  ok             boolean,
+  tabelas        int,
+  registros      bigint,
+  arquivos_novos int,
+  avisos         text,
+  erro           text
+);
+alter table public.backup_execucoes enable row level security;
+revoke all on public.backup_execucoes from anon, authenticated;
+grant select, insert, update on public.backup_execucoes to service_role;
+
+-- Senha do backup: sorteada aqui e guardada só no banco. A função confere
+-- pelo sha256 em public.backup_config. Ninguém precisa ver nem copiar.
+insert into public.integracoes_tokens (nome, token)
+select 'backup-drive', encode(extensions.gen_random_bytes(32), 'hex')
+ where not exists (select 1 from public.integracoes_tokens where nome = 'backup-drive');
+
+insert into public.backup_config (id, token_sha256)
+select 1, encode(extensions.digest(token, 'sha256'), 'hex')
+  from public.integracoes_tokens where nome = 'backup-drive'
+on conflict (id) do update set token_sha256 = excluded.token_sha256, atualizado_em = now();
+
+-- Quem o agendamento chama.
+create or replace function public.backup_drive_disparar()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare k text;
+begin
+  select token into k from integracoes_tokens where nome = 'backup-drive';
+  if k is null then return; end if;
+  perform net.http_post(
+    url := 'https://ysvmfmnwbcxgsrjewwsy.supabase.co/functions/v1/backup-drive?salvar=drive',
+    body := '{}'::jsonb,
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-backup-token', k),
+    timeout_milliseconds := 30000);
+end $$;
+revoke all on function public.backup_drive_disparar() from public, anon, authenticated;
+
+-- Todo dia às 06:00 UTC = 03:00 de Brasília.
+select cron.unschedule('backup-drive') where exists (select 1 from cron.job where jobname = 'backup-drive');
+select cron.schedule('backup-drive', '0 6 * * *', 'select public.backup_drive_disparar()');
+
+-- Para a rotina do GitHub conferir: só a data/hora do último backup que deu
+-- certo (nenhum dado). Sem backup ok há mais de 2 dias, ela fica vermelha.
+create or replace function public.backup_ultimo_ok()
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = public
+as $$ select max(terminado_em) from backup_execucoes where ok $$;
+revoke all on function public.backup_ultimo_ok() from public;
+grant execute on function public.backup_ultimo_ok() to anon, authenticated;
+
+-- Conferência: deve mostrar o agendamento e a senha criada (sem mostrar a senha).
+select (select schedule from cron.job where jobname = 'backup-drive') as agendamento,
+       (select count(*) from public.integracoes_tokens where nome = 'backup-drive') as senha_criada;
