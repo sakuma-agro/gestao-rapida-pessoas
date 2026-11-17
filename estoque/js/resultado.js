@@ -16,13 +16,18 @@ import {
   $, esc, pronto, todos, locais as todosLocais, podeLocal, linhasDe, itensOrdenados, contaNoLocal,
   comMinimoDo, temMinimo, precisaRepor, mostrarNumero, dataBR, rodadaDe, GRUPOS,
 } from './dados.js';
-import { enviarWhatsapp } from './pdf.js';
+import { enviarWhatsapp, FRASE_LOP } from './pdf.js';
 
 const locais = () => todosLocais().filter(l => podeLocal(l.id));
 const CHAVE = 'estoque.resultadoGrupo';
 let grupo = 'EPIs';
 let soComprar = false;
 let busca = '';
+/* Pedido de compra (17/11/2026): fornecedor, entregar em e observação ficam guardados no aparelho */
+const CHAVE_PC = 'estoque.pedidoCompra';
+const PC = { aberto: false, forn: '', entrega: '', obs: '' };
+try { Object.assign(PC, JSON.parse(localStorage.getItem(CHAVE_PC) || '{}'), { aberto: false }); } catch { /* sem localStorage */ }
+const guardarPC = () => { try { localStorage.setItem(CHAVE_PC, JSON.stringify({ ...PC, aberto: false })); } catch { /* ok */ } };
 try { grupo = localStorage.getItem(CHAVE) || grupo; } catch { /* sem localStorage */ }
 
 const temQtd = l => !!l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '';
@@ -140,7 +145,9 @@ export function desenharResultado() {
       até cadastrar o mínimo e o pedido em Cadastros › Produtos.</p>` : ''}
     <p class="es-nota">Em vermelho: a fazenda está no mínimo ou abaixo. <strong>Comprar</strong> soma, de todas as fazendas,
       a quantidade de pedido cadastrada (Cadastros › Produtos, mínimo da fazenda). Item com mínimo que não apareceu na contagem conta como zero.</p>
+    ${painelPedido(linhas)}
     <div class="barra fim">
+      <button class="btn" type="button" id="resPedido"${nComprar ? '' : ' disabled'}>${PC.aberto ? 'Fechar pedido de compra' : '🛒 Pedido de compra'}</button>
       <button class="btn btn-zap" type="button" id="resWhats"><img class="ic-zap" src="img/whatsapp.png" alt="">Enviar PDF no WhatsApp</button>
       <button class="btn principal" type="button" id="resImprimir">Imprimir</button>
     </div>`}`;
@@ -156,6 +163,89 @@ export function desenharResultado() {
   if (foco) { ib.focus(); ib.setSelectionRange(ib.value.length, ib.value.length); }
   $('resImprimir')?.addEventListener('click', () => { montarFolha(comContagem, lista); setTimeout(() => window.print(), 50); });
   $('resWhats')?.addEventListener('click', ev => enviarWhatsapp(pdf(comContagem, lista), ev.currentTarget));
+  $('resPedido')?.addEventListener('click', () => { PC.aberto = !PC.aberto; desenharResultado(); });
+  if (PC.aberto && $('pcForn')) {
+    const ler = () => { PC.forn = $('pcForn').value; PC.entrega = $('pcEntrega').value; PC.obs = $('pcObs').value; guardarPC(); };
+    ['pcForn', 'pcEntrega', 'pcObs'].forEach(id => $(id).addEventListener('change', ler));
+    const itens = linhas.filter(r => r.comprar > 0);
+    $('pcImp').addEventListener('click', () => { ler(); folhaPedido(itens); setTimeout(() => window.print(), 60); });
+    $('pcZap').addEventListener('click', ev => { ler(); enviarWhatsapp(pdfPedido(itens), ev.currentTarget); });
+  }
+}
+
+/* ---------------- Pedido de compra para o fornecedor (17/11/2026) ----------------
+   Pedido dele: "um relatório de compras para ser enviado para o fornecedor, onde
+   vai sair o nome do produto e qtde solicitada". Sai da coluna Comprar (soma de
+   todas as fazendas), sem o que temos em estoque: Nº, Produto, Un. e Qtd. */
+const fornecedores = () => [...new Map(todos('est_fornecedores').map(x => [x.id, x])).values()]
+  .filter(x => x.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+const fornPC = () => fornecedores().find(f => f.id === PC.forn) || null;
+function entregaPC() {
+  const ls = todosLocais();
+  const l = ls.find(x => x.id === PC.entrega) || ls.find(x => /lote\s*35/i.test(x.nome)) || ls[0];
+  return l ? l.nome : '';
+}
+function painelPedido(linhas) {
+  if (!PC.aberto) return '';
+  const n = linhas.filter(r => r.comprar > 0).length;
+  const ls = todosLocais();
+  const ent = (ls.find(x => x.id === PC.entrega) || ls.find(x => /lote\s*35/i.test(x.nome)) || ls[0] || {}).id;
+  return `<div class="cartao pc-painel">
+    <h3 style="margin:0 0 6px">Pedido de compra · ${esc(grupo)}</h3>
+    <p class="dica" style="margin:0 0 8px">Vai para o fornecedor só o produto, a unidade e a quantidade da coluna <b>Comprar</b> (${n} ${n === 1 ? 'item' : 'itens'}).</p>
+    <div class="barra">
+      <label class="campo" style="flex:1;min-width:200px">Fornecedor <select id="pcForn"><option value="">— em branco (preencher à mão) —</option>${fornecedores().map(f =>
+        `<option value="${esc(f.id)}"${f.id === PC.forn ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
+      <label class="campo">Entregar em <select id="pcEntrega">${ls.map(l => `<option value="${esc(l.id)}"${l.id === ent ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
+    </div>
+    <label class="campo">Observação <textarea id="pcObs" rows="2" placeholder="opcional">${esc(PC.obs)}</textarea></label>
+    <div class="barra fim">
+      <button class="btn btn-zap" type="button" id="pcZap"><img class="ic-zap" src="img/whatsapp.png" alt="">Pedido no WhatsApp</button>
+      <button class="btn principal" type="button" id="pcImp">Imprimir pedido</button>
+    </div></div>`;
+}
+const hojeBR = () => new Date().toLocaleDateString('pt-BR');
+
+function pdfPedido(itens) {
+  const f = fornPC();
+  return {
+    titulo: 'Pedido de Compra',
+    subtitulo: `${grupo} · emitido em ${hojeBR()}`,
+    arquivo: `Pedido de Compra ${grupo} ${new Date().toISOString().slice(0, 10)}`,
+    kpis: [['Fornecedor', f ? f.nome : ' '], ['Entregar em', entregaPC()], ['Itens', String(itens.length)]],
+    secoes: [{
+      titulo: 'Itens', head: ['Nº', 'Produto', 'Un.', 'Qtd. solicitada'],
+      body: itens.map((r, k) => [k + 1, r.item.nome, r.item.unidade || '', mostrarNumero(r.comprar)]),
+      total: ['', `Total de itens: ${itens.length}`, '', ''],
+      centro: [0, 2, 3], larguras: { 0: 12, 2: 18, 3: 32 },
+    }],
+    notas: PC.obs ? { titulo: 'Observação', texto: [PC.obs] } : undefined,
+  };
+}
+
+function folhaPedido(itens) {
+  const f = fornPC();
+  const POR = 28, pags = [];
+  for (let i = 0; i < itens.length; i += POR) pags.push(itens.slice(i, i + POR));
+  if (!pags.length) pags.push([]);
+  $('resFolha').innerHTML = pags.map((p, k) => `<div class="folha rel orc-folha">
+    <div class="rel-topo">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+      <div class="rel-tit"><h1>Pedido de Compra</h1><p>${esc(grupo)} · emitido em ${esc(hojeBR())}</p></div>
+    </div>
+    ${k === 0 ? `<div class="orc-dados">
+      <div><span>Fornecedor</span><b>${f ? esc(f.nome) : '&nbsp;'}</b>${f && (f.contato || f.telefone) ? `<small>${esc([f.contato, f.telefone].filter(Boolean).join(' · '))}</small>` : ''}</div>
+      <div><span>Entregar em</span><b>${esc(entregaPC())}</b><small>SAKUMA Agronegócios</small></div>
+      <div><span>Data</span><b>${esc(hojeBR())}</b><small>${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</small></div>
+    </div>` : ''}
+    <table class="rel-tab"><thead><tr><th class="ce" style="width:12mm">Nº</th><th>Produto</th><th class="ce" style="width:18mm">Un.</th><th class="ce" style="width:32mm">Qtd. solicitada</th></tr></thead>
+    <tbody>${p.map(r => `<tr><td class="ce">${itens.indexOf(r) + 1}</td><td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
+      <td class="ce"><b>${esc(mostrarNumero(r.comprar))}</b></td></tr>`).join('')}
+      ${k === pags.length - 1 ? `<tr class="rel-total"><td></td><td>Total de itens: ${itens.length}</td><td></td><td></td></tr>` : ''}</tbody></table>
+    ${k === pags.length - 1 && PC.obs ? `<div class="orc-notas"><b>Observação</b><p>${esc(PC.obs)}</p></div>` : ''}
+    <div class="rel-pe"><small class="lp-pag">${pags.length > 1 ? `Folha ${k + 1} de ${pags.length}` : ''}</small>
+      <span class="orc-lop"><img class="rel-lop" src="img/lop-marca.png" alt="LOP"><small>${esc(FRASE_LOP)}</small></span></div>
+  </div>`).join('');
 }
 
 const subtitulo = comContagem => `${grupo} · ${comContagem.map(f => f.local.nome + (dataCab(f) ? ' ' + dataCab(f) : '')).join(' · ')}${soComprar ? ' · só o que precisa comprar' : ''}`;
