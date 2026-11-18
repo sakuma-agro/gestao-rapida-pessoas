@@ -823,7 +823,12 @@ function ligarForm() {
     $('epmSalvar').disabled = true;
     const lanc = crypto.randomUUID();
     const faz = letraFaz(local);
-    const rows = boas.map(b => ({ id: crypto.randomUUID(), local_id: localId, data, sentido: 'saida', tipo: 'uso', item_id: b.it.id,
+    /* Um por um (18/11/2026, pedido do Vinicius): 2 ou mais do mesmo EPI viram
+       uma linha por unidade — na ficha cada um tem a sua assinatura e a sua
+       devolução. Quantidade quebrada (ex.: 1,5) fica numa linha só. */
+    const unidades = boas.flatMap(b => Number.isInteger(b.q) && b.q > 1
+      ? Array.from({ length: b.q }, () => ({ ...b, q: 1 })) : [b]);
+    const rows = unidades.map(b => ({ id: crypto.randomUUID(), local_id: localId, data, sentido: 'saida', tipo: 'uso', item_id: b.it.id,
       quantidade: b.q, documento: 'Ficha de EPI', funcionario_id: f.id, funcionario: f.nome, operador: quem(), criado_por: quem(),
       lancamento_id: lanc, ativo: true, origem: 'epi', mer: b.mer || null, faz: b.faz || faz, ficha_assinada: false, ca: b.ca || null }));
     // pela fila do núcleo: sem internet a entrega fica no aparelho e sobe depois (13/11/2026)
