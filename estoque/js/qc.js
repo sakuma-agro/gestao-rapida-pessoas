@@ -12,6 +12,7 @@ import {
   locaisDoUsuario,
 } from './dados.js';
 import { saldosEpi, casDe } from '../../js/epi-saldo.js';
+import { caReprovado } from '../../js/ca.js';
 import { lerPlanilhaQc, unidadeDe } from './qc-importar.js';
 import { gravar as gravarDireto } from './dados.js';
 
@@ -172,6 +173,21 @@ function semLocal(alvo) {
     <div class="vazio">Você não tem nenhum estoque liberado (Usuários - Acessos).</div></div>`;
 }
 
+/* Linha do item, enxuta (18/11/2026, pedido dele: "quero que apareça CA, seja
+   mais lean"): unidade · C.A · mínimo · custo médio. O "toque para ver o
+   extrato" e o "sem valor", que se repetiam em toda linha, saíram — a dica de
+   tocar ficou uma vez só, no alto da tela. */
+const rotuloCa = i => { const c = casDe(i); return c.length ? 'C.A ' + c.join(', ') : ''; };
+/* est_cas guarda a validade de cada CA; vencido ou irregular vira tag. */
+const caVencido = i => casDe(i).some(ca => { const r = todos('est_cas').find(x => x.id === ca) || {};
+  return caReprovado({ ca, ca_situacao: r.situacao, ca_validade: r.validade, ca_conferido_em: r.conferido_em }); });
+const subItem = (i, cu) => [
+  i.unidade || '',
+  rotuloCa(i),
+  temMinimo(i) ? 'mín. ' + mostrarNumero(comMinimoDo(i, (localQc() || {}).id).estoque_minimo) : '',
+  (cu.itens.get(i.id) || {}).medio != null ? 'méd. ' + brl(cu.itens.get(i.id).medio) : '',
+].filter(Boolean).map(esc).join(' · ');
+
 /* ===================================================================
    Visão do estoque — por categoria
    =================================================================== */
@@ -198,7 +214,7 @@ function desenharVisao() {
     <div class="barra entre"><h2 style="margin:0">Estoque · ${esc(nomeLocal())}</h2>${seletorLocal(true)}</div>
     <p class="dica">${verTodos() ? 'Total de todos os estoques: soma do saldo de cada um.'
       : ehQcLocal(localQc()) ? 'Saldo de cada item = entradas − saídas lançadas aqui.'
-      : 'Saldo = última contagem de cada tipo + entradas − saídas lançadas depois dela.'}</p>
+      : 'Saldo = última contagem de cada tipo + entradas − saídas lançadas depois dela.'} Toque num item para ver o extrato.</p>
     <div class="es-cards">
       <div class="es-card es-ok"><span>Itens com movimento</span><strong>${itens.length}</strong><small>${grupos.length} categoria(s)</small></div>
       <div class="es-card es-transf"><span>Valor em estoque</span><strong class="qc-rs">${esc(brl(vistosValor(itens, cu)))}</strong><small>pelo custo médio${semValor(itens, cu, sd) ? ` · ${semValor(itens, cu, sd)} sem valor` : ''}</small></div>
@@ -225,8 +241,8 @@ function desenharVisao() {
       const cab = (i.grupo || 'Outros') !== grupo ? `<h3 class="es-secao">${esc(grupo = i.grupo || 'Outros')}</h3>` : '';
       return cab + `<div class="item qc-item" data-extrato="${esc(i.id)}"><span></span>
         <div><div class="nome">${esc(i.nome)}${v < -0.0001 ? ' <span class="tag perigo">negativo</span>'
-          : precisaRepor(i, v) ? ' <span class="tag alerta">no mínimo</span>' : ''}${pend.get(i.id) ? ` <span class="tag alerta">${esc(mostrarNumero(pend.get(i.id)))} pendente</span>` : ''}</div>
-          <div class="sub">${esc(i.unidade || '')}${temMinimo(i) ? ` · mínimo ${esc(mostrarNumero(comMinimoDo(i, localQc().id).estoque_minimo))}` : ''}${(cu.itens.get(i.id) || {}).medio != null ? ` · custo médio ${esc(brlU(cu.itens.get(i.id).medio))}` : ' · sem valor'} · toque para ver o extrato</div></div>
+          : precisaRepor(i, v) ? ' <span class="tag alerta">no mínimo</span>' : ''}${pend.get(i.id) ? ` <span class="tag alerta">${esc(mostrarNumero(pend.get(i.id)))} pendente</span>` : ''}${caVencido(i) ? ' <span class="tag perigo">CA vencido</span>' : ''}</div>
+          <div class="sub">${subItem(i, cu)}</div></div>
         <div class="acoes" style="text-align:right"><strong class="qc-saldo${v < -0.0001 ? ' neg' : ''}">${esc(mostrarNumero(Math.round(v * 1000) / 1000))}</strong>
           ${(cu.itens.get(i.id) || {}).emEstoque != null && v > 0.0005 ? `<div class="sub">${esc(brl(cu.itens.get(i.id).emEstoque))}</div>` : ''}</div>
       </div>`;
@@ -293,7 +309,7 @@ function montarPosicao(itens, sd, cu) {
     if (!g || g.nome !== (i.grupo || 'Outros')) grupos.push(g = { nome: i.grupo || 'Outros', linhas: [], valor: 0 });
     const st = cu.itens.get(i.id) || {};
     g.valor += st.emEstoque || 0;
-    g.linhas.push([i.nome, i.unidade || '', mostrarNumero(Math.round(sd.get(i.id) * 1000) / 1000), brlU(st.medio), brl(st.emEstoque)]);
+    g.linhas.push([i.nome + (rotuloCa(i) ? ' (' + rotuloCa(i) + ')' : ''), i.unidade || '', mostrarNumero(Math.round(sd.get(i.id) * 1000) / 1000), brlU(st.medio), brl(st.emEstoque)]);
   }
   const total = grupos.reduce((t, g) => t + g.valor, 0);
   $('qcFolha').innerHTML = `<div class="folha rel">
@@ -315,7 +331,9 @@ function montarPosicao(itens, sd, cu) {
      resumo   — por produto: estoque inicial, entradas, saídas e final no
                 período (o mesmo desenho da aba ESTOQUE das planilhas antigas)
      consumo  — saídas de uso por direcionador (plantio/destino) e produto
-     posicao  — saldo atual de cada produto
+     posicao  — saldo de cada produto numa data escolhida (18/11/2026, pedido
+                dele: "quero ter um relatório aonde filtro as datas e vejo como
+                estava o total da época filtrada") — padrão: hoje
    =================================================================== */
 let relOpc = null;
 const r3 = v => Math.round((Number(v) || 0) * 1000) / 1000;
@@ -344,14 +362,14 @@ function dadosRelatorio(o) {
         return { dir, linhas, v: linhas.reduce((t, l) => t + l.v, 0) };
       });
   }
-  const cuFim = o.tipo === 'posicao' ? cuTodos : custos(o.ate);
+  const cuFim = custos(o.ate);   // custo médio e valor como estavam na data escolhida
   const ids = new Set(mvs.map(m => m.item_id));
   const linhas = itensOrdenados().filter(i => ids.has(i.id) && doGrupo(i)).map(i => {
     let ini = 0, ent = 0, sai = 0, fim = 0, vEnt = 0, vSai = 0;
     for (const m of mvs) {
       if (m.item_id !== i.id) continue;
       const q = (Number(m.quantidade) || 0) * (m.sentido === 'entrada' ? 1 : -1);
-      fim += q;
+      if (m.data <= o.ate) fim += q;   // posição: só o que já tinha acontecido até a data
       if (m.data < o.de) ini += q;
       else if (m.data <= o.ate) { if (q > 0) { ent += q; vEnt += valorDe(m); } else { sai -= q; vSai += valorDe(m); } }
     }
@@ -370,12 +388,12 @@ function abrirRelatorio() {
   const grupos = [...new Set(itensOrdenados().map(i => i.grupo || 'Outros'))];
   window.abrirModal('Emitir relatório do estoque', `
     <div class="qc-tipos">
-      ${[['resumo', 'Entradas e saídas do período'], ['consumo', 'Consumo por direcionador'], ['posicao', 'Posição atual (saldo)']]
+      ${[['resumo', 'Entradas e saídas do período'], ['consumo', 'Consumo por direcionador'], ['posicao', 'Posição numa data (saldo e valor)']]
         .map(([v, t]) => `<label class="qc-tipo"><input type="radio" name="relTipo" value="${v}"${relOpc.tipo === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}
     </div>
     <div class="grade">
       <label class="campo rel-per">De <input type="date" id="relDe" value="${esc(relOpc.de)}" max="${hoje}"></label>
-      <label class="campo rel-per">Até <input type="date" id="relAte" value="${esc(relOpc.ate)}" max="${hoje}"></label>
+      <label class="campo"><span id="relRotAte">Até</span> <input type="date" id="relAte" value="${esc(relOpc.ate)}" max="${hoje}"></label>
       <label class="campo">Categoria <select id="relGrupo"><option value="">Todas</option>
         ${grupos.map(g => `<option${relOpc.grupo === g ? ' selected' : ''}>${esc(g)}</option>`).join('')}</select></label>
     </div>
@@ -389,21 +407,24 @@ function abrirRelatorio() {
       relOpc = { tipo: corpo.querySelector('[name=relTipo]:checked').value, de: $('relDe').value, ate: $('relAte').value,
         grupo: $('relGrupo').value, zerados: $('relZer').checked };
       corpo.querySelectorAll('.rel-per').forEach(el => { el.hidden = relOpc.tipo === 'posicao'; });
+      $('relRotAte').textContent = relOpc.tipo === 'posicao' ? 'Posição em' : 'Até';
       $('relDica').textContent = relOpc.tipo === 'resumo' ? 'Por produto: estoque no início do período, entradas, saídas e estoque no fim — como a aba ESTOQUE das planilhas — com o valor das saídas e o valor no fim (custo médio).'
         : relOpc.tipo === 'consumo' ? 'Saídas do tipo Uso no período, somadas por direcionador (plantio/destino) e produto, com o valor pelo custo médio.'
-        : 'Saldo de hoje de cada produto (entradas − saídas), com o custo médio e o valor em estoque.';
+        : 'Como o estoque estava na data escolhida: saldo de cada produto (entradas − saídas até ela), o custo médio daquele dia e o total em R$. Deixe a data de hoje para a posição atual.';
       return relOpc;
     };
     corpo.querySelectorAll('input,select').forEach(el => el.addEventListener('change', ler));
     ler();
-    const valido = o => o.tipo === 'posicao' || (o.de && o.ate && o.de <= o.ate) || (aviso('Confira o período.', true), false);
+    const valido = o => (o.tipo === 'posicao' ? !!o.ate : (o.de && o.ate && o.de <= o.ate)) || (aviso('Confira o período.', true), false);
     $('relImp').onclick = () => { const o = ler(); if (!valido(o)) return; window.fecharModal(); montarRelatorio(o); setTimeout(() => window.print(), 80); };
     $('relCsv').onclick = () => { const o = ler(); if (valido(o)) baixarRelatorio(o); };
   });
 }
 
+/* O C.A sai junto do nome do produto, sem coluna nova, para a folha não encher. */
+const caTab = i => rotuloCa(i) ? ` <small>${esc(rotuloCa(i))}</small>` : '';
 const tituloRel = o => o.tipo === 'resumo' ? 'Entradas e Saídas do Estoque' : o.tipo === 'consumo' ? 'Consumo por Direcionador' : 'Posição do Estoque';
-const subRel = o => [o.tipo === 'posicao' ? 'saldo em ' + dataBR(hojeISO()) : dataBR(o.de) + ' a ' + dataBR(o.ate), o.grupo || 'todas as categorias']
+const subRel = o => [o.tipo === 'posicao' ? 'posição em ' + dataBR(o.ate) : dataBR(o.de) + ' a ' + dataBR(o.ate), o.grupo || 'todas as categorias']
   .join(' · ') + ' · emitido em ' + new Date().toLocaleDateString('pt-BR');
 
 function montarRelatorio(o) {
@@ -415,7 +436,7 @@ function montarRelatorio(o) {
     corpo = d.length ? `<div class="rel-kpis" style="grid-template-columns:repeat(2,1fr)"><div><span>Direcionadores</span><b>${d.length}</b></div>
         <div><span>Valor consumido</span><b>${esc(brl(totalGeral))}</b></div></div>` + d.map(g => `<h3 class="rel-secao">${esc(g.dir)}</h3>
       <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Categoria</th><th class="ce">Quantidade</th><th class="ce">Unid.</th><th class="ce">Valor</th></tr></thead>
-      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.grupo || '')}</td><td class="ce">${n(l.q)}</td><td class="ce">${esc(l.i.unidade || '')}</td><td class="ce">${esc(brl(l.v))}</td></tr>`).join('')}
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}${caTab(l.i)}</td><td class="ce">${esc(l.i.grupo || '')}</td><td class="ce">${n(l.q)}</td><td class="ce">${esc(l.i.unidade || '')}</td><td class="ce">${esc(brl(l.v))}</td></tr>`).join('')}
       <tr class="rel-total"><td colspan="4">Total ${esc(g.dir)}</td><td class="ce">${esc(brl(g.v))}</td></tr></tbody></table>`).join('')
       : '<p>Nenhuma saída de uso no período.</p>';
   } else {
@@ -427,10 +448,10 @@ function montarRelatorio(o) {
         <div><span>Valor das entradas</span><b>${esc(brl(soma(d, 'vEnt')))}</b></div><div><span>Valor das saídas</span><b>${esc(brl(soma(d, 'vSai')))}</b></div>
         <div><span>Valor no fim do período</span><b>${esc(brl(soma(d, 'vFim')))}</b></div></div>`
       : `<div class="rel-kpis" style="grid-template-columns:repeat(2,1fr)"><div><span>Produtos</span><b>${d.length}</b></div>
-        <div><span>Valor em estoque</span><b>${esc(brl(soma(d, 'vFim')))}</b></div></div>`)
+        <div><span>Valor em ${esc(dataBR(o.ate))}</span><b>${esc(brl(soma(d, 'vFim')))}</b></div></div>`)
       + (grupos.map(g => `<h3 class="rel-secao">${esc(g.nome)}</h3>
       <table class="rel-tab"><thead><tr><th>Produto</th><th class="ce">Unid.</th>${res ? '<th class="ce">Estoque inicial</th><th class="ce">Entradas</th><th class="ce">Saídas</th><th class="ce">Estoque final</th><th class="ce">Valor saídas</th><th class="ce">Valor final</th>' : '<th class="ce">Saldo</th><th class="ce">Custo médio</th><th class="ce">Valor</th>'}</tr></thead>
-      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}</td><td class="ce">${esc(l.i.unidade || '')}</td>${res
+      <tbody>${g.linhas.map(l => `<tr><td>${esc(l.i.nome)}${caTab(l.i)}</td><td class="ce">${esc(l.i.unidade || '')}</td>${res
         ? `<td class="ce">${n(l.ini)}</td><td class="ce">${l.ent ? n(l.ent) : '—'}</td><td class="ce">${l.sai ? n(l.sai) : '—'}</td><td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td><td class="ce">${l.sai && l.medio != null ? esc(brl(l.vSai)) : '—'}</td><td class="ce">${esc(brl(l.vFim))}</td>`
         : `<td class="ce"><b${l.fim < 0 ? ' style="color:#B23B2E"' : ''}>${n(l.fim)}</b></td><td class="ce">${esc(brlU(l.medio))}</td><td class="ce">${esc(brl(l.vFim))}</td>`}</tr>`).join('')}
       <tr class="rel-total"><td colspan="${res ? 6 : 4}">Total ${esc(g.nome)}</td>${res ? `<td class="ce">${esc(brl(soma(g.linhas, 'vSai')))}</td>` : ''}<td class="ce">${esc(brl(soma(g.linhas, 'vFim')))}</td></tr></tbody></table>`).join('') || '<p>Nada nesse filtro.</p>');
@@ -451,19 +472,19 @@ function baixarRelatorio(o) {
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   let linhas;
   if (o.tipo === 'consumo') {
-    linhas = [['Direcionador', 'Produto', 'Categoria', 'Quantidade', 'Unidade', 'Valor (R$)']];
-    d.forEach(g => g.linhas.forEach(l => linhas.push([g.dir, l.i.nome, l.i.grupo || '', num(l.q), l.i.unidade || '', rs(l.v)])));
+    linhas = [['Direcionador', 'Produto', 'C.A', 'Categoria', 'Quantidade', 'Unidade', 'Valor (R$)']];
+    d.forEach(g => g.linhas.forEach(l => linhas.push([g.dir, l.i.nome, l.i.ca || '', l.i.grupo || '', num(l.q), l.i.unidade || '', rs(l.v)])));
   } else if (o.tipo === 'resumo') {
-    linhas = [['Categoria', 'Produto', 'Unidade', 'Estoque inicial', 'Entradas', 'Saídas', 'Estoque final', 'Valor entradas (R$)', 'Valor saídas (R$)', 'Valor final (R$)']];
-    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.ini), num(l.ent), num(l.sai), num(l.fim), rs(l.vEnt), rs(l.vSai), rs(l.vFim)]));
+    linhas = [['Categoria', 'Produto', 'C.A', 'Unidade', 'Estoque inicial', 'Entradas', 'Saídas', 'Estoque final', 'Valor entradas (R$)', 'Valor saídas (R$)', 'Valor final (R$)']];
+    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.ca || '', l.i.unidade || '', num(l.ini), num(l.ent), num(l.sai), num(l.fim), rs(l.vEnt), rs(l.vSai), rs(l.vFim)]));
   } else {
-    linhas = [['Categoria', 'Produto', 'Unidade', 'Saldo', 'Custo médio (R$)', 'Valor (R$)']];
-    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.unidade || '', num(l.fim), rs(l.medio), rs(l.vFim)]));
+    linhas = [['Categoria', 'Produto', 'C.A', 'Unidade', 'Saldo', 'Custo médio (R$)', 'Valor (R$)']];
+    d.forEach(l => linhas.push([l.i.grupo || '', l.i.nome, l.i.ca || '', l.i.unidade || '', num(l.fim), rs(l.medio), rs(l.vFim)]));
   }
   const csv = '\ufeff' + [[tituloRel(o) + ' — ' + nomeLocal()], [subRel(o)], [], ...linhas].map(r => r.map(q).join(';')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = `Estoque QC - ${tituloRel(o)} - ${o.tipo === 'posicao' ? hojeISO() : o.de + ' a ' + o.ate}.csv`;
+  a.download = `Estoque QC - ${tituloRel(o)} - ${o.tipo === 'posicao' ? o.ate : o.de + ' a ' + o.ate}.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
