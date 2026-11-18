@@ -459,8 +459,13 @@ function telaDevol(tela) {
    na própria tela, sem janela — funcionário, data, EPI, quantidade, salvar.
    Estoque e motivo vêm sozinhos (dá para trocar). Pendências viram 2 avisos
    curtos; a lista do mês fica embaixo, só com Ficha e Assinada. */
-const FORM = { func: '', data: '', local: '', linhas: [{ item: '', qtd: '1', mer: '' }] };
-const limparForm = () => Object.assign(FORM, { func: '', data: '', local: '', linhas: [{ item: '', qtd: '1', mer: '' }] });
+/* Editar a entrega (18/11/2026, pedido dele: "colocar botão de editar ficha,
+   depois que foi assinada é proibido!"). Enquanto a ficha não foi assinada dá
+   para corrigir funcionário, data e EPIs: o lançamento é o mesmo (o Nº da
+   entrega não muda, porque o banco numera por lancamento_id), as linhas velhas
+   saem (voltam para o saldo) e entram as novas. Assinada, o botão some. */
+const FORM = { func: '', data: '', local: '', editando: '', num: null, linhas: [{ item: '', qtd: '1', mer: '' }] };
+const limparForm = () => Object.assign(FORM, { func: '', data: '', local: '', editando: '', num: null, linhas: [{ item: '', qtd: '1', mer: '' }] });
 
 function guia(id, passos) {
   try { if (localStorage.getItem('gr.guia.' + id) === 'x') return ''; } catch (e) { /* sem armazenamento */ }
@@ -486,6 +491,8 @@ function telaSaida(tela) {
       <button class="btn mini" type="button" id="epmAtualizar" title="Ler de novo do banco">↻ Atualizar</button>
     </div>
     ${guia('epi-entrega', ['Escolha o <b>funcionário</b>', 'Escolha o <b>EPI</b> e a <b>quantidade</b>', '<b>Salvar</b> e imprimir a ficha', 'Ele assinou? Toque em <b>Assinada ✓</b>'])}
+    ${FORM.editando ? `<div class="aviso info">✎ Editando a entrega ${FORM.num ? 'nº ' + esc(String(FORM.num).padStart(4, '0')) + ' ' : ''}— ao salvar, o que estava lançado é substituído, os EPIs antigos voltam para o saldo e a ficha sai de novo para assinar.
+      <button class="btn mini" type="button" id="epmCancelarEd" style="margin-left:8px">Cancelar edição</button></div>` : ''}
     <form id="epmForm" class="epm-form epm-claro" autocomplete="off">
       <!-- campos mais evidentes (13/11/2026, pedido dele: "é aquele mesmo que já tem,
            só quero melhorar ele, deixar ele mais evidente cada campo") -->
@@ -507,7 +514,7 @@ function telaSaida(tela) {
         <div class="epm-passo" style="margin:0"><i>3</i> Confira e salve</div>
         <span class="barra" style="margin:0">
           <button class="btn" type="button" id="epmLimpar">Limpar</button>
-          <button class="btn principal" type="submit" id="epmSalvar">Salvar e imprimir ficha</button>
+          <button class="btn principal" type="submit" id="epmSalvar">${FORM.editando ? 'Salvar alterações e imprimir' : 'Salvar e imprimir ficha'}</button>
         </span>
       </div>
       <p class="aviso erro" id="epmAviso" hidden></p>
@@ -539,8 +546,9 @@ function telaSaida(tela) {
       <div class="epm-ent-txt"><b>${esc(e.funcionario)}</b> <span class="dc-sem">${e.num ? `Nº ${numEntrega(e)} · ` : ''}${br(e.data)} · ${esc(localDe(e.local_id).nome)}</span><br>
         <span class="epm-ent-itens">${e.linhas.map(l => `${esc(mostra(l.quantidade))} ${esc(nomeSemCa(itemDe(l.item_id).nome))}${l.ca ? ` <span class="dc-sem">CA ${esc(l.ca)}</span>` : ''}`).join(' · ')}</span></div>
       <div class="epm-ent-acoes">
+        ${e.assinada ? '' : `<button class="btn mini" type="button" data-epm-editar="${esc(e.id)}" title="Corrigir o funcionário, a data ou os EPIs">✎ Editar</button>`}
         <button class="btn mini" type="button" data-epm-ficha="${esc(e.id)}">🖨 Ficha</button>
-        ${e.assinada ? `<button class="btn mini epm-ok" type="button" data-epm-assinar="${esc(e.id)}" title="Desmarcar">✓ Assinada</button>`
+        ${e.assinada ? `<button class="btn mini epm-ok" type="button" data-epm-assinar="${esc(e.id)}" title="Desmarcar — ficha assinada não pode ser editada">✓ Assinada</button>`
           : `<button class="btn mini principal" type="button" data-epm-assinar="${esc(e.id)}">Assinada ✓</button>`}
         ${admin() ? `<button class="btn mini epm-x" type="button" data-epm-cancelar="${esc(e.id)}" title="Cancelar a entrega">✕</button>` : ''}
       </div></div>`).join('') : `<p class="dc-sem" style="margin:8px 0">${F.sit === 'pend' ? 'Todas as fichas estão assinadas.' : 'Nenhuma entrega neste mês.'}</p>`}
@@ -574,6 +582,13 @@ function telaSaida(tela) {
     const tudo = deHoje.every(e => SEL.has(e.id));
     deHoje.forEach(e => tudo ? SEL.delete(e.id) : SEL.add(e.id)); desenhar();
   });
+  $('epmCancelarEd')?.addEventListener('click', () => { limparForm(); desenhar(); });
+  tela.querySelectorAll('[data-epm-editar]').forEach(b => b.addEventListener('click', () => {
+    const e = todas.find(x => x.id === b.dataset.epmEditar);
+    if (!e) return;
+    if (e.assinada) { alert('Esta ficha já foi assinada — não dá para editar.'); return; }
+    abrirEdicao(e);
+  }));
   tela.querySelectorAll('[data-epm-ficha]').forEach(b => b.addEventListener('click', () => imprimirFichas([todas.find(e => e.id === b.dataset.epmFicha)])));
   tela.querySelectorAll('[data-epm-assinar]').forEach(b => b.addEventListener('click', async () => {
     const e = todas.find(x => x.id === b.dataset.epmAssinar);
@@ -587,6 +602,23 @@ function telaSaida(tela) {
     await marcarLinhas(e.linhas, { ativo: false });
     desenhar();
   }));
+}
+
+/* Leva a entrega para o formulário de cima. As unidades soltas (o mesmo EPI
+   lançado um por um) voltam juntas numa linha só, para conferir mais fácil. */
+function abrirEdicao(e) {
+  const g = new Map();
+  for (const l of e.linhas) {
+    const k = [l.item_id, l.ca || '', l.mer || '', l.faz || ''].join('|');
+    const x = g.get(k) || { item: itemDe(l.item_id).nome, qtd: 0, mer: l.mer || '4', faz: l.faz || '', ca: l.ca || '', merManual: true, fazManual: true };
+    x.qtd += Number(l.quantidade) || 0;
+    g.set(k, x);
+  }
+  Object.assign(FORM, { func: e.funcionario_id, data: e.data, local: e.local_id, editando: e.id, num: e.num,
+    linhas: [...g.values()].map(x => ({ ...x, qtd: String(x.qtd) })) });   // input type=number nao aceita virgula
+  F.sit = ''; F.mes = e.data.slice(0, 7);
+  desenhar();
+  $('epmForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function marcarLinhas(linhas, mudanca) {
@@ -800,6 +832,13 @@ function ligarForm() {
     aviso('');
     const f = funcSel();
     if (!f) { aviso('Escolha o funcionário.'); $('epmFunc')?.focus(); return; }
+    /* Assinada é proibido mexer: confere de novo na hora de salvar, caso alguém
+       tenha marcado a assinatura enquanto a edição estava aberta. */
+    const edit = FORM.editando ? entregas().find(x => x.id === FORM.editando) : null;
+    if (FORM.editando && (!edit || edit.assinada)) {
+      aviso(edit ? 'Esta ficha já foi assinada — não dá para editar.' : 'Esta entrega não existe mais.');
+      return;
+    }
     const data = $('epmData').value || hoje(), localId = localAtual();
     const local = localDe(localId);
     const boas = [];
@@ -814,14 +853,19 @@ function ligarForm() {
       boas.push({ it, q, mer: l.mer || '4', ca, faz: l.faz || fazPadrao() });
     }
     if (!boas.length) { aviso('Escolha pelo menos um EPI.'); return; }
-    const faltam = boas.filter(b => saldoDoCa(sal.get(b.it.id), b.ca) < b.q);
+    // o que já estava nesta entrega volta para o saldo quando ela é refeita
+    const nela = new Map();
+    if (edit) for (const l of edit.linhas) { const k = l.item_id + '|' + (l.ca || ''); nela.set(k, (nela.get(k) || 0) + (Number(l.quantidade) || 0)); }
+    const faltam = boas.filter(b => saldoDoCa(sal.get(b.it.id), b.ca) + (nela.get(b.it.id + '|' + (b.ca || '')) || 0) < b.q);
     const vencidos = boas.filter(b => b.ca && caReprovado(caObj(b.ca)));
     const avisos = [];
     if (faltam.length) avisos.push(`O estoque ${local.nome} não tem o suficiente de: ${faltam.map(b => `${nomeSemCa(b.it.nome)}${b.ca ? ' (CA ' + b.ca + ')' : ''}`).join(', ')}.`);
     if (vencidos.length) avisos.push(`CA vencido ou irregular: ${vencidos.map(b => `${nomeSemCa(b.it.nome)} (CA ${b.ca})`).join(', ')}.`);
     if (avisos.length && !confirm(avisos.join('\n\n') + '\n\nSalvar a entrega mesmo assim?')) return;
     $('epmSalvar').disabled = true;
-    const lanc = crypto.randomUUID();
+    // mesmo lancamento_id na edição: o gatilho do banco devolve o mesmo Nº
+    const lanc = FORM.editando || crypto.randomUUID();
+    if (edit) await marcarLinhas(edit.linhas, { ativo: false });
     const faz = letraFaz(local);
     /* Um por um (18/11/2026, pedido do Vinicius): 2 ou mais do mesmo EPI viram
        uma linha por unidade — na ficha cada um tem a sua assinatura e a sua
