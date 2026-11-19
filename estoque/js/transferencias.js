@@ -16,6 +16,7 @@ import {
   localPrincipal, transferenciasFeitas, GRUPOS,
 } from './dados.js';
 import { transferenciasAFazer } from './resultado.js';
+import { enviarWhatsapp, FRASE_LOP } from './pdf.js';
 
 let filtro = '';          // tipo (grupo); vazio = todos
 let pendentes = new Map(); // chave → a sugestão que está na tela
@@ -68,6 +69,9 @@ export function desenharTransferencias() {
         </div>
       </div>`).join('')}</div>`).join('')
       : `<div class="vazio">Nada para transferir${filtro ? ' em ' + esc(filtro) : ''}. O que falta nas fazendas — se faltar — o principal não tem para mandar: está no Comprar do Resultado.</div>`}
+    ${aFazer.length ? `<div class="barra fim">
+      <button class="btn btn-zap" type="button" id="tfWhats"><img class="ic-zap" src="img/whatsapp.png" alt="">Enviar PDF no WhatsApp</button>
+      <button class="btn principal" type="button" id="tfImprimir">Imprimir a guia</button></div>` : ''}
 
     <h3 class="es-secao">Transferências concluídas ${feitas.length ? `<small>${feitas.length}</small>` : ''}</h3>
     ${feitas.length ? `<div class="lista">${feitas.map(t => {
@@ -81,6 +85,8 @@ export function desenharTransferencias() {
     }).join('')}</div>` : `<div class="vazio">Nenhuma transferência marcada como concluída${filtro ? ' em ' + esc(filtro) : ''}.</div>`}`;
 
   $('tfGrupo').addEventListener('change', e => { filtro = e.target.value; desenharTransferencias(); });
+  $('tfImprimir')?.addEventListener('click', () => { folhaTransf(porFazenda); setTimeout(() => window.print(), 60); });
+  $('tfWhats')?.addEventListener('click', ev => enviarWhatsapp(pdfTransf(porFazenda), ev.currentTarget));
   alvo.querySelectorAll('.tf-ok').forEach(b => b.addEventListener('click', () => concluir(b.dataset.ch, alvo)));
   alvo.querySelectorAll('.tf-desfazer').forEach(b => b.addEventListener('click', () => desfazer(b.dataset.id)));
 }
@@ -116,4 +122,68 @@ async function desfazer(id) {
   await gravar('est_transferencias', Object.assign({}, t, { ativo: false }));
   aviso('Transferência desfeita: voltou para a lista do que falta fazer.');
   desenharTransferencias();
+}
+
+/* ---------------- Guia de transferência (19/11/2026, pedido dele:
+   "quero poder imprimir o relatório de transferências") ----------------
+   Uma folha por fazenda de destino, no padrão SAKUMA: o que sai do principal,
+   com linha para quem entrega e para quem recebe. É o papel que vai junto com
+   o material. Lista o que ainda falta fazer — o que já foi marcado como
+   concluído sai da guia. */
+const hojeBR = () => new Date().toLocaleDateString('pt-BR');
+const POR_FOLHA = 24;
+const origemNome = () => { const l = localPrincipal(); return l ? l.nome : 'Estoque principal'; };
+
+function folhaTransf(porFazenda) {
+  const folhas = [];
+  for (const ts of porFazenda.values()) {
+    const pags = [];
+    for (let i = 0; i < ts.length; i += POR_FOLHA) pags.push(ts.slice(i, i + POR_FOLHA));
+    const total = ts.reduce((t, x) => t + x.qtd, 0);
+    pags.forEach((pag, k) => folhas.push(`<div class="folha rel">
+      <div class="rel-topo">
+        <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
+        <div class="rel-tit"><h1>Guia de Transferência</h1>
+          <p>${esc(origemNome())} &rarr; <b>${esc(ts[0].para.nome)}</b> · emitida em ${esc(hojeBR())}${pags.length > 1 ? ' · folha ' + (k + 1) + ' de ' + pags.length : ''}</p></div>
+      </div>
+      <table class="rel-tab" style="margin-top:6mm"><thead><tr>
+        <th class="ce" style="width:12mm">Nº</th><th>Produto</th><th style="width:34mm">Tipo</th>
+        <th class="ce" style="width:16mm">Un.</th><th class="ce" style="width:24mm">Qtd.</th>
+        <th class="ce" style="width:26mm">Conferido</th></tr></thead>
+      <tbody>${pag.map(t => `<tr>
+        <td class="ce">${ts.indexOf(t) + 1}</td><td>${esc(t.item.nome)}</td><td>${esc(t.grupo)}</td>
+        <td class="ce">${esc(un(t.item))}</td><td class="ce"><b>${esc(mostrarNumero(t.qtd))}</b></td>
+        <td class="ce">&nbsp;</td></tr>`).join('')}
+        ${k === pags.length - 1 ? `<tr><td></td><td><b>Total: ${ts.length} ${ts.length === 1 ? 'item' : 'itens'}</b></td><td></td><td></td>
+          <td class="ce"><b>${esc(mostrarNumero(total))}</b></td><td></td></tr>` : ''}</tbody></table>
+      ${k === pags.length - 1 ? `<p style="font-size:8.5pt;color:#51534A;margin:0 0 4mm">O material sai do ${esc(origemNome())} e entra no estoque da ${esc(ts[0].para.nome)}.
+        Confira item a item na entrega e assine as duas vias.</p>` : ''}
+      <div class="rel-pe">
+        <div class="rel-assina"><span></span><small>Entregue por — ${esc(origemNome())}</small></div>
+        <div class="rel-assina"><span></span><small>Recebido por — ${esc(ts[0].para.nome)}</small></div>
+        <img class="rel-lop" src="img/lop-marca.png" alt="LOP">
+      </div>
+    </div>`));
+  }
+  $('tfFolha').innerHTML = folhas.join('');
+}
+
+/** A mesma guia em PDF, para mandar no WhatsApp: uma tabela por fazenda. */
+function pdfTransf(porFazenda) {
+  const fs = [...porFazenda.values()];
+  const itens = fs.reduce((t, ts) => t + ts.length, 0);
+  return {
+    titulo: 'Guia de Transferência',
+    subtitulo: `Saída do ${origemNome()}${filtro ? ' · ' + filtro : ''} · emitida em ${hojeBR()}`,
+    arquivo: `Guia de Transferencia ${new Date().toISOString().slice(0, 10)}${filtro ? ' ' + filtro : ''}`,
+    kpis: [['Origem', origemNome()], ['Fazendas', String(fs.length)], ['Itens', String(itens)]],
+    secoes: fs.map(ts => ({
+      titulo: origemNome() + ' > ' + ts[0].para.nome,
+      head: ['Nº', 'Produto', 'Tipo', 'Un.', 'Qtd.'],
+      centro: [0, 3, 4],
+      body: ts.map((t, k) => [k + 1, t.item.nome, t.grupo, un(t.item), mostrarNumero(t.qtd)]),
+      total: ['', `Total: ${ts.length} ${ts.length === 1 ? 'item' : 'itens'}`, '', '', mostrarNumero(ts.reduce((s, x) => s + x.qtd, 0))],
+    })),
+    notas: { titulo: 'Conferência', texto: ['O material sai do ' + origemNome() + ' e entra no estoque da fazenda de destino. Confira item a item na entrega.'] },
+  };
 }
