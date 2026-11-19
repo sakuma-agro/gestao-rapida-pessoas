@@ -32,7 +32,8 @@ async function imagem(caminho) {
 
 /**
  * Monta o PDF.
- * o = { titulo, subtitulo, kpis: [[rótulo, valor]], secoes: [{ titulo, head: [...], body: [[...]],
+ * o = { titulo, subtitulo, kpis: [[rótulo, valor]], ficha: [[rótulo, valor, embaixo]],
+ *       secoes: [{ titulo, head: [...], body: [[...]],
  *       total: [...], dir: [índices de colunas à direita], largura: 'meia'|undefined }], paisagem }
  */
 export async function montarPdf(o) {
@@ -65,10 +66,61 @@ export async function montarPdf(o) {
       doc.setFillColor(COR.verde); doc.rect(x, y, 1, 13, 'F');
       doc.setFont('helvetica', 'normal'); doc.setFontSize(6.8); doc.setTextColor(COR.cinza);
       doc.text(String(rot).toUpperCase(), x + 3.5, y + 4.6);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5); doc.setTextColor(COR.marrom);
-      doc.text(String(v), x + 3.5, y + 10.4);
+      /* Valor comprido não pode atropelar o indicador do lado (19/11/2026: o
+         nome de quem fatura passava por cima da caixa seguinte). Diminui a
+         letra até caber e, se ainda não couber, quebra em duas linhas. */
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(COR.marrom);
+      const txt = String(v), largura = wC - 7;
+      let fs = 11.5;
+      doc.setFontSize(fs);
+      while (fs > 7.5 && doc.getTextWidth(txt) > largura) { fs -= 0.5; doc.setFontSize(fs); }
+      if (doc.getTextWidth(txt) > largura) {
+        doc.setFontSize(7.5);
+        const ls = doc.splitTextToSize(txt, largura).slice(0, 2);
+        doc.text(ls[0], x + 3.5, y + 8.2);
+        if (ls[1]) doc.text(ls[1], x + 3.5, y + 11.4);
+      } else doc.text(txt, x + 3.5, y + 10.4);
     });
     y += 18;
+  }
+
+  /* Ficha de dados (19/11/2026, escolha dele entre três desenhos): rótulo e
+     valor em duas colunas, entre dois filetes, no lugar das caixas. Nas
+     caixas, nome comprido batia na borda. Valor vazio sai como linha
+     pontilhada, para preencher à mão. o.ficha = [[rótulo, valor, embaixo]] */
+  const fi = o.ficha || [];
+  if (fi.length) {
+    const colW = (L - 2 * M) / 2, rotW = 23, altura = 8.6;
+    const linhas = Math.ceil(fi.length / 2);
+    doc.setDrawColor('#DFE2D8'); doc.setLineWidth(0.3);
+    doc.line(M, y, L - M, y);
+    fi.forEach(([rot, val, sub], i) => {
+      const x = M + (i % 2) * colW;
+      const yl = y + 5.4 + Math.floor(i / 2) * altura;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6.8); doc.setTextColor(COR.cinzaClaro);
+      doc.text(String(rot).toUpperCase(), x + rotW, yl, { align: 'right' });
+      const vx = x + rotW + 3, larg = colW - rotW - 8;
+      const txt = String(val == null ? '' : val);
+      if (txt) {
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(COR.marrom);
+        let fs = 10;
+        doc.setFontSize(fs);
+        while (fs > 7 && doc.getTextWidth(txt) > larg) { fs -= 0.25; doc.setFontSize(fs); }
+        doc.text(txt, vx, yl);
+      } else {
+        doc.setDrawColor('#C9CCC4'); doc.setLineWidth(0.25); doc.setLineDashPattern([0.7, 0.7], 0);
+        doc.line(vx, yl + 1, x + colW - 5, yl + 1);
+        doc.setLineDashPattern([], 0);
+      }
+      if (sub) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(COR.cinza);
+        doc.text(String(sub), vx, yl + 3.5);
+      }
+    });
+    y += 5.4 + linhas * altura - 2;
+    doc.setDrawColor('#DFE2D8'); doc.setLineWidth(0.3);
+    doc.line(M, y, L - M, y);
+    y += 7;
   }
 
   // seções

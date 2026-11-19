@@ -438,8 +438,14 @@ function pdfPedido(itens) {
     titulo: 'Pedido de Compra',
     subtitulo: `${grupo} · emitido em ${hojeBR()}`,
     arquivo: `Pedido de Compra ${grupo} ${new Date().toISOString().slice(0, 10)}`,
-    kpis: [['Fornecedor', f ? f.nome : ' '], ...(PC.faturar ? [['Faturar em', PC.faturar]] : []),
-      ['Entregar em', entregaPC()], ['Itens', String(itens.length)]],
+    ficha: [
+      ['Fornecedor', f ? f.nome : '', f && (f.contato || f.telefone) ? [f.contato, f.telefone].filter(Boolean).join(' · ') : ''],
+      ['Data', hojeBR()],
+      ['Faturar em', PC.faturar, 'quem recebe a nota'],
+      ['Itens', String(itens.length)],
+      ['Entregar em', entregaPC(), 'SAKUMA Agronegócios'],
+      ['Tipo', grupo],
+    ],
     secoes: [{
       titulo: 'Itens', head: ['Nº', 'Produto', 'Un.', 'Qtd. solicitada'],
       body: itens.map((r, k) => [k + 1, r.item.nome, r.item.unidade || '', mostrarNumero(qtdPedido(r))]),
@@ -460,12 +466,15 @@ function folhaPedido(itens) {
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Pedido de Compra</h1><p>${esc(grupo)} · emitido em ${esc(hojeBR())}</p></div>
     </div>
-    ${k === 0 ? `<div class="orc-dados${PC.faturar ? ' quatro' : ''}">
-      <div><span>Fornecedor</span><b>${f ? esc(f.nome) : '&nbsp;'}</b>${f && (f.contato || f.telefone) ? `<small>${esc([f.contato, f.telefone].filter(Boolean).join(' · '))}</small>` : ''}</div>
-      ${PC.faturar ? `<div><span>Faturar em</span><b class="orc-emp">${esc(PC.faturar)}</b><small>quem recebe a nota</small></div>` : ''}
-      <div><span>Entregar em</span><b>${esc(entregaPC())}</b><small>SAKUMA Agronegócios</small></div>
-      <div><span>Data</span><b>${esc(hojeBR())}</b><small>${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</small></div>
-    </div>` : ''}
+    ${k === 0 ? `<dl class="pc-ficha">
+      <dt>Fornecedor</dt><dd${f ? '' : ' class="pontilhado"'}>${f ? esc(f.nome) : '&nbsp;'}${
+        f && (f.contato || f.telefone) ? `<small>${esc([f.contato, f.telefone].filter(Boolean).join(' · '))}</small>` : ''}</dd>
+      <dt>Data</dt><dd>${esc(hojeBR())}</dd>
+      <dt>Faturar em</dt><dd${PC.faturar ? '' : ' class="pontilhado"'}>${PC.faturar ? esc(PC.faturar) : '&nbsp;'}<small>quem recebe a nota</small></dd>
+      <dt>Itens</dt><dd>${itens.length}</dd>
+      <dt>Entregar em</dt><dd>${esc(entregaPC())}<small>SAKUMA Agronegócios</small></dd>
+      <dt>Tipo</dt><dd>${esc(grupo)}</dd>
+    </dl>` : ''}
     <table class="rel-tab"><thead><tr><th class="ce" style="width:12mm">Nº</th><th>Produto</th><th class="ce" style="width:18mm">Un.</th><th class="ce" style="width:32mm">Qtd. solicitada</th></tr></thead>
     <tbody>${p.map(r => `<tr><td class="ce">${itens.indexOf(r) + 1}</td><td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
       <td class="ce"><b>${esc(mostrarNumero(qtdPedido(r)))}</b></td></tr>`).join('')}
