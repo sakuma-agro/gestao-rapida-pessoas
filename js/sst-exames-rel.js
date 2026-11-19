@@ -8,7 +8,7 @@
 //
 // Duas saídas, como todo relatório do app: documento (prévia antes de
 // imprimir) e CSV.
-import { LOGO, PE_LOP, PE_LOP_SIMBOLO } from './seed.js';
+import { LOGO, PE_LOP } from './seed.js';
 import { retratoExames, lancamentosSst } from './sst.js';
 import { montarMulti } from './multisel.js';
 import { exigidosPessoa, funcoes } from './aso.js';
@@ -465,7 +465,10 @@ export function ligarClinica() {
    já preenchidos pelo cadastro e os nomes dos exames impressos, para a médica
    marcar à mão o que foi feito e a data. Tipo de exame, riscos e conclusão
    (apto/inapto) também saem em branco — nada sai marcado. Uma folha por funcionário ativo, seguindo os filtros
-   de Fazenda e Função lá de cima. */
+   de Fazenda e Função lá de cima.
+   Sem a marca da LOP no rodapé (19/11/2026, pedido dele): o ASO é documento
+   da fazenda e da médica, assinado por elas — só o anexo e o ASO, o resto dos
+   relatórios continua com a marca. */
 const MEDICA = {
   nome: 'Marlene Aparecida Souza Silva',
   endereco: 'Av. José Cambraia nº 264 - Sala 1 - Ibiá/MG',
@@ -669,7 +672,6 @@ function folhaAso(f) {
     <div class="asp-ass asp-emp">
       <div><span></span><small>Assinatura do empregado submetido ao exame</small></div>
     </div>
-    ${PE_LOP_SIMBOLO}
   </div>`;
 }
 
@@ -756,7 +758,6 @@ function folhaAnexo(f) {
     <div class="asp-ass asp-emp asx-ass">
       <div><span></span><small>Assinatura e carimbo do médico<br><b>${MEDICA.carimbo.map(esc).join('<br>')}</b></small></div>
     </div>
-    ${PE_LOP_SIMBOLO}
   </div>`;
 }
 
