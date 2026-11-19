@@ -501,12 +501,42 @@ function calcularRealizados() {
     `<option value="${NOVO}">Admissional — pessoa nova (digitar os dados)</option>` +
     RZ.map(f => `<option value="${esc(f.id)}">${esc(f.nome)}${f.cargo ? ` — ${esc(f.cargo)}` : ''}</option>`).join('');
   sel.value = antes === NOVO || RZ.some(f => String(f.id) === antes) ? antes : '';
+  preencherNovaFuncao();
   trocarFuncRz();
 }
 
 /* Admissional (17/11/2026, pedido dele): quem vai fazer o ASO admissional
    ainda não está no cadastro. Os dados são digitados aqui e valem só para a
    folha — não grava nada. */
+/* Tipo de ASO escolhido (19/11/2026, pedido dele): admissional, periódico e
+   retorno saem com o tipo marcado e a função do cadastro impressa; mudança de
+   função troca a linha por "Função atual" + "Nova função". Vazio = folha em
+   branco como antes, para a médica marcar. */
+const tipoAso = () => so($('rzTipo') && $('rzTipo').value);
+const novaFuncao = () => (tipoAso() === 'Mudança de Função' ? so($('rzNova') && $('rzNova').value) : '');
+/** A pessoa como ela vai ficar: na mudança de função, com a função nova. */
+const comFuncaoAlvo = f => {
+  const nova = novaFuncao();
+  return nova ? { ...f, cargo: nova } : f;
+};
+
+function preencherNovaFuncao() {
+  const sel = $('rzNova');
+  if (!sel) return;
+  const antes = sel.value;
+  let lista = [];
+  try { lista = funcoes(); } catch (e) { lista = []; }
+  sel.innerHTML = '<option value="">Em branco (escrever à mão)</option>' +
+    lista.map(f => `<option>${esc(f)}</option>`).join('');
+  if (lista.includes(antes)) sel.value = antes;
+}
+
+function trocarTipoAso() {
+  // .campo tem display próprio, que passa por cima do atributo hidden
+  $('rzNovaCampo').style.display = tipoAso() === 'Mudança de Função' ? '' : 'none';
+  resumoRealizados();
+}
+
 const NOVO = '__novo';
 const pessoaNova = () => ({
   nome: so($('rzNNome').value).toUpperCase(), cpf: so($('rzNCpf').value),
@@ -516,6 +546,7 @@ const pessoaNova = () => ({
 });
 function trocarFuncRz() {
   $('rzNovo').hidden = $('rzFunc').value !== NOVO;
+  $('rzNovaCampo').style.display = tipoAso() === 'Mudança de Função' ? '' : 'none';
   resumoRealizados();
 }
 const escolhidosRz = () => {
@@ -526,9 +557,11 @@ const escolhidosRz = () => {
 
 function resumoRealizados() {
   const lista = escolhidosRz();
-  const sem = lista.filter(f => !exigidosPessoa(f).length);
-  $('rzResumo').innerHTML = `<span class="dc-sem"><b>${lista.length}</b> folha(s) para imprimir — uma por funcionário.${sem.length
-    ? ` No anexo, ${sem.length} sem lista de exames na função (sai só com linhas em branco — monte em Exames por função): ${
+  const nova = novaFuncao();
+  const sem = lista.filter(f => !exigidosPessoa(comFuncaoAlvo(f)).length);
+  $('rzResumo').innerHTML = `<span class="dc-sem"><b>${lista.length}</b> folha(s) para imprimir — uma por funcionário.${
+    tipoAso() ? ` Tipo marcado na folha: <b>${esc(tipoAso())}</b>${nova ? ` → nova função <b>${esc(nova)}</b>` : ''}.` : ''}${sem.length
+    ? ` No anexo, ${sem.length} sem lista de exames na função${nova ? ' nova' : ''} (sai só com linhas em branco — monte em Exames por função): ${
       sem.slice(0, 8).map(f => esc(f.nome || '—')).join(' · ')}${sem.length > 8 ? ' …' : ''}` : ''}</span>`;
 }
 
@@ -551,7 +584,9 @@ function folhaAso(f) {
     .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const exames = [...complementares.map(t => t.nome), 'Outros: ___________'];
   const sexo = String(f.sexo || '').toUpperCase();
-  return `<div class="an-folha asp">
+  const tipo = tipoAso();
+  const nova = novaFuncao();
+  return `<div class="an-folha asp${tipo === 'Mudança de Função' ? ' asp-mf' : ''}">
     <div class="asp-topo">
       <img src="${LOGO}" alt="">
       <div><h1>A.S.O</h1><h2>ATESTADO DE SAÚDE OCUPACIONAL</h2></div>
@@ -564,11 +599,13 @@ function folhaAso(f) {
     <h3>02 · Identificação do Colaborador</h3>
     <div class="asp-l">${linhaCampo('a) Nome:', f.nome, 4)}${linhaCampo('b) Idade:', idade(f.nascimento), 1)}</div>
     <div class="asp-l">${linhaCampo('c) CPF:', f.cpf, 2)}${linhaCampo('f) Nascimento:', f.nascimento ? dataBr(f.nascimento) : '', 1.6)}${linhaCampo('g) Admissão:', f.admissao ? dataBr(f.admissao) : '', 1.6)}</div>
-    <div class="asp-l"><span class="asp-c" style="flex:1.6"><i>e) Sexo:</i>${cx(sexo === 'F', 'Fem.')}${cx(sexo === 'M', 'Masc.')}</span>${linhaCampo('h) Cargo/Função:', f.cargo, 3)}</div>
+    <div class="asp-l"><span class="asp-c" style="flex:1.6"><i>e) Sexo:</i>${cx(sexo === 'F', 'Fem.')}${cx(sexo === 'M', 'Masc.')}</span>${
+      linhaCampo(tipo === 'Mudança de Função' ? 'h) Função atual:' : 'h) Cargo/Função:', f.cargo, 3)}</div>
+    ${tipo === 'Mudança de Função' ? `<div class="asp-l">${linhaCampo('i) Nova função:', nova)}</div>` : ''}
     <div class="asp-l">${linhaCampo('Empregador / Fazenda:', [f.empregador, f.fazenda].filter(Boolean).join(' – '))}</div>
 
     <h3>03 · Tipo de Exame Médico</h3>
-    <div class="asp-ops">${TIPOS_ASO.map(t => cx(false, t)).join('')}</div>
+    <div class="asp-ops">${TIPOS_ASO.map(t => cx(t === tipo, t)).join('')}</div>
     <div class="asp-ops"><i>Retorno ao trabalho após:</i>${cx(false, 'Acidente de trabalho')}${cx(false, 'Doença/acidente não ocupacional')}${cx(false, 'Parto')}</div>
 
     <h3>04 · Riscos de Acidentes na Função</h3>
@@ -610,6 +647,8 @@ function ligarRealizados() {
   if (!$('rzFunc')) return;
   ['erFazenda', 'erFuncao'].forEach(id => $(id).addEventListener('change', calcularRealizados));
   $('rzFunc').addEventListener('change', trocarFuncRz);
+  $('rzTipo').addEventListener('change', trocarTipoAso);
+  $('rzNova').addEventListener('change', resumoRealizados);
   $('bRzDoc').addEventListener('click', mostrarRealizados);
   $('bRzAnexo').addEventListener('click', mostrarAnexos);
 }
@@ -623,10 +662,17 @@ function ligarRealizados() {
 const LINHAS_OUTROS = 4;
 
 function folhaAnexo(f) {
-  const exigidos = exigidosPessoa(f);
+  const tipo = tipoAso();
+  const nova = novaFuncao();
+  // mudança de função: a clínica faz os exames da função NOVA (igual ao pedido para a clínica)
+  const exigidos = exigidosPessoa(comFuncaoAlvo(f));
   // função que pede quase tudo: menos linhas em branco, para caber numa folha
-  const total = exigidos.length ? exigidos.length + Math.max(1, Math.min(LINHAS_OUTROS, 16 - exigidos.length)) : 8;
-  return `<div class="an-folha asp asx">
+  // na mudança de função a folha tem uma linha a mais (a nova função): uma linha de tabela a menos
+  const teto = tipo === 'Mudança de Função' ? 15 : 16;
+  const total = exigidos.length ? exigidos.length + Math.max(1, Math.min(LINHAS_OUTROS, teto - exigidos.length)) : 8;
+  // a folha corta o que passa dela: lista comprida sai com as linhas mais juntas
+  const apertada = total >= teto - 1 ? ' apertada' : '';
+  return `<div class="an-folha asp asx${tipo === 'Mudança de Função' ? ' asp-mf' : ''}">
     <div class="asp-topo">
       <img src="${LOGO}" alt="">
       <div><h1>ANEXO DO A.S.O</h1><h2>EXAMES COMPLEMENTARES REALIZADOS</h2></div>
@@ -634,15 +680,17 @@ function folhaAnexo(f) {
 
     <h3>01 · Identificação do Colaborador</h3>
     <div class="asp-l">${linhaCampo('Nome:', f.nome, 4)}${linhaCampo('CPF:', f.cpf, 2)}</div>
-    <div class="asp-l">${linhaCampo('Cargo/Função:', f.cargo, 3)}${linhaCampo('Admissão:', f.admissao ? dataBr(f.admissao) : '', 1.4)}</div>
+    <div class="asp-l">${linhaCampo(tipo === 'Mudança de Função' ? 'Função atual:' : 'Cargo/Função:', f.cargo, 3)}${
+      linhaCampo('Admissão:', f.admissao ? dataBr(f.admissao) : '', 1.4)}</div>
+    ${tipo === 'Mudança de Função' ? `<div class="asp-l">${linhaCampo('Nova função:', nova)}</div>` : ''}
     <div class="asp-l">${linhaCampo('Empregador / Fazenda:', [f.empregador, f.fazenda].filter(Boolean).join(' – '))}</div>
 
     <h3>02 · ASO a que se refere</h3>
-    <div class="asp-ops">${TIPOS_ASO.map(t => cx(false, t)).join('')}</div>
+    <div class="asp-ops">${TIPOS_ASO.map(t => cx(t === tipo, t)).join('')}</div>
     <div class="asp-l" style="max-width:80mm">${linhaCampo('Data do ASO:', '')}</div>
 
-    <h3>03 · Exames Complementares${exigidos.length ? ' exigidos para a função' : ''}</h3>
-    <table class="asx-tab">
+    <h3>03 · Exames Complementares${exigidos.length ? (nova ? ' exigidos para a nova função' : ' exigidos para a função') : ''}</h3>
+    <table class="asx-tab${apertada}">
       <colgroup><col style="width:11mm"><col><col style="width:44mm"></colgroup>
       <thead><tr><th>Nº</th><th>EXAME</th><th>DATA DE REALIZAÇÃO</th></tr></thead>
       <tbody>

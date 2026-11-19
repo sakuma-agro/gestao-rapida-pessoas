@@ -1174,10 +1174,20 @@ addEventListener('beforeinstallprompt', function (ev) {
       <div class="cartao naoimprimir">
         <h2 style="margin:0">ASO padrão da fazenda</h2>
         <p class="dica" style="margin:2px 0 0">
-          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. O tipo de exame, os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar. Segue os filtros de Fazenda e Função lá de cima.
+          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. Escolhendo o Tipo de ASO, ele já sai marcado na folha; em <b>Mudança de Função</b> aparece o campo Nova função, e a folha sai com a função atual e a nova (o anexo passa a listar os exames da função nova). Os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar. Segue os filtros de Fazenda e Função lá de cima.
         </p>
         <div class="grade" style="margin-top:12px">
           <label class="campo">Funcionário <select id="rzFunc"></select></label>
+          <label class="campo">Tipo de ASO
+            <select id="rzTipo">
+              <option value="">Em branco (a médica marca)</option>
+              <option>Admissional</option>
+              <option>Periódico</option>
+              <option>Retorno ao Trabalho</option>
+              <option>Mudança de Função</option>
+              <option>Demissional</option>
+            </select></label>
+          <label class="campo" id="rzNovaCampo" style="display:none">Nova função <select id="rzNova"></select></label>
           <div class="campo"><span>&nbsp;</span><button type="button" class="btn principal" id="bRzDoc">Gerar ASO</button>
             <button type="button" class="btn" id="bRzAnexo">Gerar anexo dos exames</button></div>
         </div>

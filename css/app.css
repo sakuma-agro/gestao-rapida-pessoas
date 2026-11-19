@@ -302,6 +302,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .asp-local{margin:3mm 0 0;text-align:center}
 .asp-2via{margin:1.2mm 0 0;text-align:center;font-size:8.5pt}
 .asp-emp{margin-top:8mm;justify-content:center}
+/* Mudança de função: a folha ganha a linha da nova função. Para continuar
+   cabendo numa página só, o espaço das assinaturas cede 2-3 mm. */
+.asp-mf .asp-ass{margin-top:6mm}
 .asp-emp div{flex:0 0 110mm}
 .asp .an-lop{margin-top:auto}
 /* Anexo do ASO: exames complementares (17/11/2026) */
@@ -309,6 +312,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .asx-tab th{font-size:8.5pt;color:#744F28;text-align:left;border-bottom:.35mm solid #51534A;padding:1.2mm 2mm}
 .asx-tab th:first-child,.asx-tab th:last-child{text-align:center}
 .asx-tab td{border-bottom:.2mm solid #c9ccc4;padding:1.8mm 2mm;color:#51534A}
+/* Lista grande (19/11/2026): com 18 exames no cadastro a tabela passava da
+   folha, e a folha corta o que sobra. Acima de 14 linhas ela fica apertada. */
+.asx-tab.apertada td{padding:.85mm 2mm}
+.asx-tab.apertada th{padding:.9mm 2mm}
 .asx-decl{margin:4mm 0 0;line-height:1.4}
 .asx-ass{margin-top:13mm}
 
