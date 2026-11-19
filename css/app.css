@@ -738,6 +738,14 @@ dialog h3{margin:0 0 14px;font-size:16px}
      "Padrão"/"Mínimo") deixava a folha maior que a página e a marca da LOP caía
      sozinha numa folha em branco. 185 mm cabe mesmo com ~12 mm de margem. */
   .an-folha.deitada{height:auto;min-height:185mm}
+  /* ASO (19/11/2026): sem altura fixa na impressão. Em impressora de verdade o
+     Chrome desconta a margem do próprio aparelho (~4 mm, e mais se as Margens
+     estiverem em "Padrão"), então a folha de 296,8 mm ficava maior que a área
+     útil e a sobra de 1 mm caía na folha seguinte — a folha em branco que
+     aparecia entre um ASO e o outro. Agora a altura é a do conteúdo e a margem
+     interna é menor: cada ASO cabe numa folha com qualquer margem de aparelho.
+     O desenho na tela não muda (lá a folha continua A4 cheio). */
+  .an-folha.asp{height:auto;padding:5mm 10mm 4mm}
   .rel.ci-pag{page:certpag}
   #dfSaida{transform:none !important}
   .dk-folha{box-shadow:none;margin:0;padding:10mm 12mm;
