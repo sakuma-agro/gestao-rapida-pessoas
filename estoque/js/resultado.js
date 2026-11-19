@@ -34,8 +34,18 @@ let soComprar = false;
 let busca = '';
 /* Pedido de compra (17/11/2026): fornecedor, entregar em e observação ficam guardados no aparelho */
 const CHAVE_PC = 'estoque.pedidoCompra';
-const PC = { aberto: false, forn: '', entrega: '', obs: '' };
+/* Itens fora do pedido (19/11/2026, pedido dele: "quero poder selecionar os
+   produtos que vão aparecer no pedido de compra, tem fornecedores diferentes").
+   Guarda quem SAIU, não quem entrou: item novo na contagem já entra marcado.
+   Fica no aparelho, junto com fornecedor e entrega, para ele fazer um pedido
+   de cada fornecedor sem perder a escolha ao sair da tela. */
+const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [] };
 try { Object.assign(PC, JSON.parse(localStorage.getItem(CHAVE_PC) || '{}'), { aberto: false }); } catch { /* sem localStorage */ }
+if (!Array.isArray(PC.fora)) PC.fora = [];
+/** O item entra no pedido? Tudo entra, menos o que ele desmarcou. */
+const noPedido = r => !PC.fora.includes(r.item.id);
+const paraComprar = linhas => linhas.filter(r => r.comprar > 0);
+const doPedido = linhas => paraComprar(linhas).filter(noPedido);
 const guardarPC = () => { try { localStorage.setItem(CHAVE_PC, JSON.stringify({ ...PC, aberto: false })); } catch { /* ok */ } };
 try { grupo = localStorage.getItem(CHAVE) || grupo; } catch { /* sem localStorage */ }
 
@@ -235,9 +245,25 @@ export function desenharResultado() {
   if (PC.aberto && $('pcForn')) {
     const ler = () => { PC.forn = $('pcForn').value; PC.entrega = $('pcEntrega').value; PC.obs = $('pcObs').value; guardarPC(); };
     ['pcForn', 'pcEntrega', 'pcObs'].forEach(id => $(id).addEventListener('change', ler));
-    const itens = linhas.filter(r => r.comprar > 0);
-    $('pcImp').addEventListener('click', () => { ler(); folhaPedido(itens); setTimeout(() => window.print(), 60); });
-    $('pcZap').addEventListener('click', ev => { ler(); enviarWhatsapp(pdfPedido(itens), ev.currentTarget); });
+    const itens = () => doPedido(linhas);
+    const todosItens = paraComprar(linhas);
+    const marcar = ids => { PC.fora = ids; guardarPC(); desenharResultado(); };
+    $('pcTodos').addEventListener('click', () => marcar([]));
+    $('pcNenhum').addEventListener('click', () => marcar(todosItens.map(r => r.item.id)));
+    $('pcInverter').addEventListener('click', () => marcar(todosItens.filter(noPedido).map(r => r.item.id)));
+    /* Marcar um item não redesenha a tela: a lista é longa e o dedo dele perde
+       o lugar. Só o contador e os botões acompanham. */
+    document.querySelectorAll('.pc-cx').forEach(cx => cx.addEventListener('change', () => {
+      const id = cx.dataset.id;
+      PC.fora = cx.checked ? PC.fora.filter(x => x !== id) : [...new Set([...PC.fora, id])];
+      guardarPC();
+      cx.closest('.es-check').toggleAttribute('data-fora', !cx.checked);
+      const n = itens().length;
+      $('pcConta').textContent = `${n} de ${todosItens.length} ${todosItens.length === 1 ? 'marcado' : 'marcados'}`;
+      $('pcImp').disabled = !n; $('pcZap').disabled = !n;
+    }));
+    $('pcImp').addEventListener('click', () => { ler(); folhaPedido(itens()); setTimeout(() => window.print(), 60); });
+    $('pcZap').addEventListener('click', ev => { ler(); enviarWhatsapp(pdfPedido(itens()), ev.currentTarget); });
   }
 }
 
@@ -255,12 +281,27 @@ function entregaPC() {
 }
 function painelPedido(linhas) {
   if (!PC.aberto) return '';
-  const n = linhas.filter(r => r.comprar > 0).length;
+  const todosItens = paraComprar(linhas);
+  const escolhidos = todosItens.filter(noPedido);
+  const n = escolhidos.length;
   const ls = todosLocais();
   const ent = (ls.find(x => x.id === PC.entrega) || ls.find(x => /lote\s*35/i.test(x.nome)) || ls[0] || {}).id;
   return `<div class="cartao pc-painel">
     <h3 style="margin:0 0 6px">Pedido de compra · ${esc(grupo)}</h3>
-    <p class="dica" style="margin:0 0 8px">Vai para o fornecedor só o produto, a unidade e a quantidade da coluna <b>Comprar</b> (${n} ${n === 1 ? 'item' : 'itens'}).</p>
+    <p class="dica" style="margin:0 0 8px">Vai para o fornecedor só o produto, a unidade e a quantidade da coluna <b>Comprar</b>.
+      Desmarque o que não é deste fornecedor: a escolha fica guardada, então dá para imprimir um pedido de cada um.</p>
+    <div class="barra" style="margin-bottom:6px">
+      <b style="font-size:13px">Itens do pedido</b>
+      <span class="dc-sem" id="pcConta">${n} de ${todosItens.length} ${todosItens.length === 1 ? 'marcado' : 'marcados'}</span>
+      <span class="cresce"></span>
+      <button class="btn mini" type="button" id="pcTodos">Marcar todos</button>
+      <button class="btn mini" type="button" id="pcNenhum">Desmarcar todos</button>
+      <button class="btn mini" type="button" id="pcInverter">Inverter</button>
+    </div>
+    <div class="pc-itens">${todosItens.map(r => `<label class="es-check"${noPedido(r) ? '' : ' data-fora="1"'}>
+      <input type="checkbox" class="pc-cx" data-id="${esc(r.item.id)}"${noPedido(r) ? ' checked' : ''}>
+      <span class="pc-nome">${esc(r.item.nome)}</span>
+      <b class="pc-qtd">${esc(mostrarNumero(r.comprar))} ${esc(r.item.unidade || '')}</b></label>`).join('')}</div>
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Fornecedor <select id="pcForn"><option value="">— em branco (preencher à mão) —</option>${fornecedores().map(f =>
         `<option value="${esc(f.id)}"${f.id === PC.forn ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
@@ -268,8 +309,8 @@ function painelPedido(linhas) {
     </div>
     <label class="campo">Observação <textarea id="pcObs" rows="2" placeholder="opcional">${esc(PC.obs)}</textarea></label>
     <div class="barra fim">
-      <button class="btn btn-zap" type="button" id="pcZap"><img class="ic-zap" src="img/whatsapp.png" alt="">Pedido no WhatsApp</button>
-      <button class="btn principal" type="button" id="pcImp">Imprimir pedido</button>
+      <button class="btn btn-zap" type="button" id="pcZap"${n ? '' : ' disabled'}><img class="ic-zap" src="img/whatsapp.png" alt="">Pedido no WhatsApp</button>
+      <button class="btn principal" type="button" id="pcImp"${n ? '' : ' disabled'}>Imprimir pedido</button>
     </div></div>`;
 }
 const hojeBR = () => new Date().toLocaleDateString('pt-BR');
