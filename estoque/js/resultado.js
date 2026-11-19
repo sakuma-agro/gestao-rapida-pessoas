@@ -39,11 +39,15 @@ const CHAVE_PC = 'estoque.pedidoCompra';
    Guarda quem SAIU, não quem entrou: item novo na contagem já entra marcado.
    Fica no aparelho, junto com fornecedor e entrega, para ele fazer um pedido
    de cada fornecedor sem perder a escolha ao sair da tela. */
-const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [], empregador: '', qtds: {}, extras: [] };
+const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [], faturar: '', qtds: {}, extras: [] };
 try { Object.assign(PC, JSON.parse(localStorage.getItem(CHAVE_PC) || '{}'), { aberto: false }); } catch { /* sem localStorage */ }
 if (!Array.isArray(PC.fora)) PC.fora = [];
 if (!PC.qtds || typeof PC.qtds !== 'object') PC.qtds = {};
 if (!Array.isArray(PC.extras)) PC.extras = [];
+/* Nasceu como "empregador" e ele corrigiu: é para quem o fornecedor fatura.
+   Quem já tinha digitado não perde o que escreveu. */
+if (!PC.faturar && PC.empregador) PC.faturar = PC.empregador;
+delete PC.empregador;
 /** O item entra no pedido? Tudo entra, menos o que ele desmarcou. */
 const noPedido = r => !PC.fora.includes(r.item.id);
 /* A lista do pedido: o que a contagem pediu, mais o que ele acrescentou à mão
@@ -262,10 +266,10 @@ export function desenharResultado() {
   if (PC.aberto && $('pcForn')) {
     const ler = () => {
       PC.forn = $('pcForn').value; PC.entrega = $('pcEntrega').value; PC.obs = $('pcObs').value;
-      PC.empregador = $('pcEmpregador').value.trim();
+      PC.faturar = $('pcFaturar').value.trim();
       guardarPC();
     };
-    ['pcForn', 'pcEntrega', 'pcObs', 'pcEmpregador'].forEach(id => $(id).addEventListener('change', ler));
+    ['pcForn', 'pcEntrega', 'pcObs', 'pcFaturar'].forEach(id => $(id).addEventListener('change', ler));
     carregarEmpregadores();
     const itens = () => doPedido(linhas);
     const todosItens = paraComprar(linhas);
@@ -385,9 +389,9 @@ function painelPedido(linhas) {
         `<option value="${esc(f.id)}"${f.id === PC.forn ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       <label class="campo">Entregar em <select id="pcEntrega">${ls.map(l => `<option value="${esc(l.id)}"${l.id === ent ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
     </div>
-    <label class="campo">Empregador <input id="pcEmpregador" list="pcEmpregadores" autocomplete="off"
-      value="${esc(PC.empregador)}" placeholder="quem compra — ex.: FABIO MASSAO SAKUMA – FAZ. FACA">
-      <datalist id="pcEmpregadores">${EMPREGADORES.map(e => `<option value="${esc(e)}">`).join('')}</datalist></label>
+    <label class="campo">Faturar em <input id="pcFaturar" list="pcFaturarLista" autocomplete="off"
+      value="${esc(PC.faturar)}" placeholder="para quem o fornecedor fatura — ex.: FABIO MASSAO SAKUMA – FAZ. FACA">
+      <datalist id="pcFaturarLista">${EMPREGADORES.map(e => `<option value="${esc(e)}">`).join('')}</datalist></label>
     <label class="campo">Observação <textarea id="pcObs" rows="2" placeholder="opcional">${esc(PC.obs)}</textarea></label>
     <div class="barra fim">
       <button class="btn btn-zap" type="button" id="pcZap"${n ? '' : ' disabled'}><img class="ic-zap" src="img/whatsapp.png" alt="">Pedido no WhatsApp</button>
@@ -396,9 +400,10 @@ function painelPedido(linhas) {
 }
 const hojeBR = () => new Date().toLocaleDateString('pt-BR');
 
-/* Empregador no pedido (19/11/2026, pedido dele: "quero poder selecionar o
-   empregador, tipo Fabio Massao Sakuma - Faz. Faca, para sair no pedido").
-   Quem compra é a pessoa jurídica, e a mesma fazenda pode ter mais de uma —
+/* Faturar em (19/11/2026, pedido dele: "quero poder selecionar o empregador,
+   tipo Fabio Massao Sakuma - Faz. Faca, para sair no pedido" — e, logo
+   depois: "é para quem vai faturar, fazenda"). É a quem o fornecedor emite a
+   nota: a pessoa jurídica e a fazenda. A mesma fazenda pode ter mais de uma —
    o Lote 35 tem Fabio e Massato. A lista sai do cadastro de pessoal
    (funcionarios), o mesmo nome que vai no ASO, e fica guardada no aparelho
    para a tela abrir sem internet. O campo é livre: a lista é sugestão. */
@@ -433,7 +438,7 @@ function pdfPedido(itens) {
     titulo: 'Pedido de Compra',
     subtitulo: `${grupo} · emitido em ${hojeBR()}`,
     arquivo: `Pedido de Compra ${grupo} ${new Date().toISOString().slice(0, 10)}`,
-    kpis: [['Fornecedor', f ? f.nome : ' '], ...(PC.empregador ? [['Empregador', PC.empregador]] : []),
+    kpis: [['Fornecedor', f ? f.nome : ' '], ...(PC.faturar ? [['Faturar em', PC.faturar]] : []),
       ['Entregar em', entregaPC()], ['Itens', String(itens.length)]],
     secoes: [{
       titulo: 'Itens', head: ['Nº', 'Produto', 'Un.', 'Qtd. solicitada'],
@@ -455,9 +460,9 @@ function folhaPedido(itens) {
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Pedido de Compra</h1><p>${esc(grupo)} · emitido em ${esc(hojeBR())}</p></div>
     </div>
-    ${k === 0 ? `<div class="orc-dados${PC.empregador ? ' quatro' : ''}">
+    ${k === 0 ? `<div class="orc-dados${PC.faturar ? ' quatro' : ''}">
       <div><span>Fornecedor</span><b>${f ? esc(f.nome) : '&nbsp;'}</b>${f && (f.contato || f.telefone) ? `<small>${esc([f.contato, f.telefone].filter(Boolean).join(' · '))}</small>` : ''}</div>
-      ${PC.empregador ? `<div><span>Empregador</span><b class="orc-emp">${esc(PC.empregador)}</b><small>quem compra</small></div>` : ''}
+      ${PC.faturar ? `<div><span>Faturar em</span><b class="orc-emp">${esc(PC.faturar)}</b><small>quem recebe a nota</small></div>` : ''}
       <div><span>Entregar em</span><b>${esc(entregaPC())}</b><small>SAKUMA Agronegócios</small></div>
       <div><span>Data</span><b>${esc(hojeBR())}</b><small>${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</small></div>
     </div>` : ''}
