@@ -1180,13 +1180,29 @@ addEventListener('beforeinstallprompt', function (ev) {
     </section>
 
 
+    <!-- ---- SST · EXAMES: riscos por função (19/11/2026) ---- -->
+    <section class="tela" id="telaExRiscos" hidden>
+      <div class="cartao naoimprimir">
+        <h2 style="margin:0">Riscos por função</h2>
+        <p class="dica" style="margin:2px 0 0">
+          Os riscos do quadro 04 do ASO. O que for marcado aqui já sai marcado na folha do ASO daquela função.
+          A lista é a do próprio modelo do atestado — marque o que vale, não dá para criar risco novo.
+        </p>
+        <div class="grade" style="margin-top:14px">
+          <label class="campo">Função <select id="rfFuncao"></select></label>
+        </div>
+        <p class="dica" id="rfResumo" style="margin:10px 0 0"></p>
+        <div id="rfLista" style="margin-top:12px"></div>
+      </div>
+    </section>
+
     <!-- ---- SST · EXAMES: impressão do ASO (19/11/2026) ---- -->
     <section class="tela" id="telaExAso" hidden>
       <!-- ASO padrão da fazenda (17/11/2026): dados do funcionário preenchidos, exames para a médica marcar -->
       <div class="cartao naoimprimir">
         <h2 style="margin:0">ASO padrão da fazenda</h2>
         <p class="dica" style="margin:2px 0 0">
-          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. Escolhendo o Tipo de ASO, ele já sai marcado na folha; em <b>Mudança de Função</b> aparece o campo Nova função, e a folha sai com a função atual e a nova (o anexo passa a listar os exames da função nova). Os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar.
+          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. Escolhendo o Tipo de ASO, ele já sai marcado na folha; em <b>Mudança de Função</b> aparece o campo Nova função, e a folha sai com a função atual e a nova (o anexo passa a listar os exames da função nova). Os exames que a função exige já saem marcados — a médica só escreve a data ao lado; o resto da lista sai em branco, para ela marcar à mão se pedir algum. Os riscos e o apto/inapto também saem em branco. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar.
         </p>
         <div class="grade" style="margin-top:12px">
           <div class="campo">Fazenda <div id="asFazenda"></div></div>

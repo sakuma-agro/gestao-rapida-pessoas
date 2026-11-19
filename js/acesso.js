@@ -96,6 +96,7 @@ export const MODULOS = [
       ['exRel', 'Relatório por funcionário'],
       ['exAso', 'Impressão do ASO'],
       ['exFuncoes', 'Exames por função'],
+      ['exRiscos', 'Riscos por função'],
       ['exTipos', 'Tipos e periodicidade'],
     ] },
     { id: 'treinamentos', nome: 'Treinamentos', telas: [
@@ -602,6 +603,8 @@ export function podeTela(tela) {
   if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
   /* Impressão do ASO (19/11/2026): nasceu dentro do Relatório por funcionário, então quem tinha ele ganha esta. */
   if (tela === 'exAso' && acesso.telas.includes(m + ':exRel')) return true;
+  /* Riscos por função (19/11/2026): quem já monta os exames por função ganha esta. */
+  if (tela === 'exRiscos' && acesso.telas.includes(m + ':exFuncoes')) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
 

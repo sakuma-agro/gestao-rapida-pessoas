@@ -27,8 +27,27 @@ const dataBr = iso => {
 const A = {
   porFuncao: [],      // { funcao, tipo_id }
   itens: new Map(),   // exame_id -> [ { tipo_id, feito, realizado } ]
+  riscos: [],         // { funcao, grupo, risco }
   carregado: false,
 };
+
+/* Riscos do quadro 04 do ASO (19/11/2026, pedido dele): a lista é a do próprio
+   modelo do atestado, fixa — aqui só se marca quais valem para cada função,
+   para o ASO impresso já sair com elas marcadas. Mexer nesta lista muda o que
+   está impresso; o que já foi marcado é guardado pelo rótulo. */
+export const RISCOS = [
+  ['fis', 'a) Físicos', ['Ruídos', 'Vibrações', 'Radiações ionizantes', 'Frio', 'Umidade', 'Calor', 'Outros']],
+  ['qui', 'b) Químicos', ['Poeiras', 'Fumos', 'Névoas', 'Neblinas', 'Gases', 'Vapores', 'Outros']],
+  ['bio', 'c) Biológicos', ['Bacilos', 'Bactérias', 'Fungos', 'Parasitas', 'Protozoários', 'Vírus', 'Outros']],
+  ['erg', 'd) Ergonômicos', ['Esforço físico intenso', 'Postura inadequada', 'Monotonia e repetitividade',
+    'Levantamento manual de peso', 'Manuseio e transporte de peso', 'Ritmos excessivos', 'Outros']],
+];
+
+/** Os riscos marcados para a função, como Set de "grupo|risco". */
+export function riscosDe(funcao) {
+  const f = so(funcao);
+  return new Set(A.riscos.filter(x => so(x.funcao) === f).map(x => `${x.grupo}|${x.risco}`));
+}
 
 /* Os tipos vêm do sst.js, que já os carrega. Para não buscar duas vezes,
    quem chama passa a lista. */
@@ -61,20 +80,22 @@ export function exigidosPessoa(funcionario) {
 
 export async function carregarAso() {
   const c = estado.cliente;
-  const [pf, it] = await Promise.all([
+  const [pf, it, rc] = await Promise.all([
     c.from('sst_exames_funcao').select('*'),
     c.from('sst_aso_itens').select('*'),
+    c.from('sst_riscos_funcao').select('*'),
   ]);
-  if (pf.error || it.error) throw (pf.error || it.error);
-  definirAso({ porFuncao: pf.data || [], itens: it.data || [] });
+  if (pf.error || it.error || rc.error) throw (pf.error || it.error || rc.error);
+  definirAso({ porFuncao: pf.data || [], itens: it.data || [], riscos: rc.data || [] });
 }
 /* Cópia local (rodada C, 15/10/2026): o sst.js guarda isto na caixa do núcleo
    junto com exames e treinamentos, para o SST abrir sem sinal. */
 export function dadosAso() {
-  return { porFuncao: A.porFuncao, itens: [...A.itens.values()].flat() };
+  return { porFuncao: A.porFuncao, itens: [...A.itens.values()].flat(), riscos: A.riscos };
 }
 export function definirAso(d) {
   A.porFuncao = d.porFuncao || [];
+  A.riscos = d.riscos || [];
   A.itens = new Map();
   (d.itens || []).forEach(x => {
     if (!A.itens.has(x.exame_id)) A.itens.set(x.exame_id, []);
@@ -113,7 +134,7 @@ export function vencimentosDoAso(regs) {
 export const marcadosNoAso = asoId => A.itens.get(asoId) || [];
 
 export function limparAso() {
-  A.porFuncao = []; A.itens = new Map(); A.carregado = false;
+  A.porFuncao = []; A.itens = new Map(); A.riscos = []; A.carregado = false;
   pendentes = null;
 }
 
@@ -465,6 +486,85 @@ export function documentoQuadro() {
 }
 
 /* =============== ligações =============== */
+
+/* =============== Riscos por função (19/11/2026) ===============
+   Mesma ideia de Exames por função: escolhe a função e marca o que vale. O
+   que for marcado sai com X no quadro 04 do ASO impresso. Salva na hora,
+   sem botão de gravar. */
+export async function abrirRiscos() {
+  if (!$('rfFuncao')) return;
+  if (!A.carregado) {
+    try { await carregarAso(); } catch (e) {
+      $('rfLista').innerHTML = `<div class="vazio">Não consegui carregar: ${esc(e.message || e)}</div>`;
+      return;
+    }
+  }
+  const sel = $('rfFuncao');
+  const antes = sel.value;
+  const lista = funcoes();
+  sel.innerHTML = '<option value="">Escolha a função</option>' +
+    lista.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  sel.value = lista.includes(antes) ? antes : (lista[0] || '');
+  desenharRiscos();
+}
+
+function desenharRiscos() {
+  const funcao = $('rfFuncao').value;
+  const marcados = riscosDe(funcao);
+  const quantos = [...marcados].length;
+
+  $('rfResumo').textContent = funcao
+    ? `${quantos} risco(s) marcado(s) em ${funcao}. ${pessoasNa(funcao)} pessoa(s) nessa função.`
+    : '';
+
+  $('rfLista').innerHTML = !funcao ? '<div class="vazio">Escolha uma função.</div>' : `
+    <div class="rf-grupos">
+      ${RISCOS.map(([g, titulo, itens]) => `<div class="rf-grupo">
+        <h3 style="margin:0 0 6px">${esc(titulo)}</h3>
+        <div class="lista">
+          ${itens.map((r, i) => {
+            const id = `rf_${g}_${i}`;
+            return `<label class="item" for="${id}" style="grid-template-columns:22px 1fr">
+              <input type="checkbox" id="${id}" data-grupo="${g}" data-risco="${esc(r)}"
+                ${marcados.has(`${g}|${r}`) ? 'checked' : ''}>
+              <span class="nome">${esc(r)}</span>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>`).join('')}
+    </div>`;
+
+  $('rfLista').querySelectorAll('[data-risco]').forEach(cx =>
+    cx.addEventListener('change', () => trocarRisco(funcao, cx.dataset.grupo, cx.dataset.risco, cx.checked, cx)));
+}
+
+async function trocarRisco(funcao, grupo, risco, ligar, caixa) {
+  caixa.disabled = true;
+  try {
+    if (ligar) {
+      const { error } = await estado.cliente.from('sst_riscos_funcao')
+        .upsert({ funcao, grupo, risco });
+      if (error) throw error;
+      A.riscos.push({ funcao, grupo, risco });
+    } else {
+      const { error } = await estado.cliente.from('sst_riscos_funcao')
+        .delete().eq('funcao', funcao).eq('grupo', grupo).eq('risco', risco);
+      if (error) throw error;
+      A.riscos = A.riscos.filter(x =>
+        !(so(x.funcao) === so(funcao) && x.grupo === grupo && x.risco === risco));
+    }
+    desenharRiscos();
+  } catch (e) {
+    caixa.checked = !ligar;
+    alert('Não deu para salvar: ' + (e.message || e));
+  } finally { caixa.disabled = false; }
+}
+
+export function ligarRiscos() {
+  if (!$('rfFuncao')) return;
+  $('rfFuncao').addEventListener('change', desenharRiscos);
+}
+
 export function ligarAso() {
   $('efFuncao').addEventListener('change', desenharFuncao);
   $('bExcluirFuncao').addEventListener('click', excluirFuncao);

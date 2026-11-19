@@ -11,7 +11,7 @@
 import { LOGO, PE_LOP } from './seed.js';
 import { retratoExames, lancamentosSst } from './sst.js';
 import { montarMulti } from './multisel.js';
-import { exigidosPessoa, funcoes } from './aso.js';
+import { exigidosPessoa, funcoes, RISCOS, riscosDe } from './aso.js';
 import { estado } from './store.js';
 
 const $ = id => document.getElementById(id);
@@ -480,13 +480,6 @@ const TIPOS_ASO = ['Admissional', 'Periódico', 'Demissional', 'Mudança de Fun�
    que não está no cadastro (caixinha para marcar + nome + data). Na mudança de
    função sai uma só: a folha já gastou uma linha com a função nova. */
 const LINHAS_FORA_DA_LISTA = 2;
-const RISCOS = [
-  ['a) Físicos', ['Ruídos', 'Vibrações', 'Radiações ionizantes', 'Frio', 'Umidade', 'Calor', 'Outros']],
-  ['b) Químicos', ['Poeiras', 'Fumos', 'Névoas', 'Neblinas', 'Gases', 'Vapores', 'Outros']],
-  ['c) Biológicos', ['Bacilos', 'Bactérias', 'Fungos', 'Parasitas', 'Protozoários', 'Vírus', 'Outros']],
-  ['d) Ergonômicos', ['Esforço físico intenso', 'Postura inadequada', 'Monotonia e repetitividade',
-    'Levantamento manual de peso', 'Manuseio e transporte de peso', 'Ritmos excessivos', 'Outros']],
-];
 let RZ = [];   // funcionários do recorte
 
 /* Filtros da aba Impressão do ASO (19/11/2026): ela saiu de dentro do
@@ -603,8 +596,10 @@ function resumoRealizados() {
 }
 
 const cx = (marcado, rotulo) => `<span class="asp-op"><span class="asp-cx">${marcado ? 'X' : ''}</span>${esc(rotulo)}</span>`;
+/* Campo já preenchido sai sem a linha embaixo (19/11/2026, pedido dele): a
+   linha é para escrever à mão, então só fica onde o campo está vazio. */
 const linhaCampo = (rot, val, larg) =>
-  `<span class="asp-c"${larg ? ` style="flex:${larg}"` : ''}><i>${rot}</i><b>${val ? esc(val) : '&nbsp;'}</b></span>`;
+  `<span class="asp-c${val ? ' cheio' : ''}"${larg ? ` style="flex:${larg}"` : ''}><i>${rot}</i><b>${val ? esc(val) : '&nbsp;'}</b></span>`;
 
 function idade(nasc) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(nasc || '');
@@ -621,7 +616,13 @@ function folhaAso(f) {
     .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || a.nome.localeCompare(b.nome, 'pt-BR'));
   // "Outros" saiu da grade e virou linha de escrever embaixo (19/11/2026, pedido
   // dele): na caixinha não cabia o nome do exame que a médica marcasse fora da lista.
-  const exames = complementares.map(t => t.nome);
+  /* Os exames que a função (e as atividades) exigem já saem marcados — os mesmos
+     do anexo — para a médica só preencher a data (19/11/2026, pedido dele).
+     O resto da lista sai desmarcado, para ela marcar à mão se pedir algum. */
+  const exigidos = new Set(exigidosPessoa(comFuncaoAlvo(f)).map(t => t.id));
+  /* Riscos da função já marcados (19/11/2026, pedido dele): vêm de Riscos por
+     função. Na mudança de função valem os da função nova. */
+  const riscos = riscosDe(comFuncaoAlvo(f).cargo);
   const sexo = String(f.sexo || '').toUpperCase();
   const tipo = tipoAso();
   const nova = novaFuncao();
@@ -648,10 +649,12 @@ function folhaAso(f) {
     <div class="asp-ops"><i>Retorno ao trabalho após:</i>${cx(false, 'Acidente de trabalho')}${cx(false, 'Doença/acidente não ocupacional')}${cx(false, 'Parto')}</div>
 
     <h3>04 · Riscos de Acidentes na Função</h3>
-    <div class="asp-riscos">${RISCOS.map(([g, l]) => `<div><b>${g}</b>${l.map(r => cx(false, r)).join('')}</div>`).join('')}</div>
+    <div class="asp-riscos">${RISCOS.map(([g, titulo, itens]) =>
+      `<div><b>${titulo}</b>${itens.map(r => cx(riscos.has(`${g}|${r}`), r)).join('')}</div>`).join('')}</div>
 
     <h3>05 · Exames Complementares (assinalar e datar)</h3>
-    <div class="asp-exames">${exames.map(n => `<div>${cx(false, n)}<span class="asp-data">___/___/_____</span></div>`).join('')}</div>
+    <div class="asp-exames">${complementares.map(t =>
+      `<div>${cx(exigidos.has(t.id), t.nome)}<span class="asp-data">___/___/_____</span></div>`).join('')}</div>
     <div class="asp-outros">${Array.from({ length: LINHAS_FORA_DA_LISTA - (tipo === 'Mudança de Função' ? 1 : 0) }, (_, i) => `<div>${cx(false, '')}${
       linhaCampo(i ? '' : 'Outros (descrever):', '')}<span class="asp-data">___/___/_____</span></div>`).join('')}</div>
 

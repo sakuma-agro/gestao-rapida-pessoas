@@ -33,7 +33,7 @@ import { abrirReuniao, TELAS_REUNIAO, limparReuniao, pendentesReuniao, sincroniz
 import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } from './cronograma.js';
 import { abrirCompras } from './compras.js';
 import { abrirEventoCultura } from './evento-cultura.js';
-import { ligarAso, abrirFuncoes } from './aso.js';
+import { ligarAso, abrirFuncoes, ligarRiscos, abrirRiscos } from './aso.js';
 import { ligarRelExames, abrirRelExames, abrirAsoPadrao } from './sst-exames-rel.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
 import { ligarConsolidado, abrirConsolidado } from './treino-consolidado.js';
@@ -186,6 +186,7 @@ function abrirAba(nome) {
   $('telaExFuncoes').hidden = nome !== 'exFuncoes';
   $('telaExRel').hidden = nome !== 'exRel';
   $('telaExAso').hidden = nome !== 'exAso';
+  $('telaExRiscos').hidden = nome !== 'exRiscos';
   $('telaTrVenc').hidden  = nome !== 'trVenc';
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaTrFuncoes').hidden = nome !== 'trFuncoes';
@@ -253,6 +254,7 @@ function abrirAba(nome) {
   if (nome === 'config') desenharConfig();
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
+  if (nome === 'exRiscos') abrirRiscos();
   if (nome === 'exRel') abrirRelExames();
   if (nome === 'exAso') abrirAsoPadrao();
   if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
@@ -2284,6 +2286,7 @@ ligar('DP', () => ligarJornada(irParaTela));
 ligar('SST', () => ligarSst(mostrarAviso));
 ligar('RH', () => ligarRh(mostrarAviso, desenharFuncionarios));
 ligar('exames por função', ligarAso);
+ligar('riscos por função', ligarRiscos);
 ligar('relatório de exames', ligarRelExames);
 ligar('treinamentos por função', ligarTreinoFuncao);
 ligar('treinamentos consolidados', ligarConsolidado);

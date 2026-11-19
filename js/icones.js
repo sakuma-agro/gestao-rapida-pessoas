@@ -65,7 +65,7 @@ export const ICONE_TELA = {
   lista: 'check', termoSindical: 'documento', termoContrato: 'documento', contratoTrab: 'documento',
   cadRelatorios: 'grafico', rhQuadro: 'pizza', cadFerias: 'sol', etqArmarios: 'armario', etqEnvelopes: 'envelope', etqPastas: 'pasta', cadFuncoes: 'cargo', cadEstrutura: 'predio',
   fichas: 'escudo', epis: 'lista', epiCrono: 'calendario', epiSaida: 'ficha', epiEntrada: 'mais', epiSaldo: 'balanca', epiDevol: 'historico', epiUso: 'lista', epiLavagem: 'vassoura', modelo: 'lapis', fichaRev: 'historico',
-  exPainel: 'painel', exVenc: 'exame', exRel: 'ficha', exAso: 'ficha', exFuncoes: 'cargo', exTipos: 'ajuste',
+  exPainel: 'painel', exVenc: 'exame', exRel: 'ficha', exAso: 'ficha', exFuncoes: 'cargo', exRiscos: 'alerta', exTipos: 'ajuste',
   trPainel: 'painel', trVenc: 'treino', trConsol: 'lista', sstAtv: 'check', trTipos: 'ajuste', trFuncoes: 'cargo', sstCal: 'calendario',
   brPainel: 'painel', brMembros: 'pessoas', brMinimos: 'ajuste', sstNrs: 'livro',
   bhRegistros: 'lista', bhFicha: 'ficha', clLista: 'check', anDigital: 'mapa', clRegistros: 'lista', clVistorias: 'capacete', clModelos: 'ajuste', feFolhas: 'documento', siPlacas: 'alerta', siPlacasEstoque: 'etiqueta', siEtiquetasL: 'documento', siAdesivos: 'etiqueta', siReclamacao: 'reuniao',
