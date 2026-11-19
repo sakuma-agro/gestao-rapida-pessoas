@@ -474,6 +474,10 @@ const MEDICA = {
   carimbo: ['Dra. Marlene Aparecida de S. Silva', 'Medicina do Trabalho', 'CRM 19044-T · RM 6843'],
 };
 const TIPOS_ASO = ['Admissional', 'Periódico', 'Demissional', 'Mudança de Função', 'Retorno ao Trabalho'];
+/* Linhas em branco embaixo da grade de exames, para a médica escrever exame
+   que não está no cadastro (caixinha para marcar + nome + data). Na mudança de
+   função sai uma só: a folha já gastou uma linha com a função nova. */
+const LINHAS_FORA_DA_LISTA = 2;
 const RISCOS = [
   ['a) Físicos', ['Ruídos', 'Vibrações', 'Radiações ionizantes', 'Frio', 'Umidade', 'Calor', 'Outros']],
   ['b) Químicos', ['Poeiras', 'Fumos', 'Névoas', 'Neblinas', 'Gases', 'Vapores', 'Outros']],
@@ -582,13 +586,15 @@ function folhaAso(f) {
   const complementares = (lancamentosSst().exame.tipos || [])
     .filter(t => t.categoria !== 'aso')
     .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || a.nome.localeCompare(b.nome, 'pt-BR'));
-  const exames = [...complementares.map(t => t.nome), 'Outros: ___________'];
+  // "Outros" saiu da grade e virou linha de escrever embaixo (19/11/2026, pedido
+  // dele): na caixinha não cabia o nome do exame que a médica marcasse fora da lista.
+  const exames = complementares.map(t => t.nome);
   const sexo = String(f.sexo || '').toUpperCase();
   const tipo = tipoAso();
   const nova = novaFuncao();
   return `<div class="an-folha asp${tipo === 'Mudança de Função' ? ' asp-mf' : ''}">
     <div class="asp-topo">
-      <img src="${LOGO}" alt="">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div><h1>A.S.O</h1><h2>ATESTADO DE SAÚDE OCUPACIONAL</h2></div>
     </div>
 
@@ -613,6 +619,8 @@ function folhaAso(f) {
 
     <h3>05 · Exames Complementares (assinalar e datar)</h3>
     <div class="asp-exames">${exames.map(n => `<div>${cx(false, n)}<span class="asp-data">___/___/_____</span></div>`).join('')}</div>
+    <div class="asp-outros">${Array.from({ length: LINHAS_FORA_DA_LISTA - (tipo === 'Mudança de Função' ? 1 : 0) }, (_, i) => `<div>${cx(false, '')}${
+      linhaCampo(i ? '' : 'Outros (descrever):', '')}<span class="asp-data">___/___/_____</span></div>`).join('')}</div>
 
     <h3>06 · Conclusão sobre a Capacidade Laborativa</h3>
     <div class="asp-concl">
@@ -674,7 +682,7 @@ function folhaAnexo(f) {
   const apertada = total >= teto - 1 ? ' apertada' : '';
   return `<div class="an-folha asp asx${tipo === 'Mudança de Função' ? ' asp-mf' : ''}">
     <div class="asp-topo">
-      <img src="${LOGO}" alt="">
+      <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div><h1>ANEXO DO A.S.O</h1><h2>EXAMES COMPLEMENTARES REALIZADOS</h2></div>
     </div>
 

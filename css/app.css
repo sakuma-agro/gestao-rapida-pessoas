@@ -272,8 +272,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
    colorido (imprime sem "gráficos de plano de fundo"); quem separa é a borda. */
 .asp{font-size:9pt;padding:8mm 10mm 6mm}
 .asp-topo{display:flex;align-items:center;gap:6mm;border-bottom:1mm solid #84BD00;padding-bottom:2.5mm}
-.asp-topo img{height:13mm;width:auto}
-.asp-topo div{flex:1;text-align:center;margin-right:21mm}
+.asp-topo img{height:10mm;width:auto}
+.asp-topo div{flex:1;text-align:center;margin-right:29mm}
 .asp-topo h1{margin:0;font-size:15pt;color:#744F28;letter-spacing:1pt}
 .asp-topo h2{margin:0;font-size:12.5pt;color:#744F28;letter-spacing:.6pt}
 .asp h3{margin:1.5mm 0 .8mm;padding:.5mm 0;font-size:9.5pt;color:#744F28;border-top:.35mm solid #51534A;border-bottom:.2mm solid #c9ccc4}
@@ -292,19 +292,24 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--verde);outline-o
 .asp-exames{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1mm 4mm;font-size:8.5pt}
 .asp-exames div{display:flex;justify-content:space-between;align-items:center;gap:1mm;min-width:0}
 .asp-exames .asp-op{margin:0;overflow:hidden;text-overflow:ellipsis}
+/* Linhas para escrever exame fora da lista: caixinha, linha larga e data. */
+.asp-outros{display:flex;flex-direction:column;gap:1.2mm;margin-top:1.4mm;font-size:8.5pt}
+.asp-outros>div{display:flex;align-items:flex-end;gap:1.4mm}
+.asp-outros .asp-c{flex:1}
+.asp-outros .asp-c i{color:#744F28}
 .asp-data{white-space:nowrap;font-size:8.5pt;color:#7d8175}
 .asp-concl p{margin:0 0 1mm;line-height:1.3}
 .asp-concl div{display:flex;flex-wrap:wrap;gap:1.2mm 0}
-.asp-ass{display:flex;gap:12mm;margin-top:9mm}
+.asp-ass{display:flex;gap:12mm;margin-top:5mm}
 .asp-ass div{flex:1;text-align:center}
 .asp-ass span{display:block;border-top:.3mm solid #51534A;margin-bottom:1mm}
 .asp-ass small{font-size:8.5pt;line-height:1.35}
-.asp-local{margin:3mm 0 0;text-align:center}
+.asp-local{margin:2mm 0 0;text-align:center}
 .asp-2via{margin:1.2mm 0 0;text-align:center;font-size:8.5pt}
-.asp-emp{margin-top:8mm;justify-content:center}
+.asp-emp{margin-top:5mm;justify-content:center}
 /* Mudança de função: a folha ganha a linha da nova função. Para continuar
    cabendo numa página só, o espaço das assinaturas cede 2-3 mm. */
-.asp-mf .asp-ass{margin-top:6mm}
+.asp-mf .asp-ass{margin-top:3.5mm}
 .asp-emp div{flex:0 0 110mm}
 .asp .an-lop{margin-top:auto}
 /* Anexo do ASO: exames complementares (17/11/2026) */
