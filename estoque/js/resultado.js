@@ -22,7 +22,7 @@
 // conta: não some de novo, nem no transferir nem no comprar.
 import {
   $, esc, pronto, todos, locais as todosLocais, podeLocal, linhasDe, itensOrdenados, contaNoLocal,
-  comMinimoDo, temMinimo, precisaRepor, lerNumero, mostrarNumero, dataBR, rodadaDe, GRUPOS,
+  comMinimoDo, temMinimo, precisaRepor, lerNumero, mostrarNumero, dataBR, rodadaDe, GRUPOS, UNIDADES, aviso,
   localPrincipal, jaTransferido,
 } from './dados.js';
 import { enviarWhatsapp, FRASE_LOP } from './pdf.js';
@@ -39,13 +39,21 @@ const CHAVE_PC = 'estoque.pedidoCompra';
    Guarda quem SAIU, não quem entrou: item novo na contagem já entra marcado.
    Fica no aparelho, junto com fornecedor e entrega, para ele fazer um pedido
    de cada fornecedor sem perder a escolha ao sair da tela. */
-const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [], empregador: '', qtds: {} };
+const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [], empregador: '', qtds: {}, extras: [] };
 try { Object.assign(PC, JSON.parse(localStorage.getItem(CHAVE_PC) || '{}'), { aberto: false }); } catch { /* sem localStorage */ }
 if (!Array.isArray(PC.fora)) PC.fora = [];
 if (!PC.qtds || typeof PC.qtds !== 'object') PC.qtds = {};
+if (!Array.isArray(PC.extras)) PC.extras = [];
 /** O item entra no pedido? Tudo entra, menos o que ele desmarcou. */
 const noPedido = r => !PC.fora.includes(r.item.id);
-const paraComprar = linhas => linhas.filter(r => r.comprar > 0);
+/* A lista do pedido: o que a contagem pediu, mais o que ele acrescentou à mão
+   (19/11/2026, pedido dele: "quero poder adicionar um item que não está aqui"),
+   em ordem alfabética (pedido dele no mesmo dia). O acrescentado não vem de
+   contagem nenhuma: é nome, unidade e quantidade digitados, guardados no
+   aparelho junto com o resto da escolha do pedido. */
+const linhaExtra = x => ({ item: { id: x.id, nome: x.nome, unidade: x.unidade || '' }, comprar: Number(x.qtd) || 0, extra: true });
+const paraComprar = linhas => [...linhas.filter(r => r.comprar > 0), ...PC.extras.map(linhaExtra)]
+  .sort((a, b) => String(a.item.nome).localeCompare(String(b.item.nome), 'pt-BR'));
 /* Quantidade que vai no pedido (19/11/2026, pedido dele: "quero poder alterar
    a qtde do pedido"): a calculada, ou a que ele digitou por cima. Guarda só o
    que foi mudado — item sem retoque acompanha a contagem nova. */
@@ -266,6 +274,35 @@ export function desenharResultado() {
     $('pcNenhum').addEventListener('click', () => marcar(todosItens.map(r => r.item.id)));
     $('pcInverter').addEventListener('click', () => marcar(todosItens.filter(noPedido).map(r => r.item.id)));
     $('pcQtdCalc').addEventListener('click', () => { PC.qtds = {}; guardarPC(); desenharResultado(); });
+    /* Acrescentar à mão: o nome puxa a unidade do cadastro, se o produto existir. */
+    const doCatalogo = nome => todos('est_itens').find(i => i.ativo !== false
+      && String(i.nome).trim().toLowerCase() === String(nome).trim().toLowerCase()) || null;
+    $('pcNovoNome').addEventListener('change', () => {
+      const i = doCatalogo($('pcNovoNome').value);
+      if (i && !$('pcNovoUn').value.trim()) $('pcNovoUn').value = i.unidade || '';
+    });
+    const acrescentar = () => {
+      const nome = $('pcNovoNome').value.trim();
+      const qtd = lerNumero($('pcNovoQtd').value);
+      if (!nome) { aviso('Escreva o nome do produto.', true); $('pcNovoNome').focus(); return; }
+      if (!isFinite(qtd) || !(qtd > 0)) { aviso('Quantidade inválida.', true); $('pcNovoQtd').focus(); return; }
+      const i = doCatalogo(nome);
+      PC.extras = [...PC.extras, { id: 'extra:' + crypto.randomUUID(), nome: i ? i.nome : nome,
+        unidade: $('pcNovoUn').value.trim() || (i ? i.unidade : '') || '', qtd }];
+      guardarPC();
+      desenharResultado();
+      aviso(`${nome} entrou no pedido.`);
+    };
+    $('pcAdd').addEventListener('click', acrescentar);
+    ['pcNovoNome', 'pcNovoQtd', 'pcNovoUn'].forEach(id => $(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); acrescentar(); }
+    }));
+    document.querySelectorAll('.pc-tira').forEach(b => b.addEventListener('click', () => {
+      PC.extras = PC.extras.filter(x => x.id !== b.dataset.id);
+      delete PC.qtds[b.dataset.id];
+      guardarPC();
+      desenharResultado();
+    }));
     /* Digitou por cima: guarda o número dele. Caixa vazia volta ao calculado. */
     document.querySelectorAll('.pc-qtd').forEach(cx => cx.addEventListener('change', () => {
       const id = cx.dataset.id;
@@ -332,7 +369,17 @@ function painelPedido(linhas) {
         <span class="pc-nome">${esc(r.item.nome)}</span></label>
       <input class="pc-qtd${qtdMudada(r) ? ' mudada' : ''}" inputmode="decimal" data-id="${esc(r.item.id)}"
         value="${esc(mostrarNumero(qtdPedido(r)))}" title="calculado: ${esc(mostrarNumero(r.comprar))}" aria-label="quantidade">
-      <span class="pc-un">${esc(r.item.unidade || '')}</span></div>`).join('')}</div>
+      <span class="pc-un">${esc(r.item.unidade || '')}</span>
+      ${r.extra ? `<button class="pc-tira" type="button" data-id="${esc(r.item.id)}" title="tirar do pedido">&times;</button>` : ''}</div>`).join('')}</div>
+    <div class="barra pc-novo">
+      <input id="pcNovoNome" list="pcCatalogo" autocomplete="off" placeholder="acrescentar um produto que não está na lista">
+      <datalist id="pcCatalogo">${itensOrdenados().filter(i => i.ativo !== false)
+        .map(i => `<option value="${esc(i.nome)}">`).join('')}</datalist>
+      <input id="pcNovoQtd" inputmode="decimal" placeholder="qtd">
+      <input id="pcNovoUn" placeholder="un" list="pcUnidades">
+      <datalist id="pcUnidades">${UNIDADES.map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+      <button class="btn mini" type="button" id="pcAdd">Acrescentar</button>
+    </div>
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Fornecedor <select id="pcForn"><option value="">— em branco (preencher à mão) —</option>${fornecedores().map(f =>
         `<option value="${esc(f.id)}"${f.id === PC.forn ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
