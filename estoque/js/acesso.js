@@ -21,6 +21,8 @@ export const MODULOS = [
     ['ctAndamento',  'Em andamento'],
     // 17/11/2026: uma coluna por fazenda e o total a comprar — resultado.js
     ['ctResultado',  'Resultado'],
+    // 19/11/2026: o que puxar do estoque principal antes de comprar — transferencias.js
+    ['ctTransf',     'Transferências'],
     ['ctRepor',      'Reposição'],
     ['ctMapa',       'Mapa do barracão'],
     ['ctHistorico',  'Histórico'],

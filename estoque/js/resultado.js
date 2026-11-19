@@ -9,12 +9,21 @@
 // antes de existir o fechamento por tipo. Uma contagem nova, aberta e ainda
 // vazia, não esconde o resultado da anterior.
 //
-// Comprar: em cada fazenda onde o item ficou igual ou abaixo do mínimo da
-// fazenda, entra o "pedir" do cadastro (ou, sem ele, o que falta para o
-// mínimo). A coluna soma todas as fazendas.
+// Em cada fazenda onde o item ficou igual ou abaixo do mínimo da fazenda,
+// entra o "pedir" do cadastro (ou, sem ele, o que falta para o mínimo). Essa
+// necessidade é atendida em duas colunas (19/11/2026, pedido dele: "saber o
+// que preciso fazer ao contar todos os estoques, se é transferir ou comprar"):
+//   Transferir — o que o estoque principal (Lote 35) tem na prateleira e pode
+//                mandar; ele pode ficar abaixo do mínimo dele, que a compra
+//                repõe depois (escolha dele);
+//   Comprar    — só o que o principal não tem para mandar, mais a reposição do
+//                próprio principal. É o que vai no pedido de compra.
+// O que já foi marcado como concluído em Contagem › Transferências sai da
+// conta: não some de novo, nem no transferir nem no comprar.
 import {
   $, esc, pronto, todos, locais as todosLocais, podeLocal, linhasDe, itensOrdenados, contaNoLocal,
   comMinimoDo, temMinimo, precisaRepor, mostrarNumero, dataBR, rodadaDe, GRUPOS,
+  localPrincipal, jaTransferido,
 } from './dados.js';
 import { enviarWhatsapp, FRASE_LOP } from './pdf.js';
 
@@ -30,6 +39,8 @@ try { Object.assign(PC, JSON.parse(localStorage.getItem(CHAVE_PC) || '{}'), { ab
 const guardarPC = () => { try { localStorage.setItem(CHAVE_PC, JSON.stringify({ ...PC, aberto: false })); } catch { /* ok */ } };
 try { grupo = localStorage.getItem(CHAVE) || grupo; } catch { /* sem localStorage */ }
 
+/* Nome do estoque principal, para as notas da tela e das folhas (19/11/2026). */
+const PRINC = () => { const l = localPrincipal(); return l ? l.nome : ''; };
 const temQtd = l => !!l && l.quantidade !== null && l.quantidade !== undefined && l.quantidade !== '';
 const grupoDe = i => (i && i.grupo) || 'Outros';
 
@@ -65,16 +76,21 @@ function aComprar(item, qtd) {
 }
 
 /** Monta a tabela: fazendas (colunas) e itens (linhas). */
-function montar() {
+function montar(g = grupo) {
   cacheItens = null;
-  const fazendas = locais().map(l => ({ local: l, ref: ultimaFechada(l.id, grupo) }));
+  const fazendas = locais().map(l => ({ local: l, ref: ultimaFechada(l.id, g) }));
   const comContagem = fazendas.filter(f => f.ref);
   const semContagem = fazendas.filter(f => !f.ref);
   const linhasPor = new Map(comContagem.map(f => [f.local.id, new Map(linhasDe(f.ref.c.id).map(l => [l.item_id, l]))]));
-  const itens = itensOrdenados().filter(i => grupoDe(i) === grupo);
+  const itens = itensOrdenados().filter(i => grupoDe(i) === g);
+  /* A transferência sai sempre do principal (19/11/2026). Sem contagem fechada
+     do principal — ou sem acesso a ele — não há de onde tirar: tudo vira
+     compra, como era antes. */
+  const princ = localPrincipal();
+  const iP = princ ? comContagem.findIndex(f => f.local.id === princ.id) : -1;
   const linhas = [];
   for (const item of itens) {
-    let total = 0, comprar = 0, algum = false;
+    let total = 0, algum = false;
     const cel = comContagem.map(f => {
       const ln = linhasPor.get(f.local.id).get(item.id);
       const im = comMinimoDo(item, f.local.id);
@@ -85,17 +101,65 @@ function montar() {
       if (qtd === null && conta && temMinimo(im) && im.minimo_da_fazenda) qtd = 0;
       if (qtd !== null) { algum = true; total += qtd; }
       const falta = qtd !== null && precisaRepor(im, qtd);
-      const c = qtd !== null ? aComprar(im, qtd) : 0;
-      comprar += c;
       // tem na prateleira mas a fazenda não tem mínimo: nunca entra no Comprar (17/11/2026)
       const semMin = qtd !== null && qtd > 0 && !temMinimo(im);
-      return { qtd, falta, semMin, minimo: temMinimo(im) ? im.estoque_minimo : null };
+      return { local: f.local, contagemId: f.ref.c.id, qtd, falta, semMin,
+        minimo: temMinimo(im) ? im.estoque_minimo : null,
+        precisa: qtd !== null ? aComprar(im, qtd) : 0, transferir: 0 };
     });
-    // zerado em todas as fazendas e nada a comprar: não ocupa linha
-    if (!algum || (!total && !comprar)) continue;
-    linhas.push({ item, cel, total, comprar });
+    const { comprar, transf } = repor(item, cel, iP, princ);
+    const transferir = transf.reduce((t, x) => t + x.qtd, 0);
+    // zerado em todas as fazendas e nada a fazer: não ocupa linha
+    if (!algum || (!total && !comprar && !transferir)) continue;
+    linhas.push({ item, cel, total, comprar, transferir, transf, grupo: g });
   }
   return { comContagem, semContagem, linhas };
+}
+
+/* A conta de cada item (19/11/2026, pedido dele):
+   1. cada fazenda no mínimo ou abaixo precisa do pedido cadastrado (ou do que
+      falta para o mínimo), menos o que já foi transferido por esta contagem;
+   2. o que o principal tem na prateleira atende, começando por quem está mais
+      abaixo do mínimo — ele pode furar o mínimo dele;
+   3. a necessidade que o principal não cobriu vira compra;
+   4. o principal compra o pedido dele e, tendo mandado transferência, nunca
+      menos do que falta para ele voltar ao mínimo. */
+function repor(item, cel, iP, princ) {
+  const p = iP >= 0 ? cel[iP] : null;
+  const feito = c => jaTransferido(c.contagemId, item.id, c.local.id);
+  const destinos = cel.map((c, k) => ({ c, k })).filter(x => x.k !== iP && x.c.precisa > 0)
+    .sort((a, b) => (numero(a.c.qtd) - numero(a.c.minimo)) - (numero(b.c.qtd) - numero(b.c.minimo)));
+  let disp = p && p.qtd !== null
+    ? Math.max(0, p.qtd - cel.reduce((t, c, k) => k === iP ? t : t + feito(c), 0)) : 0;
+  let comprar = 0;
+  const transf = [];
+  for (const { c } of destinos) {
+    const falta = Math.max(0, c.precisa - feito(c));
+    const t = Math.min(falta, disp);
+    disp -= t;
+    c.transferir = t;
+    if (t > 0) transf.push({ de: princ, para: c.local, qtd: t, contagemId: c.contagemId, precisa: c.precisa });
+    comprar += falta - t;
+  }
+  if (p) {
+    const saiu = numero(p.qtd) - disp;
+    const gap = p.minimo !== null ? Math.max(0, numero(p.minimo) - disp) : 0;
+    comprar += saiu > 0.0001 ? Math.max(p.precisa, gap) : p.precisa;
+  }
+  return { comprar: Math.round(comprar * 1000) / 1000, transf };
+}
+
+/** As transferências que ainda faltam fazer, de todos os tipos — tela Transferências. */
+export function transferenciasAFazer() {
+  const grupos = [...new Set(todos('est_itens').filter(i => i.ativo !== false).map(grupoDe))]
+    .sort((a, b) => (GRUPOS.indexOf(a) + 1 || 99) - (GRUPOS.indexOf(b) + 1 || 99));
+  const fora = [];
+  for (const g of grupos) {
+    for (const r of montar(g).linhas) {
+      for (const t of r.transf) fora.push({ grupo: g, item: r.item, ...t });
+    }
+  }
+  return fora;
 }
 
 function filtradas(linhas) {
@@ -116,6 +180,7 @@ export function desenharResultado() {
   const { comContagem, semContagem, linhas } = montar();
   const lista = filtradas(linhas);
   const nComprar = linhas.filter(r => r.comprar > 0).length;
+  const nTransf = linhas.filter(r => r.transferir > 0).length;
   const nSemMin = linhas.reduce((t, r) => t + r.cel.filter(c => c.semMin).length, 0);
   const foco = document.activeElement && document.activeElement.id === 'resBusca';
 
@@ -127,24 +192,27 @@ export function desenharResultado() {
     </div>
     <div class="barra">
       <label class="es-check"><input type="checkbox" id="resSoComprar"${soComprar ? ' checked' : ''}> Só o que precisa comprar</label>
-      <span class="dc-sem">${linhas.length} itens · ${nComprar} para comprar${nSemMin ? ` · <span class="res-semmin-txt">${nSemMin} sem mínimo</span>` : ''}</span>
+      <span class="dc-sem">${linhas.length} itens · ${nTransf} para transferir · ${nComprar} para comprar${nSemMin ? ` · <span class="res-semmin-txt">${nSemMin} sem mínimo</span>` : ''}</span>
     </div>
     ${semContagem.length ? `<p class="es-nota">Sem contagem fechada de ${esc(grupo)}: ${semContagem.map(f => esc(f.local.nome)).join(', ')}.</p>` : ''}
     ${!comContagem.length ? `<div class="vazio">Nenhuma contagem fechada de ${esc(grupo)} ainda.</div>` : `
     <div class="es-larga res-tab-caixa"><table class="dc-planilha res-tab"><thead><tr>
       <th>Item</th><th class="ce">Un.</th>
       ${comContagem.map(f => `<th class="ce">${esc(cab(f))}<small>${esc(dataCab(f))}</small></th>`).join('')}
-      <th class="ce">Total</th><th class="ce res-comprar">Comprar</th></tr></thead>
+      <th class="ce">Total</th><th class="ce res-transf">Transferir</th><th class="ce res-comprar">Comprar</th></tr></thead>
     <tbody>${lista.map(r => `<tr>
       <td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
       ${r.cel.map(c => `<td class="ce${c.falta ? ' res-falta' : ''}"${c.minimo !== null ? ` title="mínimo ${esc(mostrarNumero(c.minimo))}"` : ''}>${c.qtd === null ? '—' : esc(mostrarNumero(c.qtd))}${c.semMin ? '<span class="res-semmin">sem mínimo</span>' : ''}</td>`).join('')}
       <td class="ce"><strong>${esc(mostrarNumero(r.total))}</strong></td>
+      <td class="ce res-transf">${r.transferir > 0 ? `<strong>${esc(mostrarNumero(r.transferir))}</strong><small>${esc(r.transf.map(t => t.para.nome).join(' · '))}</small>` : ''}</td>
       <td class="ce res-comprar">${r.comprar > 0 ? `<strong>${esc(mostrarNumero(r.comprar))}</strong>` : ''}</td>
-    </tr>`).join('') || `<tr><td colspan="${comContagem.length + 4}" class="ce">Nada para mostrar.</td></tr>`}</tbody></table></div>
+    </tr>`).join('') || `<tr><td colspan="${comContagem.length + 5}" class="ce">Nada para mostrar.</td></tr>`}</tbody></table></div>
     ${nSemMin ? `<p class="es-nota"><strong>Sem mínimo</strong>: o item tem na fazenda, mas ela não tem estoque mínimo cadastrado — ele não entra no Comprar
       até cadastrar o mínimo e o pedido em Cadastros › Produtos.</p>` : ''}
-    <p class="es-nota">Em vermelho: a fazenda está no mínimo ou abaixo. <strong>Comprar</strong> soma, de todas as fazendas,
-      a quantidade de pedido cadastrada (Cadastros › Produtos, mínimo da fazenda). Item com mínimo que não apareceu na contagem conta como zero.</p>
+    <p class="es-nota">Em vermelho: a fazenda está no mínimo ou abaixo. O que ela precisa é o pedido cadastrado
+      (Cadastros › Produtos, mínimo da fazenda) e sai primeiro do estoque principal${PRINC() ? ' (' + esc(PRINC()) + ')' : ''}:
+      <strong>Transferir</strong> é o que ele tem para mandar; <strong>Comprar</strong> é só o que ele não tem, mais a reposição dele.
+      Marque o que já saiu em <strong>Contagem › Transferências</strong>. Item com mínimo que não apareceu na contagem conta como zero.</p>
     ${painelPedido(linhas)}
     <div class="barra fim">
       <button class="btn" type="button" id="resPedido"${nComprar ? '' : ' disabled'}>${PC.aberto ? 'Fechar pedido de compra' : '🛒 Pedido de compra'}</button>
@@ -259,12 +327,15 @@ function pdf(comContagem, lista) {
     paisagem: comContagem.length > 3,
     secoes: [{
       titulo: grupo,
-      head: ['Item', 'Un.', ...comContagem.map(f => f.local.nome + (dataCab(f) ? '\n' + dataCab(f) : '')), 'Total', 'Comprar'],
-      centro: [1, ...comContagem.map((_, k) => k + 2), comContagem.length + 2, comContagem.length + 3],
+      head: ['Item', 'Un.', ...comContagem.map(f => f.local.nome + (dataCab(f) ? '\n' + dataCab(f) : '')), 'Total', 'Transferir', 'Comprar'],
+      centro: [1, ...comContagem.map((_, k) => k + 2), comContagem.length + 2, comContagem.length + 3, comContagem.length + 4],
       body: lista.map(r => [r.item.nome, r.item.unidade || '', ...r.cel.map(c => c.qtd === null ? '—' : mostrarNumero(c.qtd) + (c.falta ? ' !' : '') + (c.semMin ? ' (s/ mín.)' : '')),
-        mostrarNumero(r.total), r.comprar > 0 ? mostrarNumero(r.comprar) : '']),
+        mostrarNumero(r.total),
+        r.transferir > 0 ? mostrarNumero(r.transferir) + ' > ' + r.transf.map(t => t.para.nome).join(' · ') : '',
+        r.comprar > 0 ? mostrarNumero(r.comprar) : '']),
     }],
-    notas: { titulo: '', texto: ['"!" = a fazenda está no mínimo ou abaixo. "(s/ mín.)" = sem estoque mínimo cadastrado, não entra no Comprar. Comprar = soma de todas as fazendas.'] },
+    notas: { titulo: '', texto: ['"!" = a fazenda está no mínimo ou abaixo. "(s/ mín.)" = sem estoque mínimo cadastrado, não entra na conta.',
+      'Transferir = o que sai do estoque principal' + (PRINC() ? ' (' + PRINC() + ')' : '') + '. Comprar = o que o principal não tem para mandar, mais a reposição dele.'] },
   };
 }
 
@@ -280,11 +351,14 @@ function montarFolha(comContagem, lista) {
     </div>
     <table class="rel-tab" style="margin-top:6mm"><thead><tr><th>Item</th><th class="ce">Un.</th>
       ${comContagem.map(f => `<th class="ce">${esc(f.local.nome)}${dataCab(f) ? '<br>' + esc(dataCab(f)) : ''}</th>`).join('')}
-      <th class="ce">Total</th><th class="ce">Comprar</th></tr></thead>
+      <th class="ce">Total</th><th class="ce">Transferir</th><th class="ce">Comprar</th></tr></thead>
     <tbody>${lista.map(r => `<tr><td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
       ${r.cel.map(c => `<td class="ce"${c.falta ? ' style="color:#a5342a;font-weight:bold"' : ''}>${c.qtd === null ? '—' : esc(mostrarNumero(c.qtd))}${c.semMin ? '<br><small style="color:#8a5f00">s/ mín.</small>' : ''}</td>`).join('')}
-      <td class="ce">${esc(mostrarNumero(r.total))}</td><td class="ce"><b>${r.comprar > 0 ? esc(mostrarNumero(r.comprar)) : ''}</b></td></tr>`).join('')}</tbody></table>
-    <p style="font-size:8pt;color:#51534A;margin:0">Em vermelho: a fazenda está no mínimo ou abaixo. "s/ mín." = sem estoque mínimo cadastrado, não entra no Comprar. Comprar = soma de todas as fazendas.</p>
+      <td class="ce">${esc(mostrarNumero(r.total))}</td>
+      <td class="ce">${r.transferir > 0 ? `<b>${esc(mostrarNumero(r.transferir))}</b><br><small>${esc(r.transf.map(t => t.para.nome).join(' · '))}</small>` : ''}</td>
+      <td class="ce"><b>${r.comprar > 0 ? esc(mostrarNumero(r.comprar)) : ''}</b></td></tr>`).join('')}</tbody></table>
+    <p style="font-size:8pt;color:#51534A;margin:0">Em vermelho: a fazenda está no mínimo ou abaixo. "s/ mín." = sem estoque mínimo cadastrado, não entra na conta.
+      Transferir = o que sai do estoque principal${PRINC() ? ' (' + esc(PRINC()) + ')' : ''}; Comprar = o que ele não tem para mandar, mais a reposição dele.</p>
     <div class="rel-pe"><span></span><img class="rel-lop" src="img/lop-marca.png" alt="LOP"></div>
   </div>`;
 }

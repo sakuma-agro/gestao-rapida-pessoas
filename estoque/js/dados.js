@@ -155,6 +155,26 @@ export const precisaRepor = (item, qtd) => temMinimo(item) && qtd !== null && qt
 export const textoPedido = item => item.pedido_reposicao !== null && item.pedido_reposicao !== undefined && item.pedido_reposicao !== ''
   ? 'pedir ' + mostrarNumero(item.pedido_reposicao) + ' ' + (item.unidade || '') : 'definir quanto pedir';
 
+/* ---- estoque principal e transferências (19/11/2026, pedido dele) ----
+   "A compra é para todos os estoques, mas sempre a transferência vem do
+   principal, Lote 35." Fechadas as contagens, o que falta numa fazenda sai
+   primeiro da prateleira do principal; só o que ele não tem é que vira compra.
+   O principal pode ficar abaixo do mínimo dele (escolha dele, 19/11/2026): a
+   compra repõe o principal depois.
+   est_transferencias guarda só o que já foi marcado como CONCLUÍDO — a
+   transferência que realmente saiu. O que falta fazer é calculado na hora, a
+   partir das últimas contagens fechadas (js/resultado.js). */
+export const localPrincipal = () => {
+  const l = locais();
+  return l.find(x => x.principal) || l.find(x => /lote\s*0*35/i.test(String(x.nome || ''))) || l[0] || null;
+};
+export const transferenciasFeitas = () => [...new Map(todos('est_transferencias').map(t => [t.id, t])).values()]
+  .filter(t => t.ativo !== false);
+/** Quanto já saiu do principal para uma fazenda por causa desta contagem. */
+export const jaTransferido = (contagemId, itemId, paraLocalId) => transferenciasFeitas()
+  .filter(t => t.contagem_id === contagemId && t.item_id === itemId && t.para_local_id === paraLocalId)
+  .reduce((s, t) => s + (Number(t.quantidade) || 0), 0);
+
 /* ---- mapa do barracão (21/10/2026, pedido dele) ----
    Um estoque pode ter um mapa (est_mapas, id = local_id): as quadras, as áreas
    reservadas e os pilares do barracão. Na contagem dos fertilizantes, cada

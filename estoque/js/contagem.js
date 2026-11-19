@@ -14,6 +14,7 @@ import {
   mapaDoLocal, quadrasDe, idQuadraLinha, capacidadeQuadra, pesoBag, mesAnterior,
 } from './dados.js';
 import { enviarWhatsapp } from './pdf.js';
+import { desenharTransferencias } from './transferencias.js';
 /* Só os estoques liberados para esta pessoa (22/10/2026). */
 const locais = () => todosLocais().filter(l => podeLocal(l.id));
 /* Quem pode excluir a contagem de um tipo (pedido dele, 23/10/2026): o
@@ -1687,7 +1688,7 @@ function montarFolhaRepor(lista) {
 /* ===================================================================
    ligação com o app.js
    =================================================================== */
-const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico, ctMapa: desenharMapa, ctResultado: desenharResultado };
+const DESENHOS = { ctNova: desenharContar, ctAndamento: desenharAndamento, ctRepor: desenharRepor, ctHistorico: desenharHistorico, ctMapa: desenharMapa, ctResultado: desenharResultado, ctTransf: desenharTransferencias };
 
 export function abrirContagem(tela) {
   telaAberta = tela;
@@ -1699,7 +1700,7 @@ export function abrirContagem(tela) {
 window.addEventListener('estoque-dados', () => {
   if (!telaAberta || !DESENHOS[telaAberta]) return;
   const foco = document.activeElement;
-  if (foco && (foco.classList.contains('ct-qtd') || foco.id === 'ctBusca' || foco.id === 'resBusca' || foco.closest && (foco.closest('.ct-lote') || foco.closest('.ct-quad') || foco.closest('.mp-sel')))) return;
+  if (foco && (foco.classList.contains('ct-qtd') || foco.classList.contains('tf-qtd') || foco.id === 'ctBusca' || foco.id === 'resBusca' || foco.closest && (foco.closest('.ct-lote') || foco.closest('.ct-quad') || foco.closest('.mp-sel')))) return;
   if (!document.querySelector('#modal.oculto') && document.querySelector('#modal')) return;
   DESENHOS[telaAberta]();
 });
