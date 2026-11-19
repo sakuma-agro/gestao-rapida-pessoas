@@ -714,6 +714,12 @@ dialog h3{margin:0 0 14px;font-size:16px}
   .topo,.abas,.aba2s,.aba3s,.subabas,.rodape-fixo,.naoimprimir,dialog,.aviso{display:none !important}
   main{padding:0;max-width:none}
   .cartao{display:none}
+  /* Na impressão a prévia não é uma caixa de rolagem (19/11/2026). Na tela ela
+     rola de lado quando a folha é mais larga que a janela; na folha impressa,
+     esse mesmo overflow fazia o Chrome desenhar a barra de rolagem no pé do
+     papel. Antes ela caía na folha em branco que sobrava; sem a sobra, passou
+     a aparecer embaixo do ASO. */
+  .previa,.previa-lista{overflow:visible}
   .previa{margin:0;gap:0;display:block}
   #saida{transform:none !important}
   .folha{box-shadow:none;margin:var(--imp-margem) auto;
