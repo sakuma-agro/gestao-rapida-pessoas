@@ -22,7 +22,7 @@
 // conta: não some de novo, nem no transferir nem no comprar.
 import {
   $, esc, pronto, todos, locais as todosLocais, podeLocal, linhasDe, itensOrdenados, contaNoLocal,
-  comMinimoDo, temMinimo, precisaRepor, mostrarNumero, dataBR, rodadaDe, GRUPOS,
+  comMinimoDo, temMinimo, precisaRepor, lerNumero, mostrarNumero, dataBR, rodadaDe, GRUPOS,
   localPrincipal, jaTransferido,
 } from './dados.js';
 import { enviarWhatsapp, FRASE_LOP } from './pdf.js';
@@ -39,12 +39,21 @@ const CHAVE_PC = 'estoque.pedidoCompra';
    Guarda quem SAIU, não quem entrou: item novo na contagem já entra marcado.
    Fica no aparelho, junto com fornecedor e entrega, para ele fazer um pedido
    de cada fornecedor sem perder a escolha ao sair da tela. */
-const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [] };
+const PC = { aberto: false, forn: '', entrega: '', obs: '', fora: [], empregador: '', qtds: {} };
 try { Object.assign(PC, JSON.parse(localStorage.getItem(CHAVE_PC) || '{}'), { aberto: false }); } catch { /* sem localStorage */ }
 if (!Array.isArray(PC.fora)) PC.fora = [];
+if (!PC.qtds || typeof PC.qtds !== 'object') PC.qtds = {};
 /** O item entra no pedido? Tudo entra, menos o que ele desmarcou. */
 const noPedido = r => !PC.fora.includes(r.item.id);
 const paraComprar = linhas => linhas.filter(r => r.comprar > 0);
+/* Quantidade que vai no pedido (19/11/2026, pedido dele: "quero poder alterar
+   a qtde do pedido"): a calculada, ou a que ele digitou por cima. Guarda só o
+   que foi mudado — item sem retoque acompanha a contagem nova. */
+const qtdPedido = r => {
+  const v = PC.qtds[r.item.id];
+  return v === undefined || v === null || v === '' ? r.comprar : Number(v);
+};
+const qtdMudada = r => qtdPedido(r) !== r.comprar;
 const doPedido = linhas => paraComprar(linhas).filter(noPedido);
 const guardarPC = () => { try { localStorage.setItem(CHAVE_PC, JSON.stringify({ ...PC, aberto: false })); } catch { /* ok */ } };
 try { grupo = localStorage.getItem(CHAVE) || grupo; } catch { /* sem localStorage */ }
@@ -243,14 +252,33 @@ export function desenharResultado() {
   $('resWhats')?.addEventListener('click', ev => enviarWhatsapp(pdf(comContagem, lista), ev.currentTarget));
   $('resPedido')?.addEventListener('click', () => { PC.aberto = !PC.aberto; desenharResultado(); });
   if (PC.aberto && $('pcForn')) {
-    const ler = () => { PC.forn = $('pcForn').value; PC.entrega = $('pcEntrega').value; PC.obs = $('pcObs').value; guardarPC(); };
-    ['pcForn', 'pcEntrega', 'pcObs'].forEach(id => $(id).addEventListener('change', ler));
+    const ler = () => {
+      PC.forn = $('pcForn').value; PC.entrega = $('pcEntrega').value; PC.obs = $('pcObs').value;
+      PC.empregador = $('pcEmpregador').value.trim();
+      guardarPC();
+    };
+    ['pcForn', 'pcEntrega', 'pcObs', 'pcEmpregador'].forEach(id => $(id).addEventListener('change', ler));
+    carregarEmpregadores();
     const itens = () => doPedido(linhas);
     const todosItens = paraComprar(linhas);
     const marcar = ids => { PC.fora = ids; guardarPC(); desenharResultado(); };
     $('pcTodos').addEventListener('click', () => marcar([]));
     $('pcNenhum').addEventListener('click', () => marcar(todosItens.map(r => r.item.id)));
     $('pcInverter').addEventListener('click', () => marcar(todosItens.filter(noPedido).map(r => r.item.id)));
+    $('pcQtdCalc').addEventListener('click', () => { PC.qtds = {}; guardarPC(); desenharResultado(); });
+    /* Digitou por cima: guarda o número dele. Caixa vazia volta ao calculado. */
+    document.querySelectorAll('.pc-qtd').forEach(cx => cx.addEventListener('change', () => {
+      const id = cx.dataset.id;
+      const r = todosItens.find(x => x.item.id === id);
+      const n = lerNumero(cx.value);
+      if (cx.value.trim() === '' || (isFinite(n) && n === r.comprar)) delete PC.qtds[id];
+      else if (!isFinite(n) || n === null || n < 0) { cx.value = mostrarNumero(qtdPedido(r)); return; }
+      else PC.qtds[id] = n;
+      guardarPC();
+      cx.value = mostrarNumero(qtdPedido(r));
+      cx.classList.toggle('mudada', qtdMudada(r));
+      $('pcQtdCalc').disabled = !todosItens.some(qtdMudada);
+    }));
     /* Marcar um item não redesenha a tela: a lista é longa e o dedo dele perde
        o lugar. Só o contador e os botões acompanham. */
     document.querySelectorAll('.pc-cx').forEach(cx => cx.addEventListener('change', () => {
@@ -297,16 +325,22 @@ function painelPedido(linhas) {
       <button class="btn mini" type="button" id="pcTodos">Marcar todos</button>
       <button class="btn mini" type="button" id="pcNenhum">Desmarcar todos</button>
       <button class="btn mini" type="button" id="pcInverter">Inverter</button>
+      <button class="btn mini" type="button" id="pcQtdCalc"${todosItens.some(qtdMudada) ? '' : ' disabled'}>Voltar às quantidades calculadas</button>
     </div>
-    <div class="pc-itens">${todosItens.map(r => `<label class="es-check"${noPedido(r) ? '' : ' data-fora="1"'}>
-      <input type="checkbox" class="pc-cx" data-id="${esc(r.item.id)}"${noPedido(r) ? ' checked' : ''}>
-      <span class="pc-nome">${esc(r.item.nome)}</span>
-      <b class="pc-qtd">${esc(mostrarNumero(r.comprar))} ${esc(r.item.unidade || '')}</b></label>`).join('')}</div>
+    <div class="pc-itens">${todosItens.map(r => `<div class="es-check pc-lin"${noPedido(r) ? '' : ' data-fora="1"'}>
+      <label class="pc-marca"><input type="checkbox" class="pc-cx" data-id="${esc(r.item.id)}"${noPedido(r) ? ' checked' : ''}>
+        <span class="pc-nome">${esc(r.item.nome)}</span></label>
+      <input class="pc-qtd${qtdMudada(r) ? ' mudada' : ''}" inputmode="decimal" data-id="${esc(r.item.id)}"
+        value="${esc(mostrarNumero(qtdPedido(r)))}" title="calculado: ${esc(mostrarNumero(r.comprar))}" aria-label="quantidade">
+      <span class="pc-un">${esc(r.item.unidade || '')}</span></div>`).join('')}</div>
     <div class="barra">
       <label class="campo" style="flex:1;min-width:200px">Fornecedor <select id="pcForn"><option value="">— em branco (preencher à mão) —</option>${fornecedores().map(f =>
         `<option value="${esc(f.id)}"${f.id === PC.forn ? ' selected' : ''}>${esc(f.nome)}</option>`).join('')}</select></label>
       <label class="campo">Entregar em <select id="pcEntrega">${ls.map(l => `<option value="${esc(l.id)}"${l.id === ent ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></label>
     </div>
+    <label class="campo">Empregador <input id="pcEmpregador" list="pcEmpregadores" autocomplete="off"
+      value="${esc(PC.empregador)}" placeholder="quem compra — ex.: FABIO MASSAO SAKUMA – FAZ. FACA">
+      <datalist id="pcEmpregadores">${EMPREGADORES.map(e => `<option value="${esc(e)}">`).join('')}</datalist></label>
     <label class="campo">Observação <textarea id="pcObs" rows="2" placeholder="opcional">${esc(PC.obs)}</textarea></label>
     <div class="barra fim">
       <button class="btn btn-zap" type="button" id="pcZap"${n ? '' : ' disabled'}><img class="ic-zap" src="img/whatsapp.png" alt="">Pedido no WhatsApp</button>
@@ -315,16 +349,48 @@ function painelPedido(linhas) {
 }
 const hojeBR = () => new Date().toLocaleDateString('pt-BR');
 
+/* Empregador no pedido (19/11/2026, pedido dele: "quero poder selecionar o
+   empregador, tipo Fabio Massao Sakuma - Faz. Faca, para sair no pedido").
+   Quem compra é a pessoa jurídica, e a mesma fazenda pode ter mais de uma —
+   o Lote 35 tem Fabio e Massato. A lista sai do cadastro de pessoal
+   (funcionarios), o mesmo nome que vai no ASO, e fica guardada no aparelho
+   para a tela abrir sem internet. O campo é livre: a lista é sugestão. */
+const CHAVE_EMP = 'estoque.empregadores';
+let EMPREGADORES = [];
+try { EMPREGADORES = JSON.parse(localStorage.getItem(CHAVE_EMP) || '[]'); } catch { /* sem localStorage */ }
+async function carregarEmpregadores() {
+  const sb = window.App && window.App.sb;
+  if (!sb || window.App.online === false) return;
+  try {
+    const { data, error } = await sb.schema('public').from('funcionarios').select('empregador, fazenda');
+    if (error || !data) return;
+    const nomes = new Set();
+    for (const f of data) {
+      const e = String(f.empregador || '').trim();
+      if (!e) continue;
+      nomes.add(e);
+      const faz = String(f.fazenda || '').trim();
+      if (faz) nomes.add(e + ' – ' + faz);
+    }
+    const lista = [...nomes].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    if (!lista.length || lista.join('|') === EMPREGADORES.join('|')) return;
+    EMPREGADORES = lista;
+    try { localStorage.setItem(CHAVE_EMP, JSON.stringify(lista)); } catch { /* cheio */ }
+    if (PC.aberto) desenharResultado();
+  } catch (e) { console.warn('não li os empregadores', e); }
+}
+
 function pdfPedido(itens) {
   const f = fornPC();
   return {
     titulo: 'Pedido de Compra',
     subtitulo: `${grupo} · emitido em ${hojeBR()}`,
     arquivo: `Pedido de Compra ${grupo} ${new Date().toISOString().slice(0, 10)}`,
-    kpis: [['Fornecedor', f ? f.nome : ' '], ['Entregar em', entregaPC()], ['Itens', String(itens.length)]],
+    kpis: [['Fornecedor', f ? f.nome : ' '], ...(PC.empregador ? [['Empregador', PC.empregador]] : []),
+      ['Entregar em', entregaPC()], ['Itens', String(itens.length)]],
     secoes: [{
       titulo: 'Itens', head: ['Nº', 'Produto', 'Un.', 'Qtd. solicitada'],
-      body: itens.map((r, k) => [k + 1, r.item.nome, r.item.unidade || '', mostrarNumero(r.comprar)]),
+      body: itens.map((r, k) => [k + 1, r.item.nome, r.item.unidade || '', mostrarNumero(qtdPedido(r))]),
       total: ['', `Total de itens: ${itens.length}`, '', ''],
       centro: [0, 2, 3], larguras: { 0: 12, 2: 18, 3: 32 },
     }],
@@ -342,14 +408,15 @@ function folhaPedido(itens) {
       <img src="img/sakuma-logo.png" alt="SAKUMA Agronegócios">
       <div class="rel-tit"><h1>Pedido de Compra</h1><p>${esc(grupo)} · emitido em ${esc(hojeBR())}</p></div>
     </div>
-    ${k === 0 ? `<div class="orc-dados">
+    ${k === 0 ? `<div class="orc-dados${PC.empregador ? ' quatro' : ''}">
       <div><span>Fornecedor</span><b>${f ? esc(f.nome) : '&nbsp;'}</b>${f && (f.contato || f.telefone) ? `<small>${esc([f.contato, f.telefone].filter(Boolean).join(' · '))}</small>` : ''}</div>
+      ${PC.empregador ? `<div><span>Empregador</span><b class="orc-emp">${esc(PC.empregador)}</b><small>quem compra</small></div>` : ''}
       <div><span>Entregar em</span><b>${esc(entregaPC())}</b><small>SAKUMA Agronegócios</small></div>
       <div><span>Data</span><b>${esc(hojeBR())}</b><small>${itens.length} ${itens.length === 1 ? 'item' : 'itens'}</small></div>
     </div>` : ''}
     <table class="rel-tab"><thead><tr><th class="ce" style="width:12mm">Nº</th><th>Produto</th><th class="ce" style="width:18mm">Un.</th><th class="ce" style="width:32mm">Qtd. solicitada</th></tr></thead>
     <tbody>${p.map(r => `<tr><td class="ce">${itens.indexOf(r) + 1}</td><td>${esc(r.item.nome)}</td><td class="ce">${esc(r.item.unidade || '')}</td>
-      <td class="ce"><b>${esc(mostrarNumero(r.comprar))}</b></td></tr>`).join('')}
+      <td class="ce"><b>${esc(mostrarNumero(qtdPedido(r)))}</b></td></tr>`).join('')}
       ${k === pags.length - 1 ? `<tr class="rel-total"><td></td><td>Total de itens: ${itens.length}</td><td></td><td></td></tr>` : ''}</tbody></table>
     ${k === pags.length - 1 && PC.obs ? `<div class="orc-notas"><b>Observação</b><p>${esc(PC.obs)}</p></div>` : ''}
     <div class="rel-pe"><small class="lp-pag">${pags.length > 1 ? `Folha ${k + 1} de ${pags.length}` : ''}</small>

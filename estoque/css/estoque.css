@@ -521,6 +521,9 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .orc-dados span{display:block;font-size:7pt;letter-spacing:.3pt;text-transform:uppercase;color:#51534A}
 .orc-dados b{display:block;font-size:11pt;color:#744F28;line-height:1.3}
 .orc-dados small{display:block;font-size:8pt;color:#51534A}
+/* Com o empregador, a folha do pedido tem quatro caixas no alto (19/11/2026). */
+.orc-dados.quatro{grid-template-columns:1.3fr 1.5fr 1.1fr .7fr}
+.orc-dados.quatro .orc-emp{font-size:10pt;line-height:1.25}
 .orc-doc td{height:6.2mm}
 .orc-notas{margin-top:3mm;font-size:9pt}
 .orc-notas b{color:#744F28;font-size:10pt}
@@ -563,10 +566,14 @@ tr.epi-baixo td{background:rgba(201,138,0,.08)}
 .pc-painel .cresce{flex:1}
 .pc-itens{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px 16px;
   max-height:300px;overflow:auto;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin-bottom:10px}
-.pc-itens .es-check{white-space:normal;padding:3px 0;cursor:pointer;color:var(--texto);font-size:13px}
+.pc-itens .es-check{white-space:normal;padding:3px 0;color:var(--texto);font-size:13px}
+.pc-marca{display:flex;align-items:center;gap:7px;flex:1;min-width:0;cursor:pointer}
 .pc-itens .es-check[data-fora]{opacity:.45}
 .pc-nome{flex:1;min-width:0}
-.pc-qtd{color:var(--marrom);white-space:nowrap}
+.pc-qtd{flex:0 0 64px;width:64px;text-align:right;font-weight:700;color:var(--marrom);padding:3px 5px;border-radius:6px;
+  border:1px solid var(--linha);background:var(--papel);font-size:13px}
+.pc-qtd.mudada{border-color:var(--marrom);background:rgba(116,79,40,.08)}
+.pc-un{flex:0 0 28px;color:var(--suave);font-size:12px}
 
 /* Contagem › Transferências (19/11/2026) */
 .tf-faz{margin:14px 0 6px;font-size:13.5px;color:var(--marrom);font-weight:700}
