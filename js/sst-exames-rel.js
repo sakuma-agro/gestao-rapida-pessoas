@@ -51,7 +51,6 @@ export async function abrirRelExames() {
   desenhar();
   preencherExtras();
   resumoClinica();
-  prepararRealizados();
 }
 
 function preencherFiltros() {
@@ -487,14 +486,45 @@ const RISCOS = [
 ];
 let RZ = [];   // funcionários do recorte
 
+/* Filtros da aba Impressão do ASO (19/11/2026): ela saiu de dentro do
+   Relatório por funcionário e ganhou Fazenda e Função próprias, montadas a
+   partir do cadastro — não depende do retrato dos exames. */
+const fazendasAso = () => { const v = $('asFazenda').valores || []; return v.length ? new Set(v) : null; };
+
+function preencherFiltrosAso() {
+  const ativos = estado.funcionarios.filter(f => f.situacao === 'ATIVO');
+  const fz = new Map();
+  ativos.forEach(f => { const v = so(f.fazenda); if (v && !fz.has(chave(v))) fz.set(chave(v), v); });
+  montarMulti($('asFazenda'), {
+    opcoes: [...fz.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR')),
+    marcados: $('asFazenda').valores || [], todas: 'Todas as fazendas', plural: 'fazendas',
+  });
+  const fn = new Map();
+  ativos.forEach(f => { const v = so(f.cargo); if (v && !fn.has(chave(v))) fn.set(chave(v), v); });
+  const sel = $('asFuncao'), antes = sel.value;
+  const lista = [...fn.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+  sel.innerHTML = '<option value="">Todas</option>' +
+    lista.map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+  sel.value = lista.some(([k]) => k === antes) ? antes : '';
+}
+
 function prepararRealizados() {
   if (!$('rzFunc')) return;
+  preencherFiltrosAso();
   calcularRealizados();
 }
 
+/* A aba abre sozinha: busca o retrato dos exames (é ele que deixa os tipos e as
+   listas por função na mão) e monta os filtros. */
+export async function abrirAsoPadrao() {
+  if (!$('rzFunc')) return;
+  try { if (!BASE.length) BASE = await retratoExames(); } catch (e) { /* sem rede: vale o que já estiver guardado */ }
+  prepararRealizados();
+}
+
 function calcularRealizados() {
-  const faz = fazendasEscolhidas();
-  const fun = $('erFuncao').value;
+  const faz = fazendasAso();
+  const fun = $('asFuncao').value;
   RZ = estado.funcionarios
     .filter(f => f.situacao === 'ATIVO')
     .filter(f => (!faz || faz.has(chave(f.fazenda))) && (!fun || chave(f.cargo) === fun))
@@ -645,18 +675,29 @@ function folhaAso(f) {
 
 function mostrarRealizados() {
   const lista = escolhidosRz();
-  $('erSaida').innerHTML = lista.length
+  $('asSaida').innerHTML = lista.length
     ? lista.map(f => folhaAso(f)).join('')
     : '<div class="an-folha"><p class="pn-nada">Nenhum funcionário ativo nesse filtro.</p></div>';
-  $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('asSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+/* Mexeu em qualquer campo, a prévia que está na tela não vale mais: some, para
+   ninguém imprimir uma folha de antes. */
+const limparPreviaAso = () => { $('asSaida').innerHTML = ''; };
 
 function ligarRealizados() {
   if (!$('rzFunc')) return;
-  ['erFazenda', 'erFuncao'].forEach(id => $(id).addEventListener('change', calcularRealizados));
-  $('rzFunc').addEventListener('change', trocarFuncRz);
-  $('rzTipo').addEventListener('change', trocarTipoAso);
-  $('rzNova').addEventListener('change', resumoRealizados);
+  ['asFazenda', 'asFuncao'].forEach(id => $(id).addEventListener('change', () => {
+    limparPreviaAso(); calcularRealizados();
+  }));
+  $('bImprimirAs').addEventListener('click', () => {
+    // prévia antes de imprimir: sem folha na tela, gera o ASO primeiro
+    if (!so($('asSaida').innerHTML)) { mostrarRealizados(); return; }
+    window.print();
+  });
+  $('rzFunc').addEventListener('change', () => { limparPreviaAso(); trocarFuncRz(); });
+  $('rzTipo').addEventListener('change', () => { limparPreviaAso(); trocarTipoAso(); });
+  $('rzNova').addEventListener('change', () => { limparPreviaAso(); resumoRealizados(); });
   $('bRzDoc').addEventListener('click', mostrarRealizados);
   $('bRzAnexo').addEventListener('click', mostrarAnexos);
 }
@@ -721,8 +762,8 @@ function folhaAnexo(f) {
 
 function mostrarAnexos() {
   const lista = escolhidosRz();
-  $('erSaida').innerHTML = lista.length
+  $('asSaida').innerHTML = lista.length
     ? lista.map(folhaAnexo).join('')
     : '<div class="an-folha"><p class="pn-nada">Nenhum funcionário ativo nesse filtro.</p></div>';
-  $('erSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('asSaida').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

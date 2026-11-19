@@ -1170,12 +1170,28 @@ addEventListener('beforeinstallprompt', function (ev) {
         <div class="barra" id="clExtras" style="margin:8px 0 0;flex-wrap:wrap;gap:6px"></div>
       </div>
 
+      <div class="previa-lista" id="erSaida"></div>
+
+      <div class="rodape-fixo naoimprimir">
+        <button class="btn principal" id="bImprimirEr">Imprimir</button>
+        <span class="cresce"></span>
+        <span class="dc-sem">Gere o documento para ver a prévia antes de imprimir.</span>
+      </div>
+    </section>
+
+
+    <!-- ---- SST · EXAMES: impressão do ASO (19/11/2026) ---- -->
+    <section class="tela" id="telaExAso" hidden>
       <!-- ASO padrão da fazenda (17/11/2026): dados do funcionário preenchidos, exames para a médica marcar -->
       <div class="cartao naoimprimir">
         <h2 style="margin:0">ASO padrão da fazenda</h2>
         <p class="dica" style="margin:2px 0 0">
-          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. Escolhendo o Tipo de ASO, ele já sai marcado na folha; em <b>Mudança de Função</b> aparece o campo Nova função, e a folha sai com a função atual e a nova (o anexo passa a listar os exames da função nova). Os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar. Segue os filtros de Fazenda e Função lá de cima.
+          Uma folha por funcionário no modelo do ASO, com os dados do cadastro já preenchidos. Escolhendo o Tipo de ASO, ele já sai marcado na folha; em <b>Mudança de Função</b> aparece o campo Nova função, e a folha sai com a função atual e a nova (o anexo passa a listar os exames da função nova). Os exames (com a data ao lado), os riscos e o apto/inapto saem em branco para a médica marcar. O anexo lista os exames que a função exige, com a data em branco, para a médica datar e assinar.
         </p>
+        <div class="grade" style="margin-top:12px">
+          <div class="campo">Fazenda <div id="asFazenda"></div></div>
+          <label class="campo">Função <select id="asFuncao"></select></label>
+        </div>
         <div class="grade" style="margin-top:12px">
           <label class="campo">Funcionário <select id="rzFunc"></select></label>
           <label class="campo">Tipo de ASO
@@ -1203,13 +1219,12 @@ addEventListener('beforeinstallprompt', function (ev) {
         </div>
         <div class="barra" id="rzResumo" style="margin:10px 0 0"></div>
       </div>
-
-      <div class="previa-lista" id="erSaida"></div>
+      <div class="previa-lista" id="asSaida"></div>
 
       <div class="rodape-fixo naoimprimir">
-        <button class="btn principal" id="bImprimirEr">Imprimir</button>
+        <button class="btn principal" id="bImprimirAs">Imprimir</button>
         <span class="cresce"></span>
-        <span class="dc-sem">Gere o documento para ver a prévia antes de imprimir.</span>
+        <span class="dc-sem">Gere o ASO ou o anexo para ver a prévia antes de imprimir.</span>
       </div>
     </section>
 

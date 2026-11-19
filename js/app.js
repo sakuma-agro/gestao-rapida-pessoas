@@ -34,7 +34,7 @@ import { abrirCronograma, pendentesCronograma, enviarFila as enviarFilaCron } fr
 import { abrirCompras } from './compras.js';
 import { abrirEventoCultura } from './evento-cultura.js';
 import { ligarAso, abrirFuncoes } from './aso.js';
-import { ligarRelExames, abrirRelExames } from './sst-exames-rel.js';
+import { ligarRelExames, abrirRelExames, abrirAsoPadrao } from './sst-exames-rel.js';
 import { ligarTreinoFuncao, abrirTreinoFuncao, resumoCadastro } from './treino-funcao.js';
 import { ligarConsolidado, abrirConsolidado } from './treino-consolidado.js';
 import { ligarAtividades, abrirAtividades, desenharAtvFuncionario } from './sst-atividades.js';
@@ -185,6 +185,7 @@ function abrirAba(nome) {
   $('telaExTipos').hidden = nome !== 'exTipos';
   $('telaExFuncoes').hidden = nome !== 'exFuncoes';
   $('telaExRel').hidden = nome !== 'exRel';
+  $('telaExAso').hidden = nome !== 'exAso';
   $('telaTrVenc').hidden  = nome !== 'trVenc';
   $('telaTrTipos').hidden = nome !== 'trTipos';
   $('telaTrFuncoes').hidden = nome !== 'trFuncoes';
@@ -253,6 +254,7 @@ function abrirAba(nome) {
   if (['exPainel', 'exVenc', 'exTipos', 'trPainel', 'trVenc', 'trTipos'].includes(nome)) abrirSst(nome);
   if (nome === 'exFuncoes') abrirFuncoes();
   if (nome === 'exRel') abrirRelExames();
+  if (nome === 'exAso') abrirAsoPadrao();
   if (nome === 'trFuncoes') sstPronto().catch(() => {}).then(abrirTreinoFuncao);
   if (nome === 'trConsol') abrirConsolidado();
   if (nome === 'sstAtv') abrirAtividades();

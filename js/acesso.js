@@ -94,6 +94,7 @@ export const MODULOS = [
       ['exPainel', 'Painel'],
       ['exVenc', 'Vencimentos'],
       ['exRel', 'Relatório por funcionário'],
+      ['exAso', 'Impressão do ASO'],
       ['exFuncoes', 'Exames por função'],
       ['exTipos', 'Tipos e periodicidade'],
     ] },
@@ -599,6 +600,8 @@ export function podeTela(tela) {
   if (tela === 'ceVencimentos' && acesso.telas.includes(m + ':cePendencias')) return true;
   if (tela === 'foCl07' && acesso.telas.includes(m + ':foPainel')) return true;   /* 05/11/2026: quem vê o painel de fornecedores vê o CL 07 */
   if (tela === 'etqPastas' && ['etqArmarios', 'etqEnvelopes'].some(t => acesso.telas.includes(m + ':' + t))) return true;
+  /* Impressão do ASO (19/11/2026): nasceu dentro do Relatório por funcionário, então quem tinha ele ganha esta. */
+  if (tela === 'exAso' && acesso.telas.includes(m + ':exRel')) return true;
   return !temRestricao(m) || acesso.telas.includes(m + ':' + tela);
 }
 
