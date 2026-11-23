@@ -1256,6 +1256,61 @@ function modulos() {
     : `<div class="cr-foco-vazio"><b>Nenhuma tarefa ${est.mostrar === 'todas' ? '' : 'aberta '}${nomeP} nos filtros atuais.</b><p>Troque o prazo para Semana ou Tudo, ou confira os filtros.</p></div>`;
 }
 
+/* Situação (23/11/2026, pedido dele: "quero uma forma de saber o que está
+   atrasado"). Aba só de listas, sem calendário: no alto os números do
+   momento e, embaixo, uma debaixo da outra, Atrasadas, Em andamento, A fazer
+   (separada em Hoje / Amanhã / Ainda nesta semana / Mais para a frente) e
+   Bloqueadas. Os filtros e a pesquisa de cima valem aqui também; tocar num
+   número desce para a lista dele. Concluídas não entram. */
+function situacao() {
+  const abertas = filtrados().filter(it => it.sit !== 'feito');
+  if (!abertas.length) return `<div class="cr-foco-vazio"><b>Nada em aberto nos filtros atuais.</b>
+    <p>Não há tarefa atrasada nem a fazer para o que está filtrado em cima. Troque a pessoa, a área ou a origem para ver o resto.</p></div>`;
+
+  const porTitulo = (a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR');
+  const atrasadas = abertas.filter(atrasado).sort((a, b) => a.data.localeCompare(b.data) || porTitulo(a, b));
+  const andamento = abertas.filter(it => it.sit === 'fazendo' && !atrasado(it)).sort(ordemItens);
+  const afazer = abertas.filter(it => it.sit === 'afazer' && !atrasado(it)).sort(ordemItens);
+  const bloqueadas = abertas.filter(it => it.sit === 'bloqueado')
+    .sort((a, b) => (diasParado(b) || 0) - (diasParado(a) || 0) || a.data.localeCompare(b.data) || porTitulo(a, b));
+
+  const amanha = addDias(hoje(), 1), sabado = fimSemana();
+  const vencemHoje = abertas.filter(it => it.sit !== 'bloqueado' && it.data === hoje()).length;
+  const naSemana = abertas.filter(it => it.sit !== 'bloqueado' && it.data > hoje() && it.data <= sabado).length;
+
+  const lista = l => `<div class="cr-lista">${l.map(linha).join('')}</div>`;
+  const numero = (cls, n, rot, ir) => `<button type="button" class="cr-nm${cls ? ' ' + cls : ''}" data-sit-ir="${ir}"><b>${n}</b><small>${rot}</small></button>`;
+  const bloco = (id, cor, nome, l, vazio) => `<section class="cr-bloco" id="crSit-${id}">
+      <h3 class="cr-bloco-cab"><i style="background:${cor}"></i>${nome}<span>${l.length}</span></h3>
+      ${l.length ? lista(l) : `<p class="cr-vazio">${vazio}</p>`}</section>`;
+
+  const grupos = [
+    ['Hoje', afazer.filter(it => it.data === hoje())],
+    ['Amanhã', afazer.filter(it => it.data === amanha)],
+    ['Ainda nesta semana', afazer.filter(it => it.data > amanha && it.data <= sabado)],
+    ['Mais para a frente', afazer.filter(it => it.data > sabado)],
+  ].filter(([, l]) => l.length);
+
+  return `<div class="cr-situacao">
+    <div class="cr-sit-resumo">
+      ${numero('atraso', atrasadas.length, atrasadas.length === 1 ? 'atrasada' : 'atrasadas', 'atraso')}
+      ${numero('hoje', vencemHoje, vencemHoje === 1 ? 'vence hoje' : 'vencem hoje', 'afazer')}
+      ${numero('', naSemana, 'ainda nesta semana', 'afazer')}
+      ${numero('bloq', bloqueadas.length, bloqueadas.length === 1 ? 'bloqueada' : 'bloqueadas', 'bloqueado')}
+    </div>
+    <div class="cr-blocos">
+      ${bloco('atraso', COR_SIT.atraso, 'Atrasadas', atrasadas, 'Nada atrasado nos filtros atuais.')}
+      ${andamento.length ? bloco('fazendo', COR_SIT.fazendo, 'Em andamento', andamento, '') : ''}
+      <section class="cr-bloco" id="crSit-afazer">
+        <h3 class="cr-bloco-cab"><i style="background:${COR_SIT.afazer}"></i>A fazer<span>${afazer.length}</span></h3>
+        ${grupos.length ? grupos.map(([n, l]) => `<h4 class="cr-bloco-sub">${n}<span>${l.length}</span></h4>${lista(l)}`).join('')
+          : '<p class="cr-vazio">Nenhuma tarefa a fazer dentro do prazo nos filtros atuais.</p>'}
+      </section>
+      ${bloqueadas.length ? bloco('bloqueado', COR_SIT.bloqueado, 'Bloqueadas', bloqueadas, '') : ''}
+    </div>
+  </div>`;
+}
+
 /* Rotinas (12/11/2026, pedido dele): aba com as tarefas que repetem,
    separadas por frequência — Diárias, Semanais, Mensais, Semestrais e
    Anuais — nas cores da legenda dele. "Toda semana" com 5 dias ou mais
@@ -1421,6 +1476,7 @@ function desenhar() {
     ${dados.semTabelas ? '<div class="aviso erro">O banco ainda não tem as tabelas do Cronograma. As tarefas lançadas à mão e a mudança de situação só funcionam depois disso — os vencimentos das áreas já aparecem.</div>' : ''}
     <div class="cr-seg" role="tablist">
       <button type="button" role="tab" data-visao="calendario" aria-selected="${est.visao === 'calendario'}">Calendário</button>
+      <button type="button" role="tab" data-visao="situacao" aria-selected="${est.visao === 'situacao'}">Situação</button>
       <button type="button" role="tab" data-visao="modulos" aria-selected="${est.visao === 'modulos'}">Por módulo</button>
       <button type="button" role="tab" data-visao="rotinas" aria-selected="${est.visao === 'rotinas'}">Rotinas</button>
       <button type="button" role="tab" data-visao="foco" aria-selected="${est.visao === 'foco'}">Foco do dia</button>
@@ -1459,8 +1515,8 @@ function desenhar() {
         <button type="button" class="cr-chip" data-colunas="situacao" aria-pressed="${est.colunas === 'situacao'}">Situação</button>
         <button type="button" class="cr-chip" data-colunas="pessoa" aria-pressed="${est.colunas === 'pessoa'}">Pessoa</button>` : ''}
     </div>
-    <div id="crCorpo">${est.visao === 'rotinas' ? rotinas() : est.busca ? resultados() : est.visao === 'foco' ? foco() : est.visao === 'modulos' ? modulos() : calendario()}</div>
-    <div class="cr-legenda">${est.visao === 'rotinas' ? legendaFreq() : est.visao === 'calendario' ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
+    <div id="crCorpo">${est.visao === 'rotinas' ? rotinas() : est.busca ? resultados() : est.visao === 'situacao' ? situacao() : est.visao === 'foco' ? foco() : est.visao === 'modulos' ? modulos() : calendario()}</div>
+    <div class="cr-legenda">${est.visao === 'rotinas' ? legendaFreq() : (est.visao === 'calendario' || est.visao === 'situacao') ? legendaSit() : Object.values(AREAS_C).map(a => `<span><i style="background:${a.cor}"></i>${esc(a.nome)}</span>`).join('')}
       <span class="cr-auto-leg"><span class="cr-tag" style="background:#51534A">Do app</span> vem sozinha de outra área · <span class="cr-tag avulsa">Avulsa</span> lançada à mão</span></div>`}
   </div>`;
   ligarTela();
@@ -2062,6 +2118,7 @@ function ligarTela() {
     gravarLocal('gr.cronograma.modAbertos', [...est.abertos]);
   });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
+  r.querySelectorAll('[data-sit-ir]').forEach(b => b.onclick = () => $('crSit-' + b.dataset.sitIr)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   if ($('crBusca')) {
     let tm = null;
     $('crBusca').oninput = e => {

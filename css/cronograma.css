@@ -8,7 +8,7 @@
 .cr-sub{margin:4px 0 0;color:var(--suave);font-size:13px}
 .cr-acoes{display:flex;gap:8px;flex-wrap:wrap}
 
-.cr-seg{display:grid;grid-template-columns:repeat(6,1fr);max-width:880px;background:var(--linha);border-radius:10px;padding:3px}
+.cr-seg{display:grid;grid-template-columns:repeat(7,1fr);max-width:1020px;background:var(--linha);border-radius:10px;padding:3px}
 .cr-seg button{font:inherit;font-size:14px;min-height:40px;border:0;border-radius:8px;background:transparent;color:var(--suave);cursor:pointer}
 .cr-seg button[aria-selected="true"]{background:var(--papel);color:var(--texto);font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 @media (max-width:520px){.cr-seg button{font-size:12px;padding:0 2px;line-height:1.15}}
@@ -525,3 +525,23 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-tk-av .cr-av-bt{padding:6px 12px;font-size:13px}
 .cr-tk-ab.on{border-color:#84BD00;background:#F2F8E6}
 .cr-lemb{display:inline-block;font-size:11px;font-weight:600;color:#744F28;background:#F6EFE6;border-radius:8px;padding:0 6px;margin-right:2px}
+
+/* ---- aba Situação (23/11/2026, pedido dele: "quero uma forma de saber o
+   que está atrasado") — números no alto e as listas uma debaixo da outra. ---- */
+.cr-situacao{display:flex;flex-direction:column;gap:18px}
+.cr-sit-resumo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cr-nm{font:inherit;display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:10px 14px;color:var(--texto);cursor:pointer}
+.cr-nm:hover{border-color:var(--verde)}
+.cr-nm b{font-size:26px;line-height:1.05}
+.cr-nm small{font-size:11.5px;color:var(--suave)}
+.cr-nm.atraso b{color:var(--erro)}
+.cr-nm.hoje b{color:var(--verde-esc)}
+.cr-nm.bloq b{color:#BA7517}
+@media (max-width:620px){.cr-sit-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.cr-nm b{font-size:21px}}
+.cr-blocos{display:flex;flex-direction:column;gap:20px}
+.cr-bloco{display:flex;flex-direction:column;gap:8px}
+.cr-bloco-cab{display:flex;align-items:center;gap:8px;margin:0;font-size:15px}
+.cr-bloco-cab i{width:10px;height:10px;border-radius:50%;flex:none}
+.cr-bloco-cab span{font-size:12px;font-weight:700;color:var(--suave);background:var(--linha);border-radius:10px;padding:1px 8px}
+.cr-bloco-sub{display:flex;align-items:baseline;gap:6px;margin:6px 0 0;font-size:12px;color:var(--suave);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.cr-bloco-sub span{font-weight:400;text-transform:none;letter-spacing:0}
