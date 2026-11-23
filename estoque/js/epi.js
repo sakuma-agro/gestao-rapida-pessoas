@@ -451,12 +451,41 @@ const MER = { 1: 'Substituição por dano justificado', 2: 'Substituição por d
 const fazNome = l => { const z = FAZENDAS.find(x => x.letra === String(l || '').toUpperCase()); return z ? `${z.letra} · ${z.nome}` : (l || '—'); };
 const inicioMes = () => hojeISO().slice(0, 8) + '01';
 const U = { faz: '', func: '', de: '', ate: '' };
+/* Igual ao painel de movimentações: a moldura (chips, funcionário e o período)
+   é desenhada uma vez e só o resultado se refaz. Enquanto a tela inteira era
+   remontada a cada filtro, o campo de data era destruído no meio da digitação
+   do ano e o foco ia embora (anomalia do Lincoln, 23/11/2026). */
 function desenharUso() {
   const alvo = $('epiUsoCorpo');
   if (!alvo) return;
   if (!pronto()) { alvo.innerHTML = '<div class="vazio">Abrindo…</div>'; return; }
   if (!U.de) U.de = inicioMes();
   if (!U.ate) U.ate = hojeISO();
+  alvo.innerHTML = `
+    <h2 style="margin:0">Entregas por fazenda</h2>
+    <p class="dc-sem" style="margin:2px 0 8px">EPIs entregues aos funcionários no SST › EPI's › Entregas, pela fazenda onde vão ser usados (coluna FAZ da ficha).</p>
+    <div class="ct-chips">${[{ letra: '', nome: 'Todas' }, ...FAZENDAS].map(z => `<button type="button" class="ct-chip" data-faz="${z.letra}" aria-pressed="${U.faz === z.letra}">${z.letra ? esc(z.letra + ' · ' + z.nome) : 'Todas'}</button>`).join('')}</div>
+    <div class="barra">
+      <label class="campo" style="flex:1;min-width:180px">Funcionário <input type="text" id="usFunc" value="${esc(U.func)}" placeholder="nome do funcionário"></label>
+      <label class="campo">De <input type="date" id="usDe" value="${esc(U.de)}" max="${hojeISO()}"></label>
+      <label class="campo">Até <input type="date" id="usAte" value="${esc(U.ate)}" max="${hojeISO()}"></label>
+      <button class="btn" type="button" id="usImprimir">🖨 Imprimir</button>
+    </div>
+    <div id="usResultado"></div>`;
+  alvo.querySelectorAll('[data-faz]').forEach(b => b.onclick = () => { U.faz = b.dataset.faz; desenharUso(); });
+  /* Campo limpo volta ao padrão, e o padrão é escrito de volta no campo —
+     antes quem repunha o valor na tela era a remontagem inteira. */
+  $('usDe').onchange = ev => { U.de = ev.target.value || inicioMes(); if (!ev.target.value) ev.target.value = U.de; desenharUsoResultado(); };
+  $('usAte').onchange = ev => { U.ate = ev.target.value || hojeISO(); if (!ev.target.value) ev.target.value = U.ate; desenharUsoResultado(); };
+  $('usImprimir').onclick = () => window.print();
+  $('usFunc').addEventListener('input', ev => { U.func = ev.target.value; desenharUsoResultado(); });
+  desenharUsoResultado();
+}
+
+/** Os totais e as duas tabelas — tudo o que depende dos filtros. */
+function desenharUsoResultado() {
+  const alvo = $('usResultado');
+  if (!alvo) return;
   const fb = semAcento(U.func);
   const meus = new Set(locaisDoUsuario().map(l => l.id));
   const ent = unicos('est_movimentos').filter(m => m.ativo !== false && m.origem === 'epi' && m.sentido === 'saida' && m.funcionario
@@ -474,15 +503,6 @@ function desenharUso() {
   const funcs = new Set(ent.map(m => m.funcionario));
   const caChip = ca => { if (!ca) return ''; const e = estadoCa(caObj(ca)); return e.rotulo && e.chave !== 'emdia' ? ' ' + chip(e.cor, e.rotulo) : ''; };
   alvo.innerHTML = `
-    <h2 style="margin:0">Entregas por fazenda</h2>
-    <p class="dc-sem" style="margin:2px 0 8px">EPIs entregues aos funcionários no SST › EPI's › Entregas, pela fazenda onde vão ser usados (coluna FAZ da ficha).</p>
-    <div class="ct-chips">${[{ letra: '', nome: 'Todas' }, ...FAZENDAS].map(z => `<button type="button" class="ct-chip" data-faz="${z.letra}" aria-pressed="${U.faz === z.letra}">${z.letra ? esc(z.letra + ' · ' + z.nome) : 'Todas'}</button>`).join('')}</div>
-    <div class="barra">
-      <label class="campo" style="flex:1;min-width:180px">Funcionário <input type="text" id="usFunc" value="${esc(U.func)}" placeholder="nome do funcionário"></label>
-      <label class="campo">De <input type="date" id="usDe" value="${esc(U.de)}" max="${hojeISO()}"></label>
-      <label class="campo">Até <input type="date" id="usAte" value="${esc(U.ate)}" max="${hojeISO()}"></label>
-      <button class="btn" type="button" id="usImprimir">🖨 Imprimir</button>
-    </div>
     <p class="dc-sem"><b>${ent.length}</b> ${ent.length === 1 ? 'entrega' : 'entregas'} · <b>${funcs.size}</b> ${funcs.size === 1 ? 'funcionário' : 'funcionários'} · ${esc(dataBR(U.de))} a ${esc(dataBR(U.ate))}${U.faz ? ' · ' + esc(fazNome(U.faz)) : ''}</p>
     <h3 style="margin:14px 0 6px">Total por EPI</h3>
     <div class="es-larga"><table class="tabela"><thead><tr><th>EPI</th><th>CA</th><th class="ce">Qtd</th><th class="ce">Funcionários</th></tr></thead>
@@ -495,11 +515,6 @@ function desenharUso() {
       <td>${m.ca ? 'CA ' + esc(m.ca) + caChip(m.ca) : '—'}</td><td class="ce">${esc(mostrarNumero(m.quantidade))}</td>
       <td>${esc(MER[m.mer] || m.mer || '—')}</td><td>${esc(fazNome(m.faz))}</td><td>${esc(localDe(m.local_id).nome)}</td></tr>`).join('')
       || '<tr><td colspan="8" class="dc-sem">Nenhuma entrega neste filtro.</td></tr>'}</tbody></table></div>`;
-  alvo.querySelectorAll('[data-faz]').forEach(b => b.onclick = () => { U.faz = b.dataset.faz; desenharUso(); });
-  $('usDe').onchange = ev => { U.de = ev.target.value || inicioMes(); desenharUso(); };
-  $('usAte').onchange = ev => { U.ate = ev.target.value || hojeISO(); desenharUso(); };
-  $('usImprimir').onclick = () => window.print();
-  $('usFunc').addEventListener('input', ev => { U.func = ev.target.value; const p = ev.target.selectionStart; desenharUso(); const el = $('usFunc'); el.focus(); el.setSelectionRange(p, p); });
 }
 
 const DESENHOS = { epiSaldo: desenharSaldo, epiEntradas: () => desenharLista('entrada'), epiSaidas: () => desenharLista('saida'),

@@ -1280,21 +1280,21 @@ function blocosMov(lista) {
   return blocos;
 }
 
+/* A moldura (filtros, períodos e botões) e o resultado (os quatro números e a
+   lista) são desenhados em separado. Antes a tela inteira era remontada a cada
+   filtro, e o campo de data era destruído debaixo do dedo: ao digitar o ano, a
+   data já ficava inteira no primeiro dígito (01/10/0002), o `change` disparava,
+   o painel se refazia e o foco ia embora — ficava impossível digitar o ano
+   (anomalia do Lincoln, 23/11/2026). Mexendo só no resultado, os campos ficam
+   de pé e a digitação segue até o fim. */
 function desenharPainel() {
   const alvo = $('qcPainelCorpo');
   if (!pronto()) { alvo.innerHTML = '<div class="cartao"><div class="vazio">Abrindo…</div></div>'; return; }
   if (!localQc()) return semLocal(alvo);
   $('qcPainelFolha').innerHTML = '';
-  const lista = filtrados();
-  const ent = lista.filter(m => m.sentido === 'entrada'), sai = lista.filter(m => m.sentido === 'saida');
-  const cu = custos();
-  const vt = l => l.reduce((t, m) => t + ((cu.mov.get(m.id) || {}).total || 0), 0);
-  const lancs = l => new Set(l.map(m => m.lancamento_id || m.id)).size;
   const grupos = [...new Set(itensOrdenados().map(i => i.grupo || 'Outros'))];
   const tipos = pf.sentido === 'entrada' ? TIPOS_ENTRADA : pf.sentido === 'saida' ? TIPOS_SAIDA
     : { ...TIPOS_ENTRADA, uso: 'Uso' };
-  let dia = null;
-  const agro = ehQcLocal(localQc());
   alvo.innerHTML = `
   <div class="cartao">
     <div class="barra entre"><h2 style="margin:0">Movimentações · ${esc(nomeLocal())}</h2>${seletorLocal(false)}</div>
@@ -1315,18 +1315,53 @@ function desenharPainel() {
       ${[['mes', 'Este mês'], ['30', 'Últimos 30 dias'], ['ano', 'Este ano'], ['tudo', 'Tudo']].map(([k, v]) =>
         `<button type="button" class="ct-chip" data-periodo="${k}">${v}</button>`).join('')}
     </div>
-    <div class="es-cards">
-      <div class="es-card es-ok"><span>Entradas</span><strong>${ent.length}</strong><small>itens em ${lancs(ent)} lançamento(s) · ${esc(brl(vt(ent)))}</small></div>
-      <div class="es-card es-sobra"><span>Saídas</span><strong>${sai.length}</strong><small>itens em ${lancs(sai)} lançamento(s) · ${esc(brl(vt(sai)))}</small></div>
-      <div class="es-card es-transf"><span>Transferências</span><strong>${lista.filter(m => m.tipo === 'transferencia').length}</strong><small>entrando e saindo</small></div>
-      <div class="es-card"><span>Produtos diferentes</span><strong>${new Set(lista.map(m => m.item_id)).size}</strong><small>no período</small></div>
-    </div>
+    <div class="es-cards" id="pfResumo"></div>
     <div class="barra fim" style="margin-top:10px">
-      <button class="btn" type="button" id="pfCsv"${lista.length ? '' : ' disabled'}>Baixar planilha</button>
-      <button class="btn" type="button" id="pfImprimir"${lista.length ? '' : ' disabled'}>Imprimir</button>
+      <button class="btn" type="button" id="pfCsv">Baixar planilha</button>
+      <button class="btn" type="button" id="pfImprimir">Imprimir</button>
     </div>
   </div>
-  <div class="cartao">
+  <div class="cartao" id="pfLista"></div>`;
+
+  /* Datas, tipo, categoria e procura só mudam o resultado — a moldura fica de
+     pé. "Entradas e saídas" troca a lista de tipos, então essa refaz a moldura. */
+  $('pfDe').onchange = e => { pf.de = e.target.value; desenharMovResultado(); };
+  $('pfAte').onchange = e => { pf.ate = e.target.value; desenharMovResultado(); };
+  $('pfSentido').onchange = e => { pf.sentido = e.target.value; pf.tipo = ''; desenharPainel(); };
+  $('pfTipo').onchange = e => { pf.tipo = e.target.value; desenharMovResultado(); };
+  $('pfGrupo').onchange = e => { pf.grupo = e.target.value; desenharMovResultado(); };
+  $('pfTexto').oninput = e => { pf.texto = e.target.value; desenharMovResultado(); };
+  alvo.querySelectorAll('[data-periodo]').forEach(b => b.onclick = () => {
+    const hoje = hojeISO();
+    if (b.dataset.periodo === 'mes') { pf.de = hoje.slice(0, 8) + '01'; pf.ate = hoje; }
+    if (b.dataset.periodo === '30') { const d = new Date(); d.setDate(d.getDate() - 30); pf.de = d.toISOString().slice(0, 10); pf.ate = hoje; }
+    if (b.dataset.periodo === 'ano') { pf.de = hoje.slice(0, 4) + '-01-01'; pf.ate = hoje; }
+    if (b.dataset.periodo === 'tudo') { pf.de = ''; pf.ate = ''; }
+    $('pfDe').value = pf.de; $('pfAte').value = pf.ate;
+    desenharMovResultado();
+  });
+  $('pfCsv').addEventListener('click', () => baixarCsv(filtrados(), custos()));
+  $('pfImprimir').addEventListener('click', () => { montarFolhaMov(filtrados(), custos()); setTimeout(() => window.print(), 50); });
+  desenharMovResultado();
+}
+
+/** Os quatro números e a lista — tudo o que depende dos filtros. */
+function desenharMovResultado() {
+  const resumo = $('pfResumo'), corpo = $('pfLista');
+  if (!resumo || !corpo) return;
+  const lista = filtrados();
+  const ent = lista.filter(m => m.sentido === 'entrada'), sai = lista.filter(m => m.sentido === 'saida');
+  const cu = custos();
+  const vt = l => l.reduce((t, m) => t + ((cu.mov.get(m.id) || {}).total || 0), 0);
+  const lancs = l => new Set(l.map(m => m.lancamento_id || m.id)).size;
+  const agro = ehQcLocal(localQc());
+  let dia = null;
+  resumo.innerHTML = `
+    <div class="es-card es-ok"><span>Entradas</span><strong>${ent.length}</strong><small>itens em ${lancs(ent)} lançamento(s) · ${esc(brl(vt(ent)))}</small></div>
+    <div class="es-card es-sobra"><span>Saídas</span><strong>${sai.length}</strong><small>itens em ${lancs(sai)} lançamento(s) · ${esc(brl(vt(sai)))}</small></div>
+    <div class="es-card es-transf"><span>Transferências</span><strong>${lista.filter(m => m.tipo === 'transferencia').length}</strong><small>entrando e saindo</small></div>
+    <div class="es-card"><span>Produtos diferentes</span><strong>${new Set(lista.map(m => m.item_id)).size}</strong><small>no período</small></div>`;
+  corpo.innerHTML = `
     <div class="qc-mov${agro ? ' com-agro' : ''}">${agro && lista.length ? `<div class="qc-agro-cab"><span>${lista.filter(m => m.agro_ok).length} de ${lista.length} lançados no Agro</span><b>Agro</b></div>` : ''}${blocosMov(lista).map(b => {
       const cab = b.data !== dia ? `<h3 class="es-secao">${esc(dataBR(dia = b.data))} <small>${esc(new Date(b.data + 'T12:00').toLocaleDateString('pt-BR', { weekday: 'long' }))}</small></h3>` : '';
       const tudo = b.itens.every(m => m.agro_ok);
@@ -1344,8 +1379,11 @@ function desenharPainel() {
           ${(cu.mov.get(m.id) || {}).total != null ? `<small class="qc-mov-rs">${esc(brl(cu.mov.get(m.id).total))}</small>` : ''}</strong>
         ${agro ? `<label class="qc-agro" title="${m.agro_ok ? esc('Lançado no Agro' + (m.agro_por ? ' por ' + m.agro_por : '') + (m.agro_em ? ' em ' + new Date(m.agro_em).toLocaleString('pt-BR') : '')) : 'Marcar como verificado e lançado no Agro'}"><input type="checkbox" data-agro="${esc(m.id)}"${m.agro_ok ? ' checked' : ''}></label>` : ''}
       </div>`; }).join('');
-    }).join('') || '<div class="vazio">Nenhuma movimentação com esses filtros.</div>'}</div>
-  </div>`;
+    }).join('') || '<div class="vazio">Nenhuma movimentação com esses filtros.</div>'}</div>`;
+
+  const csv = $('pfCsv'), imp = $('pfImprimir');
+  if (csv) csv.disabled = !lista.length;
+  if (imp) imp.disabled = !lista.length;
 
   if (agro) {
     const marcar = async (ms, ok) => {
@@ -1354,34 +1392,13 @@ function desenharPainel() {
         for (const m of ms) if (!!m.agro_ok !== ok)
           await gravar('est_movimentos', Object.assign({}, m, ok ? { agro_ok: true, agro_em: agora, agro_por: quem } : { agro_ok: false, agro_em: null, agro_por: null }));
       } catch (e) { aviso('Não consegui marcar o Agro: ' + (e.message || e), true); }
-      desenharPainel();
+      desenharMovResultado();
     };
     const porId = new Map(lista.map(m => [m.id, m]));
-    alvo.querySelectorAll('[data-agro]').forEach(c => c.onchange = () => marcar([porId.get(c.dataset.agro)].filter(Boolean), c.checked));
+    corpo.querySelectorAll('[data-agro]').forEach(c => c.onchange = () => marcar([porId.get(c.dataset.agro)].filter(Boolean), c.checked));
     const blocos = new Map(blocosMov(lista).map(b => [b.chave, b.itens]));
-    alvo.querySelectorAll('[data-agro-doc]').forEach(c => c.onchange = () => marcar(blocos.get(c.dataset.agroDoc) || [], c.checked));
+    corpo.querySelectorAll('[data-agro-doc]').forEach(c => c.onchange = () => marcar(blocos.get(c.dataset.agroDoc) || [], c.checked));
   }
-
-  const refaz = () => desenharPainel();
-  $('pfDe').onchange = e => { pf.de = e.target.value; refaz(); };
-  $('pfAte').onchange = e => { pf.ate = e.target.value; refaz(); };
-  $('pfSentido').onchange = e => { pf.sentido = e.target.value; pf.tipo = ''; refaz(); };
-  $('pfTipo').onchange = e => { pf.tipo = e.target.value; refaz(); };
-  $('pfGrupo').onchange = e => { pf.grupo = e.target.value; refaz(); };
-  $('pfTexto').oninput = e => {
-    pf.texto = e.target.value; const pos = e.target.selectionStart;
-    refaz(); const el = $('pfTexto'); el.focus(); el.setSelectionRange(pos, pos);
-  };
-  alvo.querySelectorAll('[data-periodo]').forEach(b => b.onclick = () => {
-    const hoje = hojeISO();
-    if (b.dataset.periodo === 'mes') { pf.de = hoje.slice(0, 8) + '01'; pf.ate = hoje; }
-    if (b.dataset.periodo === '30') { const d = new Date(); d.setDate(d.getDate() - 30); pf.de = d.toISOString().slice(0, 10); pf.ate = hoje; }
-    if (b.dataset.periodo === 'ano') { pf.de = hoje.slice(0, 4) + '-01-01'; pf.ate = hoje; }
-    if (b.dataset.periodo === 'tudo') { pf.de = ''; pf.ate = ''; }
-    refaz();
-  });
-  $('pfCsv')?.addEventListener('click', () => baixarCsv(lista, cu));
-  $('pfImprimir')?.addEventListener('click', () => { montarFolhaMov(lista, cu); setTimeout(() => window.print(), 50); });
 }
 
 const periodoTxt = () => pf.de || pf.ate ? `${pf.de ? dataBR(pf.de) : 'início'} a ${pf.ate ? dataBR(pf.ate) : 'hoje'}` : 'todo o período';
