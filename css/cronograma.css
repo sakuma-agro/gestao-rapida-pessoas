@@ -527,11 +527,11 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-lemb{display:inline-block;font-size:11px;font-weight:600;color:#744F28;background:#F6EFE6;border-radius:8px;padding:0 6px;margin-right:2px}
 
 /* ---- aba Situação (23/11/2026, pedido dele: "quero uma forma de saber o
-   que está atrasado" e, logo depois, "faça como lista lado a lado") — quatro
-   números no alto e as quatro listas em colunas, reusando o quadro e as abas
-   de celular do Foco do dia. ---- */
+   que está atrasado" e, logo depois, "faça como lista lado a lado") — os
+   números no alto, a faixa do foco de hoje e as quatro listas em colunas,
+   reusando o quadro e as abas de celular do Foco do dia. ---- */
 .cr-situacao{display:flex;flex-direction:column;gap:12px}
-.cr-sit-resumo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.cr-sit-resumo{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 .cr-nm{font:inherit;display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;background:var(--papel);border:1px solid var(--linha);border-radius:12px;padding:10px 14px;color:var(--texto);cursor:pointer}
 .cr-nm:hover{border-color:var(--verde)}
 .cr-nm b{font-size:26px;line-height:1.05}
@@ -539,6 +539,22 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-nm.atraso b{color:var(--erro)}
 .cr-nm.hoje b{color:var(--verde-esc)}
 .cr-nm.bloq b{color:#BA7517}
-@media (max-width:620px){.cr-sit-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.cr-nm b{font-size:21px}}
+/* Quinto número e faixa "No foco hoje" (23/11/2026, pedido dele: ligar a
+   Situação com o Foco do dia). No celular o número do foco ocupa a linha
+   inteira, embaixo dos outros quatro. */
+.cr-nm.foco{border-color:var(--verde);background:var(--verde-fundo)}
+.cr-nm.foco b{color:var(--verde-esc)}
+.cr-foco-faixa{background:var(--papel);border:1px solid var(--verde);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.cr-foco-faixa-cab{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cr-foco-faixa-cab b{font-size:14px}
+.cr-foco-faixa-cab small{font-size:11.5px;color:var(--suave)}
+.cr-foco-faixa-cab .cr-ac{margin-left:auto}
+.cr-foco-tira{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.cr-foco-tira .cr-card{flex:0 0 250px;scroll-snap-align:start}
+.cr-faixa-vazia{margin:0;font-size:12.5px;color:var(--suave);line-height:1.5}
+@media (max-width:620px){.cr-sit-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.cr-nm b{font-size:21px}
+  .cr-nm.foco{grid-column:1 / -1;flex-direction:row;align-items:center;gap:8px}
+  .cr-foco-tira .cr-card{flex-basis:84%}
+  .cr-foco-faixa-cab .cr-ac{margin-left:0;flex-basis:100%;justify-content:center}}
 .cr-col.col-atraso{border-color:rgba(180,35,24,.45);background:rgba(180,35,24,.06)}
 .cr-col.col-atraso .cr-cont{color:var(--erro);font-weight:700}

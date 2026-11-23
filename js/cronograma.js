@@ -1257,6 +1257,26 @@ function modulos() {
     : `<div class="cr-foco-vazio"><b>Nenhuma tarefa ${est.mostrar === 'todas' ? '' : 'aberta '}${nomeP} nos filtros atuais.</b><p>Troque o prazo para Semana ou Tudo, ou confira os filtros.</p></div>`;
 }
 
+/* Faixa "No foco hoje" (23/11/2026, pedido dele): o alto da Situação mostra o
+   que a equipe já escolheu para hoje, deitado e na mesma ordem do Foco do dia
+   (prioridade primeiro). Os cartões são os mesmos, com a etiqueta da cor e as
+   ações de sempre; o botão da ponta abre a aba Foco do dia. Vazia, ela explica
+   como mandar a primeira — é o retrato da reunião antes de começar. */
+function faixaFoco(itens) {
+  const nf = itens.filter(naoFeito).length;
+  const conta = itens.length
+    ? `${itens.length} ${itens.length === 1 ? 'tarefa' : 'tarefas'}${nf ? ` · <span class="cr-at">${nf} não feita${nf > 1 ? 's' : ''}</span>` : ''}`
+    : 'ninguém escolheu ainda';
+  return `<div class="cr-foco-faixa" id="crSit-foco">
+    <div class="cr-foco-faixa-cab"><span class="cr-pt" style="background:var(--verde)"></span>
+      <b>🎯 No foco hoje</b><small>${conta}</small>
+      <button type="button" class="cr-ac foco" data-visao="foco">Abrir o Foco do dia →</button></div>
+    ${itens.length
+      ? `<div class="cr-foco-tira">${itens.map(i => card(i, { comSit: true })).join('')}</div>`
+      : '<p class="cr-faixa-vazia">Na reunião da manhã, toque na cor de um cartão de baixo — <b>Agora</b>, <b>Em seguida</b>, <b>Rápido</b> ou <b>Por último</b> — e a tarefa sobe para cá.</p>'}
+  </div>`;
+}
+
 /* Situação (23/11/2026, pedido dele: "quero uma forma de saber o que está
    atrasado"). Aba sem calendário: no alto os números do momento e, embaixo,
    as listas lado a lado (correção dele no mesmo dia: "faça como lista lado a
@@ -1271,16 +1291,26 @@ function situacao() {
   if (!abertas.length) return `<div class="cr-foco-vazio"><b>Nada em aberto nos filtros atuais.</b>
     <p>Não há tarefa atrasada nem a fazer para o que está filtrado em cima. Troque a pessoa, a área ou a origem para ver o resto.</p></div>`;
 
+  /* Liga com o Foco do dia (23/11/2026, pedido dele: "uma forma de ligar essa
+     parte com o foco do dia"). O que já está no foco sobe para a faixa do alto
+     e sai das quatro listas: assim cada tarefa aparece num lugar só — antes a
+     mesma tarefa contava como atrasada e estava no foco ao mesmo tempo — e as
+     listas de baixo viram "o que ainda não entrou no foco". A bloqueada fica
+     na lista dela, porque bloquear tira do foco. */
+  const noFoco = abertas.filter(it => it.focoEm && it.sit !== 'bloqueado').sort((a, b) => ordemFoco(a, b));
+  const kFoco = new Set(noFoco.map(it => it.chave));
+  const fora = abertas.filter(it => !kFoco.has(it.chave));
+
   const porTitulo = (a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR');
-  const atrasadas = abertas.filter(atrasado).sort((a, b) => a.data.localeCompare(b.data) || porTitulo(a, b));
-  const andamento = abertas.filter(it => it.sit === 'fazendo' && !atrasado(it)).sort(ordemItens);
-  const afazer = abertas.filter(it => it.sit === 'afazer' && !atrasado(it)).sort(ordemItens);
-  const bloqueadas = abertas.filter(it => it.sit === 'bloqueado')
+  const atrasadas = fora.filter(atrasado).sort((a, b) => a.data.localeCompare(b.data) || porTitulo(a, b));
+  const andamento = fora.filter(it => it.sit === 'fazendo' && !atrasado(it)).sort(ordemItens);
+  const afazer = fora.filter(it => it.sit === 'afazer' && !atrasado(it)).sort(ordemItens);
+  const bloqueadas = fora.filter(it => it.sit === 'bloqueado')
     .sort((a, b) => (diasParado(b) || 0) - (diasParado(a) || 0) || a.data.localeCompare(b.data) || porTitulo(a, b));
 
   const amanha = addDias(hoje(), 1), sabado = fimSemana();
-  const vencemHoje = abertas.filter(it => it.sit !== 'bloqueado' && it.data === hoje()).length;
-  const naSemana = abertas.filter(it => it.sit !== 'bloqueado' && it.data > hoje() && it.data <= sabado).length;
+  const vencemHoje = fora.filter(it => it.sit !== 'bloqueado' && it.data === hoje()).length;
+  const naSemana = fora.filter(it => it.sit !== 'bloqueado' && it.data > hoje() && it.data <= sabado).length;
 
   const grupos = [
     ['Hoje', afazer.filter(it => it.data === hoje())],
@@ -1290,8 +1320,8 @@ function situacao() {
   ].filter(([, l]) => l.length);
 
   const cols = [
-    { id: 'atraso', nome: 'Atrasadas', cor: COR_SIT.atraso, itens: atrasadas, vazio: 'Nada atrasado nos filtros atuais.' },
-    { id: 'fazendo', nome: 'Em andamento', cor: COR_SIT.fazendo, itens: andamento, vazio: 'Nenhuma tarefa começada.' },
+    { id: 'atraso', nome: 'Atrasadas', cor: COR_SIT.atraso, itens: atrasadas, vazio: noFoco.some(atrasado) ? 'Nada atrasado fora do foco — as atrasadas já estão na faixa de cima.' : 'Nada atrasado nos filtros atuais.' },
+    { id: 'fazendo', nome: 'Em andamento', cor: COR_SIT.fazendo, itens: andamento, vazio: 'Nenhuma tarefa começada fora do foco.' },
     { id: 'afazer', nome: 'A fazer', cor: COR_SIT.afazer, itens: afazer, vazio: 'Nada a fazer dentro do prazo.', grupos },
     { id: 'bloqueado', nome: 'Bloqueadas', cor: COR_SIT.bloqueado, itens: bloqueadas, vazio: 'Nenhuma tarefa bloqueada.' },
   ];
@@ -1309,7 +1339,9 @@ function situacao() {
       ${numero('hoje', vencemHoje, vencemHoje === 1 ? 'vence hoje' : 'vencem hoje', 'afazer')}
       ${numero('', naSemana, 'ainda nesta semana', 'afazer')}
       ${numero('bloq', bloqueadas.length, bloqueadas.length === 1 ? 'bloqueada' : 'bloqueadas', 'bloqueado')}
+      ${numero('foco', noFoco.length, 'no foco hoje', 'foco')}
     </div>
+    ${faixaFoco(noFoco)}
     <div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmobsit="${c.id}" aria-selected="${est.colMobSit === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
     <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMobSit === c.id ? ' ativa' : ''}" id="crSit-${c.id}" data-col="sit-${c.id}">
       <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${esc(c.nome)}</b><span class="cr-cont">${c.itens.length}</span></header>
@@ -1658,7 +1690,8 @@ function calendario() {
 }
 const ordemItens = (a, b) => (a.sit === 'feito') - (b.sit === 'feito') || a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo, 'pt-BR');
 const legendaSit = () => [['atraso', 'Atrasado'], ['afazer', 'A fazer'], ['fazendo', 'Em andamento'], ['bloqueado', 'Bloqueado'], ['feito', 'Concluído']]
-  .map(([k, n]) => `<span><i style="background:${COR_SIT[k]}"></i>${n}</span>`).join('');
+  .map(([k, n]) => `<span><i style="background:${COR_SIT[k]}"></i>${n}</span>`).join('')
+  + '<span><i style="background:var(--verde)"></i>No foco hoje</span>';
 
 /* ---------------- ir para a origem (29/10/2026, pedido dele) ----------------
    "Coloque um botão para ir para o local da atividade": o card e o detalhe
@@ -2126,10 +2159,12 @@ function ligarTela() {
   });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
   /* Números do alto da aba Situação: levam para a lista — no celular trocando
-     a aba, no computador trazendo a coluna para a vista. */
+     a aba, no computador trazendo a coluna para a vista. O "no foco hoje" só
+     rola até a faixa: ela fica acima das abas, aparece no celular do mesmo
+     jeito e não é uma das colunas. */
   r.querySelectorAll('[data-sit-ir]').forEach(b => b.onclick = () => {
     const id = b.dataset.sitIr;
-    if (est.colMobSit !== id) { est.colMobSit = id; desenhar(); }
+    if (id !== 'foco' && est.colMobSit !== id) { est.colMobSit = id; desenhar(); }
     $('crSit-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
   });
   if ($('crBusca')) {
