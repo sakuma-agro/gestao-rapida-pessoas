@@ -1167,6 +1167,7 @@ const vis = ler('gr.cronograma.vis', null) || {};
 const est = {
   visao: vis.visao === 'kanban' ? 'foco' : (vis.visao || 'calendario'),  // calendario | foco | reuniao
   colMob: 'afazer',                     // aba do quadro no celular
+  colMobSit: 'atraso',                  // o mesmo, na aba Situação
   colunas: vis.colunas || 'situacao',   // situacao | pessoa
   filtro: vis.filtro || 'todos',        // todos | minhas
   pessoa: '', area: '', origem: '', busca: '', mostrar: 'abertas', prazo: vis.prazo || 'semana', abertos: new Set(ler('gr.cronograma.modAbertos', [])),
@@ -1257,11 +1258,14 @@ function modulos() {
 }
 
 /* Situação (23/11/2026, pedido dele: "quero uma forma de saber o que está
-   atrasado"). Aba só de listas, sem calendário: no alto os números do
-   momento e, embaixo, uma debaixo da outra, Atrasadas, Em andamento, A fazer
-   (separada em Hoje / Amanhã / Ainda nesta semana / Mais para a frente) e
-   Bloqueadas. Os filtros e a pesquisa de cima valem aqui também; tocar num
-   número desce para a lista dele. Concluídas não entram. */
+   atrasado"). Aba sem calendário: no alto os números do momento e, embaixo,
+   as listas lado a lado (correção dele no mesmo dia: "faça como lista lado a
+   lado") — Atrasadas, Em andamento, A fazer (separada em Hoje / Amanhã /
+   Ainda nesta semana / Mais para a frente) e Bloqueadas. No celular cada
+   lista vira uma aba, como no Foco do dia. Os filtros e a pesquisa de cima
+   valem aqui também; tocar num número vai para a lista dele. Concluídas não
+   entram. Arrastar cartão não muda nada aqui: "atrasada" não é situação, é a
+   data que passou — quem muda é o botão do cartão. */
 function situacao() {
   const abertas = filtrados().filter(it => it.sit !== 'feito');
   if (!abertas.length) return `<div class="cr-foco-vazio"><b>Nada em aberto nos filtros atuais.</b>
@@ -1278,18 +1282,26 @@ function situacao() {
   const vencemHoje = abertas.filter(it => it.sit !== 'bloqueado' && it.data === hoje()).length;
   const naSemana = abertas.filter(it => it.sit !== 'bloqueado' && it.data > hoje() && it.data <= sabado).length;
 
-  const lista = l => `<div class="cr-lista">${l.map(linha).join('')}</div>`;
-  const numero = (cls, n, rot, ir) => `<button type="button" class="cr-nm${cls ? ' ' + cls : ''}" data-sit-ir="${ir}"><b>${n}</b><small>${rot}</small></button>`;
-  const bloco = (id, cor, nome, l, vazio) => `<section class="cr-bloco" id="crSit-${id}">
-      <h3 class="cr-bloco-cab"><i style="background:${cor}"></i>${nome}<span>${l.length}</span></h3>
-      ${l.length ? lista(l) : `<p class="cr-vazio">${vazio}</p>`}</section>`;
-
   const grupos = [
     ['Hoje', afazer.filter(it => it.data === hoje())],
     ['Amanhã', afazer.filter(it => it.data === amanha)],
     ['Ainda nesta semana', afazer.filter(it => it.data > amanha && it.data <= sabado)],
     ['Mais para a frente', afazer.filter(it => it.data > sabado)],
   ].filter(([, l]) => l.length);
+
+  const cols = [
+    { id: 'atraso', nome: 'Atrasadas', cor: COR_SIT.atraso, itens: atrasadas, vazio: 'Nada atrasado nos filtros atuais.' },
+    { id: 'fazendo', nome: 'Em andamento', cor: COR_SIT.fazendo, itens: andamento, vazio: 'Nenhuma tarefa começada.' },
+    { id: 'afazer', nome: 'A fazer', cor: COR_SIT.afazer, itens: afazer, vazio: 'Nada a fazer dentro do prazo.', grupos },
+    { id: 'bloqueado', nome: 'Bloqueadas', cor: COR_SIT.bloqueado, itens: bloqueadas, vazio: 'Nenhuma tarefa bloqueada.' },
+  ];
+  if (!cols.some(c => c.id === est.colMobSit)) est.colMobSit = 'atraso';
+
+  const numero = (cls, n, rot, ir) => `<button type="button" class="cr-nm${cls ? ' ' + cls : ''}" data-sit-ir="${ir}"><b>${n}</b><small>${rot}</small></button>`;
+  const corpo = c => c.grupos
+    ? (c.grupos.length ? c.grupos.map(([n, l]) => `<h4 class="cr-mod-sub">${n} <span>${l.length}</span></h4>${l.map(i => card(i)).join('')}`).join('')
+      : `<p class="cr-vazio">${c.vazio}</p>`)
+    : (c.itens.length ? c.itens.map(i => card(i)).join('') : `<p class="cr-vazio">${c.vazio}</p>`);
 
   return `<div class="cr-situacao">
     <div class="cr-sit-resumo">
@@ -1298,16 +1310,11 @@ function situacao() {
       ${numero('', naSemana, 'ainda nesta semana', 'afazer')}
       ${numero('bloq', bloqueadas.length, bloqueadas.length === 1 ? 'bloqueada' : 'bloqueadas', 'bloqueado')}
     </div>
-    <div class="cr-blocos">
-      ${bloco('atraso', COR_SIT.atraso, 'Atrasadas', atrasadas, 'Nada atrasado nos filtros atuais.')}
-      ${andamento.length ? bloco('fazendo', COR_SIT.fazendo, 'Em andamento', andamento, '') : ''}
-      <section class="cr-bloco" id="crSit-afazer">
-        <h3 class="cr-bloco-cab"><i style="background:${COR_SIT.afazer}"></i>A fazer<span>${afazer.length}</span></h3>
-        ${grupos.length ? grupos.map(([n, l]) => `<h4 class="cr-bloco-sub">${n}<span>${l.length}</span></h4>${lista(l)}`).join('')
-          : '<p class="cr-vazio">Nenhuma tarefa a fazer dentro do prazo nos filtros atuais.</p>'}
-      </section>
-      ${bloqueadas.length ? bloco('bloqueado', COR_SIT.bloqueado, 'Bloqueadas', bloqueadas, '') : ''}
-    </div>
+    <div class="cr-abas" role="tablist">${cols.map(c => `<button type="button" role="tab" data-colmobsit="${c.id}" aria-selected="${est.colMobSit === c.id}">${c.nome} <span>${c.itens.length}</span></button>`).join('')}</div>
+    <div class="cr-quadro sit">${cols.map(c => `<section class="cr-col col-${c.id}${est.colMobSit === c.id ? ' ativa' : ''}" id="crSit-${c.id}" data-col="sit-${c.id}">
+      <header class="cr-col-cab"><span class="cr-pt" style="background:${c.cor}"></span><b>${esc(c.nome)}</b><span class="cr-cont">${c.itens.length}</span></header>
+      <div class="cr-col-corpo">${corpo(c)}</div>
+    </section>`).join('')}</div>
   </div>`;
 }
 
@@ -2118,7 +2125,13 @@ function ligarTela() {
     gravarLocal('gr.cronograma.modAbertos', [...est.abertos]);
   });
   r.querySelectorAll('[data-colunas]').forEach(b => b.onclick = () => { est.colunas = b.dataset.colunas; guardarVis(); desenhar(); });
-  r.querySelectorAll('[data-sit-ir]').forEach(b => b.onclick = () => $('crSit-' + b.dataset.sitIr)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  /* Números do alto da aba Situação: levam para a lista — no celular trocando
+     a aba, no computador trazendo a coluna para a vista. */
+  r.querySelectorAll('[data-sit-ir]').forEach(b => b.onclick = () => {
+    const id = b.dataset.sitIr;
+    if (est.colMobSit !== id) { est.colMobSit = id; desenhar(); }
+    $('crSit-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+  });
   if ($('crBusca')) {
     let tm = null;
     $('crBusca').oninput = e => {
@@ -2165,6 +2178,7 @@ function ligarTela() {
     b.onkeydown = ev => { if (ev.target.closest('[data-rotfoco]')) return; if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); abre(); } };
   });
   r.querySelectorAll('[data-colmob]').forEach(b => b.onclick = () => { est.colMob = b.dataset.colmob; desenhar(); });
+  r.querySelectorAll('[data-colmobsit]').forEach(b => b.onclick = () => { est.colMobSit = b.dataset.colmobsit; desenhar(); });
   r.querySelectorAll('[data-item]').forEach(b => b.onclick = ev => {
     const ac = ev.target.closest('[data-acao]');
     if (ac) { ev.preventDefault(); ev.stopPropagation(); acaoRapida(ac.dataset.alvo, ac.dataset.acao); return; }
@@ -2197,7 +2211,8 @@ function ligarTela() {
   });
   r.querySelectorAll('.cr-col').forEach(col => {
     col.addEventListener('dragover', ev => {
-      if (est.visao === 'modulos') return;
+      // Por módulo e Situação são só vitrine: a coluna não é uma situação para soltar dentro
+      if (est.visao === 'modulos' || est.visao === 'situacao') return;
       ev.preventDefault(); col.classList.add('alvo');
       if (est.visao !== 'foco') return;
       limparMarca();
@@ -2212,7 +2227,7 @@ function ligarTela() {
       if (!it) return;
       const c = col.dataset.col;
       const origem = r.querySelector(`.cr-card[data-item="${CSS.escape(chave)}"]`)?.closest('.cr-col');
-      if (est.visao === 'modulos') return;   // colunas de módulo não mudam a tarefa
+      if (est.visao === 'modulos' || est.visao === 'situacao') return;   // colunas de módulo e de situação não mudam a tarefa
       if (c === 'bloqueado') { if (it.sit !== 'bloqueado') abrirBloquear(it); return; }
       if (est.visao === 'foco') {
         const antes = cartaoAntes(col, ev.clientY);
