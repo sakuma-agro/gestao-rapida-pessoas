@@ -586,22 +586,33 @@
    o cabeçalho para três linhas. Os números dos dias continuam em 10 px. */
 .f007-folha .rel-tabela thead th.f007-rot { font-size: 8.5px; letter-spacing: 0; }
 .f007-folha .rel-tabela tbody tr:nth-child(odd) td { background: #fff; }
-.f007-folha .rel-assina span { border-top-color: #000; height: 16px; margin-bottom: 3px; }
-.f007-folha .rel-assina small { color: #000; }
 .f007-folha .rel-rodape { margin-top: 3px; padding-top: 3px; border-top-color: #000; }
 .f007-folha .rel-rodape img { height: 14px; }
 .f007-folha .f007-aviso { margin: 0 0 3px; font-size: 9px; color: #000; }
 .f007-folha .f007-txt { margin: 2px 0 0; font-size: 9px; line-height: 1.25; color: #000; }
-.f007-folha .f007-obs { border: 1px solid #000; height: 24px; }
-.f007-folha .f007-obs-rot { font-size: 9px; color: #444; text-transform: uppercase; letter-spacing: .4px; }
+/* Pé da ficha (24/11/2026, pedido dele: "aonde o funcionário assina, o quadro
+   de observação, deixar somente uma linha"): Observação e Assinatura dividem UMA
+   linha só — rótulo minúsculo à esquerda e pauta para escrever até o fim. O nome
+   do colaborador saiu daqui: já está na faixa de dados, no alto da folha. Os
+   ~7 mm que sobraram vão para a grade de marcação, que estica sozinha. */
+.f007-folha .f007-pe { display: flex; align-items: flex-end; gap: 16px; margin: 7px 0 2px; }
+.f007-folha .f007-pe-campo { flex: 1; display: flex; align-items: flex-end; gap: 6px; }
+.f007-folha .f007-pe-campo b { font-size: 8.5px; letter-spacing: .3px; text-transform: uppercase;
+  white-space: nowrap; line-height: 1; padding-bottom: 2px; }
+.f007-folha .f007-pe-campo i { flex: 1; border-bottom: 1px solid #000; height: 14px; }
+.f007-folha .f007-pe-ass { flex: 0 0 38%; }
 /* A folha tem altura fixa e a grade estica para ocupar tudo que sobrar: se um
    texto encolher, a linha de marcação cresce sozinha — não há número mágico
    para manter em dia.
-   185 mm é a altura que sobrevive à margem da impressora (mesma conta do
-   .an-folha.deitada no app.css). Com os 210 mm da folha inteira, a margem
-   "Padrão" do Chrome jogava o rodapé para uma segunda página. */
+   Com os 210 mm da folha inteira, a margem "Padrão" do Chrome (10 mm em cima
+   e embaixo) jogava o rodapé para uma segunda página. Sobram 190 mm de área
+   impressível: 24/11/2026 a altura subiu de 185 mm para 188 mm, 2 mm abaixo
+   desse teto — não passar daqui, ou volta a folha 2.
+   Na largura a conta é a mesma: as laterais caíram de 9 mm para 6 mm
+   (285 mm úteis contra 279 mm), então cada dia do mês ganha coluna sem
+   encostar na área que a impressora não alcança. */
 .rel.rel-paisagem.f007-folha { display: flex; flex-direction: column; box-sizing: border-box;
-  height: 185mm; padding: 4mm 9mm; font-size: 10px; }
+  height: 188mm; padding: 3mm 6mm 4mm; font-size: 10px; }
 .f007-folha .rel-tabela.f007 { flex: 1 1 auto; }
 .f007-folha .rel-tabela.f007 tbody { height: 100%; }
 /* Sem @media print aqui de propósito: a prévia na tela usa as mesmas medidas

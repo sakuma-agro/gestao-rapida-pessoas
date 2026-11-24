@@ -225,9 +225,9 @@ function doc007(p, v, folha) {
       <tbody>${MESES.map(m => `<tr><td style="padding:0 4px;height:${ALTURA_007}px;vertical-align:middle">${m}</td>${dias.map(() => `<td ${td}></td>`).join('')}<td ${td}></td><td ${td}></td><td ${td}></td></tr>`).join('')}</tbody></table>
     ${texto007('Orientação:', ORIENT_007)}
     ${texto007('Recomendação de lavagem do EPI:', RECOM_007)}
-    <div style="display:flex;gap:18px;align-items:flex-end;margin-top:5px">
-      <div style="flex:1"><span class="f007-obs-rot">Observação</span><div class="f007-obs"></div></div>
-      <div class="rel-assina" style="flex:0 0 36%"><span></span><small>${p.nome ? esc(p.nome) + '<br>' : ''}Assinatura do funcionário</small></div>
+    <div class="f007-pe">
+      <span class="f007-pe-campo"><b>Observação</b><i></i></span>
+      <span class="f007-pe-campo f007-pe-ass"><b>Assinatura do funcionário</b><i></i></span>
     </div>`, 'Registro anual de lavagem dos EPIs por colaborador',
   { classe: 'rel-paisagem f007-folha' + (folha ? ' folha2' : ''), compacto: true });
 }
@@ -353,7 +353,7 @@ const IMPRESSOS = [
   { tipo: 'f024', codigo: 'FORM 024', freq: 'Anual', nome: 'Reunião com a gerência', desc: 'Reunião da gerência com os funcionários, com a lista de participantes.' },
   { tipo: 'f044', codigo: 'FORM 044', freq: 'Mensal', nome: 'Ata da reunião GRASP', desc: 'Ata da reunião mensal com o representante dos trabalhadores. A presença vai na Lista de presença (FORM 018).' },
   // 04/11/2026: fichas de papel por funcionário — uma folha para cada marcado.
-  { tipo: 'f007', codigo: 'FORM 007', freq: 'Anual · por funcionário', nome: "Higienização dos EPI's", desc: 'Ficha do ano de cada aplicador: marca 1 ou 2 no dia de cada lavagem. Sai uma folha (A4 deitada) por funcionário marcado.' },
+  { tipo: 'f007', codigo: 'FORM 007', freq: 'Anual · por funcionário', nome: "Higienização dos EPI's", desc: 'Ficha do ano de cada aplicador: marca 1 ou 2 no dia de cada lavagem. Sai uma folha (A4 deitada) por funcionário marcado — dá para escolher a fazenda que sai impressa, ou tirar uma folha de cada fazenda.' },
   { tipo: 'f054', codigo: 'FORM 054', freq: 'Mensal · por funcionário', nome: 'Banho e higiene pessoal', desc: 'Ficha do mês de cada trabalhador da aplicação: início/fim, banho tomado e assinatura. Uma folha por funcionário marcado.' },
   { tipo: 'f045', codigo: 'FORM 045', freq: 'Anual · representante', nome: 'Treinamento do representante', desc: 'Ata do treinamento do representante dos trabalhadores (GRASP), com a declaração e as duas assinaturas.' },
   { tipo: 'f046', codigo: 'FORM 046', freq: 'Anual · representante', nome: 'Direitos e deveres do representante', desc: 'Declaração dos direitos e deveres do representante eleito, para ele e a gestão assinarem.' },
@@ -450,16 +450,27 @@ function ligarSeletor(d, fs) {
     return fs.filter(x => marc.has(String(x.id))); };
 }
 
-/** FORM 007 / FORM 054: uma folha por funcionário marcado (nome, função e fazenda do cadastro). */
+/** FORM 007 / FORM 054: uma folha por funcionário marcado (nome, função e fazenda do cadastro).
+    24/11/2026, pergunta dele: "cada funcionário pode ter essas fichas em todas as
+    fazendas, tem como selecionar a fazenda que vai sair na ficha?". No FORM 054 já
+    dava (campo "Identificação da propriedade"); no FORM 007 a fazenda vinha presa ao
+    cadastro. Agora o 007 tem "Fazenda da ficha": em branco sai a do cadastro, uma
+    fazenda escolhida vale para todas as folhas da leva, e "Todas as fazendas" sai uma
+    folha por fazenda para CADA marcado — o aplicador que roda em mais de uma leva a
+    ficha de cada uma. A folha em branco do fim não se multiplica. */
 function formPorFunc(tipo, f, ant) {
   const fs = funcionarios();
   const e007 = tipo === 'f007';
   dialogo(`<h3>${esc(f.titulo)} <small class="dica">${f.codigo} · ${e007 ? 'anual' : 'mensal'} · por funcionário</small></h3>
-    <p class="dica" style="margin:0 0 8px">Marque os funcionários: sai <b>uma folha para cada um</b>, já com nome, função e fazenda do cadastro. O que ficar vazio sai em branco para escrever à mão.</p>
+    <p class="dica" style="margin:0 0 8px">Marque os funcionários: sai <b>uma folha para cada um</b>, já com nome, função e fazenda do cadastro. O que ficar vazio sai em branco para escrever à mão.${e007 ? ' Em <b>Fazenda da ficha</b> dá para trocar a fazenda que sai impressa, ou pedir uma folha de cada fazenda para o mesmo funcionário.' : ''}</p>
     <div class="grade">${e007
       ? `<label class="campo">Ano <span class="dc-sem">(opcional)</span><input type="number" id="ciAno" min="2020" max="2100" value="${esc(ant.ano || new Date().getFullYear())}"></label>
         <label class="campo">CA conjunto APL 01 <span class="dc-sem">(opcional)</span><input type="text" id="ciCa1" value="${esc(ant.ca1 || '')}"></label>
-        <label class="campo">CA conjunto APL 02 <span class="dc-sem">(opcional)</span><input type="text" id="ciCa2" value="${esc(ant.ca2 || '')}"></label>`
+        <label class="campo">CA conjunto APL 02 <span class="dc-sem">(opcional)</span><input type="text" id="ciCa2" value="${esc(ant.ca2 || '')}"></label>
+        <label class="campo plena">Fazenda da ficha <span class="dc-sem">(vazio = a do cadastro de cada um)</span><select id="ciFaz007">
+          <option value="">— fazenda do cadastro —</option>
+          ${fazendasFunc(fs).map(x => `<option value="${esc(x)}"${ant.fazenda === x ? ' selected' : ''}>${esc(x)}</option>`).join('')}
+          <option value="*"${ant.fazenda === '*' ? ' selected' : ''}>Todas as fazendas — uma folha de cada</option></select></label>`
       : `<label class="campo">Mês / ano <span class="dc-sem">(opcional)</span><input type="month" id="ciMes"></label>
         <label class="campo">Empregador <input type="text" id="ciEmp" value="${esc(ant.empregador ?? EMPREGADOR)}"></label>
         <label class="campo">Identificação da propriedade <span class="dc-sem">(vazio = fazenda do cadastro)</span><input type="text" id="ciProp" value="${esc(ant.propriedade || '')}" list="ciFazs"></label>`}
@@ -476,13 +487,18 @@ function formPorFunc(tipo, f, ant) {
     $('ciImpFunc').addEventListener('click', () => {
       const pessoas = [...marcados().map(x => ({ nome: x.nome, cargo: x.cargo || '', fazenda: so(x.fazenda) })),
         ...linhas($('ciOutros').value).map(l => { const [n, ...r] = l.split(/\s+-\s+/); return { nome: n, cargo: r.join(' - '), fazenda: '' }; })];
-      if ($('ciBranco').checked || !pessoas.length) pessoas.push({ nome: '', cargo: '', fazenda: '' });
       const v = e007
-        ? { ano: so($('ciAno').value), ca1: so($('ciCa1').value), ca2: so($('ciCa2').value) }
+        ? { ano: so($('ciAno').value), ca1: so($('ciCa1').value), ca2: so($('ciCa2').value), fazenda: $('ciFaz007').value }
         : { mes: $('ciMes').value, empregador: so($('ciEmp').value), propriedade: so($('ciProp').value) };
       lembrar(tipo, e007 ? v : { empregador: v.empregador, propriedade: v.propriedade });
+      // "Fazenda da ficha" (só FORM 007): vazio = a do cadastro; "*" = uma folha por
+      // fazenda para cada marcado; uma fazenda escolhida vale para a leva inteira.
+      let folhas = pessoas;
+      if (e007 && v.fazenda === '*') { const fz = fazendasFunc(fs); if (fz.length) folhas = pessoas.flatMap(x => fz.map(f2 => ({ ...x, fazenda: f2 }))); }
+      else if (e007 && v.fazenda) folhas = pessoas.map(x => ({ ...x, fazenda: v.fazenda }));
+      if ($('ciBranco').checked || !folhas.length) folhas = [...folhas, { nome: '', cargo: '', fazenda: e007 && v.fazenda !== '*' ? v.fazenda : '' }];
       const gera = e007 ? doc007 : doc054;
-      fechar(); mostrar(pessoas.map((p, i) => gera(p, v, i)).join(''), { barra: true });
+      fechar(); mostrar(folhas.map((x, i) => gera(x, v, i)).join(''), { barra: true });
     });
   });
 }
