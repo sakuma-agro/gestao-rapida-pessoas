@@ -615,5 +615,26 @@
   height: 188mm; padding: 3mm 6mm 4mm; font-size: 10px; }
 .f007-folha .rel-tabela.f007 { flex: 1 1 auto; }
 .f007-folha .rel-tabela.f007 tbody { height: 100%; }
+/* ---- FORM 054 · Controle de banho e higiene pessoal (24/11/2026) ----
+   "Sim, no 054 também", depois do aperto no FORM 007. O pé de uma linha não
+   cabe aqui: esta ficha não tem quadro de observação nem assinatura no rodapé
+   — Observações e Assinatura do trabalhador são COLUNAS, uma por aplicação.
+   O que vale é a outra metade do pedido, aproveitar a folha: antes sobravam
+   ~20 mm no pé da A4 em pé e as margens eram de 14 mm/12 mm. Agora a folha tem
+   altura fixa e a grade estica para ocupar o que sobrar, como no 007: as 24
+   linhas passam de 7,7 mm para cerca de 9,3 mm de altura, e a coluna de
+   Observações ganha largura.
+   275 mm = os 297 mm da A4 menos os 10 mm que a margem "Padrão" do Chrome tira
+   em cima e embaixo, com 2 mm de folga. Passar disso joga a ficha para uma
+   segunda folha. A identidade continua a verde/marrom: o preto e branco foi
+   pedido só para o FORM 007. */
+.rel.f054-folha { display: flex; flex-direction: column; box-sizing: border-box;
+  height: 275mm; padding: 5mm 8mm 4mm; }
+.f054-folha .rel-cabecalho { padding-bottom: 6px; margin-bottom: 8px; }
+.f054-folha .rel-ficha { margin-bottom: 5px !important; }
+.f054-folha .rel-tabela { flex: 1 1 auto; }
+.f054-folha .rel-tabela tbody { height: 100%; }
+.f054-folha .rel-rodape { margin-top: 5px; }
+
 /* Sem @media print aqui de propósito: a prévia na tela usa as mesmas medidas
    do papel, senão ele confere uma coisa e sai outra na impressora. */

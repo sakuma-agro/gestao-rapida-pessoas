@@ -243,7 +243,7 @@ function doc054(p, v, folha) {
       <tbody>${Array.from({ length: 24 }, () => `<tr><td ${td}>&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/</td><td style="height:29px;vertical-align:middle;text-align:center">:</td><td style="height:29px;vertical-align:middle;text-align:center">:</td>
         <td ${td}>(&nbsp;&nbsp;&nbsp;) SIM&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;) NÃO</td><td ${td}></td><td ${td}></td></tr>`).join('')}</tbody></table>
     ${texto('Orientação:', ORIENT_054)}`, 'Ficha mensal do trabalhador da aplicação',
-  { classe: folha ? 'folha2' : '', compacto: true });
+  { classe: 'f054-folha' + (folha ? ' folha2' : ''), compacto: true });
 }
 
 /* ---------------- representante dos trabalhadores (GRASP) ----------------
