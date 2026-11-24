@@ -1783,7 +1783,13 @@ function legendaPrio() {
 function acoes(it) {
   const b = (a, t, cls = '') => `<span class="cr-ac${cls}" role="button" tabindex="0" data-acao="${a}" data-alvo="${esc(it.chave)}">${t}</span>`;
   if (it.sit === 'bloqueado') return b('liberar', 'Liberar');
-  if (!it.focoEm) return it.sit === 'feito' ? b('afazer', 'Reabrir') : botoesFoco(it) + b('bloquear', 'Bloquear');
+  /* Um botão só para enviar ao foco (24/11/2026, pedido dele): fora do foco o
+     cartão mostrava as 4 cores + Bloquear, 5 controles em cada um dos ~400
+     cartões. Agora mostra "🎯 Foco do dia"; o toque abre as 4 cores no próprio
+     cartão, pelo mesmo est.prioAberta que o "Prioridade ▾" já usa. A escolha da
+     prioridade continua obrigatória — só deixou de ficar à mostra o tempo todo. */
+  if (!it.focoEm) return it.sit === 'feito' ? b('afazer', 'Reabrir')
+    : (est.prioAberta === it.chave ? botoesFoco(it) : b('prioMenu', '🎯 Foco do dia', ' foco')) + b('bloquear', 'Bloquear');
   const trocar = est.prioAberta === it.chave ? botoesPrio(it, 'prio') : b('prioMenu', 'Prioridade ▾');
   // Concluir direto do A fazer (09/11/2026): tarefa rápida não precisa passar por Em andamento
   if (it.sit === 'afazer') return b('fazendo', 'Iniciar') + b('feito', '✓ Concluir', ' ok') + b('bloquear', 'Bloquear') + b('tirar', 'Tirar do foco') + trocar;
@@ -2307,7 +2313,8 @@ function acaoRapida(chave, acao) {
   if (acao === 'liberar') return est.visao === 'foco' ? mudar(it, { sit: 'afazer', foco: true }) : mudar(it, { sit: 'afazer' });
   if (acao === 'foco') return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true });
   if (acao === 'cheio') return alert('As 2 vagas de "Fazer agora" já estão ocupadas. Conclua uma ou troque a prioridade dela antes.');
-  if (acao.startsWith('foco:')) return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true, prio: acao.slice(5) });
+  // Fechar o menu ao enviar, senão o cartão reabre já no "Trocar:" do foco.
+  if (acao.startsWith('foco:')) { est.prioAberta = null; return mudar(it, { sit: it.sit === 'feito' ? 'afazer' : it.sit, foco: true, prio: acao.slice(5) }); }
   if (acao === 'prioMenu') { est.prioAberta = chave; desenhar(); return; }
   if (acao.startsWith('prio:')) { est.prioAberta = null; return mudar(it, { prio: acao.slice(5) }); }
   if (acao === 'tirar') return mudar(it, { foco: false });
