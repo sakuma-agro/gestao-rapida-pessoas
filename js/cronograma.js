@@ -3032,6 +3032,8 @@ function abrirItem(chave) {
     </div>${nova ? '' : '</details>'}` : ''}
     <div class="grade">
       <label class="campo">Responsável${rep && it ? ' (só desta vez)' : ''}<select id="crRespSel">${opcoesPessoas(it ? (it.explicito || '') : '', nomesDe(respsDaArea(it ? it.area : (t?.area || areaIni), it?.unid)))}</select></label>
+      ${nova ? `<div class="campo plena" id="crFocoCampo">🎯 Foco do dia <small class="dica">(opcional)</small>
+        <span class="cr-prio-bts">${PRIO.map(p => `<span class="cr-prio-bt" role="button" tabindex="0" data-prio="${p.id}" style="--pc:${p.fundo || p.cor};--pt:${p.tx}">${p.curto}</span>`).join('')}</span></div>` : ''}
       ${it ? `<div class="campo">Situação${rep ? ' (desta vez)' : ''}<div class="cr-sits">${Object.entries(SIT).map(([k, n]) =>
         `<label><input type="radio" name="crSit" value="${k}" ${it.sit === k ? 'checked' : ''}> ${n}</label>`).join('')}</div></div>` : ''}
     </div>
@@ -3064,9 +3066,34 @@ function abrirItem(chave) {
     const o = $('crRespSel').options[0], n = nomesDe(respsDaArea($('crAreaT').value, null));
     o.textContent = n ? 'Responsável da área — ' + n : 'Sem responsável';
   };
+  /* Foco do dia já no lançamento (24/11/2026, pedido dele): quem lança uma
+     tarefa para hoje quase sempre quer ela no foco, e antes tinha que achar o
+     cartão no quadro depois. Nenhuma cor marcada = como era antes. Só aparece
+     em tarefa que não repete e com data de hoje (ou antes): "foco de hoje" não
+     vale para rotina nem para data lá na frente — tanto que adiar a data já
+     tira do foco, logo abaixo no crSalvar. */
+  const focoCampo = $('crFocoCampo');
+  const verFoco = () => {
+    if (!focoCampo) return;
+    focoCampo.hidden = $('crRep').value !== 'nenhuma' || $('crData').value > hoje();
+    if (focoCampo.hidden) focoCampo.querySelectorAll('.cr-prio-bt.atual').forEach(x => x.classList.remove('atual'));
+  };
+  if (focoCampo) {
+    focoCampo.querySelectorAll('.cr-prio-bt').forEach(bt => {
+      bt.onclick = () => {
+        const marcado = bt.classList.contains('atual');
+        focoCampo.querySelectorAll('.cr-prio-bt').forEach(x => x.classList.remove('atual'));
+        if (!marcado) bt.classList.add('atual');   // tocar de novo na mesma cor desmarca
+      };
+      bt.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bt.onclick(); } };
+    });
+    $('crData').onchange = verFoco;
+    verFoco();
+  }
   const rep2 = $('crRep');
   if (rep2) rep2.onchange = () => { $('crAteCampo').hidden = rep2.value === 'nenhuma'; $('crDiasCampo').hidden = !comDias(rep2.value);
-    if (rep2.value === 'diaria' && !diasDe(t).length) document.querySelectorAll('#crDias input').forEach(x => { x.checked = DIAS_UTEIS.includes(Number(x.value)); x.closest('.cr-dia')?.classList.toggle('on', x.checked); }); };
+    if (rep2.value === 'diaria' && !diasDe(t).length) document.querySelectorAll('#crDias input').forEach(x => { x.checked = DIAS_UTEIS.includes(Number(x.value)); x.closest('.cr-dia')?.classList.toggle('on', x.checked); });
+    verFoco(); };
   if ($('crDias')) $('crDias').querySelectorAll('input').forEach(c => c.onchange = () => c.closest('.cr-dia')?.classList.toggle('on', c.checked));
   d.querySelectorAll('input[name=crSit]').forEach(x => x.onchange = () => {
     if ($('crBqCampos')) $('crBqCampos').hidden = d.querySelector('input[name=crSit]:checked')?.value !== 'bloqueado';
@@ -3101,6 +3128,16 @@ function abrirItem(chave) {
       }
       if (nova || recorrencia === 'nenhuma') base.responsavel_id = resp || (nova ? vincTexto(titulo) : null);
       if ($('crRespPadrao')) base.responsavel_id = $('crRespPadrao').value || null;
+      // cor escolhida no campo do foco: grava foco_em + prioridade na própria
+      // linha da tarefa, que é de onde o painel lê (bloqDe) quando não repete
+      const prioNova = focoCampo && !focoCampo.hidden ? (focoCampo.querySelector('.cr-prio-bt.atual')?.dataset.prio || null) : null;
+      if (prioNova) {
+        // as 2 vagas de "Fazer agora" também valem no lançamento, senão o limite vaza por aqui
+        if (prioNova === 'agora' && agoraCheio({ chave: '', resps: base.responsavel_id ? [base.responsavel_id] : respsDaArea(base.area, null), prio: null }))
+          return alert('As 2 vagas de "Fazer agora" já estão ocupadas. Conclua uma ou troque a prioridade dela antes.');
+        base.foco_em = hoje();
+        base.prioridade = prioNova;
+      }
       base.checklist = ckDoRascunho($('crCkRasc'), rasc);
       if ($('crHora')) { base.lembrete_hora = $('crHora').value || null; base.lembrete_antes = Number($('crAntes').value); }
       if (!nova && recorrencia === 'nenhuma') { base.situacao = sit; base.feita_em = sit === 'feito' ? (t.feita_em || hoje()) : null; Object.assign(base, ext);

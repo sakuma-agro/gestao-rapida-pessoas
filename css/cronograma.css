@@ -455,6 +455,13 @@ textarea.cr-tk-desc:focus{outline:0;border-color:#84BD00;background:var(--papel)
 .cr-ckform-bts{display:flex;align-items:center;gap:10px;margin-top:8px}
 .cr-ckcancel{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--texto);padding:8px 10px;border-radius:8px;cursor:pointer}
 .cr-ckcancel:hover{background:var(--linha)}
+/* Foco do dia na janela Nova tarefa (24/11/2026): linha inteira, senão as 4
+   cores dividem meia coluna e "Em seguida" fica cortado. (.plena na folha só
+   vale para label, e este campo é div.) */
+#crFocoCampo{grid-column:1/-1}
+/* 120px: no computador as 4 cabem numa linha; no celular quebram 2 e 2, em vez
+   de 3 + 1 sobrando, e ficam do tamanho de um toque. */
+#crFocoCampo .cr-prio-bt{min-width:120px;padding:9px 6px}
 .cr-ckr-campo{display:block}
 .cr-ckr-campo #crCkRasc{margin-top:6px;font-weight:400;text-transform:none;letter-spacing:normal;font-size:14px;color:var(--texto)}
 .cr-ckr{margin:0 0 10px}
