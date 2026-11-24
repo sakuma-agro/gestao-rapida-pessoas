@@ -57,6 +57,8 @@ export const ICONES = {
   armario: '<rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M12 3v18M9.5 11v2M14.5 11v2M7 7h3M14 7h3"/>',
   livro: '<path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 21V5M8 7h7M8 11h5"/>',
   megafone: '<path d="M3 10v4a1 1 0 001 1h3l8 4V5L7 9H4a1 1 0 00-1 1z"/><path d="M18 9a4 4 0 010 6"/><path d="M7 15l1 5h3l-1-5"/>',
+  // 23/11/2026: atalho das Impressões no Início da Certificação.
+  impressora: '<path d="M7 9V3h10v6"/><path d="M5 9h14a2 2 0 012 2v5h-4M6 16H2v-5a2 2 0 012-2"/><rect x="7" y="14" width="10" height="7" rx="1"/>',
 };
 
 /** Ícone de cada tela da faixa do menu. Tela sem ícone aqui usa o do módulo. */

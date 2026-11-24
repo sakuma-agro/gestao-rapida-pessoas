@@ -478,6 +478,11 @@ const resumoPorta = subs => {
   return sec.length ? sec.join(' · ') : subs.map(s => s.nome).join(' · ');
 };
 const subsDaPorta = g => subsLiberados('cert').filter(s => s.grupo === g);
+/* Atalho das Impressões no Início (23/11/2026, pedido dele: "põe o atalho").
+   Ele foi procurar a lista de presença e não achou: estava em Documentos ›
+   Impressões, três toques depois da entrada. Agora o botão fica logo no alto,
+   antes das portas, e só aparece para quem tem a tela liberada. */
+const temImpressoes = () => subsDaPorta('Documentos').some(s => s.id === 'ceImpSub');
 function abrirSubDaPorta(id) {
   const s = subsLiberados('cert').find(x => x.id === id);
   if (s) abrirModulo('cert', s.telas[0][0]);
@@ -583,6 +588,11 @@ function desenharPainel() {
           <div class="ce-ent-chips">${ativas().map(c => `<span>${esc(c.nome)}</span>`).join('')}</div></div>
         ${(() => { const r = resumoVencimentos(); return `<button type="button" class="ce-ent-alerta ce-ent-venc${r.vencidos ? '' : ' ok'}" id="ceEntVenc">${svgIcone('calendario')}<span>Vencimentos: ${r.vencidos} ${r.vencidos === 1 ? 'vencido' : 'vencidos'} · ${r.logo} ${r.logo === 1 ? 'vence logo' : 'vencem logo'}</span><b>Abrir</b></button>`; })()}
         ${atrasados.length ? `<button type="button" class="ce-ent-alerta" id="ceEntAtr">${svgIcone('alerta')}<span>${atrasados.length} ${atrasados.length === 1 ? 'item atrasado' : 'itens atrasados'}</span><b>Ver</b></button>` : ''}
+        ${temImpressoes() ? `<button type="button" class="ce-ent-atalho" id="ceEntImp">
+          <span class="ce-ent-ico">${svgIcone('impressora')}</span>
+          <span class="ce-ent-txt"><b>Imprimir um papel</b>
+            <span>Lista de presença, reunião com a gerência, ata do GRASP, ficha de EPI, placas do QR Code.</span></span>
+          <b>Abrir</b></button>` : ''}
         <div class="ce-ent-portas">${PORTAS.map(p => {
           const subs = subsDaPorta(p.g);
           if (!subs.length) return '';
@@ -604,6 +614,7 @@ function desenharPainel() {
   tela.querySelectorAll('[data-sub-tela]').forEach(b => b.addEventListener('click', () => abrirModulo('cert', b.dataset.subTela)));
   tela.querySelectorAll('[data-cl-preencher]').forEach(b => b.addEventListener('click', () => preencherChecklist(b.dataset.clPreencher)));
   tela.querySelectorAll('[data-cl-regs]').forEach(b => b.addEventListener('click', () => preencherChecklist(b.dataset.clRegs, 'registros')));
+  $('ceEntImp')?.addEventListener('click', () => abrirModulo('cert', 'ceImpressoes'));
   $('ceEntVoltar')?.addEventListener('click', () => abrirModulo('cert', 'cePainel'));
   $('ceEntAtr')?.addEventListener('click', () => abrirModulo('cert', 'cePendencias'));
   $('ceEntVenc')?.addEventListener('click', () => abrirModulo('cert', 'ceVencimentos'));
